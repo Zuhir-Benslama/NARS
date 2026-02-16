@@ -1,0 +1,1542 @@
+id,wilaya_name_ascii,daira_name_ascii,commune_name_ascii
+22,Adrar,Aoulef,Timekten
+6,Adrar,Adrar,Bouda
+13,Adrar,Adrar,Ouled Ahmed Timmi
+1,Adrar,Adrar,Adrar
+9,Adrar,Fenoughil,Fenoughil
+10,Adrar,Zaouiat Kounta,In Zghmir
+16,Adrar,Reggane,Reggane
+17,Adrar,Reggane,Sali
+18,Adrar,Tsabit,Sebaa
+27,Adrar,Tsabit,Tsabit
+21,Adrar,Fenoughil,Tamest
+20,Adrar,Fenoughil,Tamantit
+26,Adrar,Aoulef,Tit
+28,Adrar,Zaouiat Kounta,Zaouiet Kounta
+2,Adrar,Aoulef,Akabli
+4,Adrar,Aoulef,Aoulef
+60,Chlef,Abou El Hassane,Talassa
+63,Chlef,Zeboudja,Zeboudja
+41,Chlef,Ouled Ben Abdelkader,El Hadjadj
+52,Chlef,Ouled Ben Abdelkader,Ouled Ben Abdelkader
+30,Chlef,Ain Merane,Ain Merane
+37,Chlef,Beni Haoua,Breira
+51,Chlef,Oued Fodda,Ouled Abbes
+48,Chlef,Oued Fodda,Oued Fodda
+34,Chlef,Oued Fodda,Beni Rached
+45,Chlef,Ain Merane,Herenfa
+59,Chlef,Abou El Hassane,Tadjena
+43,Chlef,El Marsa,El Marsa
+39,Chlef,Chlef,Chlef
+54,Chlef,Chlef,Oum Drou
+55,Chlef,Chlef,Sendjas
+56,Chlef,Tenes,Sidi Abderrahmane
+57,Chlef,Tenes,Sidi Akkacha
+62,Chlef,Tenes,Tenes
+32,Chlef,El Karimia,Beni  Bouattab
+42,Chlef,El Karimia,El Karimia
+44,Chlef,El Karimia,Harchoun
+36,Chlef,Zeboudja,Bouzeghaia
+61,Chlef,Taougrit,Taougrit
+33,Chlef,Beni Haoua,Beni Haoua
+29,Chlef,Abou El Hassane,Abou El Hassane
+49,Chlef,Beni Haoua,Oued Goussine
+38,Chlef,Ouled Fares,Chettia
+47,Chlef,El Marsa,Moussadek
+53,Chlef,Ouled Fares,Ouled Fares
+35,Chlef,Boukadir,Boukadir
+50,Chlef,Boukadir,Oued Sly
+58,Chlef,Boukadir,Sobha
+31,Chlef,Zeboudja,Benairia
+46,Chlef,Ouled Fares,Labiod Medjadja
+40,Chlef,Taougrit,Dahra
+67,Laghouat,Gueltat Sidi Saad,El Beidha
+73,Laghouat,Gueltat Sidi Saad,Gueltat Sidi Saad
+69,Laghouat,Brida,Brida
+66,Laghouat,Gueltat Sidi Saad,Ain Sidi Ali
+85,Laghouat,Ain Madhi,Tadjemout
+74,Laghouat,Brida,Hadj Mechri
+87,Laghouat,Brida,Taouiala
+71,Laghouat,El Ghicha,El Ghicha
+86,Laghouat,Ain Madhi,Tadjrouna
+82,Laghouat,Aflou,Sebgag
+83,Laghouat,Aflou,Sidi Bouzid
+80,Laghouat,Oued Morra,Oued Morra
+79,Laghouat,Laghouat,Laghouat
+81,Laghouat,Oued Morra,Oued M'zi
+78,Laghouat,Ksar El Hirane,Ksar El Hirane
+70,Laghouat,Sidi Makhlouf,El Assafia
+84,Laghouat,Sidi Makhlouf,Sidi Makhlouf
+75,Laghouat,Hassi R'mel,Hassi Delaa
+76,Laghouat,Hassi R'mel,Hassi R'mel
+65,Laghouat,Ain Madhi,Ain Madhi
+72,Laghouat,Ain Madhi,El Haouaita
+77,Laghouat,Ain Madhi,Kheneg
+68,Laghouat,Ksar El Hirane,Benacer Benchohra
+64,Laghouat,Aflou,Aflou
+104,Oum El Bouaghi,F'kirina,Fkirina
+102,Oum El Bouaghi,Ain Fekroun,El Fedjoudj Boughrara Sa
+91,Oum El Bouaghi,Ain Fekroun,Ain Fekroun
+113,Oum El Bouaghi,Meskiana,Rahia
+107,Oum El Bouaghi,Meskiana,Meskiana
+100,Oum El Bouaghi,Meskiana,El Belala
+95,Oum El Bouaghi,Meskiana,Behir Chergui
+106,Oum El Bouaghi,Ksar Sbahi,Ksar Sbahi
+115,Oum El Bouaghi,Souk Naamane,Souk Naamane
+111,Oum El Bouaghi,Souk Naamane,Ouled Zouai
+112,Oum El Bouaghi,Oum El Bouaghi,Oum El Bouaghi
+88,Oum El Bouaghi,Ain Babouche,Ain Babouche
+94,Oum El Bouaghi,Oum El Bouaghi,Ain Zitoun
+97,Oum El Bouaghi,Souk Naamane,Bir Chouhada
+89,Oum El Bouaghi,Ain Beida,Ain Beida
+96,Oum El Bouaghi,Ain Beida,Berriche
+116,Oum El Bouaghi,Ain Beida,Zorg
+93,Oum El Bouaghi,Ain M'lila,Ain M'lila
+109,Oum El Bouaghi,Ain M'lila,Ouled Gacem
+110,Oum El Bouaghi,Ain M'lila,Ouled Hamla
+99,Oum El Bouaghi,Sigus,El Amiria
+114,Oum El Bouaghi,Sigus,Sigus
+108,Oum El Bouaghi,F'kirina,Oued Nini
+90,Oum El Bouaghi,Ain Babouche,Ain Diss
+98,Oum El Bouaghi,Dhalaa,Dhalaa
+101,Oum El Bouaghi,Dhalaa,El Djazia
+92,Oum El Bouaghi,Ain Kercha,Ain Kercha
+103,Oum El Bouaghi,Ain Kercha,El Harmilia
+105,Oum El Bouaghi,Ain Kercha,Hanchir Toumghani
+150,Batna,Ain Touta,Maafa
+139,Batna,Ras El Aioun,Gosbat
+176,Batna,Timgad,Timgad
+170,Batna,Ouled Si Slimane,Taxlent
+161,Batna,Ouled Si Slimane,Ouled Si Slimane
+148,Batna,Ouled Si Slimane,Lemcene
+169,Batna,Ras El Aioun,Talkhamt
+164,Batna,Ras El Aioun,Ras El Aioun
+163,Batna,Ras El Aioun,Rahbat
+160,Batna,Ras El Aioun,Ouled Sellem
+140,Batna,Ras El Aioun,Guigba
+172,Batna,Theniet El Abed,Teniet El Abed
+123,Batna,Batna,Batna
+136,Batna,Batna,Fesdis
+154,Batna,Batna,Oued Chaaba
+141,Batna,Merouana,Hidoussa
+145,Batna,Merouana,Ksar Bellezma
+152,Batna,Merouana,Merouana
+155,Batna,Merouana,Oued El Ma
+147,Batna,Seriana,Lazrou
+167,Batna,Seriana,Seriana
+177,Batna,Seriana,Zanet El Beida
+151,Batna,Menaa,Menaa
+174,Batna,Menaa,Tigharghar
+119,Batna,El Madher,Ain Yagout
+128,Batna,El Madher,Boumia
+132,Batna,El Madher,Djerma
+135,Batna,El Madher,El Madher
+162,Batna,Tazoult,Ouyoun El Assafir
+171,Batna,Tazoult,Tazoult
+127,Batna,N'gaous,Boumagueur
+153,Batna,N'gaous,N Gaous
+165,Batna,N'gaous,Sefiane
+120,Batna,Arris,Arris
+173,Batna,Arris,Tighanimine
+117,Batna,Ain Djasser,Ain Djasser
+134,Batna,Ain Djasser,El Hassi
+166,Batna,Seggana,Seggana
+175,Batna,Seggana,Tilatou
+137,Batna,Ichemoul,Foum Toub
+142,Batna,Ichemoul,Ichemoul
+143,Batna,Ichemoul,Inoughissen
+129,Batna,Bouzina,Bouzina
+146,Batna,Bouzina,Larbaa
+126,Batna,Chemora,Boulhilat
+130,Batna,Chemora,Chemora
+122,Batna,Barika,Barika
+125,Batna,Barika,Bitam
+149,Batna,Barika,M Doukal
+121,Batna,Djezzar,Azil Abedelkader
+133,Batna,Djezzar,Djezzar
+157,Batna,Djezzar,Ouled Ammar
+138,Batna,Tkout,Ghassira
+144,Batna,Tkout,Kimmel
+168,Batna,Tkout,T Kout
+118,Batna,Ain Touta,Ain Touta
+124,Batna,Ain Touta,Beni Foudhala El Hakania
+159,Batna,Timgad,Ouled Fadel
+158,Batna,Ain Touta,Ouled Aouf
+131,Batna,Theniet El Abed,Chir
+156,Batna,Theniet El Abed,Oued Taga
+212,Béjaïa,Sidi Aich,Sidi Ayad
+186,Béjaïa,Barbacha,Barbacha
+199,Béjaïa,Sidi Aich,Leflaye
+206,Béjaïa,Barbacha,Kendira
+213,Béjaïa,Sidi Aich,Sidi-Aich
+225,Béjaïa,Sidi Aich,Tifra
+227,Béjaïa,Sidi Aich,Tinebdar
+200,Béjaïa,El Kseur,El Kseur
+201,Béjaïa,El Kseur,Fenaia Il Maten
+229,Béjaïa,El Kseur,Toudja
+198,Béjaïa,Kherrata,Dra El Caid
+207,Béjaïa,Kherrata,Kherrata
+187,Béjaïa,Bejaia,Bejaia
+210,Béjaïa,Bejaia,Oued Ghir
+191,Béjaïa,Beni Maouche,Benimaouche
+188,Béjaïa,Amizour,Beni Djellil
+202,Béjaïa,Amizour,Feraoun
+214,Béjaïa,Amizour,Smaoun
+226,Béjaïa,Timezrit,Timezrit
+209,Béjaïa,Souk El Tenine,Melbou
+215,Béjaïa,Souk El Tenine,Souk El Tenine
+219,Béjaïa,Souk El Tenine,Tamridjet
+194,Béjaïa,Tichy,Boukhelifa
+217,Béjaïa,Tichy,Tala Hamza
+224,Béjaïa,Tichy,Tichy
+179,Béjaïa,Ighil Ali,Ait R'zine
+204,Béjaïa,Ighil Ali,Ighil-Ali
+180,Béjaïa,Darguina,Ait-Smail
+197,Béjaïa,Darguina,Darguina
+221,Béjaïa,Darguina,Taskriout
+185,Béjaïa,Aokas,Aokas
+228,Béjaïa,Aokas,Tizi-N'berber
+178,Béjaïa,Adekar,Adekar
+189,Béjaïa,Adekar,Beni K'sila
+220,Béjaïa,Adekar,Taourit Ighil
+181,Béjaïa,Akbou,Akbou
+195,Béjaïa,Akbou,Chellata
+205,Béjaïa,Akbou,Ighram
+218,Béjaïa,Akbou,Tamokra
+183,Béjaïa,Seddouk,Amalou
+193,Béjaïa,Seddouk,Bouhamza
+208,Béjaïa,Seddouk,M'cisna
+211,Béjaïa,Seddouk,Seddouk
+190,Béjaïa,Tazmalt,Beni-Mallikeche
+192,Béjaïa,Tazmalt,Boudjellil
+222,Béjaïa,Tazmalt,Tazmalt
+182,Béjaïa,Chemini,Akfadou
+196,Béjaïa,Chemini,Chemini
+216,Béjaïa,Chemini,Souk Oufella
+223,Béjaïa,Chemini,Tibane
+203,Béjaïa,Ifri Ouzellaguene,Ouzellaguen
+184,Béjaïa,Amizour,Amizour
+241,Biskra,Zeribet El Oued,El Feidh
+249,Biskra,Tolga,Lichana
+235,Biskra,Tolga,Bouchakroun
+252,Biskra,Ourlal,Mekhadma
+239,Biskra,Djemorah,Djemorah
+236,Biskra,Djemorah,Branis
+246,Biskra,El Outaya,El Outaya
+245,Biskra,El Kantara,El Kantara
+248,Biskra,Zeribet El Oued,Khenguet Sidi Nadji
+231,Biskra,El Kantara,Ain Zaatout
+262,Biskra,Zeribet El Oued,Zeribet El Oued
+253,Biskra,Zeribet El Oued,Meziraa
+233,Biskra,Biskra,Biskra
+243,Biskra,Biskra,El Hadjab
+254,Biskra,Ourlal,M'lili
+247,Biskra,Foughala,Foughala
+242,Biskra,Foughala,El Ghrous
+234,Biskra,Tolga,Bordj Ben Azzouz
+257,Biskra,Ourlal,Ourlal
+256,Biskra,Ourlal,Oumache
+230,Biskra,Sidi Okba,Ain Naga
+238,Biskra,Sidi Okba,Chetma
+244,Biskra,Sidi Okba,El Haouch
+260,Biskra,Sidi Okba,Sidi Okba
+251,Biskra,Mechouneche,M'chouneche
+250,Biskra,Ourlal,Lioua
+261,Biskra,Tolga,Tolga
+264,Béchar,Bechar,Bechar
+268,Béchar,Lahmar,Boukais
+275,Béchar,Lahmar,Lahmar
+278,Béchar,Lahmar,Mogheul
+277,Béchar,Kenadsa,Meridja
+281,Béchar,Taghit,Taghit
+263,Béchar,Abadla,Abadla
+270,Béchar,Abadla,Erg-Ferradj
+276,Béchar,Abadla,Machraa-Houari-Boumediene
+267,Béchar,Beni Ounif,Beni-Ounif
+280,Béchar,Tabelbala,Tabelbala
+272,Béchar,Kenadsa,Kenadsa
+285,Blida,Ouled Yaich,Beni Mered
+305,Blida,Bougara,Ouled Slama
+302,Blida,Mouzaia,Mouzaia
+299,Blida,Bougara,Hammam Elouane
+291,Blida,Bougara,Bougara
+307,Blida,Larbaa,Souhane
+300,Blida,Larbaa,Larbaa
+308,Blida,Boufarik,Soumaa
+298,Blida,Boufarik,Guerrouaou
+290,Blida,Boufarik,Boufarik
+301,Blida,Meftah,Meftah
+294,Blida,Mouzaia,Chiffa
+284,Blida,Mouzaia,Ain Romana
+303,Blida,El Affroun,Oued  Djer
+297,Blida,El Affroun,El-Affroun
+306,Blida,Ouled Yaich,Ouled Yaich
+295,Blida,Ouled Yaich,Chrea
+296,Blida,Meftah,Djebabra
+304,Blida,Oued El Alleug,Oued El Alleug
+287,Blida,Oued El Alleug,Benkhelil
+286,Blida,Oued El Alleug,Beni-Tamou
+293,Blida,Bouinan,Chebli
+292,Blida,Bouinan,Bouinan
+289,Blida,Blida,Bouarfa
+288,Blida,Blida,Blida
+312,Bouira,Ain Bessem,Ain Laloui
+334,Bouira,Bordj Okhriss,Hadjera Zerga
+342,Bouira,Bordj Okhriss,Mezdour
+351,Bouira,Bordj Okhriss,Taguedite
+346,Bouira,Sour El Ghozlane,Ridane
+341,Bouira,Sour El Ghozlane,Maamora
+331,Bouira,Sour El Ghozlane,El-Hakimia
+310,Bouira,Bechloul,Ahl El Ksar
+325,Bouira,Sour El Ghozlane,Dirah
+324,Bouira,Sour El Ghozlane,Dechmia
+317,Bouira,Bechloul,Bechloul
+352,Bouira,M'chedallah,Ath Mansour
+347,Bouira,M'chedallah,Saharidj
+327,Bouira,Bechloul,El Adjiba
+328,Bouira,Bechloul,El Asnam
+339,Bouira,M'chedallah,M Chedallah
+319,Bouira,Bordj Okhriss,Bordj Okhriss
+349,Bouira,Sour El Ghozlane,Sour El Ghozlane
+336,Bouira,M'chedallah,Hanif
+323,Bouira,M'chedallah,Chorfa
+344,Bouira,Bechloul,Ouled Rached
+311,Bouira,Ain Bessem,Ain El Hadjar
+309,Bouira,M'chedallah,Aghbalou
+345,Bouira,Bir Ghbalou,Raouraoua
+330,Bouira,Bir Ghbalou,El Khabouzia
+318,Bouira,Bir Ghbalou,Bir Ghbalou
+321,Bouira,Bouira,Bouira
+313,Bouira,Bouira,Ain Turk
+315,Bouira,Bouira,Ait Laaziz
+314,Bouira,Ain Bessem,Ain-Bessem
+332,Bouira,Souk El Khemis,El-Mokrani
+348,Bouira,Souk El Khemis,Souk El Khemis
+316,Bouira,Kadiria,Aomar
+326,Bouira,Kadiria,Djebahia
+329,Bouira,El Hachimia,El Hachimia
+335,Bouira,Haizer,Haizer
+350,Bouira,Haizer,Taghzout
+320,Bouira,Lakhdaria,Bouderbala
+322,Bouira,Lakhdaria,Boukram
+333,Bouira,Lakhdaria,Guerrouma
+338,Bouira,Lakhdaria,Lakhdaria
+340,Bouira,Lakhdaria,Maala
+337,Bouira,Kadiria,Kadiria
+353,Bouira,Lakhdaria,Z'barbar (El Isseri )
+343,Bouira,El Hachimia,Oued El Berdi
+362,Tamanrasset,Tazrouk,Tazrouk
+354,Tamanrasset,Silet,Abelsa
+361,Tamanrasset,Tamanrasset,Tamanrasset
+355,Tamanrasset,Tamanrasset,Ain Amguel
+359,Tamanrasset,Tazrouk,Idles
+380,Tébessa,El Malabiod,El-Houidjbet
+379,Tébessa,El Aouinet,El-Aouinet
+381,Tébessa,Negrine,Ferkane
+385,Tébessa,Negrine,Negrine
+368,Tébessa,Bir Mokadem,Bir Mokkadem
+367,Tébessa,Morsott,Bir Dheheb
+388,Tébessa,Oum Ali,Saf Saf El Ouesra
+382,Tébessa,Bir Mokadem,Guorriguer
+366,Tébessa,El Kouif,Bekkaria
+371,Tébessa,El Kouif,Boulhaf Dyr
+387,Tébessa,Oum Ali,Oum Ali
+370,Tébessa,El Aouinet,Boukhadra
+374,Tébessa,El Malabiod,El Malabiod
+386,Tébessa,Ouenza,Ouenza
+375,Tébessa,Ouenza,El Meridj
+364,Tébessa,Ouenza,Ain Zerga
+389,Tébessa,El Ogla,Stah Guentis
+377,Tébessa,El Ogla,El Ogla
+376,Tébessa,El Ogla,El Mezeraa
+365,Tébessa,El Ogla,Bedjene
+384,Tébessa,Morsott,Morsott
+391,Tébessa,Cheria,Telidjen
+372,Tébessa,Cheria,Cheria
+378,Tébessa,Bir El Ater,El Ogla El Malha
+369,Tébessa,Bir El Ater,Bir-El-Ater
+390,Tébessa,Tebessa,Tebessa
+383,Tébessa,Bir Mokadem,Hammamet
+373,Tébessa,El Kouif,El Kouif
+400,Tlemcen,Bab El Assa,Bab El Assa
+441,Tlemcen,Mansourah,Terny Beni Hediel
+424,Tlemcen,Mansourah,Mansourah
+404,Tlemcen,Mansourah,Beni Mester
+394,Tlemcen,Mansourah,Ain Ghoraba
+411,Tlemcen,Chetouane,Chetouane
+399,Tlemcen,Chetouane,Amieur
+393,Tlemcen,Chetouane,Ain Fezza
+422,Tlemcen,Honnaine,Honnaine
+403,Tlemcen,Honnaine,Beni Khellad
+436,Tlemcen,Sidi Djillali,Sidi Djillali
+410,Tlemcen,Sidi Djillali,Bouihi
+427,Tlemcen,Nedroma,Nedroma
+426,Tlemcen,Marsa Ben Mehdi,M'sirda Fouaga
+425,Tlemcen,Marsa Ben Mehdi,Marsa Ben M'hidi
+437,Tlemcen,Beni Boussaid,Sidi Medjahed
+402,Tlemcen,Beni Boussaid,Beni Boussaid
+434,Tlemcen,Sebdou,Sebdou
+417,Tlemcen,Sebdou,El Gor
+414,Tlemcen,Sebdou,El Aricha
+409,Tlemcen,Sabra,Bouhlou
+423,Tlemcen,Maghnia,Maghnia
+420,Tlemcen,Maghnia,Hammam Boughrara
+444,Tlemcen,Hennaya,Zenata
+430,Tlemcen,Hennaya,Ouled Riyah
+421,Tlemcen,Hennaya,Hennaya
+435,Tlemcen,Bensekrane,Sidi Abdelli
+440,Tlemcen,Bab El Assa,Souk Tleta
+408,Tlemcen,Bensekrane,Bensekrane
+418,Tlemcen,Fellaoucene,Fellaoucene
+395,Tlemcen,Fellaoucene,Ain Kebira
+392,Tlemcen,Fellaoucene,Ain Fetah
+443,Tlemcen,Tlemcen,Tlemcen
+396,Tlemcen,Ain Tellout,Ain Nehala
+397,Tlemcen,Ain Tellout,Ain Tellout
+398,Tlemcen,Remchi,Ain Youcef
+405,Tlemcen,Remchi,Beni Ouarsous
+416,Tlemcen,Remchi,El Fehoul
+431,Tlemcen,Remchi,Remchi
+433,Tlemcen,Remchi,Sebbaa Chioukh
+439,Tlemcen,Bab El Assa,Souani
+432,Tlemcen,Sabra,Sabra
+412,Tlemcen,Ghazaouet,Dar Yaghmoracen
+419,Tlemcen,Ghazaouet,Ghazaouet
+438,Tlemcen,Ghazaouet,Souahlia
+442,Tlemcen,Ghazaouet,Tianet
+406,Tlemcen,Ouled Mimoun,Beni Smiel
+428,Tlemcen,Ouled Mimoun,Oued Lakhdar
+429,Tlemcen,Ouled Mimoun,Ouled Mimoun
+401,Tlemcen,Beni Snous,Beni Bahdel
+407,Tlemcen,Beni Snous,Beni Snous
+415,Tlemcen,Beni Snous,Azail
+413,Tlemcen,Nedroma,Djebala
+461,Tiaret,Mahdia,Mahdia
+447,Tiaret,Mahdia,Ain Dzarit
+472,Tiaret,Mahdia,Sebaine
+455,Tiaret,Sougueur,Faidja
+475,Tiaret,Sougueur,Si Abdelghani
+480,Tiaret,Sougueur,Sougueur
+485,Tiaret,Sougueur,Tousnina
+465,Tiaret,Meghila,Meghila
+473,Tiaret,Meghila,Sebt
+479,Tiaret,Meghila,Sidi Hosni
+448,Tiaret,Frenda,Ain El Hadid
+456,Tiaret,Frenda,Frenda
+482,Tiaret,Frenda,Takhemaret
+449,Tiaret,Ain Kermes,Ain Kermes
+453,Tiaret,Ain Kermes,Djebilet Rosfa
+460,Tiaret,Ain Kermes,Madna
+463,Tiaret,Ain Kermes,Medrissa
+476,Tiaret,Ain Kermes,Sidi Abderrahmane
+459,Tiaret,Ksar Chellala,Ksar Chellala
+457,Tiaret,Rahouia,Guertoufa
+474,Tiaret,Ksar Chellala,Serghine
+486,Tiaret,Ksar Chellala,Zmalet El Emir Abdelkade
+469,Tiaret,Oued Lili,Oued Lilli
+477,Tiaret,Oued Lili,Sidi Ali Mellal
+454,Tiaret,Mechraa Sfa,Djillali Ben Amar
+462,Tiaret,Mechraa Sfa,Mechraa Safa
+481,Tiaret,Mechraa Sfa,Tagdempt
+450,Tiaret,Hamadia,Bougara
+458,Tiaret,Hamadia,Hamadia
+471,Tiaret,Hamadia,Rechaiga
+484,Tiaret,Oued Lili,Tidda
+467,Tiaret,Mahdia,Nadorah
+483,Tiaret,Tiaret,Tiaret
+464,Tiaret,Medroussa,Medroussa
+466,Tiaret,Medroussa,Mellakou
+478,Tiaret,Medroussa,Sidi Bakhti
+446,Tiaret,Ain Deheb,Ain Deheb
+451,Tiaret,Ain Deheb,Chehaima
+468,Tiaret,Ain Deheb,Naima
+445,Tiaret,Dahmouni,Ain Bouchekif
+452,Tiaret,Dahmouni,Dahmouni
+470,Tiaret,Rahouia,Rahouia
+535,Tizi Ouzou,Tigzirt,Mizrana
+522,Tizi Ouzou,Bouzeguene,Idjeur
+510,Tizi Ouzou,Beni Douala,Beni-Douala
+512,Tizi Ouzou,Bouzeguene,Beni-Zikki
+527,Tizi Ouzou,Bouzeguene,Illoula Oumalou
+489,Tizi Ouzou,Ouadhias,Agouni-Gueghrane
+493,Tizi Ouzou,Ouadhias,Ait Bouaddou
+538,Tizi Ouzou,Ouadhias,Ouadhias
+547,Tizi Ouzou,Ouadhias,Tizi N'tleta
+488,Tizi Ouzou,Azeffoun,Aghribs
+498,Tizi Ouzou,Azeffoun,Ait-Chafaa
+504,Tizi Ouzou,Azeffoun,Akerrou
+507,Tizi Ouzou,Azeffoun,Azeffoun
+525,Tizi Ouzou,Tigzirt,Iflissen
+544,Tizi Ouzou,Tigzirt,Tigzirt
+505,Tizi Ouzou,Boghni,Assi-Youcef
+513,Tizi Ouzou,Boghni,Boghni
+515,Tizi Ouzou,Boghni,Bounouh
+533,Tizi Ouzou,Boghni,Mechtras
+517,Tizi Ouzou,Draa Ben Khedda,Draa-Ben-Khedda
+540,Tizi Ouzou,Draa Ben Khedda,Sidi Namane
+543,Tizi Ouzou,Draa Ben Khedda,Tadmait
+546,Tizi Ouzou,Draa Ben Khedda,Tirmitine
+494,Tizi Ouzou,Ouacif,Ait Boumahdi
+501,Tizi Ouzou,Ouacif,Ait-Toudert
+509,Tizi Ouzou,Beni Douala,Beni-Aissi
+537,Tizi Ouzou,Ouacif,Ouacif
+495,Tizi Ouzou,Mekla,Ait Khellili
+534,Tizi Ouzou,Mekla,Mekla
+541,Tizi Ouzou,Mekla,Souama
+511,Tizi Ouzou,Benni Yenni,Beni-Yenni
+521,Tizi Ouzou,Benni Yenni,Iboudrarene
+549,Tizi Ouzou,Tizi Ouzou,Tizi-Ouzou
+487,Tizi Ouzou,Ain El Hammam,Abi-Youcef
+490,Tizi Ouzou,Ain El Hammam,Ain-El-Hammam
+502,Tizi Ouzou,Ain El Hammam,Ait-Yahia
+503,Tizi Ouzou,Ain El Hammam,Akbil
+514,Tizi Ouzou,Makouda,Boudjima
+532,Tizi Ouzou,Makouda,Makouda
+491,Tizi Ouzou,Draa El Mizan,Ain-Zaouia
+496,Tizi Ouzou,Draa El Mizan,Ait Yahia Moussa
+518,Tizi Ouzou,Draa El Mizan,Draa-El-Mizan
+520,Tizi Ouzou,Draa El Mizan,Frikat
+536,Tizi Ouzou,Tizi-Ghenif,M'kira
+548,Tizi Ouzou,Tizi-Ghenif,Tizi-Gheniff
+552,Tizi Ouzou,Benni Yenni,Yatafene
+526,Tizi Ouzou,Iferhounene,Illilten
+528,Tizi Ouzou,Iferhounene,Imsouhal
+506,Tizi Ouzou,Azazga,Azazga
+519,Tizi Ouzou,Azazga,Freha
+524,Tizi Ouzou,Azazga,Ifigha
+551,Tizi Ouzou,Azazga,Yakourene
+553,Tizi Ouzou,Azazga,Zekri
+492,Tizi Ouzou,Larbaa Nath Iraten,Ait Aggouacha
+529,Tizi Ouzou,Larbaa Nath Iraten,Irdjen
+530,Tizi Ouzou,Larbaa Nath Iraten,Larbaa Nath Irathen
+500,Tizi Ouzou,Tizi Rached,Ait-Oumalou
+550,Tizi Ouzou,Tizi Rached,Tizi-Rached
+497,Tizi Ouzou,Ouaguenoun,Ait-Aissa-Mimoun
+539,Tizi Ouzou,Ouaguenoun,Ouaguenoun
+545,Tizi Ouzou,Ouaguenoun,Timizart
+531,Tizi Ouzou,Maatkas,Maatkas
+542,Tizi Ouzou,Maatkas,Souk-El-Tenine
+499,Tizi Ouzou,Beni Douala,Ait-Mahmoud
+508,Tizi Ouzou,Beni Douala,Beni Zmenzer
+523,Tizi Ouzou,Iferhounene,Iferhounene
+516,Tizi Ouzou,Bouzeguene,Bouzeguene
+588,Alger,Hussein Dey,Hussein Dey
+592,Alger,Baraki,Les Eucalyptus
+606,Alger,Baraki,Sidi Moussa
+591,Alger,Hussein Dey,Kouba
+594,Alger,Hussein Dey,Mohamed Belouzdad
+555,Alger,Dar El Beida,Ain Taya
+558,Alger,Dar El Beida,Bab Ezzouar
+569,Alger,Dar El Beida,Bordj El Kiffan
+574,Alger,Dar El Beida,Dar El Beida
+584,Alger,Dar El Beida,El Marsa
+595,Alger,Dar El Beida,Mohammadia
+566,Alger,Birtouta,Bir Touta
+598,Alger,Birtouta,Ouled Chebel
+609,Alger,Birtouta,Tessala El Merdja
+587,Alger,Rouiba,Herraoua
+602,Alger,Rouiba,Reghaia
+603,Alger,Rouiba,Rouiba
+593,Alger,Zeralda,Maalma
+600,Alger,Zeralda,Rahmania
+607,Alger,Zeralda,Souidania
+608,Alger,Zeralda,Staoueli
+610,Alger,Zeralda,Zeralda
+559,Alger,Draria,Baba Hassen
+577,Alger,Draria,Douira
+578,Alger,Draria,Draria
+579,Alger,Draria,El Achour
+590,Alger,Draria,Khraissia
+554,Alger,Cheraga,Ain Benian
+573,Alger,Cheraga,Cheraga
+575,Alger,Cheraga,Dely Ibrahim
+586,Alger,Cheraga,Hammamet
+599,Alger,Cheraga,Ouled Fayet
+556,Alger,Sidi M'hamed,Alger Centre
+582,Alger,Sidi M'hamed,El Madania
+585,Alger,Sidi M'hamed,El Mouradia
+605,Alger,Sidi M'hamed,Sidi M'hamed
+604,Alger,Bir Mourad Rais,Sehaoula
+567,Alger,Bab El Oued,Bologhine Ibnou Ziri
+572,Alger,Bab El Oued,Casbah
+596,Alger,Bab El Oued,Oued Koriche
+601,Alger,Bab El Oued,Rais Hamidou
+564,Alger,Bir Mourad Rais,Bir Mourad Rais
+565,Alger,Bir Mourad Rais,Birkhadem
+576,Alger,Bir Mourad Rais,Djasr Kasentina
+589,Alger,Bir Mourad Rais,Hydra
+583,Alger,Hussein Dey,El Magharia
+562,Alger,Bouzareah,Ben Aknoun
+563,Alger,Bouzareah,Beni Messous
+571,Alger,Bouzareah,Bouzareah
+580,Alger,Bouzareah,El Biar
+560,Alger,El Harrach,Bachedjerah
+570,Alger,El Harrach,Bourouba
+581,Alger,El Harrach,El Harrach
+597,Alger,El Harrach,Oued Smar
+561,Alger,Baraki,Baraki
+568,Alger,Dar El Beida,Bordj El Bahri
+557,Alger,Bab El Oued,Bab El Oued
+634,Djelfa,Hassi Bahbah,Hassi El Euch
+612,Djelfa,Ain El Ibel,Ain El Ibel
+626,Djelfa,Charef,El Guedid
+621,Djelfa,Charef,Charef
+618,Djelfa,Charef,Benyagoub
+642,Djelfa,Dar Chioukh,Sidi Baizid
+637,Djelfa,Dar Chioukh,M'liliha
+622,Djelfa,Dar Chioukh,Dar Chioukh
+644,Djelfa,Ain El Ibel,Taadmit
+632,Djelfa,Had Sahary,Had Sahary
+620,Djelfa,Had Sahary,Bouira Lahdab
+613,Djelfa,Had Sahary,Ain Fekka
+643,Djelfa,Sidi Laadjel,Sidi Laadjel
+635,Djelfa,Sidi Laadjel,Hassi Fedoul
+628,Djelfa,Sidi Laadjel,El Khemis
+641,Djelfa,Messaad,Selmana
+640,Djelfa,Messaad,Sed Rahal
+636,Djelfa,Messaad,Messaad
+631,Djelfa,Messaad,Guettara
+623,Djelfa,Messaad,Deldoul
+646,Djelfa,Ain El Ibel,Zaccar
+625,Djelfa,El Idrissia,Douis
+627,Djelfa,El Idrissia,El Idrissia
+611,Djelfa,El Idrissia,Ain Chouhada
+624,Djelfa,Djelfa,Djelfa
+619,Djelfa,Birine,Birine
+639,Djelfa,Faidh El Botma,Oum Laadham
+629,Djelfa,Faidh El Botma,Faidh El Botma
+616,Djelfa,Faidh El Botma,Amourah
+645,Djelfa,Hassi Bahbah,Zaafrane
+630,Djelfa,Ain Oussera,Guernini
+615,Djelfa,Ain Oussera,Ain Oussera
+617,Djelfa,Birine,Benhar
+614,Djelfa,Hassi Bahbah,Ain Maabed
+633,Djelfa,Hassi Bahbah,Hassi Bahbah
+638,Djelfa,Ain El Ibel,Moudjebara
+662,Jijel,Jijel,Jijel
+656,Jijel,El Aouana,El Aouana
+668,Jijel,El Aouana,Selma Benziada
+660,Jijel,Ziamah Mansouriah,Erraguene Souissi
+650,Jijel,Taher,Boussif Ouled Askeur
+674,Jijel,Ziamah Mansouriah,Ziama Mansouriah
+651,Jijel,Taher,Chahna
+659,Jijel,Taher,Emir Abdelkader
+665,Jijel,Taher,Oudjana
+672,Jijel,Taher,Taher
+652,Jijel,Chekfa,Chekfa
+657,Jijel,Chekfa,El Kennar Nouchfi
+670,Jijel,Chekfa,Sidi Abdelaziz
+658,Jijel,El Milia,El Milia
+667,Jijel,El Milia,Ouled Yahia Khadrouch
+666,Jijel,Sidi Marouf,Ouled Rabah
+671,Jijel,Sidi Marouf,Sidi Marouf
+661,Jijel,Settara,Ghebala
+669,Jijel,Settara,Settara
+649,Jijel,El Ancer,Bouraoui Belhadef
+655,Jijel,El Ancer,El Ancer
+664,Jijel,El Ancer,Khiri Oued Adjoul
+654,Jijel,Djimla,Djimla
+663,Jijel,Texenna,Kaous
+673,Jijel,Texenna,Texenna
+647,Jijel,Chekfa,Bordj T'har
+648,Jijel,Djimla,Boudria Beniyadjis
+653,Jijel,El Ancer,Djemaa Beni Habibi
+726,Sétif,Salah Bey,Rosfa
+721,Sétif,Amoucha,Oued El Bared
+734,Sétif,Amoucha,Tizi N'bechar
+720,Sétif,Ain Arnat,Mezloug
+709,Sétif,Ain Oulmene,Guellal
+717,Sétif,Ain Oulmene,Kasr El Abtal
+724,Sétif,Ain Oulmene,Ouled Si Ahmed
+684,Sétif,Bouandas,Ait Naoual Mezada
+685,Sétif,Bouandas,Ait-Tizi
+699,Sétif,Bouandas,Bouandas
+701,Sétif,Bouandas,Bousselam
+713,Sétif,Hammam Sokhna,Hamam Soukhna
+732,Sétif,Hammam Sokhna,Taya
+733,Sétif,Hammam Sokhna,Tella
+680,Sétif,Ain Oulmene,Ain Oulmene
+702,Sétif,Salah Bey,Boutaleb
+714,Sétif,Salah Bey,Hamma
+725,Sétif,Salah Bey,Ouled Tebben
+686,Sétif,Amoucha,Amoucha
+727,Sétif,Salah Bey,Salah Bey
+677,Sétif,Ain Azel,Ain Azel
+679,Sétif,Ain Azel,Ain Lahdjar
+689,Sétif,Ain Azel,Beidha Bordj
+697,Sétif,Ain Azel,Bir Haddada
+711,Sétif,Guenzet,Guenzet
+716,Sétif,Guenzet,Harbil
+682,Sétif,Bougaa,Ain-Roua
+694,Sétif,Bougaa,Beni Oussine
+707,Sétif,Ain Arnat,El Ouricia
+700,Sétif,Bougaa,Bougaa
+705,Sétif,Hammam Guergour,Draa-Kebila
+715,Sétif,Hammam Guergour,Hammam Guergour
+729,Sétif,Setif,Setif
+678,Sétif,Ain El Kebira,Ain El Kebira
+703,Sétif,Ain El Kebira,Dehamcha
+722,Sétif,Ain El Kebira,Ouled Addouane
+683,Sétif,Beni Aziz,Ain-Sebt
+695,Sétif,Beni Aziz,Beni-Aziz
+718,Sétif,Beni Aziz,Maaouia
+690,Sétif,Bir El Arch,Bellaa
+698,Sétif,Bir El Arch,Bir-El-Arch
+708,Sétif,Bir El Arch,El-Ouldja
+730,Sétif,Bir El Arch,Tachouda
+731,Sétif,Maoklane,Tala-Ifacene
+728,Sétif,Babor,Serdj-El-Ghoul
+712,Sétif,Guidjel,Guidjel
+723,Sétif,Guidjel,Ouled Sabor
+688,Sétif,El Eulma,Bazer-Sakra
+706,Sétif,El Eulma,El Eulma
+710,Sétif,El Eulma,Guelta Zerka
+692,Sétif,Djemila,Beni Fouda
+704,Sétif,Djemila,Djemila
+681,Sétif,Beni Ourtilane,Ain-Legradj
+691,Sétif,Beni Ourtilane,Beni Chebana
+693,Sétif,Beni Ourtilane,Beni Ourtilane
+696,Sétif,Beni Ourtilane,Beni-Mouhli
+675,Sétif,Ain Arnat,Ain Abessa
+676,Sétif,Ain Arnat,Ain Arnat
+687,Sétif,Babor,Babor
+719,Sétif,Maoklane,Maouaklane
+745,Saïda,Saida,Saida
+749,Saïda,Ouled Brahim,Tircine
+743,Saïda,Ouled Brahim,Ouled Brahim
+737,Saïda,Ouled Brahim,Ain Soltane
+741,Saïda,El Hassasna,Maamora
+739,Saïda,El Hassasna,El Hassasna
+736,Saïda,El Hassasna,Ain Sekhouna
+748,Saïda,Sidi Boubekeur,Sidi Boubekeur
+744,Saïda,Sidi Boubekeur,Ouled Khaled
+740,Saïda,Sidi Boubekeur,Hounet
+750,Saïda,Youb,Youb
+738,Saïda,Youb,Doui Thabet
+746,Saïda,Ain El Hadjar,Sidi Ahmed
+742,Saïda,Ain El Hadjar,Moulay Larbi
+735,Saïda,Ain El Hadjar,Ain El Hadjar
+747,Saïda,Sidi Boubekeur,Sidi Amar
+751,Skikda,Sidi Mezghiche,Ain Bouziane
+783,Skikda,El Harrouch,Salah Bouchaour
+768,Skikda,El Hadaiek,El Hadaiek
+787,Skikda,El Harrouch,Zerdezas
+780,Skikda,El Harrouch,Ouled Habbaba
+759,Skikda,Sidi Mezghiche,Beni Oulbane
+784,Skikda,Sidi Mezghiche,Sidi Mezghiche
+758,Skikda,Ramdane Djamel,Beni Bechir
+782,Skikda,Ramdane Djamel,Ramdane Djamel
+761,Skikda,Tamalous,Bin El Ouiden
+770,Skikda,El Harrouch,Emjez Edchich
+786,Skikda,Tamalous,Tamalous
+753,Skikda,Ain Kechra,Ain Kechra
+778,Skikda,Ain Kechra,Ouldja Boulbalout
+781,Skikda,Oum Toub,Oum Toub
+767,Skikda,Azzaba,El Ghedir
+775,Skikda,Tamalous,Kerkara
+766,Skikda,El Harrouch,El Arrouch
+788,Skikda,Zitouna,Zitouna
+779,Skikda,Ouled Attia,Ouled Attia
+777,Skikda,Ouled Attia,Oued Zhour
+764,Skikda,Collo,Collo
+763,Skikda,Collo,Cheraia
+760,Skikda,Collo,Beni Zid
+776,Skikda,Ouled Attia,Khenag Maoune
+769,Skikda,Ben Azzouz,El Marsa
+757,Skikda,Ben Azzouz,Ben Azzouz
+756,Skikda,Ben Azzouz,Bekkouche Lakhdar
+771,Skikda,Azzaba,Es Sebt
+752,Skikda,Azzaba,Ain Charchar
+755,Skikda,Azzaba,Azzaba
+762,Skikda,El Hadaiek,Bouchetata
+772,Skikda,Skikda,Filfila
+773,Skikda,Skikda,Hammadi Krouma
+785,Skikda,Skikda,Skikda
+754,Skikda,El Hadaiek,Ain Zouit
+765,Skikda,Azzaba,Djendel Saadi Mohamed
+774,Skikda,Zitouna,Kanoua
+822,Sidi Bel Abbès,Sidi Ali Ben Youb,Sidi Ali Benyoub
+814,Sidi Bel Abbès,Moulay Slissen,Moulay Slissen
+804,Sidi Bel Abbès,Moulay Slissen,El Hacaiba
+792,Sidi Bel Abbès,Moulay Slissen,Ain Tindamine
+837,Sidi Bel Abbès,Tenira,Tenira
+816,Sidi Bel Abbès,Tenira,Oued Sefioun
+805,Sidi Bel Abbès,Tenira,Hassi Dahou
+817,Sidi Bel Abbès,Merine,Oued Taourira
+798,Sidi Bel Abbès,Tenira,Benachiba Chelia
+831,Sidi Bel Abbès,Sidi Lahcene,Sidi Yacoub
+830,Sidi Bel Abbès,Sidi Lahcene,Sidi Lahcene
+829,Sidi Bel Abbès,Sidi Lahcene,Sidi Khaled
+832,Sidi Bel Abbès,Sidi Ali Ben Youb,Tabia
+825,Sidi Bel Abbès,Ain El Berd,Sidi Brahim
+794,Sidi Bel Abbès,Sidi Lahcene,Amarnas
+801,Sidi Bel Abbès,Sidi Ali Ben Youb,Boukhanefis
+806,Sidi Bel Abbès,Ben Badis,Hassi Zahana
+802,Sidi Bel Abbès,Ben Badis,Chetouane Belaila
+797,Sidi Bel Abbès,Ben Badis,Ben Badis
+795,Sidi Bel Abbès,Ben Badis,Bedrabine El Mokrani
+821,Sidi Bel Abbès,Sfisef,Sfisef
+810,Sidi Bel Abbès,Sfisef,M'cid
+800,Sidi Bel Abbès,Sfisef,Boudjebaa El Bordj
+793,Sidi Bel Abbès,Sfisef,Ain- Adden
+828,Sidi Bel Abbès,Ain El Berd,Sidi Hamadouche
+826,Sidi Bel Abbès,Marhoum,Sidi Chaib
+808,Sidi Bel Abbès,Ain El Berd,Makedra
+789,Sidi Bel Abbès,Ain El Berd,Ain El Berd
+819,Sidi Bel Abbès,Ras El Ma,Redjem Demouche
+818,Sidi Bel Abbès,Ras El Ma,Ras El Ma
+815,Sidi Bel Abbès,Ras El Ma,Oued Sebaa
+809,Sidi Bel Abbès,Marhoum,Marhoum
+824,Sidi Bel Abbès,Sidi Bel Abbes,Sidi Bel-Abbes
+791,Sidi Bel Abbès,Tessala,Ain Thrid
+820,Sidi Bel Abbès,Tessala,Sehala Thaoura
+838,Sidi Bel Abbès,Tessala,Tessala
+796,Sidi Bel Abbès,Mostefa  Ben Brahim,Belarbi
+813,Sidi Bel Abbès,Mostefa  Ben Brahim,Mostefa  Ben Brahim
+839,Sidi Bel Abbès,Mostefa  Ben Brahim,Tilmouni
+840,Sidi Bel Abbès,Mostefa  Ben Brahim,Zerouala
+803,Sidi Bel Abbès,Telagh,Dhaya
+812,Sidi Bel Abbès,Telagh,Mezaourou
+835,Sidi Bel Abbès,Telagh,Teghalimet
+836,Sidi Bel Abbès,Telagh,Telagh
+790,Sidi Bel Abbès,Sidi Ali Boussidi,Ain Kada
+807,Sidi Bel Abbès,Sidi Ali Boussidi,Lamtar
+823,Sidi Bel Abbès,Sidi Ali Boussidi,Sidi Ali Boussidi
+827,Sidi Bel Abbès,Sidi Ali Boussidi,Sidi Dahou Zairs
+799,Sidi Bel Abbès,Marhoum,Bir El Hammam
+811,Sidi Bel Abbès,Merine,Merine
+834,Sidi Bel Abbès,Merine,Tefessour
+833,Sidi Bel Abbès,Merine,Taoudmout
+842,Annaba,Annaba,Annaba
+850,Annaba,Annaba,Seraidi
+843,Annaba,Berrahal,Berrahal
+849,Annaba,Berrahal,Oued El Aneb
+848,Annaba,El Hadjar,El Hadjar
+851,Annaba,El Hadjar,Sidi Amar
+846,Annaba,El Bouni,El Bouni
+841,Annaba,Ain El Berda,Ain El Berda
+845,Annaba,Ain El Berda,Cheurfa
+847,Annaba,Ain El Berda,El Eulma
+852,Annaba,Berrahal,Treat
+844,Annaba,Chetaibi,Chetaibi
+875,Guelma,Guelaat Bousbaa,Nechmaya
+863,Guelma,Hammam Debagh,Bou Hamdane
+872,Guelma,Hammam Debagh,Hammam Debagh
+884,Guelma,Hammam Debagh,Roknia
+867,Guelma,Hammam N'bails,Dahouara
+873,Guelma,Hammam N'bails,Hammam N'bail
+871,Guelma,Guelma,Guelma
+866,Guelma,Guelaat Bousbaa,Boumahra Ahmed
+853,Guelma,Bouchegouf,Ain Ben Beida
+865,Guelma,Bouchegouf,Bouchegouf
+878,Guelma,Bouchegouf,Medjez Sfa
+881,Guelma,Bouchegouf,Oued Ferragha
+864,Guelma,Heliopolis,Bouati Mahmoud
+869,Guelma,Heliopolis,El Fedjoudj
+874,Guelma,Heliopolis,Heliopolis
+877,Guelma,Ain Hessainia,Medjez Amar
+879,Guelma,Ain Hessainia,Houari Boumedienne
+883,Guelma,Ain Hessainia,Ras El Agba
+885,Guelma,Ain Hessainia,Sellaoua Announa
+868,Guelma,Guelaat Bousbaa,Djeballah Khemissi
+861,Guelma,Oued Zenati,Bordj Sabath
+882,Guelma,Oued Zenati,Oued Zenati
+856,Guelma,Oued Zenati,Ain Regada
+854,Guelma,Ain Makhlouf,Ain Larbi
+855,Guelma,Ain Makhlouf,Ain Makhlouf
+886,Guelma,Ain Makhlouf,Tamlouka
+857,Guelma,Khezaras,Ain Sandel
+862,Guelma,Khezaras,Bou Hachana
+876,Guelma,Khezaras,Khezaras
+858,Guelma,Guelaat Bousbaa,Belkheir
+860,Guelma,Guelaat Bousbaa,Beni Mezline
+870,Guelma,Guelaat Bousbaa,Guelaat Bou Sbaa
+880,Guelma,Hammam N'bails,Oued Cheham
+859,Guelma,Guelma,Bendjarah
+892,Constantine,Hamma Bouziane,Didouche Mourad
+894,Constantine,Hamma Bouziane,Hamma Bouziane
+890,Constantine,Zighoud Youcef,Beni Hamidane
+898,Constantine,Zighoud Youcef,Zighoud Youcef
+888,Constantine,El Khroub,Ain Smara
+893,Constantine,El Khroub,El Khroub
+897,Constantine,El Khroub,Ouled Rahmoun
+887,Constantine,Ain Abid,Ain Abid
+889,Constantine,Ain Abid,Ben Badis
+895,Constantine,Ibn Ziad,Ibn Ziad
+896,Constantine,Ibn Ziad,Messaoud Boudjeriou
+891,Constantine,Constantine,Constantine
+943,Médéa,Ouled Antar,Ouled Hellal
+956,Médéa,Souaghi,Souagui
+929,Médéa,Ksar El Boukhari,Ksar El Boukhari
+934,Médéa,Ksar El Boukhari,M'fatha
+947,Médéa,Ksar El Boukhari,Saneg
+920,Médéa,El Azizia,El Azizia
+930,Médéa,El Azizia,Maghraoua
+935,Médéa,El Azizia,Mihoub
+909,Médéa,Chahbounia,Bouaiche
+912,Médéa,Chahbounia,Boughzoul
+914,Médéa,Chahbounia,Chabounia
+926,Médéa,Ouamri,Hannacha
+936,Médéa,Ouamri,Ouamri
+937,Médéa,Ouamri,Oued Harbil
+905,Médéa,Beni Slimane,Beni Slimane
+910,Médéa,Si Mahdjoub,Bouaichoune
+939,Médéa,Si Mahdjoub,Ouled Bouachra
+950,Médéa,Si Mahdjoub,Si Mahdjoub
+913,Médéa,Beni Slimane,Bouskene
+953,Médéa,Beni Slimane,Sidi Rabie
+906,Médéa,Berrouaghia,Berrouaghia
+941,Médéa,Berrouaghia,Ouled Deid
+946,Médéa,Berrouaghia,Rebaia
+932,Médéa,Seghouane,Medjebar
+961,Médéa,Seghouane,Tletat Ed Douair
+962,Médéa,Seghouane,Zoubiria
+901,Médéa,Tablat,Aissaouia
+923,Médéa,Tablat,El Haoudane
+933,Médéa,Tablat,Mezerana
+957,Médéa,Tablat,Tablat
+908,Médéa,Ouled Antar,Boghar
+949,Médéa,Seghouane,Seghouane
+919,Médéa,Medea,Draa Esmar
+931,Médéa,Medea,Medea
+959,Médéa,Medea,Tamesguida
+904,Médéa,Ouzera,Ben Chicao
+922,Médéa,Ouzera,El Hamdania
+945,Médéa,Ouzera,Ouzera
+960,Médéa,Ouzera,Tizi Mahdi
+899,Médéa,Ain Boucif,Ain Boucif
+925,Médéa,Ain Boucif,El Ouinet
+927,Médéa,Ain Boucif,Kef Lakhdar
+942,Médéa,Ain Boucif,Ouled Emaaraf
+951,Médéa,Ain Boucif,Sidi Demed
+903,Médéa,El Omaria,Baata
+924,Médéa,El Omaria,El Omaria
+940,Médéa,El Omaria,Ouled Brahim
+907,Médéa,Guelb El Kebir,Bir Ben Laabed
+921,Médéa,Guelb El Kebir,El Guelbelkebir
+948,Médéa,Guelb El Kebir,Sedraya
+900,Médéa,Chellalat El Adhaoura,Ain Ouksir
+915,Médéa,Chellalat El Adhaoura,Chelalet El Adhaoura
+916,Médéa,Chellalat El Adhaoura,Cheniguel
+958,Médéa,Chellalat El Adhaoura,Tafraout
+911,Médéa,Sidi Naamane,Bouchrahil
+928,Médéa,Sidi Naamane,Khams Djouamaa
+952,Médéa,Sidi Naamane,Sidi Naamane
+902,Médéa,Aziz,Aziz
+917,Médéa,Aziz,Derrag
+944,Médéa,Aziz,Oum El Djellil
+918,Médéa,Souaghi,Djouab
+954,Médéa,Souaghi,Sidi Zahar
+955,Médéa,Souaghi,Sidi Ziane
+938,Médéa,Ouled Antar,Ouled Antar
+970,Mostaganem,Ain Nouicy,Fornaka
+981,Mostaganem,Ain Tedeles,Oued El Kheir
+973,Mostaganem,Ain Nouicy,Hassiane
+972,Mostaganem,Hassi Mameche,Hassi Mameche
+977,Mostaganem,Hassi Mameche,Mazagran
+992,Mostaganem,Hassi Mameche,Stidia
+967,Mostaganem,Ain Tedeles,Ain-Tedles
+987,Mostaganem,Ain Tedeles,Sidi Belaattar
+991,Mostaganem,Ain Tedeles,Sour
+964,Mostaganem,Kheir Eddine,Ain-Boudinar
+975,Mostaganem,Kheir Eddine,Kheir-Eddine
+985,Mostaganem,Kheir Eddine,Sayada
+986,Mostaganem,Sidi Ali,Sidi Ali
+993,Mostaganem,Sidi Ali,Tazgait
+968,Mostaganem,Sidi Lakhdar,Benabdelmalek Ramdane
+979,Mostaganem,Mostaganem,Mostaganem
+971,Mostaganem,Sidi Lakhdar,Hadjadj
+988,Mostaganem,Sidi Lakhdar,Sidi-Lakhdar
+963,Mostaganem,Achaacha,Achaacha
+974,Mostaganem,Achaacha,Khadra
+980,Mostaganem,Achaacha,Nekmaria
+982,Mostaganem,Achaacha,Ouled Boughalem
+969,Mostaganem,Bouguirat,Bouguirat
+984,Mostaganem,Bouguirat,Safsaf
+989,Mostaganem,Bouguirat,Sirat
+990,Mostaganem,Bouguirat,Souaflia
+966,Mostaganem,Mesra,Ain-Sidi Cherif
+976,Mostaganem,Mesra,Mansourah
+978,Mostaganem,Mesra,Mesra
+994,Mostaganem,Mesra,Touahria
+965,Mostaganem,Ain Nouicy,Ain-Nouissy
+983,Mostaganem,Sidi Ali,Ouled-Maalah
+1008,M'Sila,Chellal,Chellal
+1028,M'Sila,Chellal,Ouled Madhi
+1014,M'Sila,Chellal,Khettouti Sed-El-Jir
+1000,M'Sila,Magra,Belaiba
+1004,M'Sila,Magra,Berhoum
+1009,M'Sila,Magra,Dehahna
+1018,M'Sila,Magra,Magra
+1002,M'Sila,Sidi Aissa,Beni Ilmane
+1007,M'Sila,Sidi Aissa,Bouti Sayeh
+1033,M'Sila,Sidi Aissa,Sidi Aissa
+995,M'Sila,Ain El Hadjel,Ain El Hadjel
+1035,M'Sila,Ain El Hadjel,Sidi Hadjeres
+1006,M'Sila,Bousaada,Bou Saada
+1011,M'Sila,Bousaada,El Hamel
+1032,M'Sila,Bousaada,Oulteme
+1003,M'Sila,Ouled Sidi Brahim,Benzouh
+1030,M'Sila,Ouled Sidi Brahim,Ouled Sidi Brahim
+1034,M'Sila,Sidi Ameur,Sidi Ameur
+1039,M'Sila,Sidi Ameur,Tamsa
+1001,M'Sila,Ben Srour,Ben Srour
+1022,M'Sila,Ben Srour,Mohamed Boudiaf
+1031,M'Sila,Ben Srour,Ouled Slimane
+1041,M'Sila,Ben Srour,Zarzour
+996,M'Sila,Ain El Melh,Ain El Melh
+997,M'Sila,Ain El Melh,Ain Fares
+999,M'Sila,Ain El Melh,Ain Rich
+1005,M'Sila,Ain El Melh,Bir Foda
+1036,M'Sila,Ain El Melh,Sidi M'hamed
+1020,M'Sila,Medjedel,Medjedel
+1021,M'Sila,Medjedel,Menaa
+1010,M'Sila,Djebel Messaad,Djebel Messaad
+1037,M'Sila,Djebel Messaad,Slim
+1023,M'Sila,M'sila,M'sila
+1013,M'Sila,Hammam Dalaa,Hammam Dalaa
+1025,M'Sila,Hammam Dalaa,Ouanougha
+1029,M'Sila,Hammam Dalaa,Ouled Mansour
+1040,M'Sila,Hammam Dalaa,Tarmount
+1016,M'Sila,Ouled Derradj,Maadid
+1024,M'Sila,Ouled Derradj,M'tarfa
+1017,M'Sila,Chellal,Maarif
+1027,M'Sila,Ouled Derradj,Ouled Derradj
+1038,M'Sila,Ouled Derradj,Souamaa
+1012,M'Sila,Khoubana,El Houamed
+1015,M'Sila,Khoubana,Khoubana
+1019,M'Sila,Khoubana,M'cif
+998,M'Sila,Magra,Ain Khadra
+1026,M'Sila,Ouled Derradj,Ouled Addi Guebala
+1075,Mascara,Oued El Abtal,Oued El Abtal
+1081,Mascara,Mohammadia,Sidi Abdelmoumene
+1078,Mascara,Mohammadia,Sedjerara
+1072,Mascara,Mohammadia,Mohammadia
+1085,Mascara,Tighennif,Tighennif
+1071,Mascara,Mohammadia,Mocta-Douz
+1060,Mascara,Mohammadia,Ferraguig
+1054,Mascara,Mohammadia,El Ghomri
+1087,Mascara,Zahana,Zahana
+1053,Mascara,Zahana,El Gaada
+1077,Mascara,Oggaz,Ras El Ain Amirouche
+1074,Mascara,Oggaz,Oggaz
+1046,Mascara,Oggaz,Alaimia
+1084,Mascara,Sig,Sig
+1051,Mascara,Sig,Chorfa
+1049,Mascara,Sig,Bou Henni
+1058,Mascara,Ain Fares,El Mamounia
+1055,Mascara,Bouhanifia,El Gueitena
+1042,Mascara,Ain Fares,Ain Fares
+1062,Mascara,Aouf,Gharrous
+1048,Mascara,Aouf,Benian
+1047,Mascara,Aouf,Aouf
+1064,Mascara,Oued Taria,Guerdjoum
+1045,Mascara,Ain Fekan,Ain Frass
+1043,Mascara,Ain Fekan,Ain Fekan
+1066,Mascara,El Bordj,Khalouia
+1059,Mascara,El Bordj,El Menaouer
+1052,Mascara,El Bordj,El Bordj
+1082,Mascara,Ghriss,Sidi Boussaid
+1070,Mascara,Ghriss,Matemore
+1083,Mascara,Tighennif,Sidi Kada
+1067,Mascara,Ghriss,Makhda
+1069,Mascara,Mascara,Mascara
+1050,Mascara,Bouhanifia,Bouhanifia
+1063,Mascara,Ghriss,Ghriss
+1065,Mascara,Bouhanifia,Hacine
+1057,Mascara,Tizi,El Keurt
+1061,Mascara,Tizi,Froha
+1086,Mascara,Tizi,Tizi
+1079,Mascara,Tighennif,Sehailia
+1068,Mascara,Ghriss,Maoussa
+1080,Mascara,Oued El Abtal,Sidi Abdeldjebar
+1056,Mascara,Hachem,El Hachem
+1073,Mascara,Hachem,Nesmot
+1088,Mascara,Hachem,Zelamta
+1044,Mascara,Oued El Abtal,Ain Ferah
+1076,Mascara,Oued Taria,Oued Taria
+1101,Ouargla,Ouargla,Ouargla
+1096,Ouargla,Hassi Messaoud,Hassi Messaoud
+1089,Ouargla,Sidi Khouiled,Ain Beida
+1095,Ouargla,Sidi Khouiled,Hassi Ben Abdellah
+1103,Ouargla,Sidi Khouiled,Sidi Khouiled
+1093,Ouargla,El Borma,El Borma
+1102,Ouargla,Ouargla,Rouissat
+1100,Ouargla,N'goussa,N'goussa
+1134,Oran,Es Senia,Sidi Chami
+1127,Oran,Gdyel,Hassi Mefsoukh
+1116,Oran,Bir El Djir,Bir El Djir
+1125,Oran,Bir El Djir,Hassi Ben Okba
+1124,Oran,Gdyel,Gdyel
+1126,Oran,Bir El Djir,Hassi Bounif
+1122,Oran,Es Senia,El Kerma
+1123,Oran,Es Senia,Es Senia
+1114,Oran,Gdyel,Ben Freha
+1113,Oran,Arzew,Arzew
+1133,Oran,Arzew,Sidi Ben Yebka
+1110,Oran,Bethioua,Ain Biya
+1115,Oran,Bethioua,Bethioua
+1128,Oran,Bethioua,Marsat El Hadjadj
+1112,Oran,Ain Turk,Ain Turk
+1131,Oran,Oran,Oran
+1120,Oran,Ain Turk,El Ancor
+1129,Oran,Ain Turk,Mers El Kebir
+1117,Oran,Oued Tlelat,Boufatis
+1121,Oran,Oued Tlelat,El Braya
+1132,Oran,Oued Tlelat,Oued Tlelat
+1111,Oran,Boutlelis,Ain Kerma
+1119,Oran,Boutlelis,Boutlelis
+1130,Oran,Boutlelis,Messerghin
+1118,Oran,Ain Turk,Bousfer
+1135,Oran,Oued Tlelat,Tafraoui
+1136,El Bayadh,Labiodh Sidi Cheikh,Ain El Orak
+1151,El Bayadh,Brezina,Krakda
+1154,El Bayadh,Boualem,Sidi Slimane
+1153,El Bayadh,Boualem,Sidi Ameur
+1138,El Bayadh,Boualem,Boualem
+1146,El Bayadh,Labiodh Sidi Cheikh,El Bnoud
+1139,El Bayadh,Bougtoub,Bougtoub
+1147,El Bayadh,Bougtoub,El Kheiter
+1157,El Bayadh,Bougtoub,Tousmouline
+1155,El Bayadh,Boualem,Sidi Tiffour
+1156,El Bayadh,Boualem,Stitten
+1144,El Bayadh,El Bayadh,El Bayadh
+1152,El Bayadh,Rogassa,Rogassa
+1148,El Bayadh,Chellala,El Mehara
+1150,El Bayadh,Rogassa,Kef El Ahmar
+1141,El Bayadh,Brezina,Brezina
+1149,El Bayadh,Brezina,Ghassoul
+1145,El Bayadh,Labiodh Sidi Cheikh,Labiodh Sidi Cheikh
+1140,El Bayadh,Boussemghoun,Boussemghoun
+1142,El Bayadh,Rogassa,Cheguig
+1143,El Bayadh,Chellala,Chellala
+1137,El Bayadh,Labiodh Sidi Cheikh,Arbaouat
+1159,Illizi,In Amenas,Bordj Omar Driss
+1160,Illizi,In Amenas,Debdeb
+1163,Illizi,In Amenas,In Amenas
+1162,Illizi,Illizi,Illizi
+1177,Bordj Bou Arreridj,El Hamadia,Elhammadia
+1189,Bordj Bou Arreridj,Mansourah,Ouled Sidi-Brahim
+1164,Bordj Bou Arreridj,Ain Taghrout,Ain Taghrout
+1197,Bordj Bou Arreridj,Ain Taghrout,Tixter
+1167,Bordj Bou Arreridj,Bordj Ghedir,Belimour
+1176,Bordj Bou Arreridj,Bordj Ghedir,El Annasseur
+1180,Bordj Bou Arreridj,Bordj Ghedir,Ghailasa
+1194,Bordj Bou Arreridj,Bordj Ghedir,Taglait
+1170,Bordj Bou Arreridj,Bordj Ghedir,Bordj Ghedir
+1174,Bordj Bou Arreridj,El Hamadia,El Euch
+1192,Bordj Bou Arreridj,Bir Kasdali,Sidi-Embarek
+1183,Bordj Bou Arreridj,Bir Kasdali,Khelil
+1169,Bordj Bou Arreridj,Bir Kasdali,Bir Kasdali
+1193,Bordj Bou Arreridj,Djaafra,Tefreg
+1178,Bordj Bou Arreridj,Djaafra,El Main
+1173,Bordj Bou Arreridj,Djaafra,Djaafra
+1172,Bordj Bou Arreridj,Djaafra,Colla
+1196,Bordj Bou Arreridj,Medjana,Teniet En Nasr
+1179,Bordj Bou Arreridj,Mansourah,El M'hir
+1184,Bordj Bou Arreridj,El Hamadia,Ksour
+1185,Bordj Bou Arreridj,Mansourah,Mansoura
+1181,Bordj Bou Arreridj,Mansourah,Haraza
+1190,Bordj Bou Arreridj,El Hamadia,Rabta
+1175,Bordj Bou Arreridj,Medjana,El Achir
+1182,Bordj Bou Arreridj,Medjana,Hasnaoua
+1186,Bordj Bou Arreridj,Medjana,Medjana
+1165,Bordj Bou Arreridj,Ras El Oued,Ain Tesra
+1187,Bordj Bou Arreridj,Ras El Oued,Ouled Brahem
+1191,Bordj Bou Arreridj,Ras El Oued,Ras El Oued
+1171,Bordj Bou Arreridj,Bordj Zemmoura,Bordj Zemmoura
+1188,Bordj Bou Arreridj,Bordj Zemmoura,Ouled Dahmane
+1195,Bordj Bou Arreridj,Bordj Zemmoura,Tassamert
+1166,Bordj Bou Arreridj,Bordj Bou Arreridj,B. B. Arreridj
+1168,Bordj Bou Arreridj,Mansourah,Ben Daoud
+1212,Boumerdès,Boudouaou,El Kharrouba
+1210,Boumerdès,Dellys,Dellys
+1201,Boumerdès,Dellys,Ben Choud
+1198,Boumerdès,Dellys,Afir
+1226,Boumerdès,Thenia,Thenia
+1202,Boumerdès,Thenia,Beni Amrane
+1215,Boumerdès,Khemis El Khechna,Khemis El Khechna
+1199,Boumerdès,Thenia,Ammal
+1228,Boumerdès,Isser,Timezrit
+1229,Boumerdès,Bordj Menaiel,Zemmouri
+1216,Boumerdès,Khemis El Khechna,Larbatache
+1214,Boumerdès,Isser,Isser
+1208,Boumerdès,Isser,Chabet El Ameur
+1219,Boumerdès,Naciria,Ouled Aissa
+1218,Boumerdès,Naciria,Naciria
+1207,Boumerdès,Boudouaou,Bouzegza Keddara
+1224,Boumerdès,Thenia,Souk El Had
+1223,Boumerdès,Baghlia,Sidi Daoud
+1200,Boumerdès,Baghlia,Baghlia
+1217,Boumerdès,Bordj Menaiel,Leghata
+1211,Boumerdès,Bordj Menaiel,Djinet
+1227,Boumerdès,Boumerdes,Tidjelabine
+1222,Boumerdès,Isser,Si Mustapha
+1220,Boumerdès,Boudouaou,Ouled Hedadj
+1221,Boumerdès,Khemis El Khechna,Ouled Moussa
+1206,Boumerdès,Boumerdes,Boumerdes
+1209,Boumerdès,Boumerdes,Corso
+1203,Boumerdès,Bordj Menaiel,Bordj Menaiel
+1204,Boumerdès,Boudouaou,Boudouaou
+1205,Boumerdès,Boudouaou,Boudouaou El Bahri
+1225,Boumerdès,Baghlia,Taourga
+1213,Boumerdès,Khemis El Khechna,Hammedi
+1230,El Tarf,El Tarf,Ain El Assel
+1236,El Tarf,El Tarf,Bougous
+1246,El Tarf,El Tarf,El Tarf
+1253,El Tarf,El Tarf,Zitouna
+1235,El Tarf,Besbes,Besbes
+1231,El Tarf,Bouhadjar,Ain Kerma
+1237,El Tarf,Bouhadjar,Bouhadjar
+1247,El Tarf,Bouhadjar,Hammam Beni Salah
+1249,El Tarf,Bouhadjar,Oued Zitoun
+1233,El Tarf,Ben M'hidi,Ben M Hidi
+1234,El Tarf,Ben M'hidi,Berrihane
+1239,El Tarf,Drean,Chebaita Mokhtar
+1243,El Tarf,Ben M'hidi,Echatt
+1244,El Tarf,El Kala,El Aioun
+1245,El Tarf,El Kala,El Kala
+1251,El Tarf,El Kala,Souarekh
+1252,El Tarf,Besbes,Zerizer
+1238,El Tarf,Bouteldja,Bouteldja
+1240,El Tarf,Bouteldja,Chefia
+1248,El Tarf,Bouteldja,Lac Des Oiseaux
+1241,El Tarf,Drean,Chihani
+1250,El Tarf,El Kala,Raml Souk
+1232,El Tarf,Besbes,Asfour
+1242,El Tarf,Drean,Drean
+1255,Tindouf,Tindouf,Tindouf
+1254,Tindouf,Tindouf,Oum El Assel
+1262,Tissemsilt,Khemisti,Khemisti
+1275,Tissemsilt,Theniet El Had,Theniet El Had
+1269,Tissemsilt,Tissemsilt,Ouled Bessam
+1271,Tissemsilt,Theniet El Had,Sidi Boutouchent
+1276,Tissemsilt,Tissemsilt,Tissemsilt
+1272,Tissemsilt,Lardjem,Sidi Lantri
+1257,Tissemsilt,Bordj Bounaama,Beni Chaib
+1258,Tissemsilt,Bordj Bounaama,Beni Lahcene
+1270,Tissemsilt,Ammari,Sidi Abed
+1273,Tissemsilt,Bordj Bounaama,Sidi Slimane
+1261,Tissemsilt,Lazharia,Boucaid
+1263,Tissemsilt,Lazharia,Larbaa
+1266,Tissemsilt,Lazharia,Lazharia
+1264,Tissemsilt,Lardjem,Lardjem
+1268,Tissemsilt,Lardjem,Melaab
+1265,Tissemsilt,Khemisti,Layoune
+1274,Tissemsilt,Lardjem,Tamellahet
+1277,Tissemsilt,Bordj Emir Abdelkader,Youssoufia
+1260,Tissemsilt,Bordj Emir Abdelkader,Bordj El Emir Abdelkader
+1256,Tissemsilt,Ammari,Ammari
+1267,Tissemsilt,Ammari,Maacem
+1259,Tissemsilt,Bordj Bounaama,Bordj Bounaama
+1282,El Oued,Taleb Larbi,Douar El Maa
+1283,El Oued,Robbah,El Ogla
+1291,El Oued,Magrane,Magrane
+1301,El Oued,Magrane,Sidi Aoun
+1292,El Oued,Mih Ouensa,Mih Ouansa
+1290,El Oued,El Oued,Kouinine
+1278,El Oued,Bayadha,Bayadha
+1294,El Oued,Robbah,Nakhla
+1299,El Oued,Robbah,Robbah
+1286,El Oued,Guemar,Guemar
+1279,El Oued,Taleb Larbi,Ben Guecha
+1297,El Oued,Guemar,Ourmes
+1304,El Oued,Guemar,Taghzout
+1287,El Oued,Reguiba,Hamraia
+1298,El Oued,Reguiba,Reguiba
+1280,El Oued,Debila,Debila
+1288,El Oued,Debila,Hassani Abdelkrim
+1289,El Oued,Hassi Khalifa,Hassi Khalifa
+1307,El Oued,Hassi Khalifa,Trifaoui
+1305,El Oued,Taleb Larbi,Taleb Larbi
+1295,El Oued,Mih Ouensa,Oued El Alenda
+1285,El Oued,El Oued,El-Oued
+1321,Khenchela,Chechar,Khirane
+1309,Khenchela,Babar,Babar
+1316,Khenchela,Ouled Rechache,El Mahmal
+1324,Khenchela,Ouled Rechache,Ouled Rechache
+1314,Khenchela,Chechar,Djellal
+1328,Khenchela,Bouhmama,Yabous
+1320,Khenchela,Khenchela,Khenchela
+1319,Khenchela,Kais,Kais
+1313,Khenchela,Bouhmama,Chelia
+1325,Khenchela,Kais,Remila
+1327,Khenchela,Kais,Taouzianat
+1310,Khenchela,El Hamma,Baghai
+1315,Khenchela,El Hamma,El Hamma
+1318,Khenchela,El Hamma,Ensigha
+1326,Khenchela,El Hamma,Tamza
+1308,Khenchela,Ain Touila,Ain Touila
+1323,Khenchela,Ain Touila,M'toussa
+1311,Khenchela,Bouhmama,Bouhmama
+1317,Khenchela,Chechar,El Oueldja
+1322,Khenchela,Bouhmama,M'sara
+1312,Khenchela,Chechar,Chechar
+1349,Souk Ahras,Souk Ahras,Souk Ahras
+1329,Souk Ahras,Sedrata,Ain Soltane
+1347,Souk Ahras,Sedrata,Sedrata
+1334,Souk Ahras,Mechroha,Hanencha
+1337,Souk Ahras,Mechroha,Machroha
+1330,Souk Ahras,Ouled Driss,Ain Zana
+1341,Souk Ahras,Ouled Driss,Ouled Driss
+1351,Souk Ahras,Oum El Adhaim,Terraguelt
+1343,Souk Ahras,Oum El Adhaim,Oum El Adhaim
+1340,Souk Ahras,Oum El Adhaim,Oued Kebrit
+1352,Souk Ahras,M'daourouche,Tiffech
+1345,Souk Ahras,M'daourouche,Ragouba
+1332,Souk Ahras,Taoura,Drea
+1350,Souk Ahras,Taoura,Taoura
+1353,Souk Ahras,Taoura,Zaarouria
+1333,Souk Ahras,Haddada,Haddada
+1335,Souk Ahras,Haddada,Khedara
+1342,Souk Ahras,Haddada,Ouled Moumen
+1339,Souk Ahras,Merahna,Merahna
+1344,Souk Ahras,Merahna,Ouillen
+1348,Souk Ahras,Merahna,Sidi Fredj
+1331,Souk Ahras,Bir Bouhouche,Bir Bouhouche
+1346,Souk Ahras,Bir Bouhouche,Safel El Ouiden
+1336,Souk Ahras,Sedrata,Khemissa
+1338,Souk Ahras,M'daourouche,M'daourouche
+1354,Souk Ahras,Bir Bouhouche,Zouabi
+1369,Tipaza,Hadjout,Hadjout
+1375,Tipaza,Hadjout,Merad
+1374,Tipaza,Sidi Amar,Menaceur
+1355,Tipaza,Gouraya,Aghbal
+1377,Tipaza,Sidi Amar,Nador
+1381,Tipaza,Sidi Amar,Sidi-Amar
+1368,Tipaza,Gouraya,Gouraya
+1376,Tipaza,Gouraya,Messelmoun
+1364,Tipaza,Cherchell,Cherchell
+1370,Tipaza,Cherchell,Hadjret Ennous
+1378,Tipaza,Cherchell,Sidi Ghiles
+1365,Tipaza,Damous,Damous
+1373,Tipaza,Damous,Larhat
+1367,Tipaza,Fouka,Fouka
+1357,Tipaza,Bou Ismail,Ain Tagourait
+1360,Tipaza,Bou Ismail,Bou Haroun
+1361,Tipaza,Bou Ismail,Bou Ismail
+1371,Tipaza,Bou Ismail,Khemisti
+1356,Tipaza,Ahmar El Ain,Ahmer El Ain
+1362,Tipaza,Ahmar El Ain,Bourkika
+1366,Tipaza,Fouka,Douaouda
+1379,Tipaza,Ahmar El Ain,Sidi Rached
+1358,Tipaza,Kolea,Attatba
+1363,Tipaza,Kolea,Chaiba
+1372,Tipaza,Kolea,Kolea
+1380,Tipaza,Cherchell,Sidi Semiane
+1382,Tipaza,Tipaza,Tipaza
+1359,Tipaza,Damous,Beni Mileuk
+1394,Mila,Teleghma,El Mechira
+1393,Mila,Ain Beida Harriche,El Ayadi Barbes
+1384,Mila,Ain Beida Harriche,Ain Beida Harriche
+1411,Mila,Terrai Bainen,Tassala Lematai
+1410,Mila,Terrai Bainen,Terrai Bainen
+1387,Mila,Terrai Bainen,Amira Arres
+1408,Mila,Tassadane Haddada,Tassadane Haddada
+1399,Mila,Tassadane Haddada,Minar Zarza
+1406,Mila,Sidi Merouane,Sidi Merouane
+1391,Mila,Sidi Merouane,Chigara
+1397,Mila,Grarem Gouga,Hamala
+1396,Mila,Grarem Gouga,Grarem Gouga
+1412,Mila,Rouached,Tiberguent
+1404,Mila,Rouached,Rouached
+1392,Mila,Bouhatem,Derrahi Bousselah
+1414,Mila,Oued Endja,Zeghaia
+1401,Mila,Oued Endja,Oued Endja
+1383,Mila,Oued Endja,Ahmed Rachedi
+1407,Mila,Tadjenanet,Tadjenanet
+1385,Mila,Chelghoum Laid,Ain Mellouk
+1403,Mila,Tadjenanet,Ouled Khalouf
+1388,Mila,Tadjenanet,Benyahia Abderrahmane
+1409,Mila,Teleghma,Teleghma
+1402,Mila,Teleghma,Oued Seguen
+1400,Mila,Chelghoum Laid,Oued Athmenia
+1386,Mila,Mila,Ain Tine
+1390,Mila,Chelghoum Laid,Chelghoum Laid
+1413,Mila,Ferdjioua,Yahia Beniguecha
+1395,Mila,Ferdjioua,Ferdjioua
+1405,Mila,Mila,Sidi Khelifa
+1398,Mila,Mila,Mila
+1389,Mila,Bouhatem,Bouhatem
+1440,Aïn Defla,Khemis,Khemis-Miliana
+1446,Aïn Defla,Khemis,Sidi-Lakhdar
+1415,Aïn Defla,Hammam Righa,Ain-Benian
+1420,Aïn Defla,Hammam Righa,Ain-Torki
+1437,Aïn Defla,Hammam Righa,Hammam-Righa
+1429,Aïn Defla,Djelida,Bourached
+1439,Aïn Defla,Boumedfaa,Hoceinia
+1430,Aïn Defla,Djelida,Djelida
+1421,Aïn Defla,El Amra,Arib
+1431,Aïn Defla,Djelida,Djemaa Ouled Cheikh
+1434,Aïn Defla,El Amra,El-Amra
+1435,Aïn Defla,El Attaf,El-Attaf
+1449,Aïn Defla,El Attaf,Tiberkanine
+1416,Aïn Defla,El Abadia,Ain-Bouyahia
+1433,Aïn Defla,El Abadia,El-Abadia
+1447,Aïn Defla,El Abadia,Tacheta Zegagha
+1422,Aïn Defla,Djendel,Birbouche
+1432,Aïn Defla,Djendel,Djendel
+1425,Aïn Defla,Miliana,Ben Allal
+1443,Aïn Defla,Djendel,Oued Chorfa
+1428,Aïn Defla,Boumedfaa,Boumedfaa
+1418,Aïn Defla,Ain Lechiakh,Ain-Lechiakh
+1419,Aïn Defla,Ain Lechiakh,Ain-Soltane
+1444,Aïn Defla,Ain Lechiakh,Oued Djemaa
+1436,Aïn Defla,Rouina,El-Maine
+1445,Aïn Defla,Rouina,Rouina
+1450,Aïn Defla,Rouina,Zeddine
+1426,Aïn Defla,Bordj El Emir Khaled,Bir-Ould-Khelifa
+1427,Aïn Defla,Bordj El Emir Khaled,Bordj-Emir-Khaled
+1448,Aïn Defla,Bordj El Emir Khaled,Tarik-Ibn-Ziad
+1423,Aïn Defla,Bathia,Bathia
+1424,Aïn Defla,Bathia,Belaas
+1438,Aïn Defla,Bathia,Hassania
+1417,Aïn Defla,Ain Defla,Ain-Defla
+1442,Aïn Defla,Miliana,Miliana
+1441,Aïn Defla,El Amra,Mekhatria
+1462,Naâma,Ain Sefra,Tiout
+1459,Naâma,Moghrar,Moghrar
+1453,Naâma,Asla,Asla
+1456,Naâma,Mekmen Ben Amar,Kasdir
+1457,Naâma,Mekmen Ben Amar,Makmen Ben Amar
+1452,Naâma,Ain Sefra,Ain Sefra
+1458,Naâma,Mecheria,Mecheria
+1455,Naâma,Mecheria,El Biodh
+1451,Naâma,Mecheria,Ain Ben Khelil
+1460,Naâma,Naama,Naama
+1454,Naâma,Moghrar,Djenienne Bourezg
+1461,Naâma,Sfissifa,Sfissifa
+1486,Aïn Témouchent,Ain Larbaa,Sidi Boumediene
+1489,Aïn Témouchent,Ain Larbaa,Tamzoura
+1471,Aïn Témouchent,El Maleh,Chaabat El Ham
+1474,Aïn Témouchent,El Maleh,El Maleh
+1483,Aïn Témouchent,El Maleh,Ouled Kihal
+1472,Aïn Témouchent,Hammam Bou Hadjar,Chentouf
+1490,Aïn Témouchent,El Maleh,Terga
+1481,Aïn Témouchent,Ain Larbaa,Oued Sebbah
+1473,Aïn Témouchent,El Amria,El Amria
+1479,Aïn Témouchent,El Amria,Hassi El Ghella
+1482,Aïn Témouchent,El Amria,Ouled Boudjemaa
+1463,Aïn Témouchent,Ain Kihel,Aghlal
+1465,Aïn Témouchent,Ain Kihel,Ain Kihal
+1467,Aïn Témouchent,Ain Kihel,Ain Tolba
+1468,Aïn Témouchent,Ain Kihel,Aoubellil
+1469,Aïn Témouchent,Beni Saf,Beni Saf
+1478,Aïn Témouchent,Hammam Bou Hadjar,Hassasna
+1476,Aïn Témouchent,Beni Saf,Emir Abdelkader
+1488,Aïn Témouchent,Beni Saf,Sidi Safi
+1484,Aïn Témouchent,Oulhassa Gheraba,Oulhaca El Gheraba
+1487,Aïn Témouchent,Oulhassa Gheraba,Sidi Ouriache
+1464,Aïn Témouchent,Ain Larbaa,Ain El Arbaa
+1475,Aïn Témouchent,El Amria,El Messaid
+1480,Aïn Témouchent,Hammam Bou Hadjar,Oued Berkeche
+1485,Aïn Témouchent,Ain Temouchent,Sidi Ben Adda
+1466,Aïn Témouchent,Ain Temouchent,Ain Temouchent
+1470,Aïn Témouchent,El Amria,Bouzedjar
+1477,Aïn Témouchent,Hammam Bou Hadjar,Hammam Bou Hadjar
+1493,Ghardaïa,Dhayet Ben Dhahoua,Dhayet Bendhahoua
+1500,Ghardaïa,Mansourah,Mansoura
+1494,Ghardaïa,Bounoura,El Atteuf
+1492,Ghardaïa,Bounoura,Bounoura
+1503,Ghardaïa,Zelfana,Zelfana
+1497,Ghardaïa,El Guerrara,El Guerrara
+1502,Ghardaïa,Metlili,Sebseb
+1501,Ghardaïa,Metlili,Metlili
+1491,Ghardaïa,Berriane,Berriane
+1496,Ghardaïa,Ghardaia,Ghardaia
+1516,Relizane,Mazouna,El-Guettar
+1530,Relizane,Ammi Moussa,Ouled Aiche
+1509,Relizane,Zemmoura,Beni Dergoun
+1511,Relizane,Zemmoura,Dar Ben Abdelah
+1541,Relizane,Zemmoura,Zemmoura
+1512,Relizane,Djidiouia,Djidiouia
+1519,Relizane,Djidiouia,Hamri
+1507,Relizane,El Matmar,Belaassel Bouzagza
+1517,Relizane,El Matmar,El-Matmar
+1534,Relizane,El Matmar,Sidi Khettab
+1537,Relizane,El Matmar,Sidi M'hamed Benaouda
+1505,Relizane,Ain Tarek,Ain-Tarek
+1518,Relizane,Ain Tarek,Had Echkalla
+1515,Relizane,Ammi Moussa,El Ouldja
+1522,Relizane,Mazouna,Mazouna
+1504,Relizane,Yellel,Ain Rahma
+1520,Relizane,Yellel,Kalaa
+1538,Relizane,Yellel,Sidi Saada
+1540,Relizane,Yellel,Yellel
+1539,Relizane,Ramka,Souk El Had
+1524,Relizane,Mendes,Mendes
+1528,Relizane,Mendes,Oued Essalem
+1535,Relizane,Mendes,Sidi Lazreg
+1506,Relizane,Ammi Moussa,Ammi Moussa
+1526,Relizane,Oued Rhiou,Ouarizane
+1525,Relizane,Oued Rhiou,Merdja Sidi Abed
+1531,Relizane,Djidiouia,Ouled Sidi Mihoub
+1508,Relizane,Relizane,Bendaoud
+1529,Relizane,Oued Rhiou,Oued-Rhiou
+1513,Relizane,Ammi Moussa,El Hassi
+1536,Relizane,Sidi M'hamed Ben Ali,Sidi M'hamed Benali
+1523,Relizane,Sidi M'hamed Ben Ali,Mediouna
+1510,Relizane,Sidi M'hamed Ben Ali,Beni Zentis
+1527,Relizane,El H'madna,Oued El Djemaa
+1521,Relizane,Oued Rhiou,Lahlef
+1533,Relizane,Relizane,Relizane
+1514,Relizane,El H'madna,El H'madna
+1532,Relizane,Ramka,Ramka
+25,Timimoun,Tinerkouk,Tinerkouk
+24,Timimoun,Timimoun,Timimoun
+15,Timimoun,Timimoun,Ouled Said
+12,Timimoun,Aougrout,Metarfa
+19,Timimoun,Charouine,Talmine
+14,Timimoun,Charouine,Ouled Aissa
+7,Timimoun,Charouine,Charouine
+3,Timimoun,Aougrout,Aougrout
+8,Timimoun,Aougrout,Deldoul
+11,Timimoun,Tinerkouk,Ksar Kaddour
+23,Bordj Badji Mokhtar,Bordj Badji Mokhtar,Timiaouine
+5,Bordj Badji Mokhtar,Bordj Badji Mokhtar,Bordj Badji Mokhtar
+258,Ouled Djellal,Sidi Khaled,Ras El Miad
+232,Ouled Djellal,Sidi Khaled,Besbes
+259,Ouled Djellal,Sidi Khaled,Sidi Khaled
+240,Ouled Djellal,Ouled Djellal,Doucen
+237,Ouled Djellal,Ouled Djellal,Chaiba
+255,Ouled Djellal,Ouled Djellal,Ouled Djellal
+265,Béni Abbès,Beni Abbes,Beni-Abbes
+282,Béni Abbès,Beni Abbes,Tamtert
+271,Béni Abbès,Igli,Igli
+269,Béni Abbès,El Ouata,El Ouata
+279,Béni Abbès,Ouled Khodeir,Ouled-Khodeir
+273,Béni Abbès,Kerzaz,Kerzaz
+283,Béni Abbès,Kerzaz,Timoudi
+274,Béni Abbès,Ouled Khodeir,Ksabi
+266,Béni Abbès,Kerzaz,Beni-Ikhlef
+360,In Salah,In Ghar,Inghar
+357,In Salah,In Salah,Ain Salah
+358,In Salah,In Salah,Foggaret Ezzoua
+363,In Guezzam,Tin Zouatine,Tin Zouatine
+356,In Guezzam,In Guezzam,Ain Guezzam
+1107,Touggourt,Temacine,Temacine
+1104,Touggourt,Megarine,Sidi Slimane
+1097,Touggourt,Megarine,Megarine
+1099,Touggourt,Touggourt,Nezla
+1091,Touggourt,Temacine,Blidet Amor
+1106,Touggourt,Touggourt,Tebesbest
+1108,Touggourt,Touggourt,Touggourt
+1105,Touggourt,Taibet,Taibet
+1092,Touggourt,El-Hadjira,El Alia
+1094,Touggourt,El-Hadjira,El-Hadjira
+1090,Touggourt,Taibet,Benaceur
+1098,Touggourt,Taibet,M'naguer
+1109,Touggourt,Touggourt,Zaouia El Abidia
+1161,Djanet,Djanet,Djanet
+1158,Djanet,Djanet,Bordj El Haouass
+1296,El Meghaier,El Meghaier,Oum Touyour
+1300,El Meghaier,Djamaa,Sidi Amrane
+1293,El Meghaier,Djamaa,M'rara
+1281,El Meghaier,Djamaa,Djamaa
+1306,El Meghaier,Djamaa,Tenedla
+1284,El Meghaier,El Meghaier,El-M'ghaier
+1303,El Meghaier,El Meghaier,Still
+1302,El Meghaier,El Meghaier,Sidi Khelil
+1495,El Menia,El Menia,El Meniaa
+1499,El Menia,El Menia,Hassi Gara
+1498,El Menia,Mansourah,Hassi Fehal
