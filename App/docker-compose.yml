@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with PostGIS
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: nars-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres  # CHANGE THIS in production!
+      POSTGRES_DB: nars_db
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./setup_database.sql:/docker-entrypoint-initdb.d/setup_database.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # pgAdmin (Optional - Database Management UI)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: nars-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@nars.local
+      PGADMIN_DEFAULT_PASSWORD: admin  # CHANGE THIS in production!
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+# Usage:
+# 1. Start containers:
+#    docker-compose up -d
+#
+# 2. Check status:
+#    docker-compose ps
+#
+# 3. View logs:
+#    docker-compose logs -f postgres
+#
+# 4. Access PostgreSQL:
+#    psql -h localhost -U postgres -d nars_db
+#    (password: postgres)
+#
+# 5. Access pgAdmin:
+#    Open browser: http://localhost:5050
+#    Login: admin@nars.local / admin
+#
+# 6. Stop containers:
+#    docker-compose down
+#
+# 7. Remove all data (CAREFUL!):
+#    docker-compose down -v
