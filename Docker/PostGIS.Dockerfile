@@ -1,0 +1,11 @@
+FROM postgis/postgis:latest
+
+ENV POSTGRES_PASSWORD=""
+ENV POSTGRES_USER="postgres"
+ENV POSTGRES_DB="mydb"
+ENV POSTGRES_INITDB_ARGS=""
+ENV POSTGRES_INITDB_WALDIR=""
+ENV POSTGRES_HOST_AUTH_METHOD="trust"
+
+COPY ../map_features.db /var/lib/postgresql/data/
+EXPOSE 5432
