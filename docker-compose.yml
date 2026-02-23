@@ -22,13 +22,34 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # FastAPI Application
+  api:
+    build: .
+    container_name: nars-api
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: nars_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres      # CHANGE THIS in production!
+      SECRET_KEY: change-this-in-production
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
   # pgAdmin (Optional - Database Management UI)
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: nars-pgadmin
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@nars.local
-      PGADMIN_DEFAULT_PASSWORD: admin  # CHANGE THIS in production!
+      PGADMIN_DEFAULT_PASSWORD: admin
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:
       - "5050:80"
@@ -43,6 +64,14 @@ volumes:
     driver: local
   pgadmin_data:
     driver: local
+
+# Usage:
+# Start everything:   docker-compose up -d
+# Start DB only:      docker-compose up -d postgres
+# View API logs:      docker-compose logs -f api
+# Stop everything:    docker-compose down
+# Full reset:         docker-compose down -v
+
 
 # Usage:
 # 1. Start containers:
