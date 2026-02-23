@@ -324,10 +324,10 @@
             };
         }
 
-        // Selected values
-        let selectedWilaya = '';
-        let selectedDaira = '';
-        let selectedCommune = '';
+        // Selected location data (storing both ID and name)
+        let selectedWilaya = null;  // {id, name_fr, name_ar}
+        let selectedDaira = null;   // {id, name_fr, name_ar}
+        let selectedCommune = null; // {id, name_fr, name_ar}
 
         // Wilaya searchable dropdown
         const wilayaInput = document.getElementById('signup-wilaya');
@@ -340,7 +340,7 @@
 
         wilayaInput.addEventListener('input', debounce((e) => {
             loadWilayas(e.target.value);
-            selectedWilaya = '';
+            selectedWilaya = null;
             wilayaValue.value = '';
             
             // Reset daira and commune
@@ -361,7 +361,7 @@
                     wilayas.forEach(wilaya => {
                         const div = document.createElement('div');
                         div.className = 'dropdown-item';
-                        div.textContent = wilaya;
+                        div.textContent = wilaya.name_fr;
                         div.addEventListener('click', () => {
                             selectWilaya(wilaya);
                         });
@@ -377,8 +377,8 @@
 
         function selectWilaya(wilaya) {
             selectedWilaya = wilaya;
-            wilayaInput.value = wilaya;
-            wilayaValue.value = wilaya;
+            wilayaInput.value = wilaya.name_fr;
+            wilayaValue.value = wilaya.id;
             wilayaDropdown.style.display = 'none';
             
             // Enable daira and reset
@@ -387,7 +387,7 @@
             dairaInput.placeholder = 'Search daira...';
             dairaInput.value = '';
             document.getElementById('signup-daira-value').value = '';
-            selectedDaira = '';
+            selectedDaira = null;
             
             // Reset commune
             resetCommune();
@@ -399,7 +399,7 @@
             dairaInput.placeholder = 'Select wilaya first...';
             dairaInput.value = '';
             document.getElementById('signup-daira-value').value = '';
-            selectedDaira = '';
+            selectedDaira = null;
             document.getElementById('daira-dropdown').innerHTML = '';
         }
 
@@ -417,7 +417,7 @@
         dairaInput.addEventListener('input', debounce((e) => {
             if (selectedWilaya) {
                 loadDairas(e.target.value);
-                selectedDaira = '';
+                selectedDaira = null;
                 dairaValue.value = '';
                 
                 // Reset commune
@@ -427,7 +427,7 @@
 
         async function loadDairas(search) {
             try {
-                const response = await fetch(`/api/dairas?wilaya=${encodeURIComponent(selectedWilaya)}&search=${encodeURIComponent(search)}`);
+                const response = await fetch(`/api/dairas?wilaya_id=${selectedWilaya.id}&search=${encodeURIComponent(search)}`);
                 const dairas = await response.json();
                 
                 dairaDropdown.innerHTML = '';
@@ -438,7 +438,7 @@
                     dairas.forEach(daira => {
                         const div = document.createElement('div');
                         div.className = 'dropdown-item';
-                        div.textContent = daira;
+                        div.textContent = daira.name_fr;
                         div.addEventListener('click', () => {
                             selectDaira(daira);
                         });
@@ -454,8 +454,8 @@
 
         function selectDaira(daira) {
             selectedDaira = daira;
-            dairaInput.value = daira;
-            dairaValue.value = daira;
+            dairaInput.value = daira.name_fr;
+            dairaValue.value = daira.id;
             dairaDropdown.style.display = 'none';
             
             // Enable commune
@@ -464,7 +464,7 @@
             communeInput.placeholder = 'Search commune...';
             communeInput.value = '';
             document.getElementById('signup-commune-value').value = '';
-            selectedCommune = '';
+            selectedCommune = null;
         }
 
         function resetCommune() {
@@ -473,7 +473,7 @@
             communeInput.placeholder = 'Select daira first...';
             communeInput.value = '';
             document.getElementById('signup-commune-value').value = '';
-            selectedCommune = '';
+            selectedCommune = null;
             document.getElementById('commune-dropdown').innerHTML = '';
         }
 
@@ -491,14 +491,14 @@
         communeInput.addEventListener('input', debounce((e) => {
             if (selectedWilaya && selectedDaira) {
                 loadCommunes(e.target.value);
-                selectedCommune = '';
+                selectedCommune = null;
                 communeValue.value = '';
             }
         }, 300));
 
         async function loadCommunes(search) {
             try {
-                const response = await fetch(`/api/communes?wilaya=${encodeURIComponent(selectedWilaya)}&daira=${encodeURIComponent(selectedDaira)}&search=${encodeURIComponent(search)}`);
+                const response = await fetch(`/api/communes?daira_id=${selectedDaira.id}&search=${encodeURIComponent(search)}`);
                 const communes = await response.json();
                 
                 communeDropdown.innerHTML = '';
@@ -509,7 +509,7 @@
                     communes.forEach(commune => {
                         const div = document.createElement('div');
                         div.className = 'dropdown-item';
-                        div.textContent = commune;
+                        div.textContent = commune.name_fr;
                         div.addEventListener('click', () => {
                             selectCommune(commune);
                         });
@@ -525,8 +525,8 @@
 
         function selectCommune(commune) {
             selectedCommune = commune;
-            communeInput.value = commune;
-            communeValue.value = commune;
+            communeInput.value = commune.name_fr;
+            communeValue.value = commune.id;
             communeDropdown.style.display = 'none';
         }
 
@@ -566,7 +566,7 @@
                     // Redirect to map
                     window.location.href = '/map';
                 } else {
-                    errorDiv.textContent = data.error || 'Invalid username or password';
+                    errorDiv.textContent = data.detail || data.error || 'Invalid username or password';
                     errorDiv.style.display = 'block';
                 }
             } catch (error) {
@@ -584,15 +584,12 @@
             const phone = document.getElementById('signup-phone').value;
             const username = document.getElementById('signup-username').value;
             const password = document.getElementById('signup-password').value;
-            const wilaya = selectedWilaya;
-            const daira = selectedDaira;
-            const commune = selectedCommune;
             
             const errorDiv = document.getElementById('signupError');
             const successDiv = document.getElementById('signupSuccess');
             
             // Validate location fields
-            if (!wilaya || !daira || !commune) {
+            if (!selectedWilaya || !selectedDaira || !selectedCommune) {
                 errorDiv.textContent = 'Please select wilaya, daira, and commune from the dropdown lists';
                 errorDiv.style.display = 'block';
                 return;
@@ -604,7 +601,16 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ name, email, phone, username, password, wilaya, daira, commune })
+                    body: JSON.stringify({
+                        name,
+                        email,
+                        phone,
+                        username,
+                        password,
+                        wilaya_id: selectedWilaya.id,
+                        daira_id: selectedDaira.id,
+                        commune_id: selectedCommune.id
+                    })
                 });
                 
                 const data = await response.json();
@@ -616,9 +622,9 @@
                     
                     // Clear form
                     signupFormElement.reset();
-                    selectedWilaya = '';
-                    selectedDaira = '';
-                    selectedCommune = '';
+                    selectedWilaya = null;
+                    selectedDaira = null;
+                    selectedCommune = null;
                     resetDaira();
                     resetCommune();
                     
@@ -628,7 +634,7 @@
                         successDiv.style.display = 'none';
                     }, 2000);
                 } else {
-                    errorDiv.textContent = data.error || 'Failed to create account';
+                    errorDiv.textContent = data.detail || data.error || 'Failed to create account';
                     errorDiv.style.display = 'block';
                     successDiv.style.display = 'none';
                 }

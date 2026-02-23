@@ -29,52 +29,44 @@ satelliteLayer.addTo(map);
 
 // GeoJSON boundaries layer
 let boundariesLayer = null;
-let allBoundariesData = null; // Store all boundaries data
 
-// Function to load GeoJSON boundaries (just stores data, doesn't display)
-async function loadGeoJSONBoundaries(geojsonData) {
-    console.log('loadGeoJSONBoundaries called');
-    allBoundariesData = geojsonData;
-    console.log('Municipal boundaries data loaded into memory');
-}
-
-// Function to display a specific municipality boundary
-function displayMunicipalityBoundary(municipalityName) {
-    // Remove existing boundaries if any
-    if (boundariesLayer) {
-        map.removeLayer(boundariesLayer);
-        boundariesLayer = null;
-    }
-    
-    if (!allBoundariesData) {
-        console.log('Boundaries data not loaded yet');
-        return;
-    }
-    
-    // Find the matching municipality
-    const matchingFeature = allBoundariesData.features.find(feature => {
-        if (feature.properties && feature.properties.shapeName) {
-            const name = feature.properties.shapeName.toLowerCase();
-            const searchName = municipalityName.toLowerCase();
-            return name.includes(searchName) || searchName.includes(name);
+// Function to display a specific commune boundary from database
+// Fetch and display commune boundary from database
+async function displayCommuneBoundary(communeId, communeName) {
+    try {
+        // Remove existing boundaries if any
+        if (boundariesLayer) {
+            map.removeLayer(boundariesLayer);
+            boundariesLayer = null;
         }
-        return false;
-    });
-    
-    if (matchingFeature) {
-        // Create a GeoJSON layer with just this feature
-        boundariesLayer = L.geoJSON(matchingFeature, {
+        
+        console.log(`Fetching boundary for commune ID: ${communeId}`);
+        const response = await fetch(`/api/commune/${communeId}/boundary`);
+        
+        if (!response.ok) {
+            console.error(`Failed to fetch boundary: ${response.status}`);
+            return;
+        }
+        
+        const boundaryData = await response.json();
+        console.log('Boundary data received');
+        
+        // The geometry is stored as WKB text or GeoJSON
+        // Parse it as GeoJSON
+        const geojson = JSON.parse(boundaryData.geometry);
+        
+        // Create boundary layer
+        boundariesLayer = L.geoJSON(geojson, {
             style: {
                 color: '#e74c3c',
                 weight: 2,
-                fillOpacity: 0,  // No fill, just outline
+                fillOpacity: 0,
                 fillColor: 'transparent'
             },
             onEachFeature: function(feature, layer) {
-                if (feature.properties && feature.properties.shapeName) {
-                    const name = feature.properties.shapeName;
+                const name = communeName || boundaryData.commune_name;
+                if (name) {
                     layer.bindPopup(`<b>${name}</b>`);
-                    
                     layer.bindTooltip(name, {
                         permanent: false,
                         direction: 'center',
@@ -84,15 +76,15 @@ function displayMunicipalityBoundary(municipalityName) {
             }
         }).addTo(map);
         
-        // Fit map to boundary with padding
+        // Fit map to boundary
         map.fitBounds(boundariesLayer.getBounds(), {
             padding: [50, 50],
             maxZoom: 14
         });
         
-        console.log('Displayed boundary for:', matchingFeature.properties.shapeName);
-    } else {
-        console.log('No matching municipality found for:', municipalityName);
+        console.log('Boundary displayed successfully');
+    } catch (error) {
+        console.error('Error displaying commune boundary:', error);
     }
 }
 
@@ -483,42 +475,30 @@ async function navigateToUserCommune() {
         const user = await response.json();
         console.log('Current user:', user);
         
-        if (user.commune) {
-            // Display the boundary for user's municipality
-            // This will automatically center and fit the map to the boundary
-            displayMunicipalityBoundary(user.commune);
+        if (user.commune && user.commune.id) {
+            // Fetch and display the boundary for user's commune
+            await displayCommuneBoundary(user.commune.id, user.commune.name_fr);
             
-            console.log('Navigated to user commune:', user.commune);
+            // Center map on commune coordinates if available
+            if (user.commune.latitude && user.commune.longitude) {
+                const lat = parseFloat(user.commune.latitude);
+                const lng = parseFloat(user.commune.longitude);
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    map.setView([lat, lng], 13);
+                    console.log(`Centered map on commune coordinates: [${lat}, ${lng}]`);
+                }
+            }
+            
+            console.log('Navigated to user commune:', user.commune.name_fr);
         }
     } catch (error) {
         console.error('Error navigating to user commune:', error);
     }
 }
 
-// Auto-load boundaries on page load (into memory only, not displayed)
-async function loadBoundariesOnStartup() {
-    try {
-        console.log('Loading boundaries data into memory...');
-        const response = await fetch('Boundaries.geojson');
-        if (!response.ok) {
-            throw new Error(`Failed to load boundaries file: ${response.status} ${response.statusText}`);
-        }
-        const geojsonData = await response.json();
-        console.log('GeoJSON data loaded, features count:', geojsonData.features ? geojsonData.features.length : 0);
-        await loadGeoJSONBoundaries(geojsonData);
-        console.log('Boundaries data ready');
-    } catch (error) {
-        console.error('Error loading boundaries:', error);
-        console.log('Boundaries will not be available');
-    }
-}
-
 // Auto-load data on page load
 window.addEventListener('DOMContentLoaded', async () => {
-    // Load boundaries first
-    await loadBoundariesOnStartup();
-    
-    // Navigate to user's commune
+    // Navigate to user's commune (will fetch boundary from database)
     await navigateToUserCommune();
     
     // Then load saved features
