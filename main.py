@@ -16,7 +16,7 @@ from jwt import encode as jwt_encode, decode as jwt_decode, PyJWTError
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy import Column, Integer, String, Text, DateTime, select, func, distinct, delete
+from sqlalchemy import Column, Integer, String, Text, DateTime, Float, select, func, distinct, delete
 from sqlalchemy.exc import IntegrityError
 
 # ─────────────────────────────────────────────
@@ -68,8 +68,6 @@ class UserModel(Base):
     phone         = Column(String(50),  nullable=False)
     username      = Column(String(100), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
-    wilaya_id     = Column(Integer, nullable=False)
-    daira_id      = Column(Integer, nullable=False)
     commune_id    = Column(Integer, nullable=False)
     created_at    = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
@@ -83,33 +81,32 @@ class FeatureModel(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class WilayaModel(Base):
-    __tablename__ = 'wilaya'
+    __tablename__ = 'wilayas'
     wilaya_id        = Column(Integer, primary_key=True)
-    wilaya_ar        = Column(String(255), nullable=False)
-    wilaya_fr        = Column(String(255), nullable=False)
-    wilaya_latitude  = Column(String(50))
-    wilaya_longitude = Column(String(50))
+    wilaya_ar        = Column(String(50), nullable=False)
+    wilaya_fr        = Column(String(50), nullable=False)
+    wilaya_latitude  = Column(Float)  # double precision
+    wilaya_longitude = Column(Float)  # double precision
 
 class DairaModel(Base):
-    __tablename__ = 'daira'
+    __tablename__ = 'dairas'
     daira_id        = Column(Integer, primary_key=True)
     wilaya_id       = Column(Integer, nullable=False, index=True)
-    daira_code      = Column(String(50))
-    daira_ar        = Column(String(255), nullable=False)
-    daira_fr        = Column(String(255), nullable=False)
-    daira_latitude  = Column(String(50))
-    daira_longitude = Column(String(50))
+    daira_ar        = Column(String(50), nullable=False)
+    daira_fr        = Column(String(50), nullable=False)
+    daira_latitude  = Column(Float)  # double precision
+    daira_longitude = Column(Float)  # double precision
     daira_name      = Column(String(255))
 
 class CommuneModel(Base):
     __tablename__ = 'communes'
     commune_id        = Column(Integer, primary_key=True)
     daira_id          = Column(Integer, nullable=False, index=True)
-    commune_code      = Column(String(50))
-    commune_ar        = Column(String(255), nullable=False)
-    commune_fr        = Column(String(255), nullable=False)
-    commune_latitude  = Column(String(50))
-    commune_longitude = Column(String(50))
+    commune_code      = Column(String(5))
+    commune_ar        = Column(String(50), nullable=False)
+    commune_fr        = Column(String(50), nullable=False)
+    commune_latitude  = Column(Float)  # double precision
+    commune_longitude = Column(Float)  # double precision
     commune_name      = Column(String(255))
 
 class CommuneBoundaryModel(Base):
@@ -127,8 +124,6 @@ class SignUpRequest(BaseModel):
     phone:      str
     username:   str
     password:   str
-    wilaya_id:  int
-    daira_id:   int
     commune_id: int
 
 class SignInRequest(BaseModel):
@@ -279,8 +274,6 @@ async def signup(body: SignUpRequest, db: AsyncSession = Depends(get_db)):
         phone         = body.phone,
         username      = body.username,
         password_hash = hash_password(body.password),
-        wilaya_id     = body.wilaya_id,
-        daira_id      = body.daira_id,
         commune_id    = body.commune_id,
     )
     db.add(user)
@@ -303,8 +296,6 @@ async def signin(body: SignInRequest, response: Response, db: AsyncSession = Dep
         'username':   user.username,
         'name':       user.name,
         'email':      user.email,
-        'wilaya_id':  user.wilaya_id,
-        'daira_id':   user.daira_id,
         'commune_id': user.commune_id,
     })
 
@@ -317,15 +308,20 @@ async def signin(body: SignInRequest, response: Response, db: AsyncSession = Dep
         samesite='lax',
     )
 
-    # Fetch location names for response
-    wilaya_result = await db.execute(select(WilayaModel).where(WilayaModel.wilaya_id == user.wilaya_id))
-    wilaya = wilaya_result.scalar_one_or_none()
-    
-    daira_result = await db.execute(select(DairaModel).where(DairaModel.daira_id == user.daira_id))
-    daira = daira_result.scalar_one_or_none()
-    
+    # Fetch commune with its daira and wilaya
     commune_result = await db.execute(select(CommuneModel).where(CommuneModel.commune_id == user.commune_id))
     commune = commune_result.scalar_one_or_none()
+    
+    # Get daira and wilaya info from commune
+    daira = None
+    wilaya = None
+    if commune:
+        daira_result = await db.execute(select(DairaModel).where(DairaModel.daira_id == commune.daira_id))
+        daira = daira_result.scalar_one_or_none()
+        
+        if daira:
+            wilaya_result = await db.execute(select(WilayaModel).where(WilayaModel.wilaya_id == daira.wilaya_id))
+            wilaya = wilaya_result.scalar_one_or_none()
 
     return {
         'success':      True,
@@ -336,9 +332,13 @@ async def signin(body: SignInRequest, response: Response, db: AsyncSession = Dep
             'username': user.username,
             'name':     user.name,
             'email':    user.email,
-            'wilaya':   {'id': user.wilaya_id, 'name_fr': wilaya.wilaya_fr if wilaya else None},
-            'daira':    {'id': user.daira_id, 'name_fr': daira.daira_fr if daira else None},
-            'commune':  {'id': user.commune_id, 'name_fr': commune.commune_fr if commune else None},
+            'commune':  {
+                'id': user.commune_id, 
+                'name_fr': commune.commune_fr if commune else None,
+                'name_ar': commune.commune_ar if commune else None,
+                'latitude': commune.commune_latitude if commune else None,
+                'longitude': commune.commune_longitude if commune else None,
+            },
         },
     }
 
@@ -362,19 +362,22 @@ async def current_user_info(request: Request, db: AsyncSession = Depends(get_db)
         raise HTTPException(status_code=401, detail='Invalid token')
 
     user_id = payload.get('user_id')
-    wilaya_id = payload.get('wilaya_id')
-    daira_id = payload.get('daira_id')
     commune_id = payload.get('commune_id')
 
-    # Fetch location names from database
-    wilaya_result = await db.execute(select(WilayaModel).where(WilayaModel.wilaya_id == wilaya_id))
-    wilaya = wilaya_result.scalar_one_or_none()
-    
-    daira_result = await db.execute(select(DairaModel).where(DairaModel.daira_id == daira_id))
-    daira = daira_result.scalar_one_or_none()
-    
+    # Fetch commune with its daira and wilaya through joins
     commune_result = await db.execute(select(CommuneModel).where(CommuneModel.commune_id == commune_id))
     commune = commune_result.scalar_one_or_none()
+    
+    # Get daira and wilaya info from commune
+    daira = None
+    wilaya = None
+    if commune:
+        daira_result = await db.execute(select(DairaModel).where(DairaModel.daira_id == commune.daira_id))
+        daira = daira_result.scalar_one_or_none()
+        
+        if daira:
+            wilaya_result = await db.execute(select(WilayaModel).where(WilayaModel.wilaya_id == daira.wilaya_id))
+            wilaya = wilaya_result.scalar_one_or_none()
 
     return {
         'id':       user_id,
@@ -382,14 +385,14 @@ async def current_user_info(request: Request, db: AsyncSession = Depends(get_db)
         'name':     payload.get('name'),
         'email':    payload.get('email'),
         'wilaya':   {
-            'id': wilaya_id,
+            'id': wilaya.wilaya_id if wilaya else None,
             'name_fr': wilaya.wilaya_fr if wilaya else None,
             'name_ar': wilaya.wilaya_ar if wilaya else None,
             'latitude': wilaya.wilaya_latitude if wilaya else None,
             'longitude': wilaya.wilaya_longitude if wilaya else None,
         },
         'daira':    {
-            'id': daira_id,
+            'id': daira.daira_id if daira else None,
             'name_fr': daira.daira_fr if daira else None,
             'name_ar': daira.daira_ar if daira else None,
             'latitude': daira.daira_latitude if daira else None,
@@ -445,7 +448,6 @@ async def get_dairas(wilaya_id: int, search: str = '', db: AsyncSession = Depend
             'id': d.daira_id,
             'name_fr': d.daira_fr,
             'name_ar': d.daira_ar,
-            'code': d.daira_code,
             'latitude': d.daira_latitude,
             'longitude': d.daira_longitude,
             'full_name': d.daira_name
@@ -478,28 +480,68 @@ async def get_communes(daira_id: int, search: str = '', db: AsyncSession = Depen
     ]
 
 
-@app.get('/api/commune/{commune_id}/boundary', tags=['Locations'])
-async def get_commune_boundary(commune_id: int, db: AsyncSession = Depends(get_db)):
-    """Get boundary geometry for a specific commune."""
+@app.get('/api/commune/{commune_id}/boundary-debug', tags=['Locations'])
+async def debug_commune_boundary(commune_id: int, db: AsyncSession = Depends(get_db)):
+    """Debug endpoint to check boundary geometry format."""
     result = await db.execute(
         select(CommuneBoundaryModel).where(CommuneBoundaryModel.commune_id == commune_id)
     )
     boundary = result.scalar_one_or_none()
     
     if not boundary:
-        raise HTTPException(status_code=404, detail='Boundary not found for this commune')
+        return {'error': 'Boundary not found'}
     
-    # Also get commune info
+    geom = boundary.wkb_geometry
+    return {
+        'commune_id': commune_id,
+        'geometry_type': type(geom).__name__,
+        'geometry_length': len(str(geom)),
+        'geometry_preview': str(geom)[:200],
+        'starts_with': str(geom)[:20],
+        'is_json_like': str(geom).strip().startswith('{'),
+        'full_geometry': geom  # Full geometry data
+    }
+
+
+@app.get('/api/commune/{commune_id}/boundary', tags=['Locations'])
+async def get_commune_boundary(commune_id: int, db: AsyncSession = Depends(get_db)):
+    """Get boundary geometry for a specific commune (converts WKB to GeoJSON)."""
+    from sqlalchemy import text
+    
+    # First, get commune info
     commune_result = await db.execute(
         select(CommuneModel).where(CommuneModel.commune_id == commune_id)
     )
     commune = commune_result.scalar_one_or_none()
     
-    return {
-        'commune_id': commune_id,
-        'commune_name': commune.commune_fr if commune else None,
-        'geometry': boundary.wkb_geometry
-    }
+    # Convert WKB geometry to GeoJSON using PostGIS
+    try:
+        result = await db.execute(
+            text("""
+                SELECT ST_AsGeoJSON(wkb_geometry) as geojson
+                FROM communes_boundaries 
+                WHERE commune_id = :commune_id
+            """),
+            {"commune_id": commune_id}
+        )
+        row = result.fetchone()
+        
+        if not row or not row[0]:
+            raise HTTPException(status_code=404, detail='Boundary not found for this commune')
+        
+        return {
+            'commune_id': commune_id,
+            'commune_name': commune.commune_fr if commune else None,
+            'geometry': row[0]  # GeoJSON string from PostGIS
+        }
+        
+    except Exception as e:
+        # Log the error for debugging
+        print(f"Error converting WKB to GeoJSON: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f'Failed to convert boundary geometry: {str(e)}'
+        )
 
 # ─────────────────────────────────────────────
 # Feature Routes
