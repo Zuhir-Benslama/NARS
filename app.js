@@ -49,11 +49,37 @@ async function displayCommuneBoundary(communeId, communeName) {
         }
         
         const boundaryData = await response.json();
-        console.log('Boundary data received');
+        console.log('Boundary data received:', boundaryData);
+        console.log('Geometry type:', typeof boundaryData.geometry);
+        console.log('Geometry preview:', boundaryData.geometry?.substring(0, 100));
         
-        // The geometry is stored as WKB text or GeoJSON
-        // Parse it as GeoJSON
-        const geojson = JSON.parse(boundaryData.geometry);
+        // Parse geometry
+        let geojson;
+        if (typeof boundaryData.geometry === 'string') {
+            console.log('Parsing geometry string as JSON...');
+            try {
+                geojson = JSON.parse(boundaryData.geometry);
+                console.log('✓ Parsed successfully:', geojson);
+            } catch (parseError) {
+                console.error('✗ Failed to parse geometry as JSON:', parseError);
+                console.error('Geometry content:', boundaryData.geometry);
+                alert('Error: Boundary geometry is not valid GeoJSON');
+                return;
+            }
+        } else {
+            // Already an object
+            geojson = boundaryData.geometry;
+            console.log('✓ Geometry is already an object');
+        }
+        
+        // Validate GeoJSON structure
+        if (!geojson.type || !geojson.coordinates) {
+            console.error('✗ Invalid GeoJSON structure:', geojson);
+            alert('Error: Boundary geometry missing required fields (type/coordinates)');
+            return;
+        }
+        
+        console.log('Creating Leaflet layer...');
         
         // Create boundary layer
         boundariesLayer = L.geoJSON(geojson, {
@@ -77,14 +103,16 @@ async function displayCommuneBoundary(communeId, communeName) {
         }).addTo(map);
         
         // Fit map to boundary
+        console.log('Fitting map to bounds...');
         map.fitBounds(boundariesLayer.getBounds(), {
             padding: [50, 50],
             maxZoom: 14
         });
         
-        console.log('Boundary displayed successfully');
+        console.log('✓ Boundary displayed successfully!');
     } catch (error) {
-        console.error('Error displaying commune boundary:', error);
+        console.error('✗ Error displaying commune boundary:', error);
+        console.error('Error stack:', error.stack);
     }
 }
 
