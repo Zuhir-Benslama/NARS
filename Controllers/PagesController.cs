@@ -4,32 +4,31 @@ using NarsApi.Services;
 namespace NarsApi.Controllers;
 
 /// <summary>
-/// Serves the HTML pages and static assets, mirroring the FastAPI page routes.
-/// Static files (login.html, map_app.html, app.js) should be placed in the wwwroot/ folder.
-/// Boundaries are served directly from PostGIS via GET /api/commune/{id}/boundary —
-/// the static Boundaries.geojson file is no longer needed.
+/// Serves the HTML pages. Static assets (app.js, app.css) are handled
+/// automatically by UseStaticFiles() from wwwroot/ — no explicit routes needed.
 /// </summary>
 [ApiController]
-[ApiExplorerSettings(IgnoreApi = true)]   // hide from Swagger
+[ApiExplorerSettings(IgnoreApi = true)]
 public class PagesController(JwtService jwt) : ControllerBase
 {
-    // GET /
+    // GET / — redirect to map if authenticated, otherwise to login
     [HttpGet("/")]
     public IActionResult Root()
     {
         var token = Request.Cookies["access_token"];
         if (token is not null && jwt.ValidateToken(token) is not null)
             return Redirect("/map");
-
         return Redirect("/login");
     }
 
     // GET /login
     [HttpGet("/login")]
     public IActionResult LoginPage() =>
-        PhysicalFile(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "login.html"), "text/html");
+        PhysicalFile(
+            Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "login.html"),
+            "text/html");
 
-    // GET /map
+    // GET /map — auth-guarded
     [HttpGet("/map")]
     public IActionResult MapPage()
     {
@@ -37,11 +36,8 @@ public class PagesController(JwtService jwt) : ControllerBase
         if (token is null || jwt.ValidateToken(token) is null)
             return Redirect("/login");
 
-        return PhysicalFile(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "map_app.html"), "text/html");
+        return PhysicalFile(
+            Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "map_app.html"),
+            "text/html");
     }
-
-    // GET /app.js
-    [HttpGet("/app.js")]
-    public IActionResult ServeJs() =>
-        PhysicalFile(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "app.js"), "application/javascript");
 }

@@ -74,8 +74,8 @@ const API_LAYER_TO_PHASE = {
 // ─── AREA TYPES ───────────────────────────────────────────────────────────────
 
 const AREA_TYPES = [
-    { key: 'central_urban',   label: 'Main Urban Area',             color: '#c0392b', dash: null    },
-    { key: 'secondary_urban', label: 'Secondary Urban Area',        color: '#8e44ad', dash: '8, 4'  },
+    { key: 'central_urban',   label: 'Main Urban Area',      color: '#c0392b' },
+    { key: 'secondary_urban', label: 'Secondary Urban Area', color: '#8e44ad' },
 ];
 
 const PUBLIC_SPACE_TYPES = [
@@ -122,6 +122,7 @@ let scatteredPolygons   = [];   // rings extracted from scattered GeoJSON for co
 const drawnItems        = new L.FeatureGroup().addTo(map);
 const lineEndpointLayer = L.layerGroup().addTo(map);
 const scatteredLayer    = L.layerGroup().addTo(map);
+const perimeterLabelLayer = L.layerGroup().addTo(map);  // rotated "urban perimeter" labels
 let   boundariesLayer   = null;
 const POLYLINE_WEIGHT   = 8;
 
@@ -129,8 +130,12 @@ const POLYLINE_WEIGHT   = 8;
 
 function areaStyle(areaTypeKey) {
     const at = AREA_TYPES.find(a => a.key === areaTypeKey) || AREA_TYPES[0];
-    return { color: at.color, weight: 3, fillOpacity: 0.12, fillColor: at.color,
-             ...(at.dash ? { dashArray: at.dash } : {}) };
+    return {
+        color:       at.color,
+        weight:      2.5,
+        fillOpacity: 0,          // no fill — perimeter outline only
+        dashArray:   '10, 6',    // dashed border
+    };
 }
 
 const polygonStyles = {
@@ -193,7 +198,65 @@ function addPolylineEndpoints(layer) {
 
 function createPermanentLabel(layer, label, phaseKey) {
     if (layer instanceof L.Marker) return;  // entrances show label in icon
+    if (phaseKey === 'areas') return;       // areas use rotated perimeter label instead
     layer.bindTooltip(label, { permanent: true, direction: 'center', className: 'custom-shape-label' }).openTooltip();
+}
+
+// Places a "── urban perimeter ──" label along the longest edge of an area polygon,
+// rotated to match the direction of that edge.
+function createAreaPerimeterLabel(layer, areaTypeKey) {
+    // Remove any previous label on this layer
+    if (layer._perimeterLabel) {
+        perimeterLabelLayer.removeLayer(layer._perimeterLabel);
+        layer._perimeterLabel = null;
+    }
+
+    const lls = layer.getLatLngs()[0];
+    if (!lls || lls.length < 2) return;
+
+    // Find the longest edge in screen-pixel space (so the label looks right visually)
+    let maxLen = 0, bestIdx = 0;
+    for (let i = 0; i < lls.length; i++) {
+        const a = map.latLngToLayerPoint(lls[i]);
+        const b = map.latLngToLayerPoint(lls[(i + 1) % lls.length]);
+        const len = Math.hypot(b.x - a.x, b.y - a.y);
+        if (len > maxLen) { maxLen = len; bestIdx = i; }
+    }
+
+    const p1  = lls[bestIdx];
+    const p2  = lls[(bestIdx + 1) % lls.length];
+    const mid = L.latLng((p1.lat + p2.lat) / 2, (p1.lng + p2.lng) / 2);
+
+    // Calculate screen angle and normalise to [-90°, 90°] so text is never upside-down
+    const pp1 = map.latLngToLayerPoint(p1);
+    const pp2 = map.latLngToLayerPoint(p2);
+    let angleDeg = Math.atan2(pp2.y - pp1.y, pp2.x - pp1.x) * (180 / Math.PI);
+    if (angleDeg >  90) angleDeg -= 180;
+    if (angleDeg < -90) angleDeg += 180;
+
+    const at    = AREA_TYPES.find(a => a.key === areaTypeKey) || AREA_TYPES[0];
+    const color = at.color;
+
+    const marker = L.marker(mid, {
+        icon: L.divIcon({
+            className: '',   // suppress Leaflet's default white box
+            html: `<div class="area-perimeter-label" style="color:${color};transform:rotate(${angleDeg}deg);">── urban perimeter ──</div>`,
+            iconSize:   [0, 0],
+            iconAnchor: [0, 0],
+        }),
+        interactive: false,
+        zIndexOffset: -100,
+    });
+
+    perimeterLabelLayer.addLayer(marker);
+    layer._perimeterLabel = marker;
+}
+
+// Rebuilds all area perimeter labels (called after map zoom, since angles are in pixel space)
+function refreshAreaPerimeterLabels() {
+    allFeatures.areas.forEach(({ layer, data }) => {
+        createAreaPerimeterLabel(layer, data.areaTypeKey || 'central_urban');
+    });
 }
 
 // ─── SPATIAL HELPERS ─────────────────────────────────────────────────────────
@@ -419,7 +482,7 @@ let drawControl = null;
 function buildDrawControl(phase) {
     if (drawControl) { map.removeControl(drawControl); drawControl = null; }
     const opts = { polygon: false, polyline: false, rectangle: false, circle: false, circlemarker: false, marker: false };
-    if (phase.drawType === 'polygon')  opts.polygon  = { allowIntersection: false, shapeOptions: { color: phase.color, weight: 3, fillOpacity: 0.15 } };
+    if (phase.drawType === 'polygon')  opts.polygon  = { allowIntersection: false, shapeOptions: { color: phase.color, weight: 2.5, fillOpacity: phase.key === 'areas' ? 0 : 0.15, dashArray: phase.key === 'areas' ? '10, 6' : null } };
     if (phase.drawType === 'polyline') opts.polyline = { shapeOptions: { color: phase.color, weight: POLYLINE_WEIGHT } };
     if (phase.drawType === 'marker') {
         const icon = phase.key === 'cityCenter'
@@ -951,6 +1014,7 @@ async function loadFromDatabase() {
                 drawnItems.addLayer(layer);
                 if (phase.drawType === 'polyline') addPolylineEndpoints(layer);
                 createPermanentLabel(layer, data.label, phaseKey);
+                if (phaseKey === 'areas') createAreaPerimeterLabel(layer, data.areaTypeKey || feature.layer);
                 layer.bindPopup(buildPopup(data, phase));
 
                 allFeatures[phaseKey].push({ layer, data });
@@ -1051,6 +1115,7 @@ map.on(L.Draw.Event.CREATED, async function (event) {
         drawnItems.addLayer(layer);
         if (phase.drawType === 'polyline') addPolylineEndpoints(layer);
         createPermanentLabel(layer, modalResult.label, phase.key);
+        if (phase.key === 'areas') createAreaPerimeterLabel(layer, modalResult.areaTypeKey);
         layer.bindPopup(buildPopup(featureData, phase));
 
         allFeatures[phase.key].push({ layer, data: featureData });
@@ -1093,7 +1158,10 @@ map.on(L.Draw.Event.EDITED, async function (event) {
                 body: JSON.stringify({ data: entry.data }),
             });
 
-            if (phase?.key === 'areas') await refreshScatteredAreas();
+            if (phase?.key === 'areas') {
+                createAreaPerimeterLabel(layer, entry.data.areaTypeKey || 'central_urban');
+                await refreshScatteredAreas();
+            }
         } catch (err) { console.error('Edit persist error:', err); }
     });
 
@@ -1114,6 +1182,7 @@ map.on(L.Draw.Event.DELETED, async function (event) {
             } catch (err) { console.error('Delete error:', err); }
         }
         if (layer._endpointMarkers) layer._endpointMarkers.forEach(m => lineEndpointLayer.removeLayer(m));
+        if (layer._perimeterLabel) perimeterLabelLayer.removeLayer(layer._perimeterLabel);
     });
 
     lineEndpointLayer.clearLayers();
@@ -1125,6 +1194,9 @@ map.on(L.Draw.Event.DELETED, async function (event) {
     if (areaDeleted) await refreshScatteredAreas();
     updateCounts();
 });
+
+// Recalculate perimeter label angles on zoom (pixel angles change with zoom level)
+map.on('zoomend', refreshAreaPerimeterLabels);
 
 // ─── COMMUNE NAVIGATION ───────────────────────────────────────────────────────
 
@@ -1189,38 +1261,7 @@ document.getElementById('logoutItem')?.addEventListener('click', async () => {
 
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 
-const appStyle = document.createElement('style');
-appStyle.textContent = `
-#phaseBar { position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:900;pointer-events:none; }
-#phaseSteps { display:flex;align-items:center;pointer-events:auto; }
-.phase-step {
-    width:30px;height:30px;padding:0;border:1.5px solid transparent;border-radius:50%;
-    display:inline-flex;align-items:center;justify-content:center;
-    background:transparent;cursor:pointer;transition:all 0.2s;
-}
-.phase-step.done   { background:rgba(255,255,255,0.78);border-color:#a8a8a8;color:#3f3f3f; }
-.phase-step.active { background:rgba(243,243,243,0.88);border-color:#555;color:#1f1f1f; }
-.phase-step.locked { background:rgba(220,220,220,0.6);border-color:#bbb;color:#888; }
-.phase-badge { width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;background:currentColor;color:#fff; }
-.phase-step.locked .phase-badge { background:#b0b0b0; }
-.phase-connector { width:40px;height:2px;border-radius:999px; }
-.phase-connector.done   { background:rgba(255,255,255,0.8); }
-.phase-connector.locked { background:rgba(255,255,255,0.2); }
-#map { margin-top:0!important;height:100vh!important; }
-.custom-shape-label {
-    background:transparent!important;border:none!important;box-shadow:none!important;
-    font-weight:700!important;font-size:13px!important;color:#fff!important;
-    text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000!important;
-    padding:4px 8px!important;
-}
-.custom-shape-label::before { display:none!important; }
-.boundary-tooltip {
-    background:rgba(231,76,60,0.9)!important;border:2px solid #fff!important;border-radius:4px!important;
-    color:#fff!important;font-weight:700!important;font-size:12px!important;padding:4px 10px!important;
-    box-shadow:0 2px 5px rgba(0,0,0,0.3)!important;
-}
-`;
-document.head.appendChild(appStyle);
+// Styles are in app.css — loaded via <link> in map_app.html
 
 // ─── BOOTSTRAP ────────────────────────────────────────────────────────────────
 

@@ -764,11 +764,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/home/zuhir/Workspace/NarsApi - CC/NarsApi/NarsApi.csproj",
+      "projectUniqueName": "/home/zuhir/Workspace/NarsApi.csproj",
       "projectName": "NarsApi",
-      "projectPath": "/home/zuhir/Workspace/NarsApi - CC/NarsApi/NarsApi.csproj",
+      "projectPath": "/home/zuhir/Workspace/NarsApi.csproj",
       "packagesPath": "/home/zuhir/.nuget/packages/",
-      "outputPath": "/home/zuhir/Workspace/NarsApi - CC/NarsApi/obj/",
+      "outputPath": "/home/zuhir/Workspace/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "/home/zuhir/.nuget/NuGet/NuGet.Config"

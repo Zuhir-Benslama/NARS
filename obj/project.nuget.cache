@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "LAtZ8RG5eNo=",
+  "dgSpecHash": "t1rq0FHu1p4=",
   "success": true,
-  "projectFilePath": "/home/zuhir/Workspace/NarsApi - CC/NarsApi/NarsApi.csproj",
+  "projectFilePath": "/home/zuhir/Workspace/NarsApi.csproj",
   "expectedPackageFiles": [
     "/home/zuhir/.nuget/packages/bcrypt.net-next/4.1.0/bcrypt.net-next.4.1.0.nupkg.sha512",
     "/home/zuhir/.nuget/packages/microsoft.aspnetcore.authentication.jwtbearer/10.0.3/microsoft.aspnetcore.authentication.jwtbearer.10.0.3.nupkg.sha512",
