@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NARS - National Addressing Reference System</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
+        #map { height: 100vh; width: 100%; }
+
+        /* ── Modal ── */
+        .modal {
+            display: none; position: fixed; z-index: 2000;
+            left: 0; top: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.65);
+        }
+        .modal-content {
+            background: #1a1a2e; color: #e0e0e0;
+            margin: 8% auto; padding: 28px 32px;
+            border-radius: 12px; width: 440px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .modal-header {
+            font-size: 17px; font-weight: 700; margin-bottom: 20px;
+            color: #fff; letter-spacing: 0.3px;
+        }
+        .modal-field { margin-bottom: 14px; }
+        .modal-field label {
+            display: block; margin-bottom: 5px;
+            font-size: 12px; font-weight: 600;
+            color: #aaa; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .modal-field label span.req { color: #e74c3c; margin-left: 2px; }
+        .modal-input {
+            width: 100%; padding: 10px 12px;
+            border: 1.5px solid rgba(255,255,255,0.12);
+            border-radius: 7px; font-size: 13px;
+            background: #0f0f23; color: #fff; outline: none;
+            transition: border-color 0.2s;
+        }
+        .modal-input:focus { border-color: #3498db; }
+        .modal-input::placeholder { color: #555; }
+        .modal-input.error { border-color: #e74c3c; }
+
+        /* ── Modal row for two side-by-side inputs ── */
+        .modal-row { display: flex; gap: 12px; }
+        .modal-row .modal-field { flex: 1; }
+
+        /* ── Modal extra section (dynamic content) ── */
+        #modalExtras { margin-top: 2px; }
+
+        /* ── Modal buttons ── */
+        .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
+        .modal-btn {
+            flex: 1; padding: 11px; border: none; border-radius: 7px;
+            cursor: pointer; font-size: 13px; font-weight: 700;
+            transition: all 0.2s; letter-spacing: 0.3px;
+        }
+        .modal-btn-save  { background: #27ae60; color: #fff; }
+        .modal-btn-save:hover  { background: #1e8449; }
+        .modal-btn-cancel { background: #2c2c4a; color: #ccc; border: 1px solid rgba(255,255,255,0.1); }
+        .modal-btn-cancel:hover { background: #3a3a5c; }
+
+        /* ── Hint bar (shown inside modal for context) ── */
+        #modalHint {
+            font-size: 11px; color: #888;
+            padding: 8px 12px; border-radius: 6px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.06);
+            margin-bottom: 16px; line-height: 1.5;
+        }
+
+        /* ── City-center confirm dialog (custom) ── */
+        #cityCenterDialog {
+            display: none; position: fixed; z-index: 2100;
+            left: 0; top: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.65);
+        }
+        #cityCenterDialog .dialog-box {
+            background: #1a1a2e; color: #e0e0e0;
+            margin: 20% auto; padding: 30px 36px;
+            border-radius: 12px; width: 420px; text-align: center;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        #cityCenterDialog .dialog-title {
+            font-size: 17px; font-weight: 700; margin-bottom: 12px; color: #fff;
+        }
+        #cityCenterDialog .dialog-body {
+            font-size: 13px; color: #aaa; line-height: 1.6; margin-bottom: 24px;
+        }
+        #cityCenterDialog .dialog-buttons { display: flex; gap: 12px; justify-content: center; }
+        #cityCenterDialog .dialog-btn {
+            padding: 10px 28px; border: none; border-radius: 7px;
+            font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s;
+        }
+        .dialog-btn-yes  { background: #27ae60; color: #fff; }
+        .dialog-btn-yes:hover  { background: #1e8449; }
+        .dialog-btn-skip { background: #2c2c4a; color: #ccc; border: 1px solid rgba(255,255,255,0.1); }
+        .dialog-btn-skip:hover { background: #3a3a5c; }
+
+        /* ── Info panel ── */
+        .info-panel {
+            position: absolute; bottom: 20px; right: 20px; z-index: 1000;
+            background: rgba(26,26,46,0.92); color: #e0e0e0;
+            padding: 14px 18px; border-radius: 10px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.08);
+            min-width: 200px;
+        }
+        .info-title { font-weight: 700; margin-bottom: 10px; color: #fff; font-size: 13px; }
+        .info-item  { font-size: 12px; color: #aaa; margin: 4px 0; }
+        .info-item span { color: #fff; font-weight: 600; }
+
+        /* ── Profile menu ── */
+        .profile-menu { position: absolute; top: 10px; right: 10px; z-index: 1000; }
+        .profile-button {
+            background: rgba(26,26,46,0.92); border: 1.5px solid rgba(255,255,255,0.12);
+            border-radius: 8px; padding: 8px 14px; cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            display: flex; align-items: center; gap: 8px; transition: all 0.2s;
+        }
+        .profile-button:hover { border-color: rgba(255,255,255,0.25); }
+        .profile-icon {
+            width: 30px; height: 30px; border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-weight: 700; font-size: 13px;
+        }
+        .profile-info { display: flex; flex-direction: column; align-items: flex-start; }
+        .profile-username { font-weight: 600; color: #fff; font-size: 13px; }
+        .profile-name    { font-size: 11px; color: #888; }
+        .dropdown-arrow  { margin-left: 4px; font-size: 9px; color: #888; transition: transform 0.2s; }
+        .dropdown-arrow.open { transform: rotate(180deg); }
+        .profile-dropdown {
+            position: absolute; top: 56px; right: 0;
+            background: #1a1a2e; border: 1.5px solid rgba(255,255,255,0.1);
+            border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            min-width: 190px; display: none; overflow: hidden;
+        }
+        .profile-dropdown.show { display: block; }
+        .dropdown-item {
+            padding: 11px 15px; cursor: pointer; transition: background 0.2s;
+            display: flex; align-items: center; gap: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.06); color: #ddd; font-size: 13px;
+        }
+        .dropdown-item:last-child { border-bottom: none; }
+        .dropdown-item:hover { background: rgba(255,255,255,0.06); }
+        .dropdown-item.logout { color: #e74c3c; }
+        .dropdown-item.logout:hover { background: rgba(231,76,60,0.1); }
+
+        /* ── Phase skip button (city center phase only) ── */
+        #skipCityCenterBtn {
+            display: none; position: fixed; bottom: 80px; left: 50%;
+            transform: translateX(-50%); z-index: 1100;
+            background: rgba(26,26,46,0.92); color: #aaa;
+            border: 1.5px solid rgba(255,255,255,0.15);
+            border-radius: 8px; padding: 10px 24px; font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: all 0.2s;
+        }
+        #skipCityCenterBtn:hover { background: rgba(52,52,80,0.95); color: #fff; }
+
+        /* ── Loading spinner for async modal checks ── */
+        .field-spinner {
+            display: inline-block; width: 14px; height: 14px;
+            border: 2px solid rgba(255,255,255,0.15);
+            border-top-color: #3498db; border-radius: 50%;
+            animation: spin 0.7s linear infinite; vertical-align: middle; margin-left: 6px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <!-- City-center decision dialog (shown when entering Phase 2) -->
+    <div id="cityCenterDialog">
+        <div class="dialog-box">
+            <div class="dialog-title">📍 City Center</div>
+            <div class="dialog-body">
+                Does this municipality have an identifiable city center?<br>
+                If yes, place a marker on the map. Entrance numbering will radiate outward from that point.<br><br>
+                If no, numbering will be determined automatically by road direction (East→West or North→South).
+            </div>
+            <div class="dialog-buttons">
+                <button class="dialog-btn dialog-btn-yes"  id="cityCenterYes">Yes — Place Marker</button>
+                <button class="dialog-btn dialog-btn-skip" id="cityCenterNo">No — Skip</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Skip button for city center phase -->
+    <button id="skipCityCenterBtn">Skip City Center Phase →</button>
+
+    <!-- Profile menu -->
+    <div class="profile-menu">
+        <div class="profile-button" id="profileButton">
+            <div class="profile-icon" id="profileIcon">U</div>
+            <div class="profile-info">
+                <div class="profile-username" id="profileUsername">Loading...</div>
+                <div class="profile-name"     id="profileName"></div>
+            </div>
+            <span class="dropdown-arrow" id="dropdownArrow">▼</span>
+        </div>
+        <div class="profile-dropdown" id="profileDropdown">
+            <div class="dropdown-item" id="settingsItem">
+                <span>⚙️</span><span>Settings</span>
+            </div>
+            <div class="dropdown-item logout" id="logoutItem">
+                <span>🚪</span><span>Log Out</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info panel -->
+    <div class="info-panel">
+        <div class="info-title">Map Features</div>
+        <div class="info-item">⬟ Areas: <span id="areasCount">0</span></div>
+        <div class="info-item">📍 City Center: <span id="cityCenterCount">—</span></div>
+        <div class="info-item">🏘️ Districts: <span id="districtsCount">0</span></div>
+        <div class="info-item">🛣️ Roads: <span id="roadsCount">0</span></div>
+        <div class="info-item">🚪 Main Entrances: <span id="mainEntrancesCount">0</span></div>
+        <div class="info-item">🔢 Secondary Entrances: <span id="secondaryEntrancesCount">0</span></div>
+        <div class="info-item">🏛️ Public Buildings: <span id="publicBuildingsCount">0</span></div>
+        <div class="info-item">🌳 Public Spaces: <span id="publicSpacesCount">0</span></div>
+    </div>
+
+    <!-- Feature details modal -->
+    <div id="labelModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header" id="modalHeader">Add Feature Details</div>
+            <div id="modalHint"></div>
+
+            <!-- Name field -->
+            <div class="modal-field">
+                <label>Name <span class="req">*</span></label>
+                <input type="text" id="labelInput" class="modal-input" placeholder="Feature name..." autocomplete="off">
+            </div>
+
+            <!-- Decision number + date (side by side) -->
+            <div class="modal-row">
+                <div class="modal-field">
+                    <label>Decision No. <span class="req">*</span></label>
+                    <input type="text" id="decisionNumberInput" class="modal-input" placeholder="e.g. 2024/001" autocomplete="off">
+                </div>
+                <div class="modal-field">
+                    <label>Decision Date <span class="req">*</span></label>
+                    <input type="date" id="decisionDateInput" class="modal-input">
+                </div>
+            </div>
+
+            <!-- Dynamic extras injected by JS -->
+            <div id="modalExtras"></div>
+
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-save"   id="saveLabel">Save</button>
+                <button class="modal-btn modal-btn-cancel" id="cancelLabel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
