@@ -123,12 +123,20 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
         db.Features.Add(feature);
         await db.SaveChangesAsync();
 
-        // After saving an area, recompute scattered areas asynchronously
+        // After saving an area, recompute scattered areas asynchronously.
+        // We extract token and communeId HERE (before the response completes)
+        // because HttpContext is disposed once the response is sent.
         if (body.Type == FeatureTypes.Area &&
             (body.Layer == FeatureTypes.AreaLayers.CentralUrban ||
              body.Layer == FeatureTypes.AreaLayers.SecondaryUrban))
         {
-            _ = TriggerScatteredRefreshAsync(user.UserId);
+            var token = Request.Cookies["access_token"];
+            if (token is not null)
+            {
+                var principal = jwt.ValidateToken(token);
+                if (int.TryParse(principal?.FindFirst("commune_id")?.Value, out int cId))
+                    _ = TriggerScatteredRefreshAsync(user.UserId, cId);
+            }
         }
 
         return StatusCode(201, new { success = true, id = feature.Id, message = "Feature saved successfully" });
@@ -187,7 +195,15 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
         await db.SaveChangesAsync();
 
         if (wasUrbanArea)
-            _ = TriggerScatteredRefreshAsync(user.UserId);
+        {
+            var token = Request.Cookies["access_token"];
+            if (token is not null)
+            {
+                var principal = jwt.ValidateToken(token);
+                if (int.TryParse(principal?.FindFirst("commune_id")?.Value, out int cId))
+                    _ = TriggerScatteredRefreshAsync(user.UserId, cId);
+            }
+        }
 
         return Ok(new { success = true, message = "Feature deleted successfully" });
     }
@@ -302,21 +318,12 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
     // ── Trigger scattered area recomputation ──────────────────
     // Fires-and-forgets a POST to our own /api/areas/refresh-scattered endpoint.
     // We do this after any urban area save/delete so scattered areas stay current.
-    private async Task TriggerScatteredRefreshAsync(int userId)
+    private async Task TriggerScatteredRefreshAsync(int userId, int communeId)
     {
         try
         {
-            // Re-use the cookie from the current request context by calling
-            // the validation controller logic directly via the HTTP client factory
-            // is complex. For simplicity we replicate the core refresh logic here.
-            var token = Request.Cookies["access_token"];
-            if (token is null) return;
-
-            var principal = jwt.ValidateToken(token);
-            if (principal is null) return;
-
-            if (!int.TryParse(principal.FindFirst("commune_id")?.Value, out int communeId)) return;
-
+            // communeId and userId are passed in as parameters — safe because
+            // HttpContext is already disposed when this method runs.
             const string PolygonFromDataSql = @"
                 ST_SetSRID(ST_GeomFromGeoJSON(
                     json_build_object(

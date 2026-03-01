@@ -1,5 +1,7 @@
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using NarsApi.Data;
@@ -11,17 +13,16 @@ var builder = WebApplication.CreateBuilder(args);
 // 1. Database (EF Core + Npgsql / PostGIS)
 // ─────────────────────────────────────────────
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options
-        .UseNpgsql(
-            builder.Configuration.GetConnectionString("DefaultConnection"),
-            o => o.UseNetTopologySuite()   // PostGIS spatial support
-        )
-        // NOTE: no UseSnakeCaseNamingConvention() — all entities already have
-        // explicit [Column("...")] attributes that handle the snake_case mapping
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        o => o.UseNetTopologySuite()
+    )
+    // NOTE: no UseSnakeCaseNamingConvention() — all entities have explicit
+    // [Column("...")] attributes that handle snake_case mapping
 );
 
 // ─────────────────────────────────────────────
-// 2. JWT Authentication
+// 2. JWT Authentication (cookie-first)
 // ─────────────────────────────────────────────
 var jwtSecret = builder.Configuration["Jwt:SecretKey"]
     ?? throw new InvalidOperationException("Jwt:SecretKey is not configured");
@@ -38,7 +39,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ClockSkew                = TimeSpan.Zero,
         };
 
-        // Also accept token from cookie (cookie-first auth, same as FastAPI)
+        // Read token from HttpOnly cookie (same pattern as FastAPI)
         options.Events = new JwtBearerEvents
         {
             OnMessageReceived = ctx =>
@@ -54,25 +55,23 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 
 // ─────────────────────────────────────────────
-// 3. Application Services
+// 3. Application services
 // ─────────────────────────────────────────────
 builder.Services.AddScoped<JwtService>();
 
 // ─────────────────────────────────────────────
-// 4. Controllers & JSON
+// 4. Controllers & JSON (camelCase output)
 // ─────────────────────────────────────────────
 builder.Services.AddControllers()
     .AddJsonOptions(opts =>
     {
-        // Use camelCase in responses, matching FastAPI's default output
-        opts.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        opts.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
     });
 
 // ─────────────────────────────────────────────
-// 5. CORS — must use specific origins when AllowCredentials() is needed,
-//    because AllowAnyOrigin() + AllowCredentials() is forbidden by the
-//    browser (it sends Access-Control-Allow-Origin: * which makes the
-//    browser refuse to include cookies, causing silent 401s on every save).
+// 5. CORS — specific origins + credentials
+//    AllowAnyOrigin() cannot be combined with AllowCredentials() (cookies),
+//    so we use explicit origins from appsettings.json.
 // ─────────────────────────────────────────────
 var allowedOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
@@ -85,30 +84,30 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(allowedOrigins)
               .AllowAnyMethod()
               .AllowAnyHeader()
-              .AllowCredentials()          // required for cookie-based auth
+              .AllowCredentials()   // required for HttpOnly cookie auth
     )
 );
 
 // ─────────────────────────────────────────────
-// 6. OpenAPI (native .NET 10 — replaces Swashbuckle)
+// 6. OpenAPI (native .NET 9/10)
 // ─────────────────────────────────────────────
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer((doc, _, _) =>
     {
         doc.Info.Title       = "NARS - National Addressing Reference System";
-        doc.Info.Description = "Geographic data management API — ASP.NET Core port of the FastAPI original";
+        doc.Info.Description = "Geographic data management API";
         doc.Info.Version     = "2.0.0";
         return Task.CompletedTask;
     });
 });
 
-// ─────────────────────────────────────────────
-// Build & Configure Middleware Pipeline
-// ─────────────────────────────────────────────
+// ═════════════════════════════════════════════
+// Build & configure middleware pipeline
+// ═════════════════════════════════════════════
 var app = builder.Build();
 
-// Ensure tables exist on startup (mirrors FastAPI lifespan startup)
+// ── Ensure DB tables exist on startup ────────
 using (var scope = app.Services.CreateScope())
 {
     var dbCtx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -119,16 +118,10 @@ using (var scope = app.Services.CreateScope())
     Console.WriteLine("✓ Database tables ready");
 }
 
-if (app.Environment.IsDevelopment())
-{
-    // Serves the OpenAPI JSON at /openapi/v1.json
-    app.MapOpenApi();
-}
-
-// BUG FIX: Global JSON exception handler.
-// Without this, any unhandled exception returns an HTML page or empty 500
-// body — the frontend cannot parse it, so the popup shows no useful detail.
-// This ensures all unhandled exceptions return { "detail": "...", "status": 500 }.
+// ── Global exception handler ─────────────────
+// Catches unhandled exceptions and returns structured JSON instead of
+// an HTML error page or empty 500 body — so the frontend can display
+// a meaningful error message.
 app.UseExceptionHandler(errApp =>
 {
     errApp.Run(async ctx =>
@@ -136,27 +129,28 @@ app.UseExceptionHandler(errApp =>
         ctx.Response.ContentType = "application/json";
         ctx.Response.StatusCode  = 500;
 
-        var feature = ctx.Features
-            .Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerPathFeature>();
-        var ex = feature?.Error;
+        var feature = ctx.Features.Get<IExceptionHandlerPathFeature>();
+        var ex      = feature?.Error;
+
+        if (app.Environment.IsDevelopment() && ex is not null)
+            Console.Error.WriteLine($"[EXCEPTION] {ex}");
 
         var message = app.Environment.IsDevelopment()
             ? ex?.Message ?? "An unexpected error occurred."
             : "An internal server error occurred. Please try again.";
 
-        if (app.Environment.IsDevelopment() && ex is not null)
-            Console.Error.WriteLine($"[EXCEPTION] {ex}");
-
-        var json = System.Text.Json.JsonSerializer.Serialize(
-            new { detail = message, status = 500 });
-        await ctx.Response.WriteAsync(json);
+        await ctx.Response.WriteAsync(
+            JsonSerializer.Serialize(new { detail = message, status = 500 }));
     });
 });
 
-// Static files from wwwroot/
+if (app.Environment.IsDevelopment())
+    app.MapOpenApi();
+
+// Static files from wwwroot/ (app.css, app.js, login.html served here)
 app.UseStaticFiles();
 
-// UseRouting must precede UseCors for endpoint-based CORS to apply correctly
+// Middleware order: Routing → CORS → Auth → Controllers
 app.UseRouting();
 app.UseCors();
 app.UseAuthentication();
