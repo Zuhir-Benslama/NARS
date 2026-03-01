@@ -1,0 +1,31 @@
+1- Areas:
+        a- Central urban area.
+        b- Secondary urban area.
+        c- Scattered area.
+
+2- Roads:
+        a- primary Roads:
+                - Boulevards.
+                - Avenues.
+        b- Secondary Roads:
+                - Streets
+        c- Tertiary Roads:
+                - Drives.
+                - Lanes.
+                - Cue-de-sacs.
+                - Ways.
+
+3- districts:
+	a- housing estate.
+	b- urban pole.
+	c- district.
+
+4- house entraces:
+	a- main entrance.
+	b- secondary entrance.
+
+5- Public Buildings:
+
+6- public spaces:
+	a- gardens.
+	b- squares.

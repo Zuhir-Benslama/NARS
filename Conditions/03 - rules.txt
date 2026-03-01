@@ -1,0 +1,31 @@
+Municipal Boundaries:
+1- no drawing outside the municipal boundaries.
+2- every element must have a name with a decision that has a date and a number
+
+Areas:
+1- scattered areas are not urban areas, therefore no drawing is allowed there besides of public builings
+
+Districts:
+1- no rules for districts for the meantime.
+
+Roads:
+1- all roads must have at least on connection to another road.
+1- no road shall turn over 90°.
+
+House Numbering:
+1- the direction must be on one of two cases depending on the existence of the city center (origin of numbering):
+	a- true: from the city center to the edges of Area.
+	b- false: either East to West or from North to South (depending on the angle of the road).
+2- numbering is linked to roads and separated, therefore its independent in every road.
+3- numbering of main entrances starts from the beginning of the road to until the end with:
+	a- houses on the left have odd numbers and starts from 01.
+	b- houses on the right have even numbers and starts from 02.
+4- numbering of secondary entrances is linked to main entrances and separated, therefore its independent in every main entrance.
+5- numbering of secondary entrances starts from 01 and adds by 01.
+6- numbering of secondary entrances must include the word "BIS" before the number.
+
+Public Buildings:
+1- no rules for public buildings for the meantime.
+
+Public spaces:
+1- no rules for public spaces for the meantime.
