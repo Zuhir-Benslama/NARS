@@ -40,30 +40,34 @@ public class Feature
     [Column("user_id"), Required]
     public int UserId { get; set; }
 
+    // Allowed values: area | road | district | house_entrance |
+    //                 public_building | public_space | city_center
     [Column("type"), MaxLength(50), Required]
     public string Type { get; set; } = string.Empty;
 
+    // Sub-type / layer within the top-level type — see FeatureTypes.cs
     [Column("layer"), MaxLength(50), Required]
     public string Layer { get; set; } = string.Empty;
 
-    [Column("label"), MaxLength(255), Required]
+    [Column("label"), MaxLength(500), Required]
     public string Label { get; set; } = string.Empty;
 
-    [Column("data"), Required]
+    // Stored as JSONB in PostgreSQL for efficient querying by the validation
+    // endpoints (f.data::jsonb->'coordinates', etc.).
+    // EF Core maps it as a string; Npgsql transparently handles JSONB <-> string.
+    [Column("data", TypeName = "jsonb"), Required]
     public string Data { get; set; } = string.Empty;
 
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     [Column("updated_at")]
-    public DateTime? UpdatedAt { get; set; }  // null until first edit
+    public DateTime? UpdatedAt { get; set; }
 }
 
 [Table("wilayas")]
 public class Wilaya
 {
-    // wilaya_id is the true PK. The original ogc_fid (GDAL shapefile artefact)
-    // has been removed from the schema — see nars_db.sql.
     [Key, Column("wilaya_id"), DatabaseGenerated(DatabaseGeneratedOption.None)]
     public int WilayaId { get; set; }
 
@@ -114,13 +118,13 @@ public class Commune
     [Column("daira_id"), Required]
     public int DairaId { get; set; }
 
-    [Column("commune_code")]  // nullable — not every commune has a code
+    [Column("commune_code")]
     public int? CommuneCode { get; set; }
 
-    [Column("commune_ar"), MaxLength(50), Required]
+    [Column("commune_ar"), MaxLength(100), Required]
     public string CommuneAr { get; set; } = string.Empty;
 
-    [Column("commune_fr"), MaxLength(50), Required]
+    [Column("commune_fr"), MaxLength(100), Required]
     public string CommuneFr { get; set; } = string.Empty;
 
     [Column("commune_latitude")]
@@ -139,8 +143,8 @@ public class CommuneBoundary
     [Key, Column("commune_id")]
     public int CommuneId { get; set; }
 
-    // Native PostGIS geometry — stored as the geometry type in PostgreSQL.
-    // We use raw ADO.NET + ST_AsGeoJSON for the boundary API response.
+    // PostGIS geometry column — queried via raw ADO.NET + ST_AsGeoJSON.
+    // NetTopologySuite maps to the PostGIS 'geometry' type via Npgsql.
     [Column("geometry"), Required]
     public NetTopologySuite.Geometries.Geometry Geometry { get; set; } = null!;
 }
