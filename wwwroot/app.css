@@ -17,6 +17,9 @@ body {
     overflow: hidden;
 }
 
+/* Hide Vue app until mounted to prevent FOUC */
+[v-cloak] { display: none; }
+
 
 /* ── Map ───────────────────────────────────────────────────────────────────── */
 
@@ -89,7 +92,6 @@ body {
 /* ── Modal ─────────────────────────────────────────────────────────────────── */
 
 .modal {
-    display: none;
     position: fixed;
     z-index: 2000;
     left: 0;
@@ -198,7 +200,6 @@ body {
 /* ── City-center dialog ─────────────────────────────────────────────────────── */
 
 #cityCenterDialog {
-    display: none;
     position: fixed;
     z-index: 2100;
     left: 0;
@@ -259,7 +260,6 @@ body {
 /* ── Skip city-center button ────────────────────────────────────────────────── */
 
 #skipCityCenterBtn {
-    display: none;
     position: fixed;
     bottom: 80px;
     left: 50%;
