@@ -1,0 +1,16 @@
+wwwroot/
+├── map_app.html          ← shell: #map outside, #app for Vue overlays
+├── app.css               ← add [v-cloak], remove manual display:none
+└── js/
+    ├── main.js           ← create Vue app, register components, init map
+    ├── phases.js         ← PHASES, AREA_TYPES, ROAD_TYPES, etc. (constants)
+    ├── api.js            ← apiFetch helper
+    ├── store.js          ← reactive state + openModal/resolveModal bridge
+    ├── validation.js     ← all validation API calls
+    ├── map.js            ← all Leaflet logic (layers, draw events, load/save)
+    └── components/
+        ├── PhaseBar.js
+        ├── FeatureModal.js
+        ├── CityCenterDialog.js
+        ├── InfoPanel.js
+        └── ProfileMenu.js
