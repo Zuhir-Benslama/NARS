@@ -1,0 +1,25 @@
+{
+  "name": "nars-frontend",
+  "version": "1.0.0",
+  "description": "NARS \u2014 National Addressing Reference System",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "vue": "^3.4.0",
+    "leaflet": "^1.9.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "vite": "^5.0.0",
+    "typescript": "^5.4.0",
+    "vue-tsc": "^2.0.0",
+    "@types/leaflet": "^1.9.0",
+    "@types/node": "^20.0.0",
+    "@types/leaflet-draw": "^1.0.11"
+  }
+}

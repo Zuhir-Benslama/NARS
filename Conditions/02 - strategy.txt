@@ -1,8 +1,0 @@
-1- areas.
-2- districts.
-3- roads.
-4- house entrances.
-	a- main entrances.
-	b- secondary entrances.
-5- public buildings.
-6- public spaces.
