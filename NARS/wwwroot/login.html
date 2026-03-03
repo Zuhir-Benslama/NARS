@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - NARS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 450px;
+            overflow: hidden;
+        }
+
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 600;
+            color: #6c757d;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab:hover {
+            background: #e9ecef;
+        }
+
+        .tab.active {
+            color: #667eea;
+            background: white;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .form-container {
+            padding: 40px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .success-message {
+            background: #efe;
+            color: #3c3;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            color: #667eea;
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+
+        .logo p {
+            color: #6c757d;
+            font-size: 14px;
+        }
+
+        /* Searchable select styling */
+        .search-select-wrapper {
+            position: relative;
+        }
+
+        .search-select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .search-select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .dropdown-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            background: white;
+            border: 2px solid #667eea;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            z-index: 1000;
+            display: none;
+        }
+
+        .dropdown-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .dropdown-item:hover {
+            background: #f0f0ff;
+        }
+
+        .dropdown-item.selected {
+            background: #667eea;
+            color: white;
+        }
+
+        #signupForm {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="tabs">
+            <div class="tab active" id="signinTab">Sign In</div>
+            <div class="tab" id="signupTab">Sign Up</div>
+        </div>
+
+        <div class="form-container">
+            <div class="logo">
+                <h1>🗺️ NARS</h1>
+                <p>National Addressing Reference System</p>
+            </div>
+
+            <!-- Sign In Form -->
+            <form id="signinForm">
+                <div class="error-message" id="signinError"></div>
+                
+                <div class="form-group">
+                    <label for="signin-username">Username</label>
+                    <input type="text" id="signin-username" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="signin-password">Password</label>
+                    <input type="password" id="signin-password" required>
+                </div>
+
+                <button type="submit" class="btn">Sign In</button>
+            </form>
+
+            <!-- Sign Up Form -->
+            <form id="signupForm">
+                <div class="error-message" id="signupError"></div>
+                <div class="success-message" id="signupSuccess"></div>
+
+                <div class="form-group">
+                    <label for="signup-name">Full Name</label>
+                    <input type="text" id="signup-name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="signup-email">Email</label>
+                    <input type="email" id="signup-email" placeholder="example@email.com" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="signup-phone">Phone Number</label>
+                    <input type="tel" id="signup-phone" placeholder="0555123456" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="signup-username">Username</label>
+                    <input type="text" id="signup-username" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="signup-password">Password</label>
+                    <input type="password" id="signup-password" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="signup-wilaya">Wilaya (State)</label>
+                    <div class="search-select-wrapper">
+                        <input type="text" id="signup-wilaya" class="search-select" placeholder="Search wilaya..." autocomplete="off" required>
+                        <div id="wilaya-dropdown" class="dropdown-list"></div>
+                    </div>
+                    <input type="hidden" id="signup-wilaya-value">
+                </div>
+
+                <div class="form-group">
+                    <label for="signup-daira">Daira</label>
+                    <div class="search-select-wrapper">
+                        <input type="text" id="signup-daira" class="search-select" placeholder="Select wilaya first..." autocomplete="off" disabled required>
+                        <div id="daira-dropdown" class="dropdown-list"></div>
+                    </div>
+                    <input type="hidden" id="signup-daira-value">
+                </div>
+
+                <div class="form-group">
+                    <label for="signup-commune">Commune (Municipality)</label>
+                    <div class="search-select-wrapper">
+                        <input type="text" id="signup-commune" class="search-select" placeholder="Select daira first..." autocomplete="off" disabled required>
+                        <div id="commune-dropdown" class="dropdown-list"></div>
+                    </div>
+                    <input type="hidden" id="signup-commune-value">
+                </div>
+
+                <button type="submit" class="btn">Sign Up</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching
+        const signinTab = document.getElementById('signinTab');
+        const signupTab = document.getElementById('signupTab');
+        const signinForm = document.getElementById('signinForm');
+        const signupFormElement = document.getElementById('signupForm');
+
+        signinTab.addEventListener('click', () => {
+            signinTab.classList.add('active');
+            signupTab.classList.remove('active');
+            signinForm.style.display = 'block';
+            signupFormElement.style.display = 'none';
+        });
+
+        signupTab.addEventListener('click', () => {
+            signupTab.classList.add('active');
+            signinTab.classList.remove('active');
+            signupFormElement.style.display = 'block';
+            signinForm.style.display = 'none';
+        });
+
+        // Debounce function
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Selected location data (storing both ID and name)
+        let selectedWilaya = null;  // {id, name_fr, name_ar}
+        let selectedDaira = null;   // {id, name_fr, name_ar}
+        let selectedCommune = null; // {id, name_fr, name_ar}
+
+        // Wilaya searchable dropdown
+        const wilayaInput = document.getElementById('signup-wilaya');
+        const wilayaDropdown = document.getElementById('wilaya-dropdown');
+        const wilayaValue = document.getElementById('signup-wilaya-value');
+
+        wilayaInput.addEventListener('focus', () => {
+            loadWilayas('');
+        });
+
+        wilayaInput.addEventListener('input', debounce((e) => {
+            loadWilayas(e.target.value);
+            selectedWilaya = null;
+            wilayaValue.value = '';
+            
+            // Reset daira and commune
+            resetDaira();
+            resetCommune();
+        }, 300));
+
+        async function loadWilayas(search) {
+            try {
+                const response = await fetch(`/api/wilayas?search=${encodeURIComponent(search)}`);
+                const wilayas = await response.json();
+                
+                wilayaDropdown.innerHTML = '';
+                
+                if (wilayas.length === 0) {
+                    wilayaDropdown.innerHTML = '<div class="dropdown-item" style="color: #999;">No results found</div>';
+                } else {
+                    wilayas.forEach(wilaya => {
+                        const div = document.createElement('div');
+                        div.className = 'dropdown-item';
+                        div.textContent = wilaya.name_fr;
+                        div.addEventListener('click', () => {
+                            selectWilaya(wilaya);
+                        });
+                        wilayaDropdown.appendChild(div);
+                    });
+                }
+                
+                wilayaDropdown.style.display = 'block';
+            } catch (error) {
+                console.error('Error loading wilayas:', error);
+            }
+        }
+
+        function selectWilaya(wilaya) {
+            selectedWilaya = wilaya;
+            wilayaInput.value = wilaya.name_fr;
+            wilayaValue.value = wilaya.id;
+            wilayaDropdown.style.display = 'none';
+            
+            // Enable daira and reset
+            const dairaInput = document.getElementById('signup-daira');
+            dairaInput.disabled = false;
+            dairaInput.placeholder = 'Search daira...';
+            dairaInput.value = '';
+            document.getElementById('signup-daira-value').value = '';
+            selectedDaira = null;
+            
+            // Reset commune
+            resetCommune();
+        }
+
+        function resetDaira() {
+            const dairaInput = document.getElementById('signup-daira');
+            dairaInput.disabled = true;
+            dairaInput.placeholder = 'Select wilaya first...';
+            dairaInput.value = '';
+            document.getElementById('signup-daira-value').value = '';
+            selectedDaira = null;
+            document.getElementById('daira-dropdown').innerHTML = '';
+        }
+
+        // Daira searchable dropdown
+        const dairaInput = document.getElementById('signup-daira');
+        const dairaDropdown = document.getElementById('daira-dropdown');
+        const dairaValue = document.getElementById('signup-daira-value');
+
+        dairaInput.addEventListener('focus', () => {
+            if (selectedWilaya) {
+                loadDairas('');
+            }
+        });
+
+        dairaInput.addEventListener('input', debounce((e) => {
+            if (selectedWilaya) {
+                loadDairas(e.target.value);
+                selectedDaira = null;
+                dairaValue.value = '';
+                
+                // Reset commune
+                resetCommune();
+            }
+        }, 300));
+
+        async function loadDairas(search) {
+            try {
+                const response = await fetch(`/api/dairas?wilaya_id=${selectedWilaya.id}&search=${encodeURIComponent(search)}`);
+                const dairas = await response.json();
+                
+                dairaDropdown.innerHTML = '';
+                
+                if (dairas.length === 0) {
+                    dairaDropdown.innerHTML = '<div class="dropdown-item" style="color: #999;">No results found</div>';
+                } else {
+                    dairas.forEach(daira => {
+                        const div = document.createElement('div');
+                        div.className = 'dropdown-item';
+                        div.textContent = daira.name_fr;
+                        div.addEventListener('click', () => {
+                            selectDaira(daira);
+                        });
+                        dairaDropdown.appendChild(div);
+                    });
+                }
+                
+                dairaDropdown.style.display = 'block';
+            } catch (error) {
+                console.error('Error loading dairas:', error);
+            }
+        }
+
+        function selectDaira(daira) {
+            selectedDaira = daira;
+            dairaInput.value = daira.name_fr;
+            dairaValue.value = daira.id;
+            dairaDropdown.style.display = 'none';
+            
+            // Enable commune
+            const communeInput = document.getElementById('signup-commune');
+            communeInput.disabled = false;
+            communeInput.placeholder = 'Search commune...';
+            communeInput.value = '';
+            document.getElementById('signup-commune-value').value = '';
+            selectedCommune = null;
+        }
+
+        function resetCommune() {
+            const communeInput = document.getElementById('signup-commune');
+            communeInput.disabled = true;
+            communeInput.placeholder = 'Select daira first...';
+            communeInput.value = '';
+            document.getElementById('signup-commune-value').value = '';
+            selectedCommune = null;
+            document.getElementById('commune-dropdown').innerHTML = '';
+        }
+
+        // Commune searchable dropdown
+        const communeInput = document.getElementById('signup-commune');
+        const communeDropdown = document.getElementById('commune-dropdown');
+        const communeValue = document.getElementById('signup-commune-value');
+
+        communeInput.addEventListener('focus', () => {
+            if (selectedWilaya && selectedDaira) {
+                loadCommunes('');
+            }
+        });
+
+        communeInput.addEventListener('input', debounce((e) => {
+            if (selectedWilaya && selectedDaira) {
+                loadCommunes(e.target.value);
+                selectedCommune = null;
+                communeValue.value = '';
+            }
+        }, 300));
+
+        async function loadCommunes(search) {
+            try {
+                const response = await fetch(`/api/communes?daira_id=${selectedDaira.id}&search=${encodeURIComponent(search)}`);
+                const communes = await response.json();
+                
+                communeDropdown.innerHTML = '';
+                
+                if (communes.length === 0) {
+                    communeDropdown.innerHTML = '<div class="dropdown-item" style="color: #999;">No results found</div>';
+                } else {
+                    communes.forEach(commune => {
+                        const div = document.createElement('div');
+                        div.className = 'dropdown-item';
+                        div.textContent = commune.name_fr;
+                        div.addEventListener('click', () => {
+                            selectCommune(commune);
+                        });
+                        communeDropdown.appendChild(div);
+                    });
+                }
+                
+                communeDropdown.style.display = 'block';
+            } catch (error) {
+                console.error('Error loading communes:', error);
+            }
+        }
+
+        function selectCommune(commune) {
+            selectedCommune = commune;
+            communeInput.value = commune.name_fr;
+            communeValue.value = commune.id;
+            communeDropdown.style.display = 'none';
+        }
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!wilayaInput.contains(e.target) && !wilayaDropdown.contains(e.target)) {
+                wilayaDropdown.style.display = 'none';
+            }
+            if (!dairaInput.contains(e.target) && !dairaDropdown.contains(e.target)) {
+                dairaDropdown.style.display = 'none';
+            }
+            if (!communeInput.contains(e.target) && !communeDropdown.contains(e.target)) {
+                communeDropdown.style.display = 'none';
+            }
+        });
+
+        // Sign In
+        signinForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('signin-username').value;
+            const password = document.getElementById('signin-password').value;
+            const errorDiv = document.getElementById('signinError');
+            
+            try {
+                const response = await fetch('/api/signin', { credentials: 'include',
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Redirect to map
+                    window.location.href = '/map';
+                } else {
+                    errorDiv.textContent = data.detail || data.error || 'Invalid username or password';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Error connecting to server';
+                errorDiv.style.display = 'block';
+            }
+        });
+
+        // Sign Up
+        signupFormElement.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const name = document.getElementById('signup-name').value;
+            const email = document.getElementById('signup-email').value;
+            const phone = document.getElementById('signup-phone').value;
+            const username = document.getElementById('signup-username').value;
+            const password = document.getElementById('signup-password').value;
+            
+            const errorDiv = document.getElementById('signupError');
+            const successDiv = document.getElementById('signupSuccess');
+            
+            // Validate location fields
+            if (!selectedWilaya || !selectedDaira || !selectedCommune) {
+                errorDiv.textContent = 'Please select wilaya, daira, and commune from the dropdown lists';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/signup', { credentials: 'include',
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        name,
+                        email,
+                        phone,
+                        username,
+                        password,
+                        commune_id: selectedCommune.id
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    successDiv.textContent = 'Account created successfully! Please sign in.';
+                    successDiv.style.display = 'block';
+                    errorDiv.style.display = 'none';
+                    
+                    // Clear form
+                    signupFormElement.reset();
+                    selectedWilaya = null;
+                    selectedDaira = null;
+                    selectedCommune = null;
+                    resetDaira();
+                    resetCommune();
+                    
+                    // Switch to sign in after 2 seconds
+                    setTimeout(() => {
+                        signinTab.click();
+                        successDiv.style.display = 'none';
+                    }, 2000);
+                } else {
+                    errorDiv.textContent = data.detail || data.error || 'Failed to create account';
+                    errorDiv.style.display = 'block';
+                    successDiv.style.display = 'none';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Error connecting to server';
+                errorDiv.style.display = 'block';
+                successDiv.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
