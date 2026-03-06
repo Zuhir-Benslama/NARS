@@ -34,6 +34,8 @@ export function openModal(phaseIndex: number, layer: L.Layer): Promise<ModalResu
         Object.assign(store.modal, {
             visible:             true,
             phaseIndex,
+            isEdit:              false,
+            editDbId:            null,
             label:               '',
             decisionNumber:      '',
             decisionDate:        '',
@@ -51,6 +53,37 @@ export function openModal(phaseIndex: number, layer: L.Layer): Promise<ModalResu
             selectedMainIdx:     '',
             bisNumber:           null,
             spaceTypeKey:        'garden',
+        })
+    })
+}
+
+export function openEditModal(phaseIndex: number, dbId: number, existing: import('./types').FeatureData): Promise<ModalResult | null> {
+    return new Promise((resolve) => {
+        _modalResolve     = resolve
+        currentModalLayer = null
+
+        Object.assign(store.modal, {
+            visible:         true,
+            phaseIndex,
+            isEdit:          true,
+            editDbId:        dbId,
+            label:           existing.label        ?? '',
+            decisionNumber:  existing.decisionNumber ?? '',
+            decisionDate:    existing.decisionDate   ?? '',
+            errors:          {},
+            areaTypeKey:     existing.areaTypeKey    ?? 'central_urban',
+            mainUrbanExists: false,
+            districtTypeKey: existing.districtTypeKey ?? 'district',
+            roadTypeKey:     existing.roadTypeKey     ?? 'street',
+            roadOptions:         [],
+            selectedRoadIdx:     '',
+            entranceSide:        null,
+            entranceNumber:      null,
+            entranceSideLoading: false,
+            mainEntranceOptions: [],
+            selectedMainIdx:     '',
+            bisNumber:           null,
+            spaceTypeKey:    existing.spaceTypeKey ?? 'garden',
         })
     })
 }
@@ -84,6 +117,8 @@ export const store = reactive<AppStore>({
     modal: {
         visible:             false,
         phaseIndex:          null,
+        isEdit:              false,
+        editDbId:            null,
         label:               '',
         decisionNumber:      '',
         decisionDate:        '',

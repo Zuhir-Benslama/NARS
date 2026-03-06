@@ -54,7 +54,7 @@ Workspace/
         ├── App.vue         ← Root Vue component
         ├── app.css         ← All application styles
         ├── api.ts          ← Fetch wrapper (credentials: include)
-        ├── map.ts          ← Leaflet map, draw events, feature logic
+        ├── map.ts          ← Leaflet map, draw events, feature logic, snapping
         ├── store.ts        ← Reactive app state + modal bridge
         ├── phases.ts       ← Phase definitions and feature sub-type lists
         ├── validation.ts   ← API calls to /api/validate/*
@@ -66,7 +66,7 @@ Workspace/
             ├── CityCenterDialog.vue   ← City center placement prompt
             ├── InfoPanel.vue          ← Feature count display
             ├── ProfileMenu.vue        ← User profile dropdown
-            └── FeatureModal.vue       ← Feature details form
+            └── FeatureModal.vue       ← Feature details form (add + edit modes)
 ```
 
 ---
@@ -175,16 +175,16 @@ npm run typecheck
 
 The app guides the operator through 8 sequential phases. Each phase unlocks the next once its completion criteria are met.
 
-| # | Phase | Draw Type | Validation |
-|---|---|---|---|
-| 1 | **Areas** | Polygon | One main urban area maximum. Scattered area computed automatically. |
-| 2 | **City Center** | Marker | Optional — can be skipped. Determines entrance numbering direction. |
-| 3 | **Districts** | Polygon | Must share edges (no gaps), must not overlap, must cover all urban areas. |
-| 4 | **Roads** | Polyline | No turn > 90°. Must connect to an existing road (first road exempt). |
-| 5 | **Main Entrances** | Marker | Assigned to a road. Left side = odd numbers, right side = even numbers. |
-| 6 | **Secondary Entrances** | Marker | Assigned to a main entrance. Numbered BIS01, BIS02… |
-| 7 | **Public Buildings** | Polygon | Allowed anywhere including scattered areas. |
-| 8 | **Public Spaces** | Polygon | Gardens and squares inside the municipal boundary. |
+| # | Phase | Draw Type | Validation | Status |
+|---|---|---|---|---|
+| 1 | **Areas** | Polygon | One main urban area maximum. Scattered area computed automatically. | ✅ Done |
+| 2 | **City Center** | Marker | Optional — can be skipped. Determines entrance numbering direction. | ✅ Done |
+| 3 | **Districts** | Polygon | Must share edges (no gaps), must not overlap, must cover all urban areas. | ✅ Done |
+| 4 | **Roads** | Polyline | No turn > 90°. Must connect to an existing road (first road exempt). | 🔲 Pending |
+| 5 | **Main Entrances** | Marker | Assigned to a road. Left side = odd numbers, right side = even numbers. | 🔲 Pending |
+| 6 | **Secondary Entrances** | Marker | Assigned to a main entrance. Numbered BIS01, BIS02… | 🔲 Pending |
+| 7 | **Public Buildings** | Polygon | Allowed anywhere including scattered areas. | 🔲 Pending |
+| 8 | **Public Spaces** | Polygon | Gardens and squares inside the municipal boundary. | 🔲 Pending |
 
 ---
 
@@ -288,5 +288,13 @@ Spatial indexes on `communes_boundaries.geometry` and composite indexes on `feat
 ## Notes
 
 - **Scattered areas** are never drawn manually — they are computed automatically by PostGIS as `commune_boundary MINUS ST_Union(all urban areas)` whenever an urban area is saved or deleted.
+
 - **Leaflet and leaflet-draw** are loaded from CDN (not bundled by Vite) because `leaflet-draw` is a legacy UMD bundle that requires `window.L` to exist at load time.
+
+- **Feature editing** is accessible via right-click context menu on any drawn feature, offering three actions: edit info (pre-filled modal), edit boundaries (leaflet-draw edit mode), and remove object (with confirmation).
+
+- **District boundary snapping** — when drawing districts, the cursor automatically snaps to nearby boundaries of existing areas, districts, and the municipality boundary. Corner vertices are prioritized over edge midpoints. The snap works by patching `map.mouseEventToLayerPoint` so leaflet-draw's internal coordinate pipeline always receives the snapped coordinate for both preview and click registration. Polygon rings are explicitly closed (first point repeated as last) before being sent to PostGIS to satisfy GEOS geometry requirements.
+
+- **PostGIS geometry repair** — `ValidationController` wraps all stored polygon reads with `ST_MakeValid()` to gracefully handle any legacy or edge-case geometries that may have been saved without a closed ring.
+
 - The `features.data` column is typed as `jsonb` in PostgreSQL, allowing the validation endpoints to run PostGIS queries directly against the stored geometry coordinates without a separate geometry column.

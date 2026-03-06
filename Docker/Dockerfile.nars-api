@@ -1,0 +1,23 @@
+# Build with:
+# docker build -f Docker/Dockerfile.nars-api -t your-registry/nars-api:latest .
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+# Copy project file first for better restore-layer caching
+COPY NARS/NarsApi.csproj NARS/
+RUN dotnet restore NARS/NarsApi.csproj
+
+# Copy source and publish
+COPY NARS/ NARS/
+WORKDIR /src/NARS
+RUN dotnet publish NarsApi.csproj -c Release -o /app/publish /p:UseAppHost=false
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+WORKDIR /app
+
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
+
+COPY --from=build /app/publish ./
+ENTRYPOINT ["dotnet", "NarsApi.dll"]

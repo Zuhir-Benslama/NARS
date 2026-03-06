@@ -1,0 +1,8 @@
+# Optional custom Postgres image for k8s/postgres.yaml.
+# Build with:
+# docker build -f Docker/Dockerfile.postgres -t your-registry/nars-postgres:15 .
+
+FROM postgres:15
+
+# Keep defaults; runtime env vars from Kubernetes Secret/Deployment are used.
+EXPOSE 5432
