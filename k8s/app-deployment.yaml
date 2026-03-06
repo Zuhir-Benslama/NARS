@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nars-api
+  namespace: nars
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nars-api
+  template:
+    metadata:
+      labels:
+        app: nars-api
+    spec:
+      containers:
+        - name: nars-api
+          # Replace with your pushed image
+          image: your-registry/nars-api:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: nars-config
+            - secretRef:
+                name: nars-secrets
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

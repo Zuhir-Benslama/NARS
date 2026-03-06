@@ -29,7 +29,14 @@ export async function validateRoad(layer: L.Polyline): Promise<ValidateRoadRespo
 // POST /api/validate/district
 export async function validateDistrict(layer: L.Polygon): Promise<ValidateDistrictResponse> {
     const lls = layer.getLatLngs()[0] as L.LatLng[]
-    const coords = lls.map((ll) => ({ lat: ll.lat, lng: ll.lng }))
+    let coords = lls.map((ll) => ({ lat: ll.lat, lng: ll.lng }))
+    // PostGIS requires closed ring — ensure first and last points are identical
+    if (coords.length >= 3) {
+        const first = coords[0], last = coords[coords.length - 1]
+        if (first.lat !== last.lat || first.lng !== last.lng) {
+            coords = [...coords, { lat: first.lat, lng: first.lng }]
+        }
+    }
     try {
         const res = await apiFetch('/api/validate/district', {
             method:  'POST',

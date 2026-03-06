@@ -1,29 +1,35 @@
 import { PHASES, API_LAYER_TO_PHASE, AREA_TYPES } from './phases'
 import { apiFetch }                                from './api'
-import { store, featureLayers, openModal, syncCounts, currentModalLayer } from './store'
+import { store, featureLayers, openModal, openEditModal, syncCounts, currentModalLayer } from './store'
 import { validateRoad, validateDistrict, checkDistrictCoverage, getRoadSide, checkMainUrbanExists } from './validation'
 import type { FeatureData, LayerEntry, SaveResult, DbFeature, ScatteredRefreshResponse } from './types'
 
 // ─── LEAFLET ──────────────────────────────────────────────────────────────────
-// Imported for types from @types/leaflet. At runtime, Vite's externals config
-// maps this import to the global window.L (loaded via CDN in index.html).
-import L from 'leaflet'
-import 'leaflet-draw'  // augments L with L.Draw, L.Control.Draw, L.DrawEvents
+// Both leaflet and leaflet-draw are loaded via CDN <script> tags in index.html
+// and patch window.L before this module runs. We declare L as an ambient global
+// so TypeScript knows its type without generating any import statement that
+// Rollup/Vite would fail to resolve at build time.
+declare const L: typeof import('leaflet') & {
+    Draw: any
+    Control: typeof import('leaflet').Control & { Draw: new (opts: any) => any }
+    DrawEvents: any
+}
 
 // ─── MAP & LAYER INITIALIZATION ───────────────────────────────────────────────
 
 export let map: L.Map
-let drawnItems:         L.FeatureGroup
-let lineEndpointLayer:  L.LayerGroup
-let scatteredLayer:     L.LayerGroup
+let drawnItems:          L.FeatureGroup
+let lineEndpointLayer:   L.LayerGroup
+let scatteredLayer:      L.LayerGroup
 let perimeterLabelLayer: L.LayerGroup
-let boundariesLayer:    L.GeoJSON | null = null
-let drawControl:        L.Control.Draw  | null = null
+let polygonEdgeLabelLayer: L.LayerGroup
+let boundariesLayer:     L.GeoJSON | null = null
+let drawControl:         L.Control.Draw  | null = null
 
 const POLYLINE_WEIGHT = 8
 
 export function initMap(): void {
-    map = L.map('map').setView([36.7538, 3.0588], 10)
+    map = L.map('map').setView([28.0, 2.5], 5)
 
     const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © Esri' })
     const street    = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',  { attribution: '© OpenStreetMap contributors' })
@@ -32,12 +38,13 @@ export function initMap(): void {
     satellite.addTo(map)
     L.control.layers({ Satellite: satellite, Street: street, Light: carto, Dark: dark }, undefined, { position: 'bottomleft' }).addTo(map)
 
-    drawnItems         = new L.FeatureGroup().addTo(map)
-    lineEndpointLayer  = L.layerGroup().addTo(map)
-    scatteredLayer     = L.layerGroup().addTo(map)
-    perimeterLabelLayer = L.layerGroup().addTo(map)
+    drawnItems           = new L.FeatureGroup().addTo(map)
+    lineEndpointLayer    = L.layerGroup().addTo(map)
+    scatteredLayer       = L.layerGroup().addTo(map)
+    perimeterLabelLayer  = L.layerGroup().addTo(map)
+    polygonEdgeLabelLayer = L.layerGroup().addTo(map)
 
-    map.on('zoomend', refreshAreaPerimeterLabels)
+    map.on('zoomend', refreshAllEdgeLabels)
 
     buildDrawControl(PHASES[0])
     registerDrawEvents()
@@ -51,7 +58,7 @@ export function areaStyle(areaTypeKey: string): L.PathOptions {
 }
 
 const polygonStyles: Record<string, L.PathOptions> = {
-    districts:       { color: '#f39c12', weight: 3, fillOpacity: 0.15, fillColor: '#f39c12' },
+    districts:       { color: '#f39c12', weight: 3, fillOpacity: 0 },
     publicBuildings: { color: '#e67e22', weight: 3, fillOpacity: 0.25, fillColor: '#e67e22' },
     publicSpaces:    { color: '#2ecc71', weight: 3, fillOpacity: 0.20, fillColor: '#2ecc71' },
 }
@@ -116,39 +123,91 @@ function addPolylineEndpoints(layer: L.Layer): void {
 
 function createPermanentLabel(layer: L.Layer, label: string, phaseKey: string): void {
     if (layer instanceof L.Marker) return
-    if (phaseKey === 'areas') return
+    if (phaseKey === 'areas')     return  // edge label
+    if (phaseKey === 'districts') return  // edge label
     ;(layer as L.Path).bindTooltip(label, { permanent: true, direction: 'center', className: 'custom-shape-label' }).openTooltip()
 }
 
-export function createAreaPerimeterLabel(layer: L.Layer, areaTypeKey: string): void {
-    if ((layer as any)._perimeterLabel) {
-        perimeterLabelLayer.removeLayer((layer as any)._perimeterLabel)
-        ;(layer as any)._perimeterLabel = null
-    }
-    if (!(layer instanceof L.Polygon)) return
+// ─── POLYGON EDGE LABELS ──────────────────────────────────────────────────────
+// One label per edge, rotated along the edge, size scales with zoom.
 
-    const mid   = (layer as L.Polygon).getBounds().getCenter()
-    const at    = AREA_TYPES.find(a => a.key === areaTypeKey) ?? AREA_TYPES[0]
-    const label = at.label.replace(' Area', '')
-
-    const marker = L.marker(mid, {
-        icon: L.divIcon({
-            className: '',
-            html: `<div class="area-center-label">${label}</div>`,
-            iconSize: [0, 0], iconAnchor: [0, 0],
-        }),
-        interactive: false,
-        zIndexOffset: -100,
-    })
-
-    perimeterLabelLayer.addLayer(marker)
-    ;(layer as any)._perimeterLabel = marker
+function edgeLabelFontSize(): number {
+    return Math.max(7, Math.min(18, map.getZoom() * 1.5 - 9))
 }
 
-function refreshAreaPerimeterLabels(): void {
-    featureLayers.areas.forEach(({ layer, data }) => {
-        createAreaPerimeterLabel(layer, data.areaTypeKey ?? 'central_urban')
-    })
+function clearEdgeLabels(layer: L.Layer): void {
+    const markers = (layer as any)._edgeLabelMarkers as L.Marker[] | undefined
+    if (markers) markers.forEach(m => polygonEdgeLabelLayer.removeLayer(m))
+    ;(layer as any)._edgeLabelMarkers = []
+}
+
+export function createPolygonEdgeLabel(layer: L.Layer, text: string, color: string): void {
+    if (!(layer instanceof L.Polygon)) return
+    ;(layer as any)._edgeLabelText  = text
+    ;(layer as any)._edgeLabelColor = color
+    refreshEdgeLabel(layer)
+}
+
+function refreshEdgeLabel(layer: L.Layer): void {
+    if (!(layer instanceof L.Polygon)) return
+    const text  = (layer as any)._edgeLabelText  as string | undefined
+    const color = (layer as any)._edgeLabelColor as string | undefined
+    if (!text || !color) return
+
+    clearEdgeLabels(layer)
+
+    const lls = layer.getLatLngs()[0] as L.LatLng[]
+    if (!lls?.length) return
+
+    const baseFs   = edgeLabelFontSize()
+    const charWidth = 0.6   // em units per character (approx)
+    const markers: L.Marker[] = []
+
+    for (let i = 0; i < lls.length; i++) {
+        const a  = lls[i], b = lls[(i + 1) % lls.length]
+        const pa = map.latLngToLayerPoint(a), pb = map.latLngToLayerPoint(b)
+        const dx = pb.x - pa.x, dy = pb.y - pa.y
+        const edgePx = Math.sqrt(dx * dx + dy * dy)
+
+        // cap font size so text fits within 85% of the edge — prevents corner overflow
+        const maxFs = (edgePx * 0.85) / (text.length * charWidth)
+        const fs    = Math.min(baseFs, maxFs)
+
+        // skip if too tiny to be readable
+        if (fs < 7) continue
+
+        const mid = L.latLng((a.lat + b.lat) / 2, (a.lng + b.lng) / 2)
+        let angle = Math.atan2(dy, dx) * 180 / Math.PI
+        if (angle > 90 || angle < -90) angle += 180   // keep text upright
+
+        const html = `<div class="poly-edge-label" style="position:absolute;color:${color};font-size:${fs}px;transform:translate(-50%,-50%) rotate(${angle}deg)">${text}</div>`
+
+        const m = L.marker(mid, {
+            icon: L.divIcon({
+                className: '',
+                html,
+                iconSize:   [0, 0],
+                iconAnchor: [0, 0],
+            }),
+            interactive: false,
+            zIndexOffset: 200,
+        })
+
+        polygonEdgeLabelLayer.addLayer(m)
+        markers.push(m)
+    }
+
+    ;(layer as any)._edgeLabelMarkers = markers
+}
+
+function refreshAllEdgeLabels(): void {
+    ;[...featureLayers.areas, ...featureLayers.districts].forEach(({ layer }) => refreshEdgeLabel(layer))
+}
+
+// kept for backward-compat with delete handler
+export function createAreaPerimeterLabel(layer: L.Layer, areaTypeKey: string): void {
+    const at    = AREA_TYPES.find(a => a.key === areaTypeKey) ?? AREA_TYPES[0]
+    createPolygonEdgeLabel(layer, 'Urban Perimeter Limit', at.color)
 }
 
 // ─── SPATIAL HELPERS ─────────────────────────────────────────────────────────
@@ -211,10 +270,6 @@ export async function displayCommuneBoundary(communeId: number, communeName: str
         municipalLimitRings = extractRings(geojson)
         boundariesLayer = L.geoJSON(geojson, {
             style: { color: '#e74c3c', weight: 2.5, fillOpacity: 0.03, fillColor: '#e74c3c' },
-            onEachFeature(_, layer) {
-                const name = communeName || data.commune_name
-                if (name) (layer as L.Path).bindTooltip(name, { permanent: false, direction: 'center', className: 'boundary-tooltip' })
-            },
         }).addTo(map)
         map.fitBounds(boundariesLayer.getBounds(), { padding: [50, 50], maxZoom: 14 })
     } catch (e) { console.error('Boundary error:', e) }
@@ -249,13 +304,287 @@ async function refreshScatteredAreas(): Promise<void> {
     } catch (e) { console.error('Scatter refresh error:', e) }
 }
 
+// ─── CONTEXT MENU ─────────────────────────────────────────────────────────────
+
+function createContextMenuEl(): HTMLElement {
+    const el = document.createElement('div')
+    el.id = 'nars-ctx-menu'
+    el.className = 'nars-ctx-menu'
+    el.style.display = 'none'
+    document.body.appendChild(el)
+
+    // Close on any outside click
+    document.addEventListener('click', () => { el.style.display = 'none' })
+    document.addEventListener('contextmenu', () => { el.style.display = 'none' })
+    return el
+}
+
+let _ctxEl: HTMLElement | null = null
+function getCtxEl(): HTMLElement {
+    if (!_ctxEl) _ctxEl = createContextMenuEl()
+    return _ctxEl
+}
+
+function showContextMenu(x: number, y: number, dbId: number): void {
+    const el = getCtxEl()
+    el.innerHTML = `
+        <div class="nars-ctx-item" data-action="edit">✏️ Edit Info</div>
+        <div class="nars-ctx-item" data-action="boundaries">⬟ Edit Boundaries</div>
+        <div class="nars-ctx-item nars-ctx-danger" data-action="remove">🗑️ Remove Object</div>
+    `
+    el.style.display = 'block'
+
+    // Keep menu on screen
+    el.style.left = '-9999px'
+    el.style.top  = '-9999px'
+    el.style.display = 'block'
+    const w = el.offsetWidth, h = el.offsetHeight
+    el.style.left = (x + w > window.innerWidth  ? x - w : x) + 'px'
+    el.style.top  = (y + h > window.innerHeight ? y - h : y) + 'px'
+
+    el.querySelectorAll('.nars-ctx-item').forEach(item => {
+        (item as HTMLElement).onclick = (e) => {
+            e.stopPropagation()
+            el.style.display = 'none'
+            const action = (item as HTMLElement).dataset.action
+            if      (action === 'edit')       (window as any).__narsEditFeature(dbId)
+            else if (action === 'boundaries') (window as any).__narsEditBoundaries(dbId)
+            else if (action === 'remove')     (window as any).__narsRemoveFeature(dbId)
+        }
+    })
+}
+
+async function removeFeature(dbId: number): Promise<void> {
+    if (!confirm('Remove this feature? This cannot be undone.')) return
+
+    const phaseKey = Object.keys(featureLayers).find(k =>
+        featureLayers[k].some((e: LayerEntry) => (e.layer as any)._dbId === dbId))
+    if (!phaseKey) return
+
+    const entry = featureLayers[phaseKey].find((e: LayerEntry) => (e.layer as any)._dbId === dbId)
+    if (!entry) return
+
+    try {
+        const res = await apiFetch(`/api/delete/${dbId}`, { method: 'DELETE' })
+        if (!res.ok) { alert('Failed to remove feature.'); return }
+    } catch (err) { alert('Failed to remove feature.'); return }
+
+    const layer = entry.layer
+    drawnItems.removeLayer(layer)
+
+    if ((layer as any)._endpointMarkers)
+        (layer as any)._endpointMarkers.forEach((m: L.Layer) => lineEndpointLayer.removeLayer(m))
+    if ((layer as any)._perimeterLabel)
+        perimeterLabelLayer.removeLayer((layer as any)._perimeterLabel)
+    if ((layer as any)._edgeLabelMarkers)
+        (layer as any)._edgeLabelMarkers.forEach((m: L.Marker) => polygonEdgeLabelLayer.removeLayer(m))
+
+    featureLayers[phaseKey] = featureLayers[phaseKey].filter((e: LayerEntry) => (e.layer as any)._dbId !== dbId)
+
+    if (phaseKey === 'areas') await refreshScatteredAreas()
+    syncCounts()
+}
+
+export function bindContextMenu(layer: L.Layer, dbId: number): void {
+    layer.on('contextmenu', (e: any) => {
+        e.originalEvent.preventDefault()
+        e.originalEvent.stopPropagation()
+        showContextMenu(e.originalEvent.clientX, e.originalEvent.clientY, dbId)
+    })
+}
+
+async function editBoundaries(dbId: number): Promise<void> {
+    const editBtn = document.querySelector('.leaflet-draw-edit-edit') as HTMLElement | null
+    if (!editBtn) {
+        alert('Switch to the correct phase first to enable boundary editing.')
+        return
+    }
+
+    editBtn.click()
+
+    // Find the layer being edited
+    const entry = Object.values(featureLayers).flat()
+        .find((e: LayerEntry) => (e.layer as any)._dbId === dbId) as LayerEntry | undefined
+
+    // Cancel edit on any click outside the feature
+    function onMapClick(e: any) {
+        const target = e.originalEvent?.target as HTMLElement | null
+        // If click is on the leaflet-draw toolbar or the feature itself, ignore
+        if (target?.closest('.leaflet-draw-toolbar') || target?.closest('.leaflet-draw-actions')) return
+
+        // Check if click landed on the feature's layer element
+        const layerEl = entry ? (entry.layer as any)._path ?? (entry.layer as any)._icon : null
+        if (layerEl && layerEl.contains(target)) return
+
+        // Click was outside — cancel
+        const cancelBtn = document.querySelector('.leaflet-draw-actions a[title="Cancel editing, discards all changes"]') as HTMLElement
+                       ?? document.querySelector('.leaflet-draw-actions a') as HTMLElement
+        if (cancelBtn) cancelBtn.click()
+
+        map.off('click', onMapClick)
+        map.off('contextmenu', onMapClick)
+    }
+
+    // Small delay so this click doesn't immediately cancel
+    setTimeout(() => {
+        map.on('click', onMapClick)
+        map.on('contextmenu', onMapClick)
+    }, 200)
+}
+
+;(window as any).__narsEditBoundaries = editBoundaries
+;(window as any).__narsEditFeature    = editFeatureInfo
+;(window as any).__narsRemoveFeature  = removeFeature
+
+// ─── VERTEX SNAPPING (districts phase) ───────────────────────────────────────
+
+let snapActive  = false
+let snapLatLng: L.LatLng | null = null
+let snapMarker: L.CircleMarker | null = null
+
+function getSnapRings(): L.LatLng[][] {
+    const rings: L.LatLng[][] = []
+    ;[...featureLayers.districts, ...featureLayers.areas].forEach(({ layer }) => {
+        if (!(layer instanceof L.Polygon)) return
+        const ring = (layer.getLatLngs()[0] as L.LatLng[]).filter(ll => ll && ll.lat != null && ll.lng != null)
+        if (ring.length >= 2) rings.push(ring)
+    })
+    if (boundariesLayer) {
+        boundariesLayer.eachLayer((bl: L.Layer) => {
+            try {
+                const lls = (bl as L.Polygon).getLatLngs()
+                const flat = (Array.isArray(lls[0]) ? lls[0] : lls) as L.LatLng[]
+                const ring = flat.filter(ll => ll && ll.lat != null && ll.lng != null)
+                if (ring.length >= 2) rings.push(ring)
+            } catch { /* skip */ }
+        })
+    }
+    return rings
+}
+
+function closestOnSegment(mp: L.Point, a: L.LatLng, b: L.LatLng): L.LatLng | null {
+    try {
+        const pa = map.latLngToLayerPoint(a)
+        const pb = map.latLngToLayerPoint(b)
+        const dx = pb.x - pa.x, dy = pb.y - pa.y
+        const lenSq = dx * dx + dy * dy
+        if (lenSq === 0) return a
+        const t = Math.max(0, Math.min(1, ((mp.x - pa.x) * dx + (mp.y - pa.y) * dy) / lenSq))
+        return map.layerPointToLatLng(L.point(pa.x + t * dx, pa.y + t * dy))
+    } catch { return null }
+}
+
+function pixelDist(mp: L.Point, ll: L.LatLng): number {
+    try {
+        const p = map.latLngToLayerPoint(ll)
+        return Math.hypot(p.x - mp.x, p.y - mp.y)
+    } catch { return Infinity }
+}
+
+function nearestSnapPoint(mp: L.Point, rings: L.LatLng[][]): { ll: L.LatLng; dist: number } | null {
+    let bestVertex: { ll: L.LatLng; dist: number } | null = null
+    let bestEdge:   { ll: L.LatLng; dist: number } | null = null
+
+    for (const ring of rings) {
+        for (let i = 0; i < ring.length; i++) {
+            const a = ring[i], b = ring[(i + 1) % ring.length]
+            if (!a || !b) continue
+
+            // Check corner
+            const dv = pixelDist(mp, a)
+            if (!bestVertex || dv < bestVertex.dist) bestVertex = { ll: a, dist: dv }
+
+            // Check edge midpoint
+            const cp = closestOnSegment(mp, a, b)
+            if (cp) {
+                const de = pixelDist(mp, cp)
+                if (!bestEdge || de < bestEdge.dist) bestEdge = { ll: cp, dist: de }
+            }
+        }
+    }
+
+    // Corners take priority: if a corner is within snap range, always prefer it
+    const CORNER_PX = 40
+    const EDGE_PX   = 40
+    if (bestVertex && bestVertex.dist <= CORNER_PX) return bestVertex
+    if (bestEdge   && bestEdge.dist   <= EDGE_PX)   return bestEdge
+    return null
+}
+
+// Document-level capture for snap detection — always fires regardless of leaflet-draw
+function onSnapMove(e: MouseEvent): void {
+    if (!map.getContainer().contains(e.target as Node)) return
+    const rect  = map.getContainer().getBoundingClientRect()
+    const cp    = L.point(e.clientX - rect.left, e.clientY - rect.top)
+    const mp    = map.containerPointToLayerPoint(cp)
+    const rings = getSnapRings()
+
+    if (!rings.length) { snapActive = false; snapLatLng = null; return }
+
+    const snap = nearestSnapPoint(mp, rings)
+    if (snap) {
+        snapLatLng = snap.ll
+        snapActive = true
+        if (!map.getPane('snapPane')) {
+            map.createPane('snapPane')
+            map.getPane('snapPane')!.style.zIndex = '9999'
+        }
+        if (!snapMarker) {
+            snapMarker = L.circleMarker(snap.ll, {
+                radius: 8, color: '#f39c12', weight: 2.5,
+                fillColor: '#fff', fillOpacity: 1,
+                interactive: false, pane: 'snapPane',
+            } as any).addTo(map)
+        } else {
+            snapMarker.setLatLng(snap.ll)
+            if (!map.hasLayer(snapMarker)) snapMarker.addTo(map)
+        }
+    } else {
+        snapLatLng = null
+        snapActive = false
+        if (snapMarker && map.hasLayer(snapMarker)) map.removeLayer(snapMarker)
+    }
+}
+
+function enableSnapping(): void {
+    document.addEventListener('mousemove', onSnapMove, true)
+
+    // Patch map.mouseEventToLayerPoint — leaflet-draw calls this internally
+    // in BOTH _onMouseMove and _onClick to convert raw DOM events to layer points.
+    // This is the single choke point that controls what coordinate gets recorded.
+    if (!(map as any)._origMouseEventToLayerPoint) {
+        const orig = map.mouseEventToLayerPoint.bind(map)
+        ;(map as any)._origMouseEventToLayerPoint = orig
+        map.mouseEventToLayerPoint = function(e: MouseEvent): L.Point {
+            if (snapActive && snapLatLng) {
+                return map.latLngToLayerPoint(snapLatLng)
+            }
+            return orig(e)
+        }
+    }
+}
+
+function disableSnapping(): void {
+    document.removeEventListener('mousemove', onSnapMove, true)
+    // Restore original method
+    if ((map as any)._origMouseEventToLayerPoint) {
+        map.mouseEventToLayerPoint = (map as any)._origMouseEventToLayerPoint
+        delete (map as any)._origMouseEventToLayerPoint
+    }
+    if (snapMarker && map.hasLayer(snapMarker)) map.removeLayer(snapMarker)
+    snapActive = false
+    snapLatLng = null
+}
+
+
+
 // ─── DRAW CONTROL ─────────────────────────────────────────────────────────────
 
 function buildDrawControl(phase: typeof PHASES[number]): void {
     if (drawControl) { map.removeControl(drawControl); drawControl = null }
 
     const opts: L.Control.DrawConstructorOptions = {
-        edit: { featureGroup: drawnItems, edit: false, remove: false },
+        edit: { featureGroup: drawnItems, edit: {}, remove: false },
         draw: {
             polygon:      false,
             polyline:     false,
@@ -312,7 +641,7 @@ async function validatePlacement(layer: L.Layer, phase: typeof PHASES[number]): 
 
 // ─── POPUP BUILDER ────────────────────────────────────────────────────────────
 
-function buildPopup(data: FeatureData, phase: typeof PHASES[number]): string {
+function buildPopup(data: FeatureData, phase: typeof PHASES[number], dbId?: number): string {
     const lines = [`<b>${data.label}</b>`, `<small>${phase.label}</small>`]
     if (data.decisionNumber)    lines.push(`<small>Decision: ${data.decisionNumber}</small>`)
     if (data.decisionDate)      lines.push(`<small>Date: ${data.decisionDate}</small>`)
@@ -321,6 +650,52 @@ function buildPopup(data: FeatureData, phase: typeof PHASES[number]): string {
     if (data.mainEntranceLabel) lines.push(`<small>Main entrance: ${data.mainEntranceLabel}</small>`)
     return lines.join('<br>')
 }
+
+// ── Global handler called by right-click menu ─────────────────────────────────
+
+async function editFeatureInfo(dbId: number): Promise<void> {
+    map.closePopup()
+
+    const phaseKey = Object.keys(featureLayers).find(k =>
+        featureLayers[k].some((e: LayerEntry) => (e.layer as any)._dbId === dbId))
+    if (!phaseKey) return
+
+    const entry = featureLayers[phaseKey].find((e: LayerEntry) => (e.layer as any)._dbId === dbId)
+    if (!entry) return
+
+    const phase      = PHASES.find(p => p.key === phaseKey)
+    const phaseIndex = PHASES.findIndex(p => p.key === phaseKey)
+    if (!phase || phaseIndex === -1) return
+
+    const result = await openEditModal(phaseIndex, dbId, entry.data)
+    if (!result) return
+
+    // Merge result into entry.data
+    Object.assign(entry.data, result)
+
+    // Persist to DB
+    try {
+        await apiFetch(`/api/update/${dbId}`, {
+            method:  'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ data: entry.data }),
+        })
+    } catch (err) { console.error('Edit info save error:', err) }
+
+    // Refresh popup
+    ;(entry.layer as L.Path).bindPopup(buildPopup(entry.data, phase, dbId))
+
+    // Refresh style + edge label for areas/districts
+    if (phaseKey === 'areas') {
+        ;(entry.layer as L.Path).setStyle(areaStyle(entry.data.areaTypeKey ?? 'central_urban'))
+        createAreaPerimeterLabel(entry.layer, entry.data.areaTypeKey ?? 'central_urban')
+    }
+    if (phaseKey === 'districts') {
+        createPolygonEdgeLabel(entry.layer, entry.data.label, '#f39c12')
+    }
+}
+
+;(window as any).__narsEditFeature = editFeatureInfo
 
 // ─── FEATURE DATA + API SAVE ──────────────────────────────────────────────────
 
@@ -339,7 +714,17 @@ function buildFeatureData(layer: L.Layer, phase: typeof PHASES[number], modalRes
     const lls = phase.drawType === 'polygon'
         ? ((layer as L.Polygon).getLatLngs()[0] as L.LatLng[])
         : ((layer as L.Polyline).getLatLngs() as L.LatLng[])
-    return { ...base, coordinates: lls.map(ll => ({ lat: ll.lat, lng: ll.lng })) }
+
+    // PostGIS/GEOS requires closed rings (first === last point exactly).
+    // Snapping can produce rings where they differ by floating point — close it.
+    let coords = lls.map(ll => ({ lat: ll.lat, lng: ll.lng }))
+    if (phase.drawType === 'polygon' && coords.length >= 3) {
+        const first = coords[0], last = coords[coords.length - 1]
+        if (first.lat !== last.lat || first.lng !== last.lng) {
+            coords = [...coords, { lat: first.lat, lng: first.lng }]
+        }
+    }
+    return { ...base, coordinates: coords }
 }
 
 function toApiSaveShape(fd: FeatureData): { type: string; layer: string } | null {
@@ -429,10 +814,12 @@ export async function loadFromDatabase(): Promise<void> {
 
                 ;(layer as any)._dbId = feature.id
                 drawnItems.addLayer(layer)
+                bindContextMenu(layer, feature.id)
                 if (phase.drawType === 'polyline') addPolylineEndpoints(layer)
                 createPermanentLabel(layer, data.label, phaseKey)
-                if (phaseKey === 'areas') createAreaPerimeterLabel(layer, data.areaTypeKey ?? feature.layer)
-                ;(layer as L.Path).bindPopup(buildPopup(data, phase))
+                if (phaseKey === 'areas')     createAreaPerimeterLabel(layer, data.areaTypeKey ?? feature.layer)
+                if (phaseKey === 'districts') createPolygonEdgeLabel(layer, data.label, '#f39c12')
+                ;(layer as L.Path).bindPopup(buildPopup(data, phase, feature.id))
 
                 featureLayers[phaseKey].push({ layer, data })
                 loaded++
@@ -489,6 +876,9 @@ export function setPhase(index: number): void {
     buildDrawControl(PHASES[index])
     if (PHASES[index].key === 'cityCenter' && store.cityCenterMode === null)
         store.cityCenterDialogVisible = true
+    // Enable snapping immediately when entering districts phase
+    if (PHASES[index].key === 'districts') enableSnapping()
+    else disableSnapping()
 }
 
 export function cityCenterYes(): void {
@@ -505,9 +895,14 @@ export function cityCenterSkip(): void {
 
 function registerDrawEvents(): void {
 
+    map.on(L.Draw.Event.DRAWSTART, () => {
+        if (PHASES[store.currentPhase]?.key === 'districts') enableSnapping()
+    })
+    map.on(L.Draw.Event.DRAWSTOP, () => disableSnapping())
+
     map.on(L.Draw.Event.CREATED, async (event: L.LeafletEvent) => {
-        const e     = event as L.DrawEvents.Created
-        const layer = e.layer
+        const e     = event as any
+        const layer = e.layer as L.Layer
         const phase = PHASES[store.currentPhase]
 
         if (!await validatePlacement(layer, phase)) return
@@ -534,10 +929,12 @@ function registerDrawEvents(): void {
 
         ;(layer as any)._dbId = saveResult.data!.id
         drawnItems.addLayer(layer)
+        bindContextMenu(layer, saveResult.data!.id)
         if (phase.drawType === 'polyline') addPolylineEndpoints(layer)
         createPermanentLabel(layer, modalResult.label as string, phase.key)
-        if (phase.key === 'areas') createAreaPerimeterLabel(layer, (modalResult as any).areaTypeKey as string)
-        ;(layer as L.Path).bindPopup(buildPopup(featureData, phase))
+        if (phase.key === 'areas')     createAreaPerimeterLabel(layer, (modalResult as any).areaTypeKey as string)
+        if (phase.key === 'districts') createPolygonEdgeLabel(layer, modalResult.label as string, '#f39c12')
+        ;(layer as L.Path).bindPopup(buildPopup(featureData, phase, saveResult.data!.id))
 
         featureLayers[phase.key].push({ layer, data: featureData })
 
@@ -554,7 +951,7 @@ function registerDrawEvents(): void {
     })
 
     map.on(L.Draw.Event.EDITED, async (event: L.LeafletEvent) => {
-        const e = event as L.DrawEvents.Edited
+        const e = event as any
         e.layers.eachLayer(async (layer: L.Layer) => {
             if (!(layer as any)._dbId) return
             try {
@@ -578,9 +975,17 @@ function registerDrawEvents(): void {
                     body:    JSON.stringify({ data: entry.data }),
                 })
 
+                // Refresh popup so Edit Info button stays present
+                if (phase) {
+                    ;(layer as L.Path).bindPopup(buildPopup(entry.data, phase, (layer as any)._dbId))
+                }
+
                 if (phase?.key === 'areas') {
                     createAreaPerimeterLabel(layer, entry.data.areaTypeKey ?? 'central_urban')
                     await refreshScatteredAreas()
+                }
+                if (phase?.key === 'districts') {
+                    createPolygonEdgeLabel(layer, entry.data.label, '#f39c12')
                 }
             } catch (err) { console.error('Edit persist error:', err) }
         })
@@ -590,7 +995,7 @@ function registerDrawEvents(): void {
     })
 
     map.on(L.Draw.Event.DELETED, async (event: L.LeafletEvent) => {
-        const e = event as L.DrawEvents.Deleted
+        const e = event as any
         let areaDeleted = false
         e.layers.eachLayer(async (layer: L.Layer) => {
             if ((layer as any)._dbId) {
@@ -602,6 +1007,9 @@ function registerDrawEvents(): void {
             }
             if ((layer as any)._endpointMarkers) (layer as any)._endpointMarkers.forEach((m: L.Layer) => lineEndpointLayer.removeLayer(m))
             if ((layer as any)._perimeterLabel)  perimeterLabelLayer.removeLayer((layer as any)._perimeterLabel)
+            if ((layer as any)._edgeLabelMarkers) {
+                ;(layer as any)._edgeLabelMarkers.forEach((m: L.Marker) => polygonEdgeLabelLayer.removeLayer(m))
+            }
         })
 
         lineEndpointLayer.clearLayers()
@@ -699,7 +1107,5 @@ export async function loadUserAndCommune(): Promise<void> {
 
         if (user.commune?.id)
             await displayCommuneBoundary(user.commune.id as number, user.commune.name_fr as string)
-        if (user.commune?.latitude && user.commune?.longitude)
-            map.setView([parseFloat(user.commune.latitude), parseFloat(user.commune.longitude)], 13)
     } catch (err) { console.error('Commune nav error:', err) }
 }
