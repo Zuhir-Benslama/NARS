@@ -385,7 +385,59 @@ body {
 .dropdown-item.logout:hover { background: rgba(231, 76, 60, 0.1); }
 
 
-/* ── Spinner ────────────────────────────────────────────────────────────────── */
+/* ── Right-click context menu ───────────────────────────────────────────────── */
+
+.nars-ctx-menu {
+    position: fixed;
+    z-index: 9999;
+    background: #1a1a2e;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    padding: 4px 0;
+    min-width: 180px;
+    user-select: none;
+}
+
+.nars-ctx-item {
+    padding: 10px 16px;
+    font-size: 13px;
+    color: #ddd;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.15s;
+}
+
+.nars-ctx-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.nars-ctx-danger {
+    color: #e74c3c;
+}
+
+.nars-ctx-danger:hover {
+    background: rgba(231, 76, 60, 0.12);
+}
+
+.popup-edit-btn {
+    margin-top: 6px;
+    padding: 5px 12px;
+    background: rgba(52, 152, 219, 0.15);
+    color: #3498db;
+    border: 1px solid rgba(52, 152, 219, 0.4);
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.popup-edit-btn:hover {
+    background: rgba(52, 152, 219, 0.3);
+}
 
 .field-spinner {
     display: inline-block;
@@ -412,6 +464,21 @@ body {
     pointer-events: none;
     text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
     user-select: none;
+}
+
+/* Edge-following label for areas and districts */
+.poly-edge-label {
+    font-weight: 700;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+    line-height: 1;
+    text-align: center;
+    text-shadow:
+        -1px -1px 0 rgba(0,0,0,0.85),
+         1px -1px 0 rgba(0,0,0,0.85),
+        -1px  1px 0 rgba(0,0,0,0.85),
+         1px  1px 0 rgba(0,0,0,0.85);
 }
 
 /* Centred label for districts, roads, public buildings, public spaces */

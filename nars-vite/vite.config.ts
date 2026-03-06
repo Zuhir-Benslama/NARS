@@ -14,13 +14,6 @@ export default defineConfig({
         main:  resolve(__dirname, 'index.html'),
         login: resolve(__dirname, 'login.html'),
       },
-      // Leaflet and leaflet-draw are loaded via CDN in index.html.
-      // Marking them as external tells Rollup not to bundle them,
-      // and the globals map tells it what window variable to use instead.
-      external: ['leaflet'],
-      output: {
-        globals: { leaflet: 'L' },
-      },
     },
   },
 

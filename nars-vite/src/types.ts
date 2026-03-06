@@ -105,6 +105,8 @@ export interface EntranceOption {
 export interface ModalState {
     visible:             boolean
     phaseIndex:          number | null
+    isEdit:              boolean
+    editDbId:            number | null
     label:               string
     decisionNumber:      string
     decisionDate:        string

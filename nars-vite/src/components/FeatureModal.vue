@@ -130,7 +130,7 @@
 
             <!-- Buttons -->
             <div class="modal-buttons">
-                <button class="modal-btn modal-btn-save"   @click="onSave">Save</button>
+                <button class="modal-btn modal-btn-save"   @click="onSave">{{ m.isEdit ? 'Update' : 'Save' }}</button>
                 <button class="modal-btn modal-btn-cancel" @click="onCancel">Cancel</button>
             </div>
 
@@ -151,7 +151,11 @@ const phase = computed(() => m.value.phaseIndex !== null ? PHASES[m.value.phaseI
 
 // ── Computed display helpers ──────────────────────────────────────────────────
 
-const headerText = computed(() => phase.value ? `Add ${phase.value.label.replace(/s$/, '')} Details` : '')
+const headerText = computed(() => {
+    if (!phase.value) return ''
+    const name = phase.value.label.replace(/s$/, '')
+    return m.value.isEdit ? `Edit ${name} Info` : `Add ${name} Details`
+})
 
 const sideText = computed(() => {
     if (!m.value.entranceSide) return ''
@@ -185,8 +189,9 @@ watch(() => m.value.selectedMainIdx, (val) => {
     computeBisNumber(option.dbId)
 })
 
-// When area type changes → auto-fill municipality name
+// When area type changes → auto-fill municipality name (only for new features)
 watch(() => m.value.areaTypeKey, (val) => {
+    if (m.value.isEdit) return
     if (val === 'central_urban' && !m.value.label && store.municipalityName)
         m.value.label = store.municipalityName
 })

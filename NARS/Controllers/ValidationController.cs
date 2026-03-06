@@ -17,7 +17,7 @@ public class ValidationController(AppDbContext db, JwtService jwt) : ControllerB
     // features.data stores coordinates as JSON: {"coordinates": [{"lat":..,"lng":..}, ...]}
     // PostGIS GeoJSON expects [lng, lat] ordering.
     private const string PolygonFromDataSql = @"
-        ST_SetSRID(ST_GeomFromGeoJSON(
+        ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(
             json_build_object(
                 'type', 'Polygon',
                 'coordinates', json_build_array((
@@ -28,7 +28,7 @@ public class ValidationController(AppDbContext db, JwtService jwt) : ControllerB
                     WITH ORDINALITY AS t(c, ord)
                 ))
             )::text
-        ), 4326)";
+        ), 4326))";
 
     // ── SQL helper: reconstruct a LINESTRING geometry from features.data ──────
     private const string LineStringFromDataSql = @"
