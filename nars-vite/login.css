@@ -11,7 +11,7 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: url('NARS.png') center center / cover no-repeat fixed;
+    background: url('NARS.jpg') center center / cover no-repeat fixed;
     min-height: 100vh;
     display: flex;
     align-items: center;

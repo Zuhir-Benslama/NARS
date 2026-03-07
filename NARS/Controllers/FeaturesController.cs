@@ -1,20 +1,21 @@
+using System.Data;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
 using NarsApi.DTOs;
+using NarsApi.Infrastructure;
 using NarsApi.Models;
-using NarsApi.Services;
 
 namespace NarsApi.Controllers;
 
+// fix #2 & #9: Extends NarsControllerBase which carries [Authorize] and exposes
+// CurrentUserId / CurrentCommuneId from claims — no more manual RequireAuth().
 [ApiController]
 [Tags("Features")]
-public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBase
+public class FeaturesController(AppDbContext db) : NarsControllerBase
 {
     // ── GET /api/feature-types ────────────────────────────────
-    // Returns the full type / layer hierarchy so the frontend
-    // can build its UI dynamically without hard-coding values.
 
     [HttpGet("/api/feature-types")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -22,21 +23,14 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
     {
         var types = new List<FeatureTypeDefinition>
         {
-            new(
-                Key:    FeatureTypes.Area,
-                Label:  "Area",
-                Icon:   "⬟",
+            new(Key: FeatureTypes.Area, Label: "Area", Icon: "⬟",
                 Layers: new[]
                 {
                     new LayerOption(FeatureTypes.AreaLayers.CentralUrban,   "Central Urban Area"),
                     new LayerOption(FeatureTypes.AreaLayers.SecondaryUrban, "Secondary Urban Area"),
                     new LayerOption(FeatureTypes.AreaLayers.Scattered,      "Scattered Area"),
-                }
-            ),
-            new(
-                Key:    FeatureTypes.Road,
-                Label:  "Road",
-                Icon:   "🛣️",
+                }),
+            new(Key: FeatureTypes.Road, Label: "Road", Icon: "🛣️",
                 Layers: new[]
                 {
                     new LayerOption(FeatureTypes.RoadLayers.Boulevard, "Boulevard", "primary"),
@@ -46,48 +40,31 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
                     new LayerOption(FeatureTypes.RoadLayers.Lane,      "Lane",      "tertiary"),
                     new LayerOption(FeatureTypes.RoadLayers.CulDeSac,  "Cul-de-sac","tertiary"),
                     new LayerOption(FeatureTypes.RoadLayers.Way,       "Way",       "tertiary"),
-                }
-            ),
-            new(
-                Key:    FeatureTypes.District,
-                Label:  "District",
-                Icon:   "🏘️",
+                }),
+            new(Key: FeatureTypes.District, Label: "District", Icon: "🏘️",
                 Layers: new[]
                 {
                     new LayerOption(FeatureTypes.DistrictLayers.HousingEstate, "Housing Estate"),
                     new LayerOption(FeatureTypes.DistrictLayers.UrbanPole,     "Urban Pole"),
                     new LayerOption(FeatureTypes.DistrictLayers.District,      "District"),
-                }
-            ),
-            new(
-                Key:    FeatureTypes.HouseEntrance,
-                Label:  "House Entrance",
-                Icon:   "🚪",
+                }),
+            new(Key: FeatureTypes.HouseEntrance, Label: "House Entrance", Icon: "🚪",
                 Layers: new[]
                 {
                     new LayerOption(FeatureTypes.HouseEntranceLayers.Main,      "Main Entrance"),
                     new LayerOption(FeatureTypes.HouseEntranceLayers.Secondary, "Secondary Entrance"),
-                }
-            ),
-            new(
-                Key:    FeatureTypes.PublicBuilding,
-                Label:  "Public Building",
-                Icon:   "🏛️",
+                }),
+            new(Key: FeatureTypes.PublicBuilding, Label: "Public Building", Icon: "🏛️",
                 Layers: new[]
                 {
                     new LayerOption(FeatureTypes.PublicBuildingLayers.Default, "Public Building"),
-                }
-            ),
-            new(
-                Key:    FeatureTypes.PublicSpace,
-                Label:  "Public Space",
-                Icon:   "🌳",
+                }),
+            new(Key: FeatureTypes.PublicSpace, Label: "Public Space", Icon: "🌳",
                 Layers: new[]
                 {
                     new LayerOption(FeatureTypes.PublicSpaceLayers.Garden, "Garden"),
                     new LayerOption(FeatureTypes.PublicSpaceLayers.Square, "Square"),
-                }
-            ),
+                }),
         };
 
         return Ok(types);
@@ -101,10 +78,6 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> SaveFeature([FromBody] FeatureSaveRequest body)
     {
-        if (RequireAuth() is not { } user)
-            return Unauthorized(new { detail = "Not authenticated" });
-
-        // Validate type + layer combination
         if (!FeatureTypes.All.Contains(body.Type))
             return BadRequest(new { detail = $"Unknown feature type '{body.Type}'." });
 
@@ -113,7 +86,7 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
 
         var feature = new Feature
         {
-            UserId = user.UserId,
+            UserId = CurrentUserId,
             Type   = body.Type,
             Layer  = body.Layer,
             Label  = body.Label,
@@ -123,20 +96,13 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
         db.Features.Add(feature);
         await db.SaveChangesAsync();
 
-        // After saving an area, recompute scattered areas asynchronously.
-        // We extract token and communeId HERE (before the response completes)
-        // because HttpContext is disposed once the response is sent.
         if (body.Type == FeatureTypes.Area &&
             (body.Layer == FeatureTypes.AreaLayers.CentralUrban ||
              body.Layer == FeatureTypes.AreaLayers.SecondaryUrban))
         {
-            var token = Request.Cookies["access_token"];
-            if (token is not null)
-            {
-                var principal = jwt.ValidateToken(token);
-                if (int.TryParse(principal?.FindFirst("commune_id")?.Value, out int cId))
-                    _ = TriggerScatteredRefreshAsync(user.UserId, cId);
-            }
+            // Capture values now — HttpContext is disposed before the task completes.
+            int uid = CurrentUserId, cid = CurrentCommuneId;
+            _ = TriggerScatteredRefreshAsync(uid, cid);
         }
 
         return StatusCode(201, new { success = true, id = feature.Id, message = "Feature saved successfully" });
@@ -147,11 +113,8 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
     [HttpGet("/api/load")]
     public async Task<IActionResult> LoadFeatures()
     {
-        if (RequireAuth() is not { } user)
-            return Unauthorized(new { detail = "Not authenticated" });
-
         var features = await db.Features
-            .Where(f => f.UserId == user.UserId)
+            .Where(f => f.UserId == CurrentUserId)
             .OrderBy(f => f.CreatedAt)
             .ToListAsync();
 
@@ -163,11 +126,8 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
     [HttpPost("/api/clear")]
     public async Task<IActionResult> ClearFeatures()
     {
-        if (RequireAuth() is not { } user)
-            return Unauthorized(new { detail = "Not authenticated" });
-
         var count = await db.Features
-            .Where(f => f.UserId == user.UserId)
+            .Where(f => f.UserId == CurrentUserId)
             .ExecuteDeleteAsync();
 
         return Ok(new { success = true, message = $"Deleted {count} features" });
@@ -178,11 +138,8 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
     [HttpDelete("/api/delete/{featureId:int}")]
     public async Task<IActionResult> DeleteFeature(int featureId)
     {
-        if (RequireAuth() is not { } user)
-            return Unauthorized(new { detail = "Not authenticated" });
-
         var feature = await db.Features.FirstOrDefaultAsync(f =>
-            f.Id == featureId && f.UserId == user.UserId);
+            f.Id == featureId && f.UserId == CurrentUserId);
 
         if (feature is null)
             return NotFound(new { detail = "Feature not found" });
@@ -196,13 +153,8 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
 
         if (wasUrbanArea)
         {
-            var token = Request.Cookies["access_token"];
-            if (token is not null)
-            {
-                var principal = jwt.ValidateToken(token);
-                if (int.TryParse(principal?.FindFirst("commune_id")?.Value, out int cId))
-                    _ = TriggerScatteredRefreshAsync(user.UserId, cId);
-            }
+            int uid = CurrentUserId, cid = CurrentCommuneId;
+            _ = TriggerScatteredRefreshAsync(uid, cid);
         }
 
         return Ok(new { success = true, message = "Feature deleted successfully" });
@@ -213,11 +165,8 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
     [HttpGet("/api/stats")]
     public async Task<IActionResult> GetStats()
     {
-        if (RequireAuth() is not { } user)
-            return Unauthorized(new { detail = "Not authenticated" });
-
         var groups = await db.Features
-            .Where(f => f.UserId == user.UserId)
+            .Where(f => f.UserId == CurrentUserId)
             .GroupBy(f => f.Type)
             .Select(g => new { Type = g.Key, Count = g.Count() })
             .ToListAsync();
@@ -234,11 +183,8 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
     [HttpGet("/api/load/layer/{layerType}")]
     public async Task<IActionResult> LoadByLayer(string layerType)
     {
-        if (RequireAuth() is not { } user)
-            return Unauthorized(new { detail = "Not authenticated" });
-
         var features = await db.Features
-            .Where(f => f.UserId == user.UserId && f.Layer == layerType)
+            .Where(f => f.UserId == CurrentUserId && f.Layer == layerType)
             .OrderBy(f => f.CreatedAt)
             .ToListAsync();
 
@@ -250,11 +196,8 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
     [HttpGet("/api/load/type/{featureType}")]
     public async Task<IActionResult> LoadByType(string featureType)
     {
-        if (RequireAuth() is not { } user)
-            return Unauthorized(new { detail = "Not authenticated" });
-
         var features = await db.Features
-            .Where(f => f.UserId == user.UserId && f.Type == featureType)
+            .Where(f => f.UserId == CurrentUserId && f.Type == featureType)
             .OrderBy(f => f.CreatedAt)
             .ToListAsync();
 
@@ -266,11 +209,8 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
     [HttpPut("/api/update/{featureId:int}")]
     public async Task<IActionResult> UpdateFeature(int featureId, [FromBody] FeatureUpdateRequest body)
     {
-        if (RequireAuth() is not { } user)
-            return Unauthorized(new { detail = "Not authenticated" });
-
         var feature = await db.Features.FirstOrDefaultAsync(f =>
-            f.Id == featureId && f.UserId == user.UserId);
+            f.Id == featureId && f.UserId == CurrentUserId);
 
         if (feature is null)
             return NotFound(new { detail = "Feature not found" });
@@ -290,21 +230,6 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
 
     // ── Helpers ───────────────────────────────────────────────
 
-    private (int UserId, string Username)? RequireAuth()
-    {
-        var token = Request.Cookies["access_token"];
-        if (token is null) return null;
-
-        var principal = jwt.ValidateToken(token);
-        if (principal is null) return null;
-
-        var userId   = principal.FindFirst("user_id")?.Value;
-        var username = principal.FindFirst("username")?.Value;
-
-        if (userId is null) return null;
-        return (int.Parse(userId), username ?? string.Empty);
-    }
-
     private static object ToDto(Feature f) => new
     {
         id         = f.Id,
@@ -315,35 +240,26 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
         created_at = f.CreatedAt.ToString("o"),
         updated_at = f.UpdatedAt?.ToString("o"),
     };
+
     // ── Trigger scattered area recomputation ──────────────────
-    // Fires-and-forgets a POST to our own /api/areas/refresh-scattered endpoint.
-    // We do this after any urban area save/delete so scattered areas stay current.
+    // Fire-and-forget: called after any urban area save/delete.
+    // userId and communeId are captured before HttpContext disposal.
     private async Task TriggerScatteredRefreshAsync(int userId, int communeId)
     {
         try
         {
-            // communeId and userId are passed in as parameters — safe because
-            // HttpContext is already disposed when this method runs.
-            const string PolygonFromDataSql = @"
-                ST_SetSRID(ST_GeomFromGeoJSON(
-                    json_build_object(
-                        'type', 'Polygon',
-                        'coordinates', json_build_array((
-                            SELECT json_agg(json_build_array(
-                                (c->>'lng')::float, (c->>'lat')::float
-                            ) ORDER BY ord)
-                            FROM jsonb_array_elements(f.data::jsonb->'coordinates')
-                            WITH ORDINALITY AS t(c, ord)
-                        ))
-                    )::text
-                ), 4326)";
-
             var conn = db.Database.GetDbConnection();
-            await conn.OpenAsync();
+
+            // fix #10: check state before opening — EF Core pooling may already have it open.
+            if (conn.State != ConnectionState.Open)
+                await conn.OpenAsync();
+
             string? scatteredGeoJson = null;
             try
             {
                 using var cmd = conn.CreateCommand();
+                // fix #4: use shared SqlFragments.PolygonFromData (includes ST_MakeValid)
+                // instead of a local copy that was missing it.
                 cmd.CommandText = $@"
                     WITH
                     boundary AS (
@@ -352,7 +268,7 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
                         WHERE commune_id = @cid
                     ),
                     urban AS (
-                        SELECT ST_Union({PolygonFromDataSql}) AS geom
+                        SELECT ST_Union({SqlFragments.PolygonFromData}) AS geom
                         FROM features f
                         WHERE f.user_id = @uid
                           AND f.type   = 'area'
@@ -366,8 +282,8 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
                     )
                     FROM boundary LEFT JOIN urban ON true";
 
-                var p1 = cmd.CreateParameter(); p1.ParameterName = "@cid"; p1.Value = communeId; cmd.Parameters.Add(p1);
-                var p2 = cmd.CreateParameter(); p2.ParameterName = "@uid"; p2.Value = userId;    cmd.Parameters.Add(p2);
+                AddParam(cmd, "@cid", communeId);
+                AddParam(cmd, "@uid", userId);
 
                 scatteredGeoJson = await cmd.ExecuteScalarAsync() as string;
             }
@@ -387,7 +303,7 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
                 Type   = FeatureTypes.Area,
                 Layer  = FeatureTypes.AreaLayers.Scattered,
                 Label  = "Scattered Area",
-                Data   = System.Text.Json.JsonSerializer.Serialize(new
+                Data   = JsonSerializer.Serialize(new
                 {
                     type     = "areas",
                     label    = "Scattered Area",
@@ -402,6 +318,4 @@ public class FeaturesController(AppDbContext db, JwtService jwt) : ControllerBas
             Console.Error.WriteLine($"[RefreshScattered] Error: {ex.Message}");
         }
     }
-
-
 }
