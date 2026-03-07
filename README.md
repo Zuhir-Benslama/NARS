@@ -28,10 +28,12 @@ Workspace/
 │   ├── appsettings.json    ← DB connection string, JWT config, CORS origins
 │   ├── wwwroot/            ← Vite build output (populated by npm run build)
 │   ├── Controllers/
+│   │   ├── NarsControllerBase.cs    ← Shared AddParam helper
 │   │   ├── AuthController.cs        ← /api/signup, /api/signin, /api/logout, /api/current_user
 │   │   ├── FeaturesController.cs    ← /api/save, /api/load, /api/update, /api/delete, /api/stats
 │   │   ├── LocationsController.cs   ← /api/wilayas, /api/dairas, /api/communes, /api/commune/{id}/boundary
-│   │   ├── ValidationController.cs  ← /api/validate/*, /api/road-side, /api/areas/refresh-scattered
+│   │   ├── ValidationController.cs  ← /api/validate/*
+│   │   ├── SpatialController.cs     ← /api/road-side, /api/areas/refresh-scattered
 │   │   └── PagesController.cs       ← Serves login.html and index.html
 │   ├── Data/
 │   │   └── AppDbContext.cs          ← EF Core DbContext
@@ -54,14 +56,21 @@ Workspace/
         ├── App.vue         ← Root Vue component
         ├── app.css         ← All application styles
         ├── api.ts          ← Fetch wrapper (credentials: include)
-        ├── map.ts          ← Leaflet map, draw events, feature logic, snapping
         ├── store.ts        ← Reactive app state + modal bridge
         ├── phases.ts       ← Phase definitions and feature sub-type lists
         ├── validation.ts   ← API calls to /api/validate/*
         ├── types.ts        ← Shared TypeScript interfaces
         ├── leaflet.d.ts    ← Type declarations for global window.L
+        ├── map/            ← Leaflet map split into focused modules
+        │   ├── index.ts        ← Orchestrator: init, draw control, phase nav, load
+        │   ├── state.ts        ← Shared ctx object (map + all layer references)
+        │   ├── styles.ts       ← Polygon styles, icons, buildPopup, applyStyle
+        │   ├── labels.ts       ← Edge labels, endpoint markers, layer visibility
+        │   ├── geometry.ts     ← Spatial helpers, municipality boundary, scattered areas
+        │   ├── snapping.ts     ← Full vertex snapping system
+        │   ├── context-menu.ts ← Right-click context menu, edit/remove feature
+        │   └── features.ts     ← Feature build/save, fetchRoadSide, computeBisNumber
         └── components/
-            ├── App.vue
             ├── PhaseBar.vue           ← Phase navigation stepper
             ├── CityCenterDialog.vue   ← City center placement prompt
             ├── InfoPanel.vue          ← Feature count display
@@ -178,9 +187,9 @@ The app guides the operator through 8 sequential phases. Each phase unlocks the 
 | # | Phase | Draw Type | Validation | Status |
 |---|---|---|---|---|
 | 1 | **Areas** | Polygon | One main urban area maximum. Scattered area computed automatically. | ✅ Done |
-| 2 | **City Center** | Marker | Optional — can be skipped. Determines entrance numbering direction. | ✅ Done |
-| 3 | **Districts** | Polygon | Must share edges (no gaps), must not overlap, must cover all urban areas. | ✅ Done |
-| 4 | **Roads** | Polyline | No turn > 90°. Must connect to an existing road (first road exempt). | 🔲 Pending |
+| 2 | **Districts** | Polygon | Must share edges (no gaps), must not overlap, must cover all urban areas. | ✅ Done |
+| 3 | **City Center** | Marker | Optional — can be skipped. Determines entrance numbering direction. | ✅ Done |
+| 4 | **Roads** | Polyline | No turn > 90°. Must connect to an existing road (first road exempt). | ✅ Done |
 | 5 | **Main Entrances** | Marker | Assigned to a road. Left side = odd numbers, right side = even numbers. | 🔲 Pending |
 | 6 | **Secondary Entrances** | Marker | Assigned to a main entrance. Numbered BIS01, BIS02… | 🔲 Pending |
 | 7 | **Public Buildings** | Polygon | Allowed anywhere including scattered areas. | 🔲 Pending |
@@ -235,6 +244,11 @@ Features are stored in the database with a `type` and a `layer` (sub-type):
 | POST | `/api/validate/district` | Validate district adjacency + overlap |
 | GET | `/api/validate/districts/coverage` | Check districts cover all urban areas |
 | GET | `/api/validate/area/main-urban-exists` | Check if a main urban area exists |
+
+### Spatial
+
+| Method | Route | Description |
+|---|---|---|
 | POST | `/api/road-side` | Determine entrance side (left/right) + suggested number |
 | POST | `/api/areas/refresh-scattered` | Recompute the scattered area from the commune boundary |
 

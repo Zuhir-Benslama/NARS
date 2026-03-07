@@ -68,56 +68,70 @@
                 </select>
             </div>
 
-            <!-- Main entrances: road selector + side detection -->
-            <template v-if="phase?.key === 'mainEntrances'">
-                <div class="modal-field">
-                    <label>Assign to Road <span class="req">*</span></label>
-                    <select
-                        v-model="m.selectedRoadIdx"
-                        :class="['modal-input', { error: m.errors.road }]"
-                    >
-                        <option value="">— Select a road —</option>
-                        <option v-for="r in m.roadOptions" :key="r.idx" :value="r.idx">{{ r.label }}</option>
-                    </select>
-                </div>
-                <div v-if="m.selectedRoadIdx !== ''" class="modal-field">
-                    <label>
-                        Entrance Number
-                        <span v-if="sideText" class="modal-side-hint"> — {{ sideText }}</span>
-                    </label>
-                    <div class="modal-input-row">
-                        <input
-                            type="number"
-                            v-model.number="m.entranceNumber"
-                            class="modal-input modal-input-narrow"
-                            min="1"
-                        />
-                        <span v-if="m.entranceSideLoading" class="field-spinner"></span>
-                    </div>
-                </div>
-            </template>
+            <!-- House Entrances: sub-type selector + conditional fields -->
+            <template v-if="phase?.key === 'houseEntrances'">
 
-            <!-- Secondary entrances: main entrance selector + BIS preview -->
-            <template v-if="phase?.key === 'secondaryEntrances'">
+                <!-- Entrance type selector -->
                 <div class="modal-field">
-                    <label>Assign to Main Entrance <span class="req">*</span></label>
-                    <select
-                        v-model="m.selectedMainIdx"
-                        :class="['modal-input', { error: m.errors.mainEntrance }]"
-                    >
-                        <option value="">— Select main entrance —</option>
-                        <option v-for="e in m.mainEntranceOptions" :key="e.idx" :value="e.idx">{{ e.label }}</option>
+                    <label>Entrance Type <span class="req">*</span></label>
+                    <select v-model="m.entranceTypeKey" class="modal-input">
+                        <option value="main_entrance">Main Entrance</option>
+                        <option value="secondary_entrance">Secondary Entrance</option>
                     </select>
                 </div>
-                <div v-if="bisStr" class="modal-field">
-                    <label>BIS Number (auto-suggested)</label>
-                    <input
-                        type="text"
-                        :value="bisStr"
-                        class="modal-input modal-input-readonly"
-                        readonly
-                    />
-                </div>
+
+                <!-- Main entrance: road selector + side detection -->
+                <template v-if="m.entranceTypeKey === 'main_entrance'">
+                    <div class="modal-field">
+                        <label>Assign to Road <span class="req">*</span></label>
+                        <select
+                            v-model="m.selectedRoadIdx"
+                            :class="['modal-input', { error: m.errors.road }]"
+                        >
+                            <option value="">— Select a road —</option>
+                            <option v-for="r in m.roadOptions" :key="r.idx" :value="r.idx">{{ r.label }}</option>
+                        </select>
+                    </div>
+                    <div v-if="m.selectedRoadIdx !== ''" class="modal-field">
+                        <label>
+                            Entrance Number
+                            <span v-if="sideText" class="modal-side-hint"> — {{ sideText }}</span>
+                        </label>
+                        <div class="modal-input-row">
+                            <input
+                                type="number"
+                                v-model.number="m.entranceNumber"
+                                class="modal-input modal-input-narrow"
+                                min="1"
+                            />
+                            <span v-if="m.entranceSideLoading" class="field-spinner"></span>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Secondary entrance: main entrance selector + BIS preview -->
+                <template v-if="m.entranceTypeKey === 'secondary_entrance'">
+                    <div class="modal-field">
+                        <label>Assign to Main Entrance <span class="req">*</span></label>
+                        <select
+                            v-model="m.selectedMainIdx"
+                            :class="['modal-input', { error: m.errors.mainEntrance }]"
+                        >
+                            <option value="">— Select main entrance —</option>
+                            <option v-for="e in m.mainEntranceOptions" :key="e.idx" :value="e.idx">{{ e.label }}</option>
+                        </select>
+                    </div>
+                    <div v-if="bisStr" class="modal-field">
+                        <label>BIS Number (auto-suggested)</label>
+                        <input
+                            type="text"
+                            :value="bisStr"
+                            class="modal-input modal-input-readonly"
+                            readonly
+                        />
+                    </div>
+                </template>
+
             </template>
 
             <!-- Public spaces: space type selector -->
@@ -205,8 +219,8 @@ function validate() {
     if (!m.value.decisionDate.trim())   errors.decisionDate   = 'Required'
 
     const key = phase.value?.key
-    if (key === 'mainEntrances'      && m.value.selectedRoadIdx  === '') errors.road        = 'Required'
-    if (key === 'secondaryEntrances' && m.value.selectedMainIdx  === '') errors.mainEntrance = 'Required'
+    if (key === 'houseEntrances' && m.value.entranceTypeKey === 'main_entrance'      && m.value.selectedRoadIdx  === '') errors.road        = 'Required'
+    if (key === 'houseEntrances' && m.value.entranceTypeKey === 'secondary_entrance' && m.value.selectedMainIdx  === '') errors.mainEntrance = 'Required'
 
     store.modal.errors = errors
     return Object.keys(errors).length === 0
@@ -227,17 +241,20 @@ function onSave() {
         result.districtTypeKey = m.value.districtTypeKey
     } else if (key === 'roads') {
         result.roadTypeKey = m.value.roadTypeKey
-    } else if (key === 'mainEntrances') {
-        const roadOption = m.value.roadOptions[Number(m.value.selectedRoadIdx)]
-        result.roadDbId       = roadOption?.dbId
-        result.roadLabel      = roadOption?.label
-        result.side           = m.value.entranceSide ?? undefined
-        result.entranceNumber = m.value.entranceNumber ?? undefined
-    } else if (key === 'secondaryEntrances') {
-        const mainOption = m.value.mainEntranceOptions[Number(m.value.selectedMainIdx)]
-        result.mainEntranceDbId  = mainOption?.dbId
-        result.mainEntranceLabel = mainOption?.label
-        result.bisNumber         = m.value.bisNumber ?? undefined
+    } else if (key === 'houseEntrances') {
+        result.entranceTypeKey = m.value.entranceTypeKey
+        if (m.value.entranceTypeKey === 'main_entrance') {
+            const roadOption = m.value.roadOptions[Number(m.value.selectedRoadIdx)]
+            result.roadDbId       = roadOption?.dbId
+            result.roadLabel      = roadOption?.label
+            result.side           = m.value.entranceSide ?? undefined
+            result.entranceNumber = m.value.entranceNumber ?? undefined
+        } else {
+            const mainOption = m.value.mainEntranceOptions[Number(m.value.selectedMainIdx)]
+            result.mainEntranceDbId  = mainOption?.dbId
+            result.mainEntranceLabel = mainOption?.label
+            result.bisNumber         = m.value.bisNumber ?? undefined
+        }
     } else if (key === 'publicSpaces') {
         result.spaceTypeKey = m.value.spaceTypeKey
     }

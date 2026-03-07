@@ -40,6 +40,9 @@ function onSettings() {
 
 async function onLogout() {
     try {
+        // Persist the current phase so it can be restored on next login
+        localStorage.setItem('nars_resume_phase', String(store.currentPhase))
+
         const res = await apiFetch('/api/logout', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
         })

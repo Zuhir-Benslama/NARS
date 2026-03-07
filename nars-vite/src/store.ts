@@ -11,8 +11,7 @@ export const featureLayers: Record<string, LayerEntry[]> = {
     cityCenter:          [],
     districts:           [],
     roads:               [],
-    mainEntrances:       [],
-    secondaryEntrances:  [],
+    houseEntrances:      [],
     publicBuildings:     [],
     publicSpaces:        [],
 }
@@ -44,6 +43,7 @@ export function openModal(phaseIndex: number, layer: L.Layer): Promise<ModalResu
             mainUrbanExists:     false,
             districtTypeKey:     'district',
             roadTypeKey:         'street',
+            entranceTypeKey:     'main_entrance',
             roadOptions:         [],
             selectedRoadIdx:     '',
             entranceSide:        null,
@@ -75,6 +75,7 @@ export function openEditModal(phaseIndex: number, dbId: number, existing: import
             mainUrbanExists: false,
             districtTypeKey: existing.districtTypeKey ?? 'district',
             roadTypeKey:     existing.roadTypeKey     ?? 'street',
+            entranceTypeKey: existing.entranceTypeKey ?? (existing.roadDbId != null ? 'main_entrance' : 'secondary_entrance'),
             roadOptions:         [],
             selectedRoadIdx:     '',
             entranceSide:        null,
@@ -127,6 +128,7 @@ export const store = reactive<AppStore>({
         mainUrbanExists:     false,
         districtTypeKey:     'district',
         roadTypeKey:         'street',
+        entranceTypeKey:     'main_entrance',
         roadOptions:         [],
         selectedRoadIdx:     '',
         entranceSide:        null,
@@ -142,6 +144,12 @@ export const store = reactive<AppStore>({
 // ── Sync helper ───────────────────────────────────────────────────────────────
 
 export function syncCounts(): void {
-    for (const key of Object.keys(store.counts) as (keyof typeof store.counts)[])
-        store.counts[key] = featureLayers[key]?.length ?? 0
+    store.counts.areas              = featureLayers.areas?.length             ?? 0
+    store.counts.cityCenter         = featureLayers.cityCenter?.length        ?? 0
+    store.counts.districts          = featureLayers.districts?.length         ?? 0
+    store.counts.roads              = featureLayers.roads?.length             ?? 0
+    store.counts.mainEntrances      = featureLayers.houseEntrances?.filter((e: LayerEntry) => e.data.entranceTypeKey === 'main_entrance').length      ?? 0
+    store.counts.secondaryEntrances = featureLayers.houseEntrances?.filter((e: LayerEntry) => e.data.entranceTypeKey === 'secondary_entrance').length ?? 0
+    store.counts.publicBuildings    = featureLayers.publicBuildings?.length   ?? 0
+    store.counts.publicSpaces       = featureLayers.publicSpaces?.length      ?? 0
 }

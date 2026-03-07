@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
@@ -9,7 +11,11 @@ namespace NarsApi.Controllers;
 
 [ApiController]
 [Tags("Auth")]
-public class AuthController(AppDbContext db, JwtService jwt) : ControllerBase
+public class AuthController(
+    AppDbContext db,
+    JwtService jwt,
+    IWebHostEnvironment env   // fix #5: needed to set Secure flag conditionally
+) : ControllerBase
 {
     // ── POST /api/signup ──────────────────────────────────────
 
@@ -54,20 +60,20 @@ public class AuthController(AppDbContext db, JwtService jwt) : ControllerBase
 
         var token = jwt.CreateToken(user.Id, user.Username, user.Name, user.Email, user.CommuneId);
 
-        // Set HTTP-only cookie (matches FastAPI behaviour)
+        // fix #5: Secure = true in production so the cookie is never sent over plain HTTP.
         Response.Cookies.Append("access_token", token, new CookieOptions
         {
             HttpOnly    = true,
+            Secure      = !env.IsDevelopment(),
             MaxAge      = TimeSpan.FromHours(24),
             SameSite    = SameSiteMode.Lax,
-            Path        = "/",          // ensure cookie is sent on ALL routes, not just /api/
-            IsEssential = true,         // never suppressed by cookie consent middleware
+            Path        = "/",
+            IsEssential = true,
         });
 
-        // Load commune → daira → wilaya chain
-        var commune = await db.Communes.FirstOrDefaultAsync(c => c.CommuneId == user.CommuneId);
-        var daira   = commune is not null ? await db.Dairas.FirstOrDefaultAsync(d => d.DairaId == commune.DairaId) : null;
-        var wilaya  = daira   is not null ? await db.Wilayas.FirstOrDefaultAsync(w => w.WilayaId == daira.WilayaId) : null;
+        // fix #7: single joined query instead of 3 sequential round-trips.
+        // fix #11: wilaya is not part of the SignIn response — not loaded here.
+        var loc = await LoadCommuneWithDairaAsync(user.CommuneId);
 
         return Ok(new
         {
@@ -83,10 +89,10 @@ public class AuthController(AppDbContext db, JwtService jwt) : ControllerBase
                 commune  = new
                 {
                     id        = user.CommuneId,
-                    name_fr   = commune?.CommuneFr,
-                    name_ar   = commune?.CommuneAr,
-                    latitude  = commune?.CommuneLatitude,
-                    longitude = commune?.CommuneLongitude,
+                    name_fr   = loc.Commune?.CommuneFr,
+                    name_ar   = loc.Commune?.CommuneAr,
+                    latitude  = loc.Commune?.CommuneLatitude,
+                    longitude = loc.Commune?.CommuneLongitude,
                 },
             },
         });
@@ -102,59 +108,93 @@ public class AuthController(AppDbContext db, JwtService jwt) : ControllerBase
     }
 
     // ── GET /api/current_user ─────────────────────────────────
+    // fix #1: [Authorize] + User.FindFirst(...) replaces manual GetPrincipalFromCookie(),
+    // routing unauthenticated requests through the standard JWT bearer pipeline → 401.
 
     [HttpGet("/api/current_user")]
+    [Authorize]
     public async Task<IActionResult> CurrentUser()
     {
-        var principal = GetPrincipalFromCookie();
-        if (principal is null)
-            return Unauthorized(new { detail = "Not authenticated" });
+        if (!int.TryParse(User.FindFirstValue("user_id"),    out int userId)    ||
+            !int.TryParse(User.FindFirstValue("commune_id"), out int communeId))
+            return Unauthorized(new { detail = "Malformed token claims." });
 
-        var userId    = int.Parse(principal.FindFirst("user_id")!.Value);
-        var communeId = int.Parse(principal.FindFirst("commune_id")!.Value);
-
-        var commune = await db.Communes.FirstOrDefaultAsync(c => c.CommuneId == communeId);
-        var daira   = commune is not null ? await db.Dairas.FirstOrDefaultAsync(d => d.DairaId == commune.DairaId) : null;
-        var wilaya  = daira   is not null ? await db.Wilayas.FirstOrDefaultAsync(w => w.WilayaId == daira.WilayaId) : null;
+        // fix #7: single joined query for commune → daira → wilaya.
+        var loc = await LoadLocationChainAsync(communeId);
 
         return Ok(new
         {
             id       = userId,
-            username = principal.FindFirst("username")?.Value,
-            name     = principal.FindFirst("name")?.Value,
-            email    = principal.FindFirst("email")?.Value,
+            username = User.FindFirst("username")?.Value,
+            name     = User.FindFirst("name")?.Value,
+            email    = User.FindFirst("email")?.Value,
             wilaya = new
             {
-                id        = wilaya?.WilayaId,
-                name_fr   = wilaya?.WilayaFr,
-                name_ar   = wilaya?.WilayaAr,
-                latitude  = wilaya?.WilayaLatitude,
-                longitude = wilaya?.WilayaLongitude,
+                id        = loc.Wilaya?.WilayaId,
+                name_fr   = loc.Wilaya?.WilayaFr,
+                name_ar   = loc.Wilaya?.WilayaAr,
+                latitude  = loc.Wilaya?.WilayaLatitude,
+                longitude = loc.Wilaya?.WilayaLongitude,
             },
             daira = new
             {
-                id        = daira?.DairaId,
-                name_fr   = daira?.DairaFr,
-                name_ar   = daira?.DairaAr,
-                latitude  = daira?.DairaLatitude,
-                longitude = daira?.DairaLongitude,
+                id        = loc.Daira?.DairaId,
+                name_fr   = loc.Daira?.DairaFr,
+                name_ar   = loc.Daira?.DairaAr,
+                latitude  = loc.Daira?.DairaLatitude,
+                longitude = loc.Daira?.DairaLongitude,
             },
             commune = new
             {
                 id        = communeId,
-                name_fr   = commune?.CommuneFr,
-                name_ar   = commune?.CommuneAr,
-                latitude  = commune?.CommuneLatitude,
-                longitude = commune?.CommuneLongitude,
+                name_fr   = loc.Commune?.CommuneFr,
+                name_ar   = loc.Commune?.CommuneAr,
+                latitude  = loc.Commune?.CommuneLatitude,
+                longitude = loc.Commune?.CommuneLongitude,
             },
         });
     }
 
-    // ── Helper ────────────────────────────────────────────────
+    // ── Private helpers ───────────────────────────────────────
 
-    private System.Security.Claims.ClaimsPrincipal? GetPrincipalFromCookie()
+    private record LocationChain(Commune? Commune, Daira? Daira, Wilaya? Wilaya);
+    private record CommuneWithDaira(Commune? Commune, Daira? Daira);
+
+    /// <summary>
+    /// fix #7: Loads commune → daira → wilaya in one SQL JOIN.
+    /// </summary>
+    private async Task<LocationChain> LoadLocationChainAsync(int communeId)
     {
-        var token = Request.Cookies["access_token"];
-        return token is null ? null : jwt.ValidateToken(token);
+        var row = await (
+            from c in db.Communes
+            where c.CommuneId == communeId
+            join d in db.Dairas  on c.DairaId  equals d.DairaId  into dj
+            from d in dj.DefaultIfEmpty()
+            join w in db.Wilayas on d.WilayaId equals w.WilayaId into wj
+            from w in wj.DefaultIfEmpty()
+            select new { Commune = c, Daira = (Daira?)d, Wilaya = (Wilaya?)w }
+        ).FirstOrDefaultAsync();
+
+        return row is null
+            ? new LocationChain(null, null, null)
+            : new LocationChain(row.Commune, row.Daira, row.Wilaya);
+    }
+
+    /// <summary>
+    /// fix #7 + fix #11: SignIn only needs commune + daira (wilaya absent from response).
+    /// </summary>
+    private async Task<CommuneWithDaira> LoadCommuneWithDairaAsync(int communeId)
+    {
+        var row = await (
+            from c in db.Communes
+            where c.CommuneId == communeId
+            join d in db.Dairas on c.DairaId equals d.DairaId into dj
+            from d in dj.DefaultIfEmpty()
+            select new { Commune = c, Daira = (Daira?)d }
+        ).FirstOrDefaultAsync();
+
+        return row is null
+            ? new CommuneWithDaira(null, null)
+            : new CommuneWithDaira(row.Commune, row.Daira);
     }
 }

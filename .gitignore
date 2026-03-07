@@ -1,0 +1,28 @@
+# === ASP.NET (NARS) ===
+[Bb]in/
+[Oo]bj/
+out/
+appsettings.Development.json
+*.user
+*.suo
+*.sln.docstates
+.vs/
+# If you use user secrets, they are usually stored outside the project, 
+# but keep an eye on any local secrets files.
+
+# === Vue 3 / Vite (nars-vite) ===
+nars-vite/node_modules/
+nars-vite/dist/
+nars-vite/.env.local
+nars-vite/.env.*.local
+nars-vite/npm-debug.log*
+nars-vite/yarn-debug.log*
+nars-vite/yarn-error.log*
+nars-vite/.vscode/
+
+# === General / IDE ===
+.idea/
+.vscode/
+*.swp
+*.log
+.DS_Store
