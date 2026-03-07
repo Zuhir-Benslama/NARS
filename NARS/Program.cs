@@ -107,21 +107,31 @@ builder.Services.AddOpenApi(options =>
 // ═════════════════════════════════════════════
 var app = builder.Build();
 
-// ── Ensure DB tables exist on startup ────────
+// ── Database initialisation ───────────────────
+// fix #6: MigrateAsync() applies all pending EF migrations and creates the
+// __EFMigrationsHistory table on first run.  It is a no-op when the database
+// is already up to date.
+//
+// Before running in production for the first time, generate the initial migration:
+//   dotnet ef migrations add InitialCreate
+//
+// WARNING: do NOT mix MigrateAsync with EnsureCreatedAsync on the same database.
+// EnsureCreatedAsync bypasses the migrations history table, which causes
+// MigrateAsync to fail on the next startup by attempting to re-create objects
+// that already exist.
 using (var scope = app.Services.CreateScope())
 {
     var dbCtx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     Console.WriteLine("==================================================");
     Console.WriteLine("NARS - ASP.NET Core + PostgreSQL/PostGIS");
     Console.WriteLine("==================================================");
-    await dbCtx.Database.EnsureCreatedAsync();
+
+    await dbCtx.Database.MigrateAsync();
+
     Console.WriteLine("✓ Database tables ready");
 }
 
 // ── Global exception handler ─────────────────
-// Catches unhandled exceptions and returns structured JSON instead of
-// an HTML error page or empty 500 body — so the frontend can display
-// a meaningful error message.
 app.UseExceptionHandler(errApp =>
 {
     errApp.Run(async ctx =>
@@ -147,9 +157,6 @@ app.UseExceptionHandler(errApp =>
 if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 
-// Static files from wwwroot/ — this is where `npm run build` outputs the Vite
-// bundle (index.html + assets/).  UseDefaultFiles() ensures that a bare GET /
-// can find index.html, and UseStaticFiles() serves all hashed JS/CSS assets.
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
@@ -160,6 +167,14 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-Console.WriteLine($"✓ Startup complete — http://localhost:5000\n");
+// fix #12: log the actual bound addresses reported by the server at runtime
+// instead of a hardcoded localhost URL that is wrong in Docker/Kubernetes.
+app.Lifetime.ApplicationStarted.Register(() =>
+{
+    var addresses = app.Urls.Any()
+        ? string.Join(", ", app.Urls)
+        : builder.Configuration["ASPNETCORE_URLS"] ?? "http://localhost:5000";
+    Console.WriteLine($"✓ Startup complete — {addresses}\n");
+});
 
 app.Run();

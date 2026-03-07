@@ -73,6 +73,8 @@ export interface FeatureData {
     mainEntranceDbId?:  number
     mainEntranceLabel?: string
     bisNumber?:         number
+    // houseEntrances (sub-type discriminator)
+    entranceTypeKey?: 'main_entrance' | 'secondary_entrance'
     // publicSpaces
     spaceTypeKey?:  string
     // scattered (auto-computed)
@@ -118,6 +120,8 @@ export interface ModalState {
     districtTypeKey:     string
     // roads
     roadTypeKey:         string
+    // houseEntrances — sub-type selector
+    entranceTypeKey:     'main_entrance' | 'secondary_entrance'
     // mainEntrances
     roadOptions:         RoadOption[]
     selectedRoadIdx:     number | ''
