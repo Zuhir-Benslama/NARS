@@ -6,11 +6,7 @@ import { apiFetch }            from '../api'
 import { getRoadSide, checkMainUrbanExists } from '../validation'
 import type { FeatureData, LayerEntry, SaveResult } from '../types'
 
-declare const L: typeof import('leaflet') & {
-    Draw: any
-    Control: typeof import('leaflet').Control & { Draw: new (opts: any) => any }
-    DrawEvents: any
-}
+declare const L: typeof import('leaflet')
 
 // ─── FEATURE DATA BUILDER ────────────────────────────────────────────────────
 
