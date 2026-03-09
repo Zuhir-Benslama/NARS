@@ -140,7 +140,8 @@ export function refreshLayerVisibility(): void {
     const currentKey = PHASES[store.currentPhase]?.key
 
     for (const [key, entries] of Object.entries(featureLayers)) {
-        const show = key === 'areas' || key === currentKey
+        const showCityCenter = key === 'cityCenter' && (currentKey === 'roads' || currentKey === 'houseEntrances')
+        const show = key === 'areas' || key === currentKey || showCityCenter
         for (const { layer } of entries as LayerEntry[]) {
             setLayerVisible(layer, show)
             const edgeMarkers = (layer as any)._edgeLabelMarkers as L.Marker[] | undefined

@@ -1,13 +1,14 @@
 // ─── CONTEXT MENU & FEATURE EDITING ─────────────────────────────────────────
 
 import { ctx }                           from './state'
-import { featureLayers, openEditModal, syncCounts } from '../store'
+import { featureLayers, openEditModal, syncCounts, store } from '../store'
 import { PHASES }                        from '../phases'
 import { apiFetch }                      from '../api'
 import type { LayerEntry }               from '../types'
 import { areaStyle, buildPopup }         from './styles'
 import { createAreaPerimeterLabel, createPolygonEdgeLabel, addPolylineEndpoints } from './labels'
-import { refreshScatteredAreas }         from './geometry'
+import { enableSnapping, disableSnapping, hookEditHandles } from './snapping'
+import { refreshScatteredAreas }           from './geometry'
 
 declare const L: typeof import('leaflet') & {
     Draw: any
@@ -34,12 +35,16 @@ function getCtxEl(): HTMLElement {
     return _ctxEl
 }
 
-function showContextMenu(x: number, y: number, dbId: number): void {
+function showContextMenu(x: number, y: number, dbId: number, phaseKey: string): void {
     const el = getCtxEl()
+    const isRoad        = phaseKey === 'roads'
+    const currentPhase  = PHASES[store.currentPhase]?.key
+    const isCurrentPhase = phaseKey === currentPhase
     el.innerHTML = `
         <div class="nars-ctx-item" data-action="edit">✏️ Edit Info</div>
         <div class="nars-ctx-item" data-action="boundaries">⬟ Edit Boundaries</div>
-        <div class="nars-ctx-item nars-ctx-danger" data-action="remove">🗑️ Remove Object</div>
+        ${isRoad ? '<div class="nars-ctx-item" data-action="reverse">⇄ Reverse Direction</div>' : ''}
+        ${isCurrentPhase ? '<div class="nars-ctx-item nars-ctx-danger" data-action="remove">🗑️ Remove Object</div>' : ''}
     `
     el.style.left = '-9999px'; el.style.top = '-9999px'; el.style.display = 'block'
     const w = el.offsetWidth, h = el.offsetHeight
@@ -53,16 +58,17 @@ function showContextMenu(x: number, y: number, dbId: number): void {
             const action = (item as HTMLElement).dataset.action
             if      (action === 'edit')       (window as any).__narsEditFeature(dbId)
             else if (action === 'boundaries') (window as any).__narsEditBoundaries(dbId)
+            else if (action === 'reverse')    (window as any).__narsReverseRoad(dbId)
             else if (action === 'remove')     (window as any).__narsRemoveFeature(dbId)
         }
     })
 }
 
-export function bindContextMenu(layer: L.Layer, dbId: number): void {
+export function bindContextMenu(layer: L.Layer, dbId: number, phaseKey: string): void {
     layer.on('contextmenu', (e: any) => {
         e.originalEvent.preventDefault()
         e.originalEvent.stopPropagation()
-        showContextMenu(e.originalEvent.clientX, e.originalEvent.clientY, dbId)
+        showContextMenu(e.originalEvent.clientX, e.originalEvent.clientY, dbId, phaseKey)
     })
 }
 
@@ -107,10 +113,30 @@ async function editBoundaries(dbId: number): Promise<void> {
         alert('Switch to the correct phase first to enable boundary editing.')
         return
     }
-    editBtn.click()
 
-    const entry = Object.values(featureLayers).flat()
-        .find((e: LayerEntry) => (e.layer as any)._dbId === dbId) as LayerEntry | undefined
+    // Determine which snap mode to use for this feature
+    const phaseKey = Object.keys(featureLayers).find(k =>
+        featureLayers[k].some((e: LayerEntry) => (e.layer as any)._dbId === dbId))
+
+    const entry = phaseKey
+        ? featureLayers[phaseKey].find((e: LayerEntry) => (e.layer as any)._dbId === dbId) as LayerEntry | undefined
+        : undefined
+
+    const snapMode = phaseKey === 'roads' ? 'roads'
+                   : (phaseKey === 'districts' || phaseKey === 'areas') ? 'districts'
+                   : null
+
+    if (snapMode) enableSnapping(snapMode, entry?.layer, phaseKey)
+    if (snapMode) hookEditHandles()
+
+    // Disable snapping once edit mode ends (save or cancel)
+    const onEditStop = () => {
+        if (snapMode) disableSnapping()
+        ctx.map.off('draw:editstop', onEditStop)
+    }
+    ctx.map.on('draw:editstop', onEditStop)
+
+    editBtn.click()
 
     function onMapClick(e: any) {
         const target = e.originalEvent?.target as HTMLElement | null
@@ -170,8 +196,41 @@ async function editFeatureInfo(dbId: number): Promise<void> {
     }
 }
 
+// ─── REVERSE ROAD DIRECTION ───────────────────────────────────────────────────
+
+async function reverseRoadDirection(dbId: number): Promise<void> {
+    const entry = featureLayers.roads.find((e: LayerEntry) => (e.layer as any)._dbId === dbId)
+    if (!entry) return
+
+    // Reverse coordinates in data and on the layer
+    const coords = entry.data.coordinates
+    if (!coords || coords.length < 2) return
+    const reversed = [...coords].reverse()
+    entry.data.coordinates = reversed
+
+    const newLatLngs = reversed.map((c: { lat: number; lng: number }) => L.latLng(c.lat, c.lng))
+    ;(entry.layer as L.Polyline).setLatLngs(newLatLngs)
+
+    // Refresh endpoint arrow markers
+    if ((entry.layer as any)._endpointMarkers) {
+        ;(entry.layer as any)._endpointMarkers.forEach((m: L.Layer) => ctx.lineEndpointLayer.removeLayer(m))
+        ;(entry.layer as any)._endpointMarkers = []
+    }
+    addPolylineEndpoints(entry.layer)
+
+    // Persist to database
+    try {
+        await apiFetch(`/api/update/${dbId}`, {
+            method:  'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ data: entry.data }),
+        })
+    } catch (err) { console.error('Reverse road save error:', err) }
+}
+
 // ─── GLOBAL WINDOW HANDLERS ───────────────────────────────────────────────────
 
 ;(window as any).__narsEditFeature    = editFeatureInfo
 ;(window as any).__narsEditBoundaries = editBoundaries
+;(window as any).__narsReverseRoad    = reverseRoadDirection
 ;(window as any).__narsRemoveFeature  = removeFeature
