@@ -4,11 +4,7 @@ import { AREA_TYPES, PHASES } from '../phases'
 import { POLYLINE_WEIGHT }    from './state'
 import type { FeatureData }   from '../types'
 
-declare const L: typeof import('leaflet') & {
-    Draw: any
-    Control: typeof import('leaflet').Control & { Draw: new (opts: any) => any }
-    DrawEvents: any
-}
+declare const L: typeof import('leaflet')
 
 // ─── POLYGON STYLES ───────────────────────────────────────────────────────────
 

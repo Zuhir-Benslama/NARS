@@ -125,9 +125,9 @@
 /home/zuhir/Workspace/NARS/obj/Debug/net10.0/rjsmcshtml.dswa.cache.json
 /home/zuhir/Workspace/NARS/obj/Debug/net10.0/scopedcss/bundle/NarsApi.styles.css
 /home/zuhir/Workspace/NARS/obj/Debug/net10.0/compressed/poxa7ju25v-{0}-zhueb5csv0-zhueb5csv0.gz
-/home/zuhir/Workspace/NARS/obj/Debug/net10.0/compressed/02pc8pwmfu-{0}-8mypj8itj9-8mypj8itj9.gz
-/home/zuhir/Workspace/NARS/obj/Debug/net10.0/compressed/gvjbibe90z-{0}-tp4srlvb48-tp4srlvb48.gz
-/home/zuhir/Workspace/NARS/obj/Debug/net10.0/compressed/rmwa4g5jy9-{0}-gcciyhkeni-gcciyhkeni.gz
+/home/zuhir/Workspace/NARS/obj/Debug/net10.0/compressed/l9zasifrxl-{0}-6zxzsfkglk-6zxzsfkglk.gz
+/home/zuhir/Workspace/NARS/obj/Debug/net10.0/compressed/auk0hblrki-{0}-y0enadbvs3-y0enadbvs3.gz
+/home/zuhir/Workspace/NARS/obj/Debug/net10.0/compressed/rmwa4g5jy9-{0}-trh663990c-trh663990c.gz
 /home/zuhir/Workspace/NARS/obj/Debug/net10.0/compressed/g397wswadr-{0}-rxj1on178g-rxj1on178g.gz
 /home/zuhir/Workspace/NARS/obj/Debug/net10.0/staticwebassets.build.json
 /home/zuhir/Workspace/NARS/obj/Debug/net10.0/staticwebassets.build.json.cache

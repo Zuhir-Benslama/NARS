@@ -6,11 +6,7 @@ import { featureLayers, store } from '../store'
 import { areaStyle }        from './styles'
 import type { LayerEntry }  from '../types'
 
-declare const L: typeof import('leaflet') & {
-    Draw: any
-    Control: typeof import('leaflet').Control & { Draw: new (opts: any) => any }
-    DrawEvents: any
-}
+declare const L: typeof import('leaflet')
 
 // ─── POLYLINE ENDPOINT MARKERS ────────────────────────────────────────────────
 

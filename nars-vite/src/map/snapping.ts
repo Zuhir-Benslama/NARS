@@ -4,11 +4,7 @@ import { ctx }          from './state'
 import { featureLayers } from '../store'
 import type { LayerEntry } from '../types'
 
-declare const L: typeof import('leaflet') & {
-    Draw: any
-    Control: typeof import('leaflet').Control & { Draw: new (opts: any) => any }
-    DrawEvents: any
-}
+declare const L: typeof import('leaflet')
 
 let snapActive:     boolean                      = false
 let snapLatLng:     L.LatLng | null              = null
@@ -174,18 +170,6 @@ function nearestSnapPointRoads(
     return null
 }
 
-// ─── DRAW HANDLER ACCESS ─────────────────────────────────────────────────────
-
-function getActiveDrawHandler(): any | null {
-    const toolbar = (ctx.drawControl as any)?._toolbars?.draw
-    if (!toolbar) return null
-    const modes: Record<string, any> = toolbar._modes ?? {}
-    for (const [, mode] of Object.entries(modes)) {
-        const handler = mode?.handler
-        if (handler?._enabled || handler?.enabled?.()) return handler
-    }
-    return null
-}
 
 let snapFrozen = false  // true from mousedown until after click
 
@@ -236,15 +220,6 @@ function onSnapMove(e: MouseEvent): void {
         snapLatLng = snap.ll
         snapActive = true
 
-        // Directly update the active draw handler's internal state.
-        // Leaflet-draw places vertices using _mouseMarker.latlng (set via setLatLng)
-        // and _currentLatLng — both read at mouseup time. No amount of event
-        // interception works because addVertex reads from the marker object directly.
-        const drawHandler = getActiveDrawHandler()
-        if (drawHandler) {
-            drawHandler._mouseMarker?.setLatLng(snap.ll)
-            drawHandler._currentLatLng = snap.ll
-        }
         if (!ctx.map.getPane('snapPane')) {
             ctx.map.createPane('snapPane')
             ctx.map.getPane('snapPane')!.style.zIndex = '9999'
@@ -362,17 +337,8 @@ export function hookEditHandles(): void {
 }
 
 export function installSnapInterceptors(): void {
-    // Patch 1: leaflet-draw's _onMouseMove calls map.mouseEventToLayerPoint(e.originalEvent)
-    // directly — it never reads e.latlng. Patch the method so it returns the snap
-    // layer point when snapped.
-    const orig = ctx.map.mouseEventToLayerPoint.bind(ctx.map)
-    ctx.map.mouseEventToLayerPoint = function(e: MouseEvent): L.Point {
-        if (snapActive && snapLatLng) return ctx.map.latLngToLayerPoint(snapLatLng)
-        return orig(e)
-    }
-
-    // Patch 2: also rewrite e.latlng on Leaflet events as a belt-and-suspenders
-    // measure, since some leaflet-draw versions read e.latlng instead.
+    // Rewrite e.latlng on Leaflet events so Geoman reads the snapped position
+    // when placing vertices during draw and edit.
     ctx.map.on('mousemove', (e: any) => {
         if (snapActive && snapLatLng) e.latlng = snapLatLng
     })
