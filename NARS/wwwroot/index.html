@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NARS - National Addressing Reference System</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
-  <script type="module" crossorigin src="/assets/main-_iVBN1tO.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-CoLr450b.css">
+    <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+  <script type="module" crossorigin src="/assets/main-DEjMs-sO.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main-DPV219ZG.css">
 </head>
 <body>
 
@@ -15,13 +15,9 @@
     <div id="app" v-cloak></div>
 
     <!--
-        Leaflet and leaflet-draw are loaded from CDN as plain scripts BEFORE the
-        Vue module. This guarantees window.L exists when leaflet-draw initialises,
-        which is required because leaflet-draw is a legacy UMD bundle that patches
-        the global L object — it cannot be safely imported via npm/Vite.
+        Leaflet is loaded from CDN. Leaflet-Geoman is imported via npm in the Vue module.
     -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 
 </body>

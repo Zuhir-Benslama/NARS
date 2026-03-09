@@ -268,7 +268,7 @@ function onSnapMove(e: MouseEvent): void {
 }
 
 // ─── EDIT-MODE SNAPPING ───────────────────────────────────────────────────────
-// Called directly inside the draw:editstart handler in index.ts.
+// Called directly inside the pm:editstart handler in index.ts.
 
 export let editDragActive = false  // true only while a vertex is being dragged
 export let editModeActive = false  // true from hookEditHandles until disableSnapping
@@ -276,7 +276,7 @@ export let editModeActive = false  // true from hookEditHandles until disableSna
 function hookMarker(marker: any, layer: L.Layer): void {
     // Remove any previously attached snap handlers before re-attaching.
     // This is essential because ghost midpoint markers are converted in-place
-    // to real vertex markers by leaflet-draw — same object, so _snapHooked
+    // to real vertex markers by Geoman — same object, so _snapHooked
     // would block re-hooking. Named handler refs let us cleanly replace them.
     if (marker._snapDragStart) marker.off('dragstart', marker._snapDragStart)
     if (marker._snapDrag)      marker.off('drag',      marker._snapDrag)
@@ -306,8 +306,7 @@ function hookMarker(marker: any, layer: L.Layer): void {
 
         if (!snapped) return
         setTimeout(() => {
-            // Use the layer closure variable directly — marker._poly is unreliable
-            // in leaflet-draw 1.0.4 and may be undefined for some marker types.
+            // Use the layer closure variable directly
             const poly = layer
             if (poly instanceof L.Polygon) {
                 const rings = poly.getLatLngs() as L.LatLng[][]
@@ -331,27 +330,29 @@ function hookMarker(marker: any, layer: L.Layer): void {
     marker.on('dragend',   marker._snapDragEnd)
 }
 
-function hookAllEditMarkers(): void {
+export function hookAllEditMarkers(): void {
     let layerCount = 0, markerCount = 0
     ctx.drawnItems.eachLayer((layer: L.Layer) => {
-        const editing = (layer as any).editing
-        if (!editing) return
+        // Check if Geoman editing is enabled on this layer
+        const pm = (layer as any).pm
+        if (!pm || !pm.enabled()) return
         layerCount++
 
-        const groups: any[] = []
-        if (editing._markerGroup) groups.push(editing._markerGroup)
-        ;(editing._verticesHandlers ?? []).forEach((vh: any) => {
-            if (vh._markerGroup) groups.push(vh._markerGroup)
-        })
-
-        let layerMarkers = 0
-        groups.forEach(group => {
-            group.eachLayer((marker: any) => {
-                hookMarker(marker, layer)
-                layerMarkers++
-                markerCount++
-            })
-        })
+        // Try to get the editor and its markers
+        // Geoman stores markers in the editor's _markers array
+        try {
+            const editor = pm.getEditor?.()
+            if (editor && editor._markers) {
+                editor._markers.forEach((marker: any) => {
+                    if (marker instanceof L.Marker) {
+                        hookMarker(marker, layer)
+                        markerCount++
+                    }
+                })
+            }
+        } catch (e) {
+            // Ignore errors accessing Geoman internals
+        }
     })
 }
 

@@ -12,7 +12,7 @@ import { ctx, POLYLINE_WEIGHT }       from './state'
 import { areaStyle, polygonStyles, createEntranceIcon, createCityCenterIcon, applyStyle, buildPopup } from './styles'
 import { addPolylineEndpoints, createPermanentLabel, createAreaPerimeterLabel, createPolygonEdgeLabel, refreshAllEdgeLabels, refreshLayerVisibility } from './labels'
 import { pointInMunicipalLimit, pointInScatteredArea, polylineMidpoint, displayCommuneBoundary, renderScatteredAreas, refreshScatteredAreas } from './geometry'
-import { enableSnapping, disableSnapping, hookEditHandles, editModeActive, installSnapInterceptors } from './snapping'
+import { enableSnapping, disableSnapping, hookEditHandles, hookAllEditMarkers, editModeActive, installSnapInterceptors } from './snapping'
 import { bindContextMenu }            from './context-menu'
 import { buildFeatureData, saveToDatabase, prepareModalExtras } from './features'
 
@@ -59,37 +59,49 @@ export function initMap(): void {
 // ─── DRAW CONTROL ─────────────────────────────────────────────────────────────
 
 function buildDrawControl(phase: typeof PHASES[number]): void {
-    if (ctx.drawControl) { ctx.map.removeControl(ctx.drawControl); ctx.drawControl = null }
+    // Remove existing Geoman controls
+    ctx.map.pm.removeControls()
 
-    const opts: L.Control.DrawConstructorOptions = {
-        edit: { featureGroup: ctx.drawnItems, edit: {}, remove: false },
-        draw: {
-            polygon: false, polyline: false, rectangle: false,
-            circle:  false, circlemarker: false, marker: false,
-        },
-    }
-
+    // Configure Geoman options based on the current phase
+    const drawOptions: any = {}
+    
     if (phase.drawType === 'polygon') {
-        opts.draw!.polygon = {
+        drawOptions.polygon = {
             allowIntersection: false,
-            shapeOptions: {
-                color:       phase.color,
-                weight:      2.5,
+            pathOptions: {
+                color: phase.color,
+                weight: 2.5,
                 fillOpacity: phase.key === 'areas' ? 0 : 0.15,
-                dashArray:   phase.key === 'areas' ? '10, 6' : undefined,
+                dashArray: phase.key === 'areas' ? '10, 6' : undefined,
             },
         }
     }
     if (phase.drawType === 'polyline') {
-        opts.draw!.polyline = { shapeOptions: { color: phase.color, weight: POLYLINE_WEIGHT } }
+        drawOptions.polyline = {
+            pathOptions: { color: phase.color, weight: POLYLINE_WEIGHT },
+        }
     }
     if (phase.drawType === 'marker') {
         const icon = phase.key === 'cityCenter' ? createCityCenterIcon() : createEntranceIcon('?', phase.color)
-        opts.draw!.marker = { icon }
+        drawOptions.marker = { icon }
     }
 
-    ctx.drawControl = new L.Control.Draw(opts)
-    ctx.map.addControl(ctx.drawControl)
+    // Add Geoman controls
+    // Enable drawing for current phase, enable editing for all drawn items, disable removal
+    ctx.map.pm.addControls({
+        drawMarker: phase.drawType === 'marker',
+        drawPolygon: phase.drawType === 'polygon',
+        drawPolyline: phase.drawType === 'polyline',
+        drawRectangle: false,
+        drawCircle: false,
+        drawCircleMarker: false,
+        editMode: true,
+        removalMode: false,
+        ...drawOptions,
+    })
+
+    // Store the draw mode for later use
+    ;(ctx.map as any)._geomanDrawMode = phase.drawType
 }
 
 // ─── PLACEMENT VALIDATION ─────────────────────────────────────────────────────
@@ -179,27 +191,25 @@ export function cityCenterSkip(): void {
 // ─── DRAW EVENTS ──────────────────────────────────────────────────────────────
 
 function registerDrawEvents(): void {
-
-    ctx.map.on(L.Draw.Event.DRAWSTART, () => {
+    // Geoman uses 'pm:drawstart', 'pm:drawend', 'pm:editstart', 'pm:editend', etc.
+    
+    ctx.map.on('pm:drawstart', (e: any) => {
         const key = PHASES[store.currentPhase]?.key
         if      (key === 'areas')     enableSnapping('districts', undefined, 'areas')
         else if (key === 'districts') enableSnapping('districts', undefined, 'districts')
         else if (key === 'roads')     enableSnapping('roads',     undefined, 'roads')
     })
-    ctx.map.on(L.Draw.Event.DRAWSTOP, () => {
-        // Don't disable on DRAWSTOP if we're in edit mode — EDITSTOP handles that.
-        // leaflet-draw fires DRAWSTOP internally when the edit toolbar closes,
-        // which would destroy the patch right after DRAWSTART re-installed it.
+    
+    ctx.map.on('pm:drawend', () => {
+        // Don't disable on drawend if we're in edit mode — editend handles that
         if (!editModeActive) disableSnapping()
     })
 
-    ctx.map.on(L.Draw.Event.EDITSTART, () => {
+    ctx.map.on('pm:editstart', (e: any) => {
         const key = PHASES[store.currentPhase]?.key
 
-        // Remove non-current-phase layers from drawnItems so leaflet-draw
-        // cannot select or edit them.
-        // Areas are special: remove from drawnItems (so they're not editable)
-        // but keep on the map via a display-only layer group so they stay visible.
+        // Remove non-current-phase layers from drawnItems so Geoman
+        // cannot select or edit them
         const parked:  L.Layer[] = []
         const display: L.Layer[] = []
 
@@ -229,7 +239,16 @@ function registerDrawEvents(): void {
         hookEditHandles()
     })
 
-    ctx.map.on(L.Draw.Event.EDITSTOP, () => {
+    // Handle new vertex added (e.g., via midpoint click)
+    let editVertexTimeout: ReturnType<typeof setTimeout> | null = null
+    ctx.map.on('pm:vertexadded', () => {
+        if (editVertexTimeout) clearTimeout(editVertexTimeout)
+        editVertexTimeout = setTimeout(() => {
+            hookAllEditMarkers()
+        }, 150)
+    })
+
+    ctx.map.on('pm:editend', () => {
         const parked:  L.Layer[]      = (ctx as any)._parkedLayers  ?? []
         const display: L.Layer[]      = (ctx as any)._displayLayers ?? []
         const displayLayer: L.LayerGroup | undefined = (ctx as any)._displayLayer
@@ -248,9 +267,9 @@ function registerDrawEvents(): void {
         setTimeout(refreshLayerVisibility, 0)
     })
 
-    ctx.map.on(L.Draw.Event.CREATED, async (event: L.LeafletEvent) => {
-        const e     = event as any
-        const layer = e.layer as L.Layer
+    // Geoman uses 'pm:create' instead of 'L.Draw.Event.CREATED'
+    ctx.map.on('pm:create', async (event: any) => {
+        const layer = event.layer as L.Layer
         const phase = PHASES[store.currentPhase]
 
         if (!await validatePlacement(layer, phase)) return
@@ -298,7 +317,8 @@ function registerDrawEvents(): void {
         syncCounts()
     })
 
-    ctx.map.on(L.Draw.Event.EDITED, async (event: L.LeafletEvent) => {
+    // Geoman uses 'pm:edit' instead of 'L.Draw.Event.EDITED'
+    ctx.map.on('pm:edit', async (event: any) => {
         const e = event as any
         // Defer one tick so any pending snap commits (setTimeout 0) run first
         await new Promise(r => setTimeout(r, 0))
@@ -347,7 +367,8 @@ function registerDrawEvents(): void {
         ctx.drawnItems.eachLayer(l => { if (l instanceof L.Polyline && !(l instanceof L.Polygon)) addPolylineEndpoints(l) })
     })
 
-    ctx.map.on(L.Draw.Event.DELETED, async (event: L.LeafletEvent) => {
+    // Geoman uses 'pm:remove' instead of 'L.Draw.Event.DELETED'
+    ctx.map.on('pm:remove', async (event: any) => {
         const e = event as any
         let areaDeleted = false
         e.layers.eachLayer(async (layer: L.Layer) => {
