@@ -12,7 +12,7 @@ import { ctx, POLYLINE_WEIGHT }       from './state'
 import { areaStyle, polygonStyles, createEntranceIcon, createCityCenterIcon, applyStyle, buildPopup } from './styles'
 import { addPolylineEndpoints, createPermanentLabel, createAreaPerimeterLabel, createPolygonEdgeLabel, refreshAllEdgeLabels, refreshLayerVisibility } from './labels'
 import { pointInMunicipalLimit, pointInScatteredArea, polylineMidpoint, displayCommuneBoundary, renderScatteredAreas, refreshScatteredAreas } from './geometry'
-import { enableSnapping, disableSnapping } from './snapping'
+import { enableSnapping, disableSnapping, hookEditHandles, editModeActive, installSnapInterceptors } from './snapping'
 import { bindContextMenu }            from './context-menu'
 import { buildFeatureData, saveToDatabase, prepareModalExtras } from './features'
 
@@ -50,6 +50,7 @@ export function initMap(): void {
     ctx.drawControl           = null
 
     ctx.map.on('zoomend', refreshAllEdgeLabels)
+    installSnapInterceptors()
 
     buildDrawControl(PHASES[0])
     registerDrawEvents()
@@ -97,7 +98,15 @@ async function validatePlacement(layer: L.Layer, phase: typeof PHASES[number]): 
     let checkPoint: L.LatLng
     if (phase.drawType === 'marker')        checkPoint = (layer as L.Marker).getLatLng()
     else if (phase.drawType === 'polyline') checkPoint = polylineMidpoint(layer as L.Polyline)
-    else                                    checkPoint = (layer as L.Polygon).getBounds().getCenter()
+    else {
+        // Use the actual polygon centroid (average of vertices) rather than the
+        // bounding-box center — the bbox center can fall outside a concave polygon
+        // or outside the urban area even when the polygon is mostly inside.
+        const lls = (layer as L.Polygon).getLatLngs()[0] as L.LatLng[]
+        const lat = lls.reduce((s, ll) => s + ll.lat, 0) / lls.length
+        const lng = lls.reduce((s, ll) => s + ll.lng, 0) / lls.length
+        checkPoint = L.latLng(lat, lng)
+    }
 
     if (!pointInMunicipalLimit(checkPoint)) {
         alert(`⛔ This ${phase.label.replace(/s$/, '').toLowerCase()} is outside the municipal boundary.`)
@@ -151,8 +160,8 @@ export function setPhase(index: number): void {
     buildDrawControl(PHASES[index])
     if (PHASES[index].key === 'cityCenter' && store.cityCenterMode === null)
         store.cityCenterDialogVisible = true
-    if      (PHASES[index].key === 'districts') enableSnapping('districts')
-    else if (PHASES[index].key === 'roads')     enableSnapping('roads')
+    if      (PHASES[index].key === 'districts') enableSnapping('districts', undefined, 'districts')
+    else if (PHASES[index].key === 'roads')     enableSnapping('roads',     undefined, 'roads')
     else disableSnapping()
     refreshLayerVisibility()
 }
@@ -173,10 +182,71 @@ function registerDrawEvents(): void {
 
     ctx.map.on(L.Draw.Event.DRAWSTART, () => {
         const key = PHASES[store.currentPhase]?.key
-        if      (key === 'districts') enableSnapping('districts')
-        else if (key === 'roads')     enableSnapping('roads')
+        if      (key === 'areas')     enableSnapping('districts', undefined, 'areas')
+        else if (key === 'districts') enableSnapping('districts', undefined, 'districts')
+        else if (key === 'roads')     enableSnapping('roads',     undefined, 'roads')
     })
-    ctx.map.on(L.Draw.Event.DRAWSTOP, () => disableSnapping())
+    ctx.map.on(L.Draw.Event.DRAWSTOP, () => {
+        // Don't disable on DRAWSTOP if we're in edit mode — EDITSTOP handles that.
+        // leaflet-draw fires DRAWSTOP internally when the edit toolbar closes,
+        // which would destroy the patch right after DRAWSTART re-installed it.
+        if (!editModeActive) disableSnapping()
+    })
+
+    ctx.map.on(L.Draw.Event.EDITSTART, () => {
+        const key = PHASES[store.currentPhase]?.key
+
+        // Remove non-current-phase layers from drawnItems so leaflet-draw
+        // cannot select or edit them.
+        // Areas are special: remove from drawnItems (so they're not editable)
+        // but keep on the map via a display-only layer group so they stay visible.
+        const parked:  L.Layer[] = []
+        const display: L.Layer[] = []
+
+        if (!(ctx as any)._displayLayer) {
+            ;(ctx as any)._displayLayer = L.layerGroup().addTo(ctx.map)
+        }
+        const displayLayer: L.LayerGroup = (ctx as any)._displayLayer
+
+        Object.entries(featureLayers).forEach(([phaseKey, entries]) => {
+            if (phaseKey === key) return
+            ;(entries as LayerEntry[]).forEach(({ layer }) => {
+                if (!ctx.drawnItems.hasLayer(layer)) return
+                ctx.drawnItems.removeLayer(layer)
+                if (phaseKey === 'areas') {
+                    displayLayer.addLayer(layer)
+                    display.push(layer)
+                } else {
+                    parked.push(layer)
+                }
+            })
+        })
+        ;(ctx as any)._parkedLayers  = parked
+        ;(ctx as any)._displayLayers = display
+
+        if      (key === 'districts' || key === 'areas') enableSnapping('districts', undefined, key)
+        else if (key === 'roads')                        enableSnapping('roads',     undefined, key)
+        hookEditHandles()
+    })
+
+    ctx.map.on(L.Draw.Event.EDITSTOP, () => {
+        const parked:  L.Layer[]      = (ctx as any)._parkedLayers  ?? []
+        const display: L.Layer[]      = (ctx as any)._displayLayers ?? []
+        const displayLayer: L.LayerGroup | undefined = (ctx as any)._displayLayer
+
+        // Move display-only areas back into drawnItems
+        display.forEach(layer => {
+            displayLayer?.removeLayer(layer)
+            ctx.drawnItems.addLayer(layer)
+        })
+        // Restore all other parked layers
+        parked.forEach(layer => ctx.drawnItems.addLayer(layer))
+
+        ;(ctx as any)._parkedLayers  = []
+        ;(ctx as any)._displayLayers = []
+        disableSnapping()
+        setTimeout(refreshLayerVisibility, 0)
+    })
 
     ctx.map.on(L.Draw.Event.CREATED, async (event: L.LeafletEvent) => {
         const e     = event as any
@@ -207,7 +277,7 @@ function registerDrawEvents(): void {
 
         ;(layer as any)._dbId = saveResult.data!.id
         ctx.drawnItems.addLayer(layer)
-        bindContextMenu(layer, saveResult.data!.id)
+        bindContextMenu(layer, saveResult.data!.id, phase.key)
         if (phase.drawType === 'polyline') addPolylineEndpoints(layer)
         createPermanentLabel(layer, modalResult.label as string, phase.key)
         if (phase.key === 'areas')     createAreaPerimeterLabel(layer, (modalResult as any).areaTypeKey as string)
@@ -230,6 +300,8 @@ function registerDrawEvents(): void {
 
     ctx.map.on(L.Draw.Event.EDITED, async (event: L.LeafletEvent) => {
         const e = event as any
+        // Defer one tick so any pending snap commits (setTimeout 0) run first
+        await new Promise(r => setTimeout(r, 0))
         e.layers.eachLayer(async (layer: L.Layer) => {
             if (!(layer as any)._dbId) return
             try {
@@ -243,7 +315,14 @@ function registerDrawEvents(): void {
                 } else if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
                     entry.data.coordinates = (layer.getLatLngs() as L.LatLng[]).map(ll => ({ lat: ll.lat, lng: ll.lng }))
                 } else if (layer instanceof L.Polygon) {
-                    entry.data.coordinates = ((layer.getLatLngs()[0]) as L.LatLng[]).map(ll => ({ lat: ll.lat, lng: ll.lng }))
+                    let coords = (layer.getLatLngs()[0] as L.LatLng[]).map(ll => ({ lat: ll.lat, lng: ll.lng }))
+                    // PostGIS/GEOS requires closed rings — first point must equal last
+                    if (coords.length >= 3) {
+                        const first = coords[0], last = coords[coords.length - 1]
+                        if (first.lat !== last.lat || first.lng !== last.lng)
+                            coords = [...coords, { lat: first.lat, lng: first.lng }]
+                    }
+                    entry.data.coordinates = coords
                 }
 
                 await apiFetch(`/api/update/${(layer as any)._dbId}`, {
@@ -349,7 +428,7 @@ export async function loadFromDatabase(): Promise<void> {
 
                 ;(layer as any)._dbId = feature.id
                 ctx.drawnItems.addLayer(layer)
-                bindContextMenu(layer, feature.id)
+                bindContextMenu(layer, feature.id, phaseKey)
                 if (phase.drawType === 'polyline') addPolylineEndpoints(layer)
                 createPermanentLabel(layer, data.label, phaseKey)
                 if (phaseKey === 'areas')     createAreaPerimeterLabel(layer, data.areaTypeKey ?? feature.layer)
