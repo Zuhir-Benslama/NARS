@@ -14,12 +14,15 @@ let snapActive:     boolean                      = false
 let snapLatLng:     L.LatLng | null              = null
 let snapMarker:     L.CircleMarker | null        = null
 let activeSnapMode: 'districts' | 'roads' | null = null
+let snapExclude:    L.Layer | null               = null
+let snapPhaseKey:   string | null                = null
 
 // ─── SNAP SOURCE COLLECTORS ───────────────────────────────────────────────────
 
-function getSnapRings(): L.LatLng[][] {
+function getSnapRings(phaseKey?: string): L.LatLng[][] {
     const rings: L.LatLng[][] = []
-    ;[...featureLayers.districts, ...featureLayers.areas].forEach(({ layer }) => {
+    ;[...featureLayers.areas, ...(phaseKey === 'areas' ? [] : featureLayers.districts)].forEach(({ layer }) => {
+        if (layer === snapExclude) return
         if (!(layer instanceof L.Polygon)) return
         const ring = (layer.getLatLngs()[0] as L.LatLng[]).filter(ll => ll && ll.lat != null && ll.lng != null)
         if (ring.length >= 2) rings.push(ring)
@@ -27,10 +30,19 @@ function getSnapRings(): L.LatLng[][] {
     if (ctx.boundariesLayer) {
         ctx.boundariesLayer.eachLayer((bl: L.Layer) => {
             try {
-                const lls  = (bl as L.Polygon).getLatLngs()
-                const flat = (Array.isArray(lls[0]) ? lls[0] : lls) as L.LatLng[]
-                const ring = flat.filter(ll => ll && ll.lat != null && ll.lng != null)
-                if (ring.length >= 2) rings.push(ring)
+                // getLatLngs() returns L.LatLng[] | L.LatLng[][] | L.LatLng[][][]
+                // depending on the GeoJSON geometry type — flatten all levels
+                const lls = (bl as L.Polygon).getLatLngs()
+                const extractRings = (arr: any): void => {
+                    if (!arr.length) return
+                    if (arr[0] instanceof L.LatLng) {
+                        const r = (arr as L.LatLng[]).filter(ll => ll?.lat != null && ll?.lng != null)
+                        if (r.length >= 2) rings.push(r)
+                    } else {
+                        arr.forEach(extractRings)
+                    }
+                }
+                extractRings(lls)
             } catch { /* skip */ }
         })
     }
@@ -43,6 +55,7 @@ function getRoadSnapSources(): { chains: L.LatLng[][]; rings: L.LatLng[][]; poin
     const points: L.LatLng[]   = []
 
     featureLayers.roads.forEach(({ layer }) => {
+        if (layer === snapExclude) return
         if (!(layer instanceof L.Polyline) || layer instanceof L.Polygon) return
         const lls = (layer.getLatLngs() as L.LatLng[]).filter(ll => ll?.lat != null && ll?.lng != null)
         if (lls.length >= 2) chains.push(lls)
@@ -161,19 +174,53 @@ function nearestSnapPointRoads(
     return null
 }
 
-// ─── MOUSE MOVE HANDLER ───────────────────────────────────────────────────────
+// ─── DRAW HANDLER ACCESS ─────────────────────────────────────────────────────
+
+function getActiveDrawHandler(): any | null {
+    const toolbar = (ctx.drawControl as any)?._toolbars?.draw
+    if (!toolbar) return null
+    const modes: Record<string, any> = toolbar._modes ?? {}
+    for (const [, mode] of Object.entries(modes)) {
+        const handler = mode?.handler
+        if (handler?._enabled || handler?.enabled?.()) return handler
+    }
+    return null
+}
+
+let snapFrozen = false  // true from mousedown until after click
+
+function onSnapMouseDown(): void {
+    // Only freeze in draw mode — in edit mode the drag tracks the moving cursor
+    if (!editModeActive && snapActive && snapLatLng) {
+        snapFrozen = true
+    }
+}
+
+function onSnapMouseUp(): void {
+    snapFrozen = false
+}
 
 function onSnapMove(e: MouseEvent): void {
+    if (snapFrozen) return  // mousedown in progress — hold snap state through click
     if (!ctx.map.getContainer().contains(e.target as Node)) return
+
+    // In edit mode, only snap while a vertex is actually being dragged —
+    // suppresses the snap circle appearing on the feature's own handles during hover
+    if (editModeActive && !editDragActive) {
+        snapActive = false
+        snapLatLng = null
+        if (snapMarker && ctx.map.hasLayer(snapMarker)) ctx.map.removeLayer(snapMarker)
+        return
+    }
+
     const rect = ctx.map.getContainer().getBoundingClientRect()
     const cp   = L.point(e.clientX - rect.left, e.clientY - rect.top)
     const mp   = ctx.map.containerPointToLayerPoint(cp)
-
     let snap: { ll: L.LatLng; dist: number } | null = null
     let snapColor = '#f39c12'
 
     if (activeSnapMode === 'districts') {
-        const rings = getSnapRings()
+        const rings = getSnapRings(snapPhaseKey ?? undefined)
         if (!rings.length) { snapActive = false; snapLatLng = null; return }
         snap = nearestSnapPoint(mp, rings)
     } else if (activeSnapMode === 'roads') {
@@ -188,6 +235,16 @@ function onSnapMove(e: MouseEvent): void {
     if (snap) {
         snapLatLng = snap.ll
         snapActive = true
+
+        // Directly update the active draw handler's internal state.
+        // Leaflet-draw places vertices using _mouseMarker.latlng (set via setLatLng)
+        // and _currentLatLng — both read at mouseup time. No amount of event
+        // interception works because addVertex reads from the marker object directly.
+        const drawHandler = getActiveDrawHandler()
+        if (drawHandler) {
+            drawHandler._mouseMarker?.setLatLng(snap.ll)
+            drawHandler._currentLatLng = snap.ll
+        }
         if (!ctx.map.getPane('snapPane')) {
             ctx.map.createPane('snapPane')
             ctx.map.getPane('snapPane')!.style.zIndex = '9999'
@@ -210,29 +267,142 @@ function onSnapMove(e: MouseEvent): void {
     }
 }
 
-// ─── ENABLE / DISABLE ─────────────────────────────────────────────────────────
+// ─── EDIT-MODE SNAPPING ───────────────────────────────────────────────────────
+// Called directly inside the draw:editstart handler in index.ts.
 
-export function enableSnapping(mode: 'districts' | 'roads'): void {
-    activeSnapMode = mode
-    document.addEventListener('mousemove', onSnapMove, true)
+export let editDragActive = false  // true only while a vertex is being dragged
+export let editModeActive = false  // true from hookEditHandles until disableSnapping
 
-    if (!(ctx.map as any)._origMouseEventToLayerPoint) {
-        const orig = ctx.map.mouseEventToLayerPoint.bind(ctx.map)
-        ;(ctx.map as any)._origMouseEventToLayerPoint = orig
-        ctx.map.mouseEventToLayerPoint = function(e: MouseEvent): L.Point {
-            if (snapActive && snapLatLng) return ctx.map.latLngToLayerPoint(snapLatLng)
-            return orig(e)
-        }
+function hookMarker(marker: any, layer: L.Layer): void {
+    // Remove any previously attached snap handlers before re-attaching.
+    // This is essential because ghost midpoint markers are converted in-place
+    // to real vertex markers by leaflet-draw — same object, so _snapHooked
+    // would block re-hooking. Named handler refs let us cleanly replace them.
+    if (marker._snapDragStart) marker.off('dragstart', marker._snapDragStart)
+    if (marker._snapDrag)      marker.off('drag',      marker._snapDrag)
+    if (marker._snapDragEnd)   marker.off('dragend',   marker._snapDragEnd)
+
+    marker._snapDragStart = () => {
+        snapExclude    = layer
+        editDragActive = true
+        snapActive     = false
+        snapLatLng     = null
+        if (snapMarker && ctx.map.hasLayer(snapMarker))
+            ctx.map.removeLayer(snapMarker)
     }
+
+    marker._snapDrag = () => { /* marker position tracked via onSnapMove */ }
+
+    marker._snapDragEnd = () => {
+        // Capture snap state BEFORE clearing editDragActive.
+        const snapped = snapActive && snapLatLng
+            ? L.latLng(snapLatLng.lat, snapLatLng.lng)
+            : null
+
+
+        editDragActive = false
+        snapExclude    = null
+        hookAllEditMarkers()
+
+        if (!snapped) return
+        setTimeout(() => {
+            // Use the layer closure variable directly — marker._poly is unreliable
+            // in leaflet-draw 1.0.4 and may be undefined for some marker types.
+            const poly = layer
+            if (poly instanceof L.Polygon) {
+                const rings = poly.getLatLngs() as L.LatLng[][]
+                if (rings[0] && marker._index !== undefined) {
+                    rings[0][marker._index] = snapped
+                    poly.setLatLngs(rings)
+                }
+            } else if (poly instanceof L.Polyline) {
+                const lls = poly.getLatLngs() as L.LatLng[]
+                if (marker._index !== undefined) {
+                    lls[marker._index] = snapped
+                    poly.setLatLngs(lls)
+                }
+            }
+            marker.setLatLng(snapped)
+        }, 0)
+    }
+
+    marker.on('dragstart', marker._snapDragStart)
+    marker.on('drag',      marker._snapDrag)
+    marker.on('dragend',   marker._snapDragEnd)
+}
+
+function hookAllEditMarkers(): void {
+    let layerCount = 0, markerCount = 0
+    ctx.drawnItems.eachLayer((layer: L.Layer) => {
+        const editing = (layer as any).editing
+        if (!editing) return
+        layerCount++
+
+        const groups: any[] = []
+        if (editing._markerGroup) groups.push(editing._markerGroup)
+        ;(editing._verticesHandlers ?? []).forEach((vh: any) => {
+            if (vh._markerGroup) groups.push(vh._markerGroup)
+        })
+
+        let layerMarkers = 0
+        groups.forEach(group => {
+            group.eachLayer((marker: any) => {
+                hookMarker(marker, layer)
+                layerMarkers++
+                markerCount++
+            })
+        })
+    })
+}
+
+export function hookEditHandles(): void {
+    editModeActive = true
+    setTimeout(hookAllEditMarkers, 100)
+}
+
+export function installSnapInterceptors(): void {
+    // Patch 1: leaflet-draw's _onMouseMove calls map.mouseEventToLayerPoint(e.originalEvent)
+    // directly — it never reads e.latlng. Patch the method so it returns the snap
+    // layer point when snapped.
+    const orig = ctx.map.mouseEventToLayerPoint.bind(ctx.map)
+    ctx.map.mouseEventToLayerPoint = function(e: MouseEvent): L.Point {
+        if (snapActive && snapLatLng) return ctx.map.latLngToLayerPoint(snapLatLng)
+        return orig(e)
+    }
+
+    // Patch 2: also rewrite e.latlng on Leaflet events as a belt-and-suspenders
+    // measure, since some leaflet-draw versions read e.latlng instead.
+    ctx.map.on('mousemove', (e: any) => {
+        if (snapActive && snapLatLng) e.latlng = snapLatLng
+    })
+    ctx.map.on('click', (e: any) => {
+        if (snapActive && snapLatLng) e.latlng = snapLatLng
+    })
+    ctx.map.on('mousedown', (e: any) => {
+        if (snapActive && snapLatLng) e.latlng = snapLatLng
+    })
+}
+
+
+export function enableSnapping(mode: 'districts' | 'roads', excludeLayer?: L.Layer, phaseKey?: string): void {
+    activeSnapMode = mode
+    snapExclude    = excludeLayer ?? null
+    snapPhaseKey   = phaseKey ?? null
+    document.addEventListener('mousemove',  onSnapMove,      true)
+    document.addEventListener('mousedown',  onSnapMouseDown, true)
+    document.addEventListener('mouseup',    onSnapMouseUp,   true)
 }
 
 export function disableSnapping(): void {
     activeSnapMode = null
-    document.removeEventListener('mousemove', onSnapMove, true)
-    if ((ctx.map as any)._origMouseEventToLayerPoint) {
-        ctx.map.mouseEventToLayerPoint = (ctx.map as any)._origMouseEventToLayerPoint
-        delete (ctx.map as any)._origMouseEventToLayerPoint
-    }
+    snapExclude    = null
+    snapPhaseKey   = null
+    editModeActive = false
+    editDragActive = false
+    snapFrozen     = false
+    document.removeEventListener('mousemove',  onSnapMove,      true)
+    document.removeEventListener('mousedown',  onSnapMouseDown, true)
+    document.removeEventListener('mouseup',    onSnapMouseUp,   true)
     if (snapMarker && ctx.map.hasLayer(snapMarker)) ctx.map.removeLayer(snapMarker)
     snapActive = false
     snapLatLng = null

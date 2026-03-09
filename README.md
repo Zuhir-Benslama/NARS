@@ -10,7 +10,7 @@ A full-stack web application for digitizing and managing municipal addressing da
 |---|---|
 | Backend | ASP.NET Core 10, EF Core 10, Npgsql + PostGIS |
 | Frontend | Vue 3, TypeScript, Vite 5 |
-| Map | Leaflet 1.9 + leaflet-draw (CDN) |
+| Map | Leaflet 1.9 + leaflet-draw 1.0.4 (CDN) |
 | Database | PostgreSQL 15+ with PostGIS extension |
 | Auth | JWT stored in HttpOnly cookie |
 
@@ -67,8 +67,8 @@ Workspace/
         │   ├── styles.ts       ← Polygon styles, icons, buildPopup, applyStyle
         │   ├── labels.ts       ← Edge labels, endpoint markers, layer visibility
         │   ├── geometry.ts     ← Spatial helpers, municipality boundary, scattered areas
-        │   ├── snapping.ts     ← Full vertex snapping system
-        │   ├── context-menu.ts ← Right-click context menu, edit/remove feature
+        │   ├── snapping.ts     ← Full vertex snapping system (draw + edit modes)
+        │   ├── context-menu.ts ← Right-click context menu, edit/remove/reverse feature
         │   └── features.ts     ← Feature build/save, fetchRoadSide, computeBisNumber
         └── components/
             ├── PhaseBar.vue           ← Phase navigation stepper
@@ -182,18 +182,17 @@ npm run typecheck
 
 ## Mapping Workflow
 
-The app guides the operator through 8 sequential phases. Each phase unlocks the next once its completion criteria are met.
+The app guides the operator through 7 sequential phases. Each phase unlocks the next once its completion criteria are met.
 
 | # | Phase | Draw Type | Validation | Status |
 |---|---|---|---|---|
-| 1 | **Areas** | Polygon | One main urban area maximum. Scattered area computed automatically. | ✅ Done |
-| 2 | **Districts** | Polygon | Must share edges (no gaps), must not overlap, must cover all urban areas. | ✅ Done |
-| 3 | **City Center** | Marker | Optional — can be skipped. Determines entrance numbering direction. | ✅ Done |
-| 4 | **Roads** | Polyline | No turn > 90°. Must connect to an existing road (first road exempt). | ✅ Done |
-| 5 | **Main Entrances** | Marker | Assigned to a road. Left side = odd numbers, right side = even numbers. | 🔲 Pending |
-| 6 | **Secondary Entrances** | Marker | Assigned to a main entrance. Numbered BIS01, BIS02… | 🔲 Pending |
-| 7 | **Public Buildings** | Polygon | Allowed anywhere including scattered areas. | 🔲 Pending |
-| 8 | **Public Spaces** | Polygon | Gardens and squares inside the municipal boundary. | 🔲 Pending |
+| 0 | **Areas** | Polygon | One main urban area maximum. Scattered area computed automatically. | ✅ Done |
+| 1 | **Districts** | Polygon | Must share edges (no gaps), must not overlap, must cover all urban areas. | ✅ Done |
+| 2 | **City Center** | Marker | Optional — can be skipped. Determines entrance numbering direction. | ✅ Done |
+| 3 | **Roads** | Polyline | No turn > 90°. Must connect to an existing road (first road exempt). | ✅ Done |
+| 4 | **House Entrances** | Marker | Assigned to a road. Left side = odd numbers, right side = even numbers. | 🔲 Pending |
+| 5 | **Public Buildings** | Polygon | Allowed anywhere including scattered areas. | 🔲 Pending |
+| 6 | **Public Spaces** | Polygon | Gardens and squares inside the municipal boundary. | 🔲 Pending |
 
 ---
 
@@ -301,14 +300,55 @@ Spatial indexes on `communes_boundaries.geometry` and composite indexes on `feat
 
 ## Notes
 
-- **Scattered areas** are never drawn manually — they are computed automatically by PostGIS as `commune_boundary MINUS ST_Union(all urban areas)` whenever an urban area is saved or deleted.
+### Scattered Areas
 
-- **Leaflet and leaflet-draw** are loaded from CDN (not bundled by Vite) because `leaflet-draw` is a legacy UMD bundle that requires `window.L` to exist at load time.
+Scattered areas are never drawn manually — they are computed automatically by PostGIS as `commune_boundary MINUS ST_Union(all urban areas)` whenever an urban area is saved, edited, or deleted. The frontend calls `POST /api/areas/refresh-scattered` after any of these events and re-renders the result from the returned GeoJSON.
 
-- **Feature editing** is accessible via right-click context menu on any drawn feature, offering three actions: edit info (pre-filled modal), edit boundaries (leaflet-draw edit mode), and remove object (with confirmation).
+### Leaflet / leaflet-draw Loading
 
-- **District boundary snapping** — when drawing districts, the cursor automatically snaps to nearby boundaries of existing areas, districts, and the municipality boundary. Corner vertices are prioritized over edge midpoints. The snap works by patching `map.mouseEventToLayerPoint` so leaflet-draw's internal coordinate pipeline always receives the snapped coordinate for both preview and click registration. Polygon rings are explicitly closed (first point repeated as last) before being sent to PostGIS to satisfy GEOS geometry requirements.
+Leaflet and leaflet-draw are loaded from CDN (not bundled by Vite) because `leaflet-draw` is a legacy UMD bundle that requires `window.L` to exist at load time. Both `<script>` tags appear in `index.html` before the Vite module entry point.
 
-- **PostGIS geometry repair** — `ValidationController` wraps all stored polygon reads with `ST_MakeValid()` to gracefully handle any legacy or edge-case geometries that may have been saved without a closed ring.
+### Vertex Snapping Architecture
 
-- The `features.data` column is typed as `jsonb` in PostgreSQL, allowing the validation endpoints to run PostGIS queries directly against the stored geometry coordinates without a separate geometry column.
+Snapping is implemented in `snapping.ts` and works differently for draw mode and edit mode because leaflet-draw 1.0.4 bypasses the standard Leaflet event system entirely — it never reads `e.latlng` and never calls `map.mouseEventToLayerPoint()`. Instead it maintains its own internal `_currentLatLng` and `_mouseMarker` state.
+
+**Draw mode** — `onSnapMove` runs on every `document.mousemove` event (capture phase). When a snap point is found within threshold distance, it sets `handler._currentLatLng` and calls `handler._mouseMarker.setLatLng()` directly on the active draw handler, forcing leaflet-draw to use the snapped coordinate for both the preview line and the placed vertex. The active handler is located by walking `drawControl._toolbars.draw._modes` and checking `handler._enabled`. A `mousedown` freeze (`snapFrozen`) prevents the final browser-injected `mousemove` (fired between press and release) from clearing snap state before the vertex is committed.
+
+**Edit mode** — `hookEditHandles()` walks `drawnItems` after a 100ms delay (to let leaflet-draw finish activating), then hooks `dragstart`/`dragend` on every vertex marker found in `editing._markerGroup` and `editing._verticesHandlers[n]._markerGroup`. Named handler references (`marker._snapDragStart`, `marker._snapDragEnd`) replace any previous handlers so ghost midpoint markers (which leaflet-draw converts in-place into real vertices) are always correctly re-hooked. On `dragend`, `snapLatLng` is captured into a local variable *before* `editDragActive` is cleared — clearing the flag first would allow a stray `mousemove` to wipe snap state before it is read. The snapped coordinate is applied via `layer.setLatLngs()` using the closure variable directly (`marker._poly` is unreliable in this version of leaflet-draw).
+
+**Snap interceptors** — `installSnapInterceptors()` registers permanent `mousemove` and `click` handlers on `ctx.map` before leaflet-draw is initialised. These rewrite `e.latlng` on every Leaflet event when snapped, as a belt-and-suspenders complement to the direct `_currentLatLng` assignment.
+
+**Snap sources** — districts and areas phases snap to: all area polygon rings, all district polygon rings (except the one being dragged), and the municipality boundary. The areas phase excludes district rings. Roads phase snaps to: road polyline endpoints, road midpoints, area rings, and district rings.
+
+### Edit Mode — Phase-Restricted Editing
+
+When edit mode is entered, layers belonging to other phases are temporarily removed from `drawnItems` so leaflet-draw cannot select or modify them. Area layers are moved to a separate display-only `L.layerGroup` (remaining visible on the map but uneditable). All other non-current-phase layers are fully hidden. On `EDITSTOP`, all layers are restored to `drawnItems` and layer visibility is refreshed.
+
+### Polygon Geometry Persistence
+
+When a polygon boundary edit is saved, the `EDITED` handler explicitly closes the ring (repeating the first coordinate as the last) before sending it to the backend, since leaflet-draw's `getLatLngs()` returns an open ring. PostGIS/GEOS requires closed rings and will reject unclosed geometry. After any area edit, `refreshScatteredAreas()` is called to recompute the scattered zone from the new boundary.
+
+Placement validation for polygons uses the vertex centroid (average of all vertex coordinates) rather than the bounding box center. The bounding box center of a concave polygon can fall outside the polygon itself, producing false scattered-area violations.
+
+### Context Menu
+
+Right-clicking any drawn feature opens a context menu with up to four actions:
+
+- **Edit Info** — reopens the feature modal pre-filled with current data (all phases)
+- **Edit Boundaries** — activates leaflet-draw edit mode restricted to that feature (all phases)
+- **Reverse Direction** — reverses the coordinate order of a road polyline and updates the backend (roads phase only)
+- **Remove Object** — deletes the feature with confirmation (current phase only — not shown for features belonging to other phases, preventing accidental deletion of e.g. areas while in the districts phase)
+
+### Layer Visibility
+
+- During the Roads phase, the City Center marker remains visible as a reference point.
+- During the House Entrances phase, both the City Center marker and all roads remain visible.
+- All other phases show only the current phase's features plus the Areas layer as a permanent reference.
+
+### PostGIS Geometry Repair
+
+`ValidationController` wraps all stored polygon reads with `ST_MakeValid()` to gracefully handle any legacy or edge-case geometries that may have been saved without a closed ring.
+
+### Feature Data Storage
+
+The `features.data` column is typed as `jsonb` in PostgreSQL, allowing the validation endpoints to run PostGIS queries directly against the stored geometry coordinates without a separate geometry column.
