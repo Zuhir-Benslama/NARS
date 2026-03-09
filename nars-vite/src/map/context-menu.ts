@@ -108,19 +108,18 @@ async function removeFeature(dbId: number): Promise<void> {
 // ─── EDIT BOUNDARIES ──────────────────────────────────────────────────────────
 
 async function editBoundaries(dbId: number): Promise<void> {
-    const editBtn = document.querySelector('.leaflet-draw-edit-edit') as HTMLElement | null
-    if (!editBtn) {
-        alert('Switch to the correct phase first to enable boundary editing.')
-        return
-    }
-
-    // Determine which snap mode to use for this feature
+    // Find the layer to edit
     const phaseKey = Object.keys(featureLayers).find(k =>
         featureLayers[k].some((e: LayerEntry) => (e.layer as any)._dbId === dbId))
 
     const entry = phaseKey
         ? featureLayers[phaseKey].find((e: LayerEntry) => (e.layer as any)._dbId === dbId) as LayerEntry | undefined
         : undefined
+
+    if (!entry) {
+        alert('Could not find the feature to edit.')
+        return
+    }
 
     const snapMode = phaseKey === 'roads' ? 'roads'
                    : (phaseKey === 'districts' || phaseKey === 'areas') ? 'districts'
@@ -132,28 +131,12 @@ async function editBoundaries(dbId: number): Promise<void> {
     // Disable snapping once edit mode ends (save or cancel)
     const onEditStop = () => {
         if (snapMode) disableSnapping()
-        ctx.map.off('draw:editstop', onEditStop)
+        ;(ctx.map as any).off('pm:editend', onEditStop)
     }
-    ctx.map.on('draw:editstop', onEditStop)
+    ;(ctx.map as any).on('pm:editend', onEditStop)
 
-    editBtn.click()
-
-    function onMapClick(e: any) {
-        const target = e.originalEvent?.target as HTMLElement | null
-        if (target?.closest('.leaflet-draw-toolbar') || target?.closest('.leaflet-draw-actions')) return
-        const layerEl = entry ? (entry.layer as any)._path ?? (entry.layer as any)._icon : null
-        if (layerEl && layerEl.contains(target)) return
-        const cancelBtn = document.querySelector('.leaflet-draw-actions a[title="Cancel editing, discards all changes"]') as HTMLElement
-                       ?? document.querySelector('.leaflet-draw-actions a') as HTMLElement
-        if (cancelBtn) cancelBtn.click()
-        ctx.map.off('click', onMapClick)
-        ctx.map.off('contextmenu', onMapClick)
-    }
-
-    setTimeout(() => {
-        ctx.map.on('click', onMapClick)
-        ctx.map.on('contextmenu', onMapClick)
-    }, 200)
+    // Enable Geoman editing on the layer
+    (entry.layer as any).pm.enable()
 }
 
 // ─── EDIT FEATURE INFO ────────────────────────────────────────────────────────
