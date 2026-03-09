@@ -8,31 +8,6 @@ import { initMap, loadFromDatabase, loadUserAndCommune } from './map'
 import '@geoman-io/leaflet-geoman-free'
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 
-// ── Patch deprecated Leaflet Draw _flat method ───────────────────────────────
-// Leaflet Draw 1.0.4 uses L.Polyline._flat() which is deprecated in Leaflet 1.9.4.
-// Override to redirect to the new L.LineUtil.isFlat() to suppress the warning.
-if (typeof (window as any).L !== 'undefined') {
-    const L = (window as any).L
-    if (L.Polyline && L.Polyline._flat && L.LineUtil && L.LineUtil.isFlat) {
-        L.Polyline._flat = function(latlngs: any) {
-            return L.LineUtil.isFlat(latlngs)
-        }
-    }
-}
-
-// ── Patch deprecated MouseEvent properties in Firefox ────────────────────────
-// Leaflet Draw 1.0.4 uses deprecated mozPressure and mozInputSource properties.
-// Patch MouseEvent to provide these as getters that read from PointerEvent instead.
-if (typeof window !== 'undefined') {
-    Object.defineProperty(MouseEvent.prototype, 'mozPressure', {
-        get() { return (this as any).pressure ?? 0 },
-        configurable: true,
-    })
-    Object.defineProperty(MouseEvent.prototype, 'mozInputSource', {
-        get() { return (this as any).pointerType ?? 0 },
-        configurable: true,
-    })
-}
 
 ;(async () => {
 

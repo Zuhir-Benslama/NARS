@@ -23,11 +23,7 @@ export { fetchRoadSide, computeBisNumber }                  from './features'
 export { createEntranceIcon, areaStyle }                    from './styles'
 export { createPolygonEdgeLabel, createAreaPerimeterLabel } from './labels'
 
-declare const L: typeof import('leaflet') & {
-    Draw: any
-    Control: typeof import('leaflet').Control & { Draw: new (opts: any) => any }
-    DrawEvents: any
-}
+declare const L: typeof import('leaflet')
 
 // ─── MAP INITIALIZATION ───────────────────────────────────────────────────────
 
@@ -47,7 +43,6 @@ export function initMap(): void {
     ctx.perimeterLabelLayer   = L.layerGroup().addTo(ctx.map)
     ctx.polygonEdgeLabelLayer = L.layerGroup().addTo(ctx.map)
     ctx.boundariesLayer       = null
-    ctx.drawControl           = null
 
     ctx.map.on('zoomend', refreshAllEdgeLabels)
     installSnapInterceptors()
@@ -62,46 +57,38 @@ function buildDrawControl(phase: typeof PHASES[number]): void {
     // Remove existing Geoman controls
     ctx.map.pm.removeControls()
 
-    // Configure Geoman options based on the current phase
-    const drawOptions: any = {}
-    
+    // Configure Geoman drawing styles for the current phase via setGlobalOptions.
+    // addControls only accepts visibility flags — style options must go here.
     if (phase.drawType === 'polygon') {
-        drawOptions.polygon = {
-            allowIntersection: false,
+        ctx.map.pm.setGlobalOptions({
             pathOptions: {
-                color: phase.color,
-                weight: 2.5,
+                color:       phase.color,
+                weight:      2.5,
                 fillOpacity: phase.key === 'areas' ? 0 : 0.15,
-                dashArray: phase.key === 'areas' ? '10, 6' : undefined,
+                dashArray:   phase.key === 'areas' ? '10, 6' : undefined,
             },
-        }
-    }
-    if (phase.drawType === 'polyline') {
-        drawOptions.polyline = {
-            pathOptions: { color: phase.color, weight: POLYLINE_WEIGHT },
-        }
-    }
-    if (phase.drawType === 'marker') {
+        } as any)
+    } else if (phase.drawType === 'polyline') {
+        ctx.map.pm.setGlobalOptions({
+            templineStyle: { color: phase.color, weight: POLYLINE_WEIGHT },
+            hintlineStyle: { color: phase.color, weight: POLYLINE_WEIGHT },
+        } as any)
+    } else if (phase.drawType === 'marker') {
         const icon = phase.key === 'cityCenter' ? createCityCenterIcon() : createEntranceIcon('?', phase.color)
-        drawOptions.marker = { icon }
+        ctx.map.pm.setGlobalOptions({ markerStyle: { icon } } as any)
     }
 
-    // Add Geoman controls
-    // Enable drawing for current phase, enable editing for all drawn items, disable removal
+    // Add Geoman controls — visibility flags only
     ctx.map.pm.addControls({
-        drawMarker: phase.drawType === 'marker',
-        drawPolygon: phase.drawType === 'polygon',
-        drawPolyline: phase.drawType === 'polyline',
-        drawRectangle: false,
-        drawCircle: false,
+        drawMarker:      phase.drawType === 'marker',
+        drawPolygon:     phase.drawType === 'polygon',
+        drawPolyline:    phase.drawType === 'polyline',
+        drawRectangle:   false,
+        drawCircle:      false,
         drawCircleMarker: false,
-        editMode: true,
-        removalMode: false,
-        ...drawOptions,
+        editMode:        true,
+        removalMode:     false,
     })
-
-    // Store the draw mode for later use
-    ;(ctx.map as any)._geomanDrawMode = phase.drawType
 }
 
 // ─── PLACEMENT VALIDATION ─────────────────────────────────────────────────────
@@ -267,7 +254,7 @@ function registerDrawEvents(): void {
         setTimeout(refreshLayerVisibility, 0)
     })
 
-    // Geoman uses 'pm:create' instead of 'L.Draw.Event.CREATED'
+    // Geoman fires pm:create with { layer, shape } after a shape is completed
     ctx.map.on('pm:create', async (event: any) => {
         const layer = event.layer as L.Layer
         const phase = PHASES[store.currentPhase]
@@ -317,72 +304,69 @@ function registerDrawEvents(): void {
         syncCounts()
     })
 
-    // Geoman uses 'pm:edit' instead of 'L.Draw.Event.EDITED'
+    // Geoman fires pm:edit once per edited layer with { layer, shape }
     ctx.map.on('pm:edit', async (event: any) => {
-        const e = event as any
         // Defer one tick so any pending snap commits (setTimeout 0) run first
         await new Promise(r => setTimeout(r, 0))
-        e.layers.eachLayer(async (layer: L.Layer) => {
-            if (!(layer as any)._dbId) return
-            try {
-                const phase = PHASES.find(p => featureLayers[p.key].some((f: LayerEntry) => f.layer === layer))
-                const entry = phase ? featureLayers[phase.key].find((f: LayerEntry) => f.layer === layer) : null
-                if (!entry) return
+        const layer = event.layer as L.Layer
+        if (!(layer as any)._dbId) return
+        try {
+            const phase = PHASES.find(p => featureLayers[p.key].some((f: LayerEntry) => f.layer === layer))
+            const entry = phase ? featureLayers[phase.key].find((f: LayerEntry) => f.layer === layer) : null
+            if (!entry) return
 
-                if (layer instanceof L.Marker) {
-                    const ll = layer.getLatLng()
-                    entry.data.lat = ll.lat; entry.data.lng = ll.lng
-                } else if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
-                    entry.data.coordinates = (layer.getLatLngs() as L.LatLng[]).map(ll => ({ lat: ll.lat, lng: ll.lng }))
-                } else if (layer instanceof L.Polygon) {
-                    let coords = (layer.getLatLngs()[0] as L.LatLng[]).map(ll => ({ lat: ll.lat, lng: ll.lng }))
-                    // PostGIS/GEOS requires closed rings — first point must equal last
-                    if (coords.length >= 3) {
-                        const first = coords[0], last = coords[coords.length - 1]
-                        if (first.lat !== last.lat || first.lng !== last.lng)
-                            coords = [...coords, { lat: first.lat, lng: first.lng }]
-                    }
-                    entry.data.coordinates = coords
+            if (layer instanceof L.Marker) {
+                const ll = layer.getLatLng()
+                entry.data.lat = ll.lat; entry.data.lng = ll.lng
+            } else if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+                entry.data.coordinates = (layer.getLatLngs() as L.LatLng[]).map(ll => ({ lat: ll.lat, lng: ll.lng }))
+            } else if (layer instanceof L.Polygon) {
+                let coords = (layer.getLatLngs()[0] as L.LatLng[]).map(ll => ({ lat: ll.lat, lng: ll.lng }))
+                // PostGIS/GEOS requires closed rings — first point must equal last
+                if (coords.length >= 3) {
+                    const first = coords[0], last = coords[coords.length - 1]
+                    if (first.lat !== last.lat || first.lng !== last.lng)
+                        coords = [...coords, { lat: first.lat, lng: first.lng }]
                 }
+                entry.data.coordinates = coords
+            }
 
-                await apiFetch(`/api/update/${(layer as any)._dbId}`, {
-                    method:  'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body:    JSON.stringify({ data: entry.data }),
-                })
+            await apiFetch(`/api/update/${(layer as any)._dbId}`, {
+                method:  'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ data: entry.data }),
+            })
 
-                if (phase)
-                    (layer as L.Path).bindPopup(buildPopup(entry.data, phase, (layer as any)._dbId))
-                if (phase?.key === 'areas') {
-                    createAreaPerimeterLabel(layer, entry.data.areaTypeKey ?? 'central_urban')
-                    await refreshScatteredAreas()
-                }
-                if (phase?.key === 'districts') {
-                    createPolygonEdgeLabel(layer, entry.data.label, '#f39c12')
-                }
-            } catch (err) { console.error('Edit persist error:', err) }
-        })
+            if (phase)
+                (layer as L.Path).bindPopup(buildPopup(entry.data, phase, (layer as any)._dbId))
+            if (phase?.key === 'areas') {
+                createAreaPerimeterLabel(layer, entry.data.areaTypeKey ?? 'central_urban')
+                await refreshScatteredAreas()
+            }
+            if (phase?.key === 'districts') {
+                createPolygonEdgeLabel(layer, entry.data.label, '#f39c12')
+            }
+        } catch (err) { console.error('Edit persist error:', err) }
 
         ctx.lineEndpointLayer.clearLayers()
         ctx.drawnItems.eachLayer(l => { if (l instanceof L.Polyline && !(l instanceof L.Polygon)) addPolylineEndpoints(l) })
     })
 
-    // Geoman uses 'pm:remove' instead of 'L.Draw.Event.DELETED'
+    // Geoman fires pm:remove once per removed layer with { layer, shape }
     ctx.map.on('pm:remove', async (event: any) => {
-        const e = event as any
+        const layer = event.layer as L.Layer
         let areaDeleted = false
-        e.layers.eachLayer(async (layer: L.Layer) => {
-            if ((layer as any)._dbId) {
-                try {
-                    const res = await apiFetch(`/api/delete/${(layer as any)._dbId}`, { method: 'DELETE' })
-                    if (!res.ok) console.error(`Delete failed: ${(layer as any)._dbId}`, res.status)
-                    if (featureLayers.areas.some((f: LayerEntry) => f.layer === layer)) areaDeleted = true
-                } catch (err) { console.error('Delete error:', err) }
-            }
-            if ((layer as any)._endpointMarkers) (layer as any)._endpointMarkers.forEach((m: L.Layer) => ctx.lineEndpointLayer.removeLayer(m))
-            if ((layer as any)._perimeterLabel)  ctx.perimeterLabelLayer.removeLayer((layer as any)._perimeterLabel)
-            if ((layer as any)._edgeLabelMarkers) (layer as any)._edgeLabelMarkers.forEach((m: L.Marker) => ctx.polygonEdgeLabelLayer.removeLayer(m))
-        })
+
+        if ((layer as any)._dbId) {
+            try {
+                const res = await apiFetch(`/api/delete/${(layer as any)._dbId}`, { method: 'DELETE' })
+                if (!res.ok) console.error(`Delete failed: ${(layer as any)._dbId}`, res.status)
+                if (featureLayers.areas.some((f: LayerEntry) => f.layer === layer)) areaDeleted = true
+            } catch (err) { console.error('Delete error:', err) }
+        }
+        if ((layer as any)._endpointMarkers) (layer as any)._endpointMarkers.forEach((m: L.Layer) => ctx.lineEndpointLayer.removeLayer(m))
+        if ((layer as any)._perimeterLabel)  ctx.perimeterLabelLayer.removeLayer((layer as any)._perimeterLabel)
+        if ((layer as any)._edgeLabelMarkers) (layer as any)._edgeLabelMarkers.forEach((m: L.Marker) => ctx.polygonEdgeLabelLayer.removeLayer(m))
 
         ctx.lineEndpointLayer.clearLayers()
         ctx.drawnItems.eachLayer(l => { if (l instanceof L.Polyline && !(l instanceof L.Polygon)) addPolylineEndpoints(l) })

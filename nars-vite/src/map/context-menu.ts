@@ -10,11 +10,7 @@ import { createAreaPerimeterLabel, createPolygonEdgeLabel, addPolylineEndpoints 
 import { enableSnapping, disableSnapping, hookEditHandles } from './snapping'
 import { refreshScatteredAreas }           from './geometry'
 
-declare const L: typeof import('leaflet') & {
-    Draw: any
-    Control: typeof import('leaflet').Control & { Draw: new (opts: any) => any }
-    DrawEvents: any
-}
+declare const L: typeof import('leaflet')
 
 // ─── CONTEXT MENU ─────────────────────────────────────────────────────────────
 
