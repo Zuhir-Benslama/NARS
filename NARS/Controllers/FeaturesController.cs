@@ -13,7 +13,7 @@ namespace NarsApi.Controllers;
 // CurrentUserId / CurrentCommuneId from claims — no more manual RequireAuth().
 [ApiController]
 [Tags("Features")]
-public class FeaturesController(AppDbContext db) : NarsControllerBase
+public class FeaturesController(AppDbContext db, IDbContextFactory<AppDbContext> dbFactory) : NarsControllerBase
 {
     // ── GET /api/feature-types ────────────────────────────────
 
@@ -44,9 +44,11 @@ public class FeaturesController(AppDbContext db) : NarsControllerBase
             new(Key: FeatureTypes.District, Label: "District", Icon: "🏘️",
                 Layers: new[]
                 {
-                    new LayerOption(FeatureTypes.DistrictLayers.HousingEstate, "Housing Estate"),
-                    new LayerOption(FeatureTypes.DistrictLayers.UrbanPole,     "Urban Pole"),
-                    new LayerOption(FeatureTypes.DistrictLayers.District,      "District"),
+                    new LayerOption(FeatureTypes.DistrictLayers.HousingEstate,      "Housing Estate"),
+                    new LayerOption(FeatureTypes.DistrictLayers.UrbanPole,          "Urban Pole"),
+                    new LayerOption(FeatureTypes.DistrictLayers.District,           "District"),
+                    new LayerOption(FeatureTypes.DistrictLayers.TradActivitiesZone, "Trad. Activities Zone"),
+                    new LayerOption(FeatureTypes.DistrictLayers.IndustryZone,       "Industry Zone"),
                 }),
             new(Key: FeatureTypes.HouseEntrance, Label: "House Entrance", Icon: "🚪",
                 Layers: new[]
@@ -243,23 +245,22 @@ public class FeaturesController(AppDbContext db) : NarsControllerBase
 
     // ── Trigger scattered area recomputation ──────────────────
     // Fire-and-forget: called after any urban area save/delete.
-    // userId and communeId are captured before HttpContext disposal.
+    // Uses IDbContextFactory so it owns its context and connection
+    // independently of the request scope, which may be disposed before
+    // this task completes. Never borrows the request-scoped `db`.
     private async Task TriggerScatteredRefreshAsync(int userId, int communeId)
     {
         try
         {
-            var conn = db.Database.GetDbConnection();
-
-            // fix #10: check state before opening — EF Core pooling may already have it open.
-            if (conn.State != ConnectionState.Open)
-                await conn.OpenAsync();
+            // Create a fully independent DbContext — not shared with the request.
+            await using var ownedDb = await dbFactory.CreateDbContextAsync();
+            var conn = ownedDb.Database.GetDbConnection();
+            await conn.OpenAsync();
 
             string? scatteredGeoJson = null;
             try
             {
                 using var cmd = conn.CreateCommand();
-                // fix #4: use shared SqlFragments.PolygonFromData (includes ST_MakeValid)
-                // instead of a local copy that was missing it.
                 cmd.CommandText = $@"
                     WITH
                     boundary AS (
@@ -278,26 +279,31 @@ public class FeaturesController(AppDbContext db) : NarsControllerBase
                         ST_Difference(
                             boundary.geom,
                             COALESCE(urban.geom, ST_GeomFromText('GEOMETRYCOLLECTION EMPTY', 4326))
-                        )
+                        ),
+                        6
                     )
                     FROM boundary LEFT JOIN urban ON true";
 
                 AddParam(cmd, "@cid", communeId);
                 AddParam(cmd, "@uid", userId);
 
-                scatteredGeoJson = await cmd.ExecuteScalarAsync() as string;
+                // CommandBehavior.SequentialAccess streams the large GeoJSON column
+                // in chunks instead of buffering it in Npgsql's 8 KB internal buffer.
+                using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess);
+                if (await reader.ReadAsync() && !await reader.IsDBNullAsync(0))
+                    scatteredGeoJson = await reader.GetTextReader(0).ReadToEndAsync();
             }
             finally { await conn.CloseAsync(); }
 
             if (scatteredGeoJson is null) return;
 
-            await db.Features
+            await ownedDb.Features
                 .Where(f => f.UserId == userId &&
                             f.Type   == FeatureTypes.Area &&
                             f.Layer  == FeatureTypes.AreaLayers.Scattered)
                 .ExecuteDeleteAsync();
 
-            db.Features.Add(new Feature
+            ownedDb.Features.Add(new Feature
             {
                 UserId = userId,
                 Type   = FeatureTypes.Area,
@@ -311,7 +317,7 @@ public class FeaturesController(AppDbContext db) : NarsControllerBase
                     geometry = scatteredGeoJson,
                 }),
             });
-            await db.SaveChangesAsync();
+            await ownedDb.SaveChangesAsync();
         }
         catch (Exception ex)
         {

@@ -39,8 +39,10 @@ export function openModal(phaseIndex: number, layer: L.Layer): Promise<ModalResu
             decisionNumber:      '',
             decisionDate:        '',
             errors:              {},
-            areaTypeKey:         'central_urban',
-            mainUrbanExists:     false,
+            // areaTypeKey and mainUrbanExists are set by prepareModalExtras before
+            // openModal is called — preserve them rather than resetting to defaults.
+            areaTypeKey:         store.modal.mainUrbanExists ? 'secondary_urban' : 'central_urban',
+            mainUrbanExists:     store.modal.mainUrbanExists,
             districtTypeKey:     'district',
             roadTypeKey:         'street',
             entranceTypeKey:     'main_entrance',

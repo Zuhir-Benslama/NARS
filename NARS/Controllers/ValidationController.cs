@@ -119,6 +119,7 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
         var existingCount = await db.Features.CountAsync(f =>
             f.UserId == CurrentUserId && f.Type == FeatureTypes.District);
 
+        // First district ever is always exempt from adjacency.
         if (existingCount == 0)
             return Ok(new ValidateDistrictResponse(true, null));
 
@@ -130,7 +131,7 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
             await conn.OpenAsync();
         try
         {
-            // Check overlap — hard block
+            // Check overlap — hard block (always required)
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = $@"
@@ -154,32 +155,95 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
             }
 
             // Check adjacency — must touch at least one existing district
-            using (var cmd = conn.CreateCommand())
-            {
-                cmd.CommandText = $@"
-                    SELECT EXISTS (
-                        SELECT 1
-                        FROM features f
-                        WHERE f.user_id = @uid
-                          AND f.type = 'district'
-                          AND (
-                            ST_Touches(
-                                ST_SetSRID(ST_GeomFromText(@wkt), 4326),
-                                ({SqlFragments.PolygonFromData})
-                            )
-                            OR ST_Intersects(
-                                ST_Boundary(ST_SetSRID(ST_GeomFromText(@wkt), 4326)),
-                                ST_Boundary({SqlFragments.PolygonFromData})
-                            )
-                          )
-                    )";
-                AddParam(cmd, "@uid", CurrentUserId);
-                AddParam(cmd, "@wkt", wkt);
+            // Skip this check for zones that can exist in scattered areas (trad_activities_zone, industry_zone)
+            var districtTypeKey = body.DistrictTypeKey;
+            var skipAdjacencyCheck = districtTypeKey == FeatureTypes.DistrictLayers.TradActivitiesZone ||
+                                     districtTypeKey == FeatureTypes.DistrictLayers.IndustryZone;
 
-                var touches = Convert.ToBoolean(await cmd.ExecuteScalarAsync());
-                if (!touches)
-                    return Ok(new ValidateDistrictResponse(false,
-                        "This district does not connect to any existing district. Districts must share a boundary (no gaps)."));
+            if (!skipAdjacencyCheck)
+            {
+                // Count existing districts that lie within the same urban area as
+                // the new district.  Each urban area (main or secondary) is a
+                // separate, disconnected polygon, so the "must be adjacent" rule
+                // only makes sense relative to siblings inside the same area.
+                // If this is the first district inside its urban area, the
+                // adjacency check is skipped — exactly as the global first-district
+                // exemption works.
+                long siblingsInSameArea;
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = $@"
+                        SELECT COUNT(*)
+                        FROM features d
+                        WHERE d.user_id = @uid
+                          AND d.type    = 'district'
+                          AND EXISTS (
+                              SELECT 1
+                              FROM features a
+                              WHERE a.user_id = @uid
+                                AND a.type    = 'area'
+                                AND a.layer   IN ('central_urban', 'secondary_urban')
+                                AND ST_Intersects(
+                                    ({SqlFragments.PolygonFromData.Replace("f.", "a.")}),
+                                    ST_SetSRID(ST_GeomFromText(@wkt), 4326)
+                                )
+                                AND ST_Intersects(
+                                    ({SqlFragments.PolygonFromData.Replace("f.", "a.")}),
+                                    ({SqlFragments.PolygonFromData.Replace("f.", "d.")})
+                                )
+                          )";
+                    AddParam(cmd, "@uid", CurrentUserId);
+                    AddParam(cmd, "@wkt", wkt);
+
+                    siblingsInSameArea = Convert.ToInt64(await cmd.ExecuteScalarAsync());
+                }
+
+                // First district in this urban area — no neighbours to touch yet.
+                if (siblingsInSameArea > 0)
+                {
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.CommandText = $@"
+                            SELECT EXISTS (
+                                SELECT 1
+                                FROM features f
+                                WHERE f.user_id = @uid
+                                  AND f.type = 'district'
+                                  AND (
+                                    ST_Touches(
+                                        ST_SetSRID(ST_GeomFromText(@wkt), 4326),
+                                        ({SqlFragments.PolygonFromData})
+                                    )
+                                    OR ST_Intersects(
+                                        ST_Boundary(ST_SetSRID(ST_GeomFromText(@wkt), 4326)),
+                                        ST_Boundary({SqlFragments.PolygonFromData})
+                                    )
+                                  )
+                                  AND EXISTS (
+                                      SELECT 1
+                                      FROM features a
+                                      WHERE a.user_id = @uid
+                                        AND a.type    = 'area'
+                                        AND a.layer   IN ('central_urban', 'secondary_urban')
+                                        AND ST_Intersects(
+                                            ({SqlFragments.PolygonFromData.Replace("f.", "a.")}),
+                                            ST_SetSRID(ST_GeomFromText(@wkt), 4326)
+                                        )
+                                        AND ST_Intersects(
+                                            ({SqlFragments.PolygonFromData.Replace("f.", "a.")}),
+                                            ({SqlFragments.PolygonFromData.Replace("f.", "f.")})
+                                        )
+                                  )
+                            )";
+                        AddParam(cmd, "@uid", CurrentUserId);
+                        AddParam(cmd, "@wkt", wkt);
+
+                        var touches = Convert.ToBoolean(await cmd.ExecuteScalarAsync());
+                        if (!touches)
+                            return Ok(new ValidateDistrictResponse(false,
+                                "This district does not connect to any existing district in this urban area. Districts must share a boundary (no gaps)."));
+                    }
+                }
             }
         }
         finally { await conn.CloseAsync(); }

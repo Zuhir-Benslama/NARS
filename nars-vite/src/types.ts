@@ -23,8 +23,9 @@ export interface AreaType {
 }
 
 export interface DistrictType {
-    key:   string
-    label: string
+    key:              string
+    label:            string
+    allowInScattered?: boolean  // if true, may be drawn in scattered areas
 }
 
 export interface RoadType {

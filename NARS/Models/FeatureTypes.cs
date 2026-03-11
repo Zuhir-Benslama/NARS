@@ -72,13 +72,15 @@ public static class FeatureTypes
 
     public static class DistrictLayers
     {
-        public const string HousingEstate = "housing_estate";
-        public const string UrbanPole     = "urban_pole";
-        public const string District      = "district";
+        public const string HousingEstate       = "housing_estate";
+        public const string UrbanPole           = "urban_pole";
+        public const string District            = "district";
+        public const string TradActivitiesZone  = "trad_activities_zone";
+        public const string IndustryZone        = "industry_zone";
 
         public static readonly IReadOnlySet<string> All = new HashSet<string>
         {
-            HousingEstate, UrbanPole, District
+            HousingEstate, UrbanPole, District, TradActivitiesZone, IndustryZone
         };
     }
 

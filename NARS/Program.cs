@@ -21,6 +21,15 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     // [Column("...")] attributes that handle snake_case mapping
 );
 
+// Required for fire-and-forget tasks (e.g. TriggerScatteredRefreshAsync) that
+// need a fresh, independently-owned DbContext outside the request scope.
+builder.Services.AddDbContextFactory<AppDbContext>(options =>
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        o => o.UseNetTopologySuite()
+    )
+);
+
 // ─────────────────────────────────────────────
 // 2. JWT Authentication (cookie-first)
 // ─────────────────────────────────────────────
