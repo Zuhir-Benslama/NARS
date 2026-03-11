@@ -2,7 +2,7 @@
 // Initialises the map, wires draw events, handles phase navigation and loading.
 // All heavy logic lives in the map-* sub-modules.
 
-import { PHASES, API_LAYER_TO_PHASE } from '../phases'
+import { PHASES, API_LAYER_TO_PHASE, DISTRICT_TYPES } from '../phases'
 import { apiFetch }                   from '../api'
 import { store, featureLayers, openModal, syncCounts } from '../store'
 import { validateRoad, validateDistrict, checkDistrictCoverage } from '../validation'
@@ -24,6 +24,17 @@ export { createEntranceIcon, areaStyle }                    from './styles'
 export { createPolygonEdgeLabel, createAreaPerimeterLabel } from './labels'
 
 declare const L: typeof import('leaflet')
+
+// Returns the label to display for a district. For Trade Activity Zones and Industrial Zones,
+// uses the type name when no custom label is provided.
+function getDistrictLabel(districtTypeKey: string, customLabel: string): string {
+    if (customLabel) return customLabel
+    if (districtTypeKey === 'trad_activities_zone' || districtTypeKey === 'industry_zone') {
+        const dtype = DISTRICT_TYPES.find(d => d.key === districtTypeKey)
+        return dtype?.label ?? ''
+    }
+    return customLabel
+}
 
 // ─── MAP INITIALIZATION ───────────────────────────────────────────────────────
 
@@ -80,15 +91,37 @@ function buildDrawControl(phase: typeof PHASES[number]): void {
 
     // Add Geoman controls — visibility flags only
     ctx.map.pm.addControls({
-        drawMarker:      phase.drawType === 'marker',
-        drawPolygon:     phase.drawType === 'polygon',
-        drawPolyline:    phase.drawType === 'polyline',
-        drawRectangle:   false,
-        drawCircle:      false,
+        drawMarker:       phase.drawType === 'marker',
+        drawPolygon:      phase.drawType === 'polygon',
+        drawPolyline:     phase.drawType === 'polyline',
+        drawRectangle:    false,
+        drawCircle:       false,
         drawCircleMarker: false,
-        editMode:        true,
-        removalMode:     false,
+        drawText:         false,   // no label/text tool on any phase
+        editMode:         true,
+        removalMode:      false,
     })
+
+    // Stamp pmIgnore so Geoman's global edit mode only touches the current phase
+    updateLayerEditability(phase.key)
+}
+
+// ─── LAYER EDITABILITY ────────────────────────────────────────────────────────
+// Called every time the phase changes (via buildDrawControl).
+// Sets pmIgnore:true on every non-current-phase feature so Geoman's global
+// edit mode never picks them up, regardless of which LayerGroup they live in.
+
+function updateLayerEditability(currentPhaseKey: string): void {
+    for (const [key, entries] of Object.entries(featureLayers)) {
+        const editable = key === currentPhaseKey
+        for (const { layer } of entries as LayerEntry[]) {
+            // Set at the Leaflet layer options level — this is what Geoman's
+            // global edit mode checks when deciding which layers to make editable.
+            ;(layer as any).options.pmIgnore = !editable
+            // Also set at the PM handler level for belt-and-suspenders.
+            ;(layer as any).pm?.setOptions?.({ pmIgnore: !editable })
+        }
+    }
 }
 
 // ─── PLACEMENT VALIDATION ─────────────────────────────────────────────────────
@@ -111,9 +144,11 @@ async function validatePlacement(layer: L.Layer, phase: typeof PHASES[number]): 
         alert(`⛔ This ${phase.label.replace(/s$/, '').toLowerCase()} is outside the municipal boundary.`)
         return false
     }
-    if (phase.key !== 'publicBuildings' && phase.key !== 'areas' && phase.key !== 'cityCenter') {
+    // Districts are excluded here — the scattered-area check for them happens
+    // after the modal, once we know the district type (industry zones are allowed).
+    if (phase.key !== 'publicBuildings' && phase.key !== 'areas' && phase.key !== 'cityCenter' && phase.key !== 'districts') {
         if (pointInScatteredArea(checkPoint)) {
-            alert(`⛔ This ${phase.label.replace(/s$/, '').toLowerCase()} cannot be placed in a scattered area.\nOnly public buildings are allowed in scattered areas.`)
+            alert(`⛔ This ${phase.label.replace(/s$/, '').toLowerCase()} cannot be placed in a scattered area.\nOnly public buildings and industry zones are allowed in scattered areas.`)
             return false
         }
     }
@@ -155,6 +190,7 @@ export async function goToPhase(target: number): Promise<void> {
 }
 
 export function setPhase(index: number): void {
+    console.log('setPhase called with index:', index, 'phase:', PHASES[index]?.key)
     store.currentPhase = index
     buildDrawControl(PHASES[index])
     if (PHASES[index].key === 'cityCenter' && store.cityCenterMode === null)
@@ -175,6 +211,17 @@ export function cityCenterSkip(): void {
     setPhase(PHASES.findIndex(p => p.key === 'roads'))
 }
 
+// ─── DISCARD A NEWLY CREATED LAYER ───────────────────────────────────────────
+// Geoman adds the layer to the map the moment pm:create fires, before our
+// handler runs. Every early-return path (validation failure, modal cancel,
+// save error) must call this so the ghost shape does not linger on screen.
+
+function discardCreatedLayer(layer: L.Layer): void {
+    ctx.map.removeLayer(layer)
+    // Belt-and-suspenders: also evict from drawnItems in case Geoman added it there
+    if (ctx.drawnItems.hasLayer(layer)) ctx.drawnItems.removeLayer(layer)
+}
+
 // ─── DRAW EVENTS ──────────────────────────────────────────────────────────────
 
 function registerDrawEvents(): void {
@@ -193,37 +240,42 @@ function registerDrawEvents(): void {
     })
 
     ctx.map.on('pm:editstart', (e: any) => {
-        const key = PHASES[store.currentPhase]?.key
+        try {
+            const key = PHASES[store.currentPhase]?.key
+            console.log('pm:editstart - editing phase:', key)
 
-        // Remove non-current-phase layers from drawnItems so Geoman
-        // cannot select or edit them
-        const parked:  L.Layer[] = []
-        const display: L.Layer[] = []
+            // Remove non-current-phase layers from drawnItems so Geoman
+            // cannot select or edit them
+            const parked:  L.Layer[] = []
+            const display: L.Layer[] = []
 
-        if (!(ctx as any)._displayLayer) {
-            ;(ctx as any)._displayLayer = L.layerGroup().addTo(ctx.map)
-        }
-        const displayLayer: L.LayerGroup = (ctx as any)._displayLayer
+            if (!(ctx as any)._displayLayer) {
+                ;(ctx as any)._displayLayer = L.layerGroup().addTo(ctx.map)
+            }
+            const displayLayer: L.LayerGroup = (ctx as any)._displayLayer
 
-        Object.entries(featureLayers).forEach(([phaseKey, entries]) => {
-            if (phaseKey === key) return
-            ;(entries as LayerEntry[]).forEach(({ layer }) => {
-                if (!ctx.drawnItems.hasLayer(layer)) return
-                ctx.drawnItems.removeLayer(layer)
-                if (phaseKey === 'areas') {
-                    displayLayer.addLayer(layer)
-                    display.push(layer)
-                } else {
-                    parked.push(layer)
-                }
+            Object.entries(featureLayers).forEach(([phaseKey, entries]) => {
+                if (phaseKey === key) return
+                ;(entries as LayerEntry[]).forEach(({ layer }) => {
+                    if (!ctx.drawnItems.hasLayer(layer)) return
+                    ctx.drawnItems.removeLayer(layer)
+                    if (phaseKey === 'areas') {
+                        displayLayer.addLayer(layer)
+                        display.push(layer)
+                    } else {
+                        parked.push(layer)
+                    }
+                })
             })
-        })
-        ;(ctx as any)._parkedLayers  = parked
-        ;(ctx as any)._displayLayers = display
+            ;(ctx as any)._parkedLayers  = parked
+            ;(ctx as any)._displayLayers = display
 
-        if      (key === 'districts' || key === 'areas') enableSnapping('districts', undefined, key)
-        else if (key === 'roads')                        enableSnapping('roads',     undefined, key)
-        hookEditHandles()
+            if      (key === 'districts' || key === 'areas') enableSnapping('districts', undefined, key)
+            else if (key === 'roads')                        enableSnapping('roads',     undefined, key)
+            hookEditHandles()
+        } catch (err) {
+            console.error('pm:editstart error:', err)
+        }
     })
 
     // Handle new vertex added (e.g., via midpoint click)
@@ -251,6 +303,50 @@ function registerDrawEvents(): void {
         ;(ctx as any)._parkedLayers  = []
         ;(ctx as any)._displayLayers = []
         disableSnapping()
+
+        // ── Belt-and-suspenders save ─────────────────────────────────────────
+        // pm:edit fires per-drag in Geoman 2.x; its async save (setTimeout 0)
+        // runs after our synchronous snap correction, so coordinates are correct.
+        // This extra save on editend acts as a safety net in case pm:edit missed
+        // any changes (e.g. snap edge-cases, version differences).
+        const currentKey = PHASES[store.currentPhase]?.key
+        if (currentKey) {
+            setTimeout(async () => {
+                for (const entry of (featureLayers[currentKey] ?? []) as LayerEntry[]) {
+                    const dbId = (entry.layer as any)._dbId
+                    if (!dbId) continue
+                    try {
+                        const updatedData = { ...entry.data }
+                        if (entry.layer instanceof L.Marker) {
+                            const ll = (entry.layer as L.Marker).getLatLng()
+                            updatedData.lat = ll.lat; updatedData.lng = ll.lng
+                            entry.data.lat  = ll.lat; entry.data.lng  = ll.lng
+                        } else if (entry.layer instanceof L.Polygon) {
+                            let coords = ((entry.layer as L.Polygon).getLatLngs()[0] as L.LatLng[])
+                                .map(ll => ({ lat: ll.lat, lng: ll.lng }))
+                            if (coords.length >= 3) {
+                                const f = coords[0], l = coords[coords.length - 1]
+                                if (f.lat !== l.lat || f.lng !== l.lng)
+                                    coords = [...coords, { lat: f.lat, lng: f.lng }]
+                            }
+                            updatedData.coordinates = coords
+                            entry.data.coordinates  = coords
+                        } else if (entry.layer instanceof L.Polyline) {
+                            const coords = ((entry.layer as L.Polyline).getLatLngs() as L.LatLng[])
+                                .map(ll => ({ lat: ll.lat, lng: ll.lng }))
+                            updatedData.coordinates = coords
+                            entry.data.coordinates  = coords
+                        }
+                        await apiFetch(`/api/update/${dbId}`, {
+                            method:  'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body:    JSON.stringify({ data: updatedData }),
+                        })
+                    } catch (err) { console.error('editend save error for', dbId, err) }
+                }
+            }, 30) // 30 ms: lets any pending snap redraw settle before reading coords
+        }
+
         setTimeout(refreshLayerVisibility, 0)
     })
 
@@ -259,27 +355,72 @@ function registerDrawEvents(): void {
         const layer = event.layer as L.Layer
         const phase = PHASES[store.currentPhase]
 
-        if (!await validatePlacement(layer, phase)) return
+        if (!await validatePlacement(layer, phase)) { discardCreatedLayer(layer); return }
 
-        if (phase.key === 'roads') {
-            const check = await validateRoad(layer as L.Polyline)
-            if (!check.valid) { alert(`⛔ Road cannot be saved:\n${check.error}`); return }
-        }
+        // For districts, open modal first to get the district type before validation
+        let modalResult: any = null
         if (phase.key === 'districts') {
-            const check = await validateDistrict(layer as L.Polygon)
-            if (!check.valid) { alert(`⛔ District cannot be saved:\n${check.error}`); return }
+            await prepareModalExtras(phase, layer)
+            modalResult = await openModal(store.currentPhase, layer)
+            if (!modalResult) { discardCreatedLayer(layer); return }
+            
+            const districtTypeKey = modalResult.districtTypeKey as string
+            const check = await validateDistrict(layer as L.Polygon, districtTypeKey)
+            if (!check.valid) { discardCreatedLayer(layer); alert(`⛔ District cannot be saved:\n${check.error}`); return }
+        } else {
+            if (phase.key === 'roads') {
+                const check = await validateRoad(layer as L.Polyline)
+                if (!check.valid) { discardCreatedLayer(layer); alert(`⛔ Road cannot be saved:\n${check.error}`); return }
+            }
         }
 
-        await prepareModalExtras(phase, layer)
+        // For non-districts, open modal after validation
+        if (phase.key !== 'districts') {
+            await prepareModalExtras(phase, layer)
+            modalResult = await openModal(store.currentPhase, layer)
+            if (!modalResult) { discardCreatedLayer(layer); return }
+        }
 
-        const modalResult = await openModal(store.currentPhase, layer)
-        if (!modalResult) return
+        // ── Area count rules ─────────────────────────────────────────────────
+        if (phase.key === 'areas') {
+            const areaTypeKey = (modalResult as any).areaTypeKey as string
+            const mainCount      = featureLayers.areas.filter((e: LayerEntry) => e.data.areaTypeKey === 'central_urban').length
+            const secondaryCount = featureLayers.areas.filter((e: LayerEntry) => e.data.areaTypeKey === 'secondary_urban').length
+
+            if (areaTypeKey === 'central_urban' && mainCount >= 1) {
+                discardCreatedLayer(layer)
+                alert('⛔ A municipality can only have one main urban area.')
+                return
+            }
+            if (areaTypeKey === 'secondary_urban' && secondaryCount >= 10) {
+                discardCreatedLayer(layer)
+                alert('⛔ A municipality cannot have more than 10 secondary urban areas.')
+                return
+            }
+        }
+
+        // ── District scattered-area check (type-aware) ───────────────────────
+        if (phase.key === 'districts') {
+            const districtTypeKey = (modalResult as any).districtTypeKey as string
+            const dtype = DISTRICT_TYPES.find(d => d.key === districtTypeKey)
+            if (!dtype?.allowInScattered) {
+                // Recompute centroid here — same logic as validatePlacement
+                const lls = (layer as L.Polygon).getLatLngs()[0] as L.LatLng[]
+                const lat = lls.reduce((s: number, ll: L.LatLng) => s + ll.lat, 0) / lls.length
+                const lng = lls.reduce((s: number, ll: L.LatLng) => s + ll.lng, 0) / lls.length
+                if (pointInScatteredArea(L.latLng(lat, lng))) {
+                    discardCreatedLayer(layer)
+                    alert('⛔ This district type cannot be placed in a scattered area.\nOnly Industry Zones are allowed in scattered areas.')
+                    return
+                }
+            }
+        }
 
         applyStyle(layer, phase, modalResult as unknown as FeatureData)
 
         const featureData = buildFeatureData(layer, phase, modalResult as unknown as Record<string, unknown>)
         const saveResult  = await saveToDatabase(featureData)
-        if (!saveResult.ok) { alert(`Failed to save feature.\n${saveResult.error ?? 'Please try again.'}`); return }
+        if (!saveResult.ok) { discardCreatedLayer(layer); alert(`Failed to save feature.\n${saveResult.error ?? 'Please try again.'}`); return }
 
         ;(layer as any)._dbId = saveResult.data!.id
         ctx.drawnItems.addLayer(layer)
@@ -287,7 +428,7 @@ function registerDrawEvents(): void {
         if (phase.drawType === 'polyline') addPolylineEndpoints(layer)
         createPermanentLabel(layer, modalResult.label as string, phase.key)
         if (phase.key === 'areas')     createAreaPerimeterLabel(layer, (modalResult as any).areaTypeKey as string)
-        if (phase.key === 'districts') createPolygonEdgeLabel(layer, modalResult.label as string, '#f39c12')
+        if (phase.key === 'districts') createPolygonEdgeLabel(layer, getDistrictLabel((modalResult as any).districtTypeKey as string, modalResult.label as string), '#f39c12')
         ;(layer as L.Path).bindPopup(buildPopup(featureData, phase, saveResult.data!.id))
 
         featureLayers[phase.key].push({ layer, data: featureData })
@@ -344,7 +485,7 @@ function registerDrawEvents(): void {
                 await refreshScatteredAreas()
             }
             if (phase?.key === 'districts') {
-                createPolygonEdgeLabel(layer, entry.data.label, '#f39c12')
+                createPolygonEdgeLabel(layer, getDistrictLabel(entry.data.districtTypeKey ?? 'district', entry.data.label), '#f39c12')
             }
         } catch (err) { console.error('Edit persist error:', err) }
 
@@ -437,7 +578,7 @@ export async function loadFromDatabase(): Promise<void> {
                 if (phase.drawType === 'polyline') addPolylineEndpoints(layer)
                 createPermanentLabel(layer, data.label, phaseKey)
                 if (phaseKey === 'areas')     createAreaPerimeterLabel(layer, data.areaTypeKey ?? feature.layer)
-                if (phaseKey === 'districts') createPolygonEdgeLabel(layer, data.label, '#f39c12')
+                if (phaseKey === 'districts') createPolygonEdgeLabel(layer, getDistrictLabel(data.districtTypeKey ?? 'district', data.label), '#f39c12')
                 ;(layer as L.Path).bindPopup(buildPopup(data, phase, feature.id))
 
                 featureLayers[phaseKey].push({ layer, data })

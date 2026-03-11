@@ -27,7 +27,7 @@ export async function validateRoad(layer: L.Polyline): Promise<ValidateRoadRespo
 }
 
 // POST /api/validate/district
-export async function validateDistrict(layer: L.Polygon): Promise<ValidateDistrictResponse> {
+export async function validateDistrict(layer: L.Polygon, districtTypeKey?: string): Promise<ValidateDistrictResponse> {
     const lls = layer.getLatLngs()[0] as L.LatLng[]
     let coords = lls.map((ll) => ({ lat: ll.lat, lng: ll.lng }))
     // PostGIS requires closed ring — ensure first and last points are identical
@@ -41,7 +41,7 @@ export async function validateDistrict(layer: L.Polygon): Promise<ValidateDistri
         const res = await apiFetch('/api/validate/district', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ coordinates: coords }),
+            body:    JSON.stringify({ coordinates: coords, districtTypeKey }),
         })
         if (!res.ok) return { valid: false, error: 'District validation request failed.' }
         return await res.json() as ValidateDistrictResponse

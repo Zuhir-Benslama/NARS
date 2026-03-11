@@ -2,7 +2,6 @@
 
 import { ctx }          from './state'
 import { apiFetch }     from '../api'
-import { scatteredStyle } from './styles'
 import type { ScatteredRefreshResponse } from '../types'
 
 declare const L: typeof import('leaflet')
@@ -10,7 +9,6 @@ declare const L: typeof import('leaflet')
 // ─── SPATIAL HELPERS ─────────────────────────────────────────────────────────
 
 let municipalLimitRings: L.LatLng[][] = []
-let scatteredPolygons:   L.LatLng[][] = []
 
 function pointInRing(latlng: L.LatLng, ring: L.LatLng[]): boolean {
     let inside = false
@@ -28,28 +26,49 @@ export function pointInMunicipalLimit(latlng: L.LatLng): boolean {
     return municipalLimitRings.some(r => pointInRing(latlng, r))
 }
 
-export function pointInScatteredArea(latlng: L.LatLng): boolean {
-    return scatteredPolygons.some(r => pointInRing(latlng, r))
-}
-
 export function polylineMidpoint(layer: L.Polyline): L.LatLng {
     const lls = layer.getLatLngs() as L.LatLng[]
     return lls[Math.floor(lls.length / 2)]
 }
 
+// A scattered polygon is a GeoJSON polygon with holes — the outer ring is the
+// municipal boundary shape and the holes are the urban areas subtracted by
+// ST_Difference. A point is in a scattered area if it is inside the outer ring
+// AND outside every hole ring.
+interface ScatteredPoly { outer: L.LatLng[]; holes: L.LatLng[][] }
+let scatteredPolygons: ScatteredPoly[] = []
+
+export function pointInScatteredArea(latlng: L.LatLng): boolean {
+    return scatteredPolygons.some(({ outer, holes }) =>
+        pointInRing(latlng, outer) && !holes.some(h => pointInRing(latlng, h))
+    )
+}
+
+export function extractScatteredPolys(geom: GeoJSON.Geometry): ScatteredPoly[] {
+    const toLatLngs = (ring: GeoJSON.Position[]): L.LatLng[] =>
+        ring.map(c => L.latLng(c[1], c[0]))
+
+    const fromPoly = (coords: GeoJSON.Position[][]): ScatteredPoly => ({
+        outer: toLatLngs(coords[0]),
+        holes: coords.slice(1).map(toLatLngs),
+    })
+
+    if (geom.type === 'Polygon')
+        return [fromPoly(geom.coordinates)]
+    if (geom.type === 'MultiPolygon')
+        return geom.coordinates.map(fromPoly)
+    return []
+}
+
 export function extractRings(geom: GeoJSON.Geometry): L.LatLng[][] {
+    // Used only for the municipal boundary (no holes needed there).
+    const toLatLngs = (ring: GeoJSON.Position[]): L.LatLng[] =>
+        ring.map(c => L.latLng(c[1], c[0]))
     const rings: L.LatLng[][] = []
-    const processRing = (coords: GeoJSON.Position[] | GeoJSON.Position[][] | GeoJSON.Position[][][]): void => {
-        if (!coords?.length) return
-        if (typeof (coords[0] as GeoJSON.Position)[0] === 'number') {
-            rings.push((coords as GeoJSON.Position[]).map(c => L.latLng(c[1], c[0])))
-        } else {
-            (coords as (GeoJSON.Position[] | GeoJSON.Position[][])[]).forEach(c => processRing(c as any))
-        }
-    }
-    if (geom.type === 'Polygon')           processRing(geom.coordinates)
-    else if (geom.type === 'MultiPolygon') geom.coordinates.forEach(p => processRing(p))
-    else                                   processRing((geom as any).coordinates)
+    if (geom.type === 'Polygon')
+        geom.coordinates.forEach(r => rings.push(toLatLngs(r)))
+    else if (geom.type === 'MultiPolygon')
+        geom.coordinates.forEach(poly => poly.forEach(r => rings.push(toLatLngs(r))))
     return rings
 }
 
@@ -68,6 +87,10 @@ export async function displayCommuneBoundary(communeId: number, communeName: str
         ctx.boundariesLayer = L.geoJSON(geojson, {
             style: { color: '#e74c3c', weight: 2.5, fillOpacity: 0.03, fillColor: '#e74c3c' },
         }).addTo(ctx.map)
+        // Boundary is display-only — never editable
+        ctx.boundariesLayer.eachLayer((l: L.Layer) => {
+            ;(l as any).pm?.setOptions?.({ pmIgnore: true })
+        })
         ctx.map.fitBounds(ctx.boundariesLayer.getBounds(), { padding: [50, 50], maxZoom: 14 })
     } catch (e) { console.error('Boundary error:', e) }
 }
@@ -81,13 +104,9 @@ export function renderScatteredAreas(geoJsonStr: string | GeoJSON.Geometry): voi
     try {
         const geojson: GeoJSON.Geometry = typeof geoJsonStr === 'string' ? JSON.parse(geoJsonStr) : geoJsonStr
         if (!geojson?.type) return
-        scatteredPolygons = extractRings(geojson)
-        L.geoJSON(geojson, {
-            style: scatteredStyle,
-            onEachFeature(_, layer) {
-                (layer as L.Path).bindTooltip('Scattered Area', { direction: 'center', className: 'boundary-tooltip' })
-            },
-        }).addTo(ctx.scatteredLayer)
+        // Only update the spatial hit-test data — scattered areas are not rendered
+        // visually so as not to clutter the map.
+        scatteredPolygons = extractScatteredPolys(geojson)
     } catch (e) { console.error('Scattered render error:', e) }
 }
 

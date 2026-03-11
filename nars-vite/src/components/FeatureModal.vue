@@ -13,11 +13,18 @@
                 <input
                     type="text"
                     v-model="m.label"
-                    :class="['modal-input', { error: m.errors.label }]"
-                    placeholder="Feature name..."
+                    :class="['modal-input', { error: m.errors.label, 'modal-input-readonly': isMainUrban || isZoneWithTypeName }]"
+                    :placeholder="isMainUrban || isZoneWithTypeName ? '' : 'Feature name...'"
+                    :readonly="isMainUrban || isZoneWithTypeName"
                     autocomplete="off"
                     autofocus
                 />
+                <span v-if="isMainUrban" class="modal-field-note">
+                    The main urban area takes the municipality name.
+                </span>
+                <span v-if="isZoneWithTypeName" class="modal-field-note">
+                    This zone uses its type name.
+                </span>
             </div>
 
             <!-- Decision No. + Date (side by side) -->
@@ -185,6 +192,17 @@ const bisStr = computed(() =>
 const areaTypeOptions = computed(() =>
     AREA_TYPES.filter(a => !(a.key === 'central_urban' && m.value.mainUrbanExists)))
 
+// Whether the current area being created/edited is a main urban area —
+// in that case the name is always the municipality name and is not editable.
+const isMainUrban = computed(() =>
+    phase.value?.key === 'areas' && m.value.areaTypeKey === 'central_urban')
+
+// Whether the current district being created/edited is a Trade Activity Zone or Industrial Zone —
+// in that case the name is always the type name and is not editable.
+const isZoneWithTypeName = computed(() =>
+    phase.value?.key === 'districts' &&
+    (m.value.districtTypeKey === 'trad_activities_zone' || m.value.districtTypeKey === 'industry_zone'))
+
 // ── Watchers ──────────────────────────────────────────────────────────────────
 
 // When road selection changes → fetch side + suggested number
@@ -203,18 +221,32 @@ watch(() => m.value.selectedMainIdx, (val) => {
     computeBisNumber(option.dbId)
 })
 
-// When area type changes → auto-fill municipality name (only for new features)
+// When area type changes → always lock name to municipality for central_urban,
+// and only clear when switching away if the label was the auto-filled municipality name.
 watch(() => m.value.areaTypeKey, (val) => {
-    if (m.value.isEdit) return
-    if (val === 'central_urban' && !m.value.label && store.municipalityName)
-        m.value.label = store.municipalityName
+    if (val === 'central_urban') {
+        m.value.label = store.municipalityName ?? ''
+    } else if (!m.value.isEdit && m.value.label === store.municipalityName) {
+        m.value.label = ''
+    }
+})
+
+// When district type changes → auto-fill name for zones that use type name
+watch(() => m.value.districtTypeKey, (val) => {
+    if (val === 'trad_activities_zone' || val === 'industry_zone') {
+        const dtype = DISTRICT_TYPES.find(d => d.key === val)
+        m.value.label = dtype?.label ?? ''  // Zone uses type name
+    }
 })
 
 // ── Validation + submit ───────────────────────────────────────────────────────
 
 function validate() {
     const errors: Record<string, string> = {}
-    if (!m.value.label.trim())          errors.label          = 'Required'
+    // Label is required except for zones that use type name
+    const labelRequired = !(phase.value?.key === 'districts' &&
+        (m.value.districtTypeKey === 'trad_activities_zone' || m.value.districtTypeKey === 'industry_zone'))
+    if (labelRequired && !m.value.label.trim()) errors.label = 'Required'
     if (!m.value.decisionNumber.trim()) errors.decisionNumber = 'Required'
     if (!m.value.decisionDate.trim())   errors.decisionDate   = 'Required'
 

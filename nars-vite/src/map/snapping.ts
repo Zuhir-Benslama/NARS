@@ -26,8 +26,6 @@ function getSnapRings(phaseKey?: string): L.LatLng[][] {
     if (ctx.boundariesLayer) {
         ctx.boundariesLayer.eachLayer((bl: L.Layer) => {
             try {
-                // getLatLngs() returns L.LatLng[] | L.LatLng[][] | L.LatLng[][][]
-                // depending on the GeoJSON geometry type — flatten all levels
                 const lls = (bl as L.Polygon).getLatLngs()
                 const extractRings = (arr: any): void => {
                     if (!arr.length) return
@@ -174,7 +172,6 @@ function nearestSnapPointRoads(
 let snapFrozen = false  // true from mousedown until after click
 
 function onSnapMouseDown(): void {
-    // Only freeze in draw mode — in edit mode the drag tracks the moving cursor
     if (!editModeActive && snapActive && snapLatLng) {
         snapFrozen = true
     }
@@ -185,11 +182,9 @@ function onSnapMouseUp(): void {
 }
 
 function onSnapMove(e: MouseEvent): void {
-    if (snapFrozen) return  // mousedown in progress — hold snap state through click
+    if (snapFrozen) return
     if (!ctx.map.getContainer().contains(e.target as Node)) return
 
-    // In edit mode, only snap while a vertex is actually being dragged —
-    // suppresses the snap circle appearing on the feature's own handles during hover
     if (editModeActive && !editDragActive) {
         snapActive = false
         snapLatLng = null
@@ -243,16 +238,12 @@ function onSnapMove(e: MouseEvent): void {
 }
 
 // ─── EDIT-MODE SNAPPING ───────────────────────────────────────────────────────
-// Called directly inside the pm:editstart handler in index.ts.
 
 export let editDragActive = false  // true only while a vertex is being dragged
 export let editModeActive = false  // true from hookEditHandles until disableSnapping
 
 function hookMarker(marker: any, layer: L.Layer): void {
     // Remove any previously attached snap handlers before re-attaching.
-    // This is essential because ghost midpoint markers are converted in-place
-    // to real vertex markers by Geoman — same object, so _snapHooked
-    // would block re-hooking. Named handler refs let us cleanly replace them.
     if (marker._snapDragStart) marker.off('dragstart', marker._snapDragStart)
     if (marker._snapDrag)      marker.off('drag',      marker._snapDrag)
     if (marker._snapDragEnd)   marker.off('dragend',   marker._snapDragEnd)
@@ -266,7 +257,7 @@ function hookMarker(marker: any, layer: L.Layer): void {
             ctx.map.removeLayer(snapMarker)
     }
 
-    marker._snapDrag = () => { /* marker position tracked via onSnapMove */ }
+    marker._snapDrag = () => { /* position tracked via onSnapMove */ }
 
     marker._snapDragEnd = () => {
         // Capture snap state BEFORE clearing editDragActive.
@@ -274,30 +265,59 @@ function hookMarker(marker: any, layer: L.Layer): void {
             ? L.latLng(snapLatLng.lat, snapLatLng.lng)
             : null
 
+        // Capture marker's current (un-snapped) position.
+        // Geoman's own dragend handler fires first (it was registered before ours),
+        // so layer._latlngs already reflects where the user released the mouse.
+        const unsnappedPos = marker.getLatLng()
 
         editDragActive = false
         snapExclude    = null
-        hookAllEditMarkers()
 
-        if (!snapped) return
-        setTimeout(() => {
-            // Use the layer closure variable directly
-            const poly = layer
-            if (poly instanceof L.Polygon) {
-                const rings = poly.getLatLngs() as L.LatLng[][]
-                if (rings[0] && marker._index !== undefined) {
-                    rings[0][marker._index] = snapped
-                    poly.setLatLngs(rings)
+        // ── Apply snap SYNCHRONOUSLY ──────────────────────────────────────────
+        // Geoman 2.x fires pm:edit (with async save via setTimeout 0) from its
+        // own dragend handler, which runs BEFORE ours.  Applying snap here —
+        // synchronously, before returning — ensures that setTimeout 0 in the
+        // pm:edit save handler reads the already-corrected coordinates.
+        //
+        // Using in-place mutation (ll.lat/lng = ...) instead of setLatLngs()
+        // avoids creating new LatLng objects, which would invalidate Geoman's
+        // internal _origLatLng references and produce a "shadow polygon".
+        if (snapped) {
+            if (layer instanceof L.Polygon) {
+                const rings = layer.getLatLngs() as L.LatLng[][]
+                const ring  = rings[0]
+                if (ring) {
+                    let closestIdx = -1, minDist = Infinity
+                    ring.forEach((ll, i) => {
+                        const d = unsnappedPos.distanceTo(ll)
+                        if (d < minDist) { minDist = d; closestIdx = i }
+                    })
+                    if (closestIdx >= 0) {
+                        ring[closestIdx].lat = snapped.lat
+                        ring[closestIdx].lng = snapped.lng
+                        layer.redraw()
+                        marker.setLatLng(snapped)
+                    }
                 }
-            } else if (poly instanceof L.Polyline) {
-                const lls = poly.getLatLngs() as L.LatLng[]
-                if (marker._index !== undefined) {
-                    lls[marker._index] = snapped
-                    poly.setLatLngs(lls)
+            } else if (layer instanceof L.Polyline) {
+                const lls = layer.getLatLngs() as L.LatLng[]
+                let closestIdx = -1, minDist = Infinity
+                lls.forEach((ll, i) => {
+                    const d = unsnappedPos.distanceTo(ll)
+                    if (d < minDist) { minDist = d; closestIdx = i }
+                })
+                if (closestIdx >= 0) {
+                    lls[closestIdx].lat = snapped.lat
+                    lls[closestIdx].lng = snapped.lng
+                    layer.redraw()
+                    marker.setLatLng(snapped)
                 }
             }
-            marker.setLatLng(snapped)
-        }, 0)
+        }
+
+        // Re-hook after state is stable so newly-converted midpoint markers
+        // (ghost → real vertex) also get snap handlers.
+        hookAllEditMarkers()
     }
 
     marker.on('dragstart', marker._snapDragStart)
@@ -306,28 +326,25 @@ function hookMarker(marker: any, layer: L.Layer): void {
 }
 
 export function hookAllEditMarkers(): void {
-    let layerCount = 0, markerCount = 0
     ctx.drawnItems.eachLayer((layer: L.Layer) => {
-        // Check if Geoman editing is enabled on this layer
         const pm = (layer as any).pm
         if (!pm || !pm.enabled()) return
-        layerCount++
 
-        // Try to get the editor and its markers
-        // Geoman stores markers in the editor's _markers array
-        try {
-            const editor = pm.getEditor?.()
-            if (editor && editor._markers) {
-                editor._markers.forEach((marker: any) => {
-                    if (marker instanceof L.Marker) {
-                        hookMarker(marker, layer)
-                        markerCount++
-                    }
-                })
+        // Geoman stores vertex markers in pm._markers.
+        // Polygons:  pm._markers is L.Marker[][] (one sub-array per ring).
+        // Polylines: pm._markers is L.Marker[].
+        // Flatten one level to get a single array of marker objects.
+        const raw = pm._markers as any
+        if (!raw) return
+
+        const isNested = Array.isArray(raw[0]) && !(raw[0] instanceof L.Marker)
+        const flat: any[] = isNested ? (raw as any[][]).flat() : (raw as any[])
+
+        flat.forEach((marker: any) => {
+            if (marker && typeof marker.on === 'function') {
+                hookMarker(marker, layer)
             }
-        } catch (e) {
-            // Ignore errors accessing Geoman internals
-        }
+        })
     })
 }
 
@@ -337,8 +354,6 @@ export function hookEditHandles(): void {
 }
 
 export function installSnapInterceptors(): void {
-    // Rewrite e.latlng on Leaflet events so Geoman reads the snapped position
-    // when placing vertices during draw and edit.
     ctx.map.on('mousemove', (e: any) => {
         if (snapActive && snapLatLng) e.latlng = snapLatLng
     })
