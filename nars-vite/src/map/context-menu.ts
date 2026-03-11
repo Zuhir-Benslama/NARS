@@ -20,8 +20,18 @@ function createContextMenuEl(): HTMLElement {
     el.className = 'nars-ctx-menu'
     el.style.display = 'none'
     document.body.appendChild(el)
-    document.addEventListener('click',       () => { el.style.display = 'none' })
-    document.addEventListener('contextmenu', () => { el.style.display = 'none' })
+    // Hide menu on click anywhere except on the menu itself
+    document.addEventListener('click', (e) => {
+        if (!el.contains(e.target as Node)) {
+            el.style.display = 'none'
+        }
+    })
+    // Hide menu on right-click anywhere except on the menu itself
+    document.addEventListener('contextmenu', (e) => {
+        if (!el.contains(e.target as Node)) {
+            el.style.display = 'none'
+        }
+    })
     return el
 }
 
@@ -32,15 +42,14 @@ function getCtxEl(): HTMLElement {
 }
 
 function showContextMenu(x: number, y: number, dbId: number, phaseKey: string): void {
+    console.log('showContextMenu called with x:', x, 'y:', y, 'dbId:', dbId, 'phaseKey:', phaseKey)
     const el = getCtxEl()
-    const isRoad        = phaseKey === 'roads'
-    const currentPhase  = PHASES[store.currentPhase]?.key
-    const isCurrentPhase = phaseKey === currentPhase
+    const isRoad = phaseKey === 'roads'
     el.innerHTML = `
         <div class="nars-ctx-item" data-action="edit">✏️ Edit Info</div>
         <div class="nars-ctx-item" data-action="boundaries">⬟ Edit Boundaries</div>
         ${isRoad ? '<div class="nars-ctx-item" data-action="reverse">⇄ Reverse Direction</div>' : ''}
-        ${isCurrentPhase ? '<div class="nars-ctx-item nars-ctx-danger" data-action="remove">🗑️ Remove Object</div>' : ''}
+        <div class="nars-ctx-item nars-ctx-danger" data-action="remove">🗑️ Remove Object</div>
     `
     el.style.left = '-9999px'; el.style.top = '-9999px'; el.style.display = 'block'
     const w = el.offsetWidth, h = el.offsetHeight
@@ -61,11 +70,21 @@ function showContextMenu(x: number, y: number, dbId: number, phaseKey: string): 
 }
 
 export function bindContextMenu(layer: L.Layer, dbId: number, phaseKey: string): void {
-    layer.on('contextmenu', (e: any) => {
-        e.originalEvent.preventDefault()
-        e.originalEvent.stopPropagation()
-        showContextMenu(e.originalEvent.clientX, e.originalEvent.clientY, dbId, phaseKey)
-    })
+    try {
+        console.log('bindContextMenu called for dbId:', dbId, 'phaseKey:', phaseKey)
+        layer.on('contextmenu', (e: any) => {
+            try {
+                console.log('contextmenu event fired for dbId:', dbId)
+                e.originalEvent.preventDefault()
+                e.originalEvent.stopPropagation()
+                showContextMenu(e.originalEvent.clientX, e.originalEvent.clientY, dbId, phaseKey)
+            } catch (err) {
+                console.error('Context menu error:', err)
+            }
+        })
+    } catch (err) {
+        console.error('bindContextMenu error:', err)
+    }
 }
 
 // ─── REMOVE FEATURE ───────────────────────────────────────────────────────────
@@ -76,6 +95,14 @@ async function removeFeature(dbId: number): Promise<void> {
     const phaseKey = Object.keys(featureLayers).find(k =>
         featureLayers[k].some((e: LayerEntry) => (e.layer as any)._dbId === dbId))
     if (!phaseKey) return
+
+    // Guard: only allow removal when on the feature's own phase.
+    // Areas are always visible so this prevents accidental deletion from another phase.
+    const currentPhaseKey = PHASES[store.currentPhase]?.key
+    if (phaseKey !== currentPhaseKey) {
+        alert(`⛔ Switch to the ${PHASES.find(p => p.key === phaseKey)?.label ?? phaseKey} phase to remove this feature.`)
+        return
+    }
 
     const entry = featureLayers[phaseKey].find((e: LayerEntry) => (e.layer as any)._dbId === dbId)
     if (!entry) return
@@ -112,27 +139,87 @@ async function editBoundaries(dbId: number): Promise<void> {
         ? featureLayers[phaseKey].find((e: LayerEntry) => (e.layer as any)._dbId === dbId) as LayerEntry | undefined
         : undefined
 
-    if (!entry) {
-        alert('Could not find the feature to edit.')
+    if (!entry) { alert('Could not find the feature to edit.'); return }
+
+    // Only polygon and polyline features have editable boundaries
+    if (!(entry.layer instanceof L.Polygon) && !(entry.layer instanceof L.Polyline)) {
+        alert('Boundary editing is not available for marker features.')
         return
     }
 
-    const snapMode = phaseKey === 'roads' ? 'roads'
-                   : (phaseKey === 'districts' || phaseKey === 'areas') ? 'districts'
-                   : null
-
-    if (snapMode) enableSnapping(snapMode, entry?.layer, phaseKey)
-    if (snapMode) hookEditHandles()
-
-    // Disable snapping once edit mode ends (save or cancel)
-    const onEditStop = () => {
-        if (snapMode) disableSnapping()
-        ;(ctx.map as any).off('pm:editend', onEditStop)
+    // Prevent starting a second boundary edit while one is in progress
+    if (document.getElementById('nars-boundary-finish')) {
+        alert('Please finish the current boundary edit first.')
+        return
     }
-    ;(ctx.map as any).on('pm:editend', onEditStop)
 
-    // Enable Geoman editing on the layer
-    (entry.layer as any).pm.enable()
+    // ── Set up snapping ──────────────────────────────────────────────────────
+    const snapMode = phaseKey === 'roads'
+        ? 'roads'
+        : (phaseKey === 'districts' || phaseKey === 'areas') ? 'districts'
+        : null
+
+    if (snapMode) enableSnapping(snapMode as 'districts' | 'roads', entry.layer, phaseKey)
+    hookEditHandles()
+
+    // ── Enable Geoman vertex editing on this layer only ──────────────────────
+    ;(entry.layer as any).pm.enable()
+
+    // ── Inject a "Save Boundaries" button into the map container ─────────────
+    // layer.pm.enable() shows vertex handles but provides no finish affordance;
+    // we inject a button so the user has a clear way to commit the edit.
+    const mapEl = ctx.map.getContainer()
+    const finishBtn = document.createElement('button')
+    finishBtn.id        = 'nars-boundary-finish'
+    finishBtn.className = 'nars-boundary-finish-btn'
+    finishBtn.innerHTML = '✓ Save Boundaries'
+    mapEl.appendChild(finishBtn)
+
+    // ── Cleanup & save ───────────────────────────────────────────────────────
+    const cleanup = async (save: boolean) => {
+        finishBtn.remove()
+        document.removeEventListener('keydown', onKeyDown)
+        ;(entry.layer as any).pm.disable()   // fires pm:edit + pm:editend internally
+        if (snapMode) disableSnapping()
+
+        if (!save) return
+
+        try {
+            let coordinates: { lat: number; lng: number }[] | undefined
+
+            if (entry.layer instanceof L.Polygon) {
+                let coords = (entry.layer.getLatLngs()[0] as L.LatLng[])
+                    .map(ll => ({ lat: ll.lat, lng: ll.lng }))
+                if (coords.length >= 3) {
+                    const f = coords[0], l = coords[coords.length - 1]
+                    if (f.lat !== l.lat || f.lng !== l.lng)
+                        coords = [...coords, { lat: f.lat, lng: f.lng }]
+                }
+                coordinates = coords
+            } else if (entry.layer instanceof L.Polyline) {
+                coordinates = (entry.layer.getLatLngs() as L.LatLng[])
+                    .map(ll => ({ lat: ll.lat, lng: ll.lng }))
+            }
+
+            if (coordinates) {
+                entry.data.coordinates = coordinates
+                await apiFetch(`/api/update/${dbId}`, {
+                    method:  'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ data: { ...entry.data, coordinates } }),
+                })
+                if (phaseKey === 'areas') await refreshScatteredAreas()
+            }
+        } catch (err) { console.error('Edit boundary save error:', err) }
+    }
+
+    finishBtn.addEventListener('click', () => cleanup(true),  { once: true })
+
+    // ESC cancels without saving
+    const onKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') cleanup(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
 }
 
 // ─── EDIT FEATURE INFO ────────────────────────────────────────────────────────
@@ -143,6 +230,13 @@ async function editFeatureInfo(dbId: number): Promise<void> {
     const phaseKey = Object.keys(featureLayers).find(k =>
         featureLayers[k].some((e: LayerEntry) => (e.layer as any)._dbId === dbId))
     if (!phaseKey) return
+
+    // Prohibit editing areas in districts phase
+    const currentPhaseKey = PHASES[store.currentPhase]?.key
+    if (phaseKey === 'areas' && currentPhaseKey === 'districts') {
+        alert('Areas cannot be edited in the districts phase. Please switch to the Areas phase to edit.')
+        return
+    }
 
     const entry = featureLayers[phaseKey].find((e: LayerEntry) => (e.layer as any)._dbId === dbId)
     if (!entry) return

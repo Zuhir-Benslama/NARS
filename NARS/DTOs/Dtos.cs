@@ -58,7 +58,9 @@ public record ValidateRoadResponse(
 public record ValidateDistrictRequest(
     [Required]
     [property: JsonPropertyName("coordinates")]
-    List<CoordDto> Coordinates
+    List<CoordDto> Coordinates,
+    [property: JsonPropertyName("districtTypeKey")]
+    string? DistrictTypeKey
 );
 
 public record ValidateDistrictResponse(

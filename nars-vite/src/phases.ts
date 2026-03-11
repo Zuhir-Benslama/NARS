@@ -31,9 +31,11 @@ export const API_LAYER_TO_PHASE: Record<string, string> = {
     central_urban:      'areas',
     secondary_urban:    'areas',
     city_center:        'cityCenter',
-    housing_estate:     'districts',
-    urban_pole:         'districts',
-    district:           'districts',
+    housing_estate:         'districts',
+    urban_pole:             'districts',
+    district:               'districts',
+    trad_activities_zone:   'districts',
+    industry_zone:          'districts',
     boulevard:          'roads',
     avenue:             'roads',
     street:             'roads',
@@ -56,9 +58,11 @@ export const AREA_TYPES: AreaType[] = [
 ]
 
 export const DISTRICT_TYPES: DistrictType[] = [
-    { key: 'housing_estate', label: 'Housing Estate' },
-    { key: 'urban_pole',     label: 'Urban Pole'     },
-    { key: 'district',       label: 'District'       },
+    { key: 'housing_estate',        label: 'Housing Estate'        },
+    { key: 'urban_pole',            label: 'Urban Pole'            },
+    { key: 'district',              label: 'District'              },
+    { key: 'trad_activities_zone',  label: 'Trad. Activities Zone' },
+    { key: 'industry_zone',         label: 'Industry Zone', allowInScattered: true },
 ]
 
 export const ROAD_TYPES: RoadType[] = [

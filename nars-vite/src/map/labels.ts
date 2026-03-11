@@ -24,6 +24,8 @@ export function addPolylineEndpoints(layer: L.Layer): void {
     const c = (layer.options as L.PolylineOptions).color ?? '#3498db'
     const s = L.marker(lls[0],              { icon: createEndpointIcon('>', segmentAngle(lls[0], lls[1]), c as string, true),  interactive: false })
     const e = L.marker(lls[lls.length - 1], { icon: createEndpointIcon('X', segmentAngle(lls[lls.length-2], lls[lls.length-1]), c as string, false), interactive: false })
+    ;(s as any).pm?.setOptions?.({ pmIgnore: true })
+    ;(e as any).pm?.setOptions?.({ pmIgnore: true })
     ctx.lineEndpointLayer.addLayer(s)
     ctx.lineEndpointLayer.addLayer(e)
     ;(layer as any)._endpointMarkers = [s, e]
@@ -94,6 +96,7 @@ function refreshEdgeLabel(layer: L.Layer): void {
             interactive: false,
             zIndexOffset: 200,
         })
+        ;(m as any).pm?.setOptions?.({ pmIgnore: true })
 
         ctx.polygonEdgeLabelLayer.addLayer(m)
         markers.push(m)
@@ -138,8 +141,16 @@ export function refreshLayerVisibility(): void {
     for (const [key, entries] of Object.entries(featureLayers)) {
         const showCityCenter = key === 'cityCenter' && (currentKey === 'roads' || currentKey === 'houseEntrances')
         const show = key === 'areas' || key === currentKey || showCityCenter
+        // Areas are always visible but must not intercept pointer events when
+        // another phase is active — otherwise right-click on a district/road
+        // beneath an area polygon fires on the area instead of the intended layer.
+        const interactive = key !== 'areas' || currentKey === 'areas'
         for (const { layer } of entries as LayerEntry[]) {
             setLayerVisible(layer, show)
+            if (layer instanceof L.Path) {
+                const el = (layer as any).getElement?.() as SVGElement | undefined
+                if (el) el.style.pointerEvents = interactive ? '' : 'none'
+            }
             const edgeMarkers = (layer as any)._edgeLabelMarkers as L.Marker[] | undefined
             edgeMarkers?.forEach(m => setLayerVisible(m, show))
             const perimLabel = (layer as any)._perimeterLabel as L.Layer | undefined
