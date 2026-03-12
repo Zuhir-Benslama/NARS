@@ -22,13 +22,25 @@ export function addPolylineEndpoints(layer: L.Layer): void {
     const lls = layer.getLatLngs() as L.LatLng[]
     if (!lls || lls.length < 2) return
     const c = (layer.options as L.PolylineOptions).color ?? '#3498db'
-    const s = L.marker(lls[0],              { icon: createEndpointIcon('>', segmentAngle(lls[0], lls[1]), c as string, true),  interactive: false })
+
+    // Suppress the start '>' arrow if it sits on top of a city center marker
+    // (road starts at the city center — the CC icon already marks that point).
+    const startLL  = lls[0]
+    const ccMarkers: L.LatLng[] = ((window as any).__narsGetCityCenterLatLngs?.() ?? [])
+    const onCityCenter = ccMarkers.some(cc => startLL.distanceTo(cc) < 2)
+
+    const markers: L.Marker[] = []
+    if (!onCityCenter) {
+        const s = L.marker(startLL, { icon: createEndpointIcon('>', segmentAngle(lls[0], lls[1]), c as string, true), interactive: false })
+        ;(s as any).pm?.setOptions?.({ pmIgnore: true })
+        ctx.lineEndpointLayer.addLayer(s)
+        markers.push(s)
+    }
     const e = L.marker(lls[lls.length - 1], { icon: createEndpointIcon('X', segmentAngle(lls[lls.length-2], lls[lls.length-1]), c as string, false), interactive: false })
-    ;(s as any).pm?.setOptions?.({ pmIgnore: true })
     ;(e as any).pm?.setOptions?.({ pmIgnore: true })
-    ctx.lineEndpointLayer.addLayer(s)
     ctx.lineEndpointLayer.addLayer(e)
-    ;(layer as any)._endpointMarkers = [s, e]
+    markers.push(e)
+    ;(layer as any)._endpointMarkers = markers
 }
 
 // ─── PERMANENT LABELS ─────────────────────────────────────────────────────────

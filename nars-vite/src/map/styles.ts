@@ -36,15 +36,6 @@ export function createEntranceIcon(label: string | number, color = '#27ae60'): L
     })
 }
 
-export function createCityCenterIcon(): L.DivIcon {
-    return L.divIcon({
-        className: 'city-center-marker',
-        html: '<div class="city-center-icon">★</div>',
-        iconSize:   [36, 36],
-        iconAnchor: [18, 18],
-        popupAnchor: [0, -18],
-    })
-}
 
 export function createEndpointIcon(char: string, angleDeg: number, color: string, large = false): L.DivIcon {
     const size = large ? 36 : 24, fs = large ? 28 : 20, half = size / 2
@@ -84,6 +75,4 @@ export function applyStyle(layer: L.Layer, phase: typeof PHASES[number], modalRe
             ;(layer as L.Marker).setIcon(createEntranceIcon(String(modalResult.entranceNumber ?? modalResult.label), phase.color))
         }
     }
-    else if (phase.key === 'cityCenter')
-        (layer as L.Marker).setIcon(createCityCenterIcon())
 }

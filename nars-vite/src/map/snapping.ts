@@ -43,10 +43,11 @@ function getSnapRings(phaseKey?: string): L.LatLng[][] {
     return rings
 }
 
-function getRoadSnapSources(): { chains: L.LatLng[][]; rings: L.LatLng[][]; points: L.LatLng[] } {
-    const chains: L.LatLng[][] = []
-    const rings:  L.LatLng[][] = []
-    const points: L.LatLng[]   = []
+function getRoadSnapSources(): { chains: L.LatLng[][]; rings: L.LatLng[][]; points: L.LatLng[]; circles: L.Circle[] } {
+    const chains:   L.LatLng[][] = []
+    const rings:    L.LatLng[][] = []
+    const points:   L.LatLng[]   = []
+    const circles:  L.Circle[]   = []
 
     featureLayers.roads.forEach(({ layer }) => {
         if (layer === snapExclude) return
@@ -62,10 +63,10 @@ function getRoadSnapSources(): { chains: L.LatLng[][]; rings: L.LatLng[][]; poin
     })
 
     featureLayers.cityCenter.forEach(({ layer }) => {
-        if (layer instanceof L.Marker) points.push(layer.getLatLng())
+        if (layer instanceof L.Circle) circles.push(layer as L.Circle)
     })
 
-    return { chains, rings, points }
+    return { chains, rings, points, circles }
 }
 
 // ─── GEOMETRY HELPERS ────────────────────────────────────────────────────────
@@ -79,6 +80,31 @@ function closestOnSegment(mp: L.Point, a: L.LatLng, b: L.LatLng): L.LatLng | nul
         if (lenSq === 0) return a
         const t = Math.max(0, Math.min(1, ((mp.x - pa.x) * dx + (mp.y - pa.y) * dy) / lenSq))
         return ctx.map.layerPointToLatLng(L.point(pa.x + t * dx, pa.y + t * dy))
+    } catch { return null }
+}
+
+// Returns the closest point on a circle's visual perimeter (in pixel space)
+// and its pixel distance from mp. Returns null if the circle has zero radius.
+function closestOnCirclePerimeter(
+    mp: L.Point,
+    circle: L.Circle,
+): { ll: L.LatLng; dist: number } | null {
+    try {
+        const c = circle as any
+        const centerPx: L.Point = c._point
+        const radiusPx: number  = c._radius
+        if (!centerPx || !radiusPx || radiusPx === 0) return null
+        const dx = mp.x - centerPx.x
+        const dy = mp.y - centerPx.y
+        const cursorDist = Math.hypot(dx, dy)
+        if (cursorDist === 0) return null
+        const snapPx = L.point(
+            centerPx.x + (dx / cursorDist) * radiusPx,
+            centerPx.y + (dy / cursorDist) * radiusPx,
+        )
+        const snapLL = ctx.map.layerPointToLatLng(snapPx)
+        const dist   = Math.abs(cursorDist - radiusPx)
+        return { ll: snapLL, dist }
     } catch { return null }
 }
 
@@ -116,10 +142,11 @@ function nearestSnapPoint(mp: L.Point, rings: L.LatLng[][]): { ll: L.LatLng; dis
 }
 
 function nearestSnapPointRoads(
-    mp:     L.Point,
-    chains: L.LatLng[][],
-    rings:  L.LatLng[][],
-    points: L.LatLng[],
+    mp:      L.Point,
+    chains:  L.LatLng[][],
+    rings:   L.LatLng[][],
+    points:  L.LatLng[],
+    circles: L.Circle[],
 ): { ll: L.LatLng; dist: number } | null {
     let bestVertex: { ll: L.LatLng; dist: number } | null = null
     let bestEdge:   { ll: L.LatLng; dist: number } | null = null
@@ -162,9 +189,18 @@ function nearestSnapPointRoads(
         }
     }
 
-    const CORNER_PX = 40, EDGE_PX = 40
-    if (bestVertex && bestVertex.dist <= CORNER_PX) return bestVertex
-    if (bestEdge   && bestEdge.dist   <= EDGE_PX)   return bestEdge
+    // Snap to city center circle perimeters — wins over vertex/edge if closer
+    let bestCircle: { ll: L.LatLng; dist: number } | null = null
+    for (const circle of circles) {
+        const result = closestOnCirclePerimeter(mp, circle)
+        if (result && (!bestCircle || result.dist < bestCircle.dist))
+            bestCircle = result
+    }
+
+    const CORNER_PX = 40, EDGE_PX = 40, CIRCLE_PX = 20
+    if (bestCircle  && bestCircle.dist  <= CIRCLE_PX) return bestCircle
+    if (bestVertex  && bestVertex.dist  <= CORNER_PX) return bestVertex
+    if (bestEdge    && bestEdge.dist    <= EDGE_PX)   return bestEdge
     return null
 }
 
@@ -203,9 +239,9 @@ function onSnapMove(e: MouseEvent): void {
         if (!rings.length) { snapActive = false; snapLatLng = null; return }
         snap = nearestSnapPoint(mp, rings)
     } else if (activeSnapMode === 'roads') {
-        const { chains, rings, points } = getRoadSnapSources()
-        if (!chains.length && !rings.length && !points.length) { snapActive = false; snapLatLng = null; return }
-        snap = nearestSnapPointRoads(mp, chains, rings, points)
+        const { chains, rings, points, circles } = getRoadSnapSources()
+        if (!chains.length && !rings.length && !points.length && !circles.length) { snapActive = false; snapLatLng = null; return }
+        snap = nearestSnapPointRoads(mp, chains, rings, points, circles)
         snapColor = '#3498db'
     } else {
         snapActive = false; snapLatLng = null; return
@@ -239,8 +275,8 @@ function onSnapMove(e: MouseEvent): void {
 
 // ─── EDIT-MODE SNAPPING ───────────────────────────────────────────────────────
 
-export let editDragActive = false  // true only while a vertex is being dragged
-export let editModeActive = false  // true from hookEditHandles until disableSnapping
+export let editDragActive  = false  // true only while a vertex is being dragged
+export let editModeActive  = false  // true from hookEditHandles until disableSnapping
 
 function hookMarker(marker: any, layer: L.Layer): void {
     // Remove any previously attached snap handlers before re-attaching.

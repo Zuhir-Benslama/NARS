@@ -9,6 +9,7 @@ import { areaStyle, buildPopup }         from './styles'
 import { createAreaPerimeterLabel, createPolygonEdgeLabel, addPolylineEndpoints } from './labels'
 import { enableSnapping, disableSnapping, hookEditHandles } from './snapping'
 import { refreshScatteredAreas }           from './geometry'
+import { computeAndApplyRoadDirections }   from './road-directions'
 
 declare const L: typeof import('leaflet')
 
@@ -32,6 +33,10 @@ function createContextMenuEl(): HTMLElement {
             el.style.display = 'none'
         }
     })
+    // Hide menu on ESC
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') el.style.display = 'none'
+    })
     return el
 }
 
@@ -42,13 +47,27 @@ function getCtxEl(): HTMLElement {
 }
 
 function showContextMenu(x: number, y: number, dbId: number, phaseKey: string): void {
-    console.log('showContextMenu called with x:', x, 'y:', y, 'dbId:', dbId, 'phaseKey:', phaseKey)
     const el = getCtxEl()
-    const isRoad = phaseKey === 'roads'
+    const isRoad       = phaseKey === 'roads'
+    const currentPhase = PHASES[store.currentPhase]?.key
+    // City center circles are visible in the Roads phase but must not be
+    // edited or removed from there — only from the City Center phase.
+    const ccReadOnly   = phaseKey === 'cityCenter' && currentPhase !== 'cityCenter'
+
+    if (ccReadOnly) {
+        el.innerHTML = `<div class="nars-ctx-item nars-ctx-disabled">🔒 Switch to City Center phase to edit</div>`
+        el.style.left = '-9999px'; el.style.top = '-9999px'; el.style.display = 'block'
+        const w = el.offsetWidth, h = el.offsetHeight
+        el.style.left = (x + w > window.innerWidth  ? x - w : x) + 'px'
+        el.style.top  = (y + h > window.innerHeight ? y - h : y) + 'px'
+        el.querySelector('.nars-ctx-disabled')?.addEventListener('click', () => { el.style.display = 'none' })
+        return
+    }
+
     el.innerHTML = `
         <div class="nars-ctx-item" data-action="edit">✏️ Edit Info</div>
-        <div class="nars-ctx-item" data-action="boundaries">⬟ Edit Boundaries</div>
-        ${isRoad ? '<div class="nars-ctx-item" data-action="reverse">⇄ Reverse Direction</div>' : ''}
+        <div class="nars-ctx-item" data-action="geometry">⬟ Edit Geometry</div>
+        ${isRoad ? '<div class="nars-ctx-item" data-action="road-dir">⇥ Set Road Directions</div>' : ''}
         <div class="nars-ctx-item nars-ctx-danger" data-action="remove">🗑️ Remove Object</div>
     `
     el.style.left = '-9999px'; el.style.top = '-9999px'; el.style.display = 'block'
@@ -61,10 +80,10 @@ function showContextMenu(x: number, y: number, dbId: number, phaseKey: string): 
             e.stopPropagation()
             el.style.display = 'none'
             const action = (item as HTMLElement).dataset.action
-            if      (action === 'edit')       (window as any).__narsEditFeature(dbId)
-            else if (action === 'boundaries') (window as any).__narsEditBoundaries(dbId)
-            else if (action === 'reverse')    (window as any).__narsReverseRoad(dbId)
-            else if (action === 'remove')     (window as any).__narsRemoveFeature(dbId)
+            if      (action === 'edit')     (window as any).__narsEditFeature(dbId)
+            else if (action === 'geometry') (window as any).__narsEditGeometry(dbId)
+            else if (action === 'road-dir') computeAndApplyRoadDirections()
+            else if (action === 'remove')   (window as any).__narsRemoveFeature(dbId)
         }
     })
 }
@@ -74,9 +93,11 @@ export function bindContextMenu(layer: L.Layer, dbId: number, phaseKey: string):
         console.log('bindContextMenu called for dbId:', dbId, 'phaseKey:', phaseKey)
         layer.on('contextmenu', (e: any) => {
             try {
-                console.log('contextmenu event fired for dbId:', dbId)
                 e.originalEvent.preventDefault()
                 e.originalEvent.stopPropagation()
+                // Signal the map-level contextmenu handler to skip this tick
+                // (Leaflet re-fires contextmenu to the map even after a layer handles it).
+                ;(ctx.map as any)._narsFeatureCtxHandled = true
                 showContextMenu(e.originalEvent.clientX, e.originalEvent.clientY, dbId, phaseKey)
             } catch (err) {
                 console.error('Context menu error:', err)
@@ -130,7 +151,7 @@ async function removeFeature(dbId: number): Promise<void> {
 
 // ─── EDIT BOUNDARIES ──────────────────────────────────────────────────────────
 
-async function editBoundaries(dbId: number): Promise<void> {
+async function editGeometry(dbId: number): Promise<void> {
     // Find the layer to edit
     const phaseKey = Object.keys(featureLayers).find(k =>
         featureLayers[k].some((e: LayerEntry) => (e.layer as any)._dbId === dbId))
@@ -141,19 +162,62 @@ async function editBoundaries(dbId: number): Promise<void> {
 
     if (!entry) { alert('Could not find the feature to edit.'); return }
 
-    // Only polygon and polyline features have editable boundaries
-    if (!(entry.layer instanceof L.Polygon) && !(entry.layer instanceof L.Polyline)) {
-        alert('Boundary editing is not available for marker features.')
-        return
-    }
-
-    // Prevent starting a second boundary edit while one is in progress
+    // Prevent starting a second geometry edit while one is in progress
     if (document.getElementById('nars-boundary-finish')) {
-        alert('Please finish the current boundary edit first.')
+        alert('Please finish the current geometry edit first.')
         return
     }
 
-    // ── Set up snapping ──────────────────────────────────────────────────────
+    const isMarker = entry.layer instanceof L.Marker && !(entry.layer instanceof L.Circle)
+
+    // ── MARKER path (city center — drag to new location) ─────────────────────
+    if (isMarker) {
+        const marker = entry.layer as L.Marker
+        marker.dragging?.enable()
+
+        const mapEl    = ctx.map.getContainer()
+        const finishBtn = document.createElement('button')
+        finishBtn.id        = 'nars-boundary-finish'
+        finishBtn.className = 'nars-boundary-finish-btn'
+        finishBtn.innerHTML = '✓ Save Location'
+        mapEl.appendChild(finishBtn)
+
+        const cleanup = async (save: boolean) => {
+            finishBtn.remove()
+            document.removeEventListener('keydown', onKeyDown)
+            marker.dragging?.disable()
+
+            if (!save) {
+                // Restore original position
+                marker.setLatLng(L.latLng(entry.data.lat!, entry.data.lng!))
+                return
+            }
+
+            const ll = marker.getLatLng()
+            entry.data.lat = ll.lat
+            entry.data.lng = ll.lng
+
+            // Keep the store in sync for city center
+            if (phaseKey === 'cityCenter') {
+                store.cityCenterLatLng = { lat: ll.lat, lng: ll.lng }
+            }
+
+            try {
+                await apiFetch(`/api/update/${dbId}`, {
+                    method:  'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ data: entry.data }),
+                })
+            } catch (err) { console.error('Edit location save error:', err) }
+        }
+
+        finishBtn.addEventListener('click', () => cleanup(true),  { once: true })
+        const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') cleanup(false) }
+        document.addEventListener('keydown', onKeyDown)
+        return
+    }
+
+    // ── POLYGON / POLYLINE path (reshape vertices) ───────────────────────────
     const snapMode = phaseKey === 'roads'
         ? 'roads'
         : (phaseKey === 'districts' || phaseKey === 'areas') ? 'districts'
@@ -162,20 +226,17 @@ async function editBoundaries(dbId: number): Promise<void> {
     if (snapMode) enableSnapping(snapMode as 'districts' | 'roads', entry.layer, phaseKey)
     hookEditHandles()
 
-    // ── Enable Geoman vertex editing on this layer only ──────────────────────
+    // layer.pm.enable() shows vertex handles but provides no finish affordance;
+    // inject a button so the user has a clear way to commit the edit.
     ;(entry.layer as any).pm.enable()
 
-    // ── Inject a "Save Boundaries" button into the map container ─────────────
-    // layer.pm.enable() shows vertex handles but provides no finish affordance;
-    // we inject a button so the user has a clear way to commit the edit.
     const mapEl = ctx.map.getContainer()
     const finishBtn = document.createElement('button')
     finishBtn.id        = 'nars-boundary-finish'
     finishBtn.className = 'nars-boundary-finish-btn'
-    finishBtn.innerHTML = '✓ Save Boundaries'
+    finishBtn.innerHTML = '✓ Save Geometry'
     mapEl.appendChild(finishBtn)
 
-    // ── Cleanup & save ───────────────────────────────────────────────────────
     const cleanup = async (save: boolean) => {
         finishBtn.remove()
         document.removeEventListener('keydown', onKeyDown)
@@ -210,7 +271,7 @@ async function editBoundaries(dbId: number): Promise<void> {
                 })
                 if (phaseKey === 'areas') await refreshScatteredAreas()
             }
-        } catch (err) { console.error('Edit boundary save error:', err) }
+        } catch (err) { console.error('Edit geometry save error:', err) }
     }
 
     finishBtn.addEventListener('click', () => cleanup(true),  { once: true })
@@ -269,41 +330,41 @@ async function editFeatureInfo(dbId: number): Promise<void> {
     }
 }
 
-// ─── REVERSE ROAD DIRECTION ───────────────────────────────────────────────────
-
-async function reverseRoadDirection(dbId: number): Promise<void> {
-    const entry = featureLayers.roads.find((e: LayerEntry) => (e.layer as any)._dbId === dbId)
-    if (!entry) return
-
-    // Reverse coordinates in data and on the layer
-    const coords = entry.data.coordinates
-    if (!coords || coords.length < 2) return
-    const reversed = [...coords].reverse()
-    entry.data.coordinates = reversed
-
-    const newLatLngs = reversed.map((c: { lat: number; lng: number }) => L.latLng(c.lat, c.lng))
-    ;(entry.layer as L.Polyline).setLatLngs(newLatLngs)
-
-    // Refresh endpoint arrow markers
-    if ((entry.layer as any)._endpointMarkers) {
-        ;(entry.layer as any)._endpointMarkers.forEach((m: L.Layer) => ctx.lineEndpointLayer.removeLayer(m))
-        ;(entry.layer as any)._endpointMarkers = []
-    }
-    addPolylineEndpoints(entry.layer)
-
-    // Persist to database
-    try {
-        await apiFetch(`/api/update/${dbId}`, {
-            method:  'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ data: entry.data }),
-        })
-    } catch (err) { console.error('Reverse road save error:', err) }
-}
-
 // ─── GLOBAL WINDOW HANDLERS ───────────────────────────────────────────────────
 
 ;(window as any).__narsEditFeature    = editFeatureInfo
-;(window as any).__narsEditBoundaries = editBoundaries
-;(window as any).__narsReverseRoad    = reverseRoadDirection
+;(window as any).__narsEditGeometry   = editGeometry
 ;(window as any).__narsRemoveFeature  = removeFeature
+// Used by addPolylineEndpoints to suppress start arrows overlapping city centers
+;(window as any).__narsGetCityCenterLatLngs = () =>
+    (featureLayers.cityCenter as LayerEntry[])
+        .filter((e: LayerEntry) => e.layer instanceof L.Circle)
+        .map((e: LayerEntry) => (e.layer as L.Circle).getLatLng())
+
+// ─── MAP BACKGROUND CONTEXT MENU ──────────────────────────────────────────────
+// Shown when the user right-clicks on the map (not on a feature).
+// Roads phase: "Set Road Directions" only.
+
+
+export function showMapContextMenu(x: number, y: number, phase: typeof import('../phases').PHASES[number]): void {
+    // Only show a map-level context menu during the Roads phase.
+    // For all other phases, left-click starts drawing directly.
+    if (phase.key !== 'roads') return
+
+    const el = getCtxEl()
+    el.innerHTML = `<div class="nars-ctx-item" data-action="road-dir">⇥ Set Road Directions</div>`
+
+    el.style.left = '-9999px'; el.style.top = '-9999px'; el.style.display = 'block'
+    const w = el.offsetWidth, h = el.offsetHeight
+    el.style.left = (x + w > window.innerWidth  ? x - w : x) + 'px'
+    el.style.top  = (y + h > window.innerHeight ? y - h : y) + 'px'
+
+    el.querySelectorAll('.nars-ctx-item').forEach(item => {
+        (item as HTMLElement).onclick = (e) => {
+            e.stopPropagation()
+            el.style.display = 'none'
+            if ((item as HTMLElement).dataset.action === 'road-dir')
+                computeAndApplyRoadDirections()
+        }
+    })
+}

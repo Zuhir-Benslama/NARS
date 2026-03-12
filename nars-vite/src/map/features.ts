@@ -22,6 +22,11 @@ export function buildFeatureData(layer: L.Layer, phase: typeof PHASES[number], m
         const ll = (layer as L.Marker).getLatLng()
         return { ...base, lat: ll.lat, lng: ll.lng }
     }
+    if (phase.drawType === 'circle') {
+        const ll = (layer as L.Circle).getLatLng()
+        const radius = (layer as L.Circle).getRadius()
+        return { ...base, lat: ll.lat, lng: ll.lng, radius }
+    }
     const lls = phase.drawType === 'polygon'
         ? ((layer as L.Polygon).getLatLngs()[0] as L.LatLng[])
         : ((layer as L.Polyline).getLatLngs() as L.LatLng[])
