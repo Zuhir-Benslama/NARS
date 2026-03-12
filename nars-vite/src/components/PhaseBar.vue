@@ -17,21 +17,13 @@
         </div>
     </div>
 
-    <!-- Skip button shown only during City Center phase -->
-    <button
-        v-show="showSkip"
-        id="skipCityCenterBtn"
-        @click="onSkip"
-    >
-        Skip City Center Phase →
-    </button>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import { store }   from '../store'
 import { PHASES }  from '../phases'
-import { goToPhase, navigatePhase, cityCenterSkip } from '../map'
+import { goToPhase } from '../map'
 
 const steps = computed(() => PHASES.map((p, i) => ({
     ...p,
@@ -42,8 +34,5 @@ const steps = computed(() => PHASES.map((p, i) => ({
     connectorDone: i < store.currentPhase,
 })))
 
-const showSkip = computed(() => PHASES[store.currentPhase]?.key === 'cityCenter')
-
 const onPhaseClick = (index: number) => goToPhase(index)
-const onSkip = () => cityCenterSkip()
 </script>

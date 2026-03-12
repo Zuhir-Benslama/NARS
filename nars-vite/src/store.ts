@@ -35,7 +35,7 @@ export function openModal(phaseIndex: number, layer: L.Layer): Promise<ModalResu
             phaseIndex,
             isEdit:              false,
             editDbId:            null,
-            label:               '',
+            label:               PHASES[phaseIndex]?.key === 'cityCenter' ? 'City Center' : '',
             decisionNumber:      '',
             decisionDate:        '',
             errors:              {},

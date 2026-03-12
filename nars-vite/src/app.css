@@ -419,6 +419,13 @@ body {
     color: #e74c3c;
 }
 
+.nars-ctx-disabled {
+    color: #95a5a6;
+    cursor: default;
+    font-style: italic;
+    pointer-events: none;
+}
+
 .nars-ctx-danger:hover {
     background: rgba(231, 76, 60, 0.12);
 }

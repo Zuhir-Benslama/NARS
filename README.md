@@ -187,9 +187,9 @@ The app guides the operator through 7 sequential phases. Each phase unlocks the 
 | # | Phase | Draw Type | Validation | Status |
 |---|---|---|---|---|
 | 0 | **Areas** | Polygon | One main urban area maximum. Scattered area computed automatically. | ✅ Done |
-| 1 | **Districts** | Polygon | Must share edges per urban area (no gaps), must not overlap, must cover all urban areas. First district in each urban area is exempt from adjacency check. | ✅ Done |
-| 2 | **City Center** | Marker | Optional — can be skipped. Determines entrance numbering direction. | ✅ Done |
-| 3 | **Roads** | Polyline | No turn > 90°. Must connect to an existing road (first road exempt). | ✅ Done |
+| 1 | **Districts** | Polygon | Must share edges (no gaps), must not overlap, must cover all urban areas. | ✅ Done |
+| 2 | **City Center** | Circle | 0 or 1 per urban area. Determines entrance numbering direction for roads. | ✅ Done |
+| 3 | **Roads** | Polyline | No turn > 90°. Must connect to an existing road (first road exempt). BFS direction algorithm from city center. | ✅ Done |
 | 4 | **House Entrances** | Marker | Assigned to a road. Left side = odd numbers, right side = even numbers. | 🔲 Pending |
 | 5 | **Public Buildings** | Polygon | Allowed anywhere including scattered areas. | 🔲 Pending |
 | 6 | **Public Spaces** | Polygon | Gardens and squares inside the municipal boundary. | 🔲 Pending |
@@ -308,68 +308,50 @@ Scattered areas are never drawn manually — they are computed automatically by 
 
 Leaflet is loaded from CDN while Leaflet-Geoman is imported as an npm package (`@geoman-io/leaflet-geoman-free`). The CSS is loaded from CDN in `index.html`, and the JavaScript module is imported in `main.ts` before the Vue app bootstraps.
 
-### Vertex Snapping Architecture — *The Snapping Saga* ⚔️
+### Vertex Snapping Architecture — The Snapping Saga (Chapters 1 & 2)
 
-> **Status: RESOLVED.** What follows is the full, honest account of five interlocking bugs that were collectively nicknamed "the Snapping Saga", and precisely how each one was defeated.
+Snapping is implemented in `snapping.ts` and works differently for draw mode and edit mode because Leaflet-Geoman uses Leaflet's standard event system (`e.latlng` and `map.mouseEventToLayerPoint()`), unlike leaflet-draw which maintained its own internal state.
 
-Snapping is implemented in `snapping.ts`. Draw mode and edit mode work very differently because Leaflet-Geoman 2.x uses Leaflet's standard event system (`e.latlng` and `map.mouseEventToLayerPoint()`) rather than maintaining its own internal coordinate state.
+**Draw mode** — `onSnapMove` runs on every `mousemove` event on the map. When a snap point is found within threshold distance, it intercepts the Leaflet event and rewrites `e.latlng` to the snapped coordinate. This forces Leaflet-Geoman to use the snapped coordinate for both the preview line and the placed vertex. A `mousedown` freeze (`snapFrozen`) prevents stray mouse events from clearing snap state before the vertex is committed.
 
----
+**Edit mode** — `hookEditHandles()` walks through all drawn layers after a 100ms delay (to let Leaflet-Geoman finish activating), then hooks `dragstart`/`dragend` events on every vertex marker found in the layer's PM editor (`_markerGroup`). Named handler references (`marker._snapDragStart`, `marker._snapDragEnd`) replace any previous handlers so ghost midpoint markers (which Leaflet-Geoman converts in-place into real vertices) are always correctly re-hooked. On `dragend`, the snapped coordinate is captured into a local variable *before* `editDragActive` is cleared — clearing the flag first would allow a stray `mousemove` to wipe snap state before it is read.
 
-#### Draw mode
+**Snap interceptors** — `installSnapInterceptors()` registers permanent `mousemove` and `click` handlers on `ctx.map` before Leaflet-Geoman is initialised. These rewrite `e.latlng` on every Leaflet event when snapped, providing a belt-and-suspenders approach that works with both draw and edit modes.
 
-`onSnapMove` runs on every `mousemove` event on the map. When a snap point is found within threshold distance, it intercepts the Leaflet event and rewrites `e.latlng` to the snapped coordinate. This forces Leaflet-Geoman to use the snapped coordinate for both the preview line and the placed vertex. A `mousedown` freeze (`snapFrozen`) prevents stray mouse events from clearing snap state before the vertex is committed.
+**Snap sources** — districts and areas phases snap to: all area polygon rings, all district polygon rings (except the one being dragged), and the municipality boundary. The areas phase excludes district rings. Roads phase snaps to: road polyline endpoints, road midpoints, area rings, district rings, and city center circle perimeters.
 
-Draw-mode snapping was solid from the start and survived the Saga intact.
+**Geoman's built-in snapping is fully disabled** — `snappable: false` is passed both to `pm.setGlobalOptions()` at init and directly into every `pm.enableDraw(shape, { snappable: false })` call. Without the per-`enableDraw` flag, `setGlobalOptions` alone did not suppress Geoman's draw-mode snap indicator, which jumped erratically to nearby features and completely masked our custom snapping.
 
----
-
-#### Edit mode — *the epicentre of the Saga*
-
-Edit-mode snapping required solving five separate bugs before it worked correctly end-to-end.
-
-**Bug 1 — Wrong Geoman internal API (`snapping.ts`)**
-The original `hookAllEditMarkers` called `pm.getEditor?.()._markers` — a method that does not exist in Leaflet-Geoman 2.19. Vertex markers actually live at `layer.pm._markers`. For polygons this is `L.Marker[][]` (one sub-array per ring); for polylines it is a flat `L.Marker[]`. The fix reads `pm._markers` directly and detects nesting with `Array.isArray(raw[0]) && !(raw[0] instanceof L.Marker)` before flattening one level.
-
-**Bug 2 — "Edit Boundaries" had no commit path (`context-menu.ts`)**
-`layer.pm.enable()` shows vertex handles, but `pm:editend` only fires from Geoman's *global* edit mode, not from per-layer `pm.enable()`. The old save listener was therefore a dead end — boundaries could be moved but never persisted. The fix injects a green **"✓ Save Boundaries"** button directly into the map container. Clicking it calls `layer.pm.disable()` (which correctly fires `pm:edit` and `pm:editend` internally), reads the final geometry for polygon or polyline, closes rings where needed, and persists. Pressing ESC cancels without saving.
-
-**Bug 3 — Areas editable when they must not be (`map/index.ts`)**
-`updateLayerEditability` was calling `pm.setOptions({ pmIgnore })` at the Leaflet-Geoman handler level only. Geoman's *global* edit mode checks `layer.options.pmIgnore` — the Leaflet layer options object — which was never being set. The fix now writes both: `layer.options.pmIgnore = !editable` (Leaflet level) **and** `pm.setOptions({ pmIgnore: !editable })` (Geoman level).
-
-**Bug 4 — Shadow polygon during editing (`snapping.ts`)**
-The original `_snapDragEnd` handler called `layer.setLatLngs(rings)` with **new `L.LatLng` objects**. Geoman's edit handles keep direct references (`_origLatLng`) to the existing objects inside `layer._latlngs`. Replacing those objects broke the references, causing Geoman to render both the pre-drag and post-snap positions simultaneously — the "shadow polygon". The fix mutates the existing `LatLng` objects **in-place** (`ring[idx].lat = snapped.lat; ring[idx].lng = snapped.lng`) and calls `layer.redraw()`. Geoman's internal references stay valid and no ghost appears.
-
-**Bug 5 — Edits not persisted after logout/login (`snapping.ts` + `map/index.ts`)**
-Geoman 2.x fires `pm:edit` per vertex-drag **synchronously** from within its own `dragend` handler (registered when `pm.enable()` was called). The old code applied the snap correction inside a `setTimeout(0)`, which runs *after* `pm:edit`'s own save. Result: the backend always received the un-snapped coordinates; the snap correction was purely cosmetic.
-
-Two fixes together seal this:
-
-- **Primary fix (synchronous snap):** `_snapDragEnd` now applies the snap correction *synchronously and immediately*, before returning. Because Geoman's `dragend` handler was registered before ours (it was added at `pm.enable()` time; ours at `hookAllEditMarkers` 100 ms later), Geoman fires first and moves the vertex, then our handler snaps it, then `pm:edit`'s queued `setTimeout(0)` save reads the already-corrected coordinates.
-
-- **Belt-and-suspenders (`pm:editend` in `map/index.ts`):** On edit-session end, all current-phase features are re-saved after a 30 ms delay. This catches any edge case where `pm:edit` fired with intermediate state.
-
----
-
-#### Snap interceptors
-
-`installSnapInterceptors()` registers permanent `mousemove`, `click`, and `mousedown` handlers on `ctx.map` before Leaflet-Geoman is initialised. These rewrite `e.latlng` on every Leaflet event when a snap is active, ensuring both draw and edit modes always commit the snapped coordinate.
-
----
-
-#### Snap sources
-
-| Phase | Snaps to |
-|---|---|
-| Areas | Area polygon rings, municipality boundary |
-| Districts | Area rings, other district rings (except dragged), municipality boundary |
-| Roads | Road endpoints & midpoints, area rings, district rings |
+**City center circle snapping** — The city center was converted from a `L.Marker` to a `L.Circle` to allow road endpoints to snap onto its perimeter. Snapping to a circle requires different math from snapping to a polyline vertex. The key insight: compute everything in *pixel space* using Leaflet's own internal `circle._point` (rendered center in layer pixels) and `circle._radius` (rendered radius in pixels) — the values Leaflet already computed when it painted the circle. The closest perimeter point is always in the direction of the cursor from the center: `snapPx = center + (cursor - center) / |cursor - center| * radius`. The snap distance is `|cursorDist - radiusPx|`, which is zero when the cursor sits exactly on the visible edge. Earlier approaches that manually converted meters → degrees → pixels drifted significantly at non-equatorial latitudes and varying zoom levels, causing the "repelling magnet" effect where hovering near the circle pushed the snap indicator *away* from it.
 
 ### Edit Mode — Phase-Restricted Editing
 
 When edit mode is entered, layers belonging to other phases are temporarily removed from `drawnItems` so Leaflet-Geoman cannot select or modify them. Area layers are moved to a separate display-only `L.layerGroup` (remaining visible on the map but uneditable). All other non-current-phase layers are fully hidden. On `pm:editstop`, all layers are restored to `drawnItems` and layer visibility is refreshed.
 
-Phase restriction is enforced at two levels: `layer.options.pmIgnore = true` (the Leaflet layer options object, which Geoman's global edit mode reads) **and** `layer.pm.setOptions({ pmIgnore: true })` (the Geoman PM handler). Both must be set — only setting the PM handler level was the root cause of areas being accidentally editable during the Districts phase (Bug 3 of the Snapping Saga).
+### Draw UX — Toolbar-Free, Always-On Drawing
+
+There is no Geoman toolbar. Drawing starts automatically when the phase is entered:
+
+- **On phase entry** — `buildDrawControl()` calls `pm.enableDraw(shape, { snappable: false })` via `setTimeout(0)` so the cursor is immediately in draw mode. City center (circle) is the exception — draw mode activates only after the user confirms the dialog (`cityCenterYes()`), preventing the dialog's OK click from being consumed as an accidental placement.
+- **After completing a shape** — `pm:create` re-enables draw mode *after* the modal has closed and the API save has completed, preventing Geoman from re-entering draw mode while the modal is still open (which broke the `pm:create` async handler in earlier iterations).
+- **ESC** — cancels the in-progress draw, then re-enables draw mode after 50ms so the user can immediately start a new shape.
+- **Finishing a shape** — double-click (polyline) or clicking the first vertex (polygon). The earlier `finishOn: 'click'` option was removed because it caused polylines to finish after exactly two points (click→vertex 1, click vertex 1→finish).
+- **Hover popup** — feature info is shown on `mouseover`/`mouseout` using a Leaflet popup with `closeButton: false`, replacing the old click-to-open behavior.
+
+### Road Direction Algorithm
+
+When the user leaves the Roads phase (or manually triggers "Set Road Directions"), `computeAndApplyRoadDirections()` in `road-directions.ts` runs:
+
+1. **BFS from each city center** — finds the closest road endpoint within 200m, orients that road so the city-center-side endpoint is `fromPt`, then propagates direction outward through the connected road network (30m endpoint-proximity threshold). The first city center to reach a shared road wins.
+2. **Geographic fallback** — roads not reached by any BFS are oriented by geography: `|Δlat| ≥ |Δlng|` → north-to-south (highest lat first); otherwise east-to-west (highest lng first).
+3. **Apply** — clears all existing endpoint arrows, reverses polyline coordinates where needed via `setLatLngs()`, persists the new coordinate order via `PUT /api/update/:id`, then re-adds endpoint arrows (`>` at start, `✕` at end).
+
+### City Center — Circle Instead of Marker
+
+The city center was changed from a `L.Marker` to a `L.Circle` (radius stored in `data.radius`) so that road endpoints can snap to its perimeter. Rules:
+
+- **0 or 1 per urban area** — placing a second circle inside the same area is rejected with an alert. Having zero is valid (the BFS algorithm simply skips areas without a city center and falls back to geographic direction for their roads).
+- **Read-only in Roads phase** — right-clicking a city center circle while on the Roads phase shows a locked indicator instead of edit/remove actions.
 
 ### Polygon Geometry Persistence
 
@@ -382,21 +364,22 @@ Placement validation for polygons uses the vertex centroid (average of all verte
 Right-clicking any drawn feature opens a context menu with up to four actions:
 
 - **Edit Info** — reopens the feature modal pre-filled with current data (all phases)
-- **Edit Boundaries** — activates per-layer Leaflet-Geoman editing on that feature. A green **"✓ Save Boundaries"** button appears at the bottom of the map; clicking it persists the new geometry. Pressing ESC cancels without saving. (Per-layer `pm.enable()` does not fire `pm:editend` on its own — the button is what triggers the save path.)
-- **Reverse Direction** — reverses the coordinate order of a road polyline and updates the backend (roads phase only)
+- **Edit Geometry** — activates Leaflet-Geoman edit mode restricted to that feature (all phases)
+- **Set Road Directions** — triggers the BFS direction algorithm for all roads (Roads phase only; also appears on right-clicking the map background)
 - **Remove Object** — deletes the feature with confirmation (current phase only — not shown for features belonging to other phases, preventing accidental deletion of e.g. areas while in the districts phase)
+
+City center circles are **read-only** when the current phase is Roads or later — the menu shows a locked indicator instead of the edit/remove actions. ESC dismisses the context menu.
+
+A `_narsFeatureCtxHandled` flag on the map object prevents Leaflet's double-fire of `contextmenu` (layer then map) from overwriting the feature menu with the map-level menu.
 
 ### Layer Visibility
 
-- During the Roads phase, the City Center marker remains visible as a reference point.
-- During the House Entrances phase, both the City Center marker and all roads remain visible.
+- During the Roads phase, the City Center circle remains visible as a reference point. Road endpoint arrows (`>` start, `✕` end) are **not shown** until `computeAndApplyRoadDirections()` has been run — either by leaving the Roads phase or via the right-click "Set Road Directions" menu item.
+- During the House Entrances phase, both the City Center circle and all roads (with direction arrows) remain visible.
 - All other phases show only the current phase's features plus the Areas layer as a permanent reference.
+- On page load, endpoint arrows are only restored for sessions where the Roads phase has already been completed (`currentPhase > roadsPhaseIndex`). Loading mid-Roads phase never shows arrows.
 
-### District Adjacency Validation
-
-The district adjacency rule ("districts must share a boundary — no gaps") is scoped **per urban area**, not globally across the entire commune. Each urban area (main or secondary) is a fully disconnected polygon, so the "must be adjacent" check only applies to sibling districts inside the same area.
-
-The first district drawn inside any urban area is exempt from the adjacency check — exactly as the very first district in the commune is. The backend determines whether a new district is the first in its area by counting existing districts whose geometry intersects the same urban area polygon. This prevents the false rejection that occurred when drawing the first district inside a secondary urban area while districts already existed in the main urban area.
+### PostGIS Geometry Repair
 
 `ValidationController` wraps all stored polygon reads with `ST_MakeValid()` to gracefully handle any legacy or edge-case geometries that may have been saved without a closed ring.
 
