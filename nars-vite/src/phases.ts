@@ -9,7 +9,7 @@ export const PHASES: Phase[] = [
     { index: 1, key: 'districts',          label: 'Districts',           drawType: 'polygon',
       color: '#f39c12',
       hint: 'Draw districts inside urban areas. They must share edges — no gaps allowed.' },
-    { index: 2, key: 'cityCenter',         label: 'City Center',         drawType: 'marker',
+    { index: 2, key: 'cityCenter',         label: 'City Center',         drawType: 'circle',
       color: '#e74c3c',
       hint: 'Place the city center marker. It determines the numbering direction for house entrances.' },
     { index: 3, key: 'roads',              label: 'Roads',               drawType: 'polyline',

@@ -3,7 +3,7 @@ import type * as L from "leaflet"
 
 // ── Phases ────────────────────────────────────────────────────────────────────
 
-export type DrawType = 'polygon' | 'polyline' | 'marker'
+export type DrawType = 'polygon' | 'polyline' | 'marker' | 'circle'
 
 export interface Phase {
     index:    number
@@ -56,9 +56,10 @@ export interface FeatureData {
     decisionDate:   string
     // polygon / polyline
     coordinates?:   LatLng[]
-    // marker
+    // marker / circle
     lat?:           number
     lng?:           number
+    radius?:        number
     // areas
     areaTypeKey?:   string
     // districts

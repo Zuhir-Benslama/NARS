@@ -13,9 +13,9 @@
                 <input
                     type="text"
                     v-model="m.label"
-                    :class="['modal-input', { error: m.errors.label, 'modal-input-readonly': isMainUrban || isZoneWithTypeName }]"
-                    :placeholder="isMainUrban || isZoneWithTypeName ? '' : 'Feature name...'"
-                    :readonly="isMainUrban || isZoneWithTypeName"
+                    :class="['modal-input', { error: m.errors.label, 'modal-input-readonly': isMainUrban || isZoneWithTypeName || isCityCenter }]"
+                    :placeholder="isMainUrban || isZoneWithTypeName || isCityCenter ? '' : 'Feature name...'"
+                    :readonly="isMainUrban || isZoneWithTypeName || isCityCenter"
                     autocomplete="off"
                     autofocus
                 />
@@ -24,6 +24,9 @@
                 </span>
                 <span v-if="isZoneWithTypeName" class="modal-field-note">
                     This zone uses its type name.
+                </span>
+                <span v-if="isCityCenter" class="modal-field-note">
+                    The city center is always named "City Center".
                 </span>
             </div>
 
@@ -203,6 +206,9 @@ const isZoneWithTypeName = computed(() =>
     phase.value?.key === 'districts' &&
     (m.value.districtTypeKey === 'trad_activities_zone' || m.value.districtTypeKey === 'industry_zone'))
 
+// City center is always named "City Center" — the user cannot change it.
+const isCityCenter = computed(() => phase.value?.key === 'cityCenter')
+
 // ── Watchers ──────────────────────────────────────────────────────────────────
 
 // When road selection changes → fetch side + suggested number
@@ -245,7 +251,8 @@ function validate() {
     const errors: Record<string, string> = {}
     // Label is required except for zones that use type name
     const labelRequired = !(phase.value?.key === 'districts' &&
-        (m.value.districtTypeKey === 'trad_activities_zone' || m.value.districtTypeKey === 'industry_zone'))
+        (m.value.districtTypeKey === 'trad_activities_zone' || m.value.districtTypeKey === 'industry_zone')) &&
+        phase.value?.key !== 'cityCenter'
     if (labelRequired && !m.value.label.trim()) errors.label = 'Required'
     if (!m.value.decisionNumber.trim()) errors.decisionNumber = 'Required'
     if (!m.value.decisionDate.trim())   errors.decisionDate   = 'Required'
