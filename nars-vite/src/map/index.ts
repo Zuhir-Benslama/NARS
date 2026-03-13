@@ -8,7 +8,7 @@ import { store, featureLayers, openModal, syncCounts } from '../store'
 import { validateRoad, validateDistrict, checkDistrictCoverage } from '../validation'
 import type { FeatureData, LayerEntry, DbFeature }    from '../types'
 
-import { ctx, POLYLINE_WEIGHT }       from './state'
+import { ctx, POLYLINE_WEIGHT } from './state'
 import { areaStyle, polygonStyles, createEntranceIcon, applyStyle, buildPopup } from './styles'
 import { addPolylineEndpoints, createPermanentLabel, createAreaPerimeterLabel, createPolygonEdgeLabel, refreshAllEdgeLabels, refreshLayerVisibility } from './labels'
 import { pointInMunicipalLimit, pointInScatteredArea, polylineMidpoint, displayCommuneBoundary, renderScatteredAreas, refreshScatteredAreas } from './geometry'
@@ -104,12 +104,14 @@ function buildDrawControl(phase: typeof PHASES[number]): void {
     // No toolbar rendered. Enable draw mode immediately on phase entry so the
     // cursor is already in draw mode — the first click places a vertex/marker,
     // not a wasted "activate draw" click.
-    // cityCenter (circle) is excluded here — cityCenterYes() gates it via the
     // dialog so the OK-button click isn't consumed as an accidental placement.
-    if (phase.drawType === 'polygon')       setTimeout(() => (ctx.map as any).pm.enableDraw('Polygon', { snappable: false }), 0)
-    else if (phase.drawType === 'polyline') setTimeout(() => (ctx.map as any).pm.enableDraw('Line', { snappable: false }),    0)
-    else if (phase.drawType === 'marker')   setTimeout(() => (ctx.map as any).pm.enableDraw('Marker', { snappable: false }),  0)
-    // circle (cityCenter) is handled by cityCenterYes()
+    // Auto-start drawing when entering a phase (unless edit mode is active).
+    if (!editModeActive) {
+        if      (phase.drawType === 'polygon')  setTimeout(() => (ctx.map as any).pm.enableDraw('Polygon', { snappable: false }), 0)
+        else if (phase.drawType === 'polyline') setTimeout(() => (ctx.map as any).pm.enableDraw('Line',    { snappable: false }), 0)
+        else if (phase.drawType === 'marker')   setTimeout(() => (ctx.map as any).pm.enableDraw('Marker',  { snappable: false }), 0)
+        else if (phase.drawType === 'circle')   setTimeout(() => (ctx.map as any).pm.enableDraw('Circle',  { snappable: false }), 0)
+    }
 
     // Stamp pmIgnore so Geoman's global edit mode only touches the current phase
     updateLayerEditability(phase.key)
@@ -206,17 +208,11 @@ export function setPhase(index: number): void {
     store.currentPhase = index
     buildDrawControl(PHASES[index])
     disableSnapping()
-    if (PHASES[index].key === 'cityCenter' && store.cityCenterMode === null)
-        store.cityCenterDialogVisible = true
     refreshLayerVisibility()
 }
 
-export function cityCenterYes(): void {
-    store.cityCenterDialogVisible = false
-    // Enable Circle draw mode after dialog closes — deferred so the OK click
-    // is not consumed by Geoman as an accidental shape placement.
-    setTimeout(() => (ctx.map as any).pm.enableDraw('Circle', { snappable: false }), 0)
-}
+
+
 
 // ─── DISCARD A NEWLY CREATED LAYER ───────────────────────────────────────────
 // Geoman adds the layer to the map the moment pm:create fires, before our
@@ -253,7 +249,7 @@ function registerDrawEvents(): void {
     
     // Track whether Geoman draw mode is currently active so the left-click
     // handler knows not to re-trigger it while the user is already drawing.
-    let drawModeActive = false
+    let drawModeActive    = false
 
     ctx.map.on('pm:drawstart', (e: any) => {
         drawModeActive = true
@@ -268,17 +264,24 @@ function registerDrawEvents(): void {
         if (!editModeActive) disableSnapping()
     })
 
-    // ESC cancels an in-progress draw without creating a feature.
+    // ESC cancels draw or edit.
     document.addEventListener('keydown', (e: KeyboardEvent) => {
-        if (e.key === 'Escape' && drawModeActive) {
-            ;(ctx.map as any).pm.disableDraw()
-            // Re-enable draw after a tick so the user can start a new shape.
-            const phase = PHASES[store.currentPhase]
-            if      (phase?.drawType === 'polygon')  setTimeout(() => (ctx.map as any).pm.enableDraw('Polygon', { snappable: false }), 50)
-            else if (phase?.drawType === 'polyline') setTimeout(() => (ctx.map as any).pm.enableDraw('Line',    { snappable: false }), 50)
-            else if (phase?.drawType === 'marker')   setTimeout(() => (ctx.map as any).pm.enableDraw('Marker',  { snappable: false }), 50)
-        }
+        if (e.key !== 'Escape') return
+        if (drawModeActive)  { (ctx.map as any).pm.disableDraw() }
+        if (editModeActive)  { (ctx.map as any).pm.disableGlobalEditMode() }
     })
+
+    // Left-click on map background → start drawing.
+    ctx.map.on('click', () => {
+        if (drawModeActive || editModeActive) return
+        const phase = PHASES[store.currentPhase]
+        if (!phase) return
+        if      (phase.drawType === 'polygon')  (ctx.map as any).pm.enableDraw('Polygon',  { snappable: false })
+        else if (phase.drawType === 'polyline') (ctx.map as any).pm.enableDraw('Line',     { snappable: false })
+        else if (phase.drawType === 'marker')   (ctx.map as any).pm.enableDraw('Marker',   { snappable: false })
+    })
+
+
 
     // Right-click on the map background (not on a feature):
     // • Roads phase  → show "Set Road Directions" only
@@ -286,6 +289,15 @@ function registerDrawEvents(): void {
     ctx.map.on('contextmenu', (e: any) => {
         e.originalEvent.preventDefault()
         e.originalEvent.stopPropagation()
+        // Right-click cancels any active draw or edit mode first.
+        if (drawModeActive) {
+            ;(ctx.map as any).pm.disableDraw()
+            return
+        }
+        if (editModeActive) {
+            ;(ctx.map as any).pm.disableGlobalEditMode()
+            return
+        }
         // Leaflet always re-fires contextmenu to the map even after a layer
         // handled it. Skip if a feature's contextmenu already ran this tick.
         if ((ctx.map as any)._narsFeatureCtxHandled) {
@@ -301,6 +313,8 @@ function registerDrawEvents(): void {
         try {
             const key = PHASES[store.currentPhase]?.key
             console.log('pm:editstart - editing phase:', key)
+            // Disable draw mode so the user cannot draw while editing a feature.
+            if (drawModeActive) (ctx.map as any).pm.disableDraw()
 
             // Remove non-current-phase layers from drawnItems so Geoman
             // cannot select or edit them

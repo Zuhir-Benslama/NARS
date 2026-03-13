@@ -25,4 +25,5 @@ nars-vite/.vscode/
 .vscode/
 *.swp
 *.log
+*.Rhistory
 .DS_Store

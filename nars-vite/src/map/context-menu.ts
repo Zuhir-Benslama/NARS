@@ -6,7 +6,7 @@ import { PHASES }                        from '../phases'
 import { apiFetch }                      from '../api'
 import type { LayerEntry }               from '../types'
 import { areaStyle, buildPopup }         from './styles'
-import { createAreaPerimeterLabel, createPolygonEdgeLabel, addPolylineEndpoints } from './labels'
+import { createAreaPerimeterLabel, createPolygonEdgeLabel, addPolylineEndpoints, createPermanentLabel } from './labels'
 import { enableSnapping, disableSnapping, hookEditHandles } from './snapping'
 import { refreshScatteredAreas }           from './geometry'
 import { computeAndApplyRoadDirections }   from './road-directions'
@@ -21,21 +21,18 @@ function createContextMenuEl(): HTMLElement {
     el.className = 'nars-ctx-menu'
     el.style.display = 'none'
     document.body.appendChild(el)
+    const hideMenu = () => { el.style.display = 'none' }
     // Hide menu on click anywhere except on the menu itself
     document.addEventListener('click', (e) => {
-        if (!el.contains(e.target as Node)) {
-            el.style.display = 'none'
-        }
+        if (!el.contains(e.target as Node)) hideMenu()
     })
     // Hide menu on right-click anywhere except on the menu itself
     document.addEventListener('contextmenu', (e) => {
-        if (!el.contains(e.target as Node)) {
-            el.style.display = 'none'
-        }
+        if (!el.contains(e.target as Node)) hideMenu()
     })
     // Hide menu on ESC
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') el.style.display = 'none'
+        if (e.key === 'Escape') hideMenu()
     })
     return el
 }
@@ -98,6 +95,15 @@ export function bindContextMenu(layer: L.Layer, dbId: number, phaseKey: string):
                 // Signal the map-level contextmenu handler to skip this tick
                 // (Leaflet re-fires contextmenu to the map even after a layer handles it).
                 ;(ctx.map as any)._narsFeatureCtxHandled = true
+                // Right-click cancels draw or edit mode instead of opening the menu.
+                if ((ctx.map as any).pm.globalDrawModeEnabled()) {
+                    ;(ctx.map as any).pm.disableDraw()
+                    return
+                }
+                if ((ctx.map as any).pm.globalEditModeEnabled()) {
+                    ;(ctx.map as any).pm.disableGlobalEditMode()
+                    return
+                }
                 showContextMenu(e.originalEvent.clientX, e.originalEvent.clientY, dbId, phaseKey)
             } catch (err) {
                 console.error('Context menu error:', err)
@@ -327,6 +333,10 @@ async function editFeatureInfo(dbId: number): Promise<void> {
     }
     if (phaseKey === 'districts') {
         createPolygonEdgeLabel(entry.layer, entry.data.label, '#f39c12')
+    }
+    // Update the permanent centre label for roads and other polyline/polygon phases
+    if (phaseKey !== 'areas' && phaseKey !== 'districts') {
+        createPermanentLabel(entry.layer, entry.data.label, phaseKey)
     }
 }
 
