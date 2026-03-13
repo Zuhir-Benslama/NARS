@@ -1,7 +1,7 @@
 {
   "name": "nars-frontend",
   "version": "1.0.0",
-  "description": "NARS \u2014 National Addressing Reference System",
+  "description": "NARS — National Addressing Reference System",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,16 +10,20 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "vue": "^3.5.30",
+    "@geoman-io/leaflet-geoman-free": "^2.19.2",
+    "@turf/turf": "^7.3.4",
+    "graphology": "^0.26.0",
+    "graphology-shortest-path": "^2.1.0",
+    "graphology-traversal": "^0.3.1",
     "leaflet": "^1.9.4",
-    "@geoman-io/leaflet-geoman-free": "^2.19.2"
+    "vue": "^3.5.30"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^6.0.4",
-    "vite": "^7.3.1",
-    "typescript": "^5.9.3",
-    "vue-tsc": "^3.2.5",
     "@types/leaflet": "^1.9.21",
-    "@types/node": "^25.4.0"
+    "@types/node": "^25.5.0",
+    "@vitejs/plugin-vue": "^6.0.5",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.0",
+    "vue-tsc": "^3.2.5"
   }
 }

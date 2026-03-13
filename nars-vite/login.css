@@ -20,12 +20,12 @@ body {
 }
 
 .container {
-    background: rgba(255, 255, 255, 0.01);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     border-radius: 15px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255,255,255,0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255,255,255,0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
     width: 100%;
     max-width: 450px;
     overflow: hidden;
@@ -78,11 +78,12 @@ label {
 input, select {
     width: 100%;
     padding: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 8px;
     font-size: 14px;
-    background: transparent !important;
-    background-color: transparent !important;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     -webkit-appearance: none;
     appearance: none;
     color-scheme: dark;
@@ -120,9 +121,11 @@ select option {
 .btn {
     width: 100%;
     padding: 14px;
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     color: white;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.25);
     border-radius: 8px;
     font-size: 16px;
     font-weight: 600;
@@ -221,10 +224,10 @@ select option {
     right: 0;
     max-height: 200px;
     overflow-y: auto;
-    background: rgba(10, 30, 55, 0.15);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(10, 30, 55, 0.4);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-top: none;
     border-radius: 0 0 8px 8px;
     z-index: 1000;
