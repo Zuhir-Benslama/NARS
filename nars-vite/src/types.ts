@@ -176,7 +176,6 @@ export interface AppStore {
     cityCenterLatLng:        LatLng | null
     user:                    UserInfo | null
     municipalityName:        string
-    cityCenterDialogVisible: boolean
     modal:                   ModalState
 }
 

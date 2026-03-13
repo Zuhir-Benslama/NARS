@@ -115,7 +115,6 @@ export const store = reactive<AppStore>({
     user:             null,
     municipalityName: '',
 
-    cityCenterDialogVisible: false,
 
     modal: {
         visible:             false,
