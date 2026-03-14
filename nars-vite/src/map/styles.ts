@@ -27,12 +27,14 @@ export const scatteredStyle: L.PathOptions = {
 
 export function createEntranceIcon(label: string | number, color = '#27ae60'): L.DivIcon {
     const text = String(label ?? '').trim().slice(0, 6) || '?'
+    // Width scales with content: 3 chars or fewer → 16 px circle, longer → pill
+    const w = text.length <= 2 ? 16 : text.length <= 4 ? 22 : 28
     return L.divIcon({
         className: 'entrance-marker',
-        html: `<div class="entrance-icon" style="background:${color}">${text}</div>`,
-        iconSize:    [28, 28],
-        iconAnchor:  [14, 14],
-        popupAnchor: [0, -14],
+        html: `<div class="entrance-icon" style="background:${color};width:${w}px">${text}</div>`,
+        iconSize:    [w, 16],
+        iconAnchor:  [w / 2, 8],
+        popupAnchor: [0, -10],
     })
 }
 

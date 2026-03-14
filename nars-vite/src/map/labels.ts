@@ -130,46 +130,66 @@ export function createAreaPerimeterLabel(layer: L.Layer, areaTypeKey: string): v
 }
 
 // ─── LAYER VISIBILITY ─────────────────────────────────────────────────────────
-// Always show areas. Show the current phase's layers. Hide everything else.
-
-function setLayerVisible(layer: L.Layer, visible: boolean): void {
-    if (layer instanceof L.Marker) {
-        const el = (layer as any)._icon as HTMLElement | undefined
-        if (el) el.style.display = visible ? '' : 'none'
-    } else if (layer instanceof L.Path) {
-        ;(layer as any)._path?.style.setProperty('display', visible ? '' : 'none')
-    }
-    // Permanent tooltip (road names, building names, etc.)
-    const tooltip = (layer as any).getTooltip?.()
-    if (tooltip) {
-        if (visible) (layer as any).openTooltip?.()
-        else         (layer as any).closeTooltip?.()
-    }
-}
-
 export function refreshLayerVisibility(): void {
     const currentKey = PHASES[store.currentPhase]?.key
 
     for (const [key, entries] of Object.entries(featureLayers)) {
-        const showCityCenter = key === 'cityCenter' && (currentKey === 'roads' || currentKey === 'houseEntrances')
-        const show = key === 'areas' || key === currentKey || showCityCenter
-        // Areas are always visible but must not intercept pointer events when
-        // another phase is active — otherwise right-click on a district/road
-        // beneath an area polygon fires on the area instead of the intended layer.
-        const interactive = key !== 'areas' || currentKey === 'areas'
+        const isCurrent     = key === currentKey
+        const isRoads       = (key as string) === 'roads'
+        const alwaysVisible = key === 'areas'
+            || (key === 'cityCenter' && (currentKey === 'roads' || currentKey === 'houseEntrances'))
+        const show = isCurrent || alwaysVisible || isRoads
+
+        // Roads stay interactive during houseEntrances for right-click menus.
+        // Areas are never interactive outside the areas phase.
+        const isRoadOverlay = isRoads && currentKey === 'houseEntrances'
+        const interactive   = isRoadOverlay || key !== 'areas' || currentKey === 'areas'
+
         for (const { layer } of entries as LayerEntry[]) {
-            setLayerVisible(layer, show)
+            // Roads live permanently in roadsDisplayLayer — never touch drawnItems for them.
+            // All other layers: add to / remove from drawnItems.
+            if (!isRoads) {
+                if (isCurrent || alwaysVisible) {
+                    if (!ctx.drawnItems.hasLayer(layer)) ctx.drawnItems.addLayer(layer)
+                } else {
+                    if (ctx.drawnItems.hasLayer(layer)) ctx.drawnItems.removeLayer(layer)
+                }
+            }
+
             if (layer instanceof L.Path) {
                 const el = (layer as any).getElement?.() as SVGElement | undefined
-                if (el) el.style.pointerEvents = interactive ? '' : 'none'
+                if (el) {
+                    el.style.pointerEvents = interactive ? '' : 'none'
+                    // Roads live in roadsDisplayLayer (not drawnItems) and are never
+                    // removed from the map — but Geoman's pm.enableDraw iterates all
+                    // map layers and can set display:none on pmIgnore:true layers as a
+                    // side-effect of entering draw mode. Explicitly restore display so
+                    // roads stay visible in every phase (show=true for roads always).
+                    if (isRoads) el.style.display = show ? '' : 'none'
+                }
             }
+
+            const tooltip = (layer as any).getTooltip?.()
+            if (tooltip) { show ? (layer as any).openTooltip?.() : (layer as any).closeTooltip?.() }
+
             const edgeMarkers = (layer as any)._edgeLabelMarkers as L.Marker[] | undefined
-            edgeMarkers?.forEach(m => setLayerVisible(m, show))
+            edgeMarkers?.forEach(m => {
+                const el = (m as any)._icon as HTMLElement | undefined
+                if (el) el.style.display = show ? '' : 'none'
+            })
             const perimLabel = (layer as any)._perimeterLabel as L.Layer | undefined
-            if (perimLabel) setLayerVisible(perimLabel, show)
+            if (perimLabel) {
+                const pl = perimLabel as any
+                if (pl._icon) pl._icon.style.display = show ? '' : 'none'
+            }
         }
     }
 
-    // Road endpoint markers are tied to the roads phase
-    ctx.lineEndpointLayer.eachLayer(l => setLayerVisible(l, currentKey === 'roads'))
+    // Endpoint arrows — visible during Roads phase and House Entrances phase
+    // (operators need road direction indicators as reference when placing entrances).
+    if (currentKey === 'roads' || currentKey === 'houseEntrances') {
+        if (!ctx.map.hasLayer(ctx.lineEndpointLayer)) ctx.map.addLayer(ctx.lineEndpointLayer)
+    } else {
+        if (ctx.map.hasLayer(ctx.lineEndpointLayer)) ctx.map.removeLayer(ctx.lineEndpointLayer)
+    }
 }

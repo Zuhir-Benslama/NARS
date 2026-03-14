@@ -177,6 +177,9 @@ export interface AppStore {
     user:                    UserInfo | null
     municipalityName:        string
     modal:                   ModalState
+    // House entrances phase — selected references
+    referenceRoadDbId:       number | null   // road chosen as reference for main entrances
+    referenceEntranceDbId:   number | null   // main entrance chosen as reference for secondary
 }
 
 // ── API responses ─────────────────────────────────────────────────────────────

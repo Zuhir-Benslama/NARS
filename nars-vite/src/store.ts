@@ -80,12 +80,12 @@ export function openEditModal(phaseIndex: number, dbId: number, existing: import
             entranceTypeKey: existing.entranceTypeKey ?? (existing.roadDbId != null ? 'main_entrance' : 'secondary_entrance'),
             roadOptions:         [],
             selectedRoadIdx:     '',
-            entranceSide:        null,
-            entranceNumber:      null,
+            entranceSide:        (existing.side           ?? null) as 'left' | 'right' | null,
+            entranceNumber:      existing.entranceNumber  ?? null,
             entranceSideLoading: false,
             mainEntranceOptions: [],
             selectedMainIdx:     '',
-            bisNumber:           null,
+            bisNumber:           existing.bisNumber       ?? null,
             spaceTypeKey:    existing.spaceTypeKey ?? 'garden',
         })
     })
@@ -113,6 +113,8 @@ export const store = reactive<AppStore>({
     cityCenterLatLng: null,
 
     user:             null,
+    referenceRoadDbId:     null,
+    referenceEntranceDbId: null,
     municipalityName: '',
 
 
