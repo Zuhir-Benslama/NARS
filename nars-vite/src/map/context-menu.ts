@@ -1,15 +1,17 @@
 // ─── CONTEXT MENU & FEATURE EDITING ─────────────────────────────────────────
 
 import { ctx }                           from './state'
+import { POLYLINE_WEIGHT }               from './state'
 import { featureLayers, openEditModal, syncCounts, store } from '../store'
 import { PHASES }                        from '../phases'
 import { apiFetch }                      from '../api'
 import type { LayerEntry }               from '../types'
-import { areaStyle, buildPopup }         from './styles'
+import { areaStyle, buildPopup, createEntranceIcon } from './styles'
 import { createAreaPerimeterLabel, createPolygonEdgeLabel, addPolylineEndpoints, createPermanentLabel } from './labels'
 import { enableSnapping, disableSnapping, hookEditHandles } from './snapping'
 import { refreshScatteredAreas }           from './geometry'
 import { computeAndApplyRoadDirections }   from './road-directions'
+import * as turf                           from '@turf/turf'
 
 declare const L: typeof import('leaflet')
 
@@ -61,11 +63,48 @@ function showContextMenu(x: number, y: number, dbId: number, phaseKey: string): 
         return
     }
 
+    const isRoadsPhase          = currentPhase === 'roads'
+    const isHouseEntrancesPhase = currentPhase === 'houseEntrances'
+    const isMainEntrance = phaseKey === 'houseEntrances' &&
+        (featureLayers.houseEntrances as LayerEntry[]).find(
+            e => (e.layer as any)._dbId === dbId
+        )?.data?.entranceTypeKey === 'main_entrance'
+
+    // "Set Road Directions" — only available while in the Roads phase (phase 04).
+    const roadDir = isRoad && isRoadsPhase
+        ? `<div class="nars-ctx-item" data-action="road-dir">⇥ Set Road Directions</div>` : ''
+
+    // "Set as Reference Road" — shown in House Entrances phase when this road is NOT
+    // already the reference. Replaced by "Remove" when it IS the reference.
+    const isCurrentRef   = isRoad && dbId === store.referenceRoadDbId
+    const setRoadRef     = isRoad && isHouseEntrancesPhase && !isCurrentRef
+        ? `<div class="nars-ctx-item" data-action="set-road-ref">📍 Set as Reference Road</div>` : ''
+    const removeRoadRef  = isRoad && isHouseEntrancesPhase && isCurrentRef
+        ? `<div class="nars-ctx-item" data-action="remove-road-ref">❌ Remove Reference Road</div>` : ''
+
+    // "Set as Reference Entrance" for main entrances (when in house entrances phase)
+    const setEntranceRef = isMainEntrance && isHouseEntrancesPhase
+        ? `<div class="nars-ctx-item" data-action="set-entrance-ref">📍 Set as Reference Entrance</div>` : ''
+
+    // Roads are fully read-only in the House Entrances phase: no edit, no geometry, no delete.
+    // House entrance markers DO keep Edit Info so the user can change the entrance number.
+    const roadInHousePhase = isRoad && isHouseEntrancesPhase
+
+    const editInfo     = !roadInHousePhase
+        ? `<div class="nars-ctx-item" data-action="edit">✏️ Edit Info</div>`         : ''
+    const editGeometry = !roadInHousePhase
+        ? `<div class="nars-ctx-item" data-action="geometry">⬟ Edit Geometry</div>` : ''
+    const removeItem   = !roadInHousePhase
+        ? `<div class="nars-ctx-item nars-ctx-danger" data-action="remove">🗑️ Remove Object</div>` : ''
+
     el.innerHTML = `
-        <div class="nars-ctx-item" data-action="edit">✏️ Edit Info</div>
-        <div class="nars-ctx-item" data-action="geometry">⬟ Edit Geometry</div>
-        ${isRoad ? '<div class="nars-ctx-item" data-action="road-dir">⇥ Set Road Directions</div>' : ''}
-        <div class="nars-ctx-item nars-ctx-danger" data-action="remove">🗑️ Remove Object</div>
+        ${editInfo}
+        ${editGeometry}
+        ${roadDir}
+        ${setRoadRef}
+        ${removeRoadRef}
+        ${setEntranceRef}
+        ${removeItem}
     `
     el.style.left = '-9999px'; el.style.top = '-9999px'; el.style.display = 'block'
     const w = el.offsetWidth, h = el.offsetHeight
@@ -77,10 +116,13 @@ function showContextMenu(x: number, y: number, dbId: number, phaseKey: string): 
             e.stopPropagation()
             el.style.display = 'none'
             const action = (item as HTMLElement).dataset.action
-            if      (action === 'edit')     (window as any).__narsEditFeature(dbId)
-            else if (action === 'geometry') (window as any).__narsEditGeometry(dbId)
-            else if (action === 'road-dir') computeAndApplyRoadDirections()
-            else if (action === 'remove')   (window as any).__narsRemoveFeature(dbId)
+            if      (action === 'edit')             (window as any).__narsEditFeature(dbId)
+            else if (action === 'geometry')          (window as any).__narsEditGeometry(dbId)
+            else if (action === 'road-dir')          computeAndApplyRoadDirections()
+            else if (action === 'set-road-ref')      setReferenceRoad(dbId)
+            else if (action === 'remove-road-ref')   clearReferenceRoad()
+            else if (action === 'set-entrance-ref')  setReferenceEntrance(dbId)
+            else if (action === 'remove')            (window as any).__narsRemoveFeature(dbId)
         }
     })
 }
@@ -141,6 +183,8 @@ async function removeFeature(dbId: number): Promise<void> {
 
     const layer = entry.layer
     ctx.drawnItems.removeLayer(layer)
+    // Roads live in roadsDisplayLayer, not drawnItems — remove from there too.
+    if (ctx.roadsDisplayLayer.hasLayer(layer)) ctx.roadsDisplayLayer.removeLayer(layer)
 
     if ((layer as any)._endpointMarkers)
         (layer as any)._endpointMarkers.forEach((m: L.Layer) => ctx.lineEndpointLayer.removeLayer(m))
@@ -312,7 +356,41 @@ async function editFeatureInfo(dbId: number): Promise<void> {
     const phaseIndex = PHASES.findIndex(p => p.key === phaseKey)
     if (!phase || phaseIndex === -1) return
 
-    const result = await openEditModal(phaseIndex, dbId, entry.data)
+    // openEditModal sets basic fields (label, decisionNumber, decisionDate, entranceSide,
+    // entranceNumber, bisNumber) but resets roadOptions/mainEntranceOptions to [].
+    // Start the modal promise then immediately re-populate the selector lists and
+    // pre-select the existing road / main entrance synchronously — before Vue renders.
+    const resultPromise = openEditModal(phaseIndex, dbId, entry.data)
+
+    if (phaseKey === 'houseEntrances') {
+        const m = store.modal
+        // Rebuild the road option list
+        m.roadOptions = (featureLayers.roads as LayerEntry[]).map((r, i) => ({
+            idx:   i,
+            label: r.data.label || `Road ${i + 1}`,
+            dbId:  (r.layer as any)._dbId as number,
+        }))
+        // Rebuild the main-entrance option list (for secondary entrances)
+        m.mainEntranceOptions = (featureLayers.houseEntrances as LayerEntry[])
+            .filter((e: LayerEntry) => e.data.entranceTypeKey === 'main_entrance')
+            .map((e, i) => ({
+                idx:   i,
+                label: e.data.label || `Entrance ${i + 1}`,
+                dbId:  (e.layer as any)._dbId as number,
+            }))
+        // Pre-select the road this entrance is assigned to
+        if (entry.data.roadDbId != null) {
+            const idx = m.roadOptions.findIndex(r => r.dbId === entry.data.roadDbId)
+            if (idx >= 0) m.selectedRoadIdx = idx
+        }
+        // Pre-select the main entrance this secondary entrance is linked to
+        if (entry.data.mainEntranceDbId != null) {
+            const idx = m.mainEntranceOptions.findIndex(e => e.dbId === entry.data.mainEntranceDbId)
+            if (idx >= 0) m.selectedMainIdx = idx
+        }
+    }
+
+    const result = await resultPromise
     if (!result) return
 
     Object.assign(entry.data, result)
@@ -357,12 +435,15 @@ async function editFeatureInfo(dbId: number): Promise<void> {
 
 
 export function showMapContextMenu(x: number, y: number, phase: typeof import('../phases').PHASES[number]): void {
-    // Only show a map-level context menu during the Roads phase.
-    // For all other phases, left-click starts drawing directly.
-    if (phase.key !== 'roads') return
+    if (phase.key !== 'roads' && phase.key !== 'houseEntrances') return
 
     const el = getCtxEl()
-    el.innerHTML = `<div class="nars-ctx-item" data-action="road-dir">⇥ Set Road Directions</div>`
+
+    if (phase.key === 'roads') {
+        el.innerHTML = `<div class="nars-ctx-item" data-action="road-dir">⇥ Set Road Directions</div>`
+    } else {
+        el.innerHTML = `<div class="nars-ctx-item" data-action="set-house-numbers">🔢 Set House Numbers</div>`
+    }
 
     el.style.left = '-9999px'; el.style.top = '-9999px'; el.style.display = 'block'
     const w = el.offsetWidth, h = el.offsetHeight
@@ -373,8 +454,129 @@ export function showMapContextMenu(x: number, y: number, phase: typeof import('.
         (item as HTMLElement).onclick = (e) => {
             e.stopPropagation()
             el.style.display = 'none'
-            if ((item as HTMLElement).dataset.action === 'road-dir')
-                computeAndApplyRoadDirections()
+            const action = (item as HTMLElement).dataset.action
+            if (action === 'road-dir')               computeAndApplyRoadDirections()
+            else if (action === 'set-house-numbers') setHouseNumbers()
         }
     })
+}
+
+// ─── HOUSE ENTRANCE REFERENCE HELPERS ────────────────────────────────────────
+
+function highlightLayer(dbId: number, phaseKey: string, active: boolean): void {
+    const entries = featureLayers[phaseKey] as LayerEntry[]
+    const entry = entries?.find(e => (e.layer as any)._dbId === dbId)
+    if (!entry) return
+    if (entry.layer instanceof L.Polyline && !(entry.layer instanceof L.Polygon)) {
+        entry.layer.setStyle({ color: active ? '#f39c12' : '#3498db', weight: active ? 5 : POLYLINE_WEIGHT })
+    } else if (entry.layer instanceof L.Marker) {
+        // pulse class toggled for markers
+        const el = (entry.layer as any).getElement?.() as HTMLElement | undefined
+        if (el) el.classList.toggle('nars-reference', active)
+    }
+}
+
+export function setReferenceRoad(dbId: number): void {
+    // Clear previous road highlight
+    if (store.referenceRoadDbId != null)
+        highlightLayer(store.referenceRoadDbId, 'roads', false)
+    store.referenceRoadDbId = dbId
+    highlightLayer(dbId, 'roads', true)
+}
+
+export function clearReferenceRoad(): void {
+    if (store.referenceRoadDbId != null) {
+        highlightLayer(store.referenceRoadDbId, 'roads', false)
+        store.referenceRoadDbId = null
+    }
+}
+
+export function setReferenceEntrance(dbId: number): void {
+    if (store.referenceEntranceDbId != null)
+        highlightLayer(store.referenceEntranceDbId, 'houseEntrances', false)
+    store.referenceEntranceDbId = dbId
+    highlightLayer(dbId, 'houseEntrances', true)
+}
+
+export async function setHouseNumbers(): Promise<void> {
+    if (store.referenceRoadDbId == null) {
+        alert('⛔ No reference road set.\nRight-click a road and choose "Set as Reference Road" first.')
+        return
+    }
+
+    const roadEntry = (featureLayers.roads as LayerEntry[])
+        .find(r => (r.layer as any)._dbId === store.referenceRoadDbId)
+    if (!roadEntry?.data.coordinates?.length) {
+        alert('⛔ Reference road has no coordinates.')
+        return
+    }
+
+    // Collect all unassigned (label === '?') main entrances on this road
+    const unassigned = (featureLayers.houseEntrances as LayerEntry[]).filter(e =>
+        e.data.entranceTypeKey === 'main_entrance' &&
+        e.data.roadDbId === store.referenceRoadDbId &&
+        e.data.label === '?'
+    )
+    if (!unassigned.length) {
+        alert('No unassigned entrances found for the reference road.')
+        return
+    }
+
+    // Build a turf LineString from the road coordinates
+    const roadLine = turf.lineString(
+        roadEntry.data.coordinates.map(c => [c.lng, c.lat])
+    )
+
+    // Project each entrance onto the road and record distance from road start
+    const withDist = unassigned.map(e => {
+        const ll    = (e.layer as L.Marker).getLatLng()
+        const pt    = turf.point([ll.lng, ll.lat])
+        const snapped = turf.nearestPointOnLine(roadLine, pt, { units: 'meters' })
+        return { entry: e, dist: snapped.properties.location ?? 0 }
+    })
+
+    // Sort by distance from road start (ascending)
+    withDist.sort((a, b) => a.dist - b.dist)
+
+    // Assign odd numbers to left side, even to right — each counter independent
+    let oddNext = 1, evenNext = 2
+    // Find the current max odd/even already assigned on this road to continue numbering
+    ;(featureLayers.houseEntrances as LayerEntry[])
+        .filter(e => e.data.entranceTypeKey === 'main_entrance'
+                  && e.data.roadDbId === store.referenceRoadDbId
+                  && e.data.label !== '?'
+                  && e.data.entranceNumber != null)
+        .forEach(e => {
+            const n = e.data.entranceNumber!
+            if (n % 2 !== 0 && n >= oddNext)  oddNext  = n + 2
+            if (n % 2 === 0 && n >= evenNext)  evenNext = n + 2
+        })
+
+    const phase = PHASES.find(p => p.key === 'houseEntrances')!
+    const updates: Promise<void>[] = []
+
+    for (const { entry } of withDist) {
+        const isLeft = entry.data.side === 'left'
+        const number = isLeft ? oddNext : evenNext
+        if (isLeft) oddNext += 2; else evenNext += 2
+
+        entry.data.entranceNumber = number
+        entry.data.label          = String(number)
+
+        // Update icon
+        ;(entry.layer as L.Marker).setIcon(createEntranceIcon(String(number), phase.color))
+
+        // Persist
+        const dbId = (entry.layer as any)._dbId
+        updates.push(
+            apiFetch(`/api/update/${dbId}`, {
+                method:  'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ data: entry.data }),
+            }).then(() => {}).catch(err => console.error(`setHouseNumbers save error (id=${dbId}):`, err))
+        )
+    }
+
+    await Promise.all(updates)
+    syncCounts()
 }
