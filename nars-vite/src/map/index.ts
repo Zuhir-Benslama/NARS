@@ -5,7 +5,7 @@
 import { PHASES, API_LAYER_TO_PHASE, DISTRICT_TYPES } from '../phases'
 import { apiFetch }                   from '../api'
 import { store, featureLayers, openModal, syncCounts } from '../store'
-import { validateRoad, validateDistrict, checkDistrictCoverage } from '../validation'
+import { validateRoad, validateDistrict, checkDistrictCoverage, getRoadSide } from '../validation'
 import type { FeatureData, LayerEntry, DbFeature }    from '../types'
 
 import { ctx, POLYLINE_WEIGHT } from './state'
@@ -55,6 +55,8 @@ export function initMap(): void {
     L.control.layers({ Satellite: satellite, Street: street, Light: carto, Dark: dark }, undefined, { position: 'bottomleft' }).addTo(ctx.map)
 
     ctx.drawnItems            = new L.FeatureGroup().addTo(ctx.map)
+    ctx.displayOverlayLayer   = L.layerGroup().addTo(ctx.map)
+    ctx.roadsDisplayLayer     = L.layerGroup().addTo(ctx.map)   // roads live here always
     ctx.lineEndpointLayer     = L.layerGroup().addTo(ctx.map)
     ctx.scatteredLayer        = L.layerGroup().addTo(ctx.map)
     ctx.perimeterLabelLayer   = L.layerGroup().addTo(ctx.map)
@@ -209,6 +211,9 @@ export function setPhase(index: number): void {
     buildDrawControl(PHASES[index])
     disableSnapping()
     refreshLayerVisibility()
+    // Re-run after Geoman's deferred pm.enableDraw settles — it can re-process
+    // layers and override visibility set in the first call.
+    setTimeout(refreshLayerVisibility, 50)
 }
 
 
@@ -221,8 +226,8 @@ export function setPhase(index: number): void {
 
 function discardCreatedLayer(layer: L.Layer): void {
     ctx.map.removeLayer(layer)
-    // Belt-and-suspenders: also evict from drawnItems in case Geoman added it there
-    if (ctx.drawnItems.hasLayer(layer)) ctx.drawnItems.removeLayer(layer)
+    if (ctx.drawnItems.hasLayer(layer))      ctx.drawnItems.removeLayer(layer)
+    if (ctx.roadsDisplayLayer.hasLayer(layer)) ctx.roadsDisplayLayer.removeLayer(layer)
 }
 
 // ─── DRAW EVENTS ──────────────────────────────────────────────────────────────
@@ -286,6 +291,10 @@ function registerDrawEvents(): void {
     // Right-click on the map background (not on a feature):
     // • Roads phase  → show "Set Road Directions" only
     // • Other phases → show "Start Drawing" (triggers Geoman draw mode)
+    // Re-apply layer visibility after every zoom — Leaflet re-renders SVG _path
+    // elements on zoom, discarding any inline display style we set previously.
+    ctx.map.on('zoomend', () => refreshLayerVisibility())
+
     ctx.map.on('contextmenu', (e: any) => {
         e.originalEvent.preventDefault()
         e.originalEvent.stopPropagation()
@@ -329,6 +338,9 @@ function registerDrawEvents(): void {
             Object.entries(featureLayers).forEach(([phaseKey, entries]) => {
                 if (phaseKey === key) return
                 ;(entries as LayerEntry[]).forEach(({ layer }) => {
+                    // Roads are never in drawnItems — they live in roadsDisplayLayer
+                    // and are always visible; skip them here.
+                    if (phaseKey === 'roads') return
                     if (!ctx.drawnItems.hasLayer(layer)) return
                     ctx.drawnItems.removeLayer(layer)
                     if (phaseKey === 'areas') {
@@ -451,8 +463,65 @@ function registerDrawEvents(): void {
             }
         }
 
-        // For non-districts, open modal after validation
-        if (phase.key !== 'districts') {
+        // For non-districts, open modal after validation.
+        // House entrances skip the modal entirely: type, number and road/entrance
+        // assignment are all derived automatically from the active reference.
+        if (phase.key === 'houseEntrances') {
+            const ll = (layer as L.Marker).getLatLng()
+
+            if (store.referenceEntranceDbId != null) {
+                // ── Secondary entrance — BIS number auto-assigned at placement ──
+                const mainEntry = (featureLayers.houseEntrances as LayerEntry[])
+                    .find(e => (e.layer as any)._dbId === store.referenceEntranceDbId)
+                if (!mainEntry) {
+                    discardCreatedLayer(layer)
+                    alert('⛔ Reference entrance not found. Please set a valid reference entrance first.')
+                    return
+                }
+                const bisCount = (featureLayers.houseEntrances as LayerEntry[])
+                    .filter(e => e.data.entranceTypeKey === 'secondary_entrance'
+                              && e.data.mainEntranceDbId === store.referenceEntranceDbId).length
+                const bisNumber = bisCount + 1
+                const label     = 'BIS' + String(bisNumber).padStart(2, '0')
+                modalResult = {
+                    entranceTypeKey:   'secondary_entrance',
+                    mainEntranceDbId:  store.referenceEntranceDbId,
+                    mainEntranceLabel: mainEntry.data.label,
+                    bisNumber,
+                    label,
+                    decisionNumber:    '',
+                    decisionDate:      '',
+                }
+
+            } else if (store.referenceRoadDbId != null) {
+                // ── Main entrance — number assigned later via "Set House Numbers" ──
+                const roadEntry = (featureLayers.roads as LayerEntry[])
+                    .find(r => (r.layer as any)._dbId === store.referenceRoadDbId)
+                if (!roadEntry) {
+                    discardCreatedLayer(layer)
+                    alert('⛔ Reference road not found. Please set a valid reference road first.')
+                    return
+                }
+                const sideResult = await getRoadSide(store.referenceRoadDbId, ll.lat, ll.lng)
+                const side = sideResult?.side ?? 'left'
+                modalResult = {
+                    entranceTypeKey: 'main_entrance',
+                    roadDbId:        store.referenceRoadDbId,
+                    roadLabel:       roadEntry.data.label,
+                    side,
+                    entranceNumber:  undefined,
+                    label:           '?',
+                    decisionNumber:  '',
+                    decisionDate:    '',
+                }
+
+            } else {
+                discardCreatedLayer(layer)
+                alert('⛔ No reference set.\nRight-click a road to set it as Reference Road (for main entrances),\nor right-click a main entrance to set it as Reference Entrance (for secondary entrances).')
+                return
+            }
+
+        } else if (phase.key !== 'districts') {
             await prepareModalExtras(phase, layer)
             modalResult = await openModal(store.currentPhase, layer)
             if (!modalResult) { discardCreatedLayer(layer); return }
@@ -550,7 +619,15 @@ function registerDrawEvents(): void {
         if (!saveResult.ok) { discardCreatedLayer(layer); alert(`Failed to save feature.\n${saveResult.error ?? 'Please try again.'}`); return }
 
         ;(layer as any)._dbId = saveResult.data!.id
-        ctx.drawnItems.addLayer(layer)
+        // Roads live ONLY in roadsDisplayLayer — never in drawnItems.
+        // Leaflet only allows one parent group per layer; putting a road in
+        // drawnItems would evict it from roadsDisplayLayer, breaking cross-phase display.
+        // Geoman can still edit roads via pmIgnore=false without them being in drawnItems.
+        if (phase.key === 'roads') {
+            ctx.roadsDisplayLayer.addLayer(layer)
+        } else {
+            ctx.drawnItems.addLayer(layer)
+        }
         bindContextMenu(layer, saveResult.data!.id, phase.key)
         // Endpoint arrows for roads are added by computeAndApplyRoadDirections(),
         // not here — direction isn't known until the full network is finalised.
@@ -653,7 +730,8 @@ function registerDrawEvents(): void {
         ctx.drawnItems.eachLayer(l => { if (l instanceof L.Polyline && !(l instanceof L.Polygon)) addPolylineEndpoints(l) })
 
         for (const key of Object.keys(featureLayers))
-            featureLayers[key] = featureLayers[key].filter((f: LayerEntry) => ctx.drawnItems.hasLayer(f.layer))
+            featureLayers[key] = featureLayers[key].filter((f: LayerEntry) =>
+                ctx.drawnItems.hasLayer(f.layer) || ctx.roadsDisplayLayer.hasLayer(f.layer))
 
         if (areaDeleted) await refreshScatteredAreas()
         syncCounts()
@@ -670,6 +748,7 @@ export async function loadFromDatabase(): Promise<void> {
         if (!features.length) { console.log('No saved features.'); return }
 
         ctx.drawnItems.clearLayers()
+        ctx.roadsDisplayLayer.clearLayers()
         ctx.lineEndpointLayer.clearLayers()
         for (const key of Object.keys(featureLayers)) featureLayers[key] = []
 
@@ -719,7 +798,11 @@ export async function loadFromDatabase(): Promise<void> {
                 }
 
                 ;(layer as any)._dbId = feature.id
-                ctx.drawnItems.addLayer(layer)
+                if (phaseKey === 'roads') {
+                    ctx.roadsDisplayLayer.addLayer(layer)
+                } else {
+                    ctx.drawnItems.addLayer(layer)
+                }
                 bindContextMenu(layer, feature.id, phaseKey)
                 // Endpoint arrows added after direction computation, not on load.
                 createPermanentLabel(layer, data.label, phaseKey)
@@ -750,6 +833,10 @@ export async function loadFromDatabase(): Promise<void> {
         buildDrawControl(PHASES[store.currentPhase])
         syncCounts()
         refreshLayerVisibility()
+        // buildDrawControl schedules pm.enableDraw via setTimeout(0), so Geoman's
+        // draw-mode activation fires AFTER the synchronous refreshLayerVisibility call
+        // above. Re-run visibility after Geoman settles — same pattern as setPhase().
+        setTimeout(refreshLayerVisibility, 100)
 
         // If roads have already had directions computed (i.e. we are past the
         // roads phase or the user already clicked "Set Road Directions"), restore

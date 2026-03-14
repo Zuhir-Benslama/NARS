@@ -7,8 +7,8 @@
             <!-- Hint bar -->
             <div id="modalHint" v-if="phase?.hint">{{ phase.hint }}</div>
 
-            <!-- Name -->
-            <div class="modal-field">
+            <!-- Name — hidden when editing a house entrance (set at creation, not editable) -->
+            <div v-if="!isHouseEntranceEdit" class="modal-field">
                 <label>Name <span class="req">*</span></label>
                 <input
                     type="text"
@@ -30,8 +30,8 @@
                 </span>
             </div>
 
-            <!-- Decision No. + Date (side by side) -->
-            <div class="modal-row">
+            <!-- Decision No. + Date — hidden when editing a house entrance -->
+            <div v-if="!isHouseEntranceEdit" class="modal-row">
                 <div class="modal-field">
                     <label>Decision No. <span class="req">*</span></label>
                     <input
@@ -90,9 +90,10 @@
                     </select>
                 </div>
 
-                <!-- Main entrance: road selector + side detection -->
+                <!-- Main entrance: road selector + side detection.
+                     Road assignment is fixed at creation — not editable afterwards. -->
                 <template v-if="m.entranceTypeKey === 'main_entrance'">
-                    <div class="modal-field">
+                    <div v-if="!m.isEdit" class="modal-field">
                         <label>Assign to Road <span class="req">*</span></label>
                         <select
                             v-model="m.selectedRoadIdx"
@@ -209,11 +210,19 @@ const isZoneWithTypeName = computed(() =>
 // City center is always named "City Center" — the user cannot change it.
 const isCityCenter = computed(() => phase.value?.key === 'cityCenter')
 
+// Editing a house entrance: name, decision fields and road assignment are
+// hidden — they were set at creation and must not be changed.
+const isHouseEntranceEdit = computed(() =>
+    phase.value?.key === 'houseEntrances' && m.value.isEdit)
+
 // ── Watchers ──────────────────────────────────────────────────────────────────
 
-// When road selection changes → fetch side + suggested number
+// When road selection changes → fetch side + suggested number.
+// In edit mode the side/number are already populated from existing data — skip
+// the API call so we don't overwrite them when the selector is pre-selected.
 watch(() => m.value.selectedRoadIdx, async (val) => {
     if (val === '' || val === null) return
+    if (m.value.isEdit) return
     const roadOption = m.value.roadOptions[Number(val)]
     if (!roadOption) return
     await fetchRoadSide(roadOption.dbId, Number(val))
@@ -249,17 +258,24 @@ watch(() => m.value.districtTypeKey, (val) => {
 
 function validate() {
     const errors: Record<string, string> = {}
-    // Label is required except for zones that use type name
-    const labelRequired = !(phase.value?.key === 'districts' &&
-        (m.value.districtTypeKey === 'trad_activities_zone' || m.value.districtTypeKey === 'industry_zone')) &&
-        phase.value?.key !== 'cityCenter'
-    if (labelRequired && !m.value.label.trim()) errors.label = 'Required'
-    if (!m.value.decisionNumber.trim()) errors.decisionNumber = 'Required'
-    if (!m.value.decisionDate.trim())   errors.decisionDate   = 'Required'
-
     const key = phase.value?.key
-    if (key === 'houseEntrances' && m.value.entranceTypeKey === 'main_entrance'      && m.value.selectedRoadIdx  === '') errors.road        = 'Required'
-    if (key === 'houseEntrances' && m.value.entranceTypeKey === 'secondary_entrance' && m.value.selectedMainIdx  === '') errors.mainEntrance = 'Required'
+
+    // Name, decision number and date are hidden when editing a house entrance —
+    // skip their validation entirely in that case.
+    if (!isHouseEntranceEdit.value) {
+        const labelRequired = !(key === 'districts' &&
+            (m.value.districtTypeKey === 'trad_activities_zone' || m.value.districtTypeKey === 'industry_zone')) &&
+            key !== 'cityCenter'
+        if (labelRequired && !m.value.label.trim()) errors.label = 'Required'
+        if (!m.value.decisionNumber.trim()) errors.decisionNumber = 'Required'
+        if (!m.value.decisionDate.trim())   errors.decisionDate   = 'Required'
+    }
+
+    // Road / main-entrance selectors are also hidden in edit mode — skip them too.
+    if (!m.value.isEdit) {
+        if (key === 'houseEntrances' && m.value.entranceTypeKey === 'main_entrance'      && m.value.selectedRoadIdx  === '') errors.road        = 'Required'
+        if (key === 'houseEntrances' && m.value.entranceTypeKey === 'secondary_entrance' && m.value.selectedMainIdx  === '') errors.mainEntrance = 'Required'
+    }
 
     store.modal.errors = errors
     return Object.keys(errors).length === 0
