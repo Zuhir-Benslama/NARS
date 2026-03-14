@@ -14,6 +14,8 @@ import { addPolylineEndpoints, createPermanentLabel, createAreaPerimeterLabel, c
 import { pointInMunicipalLimit, pointInScatteredArea, polylineMidpoint, displayCommuneBoundary, renderScatteredAreas, refreshScatteredAreas } from './geometry'
 import { enableSnapping, disableSnapping, hookEditHandles, hookAllEditMarkers, editModeActive, installSnapInterceptors } from './snapping'
 import { bindContextMenu, showMapContextMenu } from './context-menu'
+import './naming-panels'
+import { generateNamingPanels } from './naming-panels'
 import { buildFeatureData, saveToDatabase, prepareModalExtras } from './features'
 import { computeAndApplyRoadDirections } from './road-directions'
 
@@ -208,7 +210,17 @@ export async function goToPhase(target: number): Promise<void> {
 
 export function setPhase(index: number): void {
     store.currentPhase = index
-    buildDrawControl(PHASES[index])
+    const phase = PHASES[index]
+    buildDrawControl(phase)
+    // Disable drawing in Naming Panels phase — panels are auto-generated only.
+    if (phase.key === 'namingPanels') {
+        try { (ctx.map as any).pm.disableDraw() } catch {}
+        // Auto-generate naming panels once when entering this phase
+        try {
+            if ((featureLayers.namingPanels?.length ?? 0) === 0)
+                generateNamingPanels()
+        } catch (err) { console.error('Auto-generate naming panels error:', err) }
+    }
     disableSnapping()
     refreshLayerVisibility()
     // Re-run after Geoman's deferred pm.enableDraw settles — it can re-process
@@ -276,11 +288,12 @@ function registerDrawEvents(): void {
         if (editModeActive)  { (ctx.map as any).pm.disableGlobalEditMode() }
     })
 
-    // Left-click on map background → start drawing.
+    // Left-click on map background → start drawing (disabled during Naming Panels).
     ctx.map.on('click', () => {
         if (drawModeActive || editModeActive) return
         const phase = PHASES[store.currentPhase]
         if (!phase) return
+        if (phase.key === 'namingPanels') return // prohibit draw/interaction in this phase
         if      (phase.drawType === 'polygon')  (ctx.map as any).pm.enableDraw('Polygon',  { snappable: false })
         else if (phase.drawType === 'polyline') (ctx.map as any).pm.enableDraw('Line',     { snappable: false })
         else if (phase.drawType === 'marker')   (ctx.map as any).pm.enableDraw('Marker',   { snappable: false })
@@ -298,6 +311,7 @@ function registerDrawEvents(): void {
     ctx.map.on('contextmenu', (e: any) => {
         e.originalEvent.preventDefault()
         e.originalEvent.stopPropagation()
+        const phase = PHASES[store.currentPhase]
         // Right-click cancels any active draw or edit mode first.
         if (drawModeActive) {
             ;(ctx.map as any).pm.disableDraw()
@@ -313,7 +327,6 @@ function registerDrawEvents(): void {
             ;(ctx.map as any)._narsFeatureCtxHandled = false
             return
         }
-        const phase = PHASES[store.currentPhase]
         if (!phase) return
         showMapContextMenu(e.originalEvent.clientX, e.originalEvent.clientY, phase)
     })
@@ -837,6 +850,12 @@ export async function loadFromDatabase(): Promise<void> {
         // draw-mode activation fires AFTER the synchronous refreshLayerVisibility call
         // above. Re-run visibility after Geoman settles — same pattern as setPhase().
         setTimeout(refreshLayerVisibility, 100)
+
+        // Auto-generate naming panels if resuming into that phase after load
+        const currentKeyAfterLoad = PHASES[store.currentPhase]?.key
+        if (currentKeyAfterLoad === 'namingPanels' && (featureLayers.namingPanels?.length ?? 0) === 0) {
+            try { await generateNamingPanels() } catch (err) { console.error('Auto-generate naming panels after load error:', err) }
+        }
 
         // If roads have already had directions computed (i.e. we are past the
         // roads phase or the user already clicked "Set Road Directions"), restore

@@ -50,8 +50,9 @@ export function toApiSaveShape(fd: FeatureData): { type: string; layer: string }
         case 'districts':       return { type: 'district',        layer: fd.districtTypeKey ?? 'district' }
         case 'roads':           return { type: 'road',            layer: fd.roadTypeKey     ?? 'street' }
         case 'houseEntrances':  return { type: 'house_entrance',  layer: fd.entranceTypeKey ?? 'main_entrance' }
-        case 'publicBuildings': return { type: 'public_building', layer: 'public_building' }
+        case 'publicBuildings': return { type: 'public_building', layer: fd.buildingTypeKey ?? 'public_building' }
         case 'publicSpaces':    return { type: 'public_space',    layer: fd.spaceTypeKey    ?? 'garden' }
+        case 'namingPanels':    return { type: 'naming_panel',    layer: 'naming_panel' }
         default: return null
     }
 }

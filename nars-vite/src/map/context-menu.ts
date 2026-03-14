@@ -435,14 +435,16 @@ async function editFeatureInfo(dbId: number): Promise<void> {
 
 
 export function showMapContextMenu(x: number, y: number, phase: typeof import('../phases').PHASES[number]): void {
-    if (phase.key !== 'roads' && phase.key !== 'houseEntrances') return
-
     const el = getCtxEl()
 
     if (phase.key === 'roads') {
         el.innerHTML = `<div class="nars-ctx-item" data-action="road-dir">⇥ Set Road Directions</div>`
-    } else {
+    } else if (phase.key === 'houseEntrances') {
         el.innerHTML = `<div class="nars-ctx-item" data-action="set-house-numbers">🔢 Set House Numbers</div>`
+    } else if (phase.key === 'namingPanels') {
+        el.innerHTML = `<div class="nars-ctx-item" data-action="set-naming-panels">🏷️ Set Naming Panels</div>`
+    } else {
+        return
     }
 
     el.style.left = '-9999px'; el.style.top = '-9999px'; el.style.display = 'block'

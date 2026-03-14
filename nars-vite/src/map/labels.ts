@@ -138,35 +138,41 @@ export function refreshLayerVisibility(): void {
         const isRoads       = (key as string) === 'roads'
         const alwaysVisible = key === 'areas'
             || (key === 'cityCenter' && (currentKey === 'roads' || currentKey === 'houseEntrances'))
-        const show = isCurrent || alwaysVisible || isRoads
+            || (key === 'publicBuildings' && currentKey === 'publicSpaces')
+        // Roads are shown only up to and including the House Entrances phase.
+        const roadsVisible  = isRoads && currentKey !== 'publicBuildings' && currentKey !== 'publicSpaces'
+        // Phase 08 (namingPanels): show districts, public buildings and public spaces in addition to current phase.
+        const phase08Extra  = currentKey === 'namingPanels' && (key === 'districts' || key === 'publicBuildings' || key === 'publicSpaces')
+        const show = isCurrent || alwaysVisible || roadsVisible || phase08Extra
 
         // Roads stay interactive during houseEntrances for right-click menus.
         // Areas are never interactive outside the areas phase.
         const isRoadOverlay = isRoads && currentKey === 'houseEntrances'
-        const interactive   = isRoadOverlay || key !== 'areas' || currentKey === 'areas'
+        let interactive   = isRoadOverlay || key !== 'areas' || currentKey === 'areas'
+        // In namingPanels phase, only free-hand mode: non-current layers are non-interactive.
+        if (currentKey === 'namingPanels' && key !== 'namingPanels') interactive = false
 
         for (const { layer } of entries as LayerEntry[]) {
             // Roads live permanently in roadsDisplayLayer — never touch drawnItems for them.
             // All other layers: add to / remove from drawnItems.
             if (!isRoads) {
-                if (isCurrent || alwaysVisible) {
+                if (isCurrent || alwaysVisible || phase08Extra) {
                     if (!ctx.drawnItems.hasLayer(layer)) ctx.drawnItems.addLayer(layer)
+                    // Ensure Phase 08 overlay layers render above roads visually.
+                    if (currentKey === 'namingPanels' && (key === 'districts' || key === 'publicBuildings' || key === 'publicSpaces')) {
+                        if (layer instanceof L.Path) (layer as L.Path).bringToFront()
+                    }
                 } else {
                     if (ctx.drawnItems.hasLayer(layer)) ctx.drawnItems.removeLayer(layer)
                 }
+            } else {
+                // Roads: push behind overlays during Phase 08 to avoid visual overlap.
+                if (currentKey === 'namingPanels' && layer instanceof L.Path) (layer as L.Path).bringToBack()
             }
 
             if (layer instanceof L.Path) {
                 const el = (layer as any).getElement?.() as SVGElement | undefined
-                if (el) {
-                    el.style.pointerEvents = interactive ? '' : 'none'
-                    // Roads live in roadsDisplayLayer (not drawnItems) and are never
-                    // removed from the map — but Geoman's pm.enableDraw iterates all
-                    // map layers and can set display:none on pmIgnore:true layers as a
-                    // side-effect of entering draw mode. Explicitly restore display so
-                    // roads stay visible in every phase (show=true for roads always).
-                    if (isRoads) el.style.display = show ? '' : 'none'
-                }
+                if (el) el.style.pointerEvents = interactive ? '' : 'none'
             }
 
             const tooltip = (layer as any).getTooltip?.()
@@ -191,5 +197,13 @@ export function refreshLayerVisibility(): void {
         if (!ctx.map.hasLayer(ctx.lineEndpointLayer)) ctx.map.addLayer(ctx.lineEndpointLayer)
     } else {
         if (ctx.map.hasLayer(ctx.lineEndpointLayer)) ctx.map.removeLayer(ctx.lineEndpointLayer)
+    }
+
+    // Roads layer group — hidden in Public Buildings and Public Spaces phases.
+    const showRoads = currentKey !== 'publicBuildings' && currentKey !== 'publicSpaces'
+    if (showRoads) {
+        if (!ctx.map.hasLayer(ctx.roadsDisplayLayer)) ctx.map.addLayer(ctx.roadsDisplayLayer)
+    } else {
+        if (ctx.map.hasLayer(ctx.roadsDisplayLayer)) ctx.map.removeLayer(ctx.roadsDisplayLayer)
     }
 }

@@ -97,8 +97,95 @@ public static class FeatureTypes
 
     public static class PublicBuildingLayers
     {
-        public const string Default = "public_building";
-        public static readonly IReadOnlySet<string> All = new HashSet<string> { Default };
+        public const string Default = "public_building"; // legacy / fallback
+
+        // Banking & Postal
+        public const string Bank       = "bank";
+        public const string PostOffice = "post_office";
+
+        // Commerce
+        public const string ConventionCentre = "convention_centre";
+        public const string PublicMarket     = "public_market";
+        public const string TradeCentre      = "trade_centre";
+
+        // Culture
+        public const string Library = "library";
+        public const string Museum  = "museum";
+        public const string Theater = "theater";
+
+        // Defence and Security
+        public const string BordersGuard    = "borders_guard";
+        public const string Customs         = "customs";
+        public const string FireStation     = "fire_station";
+        public const string Gendarmes       = "gendarmes";
+        public const string MilitaryBarrack = "military_barrack";
+        public const string PoliceStation   = "police_station";
+
+        // Government & Law
+        public const string AdministrativeBranch = "administrative_branch";
+
+        // Healthcare
+        public const string PublicHospital      = "public_hospital";
+        public const string NeighborhoodHealth  = "neighborhood_health";
+        public const string SpecializedHospital = "specialized_hospital";
+        public const string TreatmentRoom       = "treatment_room";
+        public const string UniversityHospital  = "university_hospital";
+
+        // Higher Education
+        public const string ResearchInstitute = "research_institute";
+        public const string University        = "university";
+
+        // National Education
+        public const string College = "college";
+        public const string School  = "school";
+
+        // Religious
+        public const string Cemetery = "cemetery";
+        public const string Mosque   = "mosque";
+
+        // Tourism
+        public const string Hostel = "hostel";
+        public const string Hotel  = "hotel";
+        public const string Motel  = "motel";
+
+        // Transport
+        public const string Airport      = "airport";
+        public const string BusStation   = "bus_station";
+        public const string TrainStation = "train_station";
+
+        // Vocational Training and Education
+        public const string SpecializedVocationalInstitute  = "specialized_vocational_institute";
+        public const string VocationalEducationInstitute    = "vocational_education_institute";
+        public const string VocationalApprenticeshipCenter  = "vocational_apprenticeship_center";
+        public const string VocationalTrainingInstitute     = "vocational_training_institute";
+
+        // Youth & Sports
+        public const string IndoorArena   = "indoor_arena";
+        public const string LeisureCenter = "leisure_center";
+        public const string SportsComplex = "sports_complex";
+        public const string Stadium       = "stadium";
+        public const string SwimmingPool  = "swimming_pool";
+        public const string YouthClubs    = "youth_clubs";
+        public const string YouthHostel   = "youth_hostel";
+
+        public static readonly IReadOnlySet<string> All = new HashSet<string>
+        {
+            Default,
+            Bank, PostOffice,
+            ConventionCentre, PublicMarket, TradeCentre,
+            Library, Museum, Theater,
+            BordersGuard, Customs, FireStation, Gendarmes, MilitaryBarrack, PoliceStation,
+            AdministrativeBranch,
+            PublicHospital, NeighborhoodHealth, SpecializedHospital, TreatmentRoom, UniversityHospital,
+            ResearchInstitute, University,
+            College, School,
+            Cemetery, Mosque,
+            Hostel, Hotel, Motel,
+            Airport, BusStation, TrainStation,
+            SpecializedVocationalInstitute, VocationalEducationInstitute,
+            VocationalApprenticeshipCenter, VocationalTrainingInstitute,
+            IndoorArena, LeisureCenter, SportsComplex, Stadium, SwimmingPool, YouthClubs, YouthHostel,
+        };
     }
 
     public static class PublicSpaceLayers
