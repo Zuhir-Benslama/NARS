@@ -1,4 +1,5 @@
 import L from 'leaflet'
+import * as turf from '@turf/turf'
 import { apiFetch } from './api'
 import type {
     ValidateRoadResponse,
@@ -7,12 +8,23 @@ import type {
     RoadSideResponse,
 } from './types'
 
+const MIN_ROAD_LENGTH_M = 10
+
 // POST /api/validate/road
 export async function validateRoad(layer: L.Polyline): Promise<ValidateRoadResponse> {
     const coords = layer.getLatLngs().map((ll) => {
         const l = ll as L.LatLng
         return { lat: l.lat, lng: l.lng }
     })
+
+    // Client-side minimum length check — avoids a round-trip for trivially short roads.
+    if (coords.length >= 2) {
+        const line   = turf.lineString(coords.map(c => [c.lng, c.lat]))
+        const metres = turf.length(line, { units: 'meters' })
+        if (metres < MIN_ROAD_LENGTH_M)
+            return { valid: false, error: `Road is too short (${metres.toFixed(1)} m). Minimum length is ${MIN_ROAD_LENGTH_M} m.` }
+    }
+
     try {
         const res = await apiFetch('/api/validate/road', {
             method:  'POST',

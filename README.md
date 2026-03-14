@@ -7,9 +7,13 @@ A full-stack GIS web application for Algerian municipal addressing.
 
 ## Overview
 
-NARS guides operators through 7 sequential mapping phases to produce a complete, standards-compliant address reference for a municipality. Each phase builds on the previous — areas before districts, districts before roads, roads before house entrances, and so on.
+NARS guides operators through 8 sequential mapping phases to produce a complete, standards-compliant address reference for a municipality. Each phase builds on the previous — areas before districts, districts before roads, roads before house entrances, and so on.
 
 ---
+
+## Project Status
+
+- Pre-Alpha stage completed. All 8 mapping phases are implemented end-to-end.
 
 ## Mapping Phases
 
@@ -20,8 +24,9 @@ NARS guides operators through 7 sequential mapping phases to produce a complete,
 | 2 | `cityCenter` | City Center | Circle | ✅ Done | City center circle per urban area. Determines road direction and house entrance numbering. |
 | 3 | `roads` | Roads | Polyline | ✅ Done | Roads inside the municipal limit. Must connect to at least one other road. |
 | 4 | `houseEntrances` | House Entrances | Marker | ✅ Done | Main entrances (left = odd, right = even) and secondary entrances (BIS01, BIS02…). |
-| 5 | `publicBuildings` | Public Buildings | Polygon | 🔲 Pending | Public buildings. Allowed everywhere including scattered areas. |
-| 6 | `publicSpaces` | Public Spaces | Polygon | 🔲 Pending | Public spaces (gardens, squares) inside the municipal limit. |
+| 5 | `publicBuildings` | Public Buildings | Polygon | ✅ Done | Public buildings. Allowed everywhere including scattered areas. |
+| 6 | `publicSpaces` | Public Spaces | Polygon | ✅ Done | Public spaces (gardens, squares) inside the municipal limit. |
+| 7 | `namingPanels` | Naming Panels | Marker | ✅ Done | Auto-generated signage panels derived from existing features. |
 
 ---
 
@@ -38,6 +43,7 @@ src/
 │   ├── features.ts         # buildFeatureData, saveToDatabase, applyStyle
 │   ├── labels.ts           # Permanent labels, edge labels, endpoint arrows
 │   ├── geometry.ts         # Spatial helpers
+│   ├── naming-panels.ts    # Auto-generate naming panels from features (display-only)
 │   └── styles.ts           # Phase-specific Leaflet style objects
 ├── components/
 │   ├── PhaseBar.vue        # Phase navigation bar
@@ -215,6 +221,25 @@ Icons are updated immediately and all changes are persisted to the database in p
 
 ---
 
+## Naming Panels Mathematics
+
+- Districts: place at every distinct polygon vertex (excluding the duplicate closing vertex when equal to the first).
+- Roads: place at start, end, and every S meters along the polyline (S = 100 m).
+- Public Buildings/Spaces: place at the first drawn vertex of the polygon.
+- Dedupe within radius r (r = 3 m): do not add a marker if an existing naming panel lies closer than r.
+
+Road station interpolation for a segment [A, B] with accumulated length acc and target nextAt:
+
+Let segLen = d(A, B). While acc + segLen ≥ nextAt, compute t = (nextAt − acc) / segLen and:
+
+$\displaystyle P=\bigl(A_{lat} + (B_{lat}-A_{lat})\,t,\; A_{lng} + (B_{lng}-A_{lng})\,t\bigr)$
+
+Append P, then increase nextAt by S and continue across segments. Always include the first and last vertices as stations.
+
+Dedupe check for a candidate point C against existing panels E:
+
+$\displaystyle \exists\, p \in E:\ d(p, C) < r \;\Rightarrow\; \text{skip}$
+
 ## Context Menu — Phase 4 (House Entrances)
 
 The right-click menu is context-sensitive in Phase 4:
@@ -258,6 +283,5 @@ Backend: ASP.NET Core 10. API base: `/api/`. Authentication via session cookie.
 
 ## Known Constraints
 
-- Phases 5–6 (Public Buildings, Public Spaces) UI pending.
 - Road turn validation (≤ 90°) is enforced server-side in `ValidationController.cs`.
 - City center radius defaults to 50 m if not stored.

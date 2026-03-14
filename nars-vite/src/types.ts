@@ -78,7 +78,10 @@ export interface FeatureData {
     // houseEntrances (sub-type discriminator)
     entranceTypeKey?: 'main_entrance' | 'secondary_entrance'
     // publicSpaces
-    spaceTypeKey?:  string
+    spaceTypeKey?:    string
+    // publicBuildings
+    sectorKey?:       string
+    buildingTypeKey?: string
     // scattered (auto-computed)
     geometry?:      string
 }
@@ -136,6 +139,9 @@ export interface ModalState {
     bisNumber:           number | null
     // publicSpaces
     spaceTypeKey:        string
+    // publicBuildings
+    sectorKey:           string
+    buildingTypeKey:     string
 }
 
 // ── Commune / user ────────────────────────────────────────────────────────────

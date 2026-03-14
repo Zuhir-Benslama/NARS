@@ -14,6 +14,7 @@ export const featureLayers: Record<string, LayerEntry[]> = {
     houseEntrances:      [],
     publicBuildings:     [],
     publicSpaces:        [],
+    namingPanels:        [],
 }
 
 // The Leaflet layer currently being processed inside the open modal.
@@ -55,6 +56,8 @@ export function openModal(phaseIndex: number, layer: L.Layer): Promise<ModalResu
             selectedMainIdx:     '',
             bisNumber:           null,
             spaceTypeKey:        'garden',
+            sectorKey:           'banking_postal',
+            buildingTypeKey:     'bank',
         })
     })
 }
@@ -87,6 +90,8 @@ export function openEditModal(phaseIndex: number, dbId: number, existing: import
             selectedMainIdx:     '',
             bisNumber:           existing.bisNumber       ?? null,
             spaceTypeKey:    existing.spaceTypeKey ?? 'garden',
+            sectorKey:       existing.sectorKey       ?? 'banking_postal',
+            buildingTypeKey: existing.buildingTypeKey ?? 'bank',
         })
     })
 }
@@ -141,6 +146,8 @@ export const store = reactive<AppStore>({
         selectedMainIdx:     '',
         bisNumber:           null,
         spaceTypeKey:        'garden',
+        sectorKey:           'banking_postal',
+        buildingTypeKey:     'bank',
     },
 })
 

@@ -145,6 +145,22 @@
 
             </template>
 
+            <!-- Public Buildings: sector → building cascading selectors -->
+            <template v-if="phase?.key === 'publicBuildings'">
+                <div class="modal-field">
+                    <label>Sector <span class="req">*</span></label>
+                    <select v-model="m.sectorKey" class="modal-input">
+                        <option v-for="s in PUBLIC_BUILDING_SECTORS" :key="s.key" :value="s.key">{{ s.label }}</option>
+                    </select>
+                </div>
+                <div class="modal-field">
+                    <label>Building Type <span class="req">*</span></label>
+                    <select v-model="m.buildingTypeKey" class="modal-input">
+                        <option v-for="b in currentSectorBuildings" :key="b.key" :value="b.key">{{ b.label }}</option>
+                    </select>
+                </div>
+            </template>
+
             <!-- Public spaces: space type selector -->
             <div v-if="phase?.key === 'publicSpaces'" class="modal-field">
                 <label>Space Type <span class="req">*</span></label>
@@ -166,7 +182,7 @@
 <script setup lang="ts">
 import { computed, watch }                                          from 'vue'
 import { store }                                                    from '../store'
-import { PHASES, AREA_TYPES, DISTRICT_TYPES, ROAD_TYPES, PUBLIC_SPACE_TYPES } from '../phases'
+import { PHASES, AREA_TYPES, DISTRICT_TYPES, ROAD_TYPES, PUBLIC_SPACE_TYPES, PUBLIC_BUILDING_SECTORS } from '../phases'
 import { resolveModal }                                             from '../store'
 import type { FeatureData }                                         from '../types'
 import { fetchRoadSide, computeBisNumber }                          from '../map'
@@ -236,7 +252,17 @@ watch(() => m.value.selectedMainIdx, (val) => {
     computeBisNumber(option.dbId)
 })
 
-// When area type changes → always lock name to municipality for central_urban,
+// Buildings available for the currently selected sector
+const currentSectorBuildings = computed(() => {
+    const sector = PUBLIC_BUILDING_SECTORS.find(s => s.key === m.value.sectorKey)
+    return sector?.buildings ?? []
+})
+
+// When sector changes, reset building to the first option of the new sector
+watch(() => m.value.sectorKey, () => {
+    const first = currentSectorBuildings.value[0]
+    if (first) m.value.buildingTypeKey = first.key
+})
 // and only clear when switching away if the label was the auto-filled municipality name.
 watch(() => m.value.areaTypeKey, (val) => {
     if (val === 'central_urban') {
@@ -310,6 +336,9 @@ function onSave() {
             result.mainEntranceLabel = mainOption?.label
             result.bisNumber         = m.value.bisNumber ?? undefined
         }
+    } else if (key === 'publicBuildings') {
+        result.sectorKey       = m.value.sectorKey
+        result.buildingTypeKey = m.value.buildingTypeKey
     } else if (key === 'publicSpaces') {
         result.spaceTypeKey = m.value.spaceTypeKey
     }
