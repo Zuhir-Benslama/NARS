@@ -23,8 +23,8 @@ public class SpatialController(AppDbContext db) : NarsControllerBase
     [HttpPost("/api/road-side")]
     public async Task<IActionResult> GetRoadSide([FromBody] RoadSideRequest body)
     {
-        var road = await db.Features.FirstOrDefaultAsync(f =>
-            f.Id == body.RoadId && f.UserId == CurrentUserId && f.Type == FeatureTypes.Road);
+        var road = await db.Roads.FirstOrDefaultAsync(f =>
+            f.Id == body.RoadId && f.UserId == CurrentUserId);
 
         if (road is null)
             return NotFound(new { detail = "Road not found." });
@@ -75,11 +75,10 @@ public class SpatialController(AppDbContext db) : NarsControllerBase
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 SELECT (data::jsonb->>'entranceNumber')::int
-                FROM features
+                FROM house_entrances
                 WHERE user_id = @uid
-                  AND type    = 'house_entrance'
                   AND layer   = 'main_entrance'
-                  AND (data::jsonb->>'roadDbId')::int = @rid
+                  AND road_id = @rid
                   AND data::jsonb->>'entranceNumber' IS NOT NULL";
             AddParam(cmd, "@uid", CurrentUserId);
             AddParam(cmd, "@rid", body.RoadId);
@@ -126,9 +125,8 @@ public class SpatialController(AppDbContext db) : NarsControllerBase
                 ),
                 urban AS (
                     SELECT ST_Union({SqlFragments.PolygonFromData}) AS geom
-                    FROM features f
+                    FROM areas f
                     WHERE f.user_id = @uid
-                      AND f.type   = 'area'
                       AND f.layer  IN ('central_urban', 'secondary_urban')
                 )
                 SELECT ST_AsGeoJSON(
@@ -149,16 +147,14 @@ public class SpatialController(AppDbContext db) : NarsControllerBase
         if (scatteredGeoJson is null)
             return Ok(new ScatteredRefreshResponse(false, null, "Municipal boundary not found."));
 
-        await db.Features
-            .Where(f => f.UserId    == CurrentUserId &&
-                        f.Type      == FeatureTypes.Area &&
-                        f.Layer     == FeatureTypes.AreaLayers.Scattered)
+        await db.Areas
+            .Where(f => f.UserId == CurrentUserId &&
+                        f.Layer  == FeatureTypes.AreaLayers.Scattered)
             .ExecuteDeleteAsync();
 
-        var scattered = new Feature
+        var scattered = new Area
         {
             UserId = CurrentUserId,
-            Type   = FeatureTypes.Area,
             Layer  = FeatureTypes.AreaLayers.Scattered,
             Label  = "Scattered Area",
             Data   = JsonSerializer.Serialize(new
@@ -169,7 +165,7 @@ public class SpatialController(AppDbContext db) : NarsControllerBase
                 geometry = scatteredGeoJson,
             }),
         };
-        db.Features.Add(scattered);
+        db.Areas.Add(scattered);
         await db.SaveChangesAsync();
 
         return Ok(new ScatteredRefreshResponse(true, scatteredGeoJson, "Scattered area recomputed."));

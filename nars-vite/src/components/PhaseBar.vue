@@ -4,7 +4,8 @@
             <template v-for="(step, i) in steps" :key="step.key">
                 <button
                     :class="['phase-step', step.done ? 'done' : step.active ? 'active' : 'locked']"
-                    :title="step.label"
+                    :title="t(step.label)"
+                    :aria-label="t(step.label)"
                     @click="onPhaseClick(i)"
                 >
                     <span class="phase-badge">{{ step.badge }}</span>
@@ -16,14 +17,16 @@
             </template>
         </div>
     </div>
-
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { store }   from '../store'
-import { PHASES }  from '../phases'
+import { computed }  from 'vue'
+import { useI18n }   from 'vue-i18n'
+import { store }     from '../store'
+import { PHASES }    from '../phases'
 import { goToPhase } from '../map'
+
+const { t } = useI18n()
 
 const steps = computed(() => PHASES.map((p, i) => ({
     ...p,
