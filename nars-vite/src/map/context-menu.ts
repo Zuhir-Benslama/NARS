@@ -10,8 +10,7 @@ import { areaStyle, buildPopup, createEntranceIcon } from './styles'
 import { createAreaPerimeterLabel, createPolygonEdgeLabel, addPolylineEndpoints, createPermanentLabel } from './labels'
 import { enableSnapping, disableSnapping, hookEditHandles } from './snapping'
 import { refreshScatteredAreas }           from './geometry'
-import { computeAndApplyRoadDirections }   from './road-directions'
-import * as turf                           from '@turf/turf'
+import { t }                               from '../i18n'
 
 declare const L: typeof import('leaflet')
 
@@ -54,7 +53,7 @@ function showContextMenu(x: number, y: number, dbId: number, phaseKey: string): 
     const ccReadOnly   = phaseKey === 'cityCenter' && currentPhase !== 'cityCenter'
 
     if (ccReadOnly) {
-        el.innerHTML = `<div class="nars-ctx-item nars-ctx-disabled">🔒 Switch to City Center phase to edit</div>`
+        el.innerHTML = `<div class="nars-ctx-item nars-ctx-disabled">${t('ctx_cc_lock')}</div>`
         el.style.left = '-9999px'; el.style.top = '-9999px'; el.style.display = 'block'
         const w = el.offsetWidth, h = el.offsetHeight
         el.style.left = (x + w > window.innerWidth  ? x - w : x) + 'px'
@@ -72,30 +71,30 @@ function showContextMenu(x: number, y: number, dbId: number, phaseKey: string): 
 
     // "Set Road Directions" — only available while in the Roads phase (phase 04).
     const roadDir = isRoad && isRoadsPhase
-        ? `<div class="nars-ctx-item" data-action="road-dir">⇥ Set Road Directions</div>` : ''
+        ? `<div class="nars-ctx-item" data-action="road-dir">${t('ctx_road_dir')}</div>` : ''
 
     // "Set as Reference Road" — shown in House Entrances phase when this road is NOT
     // already the reference. Replaced by "Remove" when it IS the reference.
     const isCurrentRef   = isRoad && dbId === store.referenceRoadDbId
     const setRoadRef     = isRoad && isHouseEntrancesPhase && !isCurrentRef
-        ? `<div class="nars-ctx-item" data-action="set-road-ref">📍 Set as Reference Road</div>` : ''
+        ? `<div class="nars-ctx-item" data-action="set-road-ref">${t('ctx_road_ref')}</div>` : ''
     const removeRoadRef  = isRoad && isHouseEntrancesPhase && isCurrentRef
-        ? `<div class="nars-ctx-item" data-action="remove-road-ref">❌ Remove Reference Road</div>` : ''
+        ? `<div class="nars-ctx-item" data-action="remove-road-ref">${t('ctx_road_ref_remove')}</div>` : ''
 
     // "Set as Reference Entrance" for main entrances (when in house entrances phase)
     const setEntranceRef = isMainEntrance && isHouseEntrancesPhase
-        ? `<div class="nars-ctx-item" data-action="set-entrance-ref">📍 Set as Reference Entrance</div>` : ''
+        ? `<div class="nars-ctx-item" data-action="set-entrance-ref">${t('ctx_ent_ref')}</div>` : ''
 
     // Roads are fully read-only in the House Entrances phase: no edit, no geometry, no delete.
     // House entrance markers DO keep Edit Info so the user can change the entrance number.
     const roadInHousePhase = isRoad && isHouseEntrancesPhase
 
     const editInfo     = !roadInHousePhase
-        ? `<div class="nars-ctx-item" data-action="edit">✏️ Edit Info</div>`         : ''
+        ? `<div class="nars-ctx-item" data-action="edit">${t('ctx_edit_info')}</div>`         : ''
     const editGeometry = !roadInHousePhase
-        ? `<div class="nars-ctx-item" data-action="geometry">⬟ Edit Geometry</div>` : ''
+        ? `<div class="nars-ctx-item" data-action="geometry">${t('ctx_edit_geom')}</div>` : ''
     const removeItem   = !roadInHousePhase
-        ? `<div class="nars-ctx-item nars-ctx-danger" data-action="remove">🗑️ Remove Object</div>` : ''
+        ? `<div class="nars-ctx-item nars-ctx-danger" data-action="remove">${t('ctx_remove')}</div>` : ''
 
     el.innerHTML = `
         ${editInfo}
@@ -118,7 +117,9 @@ function showContextMenu(x: number, y: number, dbId: number, phaseKey: string): 
             const action = (item as HTMLElement).dataset.action
             if      (action === 'edit')             (window as any).__narsEditFeature(dbId)
             else if (action === 'geometry')          (window as any).__narsEditGeometry(dbId)
-            else if (action === 'road-dir')          computeAndApplyRoadDirections()
+            else if (action === 'road-dir') {
+                import('./road-directions').then(m => m.computeAndApplyRoadDirections())
+            }
             else if (action === 'set-road-ref')      setReferenceRoad(dbId)
             else if (action === 'remove-road-ref')   clearReferenceRoad()
             else if (action === 'set-entrance-ref')  setReferenceEntrance(dbId)
@@ -159,7 +160,7 @@ export function bindContextMenu(layer: L.Layer, dbId: number, phaseKey: string):
 // ─── REMOVE FEATURE ───────────────────────────────────────────────────────────
 
 async function removeFeature(dbId: number): Promise<void> {
-    if (!confirm('Remove this feature? This cannot be undone.')) return
+    if (!confirm(t('msg_confirm_remove'))) return
 
     const phaseKey = Object.keys(featureLayers).find(k =>
         featureLayers[k].some((e: LayerEntry) => (e.layer as any)._dbId === dbId))
@@ -169,7 +170,7 @@ async function removeFeature(dbId: number): Promise<void> {
     // Areas are always visible so this prevents accidental deletion from another phase.
     const currentPhaseKey = PHASES[store.currentPhase]?.key
     if (phaseKey !== currentPhaseKey) {
-        alert(`⛔ Switch to the ${PHASES.find(p => p.key === phaseKey)?.label ?? phaseKey} phase to remove this feature.`)
+        alert(t('alert_switch_phase_to_remove', { phase: t(PHASES.find(p => p.key === phaseKey)?.label ?? phaseKey) }))
         return
     }
 
@@ -178,8 +179,8 @@ async function removeFeature(dbId: number): Promise<void> {
 
     try {
         const res = await apiFetch(`/api/delete/${dbId}`, { method: 'DELETE' })
-        if (!res.ok) { alert('Failed to remove feature.'); return }
-    } catch { alert('Failed to remove feature.'); return }
+        if (!res.ok) { alert(t('alert_remove_failed')); return }
+    } catch { alert(t('alert_remove_failed')); return }
 
     const layer = entry.layer
     ctx.drawnItems.removeLayer(layer)
@@ -210,11 +211,19 @@ async function editGeometry(dbId: number): Promise<void> {
         ? featureLayers[phaseKey].find((e: LayerEntry) => (e.layer as any)._dbId === dbId) as LayerEntry | undefined
         : undefined
 
-    if (!entry) { alert('Could not find the feature to edit.'); return }
+    if (!entry) { alert(t('alert_edit_not_found')); return }
+
+    // Guard: geometry edits are only allowed in the feature's own phase.
+    const currentPhaseKeyEg = PHASES[store.currentPhase]?.key
+    if (phaseKey !== currentPhaseKeyEg) {
+        const phaseLabel = PHASES.find(p => p.key === phaseKey)?.label ?? phaseKey ?? ''
+        alert(t('alert_switch_phase_to_edit', { phase: t(phaseLabel) }))
+        return
+    }
 
     // Prevent starting a second geometry edit while one is in progress
     if (document.getElementById('nars-boundary-finish')) {
-        alert('Please finish the current geometry edit first.')
+        alert(t('alert_finish_current_edit'))
         return
     }
 
@@ -228,8 +237,8 @@ async function editGeometry(dbId: number): Promise<void> {
         const mapEl    = ctx.map.getContainer()
         const finishBtn = document.createElement('button')
         finishBtn.id        = 'nars-boundary-finish'
-        finishBtn.className = 'nars-boundary-finish-btn'
-        finishBtn.innerHTML = '✓ Save Location'
+        finishBtn.className = 'nars-boundary-finish-btn nars-btn-confirm'
+        finishBtn.innerHTML = t('btn_save_location')
         mapEl.appendChild(finishBtn)
 
         const cleanup = async (save: boolean) => {
@@ -283,8 +292,8 @@ async function editGeometry(dbId: number): Promise<void> {
     const mapEl = ctx.map.getContainer()
     const finishBtn = document.createElement('button')
     finishBtn.id        = 'nars-boundary-finish'
-    finishBtn.className = 'nars-boundary-finish-btn'
-    finishBtn.innerHTML = '✓ Save Geometry'
+    finishBtn.className = 'nars-boundary-finish-btn nars-btn-confirm'
+    finishBtn.innerHTML = t('btn_save_geometry')
     mapEl.appendChild(finishBtn)
 
     const cleanup = async (save: boolean) => {
@@ -342,10 +351,11 @@ async function editFeatureInfo(dbId: number): Promise<void> {
         featureLayers[k].some((e: LayerEntry) => (e.layer as any)._dbId === dbId))
     if (!phaseKey) return
 
-    // Prohibit editing areas in districts phase
+    // Guard: info edits are only allowed in the feature's own phase.
     const currentPhaseKey = PHASES[store.currentPhase]?.key
-    if (phaseKey === 'areas' && currentPhaseKey === 'districts') {
-        alert('Areas cannot be edited in the districts phase. Please switch to the Areas phase to edit.')
+    if (phaseKey !== currentPhaseKey) {
+        const phaseLabel = PHASES.find(p => p.key === phaseKey)?.label ?? phaseKey ?? ''
+        alert(t('alert_switch_phase_to_edit', { phase: t(phaseLabel) }))
         return
     }
 
@@ -438,11 +448,11 @@ export function showMapContextMenu(x: number, y: number, phase: typeof import('.
     const el = getCtxEl()
 
     if (phase.key === 'roads') {
-        el.innerHTML = `<div class="nars-ctx-item" data-action="road-dir">⇥ Set Road Directions</div>`
+        el.innerHTML = `<div class="nars-ctx-item" data-action="road-dir">${t('ctx_road_dir')}</div>`
     } else if (phase.key === 'houseEntrances') {
-        el.innerHTML = `<div class="nars-ctx-item" data-action="set-house-numbers">🔢 Set House Numbers</div>`
+        el.innerHTML = `<div class="nars-ctx-item" data-action="set-house-numbers">${t('ctx_house_nums')}</div>`
     } else if (phase.key === 'namingPanels') {
-        el.innerHTML = `<div class="nars-ctx-item" data-action="set-naming-panels">🏷️ Set Naming Panels</div>`
+        el.innerHTML = `<div class="nars-ctx-item" data-action="set-naming-panels">${t('ctx_set_naming_panels')}</div>`
     } else {
         return
     }
@@ -457,7 +467,10 @@ export function showMapContextMenu(x: number, y: number, phase: typeof import('.
             e.stopPropagation()
             el.style.display = 'none'
             const action = (item as HTMLElement).dataset.action
-            if (action === 'road-dir')               computeAndApplyRoadDirections()
+            if (action === 'road-dir') {
+                import('./road-directions').then(m => m.computeAndApplyRoadDirections())
+            }
+            else if (action === 'set-naming-panels') (window as any).__narsSetNamingPanels()
             else if (action === 'set-house-numbers') setHouseNumbers()
         }
     })
@@ -502,14 +515,14 @@ export function setReferenceEntrance(dbId: number): void {
 
 export async function setHouseNumbers(): Promise<void> {
     if (store.referenceRoadDbId == null) {
-        alert('⛔ No reference road set.\nRight-click a road and choose "Set as Reference Road" first.')
+        alert(t('alert_no_ref_road'))
         return
     }
 
     const roadEntry = (featureLayers.roads as LayerEntry[])
         .find(r => (r.layer as any)._dbId === store.referenceRoadDbId)
     if (!roadEntry?.data.coordinates?.length) {
-        alert('⛔ Reference road has no coordinates.')
+        alert(t('alert_ref_road_no_coords'))
         return
     }
 
@@ -520,9 +533,11 @@ export async function setHouseNumbers(): Promise<void> {
         e.data.label === '?'
     )
     if (!unassigned.length) {
-        alert('No unassigned entrances found for the reference road.')
+        alert(t('alert_no_unassigned_entrances'))
         return
     }
+
+    const turf = await import('@turf/turf')
 
     // Build a turf LineString from the road coordinates
     const roadLine = turf.lineString(

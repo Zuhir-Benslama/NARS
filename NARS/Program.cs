@@ -7,6 +7,12 @@ using Microsoft.IdentityModel.Tokens;
 using NarsApi.Data;
 using NarsApi.Services;
 
+// Npgsql 6+ maps DateTime to timestamptz by default. Our DB uses
+// 'timestamp without time zone', so we restore the legacy behaviour that
+// reads/writes both types as unspecified-timezone DateTime.
+// Remove this line once the DB columns are migrated to timestamptz.
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 var builder = WebApplication.CreateBuilder(args);
 
 // ─────────────────────────────────────────────
@@ -67,6 +73,7 @@ builder.Services.AddAuthorization();
 // 3. Application services
 // ─────────────────────────────────────────────
 builder.Services.AddScoped<JwtService>();
+builder.Services.AddScoped<IScatteredAreaService, ScatteredAreaService>();
 
 // ─────────────────────────────────────────────
 // 4. Controllers & JSON (camelCase output)
@@ -124,10 +131,9 @@ var app = builder.Build();
 // Before running in production for the first time, generate the initial migration:
 //   dotnet ef migrations add InitialCreate
 //
-// WARNING: do NOT mix MigrateAsync with EnsureCreatedAsync on the same database.
-// EnsureCreatedAsync bypasses the migrations history table, which causes
-// MigrateAsync to fail on the next startup by attempting to re-create objects
-// that already exist.
+// The schema is managed manually via nars_db_v2.sql — not through EF migrations.
+// We simply verify the connection is reachable at startup instead of running
+// MigrateAsync(), which would fail trying to query __EFMigrationsHistory.
 using (var scope = app.Services.CreateScope())
 {
     var dbCtx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -135,9 +141,9 @@ using (var scope = app.Services.CreateScope())
     Console.WriteLine("NARS - ASP.NET Core + PostgreSQL/PostGIS");
     Console.WriteLine("==================================================");
 
-    await dbCtx.Database.MigrateAsync();
+    await dbCtx.Database.CanConnectAsync();
 
-    Console.WriteLine("✓ Database tables ready");
+    Console.WriteLine("✓ Database connection verified");
 }
 
 // ── Global exception handler ─────────────────

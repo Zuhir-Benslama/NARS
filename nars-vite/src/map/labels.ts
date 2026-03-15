@@ -130,44 +130,52 @@ export function createAreaPerimeterLabel(layer: L.Layer, areaTypeKey: string): v
 }
 
 // ─── LAYER VISIBILITY ─────────────────────────────────────────────────────────
+// ── Visibility lookup table — derived directly from Phases.xlsx ───────────────
+// Each entry lists the layer keys that should be visible for that phase.
+// The current phase's own layer is always visible (added at runtime below).
+// 'roads' visibility is handled separately via roadsDisplayLayer.
+
+const PHASE_VISIBILITY: Record<string, ReadonlySet<string>> = {
+    areas:           new Set(['areas']),
+    districts:       new Set(['areas', 'districts']),
+    cityCenter:      new Set(['areas', 'cityCenter']),
+    roads:           new Set(['areas', 'cityCenter', 'roads']),
+    houseEntrances:  new Set(['areas', 'cityCenter', 'roads', 'houseEntrances']),
+    publicBuildings: new Set(['areas', 'publicBuildings']),
+    publicSpaces:    new Set(['areas', 'publicSpaces']),
+    namingPanels:    new Set(['areas', 'districts', 'roads', 'publicBuildings', 'publicSpaces', 'namingPanels']),
+}
+
 export function refreshLayerVisibility(): void {
     const currentKey = PHASES[store.currentPhase]?.key
+    const visible    = PHASE_VISIBILITY[currentKey] ?? new Set([currentKey])
 
     for (const [key, entries] of Object.entries(featureLayers)) {
-        const isCurrent     = key === currentKey
-        const isRoads       = (key as string) === 'roads'
-        const alwaysVisible = key === 'areas'
-            || (key === 'cityCenter' && (currentKey === 'roads' || currentKey === 'houseEntrances'))
-            || (key === 'publicBuildings' && currentKey === 'publicSpaces')
-        // Roads are shown only up to and including the House Entrances phase.
-        const roadsVisible  = isRoads && currentKey !== 'publicBuildings' && currentKey !== 'publicSpaces'
-        // Phase 08 (namingPanels): show districts, public buildings and public spaces in addition to current phase.
-        const phase08Extra  = currentKey === 'namingPanels' && (key === 'districts' || key === 'publicBuildings' || key === 'publicSpaces')
-        const show = isCurrent || alwaysVisible || roadsVisible || phase08Extra
+        const isRoads = key === 'roads'
+        const show    = visible.has(key)
 
         // Roads stay interactive during houseEntrances for right-click menus.
-        // Areas are never interactive outside the areas phase.
+        // Areas are never interactive outside their own phase.
+        // In namingPanels phase all non-current layers are display-only.
         const isRoadOverlay = isRoads && currentKey === 'houseEntrances'
-        let interactive   = isRoadOverlay || key !== 'areas' || currentKey === 'areas'
-        // In namingPanels phase, only free-hand mode: non-current layers are non-interactive.
+        let interactive = isRoadOverlay || (key !== 'areas') || (currentKey === 'areas')
         if (currentKey === 'namingPanels' && key !== 'namingPanels') interactive = false
 
         for (const { layer } of entries as LayerEntry[]) {
-            // Roads live permanently in roadsDisplayLayer — never touch drawnItems for them.
-            // All other layers: add to / remove from drawnItems.
+            // Roads live permanently in roadsDisplayLayer — never in drawnItems.
             if (!isRoads) {
-                if (isCurrent || alwaysVisible || phase08Extra) {
+                if (show) {
                     if (!ctx.drawnItems.hasLayer(layer)) ctx.drawnItems.addLayer(layer)
-                    // Ensure Phase 08 overlay layers render above roads visually.
-                    if (currentKey === 'namingPanels' && (key === 'districts' || key === 'publicBuildings' || key === 'publicSpaces')) {
+                    // namingPanels: overlay layers render above roads visually.
+                    if (currentKey === 'namingPanels' && key !== 'namingPanels')
                         if (layer instanceof L.Path) (layer as L.Path).bringToFront()
-                    }
                 } else {
                     if (ctx.drawnItems.hasLayer(layer)) ctx.drawnItems.removeLayer(layer)
                 }
             } else {
-                // Roads: push behind overlays during Phase 08 to avoid visual overlap.
-                if (currentKey === 'namingPanels' && layer instanceof L.Path) (layer as L.Path).bringToBack()
+                // Roads: push behind overlays during namingPanels.
+                if (currentKey === 'namingPanels' && layer instanceof L.Path)
+                    (layer as L.Path).bringToBack()
             }
 
             if (layer instanceof L.Path) {
@@ -191,16 +199,16 @@ export function refreshLayerVisibility(): void {
         }
     }
 
-    // Endpoint arrows — visible during Roads phase and House Entrances phase
-    // (operators need road direction indicators as reference when placing entrances).
-    if (currentKey === 'roads' || currentKey === 'houseEntrances') {
+    // Endpoint arrows — shown when roads are visible and operator needs direction reference.
+    const showArrows = visible.has('roads')
+    if (showArrows) {
         if (!ctx.map.hasLayer(ctx.lineEndpointLayer)) ctx.map.addLayer(ctx.lineEndpointLayer)
     } else {
         if (ctx.map.hasLayer(ctx.lineEndpointLayer)) ctx.map.removeLayer(ctx.lineEndpointLayer)
     }
 
-    // Roads layer group — hidden in Public Buildings and Public Spaces phases.
-    const showRoads = currentKey !== 'publicBuildings' && currentKey !== 'publicSpaces'
+    // Roads layer group — driven by the same visibility table.
+    const showRoads = visible.has('roads')
     if (showRoads) {
         if (!ctx.map.hasLayer(ctx.roadsDisplayLayer)) ctx.map.addLayer(ctx.roadsDisplayLayer)
     } else {

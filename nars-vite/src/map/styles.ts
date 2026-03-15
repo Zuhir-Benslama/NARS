@@ -3,6 +3,7 @@
 import { AREA_TYPES, PHASES } from '../phases'
 import { POLYLINE_WEIGHT }    from './state'
 import type { FeatureData }   from '../types'
+import { t } from '../i18n'
 
 declare const L: typeof import('leaflet')
 
@@ -52,12 +53,12 @@ export function createEndpointIcon(char: string, angleDeg: number, color: string
 // ─── POPUP BUILDER ────────────────────────────────────────────────────────────
 
 export function buildPopup(data: FeatureData, phase: typeof PHASES[number], dbId?: number): string {
-    const lines = [`<b>${data.label}</b>`, `<small>${phase.label}</small>`]
-    if (data.decisionNumber)    lines.push(`<small>Decision: ${data.decisionNumber}</small>`)
-    if (data.decisionDate)      lines.push(`<small>Date: ${data.decisionDate}</small>`)
-    if (data.roadLabel)         lines.push(`<small>Road: ${data.roadLabel}</small>`)
-    if (data.side)              lines.push(`<small>Side: ${data.side} (${data.side === 'left' ? 'odd' : 'even'})</small>`)
-    if (data.mainEntranceLabel) lines.push(`<small>Main entrance: ${data.mainEntranceLabel}</small>`)
+    const lines = [`<b>${data.label}</b>`, `<small>${t(phase.label)}</small>`]
+    if (data.decisionNumber)    lines.push(`<small>${t('popup_decision')}: ${data.decisionNumber}</small>`)
+    if (data.decisionDate)      lines.push(`<small>${t('popup_date')}: ${data.decisionDate}</small>`)
+    if (data.roadLabel)         lines.push(`<small>${t('popup_road')}: ${data.roadLabel}</small>`)
+    if (data.side)              lines.push(`<small>${t('popup_side')}: ${data.side} (${t(data.side === 'left' ? 'popup_side_odd' : 'popup_side_even')})</small>`)
+    if (data.mainEntranceLabel) lines.push(`<small>${t('popup_main_entrance')}: ${data.mainEntranceLabel}</small>`)
     return lines.join('<br>')
 }
 

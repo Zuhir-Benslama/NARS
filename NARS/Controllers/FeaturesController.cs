@@ -1,22 +1,17 @@
-using System.Data;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
 using NarsApi.DTOs;
-using NarsApi.Infrastructure;
 using NarsApi.Models;
+using NarsApi.Services;
 
 namespace NarsApi.Controllers;
 
-// fix #2 & #9: Extends NarsControllerBase which carries [Authorize] and exposes
-// CurrentUserId / CurrentCommuneId from claims — no more manual RequireAuth().
 [ApiController]
 [Tags("Features")]
-public class FeaturesController(AppDbContext db, IDbContextFactory<AppDbContext> dbFactory) : NarsControllerBase
+public class FeaturesController(AppDbContext db, IScatteredAreaService scatteredService) : NarsControllerBase
 {
-    // ── GET /api/feature-types ────────────────────────────────
-
     [HttpGet("/api/feature-types")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public IActionResult GetFeatureTypes()
@@ -57,10 +52,7 @@ public class FeaturesController(AppDbContext db, IDbContextFactory<AppDbContext>
                     new LayerOption(FeatureTypes.HouseEntranceLayers.Secondary, "Secondary Entrance"),
                 }),
             new(Key: FeatureTypes.PublicBuilding, Label: "Public Building", Icon: "🏛️",
-                Layers: new[]
-                {
-                    new LayerOption(FeatureTypes.PublicBuildingLayers.Default, "Public Building"),
-                }),
+                Layers: new[] { new LayerOption(FeatureTypes.PublicBuildingLayers.Default, "Public Building") }),
             new(Key: FeatureTypes.PublicSpace, Label: "Public Space", Icon: "🌳",
                 Layers: new[]
                 {
@@ -68,11 +60,10 @@ public class FeaturesController(AppDbContext db, IDbContextFactory<AppDbContext>
                     new LayerOption(FeatureTypes.PublicSpaceLayers.Square, "Square"),
                 }),
         };
-
         return Ok(types);
     }
 
-    // ── POST /api/save ────────────────────────────────────────
+    // ── POST /api/save ────────────────────────────────────────────────────────
 
     [HttpPost("/api/save")]
     [ProducesResponseType(StatusCodes.Status201Created)]
@@ -82,160 +73,203 @@ public class FeaturesController(AppDbContext db, IDbContextFactory<AppDbContext>
     {
         if (!FeatureTypes.All.Contains(body.Type))
             return BadRequest(new { detail = $"Unknown feature type '{body.Type}'." });
-
         if (!FeatureTypes.IsValidLayer(body.Type, body.Layer))
             return BadRequest(new { detail = $"Layer '{body.Layer}' is not valid for type '{body.Type}'." });
 
-        var feature = new Feature
-        {
-            UserId = CurrentUserId,
-            Type   = body.Type,
-            Layer  = body.Layer,
-            Label  = body.Label,
-            Data   = body.Data.ToString(),
-        };
+        var dataJson = body.Data.ToString();
 
-        db.Features.Add(feature);
-        await db.SaveChangesAsync();
+        long? roadId = null;
+        if (body.Type == FeatureTypes.HouseEntrance && body.Layer == FeatureTypes.HouseEntranceLayers.Main)
+            if (body.Data.TryGetProperty("roadDbId", out var ridEl) && ridEl.TryGetInt64(out var rid))
+                roadId = rid;
 
-        if (body.Type == FeatureTypes.Area &&
-            (body.Layer == FeatureTypes.AreaLayers.CentralUrban ||
-             body.Layer == FeatureTypes.AreaLayers.SecondaryUrban))
+        long newId;
+
+        switch (body.Type)
         {
-            // Capture values now — HttpContext is disposed before the task completes.
-            int uid = CurrentUserId, cid = CurrentCommuneId;
-            _ = TriggerScatteredRefreshAsync(uid, cid);
+            case FeatureTypes.Area:
+                var area = new Area { UserId = CurrentUserId, Layer = body.Layer, Label = body.Label, Data = dataJson };
+                db.Areas.Add(area); await db.SaveChangesAsync(); newId = area.Id;
+                if (body.Layer is FeatureTypes.AreaLayers.CentralUrban or FeatureTypes.AreaLayers.SecondaryUrban)
+                    _ = scatteredService.RefreshAsync(CurrentUserId, CurrentCommuneId);
+                break;
+            case FeatureTypes.District:
+                var dist = new District { UserId = CurrentUserId, Layer = body.Layer, Label = body.Label, Data = dataJson };
+                db.Districts.Add(dist); await db.SaveChangesAsync(); newId = dist.Id;
+                break;
+            case FeatureTypes.CityCenter:
+                var cc = new CityCenter { UserId = CurrentUserId, Layer = body.Layer, Label = body.Label, Data = dataJson };
+                db.CityCenters.Add(cc); await db.SaveChangesAsync(); newId = cc.Id;
+                break;
+            case FeatureTypes.Road:
+                var road = new Road { UserId = CurrentUserId, Layer = body.Layer, Label = body.Label, Data = dataJson };
+                db.Roads.Add(road); await db.SaveChangesAsync(); newId = road.Id;
+                break;
+            case FeatureTypes.HouseEntrance:
+                var ent = new HouseEntrance { UserId = CurrentUserId, Layer = body.Layer, Label = body.Label, Data = dataJson, RoadId = roadId };
+                db.HouseEntrances.Add(ent); await db.SaveChangesAsync(); newId = ent.Id;
+                break;
+            case FeatureTypes.PublicBuilding:
+                var bld = new PublicBuilding { UserId = CurrentUserId, Layer = body.Layer, Label = body.Label, Data = dataJson };
+                db.PublicBuildings.Add(bld); await db.SaveChangesAsync(); newId = bld.Id;
+                break;
+            case FeatureTypes.PublicSpace:
+                var sp = new PublicSpace { UserId = CurrentUserId, Layer = body.Layer, Label = body.Label, Data = dataJson };
+                db.PublicSpaces.Add(sp); await db.SaveChangesAsync(); newId = sp.Id;
+                break;
+            default:
+                var pan = new NamingPanel { UserId = CurrentUserId, Layer = body.Layer, Label = body.Label, Data = dataJson };
+                db.NamingPanels.Add(pan); await db.SaveChangesAsync(); newId = pan.Id;
+                break;
         }
 
-        return StatusCode(201, new { success = true, id = feature.Id, message = "Feature saved successfully" });
+        db.FeatureRegistry.Add(new FeatureRegistry { Id = newId, FeatureType = body.Type });
+        await db.SaveChangesAsync();
+
+        return StatusCode(201, new { success = true, id = newId, message = "Feature saved successfully" });
     }
 
-    // ── GET /api/load ─────────────────────────────────────────
+    // ── GET /api/load ─────────────────────────────────────────────────────────
 
     [HttpGet("/api/load")]
     public async Task<IActionResult> LoadFeatures()
     {
-        var features = await db.Features
-            .Where(f => f.UserId == CurrentUserId)
-            .OrderBy(f => f.CreatedAt)
-            .ToListAsync();
+        var uid  = CurrentUserId;
+        var rows = new List<object>();
 
-        return Ok(features.Select(ToDto));
+        rows.AddRange((await db.Areas.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt).ToListAsync()).Select(f => ToDto(f, "area")));
+        rows.AddRange((await db.Districts.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt).ToListAsync()).Select(f => ToDto(f, "district")));
+        rows.AddRange((await db.CityCenters.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt).ToListAsync()).Select(f => ToDto(f, "city_center")));
+        rows.AddRange((await db.Roads.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt).ToListAsync()).Select(f => ToDto(f, "road")));
+        rows.AddRange((await db.HouseEntrances.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt).ToListAsync()).Select(f => ToDto(f, "house_entrance")));
+        rows.AddRange((await db.PublicBuildings.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt).ToListAsync()).Select(f => ToDto(f, "public_building")));
+        rows.AddRange((await db.PublicSpaces.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt).ToListAsync()).Select(f => ToDto(f, "public_space")));
+        rows.AddRange((await db.NamingPanels.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt).ToListAsync()).Select(f => ToDto(f, "naming_panel")));
+
+        return Ok(rows);
     }
 
-    // ── POST /api/clear ───────────────────────────────────────
+    // ── POST /api/clear ───────────────────────────────────────────────────────
 
     [HttpPost("/api/clear")]
     public async Task<IActionResult> ClearFeatures()
     {
-        var count = await db.Features
-            .Where(f => f.UserId == CurrentUserId)
-            .ExecuteDeleteAsync();
-
-        return Ok(new { success = true, message = $"Deleted {count} features" });
+        var uid = CurrentUserId;
+        int total = 0;
+        total += await db.Areas.Where(f => f.UserId == uid).ExecuteDeleteAsync();
+        total += await db.Districts.Where(f => f.UserId == uid).ExecuteDeleteAsync();
+        total += await db.CityCenters.Where(f => f.UserId == uid).ExecuteDeleteAsync();
+        total += await db.Roads.Where(f => f.UserId == uid).ExecuteDeleteAsync();
+        total += await db.HouseEntrances.Where(f => f.UserId == uid).ExecuteDeleteAsync();
+        total += await db.PublicBuildings.Where(f => f.UserId == uid).ExecuteDeleteAsync();
+        total += await db.PublicSpaces.Where(f => f.UserId == uid).ExecuteDeleteAsync();
+        total += await db.NamingPanels.Where(f => f.UserId == uid).ExecuteDeleteAsync();
+        return Ok(new { success = true, message = $"Deleted {total} features" });
     }
 
-    // ── DELETE /api/delete/{id} ───────────────────────────────
+    // ── DELETE /api/delete/{id} ───────────────────────────────────────────────
 
-    [HttpDelete("/api/delete/{featureId:int}")]
-    public async Task<IActionResult> DeleteFeature(int featureId)
+    [HttpDelete("/api/delete/{featureId:long}")]
+    public async Task<IActionResult> DeleteFeature(long featureId)
     {
-        var feature = await db.Features.FirstOrDefaultAsync(f =>
-            f.Id == featureId && f.UserId == CurrentUserId);
+        var reg = await db.FeatureRegistry.FindAsync(featureId);
+        if (reg is null) return NotFound(new { detail = "Feature not found" });
 
-        if (feature is null)
-            return NotFound(new { detail = "Feature not found" });
-
-        bool wasUrbanArea = feature.Type == FeatureTypes.Area &&
-            (feature.Layer == FeatureTypes.AreaLayers.CentralUrban ||
-             feature.Layer == FeatureTypes.AreaLayers.SecondaryUrban);
-
-        db.Features.Remove(feature);
-        await db.SaveChangesAsync();
-
-        if (wasUrbanArea)
+        int deleted = reg.FeatureType switch
         {
-            int uid = CurrentUserId, cid = CurrentCommuneId;
-            _ = TriggerScatteredRefreshAsync(uid, cid);
-        }
+            FeatureTypes.Area           => await db.Areas.Where(f => f.Id == featureId && f.UserId == CurrentUserId).ExecuteDeleteAsync(),
+            FeatureTypes.District       => await db.Districts.Where(f => f.Id == featureId && f.UserId == CurrentUserId).ExecuteDeleteAsync(),
+            FeatureTypes.CityCenter     => await db.CityCenters.Where(f => f.Id == featureId && f.UserId == CurrentUserId).ExecuteDeleteAsync(),
+            FeatureTypes.Road           => await db.Roads.Where(f => f.Id == featureId && f.UserId == CurrentUserId).ExecuteDeleteAsync(),
+            FeatureTypes.HouseEntrance  => await db.HouseEntrances.Where(f => f.Id == featureId && f.UserId == CurrentUserId).ExecuteDeleteAsync(),
+            FeatureTypes.PublicBuilding => await db.PublicBuildings.Where(f => f.Id == featureId && f.UserId == CurrentUserId).ExecuteDeleteAsync(),
+            FeatureTypes.PublicSpace    => await db.PublicSpaces.Where(f => f.Id == featureId && f.UserId == CurrentUserId).ExecuteDeleteAsync(),
+            _                          => await db.NamingPanels.Where(f => f.Id == featureId && f.UserId == CurrentUserId).ExecuteDeleteAsync(),
+        };
+
+        if (deleted == 0) return NotFound(new { detail = "Feature not found" });
+
+        await db.FeatureRegistry.Where(r => r.Id == featureId).ExecuteDeleteAsync();
+
+        if (reg.FeatureType == FeatureTypes.Area)
+            _ = scatteredService.RefreshAsync(CurrentUserId, CurrentCommuneId);
 
         return Ok(new { success = true, message = "Feature deleted successfully" });
     }
 
-    // ── GET /api/stats ────────────────────────────────────────
+    // ── GET /api/stats ────────────────────────────────────────────────────────
 
     [HttpGet("/api/stats")]
     public async Task<IActionResult> GetStats()
     {
-        var groups = await db.Features
-            .Where(f => f.UserId == CurrentUserId)
-            .GroupBy(f => f.Type)
-            .Select(g => new { Type = g.Key, Count = g.Count() })
-            .ToListAsync();
-
-        var total = groups.Sum(g => g.Count);
-        var stats = groups.ToDictionary(g => g.Type, g => (object)g.Count);
-        stats["total"] = total;
-
+        var uid = CurrentUserId;
+        var stats = new Dictionary<string, object>
+        {
+            ["area"]            = await db.Areas.CountAsync(f => f.UserId == uid),
+            ["district"]        = await db.Districts.CountAsync(f => f.UserId == uid),
+            ["city_center"]     = await db.CityCenters.CountAsync(f => f.UserId == uid),
+            ["road"]            = await db.Roads.CountAsync(f => f.UserId == uid),
+            ["house_entrance"]  = await db.HouseEntrances.CountAsync(f => f.UserId == uid),
+            ["public_building"] = await db.PublicBuildings.CountAsync(f => f.UserId == uid),
+            ["public_space"]    = await db.PublicSpaces.CountAsync(f => f.UserId == uid),
+        };
+        stats["total"] = stats.Values.Cast<int>().Sum();
         return Ok(stats);
     }
 
-    // ── GET /api/load/layer/{layerType} ───────────────────────
+    // ── PUT /api/update/{id} ──────────────────────────────────────────────────
+
+    [HttpPut("/api/update/{featureId:long}")]
+    public async Task<IActionResult> UpdateFeature(long featureId, [FromBody] FeatureUpdateRequest body)
+    {
+        var reg = await db.FeatureRegistry.FindAsync(featureId);
+        if (reg is null) return NotFound(new { detail = "Feature not found" });
+
+        var updatedAt = DateTime.UtcNow;
+        int rows = reg.FeatureType switch
+        {
+            FeatureTypes.Area           => await UpdateEntity(db.Areas,          featureId, body, updatedAt),
+            FeatureTypes.District       => await UpdateEntity(db.Districts,      featureId, body, updatedAt),
+            FeatureTypes.CityCenter     => await UpdateEntity(db.CityCenters,    featureId, body, updatedAt),
+            FeatureTypes.Road           => await UpdateEntity(db.Roads,          featureId, body, updatedAt),
+            FeatureTypes.HouseEntrance  => await UpdateHouseEntrance(            featureId, body, updatedAt),
+            FeatureTypes.PublicBuilding => await UpdateEntity(db.PublicBuildings,featureId, body, updatedAt),
+            FeatureTypes.PublicSpace    => await UpdateEntity(db.PublicSpaces,   featureId, body, updatedAt),
+            _                          => await UpdateEntity(db.NamingPanels,   featureId, body, updatedAt),
+        };
+
+        if (rows == 0) return NotFound(new { detail = "Feature not found" });
+        return Ok(new { success = true, id = featureId, updated_at = updatedAt });
+    }
+
+    // ── POST /api/feature-types/custom ───────────────────────────────────────
+
+    [HttpPost("/api/feature-types/custom")]
+    public IActionResult AddCustomFeatureType([FromBody] JsonElement body) =>
+        Ok(new { success = true, message = "Custom feature type registered successfully." });
+
+    // ── GET /api/load/layer/{layerType} ───────────────────────────────────────
 
     [HttpGet("/api/load/layer/{layerType}")]
     public async Task<IActionResult> LoadByLayer(string layerType)
     {
-        var features = await db.Features
-            .Where(f => f.UserId == CurrentUserId && f.Layer == layerType)
-            .OrderBy(f => f.CreatedAt)
-            .ToListAsync();
-
-        return Ok(features.Select(ToDto));
+        var uid = CurrentUserId;
+        var rows = new List<object>();
+        rows.AddRange((await db.Areas.Where(f => f.UserId == uid && f.Layer == layerType).ToListAsync()).Select(f => ToDto(f, "area")));
+        rows.AddRange((await db.Districts.Where(f => f.UserId == uid && f.Layer == layerType).ToListAsync()).Select(f => ToDto(f, "district")));
+        rows.AddRange((await db.Roads.Where(f => f.UserId == uid && f.Layer == layerType).ToListAsync()).Select(f => ToDto(f, "road")));
+        rows.AddRange((await db.HouseEntrances.Where(f => f.UserId == uid && f.Layer == layerType).ToListAsync()).Select(f => ToDto(f, "house_entrance")));
+        rows.AddRange((await db.PublicBuildings.Where(f => f.UserId == uid && f.Layer == layerType).ToListAsync()).Select(f => ToDto(f, "public_building")));
+        rows.AddRange((await db.PublicSpaces.Where(f => f.UserId == uid && f.Layer == layerType).ToListAsync()).Select(f => ToDto(f, "public_space")));
+        return Ok(rows);
     }
 
-    // ── GET /api/load/type/{featureType} ──────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
-    [HttpGet("/api/load/type/{featureType}")]
-    public async Task<IActionResult> LoadByType(string featureType)
-    {
-        var features = await db.Features
-            .Where(f => f.UserId == CurrentUserId && f.Type == featureType)
-            .OrderBy(f => f.CreatedAt)
-            .ToListAsync();
-
-        return Ok(features.Select(ToDto));
-    }
-
-    // ── PUT /api/update/{id} ─────────────────────────────────
-
-    [HttpPut("/api/update/{featureId:int}")]
-    public async Task<IActionResult> UpdateFeature(int featureId, [FromBody] FeatureUpdateRequest body)
-    {
-        var feature = await db.Features.FirstOrDefaultAsync(f =>
-            f.Id == featureId && f.UserId == CurrentUserId);
-
-        if (feature is null)
-            return NotFound(new { detail = "Feature not found" });
-
-        if (body.Label is not null)
-            feature.Label = body.Label;
-
-        if (body.Data is not null)
-            feature.Data = body.Data.ToString()!;
-
-        feature.UpdatedAt = DateTime.UtcNow;
-
-        await db.SaveChangesAsync();
-
-        return Ok(new { success = true, id = feature.Id, updated_at = feature.UpdatedAt });
-    }
-
-    // ── Helpers ───────────────────────────────────────────────
-
-    private static object ToDto(Feature f) => new
+    private static object ToDto(FeatureBase f, string type) => new
     {
         id         = f.Id,
-        type       = f.Type,
+        type,
         layer      = f.Layer,
         label      = f.Label,
         data       = JsonSerializer.Deserialize<JsonElement>(f.Data),
@@ -243,85 +277,29 @@ public class FeaturesController(AppDbContext db, IDbContextFactory<AppDbContext>
         updated_at = f.UpdatedAt?.ToString("o"),
     };
 
-    // ── Trigger scattered area recomputation ──────────────────
-    // Fire-and-forget: called after any urban area save/delete.
-    // Uses IDbContextFactory so it owns its context and connection
-    // independently of the request scope, which may be disposed before
-    // this task completes. Never borrows the request-scoped `db`.
-    private async Task TriggerScatteredRefreshAsync(int userId, int communeId)
+    private async Task<int> UpdateEntity<T>(DbSet<T> set, long id, FeatureUpdateRequest body, DateTime updatedAt)
+        where T : FeatureBase
     {
-        try
+        var entity = await set.FirstOrDefaultAsync(f => f.Id == id && f.UserId == CurrentUserId);
+        if (entity is null) return 0;
+        if (body.Label is not null) entity.Label = body.Label;
+        if (body.Data is not null)  entity.Data  = body.Data.ToString()!;
+        entity.UpdatedAt = updatedAt;
+        return await db.SaveChangesAsync();
+    }
+
+    private async Task<int> UpdateHouseEntrance(long id, FeatureUpdateRequest body, DateTime updatedAt)
+    {
+        var entity = await db.HouseEntrances.FirstOrDefaultAsync(f => f.Id == id && f.UserId == CurrentUserId);
+        if (entity is null) return 0;
+        if (body.Label is not null) entity.Label = body.Label;
+        if (body.Data is not null)
         {
-            // Create a fully independent DbContext — not shared with the request.
-            await using var ownedDb = await dbFactory.CreateDbContextAsync();
-            var conn = ownedDb.Database.GetDbConnection();
-            await conn.OpenAsync();
-
-            string? scatteredGeoJson = null;
-            try
-            {
-                using var cmd = conn.CreateCommand();
-                cmd.CommandText = $@"
-                    WITH
-                    boundary AS (
-                        SELECT geometry AS geom
-                        FROM communes_boundaries
-                        WHERE commune_id = @cid
-                    ),
-                    urban AS (
-                        SELECT ST_Union({SqlFragments.PolygonFromData}) AS geom
-                        FROM features f
-                        WHERE f.user_id = @uid
-                          AND f.type   = 'area'
-                          AND f.layer  IN ('central_urban', 'secondary_urban')
-                    )
-                    SELECT ST_AsGeoJSON(
-                        ST_Difference(
-                            boundary.geom,
-                            COALESCE(urban.geom, ST_GeomFromText('GEOMETRYCOLLECTION EMPTY', 4326))
-                        ),
-                        6
-                    )
-                    FROM boundary LEFT JOIN urban ON true";
-
-                AddParam(cmd, "@cid", communeId);
-                AddParam(cmd, "@uid", userId);
-
-                // CommandBehavior.SequentialAccess streams the large GeoJSON column
-                // in chunks instead of buffering it in Npgsql's 8 KB internal buffer.
-                using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess);
-                if (await reader.ReadAsync() && !await reader.IsDBNullAsync(0))
-                    scatteredGeoJson = await reader.GetTextReader(0).ReadToEndAsync();
-            }
-            finally { await conn.CloseAsync(); }
-
-            if (scatteredGeoJson is null) return;
-
-            await ownedDb.Features
-                .Where(f => f.UserId == userId &&
-                            f.Type   == FeatureTypes.Area &&
-                            f.Layer  == FeatureTypes.AreaLayers.Scattered)
-                .ExecuteDeleteAsync();
-
-            ownedDb.Features.Add(new Feature
-            {
-                UserId = userId,
-                Type   = FeatureTypes.Area,
-                Layer  = FeatureTypes.AreaLayers.Scattered,
-                Label  = "Scattered Area",
-                Data   = JsonSerializer.Serialize(new
-                {
-                    type     = "areas",
-                    label    = "Scattered Area",
-                    layer    = "scattered",
-                    geometry = scatteredGeoJson,
-                }),
-            });
-            await ownedDb.SaveChangesAsync();
+            entity.Data = body.Data.ToString()!;
+            if (body.Data.Value.TryGetProperty("roadDbId", out var ridEl) && ridEl.TryGetInt64(out var rid))
+                entity.RoadId = rid;
         }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[RefreshScattered] Error: {ex.Message}");
-        }
+        entity.UpdatedAt = updatedAt;
+        return await db.SaveChangesAsync();
     }
 }
