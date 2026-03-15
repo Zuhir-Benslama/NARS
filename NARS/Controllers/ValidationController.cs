@@ -26,9 +26,8 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
     [HttpGet("/api/validate/area/main-urban-exists")]
     public async Task<IActionResult> MainUrbanExists()
     {
-        var exists = await db.Features.AnyAsync(f =>
+        var exists = await db.Areas.AnyAsync(f =>
             f.UserId == CurrentUserId &&
-            f.Type   == FeatureTypes.Area &&
             f.Layer  == FeatureTypes.AreaLayers.CentralUrban);
 
         return Ok(new { exists });
@@ -66,8 +65,7 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
         }
 
         // Rule 2: connectivity check (PostGIS) — first road is exempt
-        var existingCount = await db.Features.CountAsync(f =>
-            f.UserId == CurrentUserId && f.Type == FeatureTypes.Road);
+        var existingCount = await db.Roads.CountAsync(f => f.UserId == CurrentUserId);
 
         if (existingCount == 0)
             return Ok(new ValidateRoadResponse(true, null));
@@ -84,9 +82,8 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
             cmd.CommandText = $@"
                 SELECT EXISTS (
                     SELECT 1
-                    FROM features f
+                    FROM roads f
                     WHERE f.user_id = @uid
-                      AND f.type = 'road'
                       AND ST_DWithin(
                             ({SqlFragments.LineStringFromData})::geography,
                             ST_SetSRID(ST_GeomFromText(@wkt), 4326)::geography,
@@ -116,8 +113,7 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
         if (body.Coordinates.Count < 3)
             return BadRequest(new ValidateDistrictResponse(false, "A district must have at least 3 points."));
 
-        var existingCount = await db.Features.CountAsync(f =>
-            f.UserId == CurrentUserId && f.Type == FeatureTypes.District);
+        var existingCount = await db.Districts.CountAsync(f => f.UserId == CurrentUserId);
 
         // First district ever is always exempt from adjacency.
         if (existingCount == 0)
@@ -137,9 +133,8 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
                 cmd.CommandText = $@"
                     SELECT EXISTS (
                         SELECT 1
-                        FROM features f
+                        FROM districts f
                         WHERE f.user_id = @uid
-                          AND f.type = 'district'
                           AND ST_Overlaps(
                                 ({SqlFragments.PolygonFromData}),
                                 ST_SetSRID(ST_GeomFromText(@wkt), 4326)
@@ -174,14 +169,12 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
                 {
                     cmd.CommandText = $@"
                         SELECT COUNT(*)
-                        FROM features d
+                        FROM districts d
                         WHERE d.user_id = @uid
-                          AND d.type    = 'district'
                           AND EXISTS (
                               SELECT 1
-                              FROM features a
+                              FROM areas a
                               WHERE a.user_id = @uid
-                                AND a.type    = 'area'
                                 AND a.layer   IN ('central_urban', 'secondary_urban')
                                 AND ST_Intersects(
                                     ({SqlFragments.PolygonFromData.Replace("f.", "a.")}),
@@ -206,9 +199,8 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
                         cmd.CommandText = $@"
                             SELECT EXISTS (
                                 SELECT 1
-                                FROM features f
+                                FROM districts f
                                 WHERE f.user_id = @uid
-                                  AND f.type = 'district'
                                   AND (
                                     ST_Touches(
                                         ST_SetSRID(ST_GeomFromText(@wkt), 4326),
@@ -221,9 +213,8 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
                                   )
                                   AND EXISTS (
                                       SELECT 1
-                                      FROM features a
+                                      FROM areas a
                                       WHERE a.user_id = @uid
-                                        AND a.type    = 'area'
                                         AND a.layer   IN ('central_urban', 'secondary_urban')
                                         AND ST_Intersects(
                                             ({SqlFragments.PolygonFromData.Replace("f.", "a.")}),
@@ -256,17 +247,15 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
     [HttpGet("/api/validate/districts/coverage")]
     public async Task<IActionResult> DistrictsCoverage()
     {
-        var urbanCount = await db.Features.CountAsync(f =>
+        var urbanCount = await db.Areas.CountAsync(f =>
             f.UserId == CurrentUserId &&
-            f.Type   == FeatureTypes.Area &&
             (f.Layer == FeatureTypes.AreaLayers.CentralUrban ||
              f.Layer == FeatureTypes.AreaLayers.SecondaryUrban));
 
         if (urbanCount == 0)
             return Ok(new DistrictCoverageResponse(true, "No urban areas to cover."));
 
-        var districtCount = await db.Features.CountAsync(f =>
-            f.UserId == CurrentUserId && f.Type == FeatureTypes.District);
+        var districtCount = await db.Districts.CountAsync(f => f.UserId == CurrentUserId);
 
         if (districtCount == 0)
             return Ok(new DistrictCoverageResponse(false,
@@ -286,16 +275,14 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
                 WITH
                 urban AS (
                     SELECT ST_Union({SqlFragments.PolygonFromData}) AS geom
-                    FROM features f
+                    FROM areas f
                     WHERE f.user_id = @uid
-                      AND f.type   = 'area'
                       AND f.layer  IN ('central_urban', 'secondary_urban')
                 ),
                 districts AS (
                     SELECT ST_Union({SqlFragments.PolygonFromData}) AS geom
-                    FROM features f
+                    FROM districts f
                     WHERE f.user_id = @uid
-                      AND f.type   = 'district'
                 )
                 SELECT ST_Covers(
                     ST_Buffer(districts.geom::geography, {DistrictBoundaryToleranceMeters})::geometry,

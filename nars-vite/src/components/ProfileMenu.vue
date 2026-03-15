@@ -10,23 +10,31 @@
         </div>
         <div :class="['profile-dropdown', { show: dropdownOpen }]">
             <div class="dropdown-item" @click="onSettings">
-                <span>⚙️</span><span>Settings</span>
+                <span>⚙️</span><span>{{ t('menu_settings') }}</span>
             </div>
             <div class="dropdown-item logout" @click="onLogout">
-                <span>🚪</span><span>Log Out</span>
+                <span>🚪</span><span>{{ t('menu_logout') }}</span>
             </div>
         </div>
     </div>
+
+    <!-- Settings Modal -->
+    <SettingsModal :visible="settingsVisible" @close="settingsVisible = false" />
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n }       from 'vue-i18n'
 import { store }         from '../store'
 import { apiFetch }      from '../api'
+import SettingsModal     from './SettingsModal.vue'
 
-const dropdownOpen = ref(false)
+const { t } = useI18n()
 
-const username = computed(() => store.user?.username || 'Loading...')
+const dropdownOpen    = ref(false)
+const settingsVisible = ref(false)
+
+const username = computed(() => store.user?.username || t('loading'))
 const name     = computed(() => store.user?.name     || '')
 const initials = computed(() => (store.user?.username || 'U').charAt(0).toUpperCase())
 
@@ -34,20 +42,18 @@ const toggleDropdown = () => { dropdownOpen.value = !dropdownOpen.value }
 const closeDropdown  = () => { dropdownOpen.value = false }
 
 function onSettings() {
-    alert('Settings coming soon.')
+    settingsVisible.value = true
     closeDropdown()
 }
 
 async function onLogout() {
     try {
-        // Persist the current phase so it can be restored on next login
         localStorage.setItem('nars_resume_phase', String(store.currentPhase))
-
         const res = await apiFetch('/api/logout', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
         })
         if (res.ok) window.location.href = '/login'
-        else alert('Logout failed. Please try again.')
-    } catch { alert('Logout failed. Please try again.') }
+        else alert(t('alert_logout_failed'))
+    } catch { alert(t('alert_logout_failed')) }
 }
 </script>

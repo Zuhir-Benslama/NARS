@@ -88,7 +88,7 @@ function roadStations(line: L.Polyline): L.LatLng[] {
   return out
 }
 
-async function addPanelIfMissing(label: string, ll: L.LatLng): Promise<void> {
+async function addPanelIfMissing(label: string, ll: L.LatLng, color: string): Promise<void> {
   if (nearExisting(ll)) return
 
   const phase = getNamingPanelsPhase()
@@ -101,8 +101,8 @@ async function addPanelIfMissing(label: string, ll: L.LatLng): Promise<void> {
     lng:            ll.lng,
   }
 
-  // Create marker layer with phase color (display-only, not persisted)
-  const icon = createEntranceIcon(label, phase.color)
+  // Use the source feature's phase color so panels are visually linked to their origin.
+  const icon = createEntranceIcon(label, color)
   // Ensure naming panels render on top by using a dedicated high z-index pane
   if (!ctx.map.getPane('namingPanelsPane')) {
     ctx.map.createPane('namingPanelsPane')
@@ -124,28 +124,28 @@ export async function generateNamingPanels(): Promise<void> {
   for (const e of featureLayers.districts as LayerEntry[]) {
     if (!(e.layer instanceof L.Polygon)) continue
     const verts = polygonVertices(e.layer)
-    for (const v of verts) tasks.push(addPanelIfMissing(e.data.label, v))
+    for (const v of verts) tasks.push(addPanelIfMissing(e.data.label, v, '#f39c12'))
   }
 
   // Roads: start, end, every 100m
   for (const e of featureLayers.roads as LayerEntry[]) {
     if (!(e.layer instanceof L.Polyline) || (e.layer instanceof L.Polygon)) continue
     const stations = roadStations(e.layer)
-    for (const v of stations) tasks.push(addPanelIfMissing(e.data.label, v))
+    for (const v of stations) tasks.push(addPanelIfMissing(e.data.label, v, '#3498db'))
   }
 
   // Public Buildings: first vertex
   for (const e of featureLayers.publicBuildings as LayerEntry[]) {
     if (!(e.layer instanceof L.Polygon)) continue
     const v = firstVertex(e.layer)
-    if (v) tasks.push(addPanelIfMissing(e.data.label, v))
+    if (v) tasks.push(addPanelIfMissing(e.data.label, v, '#e67e22'))
   }
 
   // Public Spaces: first vertex
   for (const e of featureLayers.publicSpaces as LayerEntry[]) {
     if (!(e.layer instanceof L.Polygon)) continue
     const v = firstVertex(e.layer)
-    if (v) tasks.push(addPanelIfMissing(e.data.label, v))
+    if (v) tasks.push(addPanelIfMissing(e.data.label, v, '#2ecc71'))
   }
 
   await Promise.all(tasks)

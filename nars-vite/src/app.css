@@ -4,6 +4,121 @@
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 
+/* ── CSS custom properties ──────────────────────────────────────────────────── */
+/* Dark is the default (map apps live at night).                                 */
+/* [data-theme="light"] overrides every variable for light mode.                 */
+/* The "auto" option in the settings writes no attribute, so the                 */
+/* @media (prefers-color-scheme) block below handles system preference.          */
+
+:root {
+    /* Panels / chrome */
+    --bg-panel:         rgba(26, 26, 46, 0.92);
+    --bg-panel-solid:   #1a1a2e;
+    --bg-modal:         #1a1a2e;
+    --bg-input:         #0f0f23;
+    --bg-dropdown:      #1a1a2e;
+    --bg-item-hover:    rgba(255, 255, 255, 0.06);
+    --bg-danger-hover:  rgba(231, 76, 60, 0.10);
+    --bg-ctx-menu:      #1a1a2e;
+
+    /* Text */
+    --text-primary:     #e0e0e0;
+    --text-secondary:   #aaaaaa;
+    --text-muted:       #888888;
+    --text-white:       #ffffff;
+
+    /* Borders */
+    --border-subtle:    rgba(255, 255, 255, 0.06);
+    --border-normal:    rgba(255, 255, 255, 0.08);
+    --border-medium:    rgba(255, 255, 255, 0.12);
+    --border-strong:    rgba(255, 255, 255, 0.15);
+
+    /* Inputs */
+    --input-border:     rgba(255, 255, 255, 0.12);
+    --input-focus:      #3498db;
+    --input-placeholder: #555555;
+
+    /* Buttons */
+    --btn-cancel-bg:    #2c2c4a;
+    --btn-cancel-text:  #cccccc;
+    --btn-cancel-hover: #3a3a5c;
+}
+
+[data-theme="light"] {
+    /* Panels / chrome */
+    --bg-panel:         rgba(255, 255, 255, 0.92);
+    --bg-panel-solid:   #f0f2f8;
+    --bg-modal:         #ffffff;
+    --bg-input:         #f5f6fa;
+    --bg-dropdown:      #ffffff;
+    --bg-item-hover:    rgba(0, 0, 0, 0.04);
+    --bg-danger-hover:  rgba(231, 76, 60, 0.06);
+    --bg-ctx-menu:      #ffffff;
+
+    /* Text */
+    --text-primary:     #1a1a2e;
+    --text-secondary:   #555577;
+    --text-muted:       #888899;
+    --text-white:       #1a1a2e;
+
+    /* Borders */
+    --border-subtle:    rgba(0, 0, 0, 0.05);
+    --border-normal:    rgba(0, 0, 0, 0.08);
+    --border-medium:    rgba(0, 0, 0, 0.12);
+    --border-strong:    rgba(0, 0, 0, 0.15);
+
+    /* Inputs */
+    --input-border:     rgba(0, 0, 0, 0.15);
+    --input-focus:      #2980b9;
+    --input-placeholder: #aaaaaa;
+
+    /* Buttons */
+    --btn-cancel-bg:    #e8eaf0;
+    --btn-cancel-text:  #444466;
+    --btn-cancel-hover: #d8daec;
+}
+
+/* When the user picks "auto", no data-theme attribute is set.              */
+/* Use the OS preference as the tiebreaker.                                 */
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme]) {
+        --bg-panel:         rgba(255, 255, 255, 0.92);
+        --bg-panel-solid:   #f0f2f8;
+        --bg-modal:         #ffffff;
+        --bg-input:         #f5f6fa;
+        --bg-dropdown:      #ffffff;
+        --bg-item-hover:    rgba(0, 0, 0, 0.04);
+        --bg-danger-hover:  rgba(231, 76, 60, 0.06);
+        --bg-ctx-menu:      #ffffff;
+        --text-primary:     #1a1a2e;
+        --text-secondary:   #555577;
+        --text-muted:       #888899;
+        --text-white:       #1a1a2e;
+        --border-subtle:    rgba(0, 0, 0, 0.05);
+        --border-normal:    rgba(0, 0, 0, 0.08);
+        --border-medium:    rgba(0, 0, 0, 0.12);
+        --border-strong:    rgba(0, 0, 0, 0.15);
+        --input-border:     rgba(0, 0, 0, 0.15);
+        --input-focus:      #2980b9;
+        --input-placeholder: #aaaaaa;
+        --btn-cancel-bg:    #e8eaf0;
+        --btn-cancel-text:  #444466;
+        --btn-cancel-hover: #d8daec;
+    }
+}
+
+
+/* ── Smooth theme transition ────────────────────────────────────────────────── */
+/* Applies to every element so background/color/border changes animate when    */
+/* data-theme is toggled. The 0.25s duration is fast enough to feel instant.   */
+
+*, *::before, *::after {
+    transition:
+        background-color 0.25s ease,
+        border-color     0.25s ease,
+        color            0.25s ease;
+}
+
 /* ── Reset & base ──────────────────────────────────────────────────────────── */
 
 * {
@@ -102,21 +217,21 @@ body {
 }
 
 .modal-content {
-    background: #1a1a2e;
-    color: #e0e0e0;
+    background: var(--bg-modal);
+    color: var(--text-primary);
     margin: 8% auto;
     padding: 28px 32px;
     border-radius: 12px;
     width: 440px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-normal);
 }
 
 .modal-header {
     font-size: 17px;
     font-weight: 700;
     margin-bottom: 20px;
-    color: #fff;
+    color: var(--text-white);
     letter-spacing: 0.3px;
 }
 
@@ -127,7 +242,7 @@ body {
     margin-bottom: 5px;
     font-size: 12px;
     font-weight: 600;
-    color: #aaa;
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -140,18 +255,18 @@ body {
 .modal-input {
     width: 100%;
     padding: 10px 12px;
-    border: 1.5px solid rgba(255, 255, 255, 0.12);
+    border: 1.5px solid var(--input-border);
     border-radius: 7px;
     font-size: 13px;
-    background: #0f0f23;
-    color: #fff;
+    background: var(--bg-input);
+    color: var(--text-primary);
     outline: none;
     transition: border-color 0.2s;
 }
 
-.modal-input:focus       { border-color: #3498db; }
-.modal-input::placeholder { color: #555; }
-.modal-input.error       { border-color: #e74c3c; }
+.modal-input:focus        { border-color: var(--input-focus); }
+.modal-input::placeholder { color: var(--input-placeholder); }
+.modal-input.error        { border-color: #e74c3c; }
 
 /* Two side-by-side inputs */
 .modal-row { display: flex; gap: 12px; }
@@ -163,11 +278,11 @@ body {
 /* Hint bar */
 #modalHint {
     font-size: 11px;
-    color: #888;
+    color: var(--text-muted);
     padding: 8px 12px;
     border-radius: 6px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--bg-item-hover);
+    border: 1px solid var(--border-subtle);
     margin-bottom: 16px;
     line-height: 1.5;
 }
@@ -191,19 +306,18 @@ body {
     letter-spacing: 0.3px;
 }
 
-.modal-btn-save          { background: #27ae60; color: #fff; }
-.modal-btn-save:hover    { background: #1e8449; }
-.modal-btn-cancel        { background: #2c2c4a; color: #ccc; border: 1px solid rgba(255, 255, 255, 0.1); }
-.modal-btn-cancel:hover  { background: #3a3a5c; }
+.modal-btn-save         { background: #27ae60; color: #fff; }
+.modal-btn-save:hover   { background: #1e8449; }
+.modal-btn-cancel       { background: var(--btn-cancel-bg); color: var(--btn-cancel-text); border: 1px solid var(--border-medium); }
+.modal-btn-cancel:hover { background: var(--btn-cancel-hover); }
 
 
-
-/* Modal utility classes extracted from inline styles */
-.modal-side-hint    { font-weight: 400; text-transform: none; color: #888; }
-.modal-input-row    { display: flex; align-items: center; gap: 8px; }
-.modal-input-narrow { width: 100px; }
+/* Modal utility classes */
+.modal-side-hint      { font-weight: 400; text-transform: none; color: var(--text-muted); }
+.modal-input-row      { display: flex; align-items: center; gap: 8px; }
+.modal-input-narrow   { width: 100px; }
 .modal-input-readonly { cursor: default; opacity: 0.7; }
-.modal-field-note { display: block; margin-top: 4px; font-size: 0.78rem; color: #888; font-style: italic; }
+.modal-field-note     { display: block; margin-top: 4px; font-size: 0.78rem; color: var(--text-muted); font-style: italic; }
 
 /* ── City-center dialog ─────────────────────────────────────────────────────── */
 
@@ -218,27 +332,27 @@ body {
 }
 
 #cityCenterDialog .dialog-box {
-    background: #1a1a2e;
-    color: #e0e0e0;
+    background: var(--bg-modal);
+    color: var(--text-primary);
     margin: 20% auto;
     padding: 30px 36px;
     border-radius: 12px;
     width: 420px;
     text-align: center;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-normal);
 }
 
 #cityCenterDialog .dialog-title {
     font-size: 17px;
     font-weight: 700;
     margin-bottom: 12px;
-    color: #fff;
+    color: var(--text-white);
 }
 
 #cityCenterDialog .dialog-body {
     font-size: 13px;
-    color: #aaa;
+    color: var(--text-secondary);
     line-height: 1.6;
     margin-bottom: 24px;
 }
@@ -259,10 +373,10 @@ body {
     transition: all 0.2s;
 }
 
-.dialog-btn-yes          { background: #27ae60; color: #fff; }
-.dialog-btn-yes:hover    { background: #1e8449; }
-.dialog-btn-skip         { background: #2c2c4a; color: #ccc; border: 1px solid rgba(255, 255, 255, 0.1); }
-.dialog-btn-skip:hover   { background: #3a3a5c; }
+.dialog-btn-yes:hover  { background: #1e8449; }
+.dialog-btn-yes        { background: #27ae60; color: #fff; }
+.dialog-btn-skip       { background: var(--btn-cancel-bg); color: var(--btn-cancel-text); border: 1px solid var(--border-medium); }
+.dialog-btn-skip:hover { background: var(--btn-cancel-hover); }
 
 
 /* ── Skip city-center button ────────────────────────────────────────────────── */
@@ -273,9 +387,9 @@ body {
     left: 50%;
     transform: translateX(-50%);
     z-index: 1100;
-    background: rgba(26, 26, 46, 0.92);
-    color: #aaa;
-    border: 1.5px solid rgba(255, 255, 255, 0.15);
+    background: var(--bg-panel);
+    color: var(--text-secondary);
+    border: 1.5px solid var(--border-medium);
     border-radius: 8px;
     padding: 10px 24px;
     font-size: 13px;
@@ -284,7 +398,7 @@ body {
     transition: all 0.2s;
 }
 
-#skipCityCenterBtn:hover { background: rgba(52, 52, 80, 0.95); color: #fff; }
+#skipCityCenterBtn:hover { background: var(--btn-cancel-hover); color: var(--text-white); }
 
 
 /* ── Info panel ─────────────────────────────────────────────────────────────── */
@@ -294,18 +408,18 @@ body {
     bottom: 20px;
     right: 20px;
     z-index: 1000;
-    background: rgba(26, 26, 46, 0.92);
-    color: #e0e0e0;
+    background: var(--bg-panel);
+    color: var(--text-primary);
     padding: 14px 18px;
     border-radius: 10px;
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-normal);
     min-width: 200px;
 }
 
-.info-title { font-weight: 700; margin-bottom: 10px; color: #fff; font-size: 13px; }
-.info-item  { font-size: 12px; color: #aaa; margin: 4px 0; }
-.info-item span { color: #fff; font-weight: 600; }
+.info-title { font-weight: 700; margin-bottom: 10px; color: var(--text-white); font-size: 13px; }
+.info-item  { font-size: 12px; color: var(--text-secondary); margin: 4px 0; }
+.info-item span { color: var(--text-white); font-weight: 600; }
 
 
 /* ── Profile menu ───────────────────────────────────────────────────────────── */
@@ -313,8 +427,8 @@ body {
 .profile-menu { position: absolute; top: 10px; right: 10px; z-index: 1000; }
 
 .profile-button {
-    background: rgba(26, 26, 46, 0.92);
-    border: 1.5px solid rgba(255, 255, 255, 0.12);
+    background: var(--bg-panel);
+    border: 1.5px solid var(--border-medium);
     border-radius: 8px;
     padding: 8px 14px;
     cursor: pointer;
@@ -325,7 +439,7 @@ body {
     transition: all 0.2s;
 }
 
-.profile-button:hover { border-color: rgba(255, 255, 255, 0.25); }
+.profile-button:hover { border-color: var(--border-strong); }
 
 .profile-icon {
     width: 30px;
@@ -341,13 +455,13 @@ body {
 }
 
 .profile-info { display: flex; flex-direction: column; align-items: flex-start; }
-.profile-username { font-weight: 600; color: #fff; font-size: 13px; }
-.profile-name     { font-size: 11px; color: #888; }
+.profile-username { font-weight: 600; color: var(--text-white); font-size: 13px; }
+.profile-name     { font-size: 11px; color: var(--text-muted); }
 
 .dropdown-arrow {
     margin-left: 4px;
     font-size: 9px;
-    color: #888;
+    color: var(--text-muted);
     transition: transform 0.2s;
 }
 
@@ -357,8 +471,8 @@ body {
     position: absolute;
     top: 56px;
     right: 0;
-    background: #1a1a2e;
-    border: 1.5px solid rgba(255, 255, 255, 0.1);
+    background: var(--bg-dropdown);
+    border: 1.5px solid var(--border-medium);
     border-radius: 8px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     min-width: 190px;
@@ -375,15 +489,15 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    color: #ddd;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-primary);
     font-size: 13px;
 }
 
 .dropdown-item:last-child { border-bottom: none; }
-.dropdown-item:hover      { background: rgba(255, 255, 255, 0.06); }
+.dropdown-item:hover      { background: var(--bg-item-hover); }
 .dropdown-item.logout     { color: #e74c3c; }
-.dropdown-item.logout:hover { background: rgba(231, 76, 60, 0.1); }
+.dropdown-item.logout:hover { background: var(--bg-danger-hover); }
 
 
 /* ── Right-click context menu ───────────────────────────────────────────────── */
@@ -391,8 +505,8 @@ body {
 .nars-ctx-menu {
     position: fixed;
     z-index: 9999;
-    background: #1a1a2e;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: var(--bg-ctx-menu);
+    border: 1px solid var(--border-medium);
     border-radius: 8px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
     padding: 4px 0;
@@ -403,7 +517,7 @@ body {
 .nars-ctx-item {
     padding: 10px 16px;
     font-size: 13px;
-    color: #ddd;
+    color: var(--text-primary);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -411,24 +525,16 @@ body {
     transition: background 0.15s;
 }
 
-.nars-ctx-item:hover {
-    background: rgba(255, 255, 255, 0.08);
-}
-
-.nars-ctx-danger {
-    color: #e74c3c;
-}
-
+.nars-ctx-item:hover    { background: var(--bg-item-hover); }
+.nars-ctx-danger        { color: #e74c3c; }
+.nars-ctx-danger:hover  { background: var(--bg-danger-hover); }
 .nars-ctx-disabled {
-    color: #95a5a6;
+    color: var(--text-muted);
     cursor: default;
     font-style: italic;
     pointer-events: none;
 }
 
-.nars-ctx-danger:hover {
-    background: rgba(231, 76, 60, 0.12);
-}
 
 /* ─── Edit Boundaries finish button ───────────────────────────────────────── */
 .nars-boundary-finish-btn {
@@ -470,9 +576,7 @@ body {
     transition: all 0.2s;
 }
 
-.popup-edit-btn:hover {
-    background: rgba(52, 152, 219, 0.3);
-}
+.popup-edit-btn:hover { background: rgba(52, 152, 219, 0.3); }
 
 .field-spinner {
     display: inline-block;
@@ -491,7 +595,6 @@ body {
 
 /* ── Map feature labels ─────────────────────────────────────────────────────── */
 
-/* Simple centered label for areas */
 .area-center-label {
     font-size: 12px;
     font-weight: 700;
@@ -501,7 +604,6 @@ body {
     user-select: none;
 }
 
-/* Edge-following label for areas and districts */
 .poly-edge-label {
     font-weight: 700;
     white-space: nowrap;
@@ -516,7 +618,6 @@ body {
          1px  1px 0 rgba(0,0,0,0.85);
 }
 
-/* Centred label for districts, roads, public buildings, public spaces */
 .custom-shape-label {
     background: transparent !important;
     border: none !important;
@@ -530,7 +631,6 @@ body {
 
 .custom-shape-label::before { display: none !important; }
 
-/* Municipal boundary tooltip */
 .boundary-tooltip {
     background: rgba(231, 76, 60, 0.9) !important;
     border: 2px solid #fff !important;
@@ -542,9 +642,43 @@ body {
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3) !important;
 }
 
+
+/* ── Leaflet layer control (tile switcher) ──────────────────────────────────── */
+/* Leaflet ships its own white-background CSS — override it with theme vars.    */
+
+.leaflet-control-layers {
+    background: var(--bg-panel-solid) !important;
+    border: 1px solid var(--border-medium) !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35) !important;
+    border-radius: 8px !important;
+}
+
+.leaflet-control-layers-expanded {
+    padding: 10px 14px !important;
+    color: var(--text-primary) !important;
+}
+
+.leaflet-control-layers label {
+    color: var(--text-primary) !important;
+    font-size: 13px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    margin: 4px 0 !important;
+    cursor: pointer !important;
+}
+
+.leaflet-control-layers-toggle {
+    background-color: var(--bg-panel-solid) !important;
+    border-radius: 8px !important;
+}
+
+.leaflet-control-layers-separator {
+    border-color: var(--border-medium) !important;
+}
+
+
 /* ── Leaflet DivIcon classes ────────────────────────────────────────────────── */
-/* These replace inline styles on Leaflet marker icons created in map.ts.       */
-/* Dynamic values (color, size, rotation) are still set via inline style.       */
 
 .entrance-icon {
     color: #fff;
@@ -583,4 +717,3 @@ body {
     text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
     transform-origin: center;
 }
-
