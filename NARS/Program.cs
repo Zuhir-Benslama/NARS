@@ -75,6 +75,24 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<IScatteredAreaService, ScatteredAreaService>();
 
+// HTTP client for tile proxy — reuses connections, respects DNS TTL
+builder.Services.AddHttpClient("tile-proxy", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(15);
+    client.DefaultRequestHeaders.Add("User-Agent", "NARS-TileProxy/1.0");
+});
+
+
+// HTTP client for Planetary Computer satellite tiles
+builder.Services.AddHttpClient("satellite", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+    client.DefaultRequestHeaders.Add("User-Agent", "NARS-Satellite/1.0");
+});
+
+// In-memory cache for Planetary Computer SAS token (refreshed every 50 min)
+builder.Services.AddMemoryCache();
+
 // ─────────────────────────────────────────────
 // 4. Controllers & JSON (camelCase output)
 // ─────────────────────────────────────────────

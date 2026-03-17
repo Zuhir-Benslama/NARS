@@ -88,7 +88,22 @@ export async function prepareModalExtras(phase: typeof PHASES[number], _layer: L
 
     if (phase.key === 'areas') {
         m.mainUrbanExists = await checkMainUrbanExists()
-        if (!m.mainUrbanExists && store.municipalityName) m.label = store.municipalityName
+        // Central urban area always takes the commune name as its label.
+        // Fall back to store.user.commune.name_fr in case municipalityName
+        // hasn't been populated yet (race condition on first load).
+        if (!m.mainUrbanExists) {
+            // Central urban area — always named after the commune, field is disabled
+            const name = store.municipalityName
+                || (store.user as any)?.commune?.name_fr
+                || (store.user as any)?.commune?.name_ar
+                || ''
+            m.label       = name
+            m.areaTypeKey = 'central_urban'
+        } else {
+            // Secondary urban area — name is editable, start empty
+            m.label       = ''
+            m.areaTypeKey = 'secondary_urban'
+        }
         m.areaTypeKey = m.mainUrbanExists ? 'secondary_urban' : 'central_urban'
     }
 

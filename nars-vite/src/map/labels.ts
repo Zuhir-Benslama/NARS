@@ -45,11 +45,26 @@ export function addPolylineEndpoints(layer: L.Layer): void {
 
 // ─── PERMANENT LABELS ─────────────────────────────────────────────────────────
 
+// Minimum zoom level at which road labels are shown.
+// Below this threshold roads are too dense to read individual labels.
+const ROAD_LABEL_MIN_ZOOM = 14
+
 export function createPermanentLabel(layer: L.Layer, label: string, phaseKey: string): void {
     if (layer instanceof L.Marker) return
     if (phaseKey === 'areas')     return  // edge label
     if (phaseKey === 'districts') return  // edge label
-    ;(layer as L.Path).bindTooltip(label, { permanent: true, direction: 'center', className: 'custom-shape-label' }).openTooltip()
+
+    const tooltip = (layer as L.Path).bindTooltip(
+        label, { permanent: true, direction: 'center', className: 'custom-shape-label' }
+    )
+
+    // Roads: open/close the tooltip based on current zoom immediately.
+    if (phaseKey === 'roads') {
+        if (ctx.map.getZoom() >= ROAD_LABEL_MIN_ZOOM) tooltip.openTooltip()
+        else                                           tooltip.closeTooltip()
+    } else {
+        tooltip.openTooltip()
+    }
 }
 
 // ─── POLYGON EDGE LABELS ──────────────────────────────────────────────────────
@@ -83,20 +98,34 @@ function refreshEdgeLabel(layer: L.Layer): void {
     const lls = layer.getLatLngs()[0] as L.LatLng[]
     if (!lls?.length) return
 
+    // ── Find the longest edge in pixel space ──────────────────────────────────
+    // Placing a label on every edge causes dense overlap, especially where
+    // adjacent polygons share a boundary (each polygon would label the same edge).
+    // Using the single longest edge gives one unambiguous label per polygon and
+    // naturally avoids shared-edge duplication.
+    let bestIdx  = 0
+    let bestPx   = 0
+
+    for (let i = 0; i < lls.length; i++) {
+        const a = lls[i], b = lls[(i + 1) % lls.length]
+        const pa = ctx.map.latLngToLayerPoint(a), pb = ctx.map.latLngToLayerPoint(b)
+        const dx = pb.x - pa.x, dy = pb.y - pa.y
+        const px = Math.sqrt(dx * dx + dy * dy)
+        if (px > bestPx) { bestPx = px; bestIdx = i }
+    }
+
     const baseFs    = edgeLabelFontSize()
     const charWidth = 0.6
     const markers: L.Marker[] = []
 
-    for (let i = 0; i < lls.length; i++) {
-        const a  = lls[i], b = lls[(i + 1) % lls.length]
-        const pa = ctx.map.latLngToLayerPoint(a), pb = ctx.map.latLngToLayerPoint(b)
-        const dx = pb.x - pa.x, dy = pb.y - pa.y
-        const edgePx = Math.sqrt(dx * dx + dy * dy)
+    const a  = lls[bestIdx], b = lls[(bestIdx + 1) % lls.length]
+    const pa = ctx.map.latLngToLayerPoint(a), pb = ctx.map.latLngToLayerPoint(b)
+    const dx = pb.x - pa.x, dy = pb.y - pa.y
 
-        const maxFs = (edgePx * 0.85) / (text.length * charWidth)
-        const fs    = Math.min(baseFs, maxFs)
-        if (fs < 7) continue
+    const maxFs = (bestPx * 0.85) / (text.length * charWidth)
+    const fs    = Math.min(baseFs, maxFs)
 
+    if (fs >= 7) {
         const mid = L.latLng((a.lat + b.lat) / 2, (a.lng + b.lng) / 2)
         let angle = Math.atan2(dy, dx) * 180 / Math.PI
         if (angle > 90 || angle < -90) angle += 180
@@ -109,7 +138,6 @@ function refreshEdgeLabel(layer: L.Layer): void {
             zIndexOffset: 200,
         })
         ;(m as any).pm?.setOptions?.({ pmIgnore: true })
-
         ctx.polygonEdgeLabelLayer.addLayer(m)
         markers.push(m)
     }
@@ -119,7 +147,16 @@ function refreshEdgeLabel(layer: L.Layer): void {
 
 export function refreshAllEdgeLabels(): void {
     ;[...featureLayers.areas, ...featureLayers.districts].forEach(({ layer }) => refreshEdgeLabel(layer))
-    // Newly created markers start visible — re-apply current phase visibility
+
+    // Refresh road label visibility based on current zoom level.
+    const showRoadLabels = ctx.map.getZoom() >= ROAD_LABEL_MIN_ZOOM
+    for (const { layer } of featureLayers.roads as LayerEntry[]) {
+        const tooltip = (layer as any).getTooltip?.()
+        if (!tooltip) continue
+        if (showRoadLabels) (layer as any).openTooltip?.()
+        else                (layer as any).closeTooltip?.()
+    }
+
     refreshLayerVisibility()
 }
 
@@ -130,10 +167,8 @@ export function createAreaPerimeterLabel(layer: L.Layer, areaTypeKey: string): v
 }
 
 // ─── LAYER VISIBILITY ─────────────────────────────────────────────────────────
-// ── Visibility lookup table — derived directly from Phases.xlsx ───────────────
-// Each entry lists the layer keys that should be visible for that phase.
-// The current phase's own layer is always visible (added at runtime below).
-// 'roads' visibility is handled separately via roadsDisplayLayer.
+// Lookup table derived directly from Phases.xlsx.
+// The current phase's own layer is always visible (covered by visible.has(key)).
 
 const PHASE_VISIBILITY: Record<string, ReadonlySet<string>> = {
     areas:           new Set(['areas']),
@@ -183,13 +218,23 @@ export function refreshLayerVisibility(): void {
                 if (el) el.style.pointerEvents = interactive ? '' : 'none'
             }
 
+            // In namingPanels phase, suppress labels for districts / roads /
+            // public buildings / public spaces — the naming panels themselves
+            // are the authoritative labels in that phase.
+            const labelsHidden = currentKey === 'namingPanels' &&
+                (key === 'districts' || key === 'roads' || key === 'publicBuildings' || key === 'publicSpaces')
+
             const tooltip = (layer as any).getTooltip?.()
-            if (tooltip) { show ? (layer as any).openTooltip?.() : (layer as any).closeTooltip?.() }
+            if (tooltip) {
+                const showTooltip = show && !labelsHidden &&
+                    (key !== 'roads' || ctx.map.getZoom() >= ROAD_LABEL_MIN_ZOOM)
+                showTooltip ? (layer as any).openTooltip?.() : (layer as any).closeTooltip?.()
+            }
 
             const edgeMarkers = (layer as any)._edgeLabelMarkers as L.Marker[] | undefined
             edgeMarkers?.forEach(m => {
                 const el = (m as any)._icon as HTMLElement | undefined
-                if (el) el.style.display = show ? '' : 'none'
+                if (el) el.style.display = (show && !labelsHidden) ? '' : 'none'
             })
             const perimLabel = (layer as any)._perimeterLabel as L.Layer | undefined
             if (perimLabel) {
@@ -207,7 +252,7 @@ export function refreshLayerVisibility(): void {
         if (ctx.map.hasLayer(ctx.lineEndpointLayer)) ctx.map.removeLayer(ctx.lineEndpointLayer)
     }
 
-    // Roads layer group — driven by the same visibility table.
+    // Roads layer group visibility — driven by the same lookup table.
     const showRoads = visible.has('roads')
     if (showRoads) {
         if (!ctx.map.hasLayer(ctx.roadsDisplayLayer)) ctx.map.addLayer(ctx.roadsDisplayLayer)
