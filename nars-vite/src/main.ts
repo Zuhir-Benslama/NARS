@@ -7,6 +7,7 @@ import { initTheme }                              from './composables/useTheme'
 import { initMap, loadFromDatabase, loadUserAndCommune } from './map'
 
 import '@geoman-io/leaflet-geoman-free'
+import 'leaflet-rotate'
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 
 // Apply the saved theme before anything renders — prevents flash of wrong theme.

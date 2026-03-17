@@ -74,6 +74,44 @@
                     <button class="s-btn" @click="saveAccount">{{ t('btn_update_creds') }}</button>
                 </div>
 
+                <!-- Export -->
+                <div v-if="activeTab === 'export'">
+                    <p class="s-hint">{{ t('export_hint') }}</p>
+                    <div class="s-field">
+                        <label>{{ t('export_paper_size') }}</label>
+                        <div class="s-theme-row">
+                            <button
+                                :class="['s-theme-btn', { active: exportState.size === 'A3' }]"
+                                @click="exportState.size = 'A3'"
+                            >A3 <span class="s-size-dim">420 × 297 mm</span></button>
+                            <button
+                                :class="['s-theme-btn', { active: exportState.size === 'A0' }]"
+                                @click="exportState.size = 'A0'"
+                            >A0 <span class="s-size-dim">1189 × 841 mm</span></button>
+                        </div>
+                    </div>
+                    <p v-if="exportState.error" class="s-export-error">{{ exportState.error }}</p>
+
+                    <!-- Progress bar — shown only while exporting -->
+                    <div v-if="exportState.loading" class="s-progress-wrap">
+                        <div class="s-progress-header">
+                            <span class="s-progress-label">{{ exportState.stepLabel }}</span>
+                            <span class="s-progress-pct">{{ exportState.progress }}%</span>
+                        </div>
+                        <div class="s-progress-track">
+                            <div
+                                class="s-progress-bar"
+                                :style="{ width: exportState.progress + '%' }"
+                            ></div>
+                        </div>
+                    </div>
+
+                    <button class="s-btn" :disabled="exportState.loading" @click="doExport">
+                        <span v-if="exportState.loading">⏳ {{ t('export_loading') }}</span>
+                        <span v-else>⬇️ {{ t('export_btn') }} {{ exportState.size }} PDF</span>
+                    </button>
+                </div>
+
                 <!-- Feature types -->
                 <div v-if="activeTab === 'features'">
                     <p class="s-hint">{{ t('hint_features') }}</p>
@@ -115,6 +153,8 @@ import { store }                from '../store'
 import { apiFetch }             from '../api'
 import { setLang }              from '../i18n'
 import { theme, setTheme }      from '../composables/useTheme'
+import { exportMapToPdf }        from '../map/export'
+import type { PaperSize }        from '../map/export'
 
 const { t, locale } = useI18n()
 
@@ -126,6 +166,7 @@ const activeTab = ref('general')
 const tabs = [
     { id: 'general',  tKey: 'tab_general',  icon: '⚙️' },
     { id: 'account',  tKey: 'tab_account',  icon: '👤' },
+    { id: 'export',   tKey: 'tab_export',   icon: '🗺️'  },
     { id: 'features', tKey: 'tab_features', icon: '⬟'  },
     { id: 'about',    tKey: 'tab_about',    icon: 'ℹ️'  },
 ]
@@ -164,6 +205,31 @@ async function saveAccount() {
     }
 }
 
+// ── Export ────────────────────────────────────────────────────────────────────
+const exportState = reactive({ size: 'A3' as PaperSize, loading: false, error: '', progress: 0, stepLabel: '' })
+
+async function doExport() {
+    exportState.loading   = true
+    exportState.error     = ''
+    exportState.progress  = 0
+    exportState.stepLabel = ''
+    try {
+        await exportMapToPdf(
+            exportState.size,
+            store.municipalityName || 'NARS',
+            (pct, label) => {
+                exportState.progress  = pct
+                exportState.stepLabel = label
+            }
+        )
+    } catch (err) {
+        exportState.error = (err as Error)?.message ?? t('export_error')
+        console.error('Export error:', err)
+    } finally {
+        exportState.loading = false
+    }
+}
+
 // ── Feature types ─────────────────────────────────────────────────────────────
 const newFeature = reactive({ category: 'districts', label: '' })
 
@@ -189,10 +255,12 @@ async function addFeatureType() {
     display: flex;
     align-items: center;
     justify-content: center;
-    /* Match login page: stronger blur + subtle dark wash to keep map legible */
-    background: rgba(0, 0, 0, 0.35);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    /* The map is visible behind the backdrop — blur it and add a dark wash
+       so the frosted glass card reads clearly, exactly like the login page
+       effect but using the live map as the background. */
+    background: var(--modal-backdrop-bg);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
 }
 
 .s-card {
@@ -201,14 +269,15 @@ async function addFeatureType() {
     max-height: 90vh;
     display: flex;
     flex-direction: column;
-    background: rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    /* Uses CSS vars from app.css — responds to data-theme automatically */
+    background: var(--modal-card-bg);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     border-radius: 15px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: var(--modal-card-shadow);
+    border: 1px solid var(--modal-card-border);
     overflow: hidden;
-    color: #fff;
+    color: var(--modal-card-color);
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
@@ -404,12 +473,7 @@ async function addFeatureType() {
 /* The modal uses glassmorphism (rgba whites) designed for dark.                 */
 /* In light mode we flip to a semi-opaque light card with dark text.             */
 
-:global([data-theme="light"]) .s-card {
-    background: rgba(255, 255, 255, 0.88);
-    border: 1px solid rgba(0, 0, 0, 0.12);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9);
-    color: #1a1a2e;
-}
+/* card + backdrop theme handled via CSS vars in app.css */
 
 :global([data-theme="light"]) .s-header {
     border-bottom-color: rgba(0, 0, 0, 0.08);
@@ -506,5 +570,62 @@ async function addFeatureType() {
 }
 :global([data-theme="light"]) .s-divider {
     border-top-color: rgba(0, 0, 0, 0.12);
+}
+
+.s-size-dim {
+    display: block;
+    font-size: 11px;
+    font-weight: 400;
+    opacity: 0.65;
+    margin-top: 2px;
+}
+
+.s-export-error {
+    font-size: 13px;
+    color: #ff6b6b;
+    margin-bottom: 12px;
+}
+
+.s-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+.s-progress-wrap {
+    margin-bottom: 14px;
+}
+
+.s-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 6px;
+}
+
+.s-progress-label {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.s-progress-pct {
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.s-progress-track {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.s-progress-bar {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.9) 100%);
+    transition: width 0.4s ease;
 }
 </style>

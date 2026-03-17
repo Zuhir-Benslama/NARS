@@ -1,13 +1,15 @@
 # NARS — National Addressing Reference System
 
 A full-stack GIS web application for Algerian municipal addressing.  
-**Stack:** ASP.NET Core 10 · Vue 3 · TypeScript · Vite 8 · Leaflet · Leaflet-Geoman 2.19.2 · Turf.js · Graphology · vue-i18n 10 · @vueuse/core
+**Stack:** ASP.NET Core 10 · Vue 3 · TypeScript · Vite 8 · Leaflet · Leaflet-Geoman 2.19.2 · Turf.js · Graphology · vue-i18n 10 · @vueuse/core · leaflet-rotate
 
 ---
 
 ## Project Status
 
-**Version 1.1-Alpha** — All 8 mapping phases implemented end-to-end. Significant refactoring, theming, i18n, and database restructuring completed since Pre-Alpha.
+**Version 1.1-Beta** — All 8 mapping phases fully operational. UI polish, map controls, PDF export, and database restructuring complete. Approaching 1.0-Stable.
+
+> **Up next:** 1.0-Stable → then **NARStreet**, the companion field-worker mobile app.
 
 ---
 
@@ -15,18 +17,16 @@ A full-stack GIS web application for Algerian municipal addressing.
 
 | # | Key | Label | Draw Type | Status | Description |
 |---|-----|-------|-----------|--------|-------------|
-| 0 | `areas` | Areas | Polygon | ✅ Done | Urban areas (Main Urban, Secondary Urban). Scattered areas computed automatically. |
-| 1 | `districts` | Districts | Polygon | ✅ Done | Districts inside urban areas. Must share edges — no gaps allowed. |
-| 2 | `cityCenter` | City Center | Circle | ✅ Done | City center circle per urban area. Determines road direction and house entrance numbering. |
+| 0 | `areas` | Areas | Polygon | ✅ Done | Urban areas (Main Urban, Secondary Urban). Scattered areas computed automatically. Main urban name = commune name. |
+| 1 | `districts` | Districts | Polygon | ✅ Done | Districts inside urban areas. Must share edges — no gaps. |
+| 2 | `cityCenter` | City Center | Circle | ✅ Done | City center circle per urban area. Drives road direction and entrance numbering. |
 | 3 | `roads` | Roads | Polyline | ✅ Done | Roads inside the municipal limit. Must connect to at least one other road. |
 | 4 | `houseEntrances` | House Entrances | Marker | ✅ Done | Main entrances (left = odd, right = even) and secondary entrances (BIS01, BIS02…). |
 | 5 | `publicBuildings` | Public Buildings | Polygon | ✅ Done | Public buildings. Allowed everywhere including scattered areas. |
-| 6 | `publicSpaces` | Public Spaces | Polygon | ✅ Done | Public spaces (gardens, squares) inside the municipal limit. |
-| 7 | `namingPanels` | Naming Panels | Marker | ✅ Done | Auto-generated signage panels derived from existing features. |
+| 6 | `publicSpaces` | Public Spaces | Polygon | ✅ Done | Gardens and squares inside the municipal limit. |
+| 7 | `namingPanels` | Naming Panels | Marker | ✅ Done | Auto-generated signage panels. Display-only — no manual placement. Grab cursor. |
 
 ### Phase Visibility Matrix
-
-Each phase shows only the layers relevant to the operator's current task.
 
 | Active Phase | Visible layers |
 |---|---|
@@ -46,229 +46,119 @@ Each phase shows only the layers relevant to the operator's current task.
 ```
 src/
 ├── map/
-│   ├── index.ts             # Map orchestrator — initMap, phase navigation, re-exports
+│   ├── index.ts             # Map orchestrator — initMap, phase navigation
 │   ├── draw-control.ts      # buildDrawControl, updateLayerEditability
 │   ├── draw-events.ts       # All pm:* and Leaflet map event wiring
-│   ├── create-handler.ts    # pm:create business logic, bindHoverPopup, getDistrictLabel
+│   ├── create-handler.ts    # pm:create business logic
 │   ├── loader.ts            # loadFromDatabase, loadUserAndCommune
-│   ├── context-menu.ts      # Menu DOM, bindContextMenu, showMapContextMenu
-│   ├── edit-actions.ts      # removeFeature, editGeometry, editFeatureInfo, window globals
-│   ├── house-entrances.ts   # setReferenceRoad/Entrance, setHouseNumbers algorithm
-│   ├── state.ts             # Shared ctx object (map, drawnItems, layers)
-│   ├── snapping.ts          # Custom vertex snapping (endpoint + city center perimeter)
+│   ├── context-menu.ts      # Right-click menu, bindContextMenu
+│   ├── edit-actions.ts      # removeFeature, editGeometry, editFeatureInfo
+│   ├── house-entrances.ts   # setReferenceRoad/Entrance, setHouseNumbers
+│   ├── rotation.ts          # Map rotation controls (↺ ↻)
+│   ├── export.ts            # PDF export (html2canvas + jsPDF)
+│   ├── state.ts             # Shared ctx object
+│   ├── snapping.ts          # Custom vertex snapping
 │   ├── road-directions.ts   # Road direction algorithm
-│   ├── features.ts          # buildFeatureData, saveToDatabase, prepareModalExtras
-│   ├── labels.ts            # Labels, edge labels, endpoint arrows, PHASE_VISIBILITY table
+│   ├── features.ts          # buildFeatureData, saveToDatabase
+│   ├── labels.ts            # Labels, PHASE_VISIBILITY table
 │   ├── geometry.ts          # Spatial helpers
-│   ├── naming-panels.ts     # Auto-generate naming panels (display-only, per-source colors)
-│   └── styles.ts            # Phase-specific Leaflet style objects
+│   ├── naming-panels.ts     # Auto-generate naming panels
+│   └── styles.ts            # Phase-specific Leaflet styles
 ├── components/
 │   ├── PhaseBar.vue         # Phase navigation bar
 │   ├── FeatureModal.vue     # Feature creation / edit dialog
-│   ├── InfoPanel.vue        # Sidebar info panel
-│   ├── ProfileMenu.vue      # User profile menu
-│   └── SettingsModal.vue    # Settings: language, theme, account, feature types
+│   ├── InfoPanel.vue        # Feature counts panel (top-right)
+│   ├── ProfileMenu.vue      # User profile + settings entry
+│   ├── SettingsModal.vue    # Language, theme, account, export
+│   └── TileControl.vue      # Custom tile layer switcher (bottom-right)
 ├── composables/
-│   └── useTheme.ts          # Singleton theme composable (light / dark / auto)
+│   └── useTheme.ts          # Theme singleton (light / dark / auto)
 ├── locales/
-│   ├── en.json              # English translations
-│   ├── fr.json              # French translations
-│   └── ar.json              # Arabic translations
-├── store.ts                 # Reactive Vue store (AppStore)
-├── phases.ts                # Phase definitions, area/district/road/space types
+│   ├── en.json              # English
+│   ├── fr.json              # French
+│   └── ar.json              # Arabic (RTL)
+├── store.ts                 # Reactive Vue store
+├── phases.ts                # Phase definitions, feature type hierarchy
 ├── types.ts                 # TypeScript interfaces
-├── i18n.ts                  # vue-i18n instance, setLang, applyInitialLang
+├── i18n.ts                  # vue-i18n instance, setLang
 ├── api.ts                   # apiFetch wrapper
-└── validation.ts            # Client-side validation helpers
+└── app.css                  # All styles + CSS variable theme system
 ```
 
 ---
 
-## What Changed in v1.1-Alpha
+## What Changed in v1.1-Beta
 
-### Frontend — Code Organisation
+### Map Controls
 
-`src/map/index.ts` was 930 lines. It has been split into 5 focused modules:
+**Rotation** — `↺` and `↻` buttons at bottom-right rotate the map 5° per click via `leaflet-rotate`. Implemented in `rotation.ts` as a Leaflet control. The map container is moved outside `leaflet-rotate`'s DOM wrapper so pointer events on all controls work correctly.
 
-| New file | Responsibility | Lines |
-|---|---|---|
-| `index.ts` | `initMap`, phase navigation | 157 |
-| `draw-control.ts` | `buildDrawControl`, `updateLayerEditability` | 71 |
-| `draw-events.ts` | All `pm:*` + map event wiring | 273 |
-| `create-handler.ts` | `pm:create` per-phase business logic | 297 |
-| `loader.ts` | `loadFromDatabase`, `loadUserAndCommune` | 169 |
+**Tile layer switcher** — native Leaflet layer control replaced by `TileControl.vue` (custom Vue component, bottom-right). Immune to `leaflet-rotate` DOM interference. Four base layers: Satellite (ESRI), Street (OSM), Light (CARTO), Dark (CARTO). `window.__narsSetBaseLayer(key)` swaps layers from `index.ts`.
 
-`src/map/context-menu.ts` was 590 lines. Split into 3 modules:
+**Info panel** — top-right below profile menu, width matches profile button.
 
-| New file | Responsibility | Lines |
-|---|---|---|
-| `context-menu.ts` | Menu DOM, `bindContextMenu`, `showMapContextMenu` | 152 |
-| `edit-actions.ts` | `removeFeature`, `editGeometry`, `editFeatureInfo`, `window.__nars*` | 250 |
-| `house-entrances.ts` | Reference road/entrance state, `setHouseNumbers` | 134 |
+### Phase 8 — Naming Panels
 
-### Frontend — Internationalisation
+All Geoman modes fully disabled (`pmIgnore: true`). Grab cursor set on phase entry and restored on exit. Panels auto-generated on first entry; labels hidden for source layers. Per-source colors: Districts `#f39c12` · Roads `#3498db` · Buildings `#e67e22` · Spaces `#2ecc71`.
 
-Migrated from a custom hand-rolled i18n implementation to **vue-i18n v10** (Composition API mode, `legacy: false`).
+### PDF Export
 
-- `en` locale is bundled inline; `fr` and `ar` are lazy-loaded on first use via dynamic `import()`.
-- All Vue components use `const { t } = useI18n()` — Vue's dependency tracking applies correctly in templates.
-- Non-component TypeScript files (`map/*.ts`) import `t()` directly from `src/i18n.ts` — same signature as before, zero call-site changes.
-- `setLang(lang)` handles RTL direction, localStorage persistence, Geoman sync, and layer control label refresh.
+Export tab in Settings — A3 or A0 landscape. `html2canvas` captures the live `#map` element (controls detached before capture, restored after). ESRI satellite swaps to OSM during capture to avoid CORS canvas tainting. `jsPDF` embeds the canvas with a title bar. Animated progress bar with step labels.
 
-### Frontend — Theming
+### Theming
 
-A `useTheme` composable (`src/composables/useTheme.ts`) manages the color mode as a singleton:
+Full CSS variable system (`--modal-card-bg`, `--text-primary`, etc.) across `:root` (dark default), `[data-theme="light"]`, and `@media (prefers-color-scheme: light)`. Info panel, profile menu, dropdown, tile control, settings modal, and Leaflet controls all theme-aware.
 
-- Initialised in `main.ts` before `app.mount()` — prevents flash of wrong theme on load.
-- Writes `data-theme="light"` or `data-theme="dark"` on `<html>`.
-- **Auto** mode removes the attribute entirely — `app.css` uses `@media (prefers-color-scheme: light)` on `:root:not([data-theme])` to resolve the OS preference.
-- All UI colors in `app.css` are CSS custom properties defined on `:root` (dark default) and overridden by `[data-theme="light"]`.
-- The Settings modal uses `:global([data-theme="light"])` selectors to flip its glassmorphism card from white-on-dark to dark-on-light.
+### Feature Modal
 
-### Frontend — Phase Visibility
+- **Main urban area** — label disabled, pre-filled with commune name (`store.municipalityName` → `store.user.commune.name_fr` fallback). Commune name always used on submit.
+- **Secondary urban area** — label editable.
+- **Hint** — rendered via `t(phase.hint)` (was showing raw i18n key).
+- **Validation** — label "Required" skipped for `central_urban` and `cityCenter`.
 
-`refreshLayerVisibility()` in `labels.ts` was a chain of ad-hoc booleans. Replaced with a `PHASE_VISIBILITY` lookup table:
+### Edit Phase Guards
 
-```typescript
-const PHASE_VISIBILITY: Record<string, ReadonlySet<string>> = {
-    areas:           new Set(['areas']),
-    districts:       new Set(['areas', 'districts']),
-    // …
-}
-```
-
-This also fixed a bug: `publicBuildings` was incorrectly shown during the `publicSpaces` phase.
-
-### Frontend — Edit Phase Guards
-
-`editGeometry` previously had no phase guard — any visible feature could be reshaped from any phase. `editFeatureInfo` only blocked the `areas-in-districts` edge case. Both now enforce a consistent guard:
-
-```
-feature.phaseKey !== currentPhaseKey → alert + return
-```
-
-### Frontend — Naming Panel Colors
-
-Naming panels are now coloured by their source feature type rather than a single purple:
-
-| Source | Color |
-|---|---|
-| Districts | `#f39c12` orange |
-| Roads | `#3498db` blue |
-| Public Buildings | `#e67e22` burnt orange |
-| Public Spaces | `#2ecc71` green |
-
-### Frontend — Vite / Build
-
-Migrated from `rollupOptions` to `rolldownOptions` (Vite 8 uses the Rolldown bundler). Manual chunks defined for `vendor-geoman`, `vendor-leaflet`, `vendor-turf`, and `vendor-graphology`. The `outDir` is set to `../NARS/wwwroot` so `npm run build` deploys directly to the backend. Static files (`login.html`, `login.css`, `NARS.jpg`) live in `public/` and are copied to `outDir` automatically.
-
-### Backend — ScatteredAreaService
-
-The fire-and-forget scattered area recomputation was extracted from `FeaturesController` into `IScatteredAreaService` / `ScatteredAreaService`. Registered as `AddScoped` in `Program.cs`. The controller receives it by constructor injection.
-
-### Backend — Startup
-
-`MigrateAsync()` replaced with `CanConnectAsync()`. The schema is managed via SQL scripts — not EF migrations — so `MigrateAsync` would fail querying `__EFMigrationsHistory`. `AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true)` is applied at the top of `Program.cs` to match the existing `timestamp without time zone` columns.
-
-### Database — Split Feature Tables
-
-The monolithic `features` table (projected to 31+ million rows) has been replaced by 8 dedicated tables:
-
-| Table | Feature type | Projected rows |
-|---|---|---|
-| `areas` | Urban areas + scattered | ~5 000 |
-| `districts` | District polygons | ~50 000 |
-| `city_centers` | City center circles | ~5 000 |
-| `roads` | Road polylines | ~1 000 000 |
-| `house_entrances` | Main + secondary entrances | ~30 000 000 |
-| `public_buildings` | Public building polygons | ~100 000 |
-| `public_spaces` | Gardens and squares | ~100 000 |
-| `naming_panels` | Auto-generated signage | session-only |
-
-Each table keeps `data jsonb` — the frontend payload is unchanged, zero frontend changes required.
-
-**`feature_registry(id, feature_type)`** — written on every INSERT. `PUT /api/update/:id` and `DELETE /api/delete/:id` do a single PK lookup here to find which table to target in O(1).
-
-**Global `feature_id_seq`** — a single PostgreSQL sequence shared by all tables so IDs are globally unique.
-
-**`house_entrances.road_id`** — extracted from `data->>'roadDbId'` into a proper `bigint` column with a partial index. The road-side query (`WHERE road_id = @rid AND layer = 'main_entrance'`) no longer casts 30 million JSONB fields.
-
-**Indexes added:**
-
-- `ix_areas_user_id`, `ix_areas_user_layer`
-- `ix_districts_user_id`, `ix_districts_data_gin` (GIN)
-- `ix_roads_user_id`, `ix_roads_user_layer`, `ix_roads_data_gin` (GIN)
-- `ix_house_entrances_user_id`, `ix_house_entrances_user_layer`, `ix_house_entrances_road_id` (partial)
-- `ix_communes_boundaries_geometry` (GIST)
-
-**Migration:** `move_features.sql` moves all rows from the old `features` table into the new split tables in a single transaction with a verification step, then deletes the source rows.
+Every edit (info, geometry) and delete checks that the target feature belongs to the current active phase. Wrong-phase attempts show a localised alert.
 
 ---
 
 ## Drawing UX
 
-- **Auto-start on phase entry** — draw mode activates immediately when a phase is entered.
-- **Click-to-draw fallback** — if draw mode is interrupted (ESC, context menu, alert), the next map click restarts it automatically.
-- **Right-click cancels** — right-clicking anywhere cancels active draw or edit mode. If neither is active, the context menu opens.
-- **ESC** — cancels draw mode; next click restarts it.
-- **Phase guards** — editing (info or geometry) and removing a feature is only permitted in the feature's own phase. Attempting it from another phase shows an alert directing the operator to the correct phase.
-- **No Geoman toolbar** — all draw controls are programmatic.
-
----
-
-## Snapping
-
-Geoman's built-in snap is disabled (`snappable: false`). Custom snapping in `snapping.ts`:
-
-- **Endpoint snap** — snaps to existing road/polygon endpoints within 20 px.
-- **City center perimeter snap** — snaps to the circle edge in pixel space:
-
-$$\hat{d} = \frac{P_{cursor} - P_{center}}{\|P_{cursor} - P_{center}\|}$$
-
-$$P_{snap} = P_{center} + \hat{d} \cdot r_{px}, \quad d_{snap} = \left| \|P_{cursor} - P_{center}\| - r_{px} \right|$$
-
-The snap activates when $d_{snap} \leq 20\text{ px}$.
+- Auto-start draw on phase entry
+- Click-to-draw fallback after ESC / context menu / alert
+- Right-click cancels draw or edit, or opens context menu
+- Phase guards on all edit and delete actions
+- Naming panels phase: grab cursor, all drawing/editing blocked
 
 ---
 
 ## Road Direction Algorithm
 
-Located in `road-directions.ts`. Uses Turf.js for spatial math and Graphology for network traversal.
-
-**Rules:** Roads orient away from the city center outward. Without a city center: North→South if more vertical, East→West if more horizontal. Dead-ends always flow from the connected endpoint to the free tip.
-
-**Steps:** Network graph construction (O(n²), detects endpoint-to-endpoint, T-junction, X-junction) → DFS orientation from city center seed nodes → majority vote per split road → dead-end correction → coordinate flip + DB persist.
+`road-directions.ts` — Turf.js + Graphology. Builds O(n²) network graph detecting endpoint-to-endpoint, T-junction, and X-junction connections. DFS orientation from city center outward → majority vote per split road → dead-end correction → coordinate flip + DB persist.
 
 ---
 
-## House Entrance Numbering Algorithm
+## House Entrance Numbering
 
-Located in `house-entrances.ts` (`setHouseNumbers`) and `create-handler.ts` (`pm:create` handler).
-
-**Placement** — entrance type is derived automatically from the active reference. The server determines road side (`POST /api/road-side`) driving odd (left) / even (right) parity. BIS numbers are assigned at placement: $\text{BIS}_n = k + 1$.
-
-**Assignment** — each marker is projected onto the road polyline, sorted by arc-length, then numbered by parity continuing from the highest already-assigned number on that road.
+`house-entrances.ts` — projects each marker onto the road polyline, sorts by arc-length, assigns odd (left) / even (right) numbers continuing from the highest already assigned. BIS numbering for secondary entrances. All changes persisted in parallel.
 
 ---
 
 ## Naming Panels
 
-- Districts: panel at every polygon vertex (excluding the duplicate closing vertex).
-- Roads: panel at start, end, and every 100 m along the polyline.
-- Public Buildings / Spaces: panel at the first drawn vertex.
-- Dedupe radius: 3 m — skip if an existing panel is closer.
-- Panel color matches the source feature's phase color for visual association.
+Districts: every vertex · Roads: start + end + every 100 m · Buildings/Spaces: first vertex · Dedupe radius 3 m · Color matches source phase.
 
 ---
 
-## Settings
+## Settings Modal
 
-The Settings modal (glassmorphism design matching the login page) provides:
-
-- **Language** — English / French / Arabic. `fr` and `ar` locales are lazy-loaded. RTL layout applied automatically for Arabic.
-- **Theme** — Light / Dark / Auto. Auto mode follows the OS preference via `@media (prefers-color-scheme)`. Selection persisted in `localStorage` under `nars_theme`.
-- **Account** — update username, email, and password.
-- **Feature types** — register custom feature type extensions.
+| Tab | Contents |
+|---|---|
+| General | Language (EN/FR/AR), Theme (Light/Dark/Auto) |
+| Account | Username, email, password |
+| Export | Paper size (A3/A0), download PDF |
+| Feature types | Custom type extensions |
+| About | Version info |
 
 ---
 
@@ -281,33 +171,22 @@ The Settings modal (glassmorphism design matching the login page) provides:
 | `@turf/turf` | Spatial math |
 | `graphology` + `graphology-traversal` | Road network graph |
 | `vue` | Reactive UI |
-| `vue-i18n` | Internationalisation (v10, Composition API) |
+| `vue-i18n` | Internationalisation v10 |
 | `@vueuse/core` | Vue composable utilities |
+| `leaflet-rotate` | Map bearing rotation |
+| `html2canvas` | Map capture for PDF export |
+| `jspdf` | PDF generation |
 
 ---
 
 ## Development
 
 ```bash
-# Frontend (Vite dev server — hot reload)
-cd nars-vite
-npm install
+cd nars-vite && npm install
 npm run dev        # http://localhost:5173
-npm run build      # Compiles directly into ../NARS/wwwroot
+npm run build      # → ../NARS/wwwroot
 
-# Backend (API server)
-cd NARS
-dotnet run         # http://localhost:5000
-```
-
-The Vite dev server proxies `/api/*` to the ASP.NET backend so both can run simultaneously during development.
-
-**Production build workflow:**
-
-```bash
-cd nars-vite
-npm run build      # → ../NARS/wwwroot (empties and rewrites)
-# Restart backend or refresh — new assets served immediately
+cd NARS && dotnet run   # http://localhost:5000
 ```
 
 ---
@@ -315,21 +194,41 @@ npm run build      # → ../NARS/wwwroot (empties and rewrites)
 ## Database Setup
 
 ```bash
-# Fresh install
-psql -U <user> -d <dbname> -f nars_db_v2.sql
-
-# Migrating from Pre-Alpha (old features table still on disk)
-psql -U <user> -d <dbname> -f nars_db_v2.sql
-psql -U <user> -d <dbname> -f move_features.sql
+psql -U <user> -d <dbname> -f nars_db_v2.sql        # fresh install
+psql -U <user> -d <dbname> -f move_features.sql      # migrate from Pre-Alpha
 ```
 
-`move_features.sql` runs in a single transaction and prints a row-count verification report before committing. The old `features` table is emptied (not dropped) — drop it manually once the application is verified.
+### Split Feature Tables
+
+| Table | Type | Scale |
+|---|---|---|
+| `areas` | Urban + scattered | ~5 000 |
+| `districts` | District polygons | ~50 000 |
+| `city_centers` | City center circles | ~5 000 |
+| `roads` | Road polylines | ~1 000 000 |
+| `house_entrances` | Main + secondary entrances | ~30 000 000 |
+| `public_buildings` | Public buildings | ~100 000 |
+| `public_spaces` | Gardens and squares | ~100 000 |
+| `naming_panels` | Auto-generated panels | session-only |
+
+`feature_registry(id, feature_type)` — O(1) routing for PUT/DELETE. Global `feature_id_seq` — unique IDs across all tables. `house_entrances.road_id` extracted column for indexed road-side queries.
 
 ---
 
 ## Known Constraints
 
-- Road turn validation (≤ 90°) is enforced server-side in `ValidationController.cs`.
-- City center radius defaults to 50 m if not stored.
-- `timestamp without time zone` is used for `created_at` / `updated_at` columns. `AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true)` is set in `Program.cs` to match. Migrate to `timestamptz` with `ALTER TABLE … ALTER COLUMN … TYPE timestamptz USING … AT TIME ZONE 'UTC'` when ready, then remove the switch.
-- Schema is managed via SQL files — not EF migrations. `CanConnectAsync()` is used at startup instead of `MigrateAsync()`.
+- Road turn ≤ 90° validated server-side in `ValidationController.cs`
+- ESRI satellite tiles swap to OSM during PDF export (CORS)
+- Schema managed via SQL — `CanConnectAsync()` at startup, not `MigrateAsync()`
+- `Npgsql.EnableLegacyTimestampBehavior = true` until columns migrate to `timestamptz`
+
+---
+
+## Roadmap
+
+| Version | Status |
+|---|---|
+| 1.1-Alpha | ✅ Released |
+| **1.1-Beta** | ✅ Current |
+| 1.0-Stable | 🔜 Final QA + edge case hardening |
+| **NARStreet** | 📱 Field worker mobile app — offline-first, GPS-assisted entrance placement |
