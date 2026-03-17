@@ -5,7 +5,7 @@
             <div class="modal-header">{{ headerText }}</div>
 
             <!-- Hint bar -->
-            <div id="modalHint" v-if="phase?.hint">{{ phase.hint }}</div>
+            <div id="modalHint" v-if="phase?.hint">{{ t(phase.hint) }}</div>
 
             <!-- Name — hidden when editing a house entrance (set at creation, not editable) -->
             <div v-if="!isHouseEntranceEdit" class="modal-field">
@@ -16,6 +16,7 @@
                     :class="['modal-input', { error: m.errors.label, 'modal-input-readonly': isMainUrban || isZoneWithTypeName || isCityCenter }]"
                     :placeholder="isMainUrban || isZoneWithTypeName || isCityCenter ? '' : 'Feature name...'"
                     :readonly="isMainUrban || isZoneWithTypeName || isCityCenter"
+                    :disabled="isMainUrban"
                     autocomplete="off"
                     autofocus
                 />
@@ -181,12 +182,14 @@
 
 <script setup lang="ts">
 import { computed, watch }                                          from 'vue'
+import { useI18n }                                                  from 'vue-i18n'
 import { store }                                                    from '../store'
 import { PHASES, AREA_TYPES, DISTRICT_TYPES, ROAD_TYPES, PUBLIC_SPACE_TYPES, PUBLIC_BUILDING_SECTORS } from '../phases'
 import { resolveModal }                                             from '../store'
 import type { FeatureData }                                         from '../types'
 import { fetchRoadSide, computeBisNumber }                          from '../map'
 
+const { t } = useI18n()
 const m     = computed(() => store.modal)
 const phase = computed(() => m.value.phaseIndex !== null ? PHASES[m.value.phaseIndex] ?? null : null)
 
@@ -266,7 +269,12 @@ watch(() => m.value.sectorKey, () => {
 // and only clear when switching away if the label was the auto-filled municipality name.
 watch(() => m.value.areaTypeKey, (val) => {
     if (val === 'central_urban') {
-        m.value.label = store.municipalityName ?? ''
+        // Use municipalityName or fall back to user.commune.name_fr
+        const communeName = store.municipalityName
+            || (store.user as any)?.commune?.name_fr
+            || (store.user as any)?.commune?.name_ar
+            || ''
+        m.value.label = communeName
     } else if (!m.value.isEdit && m.value.label === store.municipalityName) {
         m.value.label = ''
     }
@@ -291,7 +299,8 @@ function validate() {
     if (!isHouseEntranceEdit.value) {
         const labelRequired = !(key === 'districts' &&
             (m.value.districtTypeKey === 'trad_activities_zone' || m.value.districtTypeKey === 'industry_zone')) &&
-            key !== 'cityCenter'
+            key !== 'cityCenter' &&
+            !(key === 'areas' && m.value.areaTypeKey === 'central_urban')
         if (labelRequired && !m.value.label.trim()) errors.label = 'Required'
         if (!m.value.decisionNumber.trim()) errors.decisionNumber = 'Required'
         if (!m.value.decisionDate.trim())   errors.decisionDate   = 'Required'
@@ -311,7 +320,9 @@ function onSave() {
     if (!validate()) return
     const key = phase.value?.key
     const result: Partial<FeatureData> = {
-        label:          m.value.label.trim(),
+        label:          (isMainUrban.value
+                            ? (store.municipalityName || (store.user as any)?.commune?.name_fr || '')
+                            : m.value.label.trim()),
         decisionNumber: m.value.decisionNumber.trim(),
         decisionDate:   m.value.decisionDate.trim(),
     }
