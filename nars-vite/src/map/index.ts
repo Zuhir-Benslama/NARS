@@ -4,20 +4,21 @@
 import { watch } from 'vue'
 import { t, applyInitialLang, currentLang } from '../i18n'
 
-import { PHASES, API_LAYER_TO_PHASE, DISTRICT_TYPES } from '../phases'
+import { PHASES, DISTRICT_TYPES }                      from '../phases'
 import { apiFetch }                   from '../api'
 import { store, featureLayers, openModal, syncCounts } from '../store'
 import { validateRoad, validateDistrict, checkDistrictCoverage, getRoadSide } from '../validation'
-import type { FeatureData, LayerEntry, DbFeature }    from '../types'
+import type { FeatureData, LayerEntry }                from '../types'
 
 import { ctx, POLYLINE_WEIGHT } from './state'
 import { areaStyle, polygonStyles, createEntranceIcon, applyStyle, buildPopup } from './styles'
 import { addPolylineEndpoints, createPermanentLabel, createAreaPerimeterLabel, createPolygonEdgeLabel, refreshAllEdgeLabels, refreshLayerVisibility } from './labels'
 import { initRotationControls } from './rotation'
-import { pointInMunicipalLimit, pointInScatteredArea, polylineMidpoint, displayCommuneBoundary, renderScatteredAreas, refreshScatteredAreas } from './geometry'
+import { pointInMunicipalLimit, pointInScatteredArea, polylineMidpoint, displayCommuneBoundary, refreshScatteredAreas } from './geometry'
 import { enableSnapping, disableSnapping, hookEditHandles, hookAllEditMarkers, editModeActive, installSnapInterceptors } from './snapping'
 import { bindContextMenu, showMapContextMenu } from './context-menu'
 import { buildFeatureData, saveToDatabase, prepareModalExtras } from './features'
+import { bindHoverPopup, getDistrictLabel }                    from './create-handler'
 
 // Re-export public API consumed by Vue components and main.ts
 export { displayCommuneBoundary }                           from './geometry'
@@ -25,19 +26,9 @@ export { bindContextMenu }                                  from './context-menu
 export { fetchRoadSide, computeBisNumber }                  from './features'
 export { createEntranceIcon, areaStyle }                    from './styles'
 export { createPolygonEdgeLabel, createAreaPerimeterLabel } from './labels'
+export { loadFromDatabase, loadUserAndCommune }             from './loader'
 
 declare const L: typeof import('leaflet')
-
-// Returns the label to display for a district. For Trade Activity Zones and Industrial Zones,
-// uses the type name when no custom label is provided.
-function getDistrictLabel(districtTypeKey: string, customLabel: string): string {
-    if (customLabel) return customLabel
-    if (districtTypeKey === 'trad_activities_zone' || districtTypeKey === 'industry_zone') {
-        const dtype = DISTRICT_TYPES.find(d => d.key === districtTypeKey)
-        return dtype?.label ?? ''
-    }
-    return customLabel
-}
 
 // ─── MAP INITIALIZATION ───────────────────────────────────────────────────────
 
@@ -299,23 +290,6 @@ function discardCreatedLayer(layer: L.Layer): void {
 }
 
 // ─── DRAW EVENTS ──────────────────────────────────────────────────────────────
-
-// Opens the feature info popup on hover instead of click.
-// Uses a standard Leaflet popup so the existing buildPopup HTML is reused.
-function bindHoverPopup(layer: L.Layer, content: string): void {
-    if (layer instanceof L.Marker) {
-        const popup = L.popup({ offset: L.point(0, -10), closeButton: false }).setContent(content)
-        layer.bindPopup(popup)
-        layer.on('mouseover', () => layer.openPopup())
-        layer.on('mouseout',  () => layer.closePopup())
-    } else {
-        const path = layer as L.Path
-        const popup = L.popup({ closeButton: false }).setContent(content)
-        path.bindPopup(popup)
-        layer.on('mouseover', (e: any) => path.openPopup(e.latlng))
-        layer.on('mouseout',  () => path.closePopup())
-    }
-}
 
 function registerDrawEvents(): void {
     // Geoman uses 'pm:drawstart', 'pm:drawend', 'pm:editstart', 'pm:editend', etc.
@@ -807,146 +781,3 @@ function registerDrawEvents(): void {
     })
 }
 
-// ─── LOAD FROM DATABASE ───────────────────────────────────────────────────────
-
-export async function loadFromDatabase(): Promise<void> {
-    try {
-        const res = await apiFetch('/api/load')
-        if (!res.ok) { console.error('Load failed:', res.status); return }
-        const features = await res.json() as DbFeature[]
-        if (!features.length) { console.log('No saved features.'); return }
-
-        ctx.drawnItems.clearLayers()
-        ctx.roadsDisplayLayer.clearLayers()
-        ctx.lineEndpointLayer.clearLayers()
-        for (const key of Object.keys(featureLayers)) featureLayers[key] = []
-
-        let loaded = 0, skipped = 0
-
-        for (const feature of features) {
-            try {
-                const data: FeatureData = typeof feature.data === 'string' ? JSON.parse(feature.data) : feature.data
-
-                if (feature.layer === 'scattered') {
-                    if (data.geometry) renderScatteredAreas(data.geometry)
-                    continue
-                }
-
-                const phaseKey = API_LAYER_TO_PHASE[feature.layer] ?? data.type
-                if (!phaseKey || !Object.prototype.hasOwnProperty.call(featureLayers, phaseKey)) { skipped++; continue }
-
-                const phase = PHASES.find(p => p.key === phaseKey)
-                if (!phase) { skipped++; continue }
-
-                let layer: L.Layer
-
-                if (phase.drawType === 'circle') {
-                    if (!data.lat || !data.lng) { skipped++; continue }
-                    layer = L.circle([data.lat, data.lng], {
-                        radius: data.radius ?? 50,
-                        color: '#e74c3c', weight: 2, fillColor: '#e74c3c', fillOpacity: 0.15,
-                    })
-                } else if (phase.drawType === 'marker') {
-                    if (!data.lat || !data.lng) { skipped++; continue }
-                    if (phaseKey === 'houseEntrances' && !data.entranceTypeKey)
-                        data.entranceTypeKey = feature.layer as 'main_entrance' | 'secondary_entrance'
-                    const entranceColor = phaseKey === 'houseEntrances' && data.entranceTypeKey === 'secondary_entrance' ? '#16a085' : phase.color
-                    const icon = createEntranceIcon(data.label, entranceColor)
-                    layer = L.marker([data.lat, data.lng], { icon })
-                    if (phase.key === 'cityCenter' && data.lat != null && data.lng != null) {
-                        store.cityCenterMode   = 'city_center'
-                        store.cityCenterLatLng = { lat: data.lat, lng: data.lng }
-                    }
-                } else if (phase.drawType === 'polyline') {
-                    if (!data.coordinates?.length) { skipped++; continue }
-                    layer = L.polyline(data.coordinates.map(c => [c.lat, c.lng] as [number, number]), { color: phase.color, weight: POLYLINE_WEIGHT })
-                } else {
-                    if (!data.coordinates?.length) { skipped++; continue }
-                    const style = phase.key === 'areas' ? areaStyle(data.areaTypeKey ?? feature.layer) : (polygonStyles[phaseKey] ?? { color: phase.color, weight: 3, fillOpacity: 0.15 })
-                    layer = L.polygon(data.coordinates.map(c => [c.lat, c.lng] as [number, number]), style)
-                }
-
-                ;(layer as any)._dbId = feature.id
-                if (phaseKey === 'roads') {
-                    ctx.roadsDisplayLayer.addLayer(layer)
-                } else {
-                    ctx.drawnItems.addLayer(layer)
-                }
-                bindContextMenu(layer, feature.id, phaseKey)
-                // Endpoint arrows added after direction computation, not on load.
-                createPermanentLabel(layer, data.label, phaseKey)
-                if (phaseKey === 'areas')     createAreaPerimeterLabel(layer, data.areaTypeKey ?? feature.layer)
-                if (phaseKey === 'districts') createPolygonEdgeLabel(layer, getDistrictLabel(data.districtTypeKey ?? 'district', data.label), '#f39c12')
-                bindHoverPopup(layer, buildPopup(data, phase, feature.id))
-
-                featureLayers[phaseKey].push({ layer, data })
-                loaded++
-            } catch (err) { console.error('Load feature error:', err); skipped++ }
-        }
-
-        let resumeAt = 0
-        for (let i = 0; i < PHASES.length; i++) {
-            const key = PHASES[i].key
-            if      (featureLayers[key].length > 0)                              resumeAt = i
-            else if (key === 'cityCenter' && store.cityCenterMode !== null)      resumeAt = i
-            else                                                                 { resumeAt = i; break }
-        }
-        store.currentPhase = resumeAt
-
-        // Restore the exact phase the user was on when they logged out
-        const savedPhase = parseInt(localStorage.getItem('nars_resume_phase') ?? '', 10)
-        if (!isNaN(savedPhase) && savedPhase >= 0 && savedPhase < PHASES.length)
-            store.currentPhase = savedPhase
-        localStorage.removeItem('nars_resume_phase')
-
-        buildDrawControl(PHASES[store.currentPhase])
-        syncCounts()
-        refreshLayerVisibility()
-        // buildDrawControl schedules pm.enableDraw via setTimeout(0), so Geoman's
-        // draw-mode activation fires AFTER the synchronous refreshLayerVisibility call
-        // above. Re-run visibility after Geoman settles — same pattern as setPhase().
-        setTimeout(refreshLayerVisibility, 100)
-
-        // Auto-generate naming panels if resuming into that phase after load
-        const currentKeyAfterLoad = PHASES[store.currentPhase]?.key
-        if (currentKeyAfterLoad === 'namingPanels' && (featureLayers.namingPanels?.length ?? 0) === 0) {
-            try { 
-                const { generateNamingPanels } = await import('./naming-panels')
-                await generateNamingPanels() 
-            } catch (err) { console.error('Auto-generate naming panels after load error:', err) }
-        }
-
-        // If roads have already had directions computed (i.e. we are past the
-        // roads phase or the user already clicked "Set Road Directions"), restore
-        // their endpoint arrow markers now.  Directions are stored in the
-        // coordinate order in the DB, so we just add arrows for the saved order.
-        const resumedPhaseKey = PHASES[store.currentPhase]?.key
-        const roadsPhaseIdx   = PHASES.findIndex(p => p.key === 'roads')
-        const housePhaseIdx   = PHASES.findIndex(p => p.key === 'houseEntrances')
-        const isPastRoads = store.currentPhase > roadsPhaseIdx
-        // Only restore endpoint arrows if directions have actually been computed,
-        // i.e. the user has moved past the Roads phase. While still on Roads,
-        // arrows are added by computeAndApplyRoadDirections() — not on load.
-        if (featureLayers.roads.length > 0 && isPastRoads) {
-            for (const entry of featureLayers.roads as LayerEntry[]) {
-                addPolylineEndpoints(entry.layer)
-            }
-        }
-
-        console.log(`✓ Loaded ${loaded} features (${skipped} skipped)`)
-    } catch (err) { console.error('Load error:', err) }
-}
-
-// ─── USER / COMMUNE BOOTSTRAP ────────────────────────────────────────────────
-
-export async function loadUserAndCommune(): Promise<void> {
-    try {
-        const res = await apiFetch('/api/current_user')
-        if (!res.ok) return
-        const user = await res.json()
-        store.user             = user
-        store.municipalityName = user.commune?.name_fr ?? ''
-        if (user.commune?.id)
-            await displayCommuneBoundary(user.commune.id as number, user.commune.name_fr as string)
-    } catch (err) { console.error('Commune nav error:', err) }
-}

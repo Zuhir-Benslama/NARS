@@ -27,8 +27,6 @@
     <!-- OpenAPI (built-in .NET 10 — replaces Swashbuckle) -->
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
 
-    <!-- Headless browser for server-side map PDF export -->
-    <PackageReference Include="PuppeteerSharp" Version="24.39.0" />
   </ItemGroup>
 
 </Project>

@@ -736,22 +736,6 @@
           }
         }
       },
-      "PuppeteerSharp/24.39.0": {
-        "type": "package",
-        "dependencies": {
-          "WebDriverBiDi": "0.0.45"
-        },
-        "compile": {
-          "lib/net10.0/PuppeteerSharp.dll": {
-            "related": ".xml"
-          }
-        },
-        "runtime": {
-          "lib/net10.0/PuppeteerSharp.dll": {
-            "related": ".xml"
-          }
-        }
-      },
       "System.CodeDom/6.0.0": {
         "type": "package",
         "compile": {
@@ -891,19 +875,6 @@
         },
         "runtime": {
           "lib/net10.0/System.IdentityModel.Tokens.Jwt.dll": {
-            "related": ".xml"
-          }
-        }
-      },
-      "WebDriverBiDi/0.0.45": {
-        "type": "package",
-        "compile": {
-          "lib/net10.0/WebDriverBiDi.dll": {
-            "related": ".xml"
-          }
-        },
-        "runtime": {
-          "lib/net10.0/WebDriverBiDi.dll": {
             "related": ".xml"
           }
         }
@@ -2507,22 +2478,6 @@
         "postgresql.png"
       ]
     },
-    "PuppeteerSharp/24.39.0": {
-      "sha512": "T0Y6LiBa/c7Yk0O5i1A7FG0rSzgyJjGXtkGMCLwR9L7dZaXOjHj3/nq43KSlyzu98+loSKtVbFAnDpOM/Tc+zQ==",
-      "type": "package",
-      "path": "puppeteersharp/24.39.0",
-      "files": [
-        ".nupkg.metadata",
-        ".signature.p7s",
-        "README.md",
-        "lib/net10.0/PuppeteerSharp.dll",
-        "lib/net10.0/PuppeteerSharp.xml",
-        "lib/netstandard2.0/PuppeteerSharp.dll",
-        "lib/netstandard2.0/PuppeteerSharp.xml",
-        "puppeteersharp.24.39.0.nupkg.sha512",
-        "puppeteersharp.nuspec"
-      ]
-    },
     "System.CodeDom/6.0.0": {
       "sha512": "CPc6tWO1LAer3IzfZufDBRL+UZQcj5uS207NHALQzP84Vp/z6wF0Aa0YZImOQY8iStY0A2zI/e3ihKNPfUm8XA==",
       "type": "package",
@@ -2734,26 +2689,6 @@
         "system.identitymodel.tokens.jwt.8.16.0.nupkg.sha512",
         "system.identitymodel.tokens.jwt.nuspec"
       ]
-    },
-    "WebDriverBiDi/0.0.45": {
-      "sha512": "lMQhMh32mqZCIBOkEP5DX+vtuoImuyKEAotqw33OuTZUgFFUFl+tEVPZ8fTIhsTCAXp5Nbhy2d3FeVxHYLehFw==",
-      "type": "package",
-      "path": "webdriverbidi/0.0.45",
-      "files": [
-        ".nupkg.metadata",
-        ".signature.p7s",
-        "README.md",
-        "lib/net10.0/WebDriverBiDi.dll",
-        "lib/net10.0/WebDriverBiDi.xml",
-        "lib/net8.0/WebDriverBiDi.dll",
-        "lib/net8.0/WebDriverBiDi.xml",
-        "lib/net9.0/WebDriverBiDi.dll",
-        "lib/net9.0/WebDriverBiDi.xml",
-        "lib/netstandard2.0/WebDriverBiDi.dll",
-        "lib/netstandard2.0/WebDriverBiDi.xml",
-        "webdriverbidi.0.0.45.nupkg.sha512",
-        "webdriverbidi.nuspec"
-      ]
     }
   },
   "projectFileDependencyGroups": {
@@ -2765,7 +2700,6 @@
       "Microsoft.EntityFrameworkCore.Design >= 10.0.5",
       "Npgsql.EntityFrameworkCore.PostgreSQL >= 10.0.1",
       "Npgsql.EntityFrameworkCore.PostgreSQL.NetTopologySuite >= 10.0.1",
-      "PuppeteerSharp >= 24.39.0",
       "System.IdentityModel.Tokens.Jwt >= 8.16.0"
     ]
   },
@@ -2842,10 +2776,6 @@
           "Npgsql.EntityFrameworkCore.PostgreSQL.NetTopologySuite": {
             "target": "Package",
             "version": "[10.0.1, )"
-          },
-          "PuppeteerSharp": {
-            "target": "Package",
-            "version": "[24.39.0, )"
           },
           "System.IdentityModel.Tokens.Jwt": {
             "target": "Package",

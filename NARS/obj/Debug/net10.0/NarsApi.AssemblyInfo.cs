@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("NarsApi")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0caa94d3679a6b5e6e2bfa7d08eefc3e48aa001a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8da2e3f70a0f027b4e1dd459ef73c88e2c0e26ca")]
 [assembly: System.Reflection.AssemblyProductAttribute("NarsApi")]
 [assembly: System.Reflection.AssemblyTitleAttribute("NarsApi")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

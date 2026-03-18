@@ -24,6 +24,24 @@ export let currentModalLayer: L.Layer | null = null
 
 let _modalResolve: ((result: ModalResult | null) => void) | null = null
 
+// ─── MODAL DEFAULTS ───────────────────────────────────────────────────────────
+// Fields shared by both openModal (new) and openEditModal (edit).
+// Callers Object.assign() these over the store and then override what differs.
+
+function modalDefaults() {
+    return {
+        errors:              {} as Record<string, string>,
+        roadOptions:         [] as import('./types').RoadOption[],
+        selectedRoadIdx:     '' as number | '',
+        entranceSide:        null as 'left' | 'right' | null,
+        entranceNumber:      null as number | null,
+        entranceSideLoading: false,
+        mainEntranceOptions: [] as import('./types').EntranceOption[],
+        selectedMainIdx:     '' as number | '',
+        bisNumber:           null as number | null,
+    }
+}
+
 export function openModal(phaseIndex: number, layer: L.Layer): Promise<ModalResult | null> {
     PHASES[phaseIndex] // validate index (throws if out of bounds)
 
@@ -32,32 +50,24 @@ export function openModal(phaseIndex: number, layer: L.Layer): Promise<ModalResu
         currentModalLayer = layer
 
         Object.assign(store.modal, {
-            visible:             true,
+            ...modalDefaults(),
+            visible:         true,
             phaseIndex,
-            isEdit:              false,
-            editDbId:            null,
-            label:               PHASES[phaseIndex]?.key === 'cityCenter' ? 'City Center' : '',
-            decisionNumber:      '',
-            decisionDate:        '',
-            errors:              {},
+            isEdit:          false,
+            editDbId:        null,
+            label:           PHASES[phaseIndex]?.key === 'cityCenter' ? 'City Center' : '',
+            decisionNumber:  '',
+            decisionDate:    '',
             // areaTypeKey and mainUrbanExists are set by prepareModalExtras before
             // openModal is called — preserve them rather than resetting to defaults.
-            areaTypeKey:         store.modal.mainUrbanExists ? 'secondary_urban' : 'central_urban',
-            mainUrbanExists:     store.modal.mainUrbanExists,
-            districtTypeKey:     'district',
-            roadTypeKey:         'street',
-            entranceTypeKey:     'main_entrance',
-            roadOptions:         [],
-            selectedRoadIdx:     '',
-            entranceSide:        null,
-            entranceNumber:      null,
-            entranceSideLoading: false,
-            mainEntranceOptions: [],
-            selectedMainIdx:     '',
-            bisNumber:           null,
-            spaceTypeKey:        'garden',
-            sectorKey:           'banking_postal',
-            buildingTypeKey:     'bank',
+            areaTypeKey:     store.modal.mainUrbanExists ? 'secondary_urban' : 'central_urban',
+            mainUrbanExists: store.modal.mainUrbanExists,
+            districtTypeKey: 'district',
+            roadTypeKey:     'street',
+            entranceTypeKey: 'main_entrance',
+            spaceTypeKey:    'garden',
+            sectorKey:       'banking_postal',
+            buildingTypeKey: 'bank',
         })
     })
 }
@@ -68,28 +78,23 @@ export function openEditModal(phaseIndex: number, dbId: number, existing: import
         currentModalLayer = null
 
         Object.assign(store.modal, {
+            ...modalDefaults(),
             visible:         true,
             phaseIndex,
             isEdit:          true,
             editDbId:        dbId,
-            label:           existing.label        ?? '',
-            decisionNumber:  existing.decisionNumber ?? '',
-            decisionDate:    existing.decisionDate   ?? '',
-            errors:          {},
-            areaTypeKey:     existing.areaTypeKey    ?? 'central_urban',
+            label:           existing.label           ?? '',
+            decisionNumber:  existing.decisionNumber  ?? '',
+            decisionDate:    existing.decisionDate    ?? '',
+            areaTypeKey:     existing.areaTypeKey     ?? 'central_urban',
             mainUrbanExists: false,
             districtTypeKey: existing.districtTypeKey ?? 'district',
             roadTypeKey:     existing.roadTypeKey     ?? 'street',
             entranceTypeKey: existing.entranceTypeKey ?? (existing.roadDbId != null ? 'main_entrance' : 'secondary_entrance'),
-            roadOptions:         [],
-            selectedRoadIdx:     '',
-            entranceSide:        (existing.side           ?? null) as 'left' | 'right' | null,
-            entranceNumber:      existing.entranceNumber  ?? null,
-            entranceSideLoading: false,
-            mainEntranceOptions: [],
-            selectedMainIdx:     '',
-            bisNumber:           existing.bisNumber       ?? null,
-            spaceTypeKey:    existing.spaceTypeKey ?? 'garden',
+            entranceSide:    (existing.side           ?? null) as 'left' | 'right' | null,
+            entranceNumber:  existing.entranceNumber  ?? null,
+            bisNumber:       existing.bisNumber       ?? null,
+            spaceTypeKey:    existing.spaceTypeKey    ?? 'garden',
             sectorKey:       existing.sectorKey       ?? 'banking_postal',
             buildingTypeKey: existing.buildingTypeKey ?? 'bank',
         })

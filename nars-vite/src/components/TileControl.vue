@@ -19,11 +19,12 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { t }   from '../i18n'
+import { useI18n } from 'vue-i18n'
 import { ctx } from '../map/state'
 
 declare const L: typeof import('leaflet')
 
+const { t } = useI18n()
 const open      = ref(false)
 const activeKey = ref('satellite')
 
@@ -51,65 +52,64 @@ function select(key: string) {
     position: fixed;
     bottom: 10px;
     right: 10px;
-    z-index: 1100;
+    z-index: 1050;
 }
 
 .tile-toggle {
     width: 36px;
     height: 36px;
     border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    background: rgba(15, 25, 50, 0.92);
-    color: #fff;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-bg);
+    color: var(--text-primary);
     font-size: 16px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
     transition: background 0.15s;
 }
+.tile-toggle:hover { background: var(--glass-bg-hover); }
 
 .tile-icon {
     width: 22px;
     height: 22px;
     object-fit: contain;
-    /* Invert to white for dark mode */
     filter: invert(1);
 }
-.tile-toggle:hover {
-    background: rgba(255, 255, 255, 0.15);
-}
+
+:global([data-theme="light"]) .tile-icon { filter: none; }
 
 .tile-dropdown {
     position: absolute;
     bottom: 42px;
     right: 0;
-    background: rgba(15, 25, 50, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: var(--dropdown-bg);
+    border: 1px solid var(--dropdown-border);
     border-radius: 8px;
     overflow: hidden;
     min-width: 150px;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    backdrop-filter: var(--dropdown-bg-blur);
+    -webkit-backdrop-filter: var(--dropdown-bg-blur);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
 }
 
 .tile-item {
     padding: 9px 14px;
     font-size: 13px;
-    color: rgba(255,255,255,0.8);
+    color: var(--dropdown-item);
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 8px;
     transition: background 0.15s;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    border-bottom: 1px solid var(--glass-border);
 }
 .tile-item:last-child { border-bottom: none; }
-.tile-item:hover      { background: rgba(255,255,255,0.08); }
-.tile-item.active     { color: #fff; font-weight: 600; background: rgba(255,255,255,0.06); }
+.tile-item:hover      { background: var(--dropdown-hover); }
+.tile-item.active     { color: var(--text-primary); font-weight: 600; }
 
 .tile-dot {
     width: 10px;
@@ -117,28 +117,4 @@ function select(key: string) {
     border-radius: 50%;
     flex-shrink: 0;
 }
-
-/* Light mode */
-:global([data-theme="light"]) .tile-toggle {
-    background: rgba(240, 244, 255, 0.97);
-    border-color: rgba(0,0,0,0.15);
-    color: #1a1a2e;
-}
-:global([data-theme="light"]) .tile-icon {
-    filter: none;  /* already black, no invert needed */
-}
-:global([data-theme="light"]) .tile-toggle:hover {
-    background: rgba(210, 220, 245, 0.99);
-}
-:global([data-theme="light"]) .tile-dropdown {
-    background: rgba(240, 244, 255, 0.98);
-    border-color: rgba(0,0,0,0.12);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
-}
-:global([data-theme="light"]) .tile-item {
-    color: #1a1a2e;
-    border-bottom-color: rgba(0,0,0,0.06);
-}
-:global([data-theme="light"]) .tile-item:hover     { background: rgba(0,0,0,0.04); }
-:global([data-theme="light"]) .tile-item.active    { background: rgba(0,0,0,0.06); }
 </style>
