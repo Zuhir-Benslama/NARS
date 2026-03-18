@@ -15,7 +15,6 @@
           "Microsoft.EntityFrameworkCore.Design": "10.0.5",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "10.0.1",
           "Npgsql.EntityFrameworkCore.PostgreSQL.NetTopologySuite": "10.0.1",
-          "PuppeteerSharp": "24.39.0",
           "System.IdentityModel.Tokens.Jwt": "8.16.0"
         },
         "runtime": {
@@ -561,17 +560,6 @@
           }
         }
       },
-      "PuppeteerSharp/24.39.0": {
-        "dependencies": {
-          "WebDriverBiDi": "0.0.45"
-        },
-        "runtime": {
-          "lib/net10.0/PuppeteerSharp.dll": {
-            "assemblyVersion": "24.39.0.0",
-            "fileVersion": "24.39.0.0"
-          }
-        }
-      },
       "System.CodeDom/6.0.0": {
         "runtime": {
           "lib/net6.0/System.CodeDom.dll": {
@@ -649,14 +637,6 @@
           "lib/net10.0/System.IdentityModel.Tokens.Jwt.dll": {
             "assemblyVersion": "8.16.0.0",
             "fileVersion": "8.16.0.26043"
-          }
-        }
-      },
-      "WebDriverBiDi/0.0.45": {
-        "runtime": {
-          "lib/net10.0/WebDriverBiDi.dll": {
-            "assemblyVersion": "0.0.45.0",
-            "fileVersion": "0.0.45.0"
           }
         }
       }
@@ -885,13 +865,6 @@
       "path": "npgsql.nettopologysuite/10.0.2",
       "hashPath": "npgsql.nettopologysuite.10.0.2.nupkg.sha512"
     },
-    "PuppeteerSharp/24.39.0": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-T0Y6LiBa/c7Yk0O5i1A7FG0rSzgyJjGXtkGMCLwR9L7dZaXOjHj3/nq43KSlyzu98+loSKtVbFAnDpOM/Tc+zQ==",
-      "path": "puppeteersharp/24.39.0",
-      "hashPath": "puppeteersharp.24.39.0.nupkg.sha512"
-    },
     "System.CodeDom/6.0.0": {
       "type": "package",
       "serviceable": true,
@@ -947,13 +920,6 @@
       "sha512": "sha512-rrs2u7DRMXQG2yh0oVyF/vLwosfRv20Ld2iEpYcKwQWXHjfV+gFXNQsQ9p008kR9Ou4pxBs68Q6/9zC8Gi1wjg==",
       "path": "system.identitymodel.tokens.jwt/8.16.0",
       "hashPath": "system.identitymodel.tokens.jwt.8.16.0.nupkg.sha512"
-    },
-    "WebDriverBiDi/0.0.45": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-lMQhMh32mqZCIBOkEP5DX+vtuoImuyKEAotqw33OuTZUgFFUFl+tEVPZ8fTIhsTCAXp5Nbhy2d3FeVxHYLehFw==",
-      "path": "webdriverbidi/0.0.45",
-      "hashPath": "webdriverbidi.0.0.45.nupkg.sha512"
     }
   }
 }

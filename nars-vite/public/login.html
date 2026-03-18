@@ -451,5 +451,152 @@
             }
         });
     </script>
+
+    <!-- ── Language + Theme controls ─────────────────────────────────── -->
+    <div class="login-controls">
+        <select class="lc-select" id="langSelect">
+            <option value="en">🌐 EN</option>
+            <option value="fr">🌐 FR</option>
+            <option value="ar">🌐 عر</option>
+        </select>
+        <select class="lc-select" id="themeSelect">
+            <option value="light">☀️ Light</option>
+            <option value="dark">🌙 Dark</option>
+            <option value="auto">🖥️ Auto</option>
+        </select>
+    </div>
+
+    <script>
+    // ── i18n ──────────────────────────────────────────────────────────────────
+    const STRINGS = {
+        en: {
+            signIn: 'Sign In', signUp: 'Sign Up',
+            fullName: 'Full Name', email: 'Email', phone: 'Phone Number',
+            username: 'Username', password: 'Password',
+            wilaya: 'Wilaya (State)', daira: 'Daira', commune: 'Commune (Municipality)',
+            searchWilaya: 'Search wilaya...', selectWilaya: 'Select wilaya first...',
+            searchDaira: 'Search daira...', selectDaira: 'Select daira first...',
+            searchCommune: 'Search commune...', selectDairaFirst: 'Select daira first...',
+            noResults: 'No results found',
+            btnSignIn: 'Sign In', btnSignUp: 'Sign Up',
+            errInvalid: 'Invalid username or password',
+            errServer: 'Error connecting to server',
+            errLocation: 'Please select wilaya, daira, and commune from the dropdown lists',
+            successSignup: 'Account created successfully! Please sign in.',
+        },
+        fr: {
+            signIn: 'Connexion', signUp: 'Inscription',
+            fullName: 'Nom complet', email: 'Email', phone: 'Numéro de téléphone',
+            username: "Nom d'utilisateur", password: 'Mot de passe',
+            wilaya: 'Wilaya', daira: 'Daïra', commune: 'Commune',
+            searchWilaya: 'Rechercher une wilaya...', selectWilaya: 'Sélectionnez la wilaya...',
+            searchDaira: 'Rechercher une daïra...', selectDaira: "Sélectionnez la wilaya d'abord...",
+            searchCommune: 'Rechercher une commune...', selectDairaFirst: "Sélectionnez la daïra d'abord...",
+            noResults: 'Aucun résultat',
+            btnSignIn: 'Se connecter', btnSignUp: "S\u2019inscrire",
+            errInvalid: "Nom d'utilisateur ou mot de passe invalide",
+            errServer: 'Erreur de connexion au serveur',
+            errLocation: 'Veuillez sélectionner une wilaya, daïra et commune',
+            successSignup: 'Compte créé avec succès ! Veuillez vous connecter.',
+        },
+        ar: {
+            signIn: 'تسجيل الدخول', signUp: 'إنشاء حساب',
+            fullName: 'الاسم الكامل', email: 'البريد الإلكتروني', phone: 'رقم الهاتف',
+            username: 'اسم المستخدم', password: 'كلمة المرور',
+            wilaya: 'الولاية', daira: 'الدائرة', commune: 'البلدية',
+            searchWilaya: 'ابحث عن ولاية...', selectWilaya: 'اختر الولاية أولاً...',
+            searchDaira: 'ابحث عن دائرة...', selectDaira: 'اختر الولاية أولاً...',
+            searchCommune: 'ابحث عن بلدية...', selectDairaFirst: 'اختر الدائرة أولاً...',
+            noResults: 'لا توجد نتائج',
+            btnSignIn: 'دخول', btnSignUp: 'تسجيل',
+            errInvalid: 'اسم المستخدم أو كلمة المرور غير صحيحة',
+            errServer: 'خطأ في الاتصال بالخادم',
+            errLocation: 'الرجاء اختيار الولاية والدائرة والبلدية من القوائم',
+            successSignup: 'تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول.',
+        }
+    }
+
+    function applyLang(lang) {
+        const s = STRINGS[lang] || STRINGS.en
+        const html = document.documentElement
+        html.lang = lang
+        html.dir  = lang === 'ar' ? 'rtl' : 'ltr'
+        localStorage.setItem('nars_lang', lang)
+
+        // Also persist for the map app
+        document.getElementById('signinTab').textContent  = s.signIn
+        document.getElementById('signupTab').textContent  = s.signUp
+
+        // Labels
+        const labels = {
+            'signup-name':    s.fullName,
+            'signup-email':   s.email,
+            'signup-phone':   s.phone,
+            'signup-username': s.username,
+            'signup-password': s.password,
+            'signup-wilaya':  s.wilaya,
+            'signup-daira':   s.daira,
+            'signup-commune': s.commune,
+        }
+        Object.entries(labels).forEach(([id, text]) => {
+            const el = document.getElementById(id)
+            if (el) {
+                const label = el.closest('.form-group')?.querySelector('label')
+                if (label) label.firstChild.textContent = text
+            }
+        })
+
+        // Placeholders
+        document.getElementById('signup-wilaya').placeholder = s.searchWilaya
+        const dairaEl = document.getElementById('signup-daira')
+        dairaEl.placeholder = dairaEl.disabled ? s.selectWilaya : s.searchDaira
+        const communeEl = document.getElementById('signup-commune')
+        communeEl.placeholder = communeEl.disabled ? s.selectDairaFirst : s.searchCommune
+
+        // Buttons
+        document.querySelector('#signinForm .btn').textContent  = s.btnSignIn
+        document.querySelector('#signupForm .btn').textContent  = s.btnSignUp
+
+        // Sign-in username/password labels
+        document.querySelector('label[for="signin-username"]').textContent = s.username
+        document.querySelector('label[for="signin-password"]').textContent = s.password
+
+        // Active button state
+        const ls = document.getElementById('langSelect')
+        if (ls) ls.value = lang
+    }
+
+    // ── Theme ─────────────────────────────────────────────────────────────────
+    function applyTheme(mode) {
+        const html = document.documentElement
+        if (mode === 'light') {
+            html.removeAttribute('data-theme')   // light = default, no attribute needed
+        } else if (mode === 'dark') {
+            html.setAttribute('data-theme', 'dark')
+        } else {
+            // auto — match OS preference
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+            if (prefersDark) html.setAttribute('data-theme', 'dark')
+            else             html.removeAttribute('data-theme')
+        }
+        localStorage.setItem('nars_theme', mode)
+        const ts = document.getElementById('themeSelect')
+        if (ts) ts.value = mode
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+    const savedLang  = localStorage.getItem('nars_lang')  || 'en'
+    const savedTheme = localStorage.getItem('nars_theme') || 'light'
+    applyLang(savedLang)
+    applyTheme(savedTheme)
+
+    document.getElementById('langSelect').addEventListener('change', function() {
+        applyLang(this.value)
+    })
+    document.getElementById('themeSelect').addEventListener('change', function() {
+        applyTheme(this.value)
+    })
+    </script>
+
 </body>
 </html>

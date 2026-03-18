@@ -253,3 +253,137 @@ select option {
 #signupForm {
     display: none;
 }
+
+/* ── Language + Theme control bar ──────────────────────────────────────────── */
+
+.login-controls {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    gap: 8px;
+    z-index: 100;
+}
+
+[dir="rtl"] .login-controls { right: auto; left: 16px; }
+
+.lc-select {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 24px 6px 10px;
+    cursor: pointer;
+    font-family: inherit;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,255,0.7)'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+}
+
+.lc-select:hover { background-color: rgba(255, 255, 255, 0.28); }
+.lc-select option { background: #1a1a2e; color: #fff; }
+
+/* ── Dark mode ───────────────────────────────────────────────────────────────── */
+/* The default styles above are the light mode.                                 */
+/* [data-theme="dark"] overrides everything to a deep dark glassmorphism.       */
+
+[data-theme="dark"] body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    pointer-events: none;
+    z-index: 0;
+}
+
+[data-theme="dark"] .container {
+    position: relative;
+    z-index: 1;
+    background: rgba(15, 25, 50, 0.75);
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+[data-theme="dark"] .tabs {
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .tab {
+    color: rgba(255, 255, 255, 0.45);
+}
+
+[data-theme="dark"] .tab:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+[data-theme="dark"] .tab.active {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+    border-bottom-color: rgba(255, 255, 255, 0.6);
+}
+
+[data-theme="dark"] label {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+[data-theme="dark"] .logo h1 { color: #fff; }
+[data-theme="dark"] .logo p  { color: rgba(255, 255, 255, 0.55); }
+
+[data-theme="dark"] input,
+[data-theme="dark"] .search-select {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    color-scheme: dark;
+    -webkit-text-fill-color: #fff;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] .search-select::placeholder {
+    color: rgba(255, 255, 255, 0.25);
+}
+
+[data-theme="dark"] input:focus,
+[data-theme="dark"] .search-select:focus {
+    border-color: rgba(255, 255, 255, 0.35);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04) !important;
+}
+
+[data-theme="dark"] .btn {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.18);
+    color: #fff;
+}
+
+[data-theme="dark"] .btn:hover {
+    background: rgba(255, 255, 255, 0.16);
+}
+
+[data-theme="dark"] .dropdown-list {
+    background: rgba(10, 20, 45, 0.92);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="dark"] .dropdown-item {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+[data-theme="dark"] .dropdown-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .login-controls { z-index: 101; }
+
+[data-theme="dark"] .lc-select {
+    background-color: rgba(15, 25, 50, 0.7);
+    border-color: rgba(255, 255, 255, 0.18);
+}

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "YQt4Yfxy0ic=",
+  "dgSpecHash": "ZMXGWboTLu8=",
   "success": true,
   "projectFilePath": "/home/zuhir/Workspace/NARS/NarsApi.csproj",
   "expectedPackageFiles": [
@@ -37,7 +37,6 @@
     "/home/zuhir/.nuget/packages/npgsql.entityframeworkcore.postgresql/10.0.1/npgsql.entityframeworkcore.postgresql.10.0.1.nupkg.sha512",
     "/home/zuhir/.nuget/packages/npgsql.entityframeworkcore.postgresql.nettopologysuite/10.0.1/npgsql.entityframeworkcore.postgresql.nettopologysuite.10.0.1.nupkg.sha512",
     "/home/zuhir/.nuget/packages/npgsql.nettopologysuite/10.0.2/npgsql.nettopologysuite.10.0.2.nupkg.sha512",
-    "/home/zuhir/.nuget/packages/puppeteersharp/24.39.0/puppeteersharp.24.39.0.nupkg.sha512",
     "/home/zuhir/.nuget/packages/system.codedom/6.0.0/system.codedom.6.0.0.nupkg.sha512",
     "/home/zuhir/.nuget/packages/system.composition/9.0.0/system.composition.9.0.0.nupkg.sha512",
     "/home/zuhir/.nuget/packages/system.composition.attributedmodel/9.0.0/system.composition.attributedmodel.9.0.0.nupkg.sha512",
@@ -45,8 +44,7 @@
     "/home/zuhir/.nuget/packages/system.composition.hosting/9.0.0/system.composition.hosting.9.0.0.nupkg.sha512",
     "/home/zuhir/.nuget/packages/system.composition.runtime/9.0.0/system.composition.runtime.9.0.0.nupkg.sha512",
     "/home/zuhir/.nuget/packages/system.composition.typedparts/9.0.0/system.composition.typedparts.9.0.0.nupkg.sha512",
-    "/home/zuhir/.nuget/packages/system.identitymodel.tokens.jwt/8.16.0/system.identitymodel.tokens.jwt.8.16.0.nupkg.sha512",
-    "/home/zuhir/.nuget/packages/webdriverbidi/0.0.45/webdriverbidi.0.0.45.nupkg.sha512"
+    "/home/zuhir/.nuget/packages/system.identitymodel.tokens.jwt/8.16.0/system.identitymodel.tokens.jwt.8.16.0.nupkg.sha512"
   ],
   "logs": []
 }

@@ -1,0 +1,19 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5432;Database=nars_db;Username=postgres;Password=YOUR_DB_PASSWORD"
+  },
+  "Jwt": {
+    "SecretKey": "REPLACE_WITH_A_LONG_RANDOM_SECRET_AT_LEAST_32_CHARS",
+    "Algorithm": "HS256",
+    "ExpiresInMinutes": 1440
+  },
+  "Cors": {
+    "AllowedOrigins": [
+      "http://localhost:5000",
+      "http://localhost:5001",
+      "https://localhost:7000",
+      "https://localhost:7001",
+      "http://localhost:5173"
+    ]
+  }
+}

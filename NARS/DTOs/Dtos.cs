@@ -6,6 +6,12 @@ namespace NarsApi.DTOs;
 
 // ── Auth ──────────────────────────────────────────────────
 
+public record UpdateUserRequest(
+    [property: JsonPropertyName("username")] string? Username,
+    [property: JsonPropertyName("email")]    string? Email,
+    [property: JsonPropertyName("password")] string? Password
+);
+
 public record SignUpRequest(
     [Required] string Name,
     [Required, EmailAddress] string Email,
@@ -21,6 +27,10 @@ public record SignInRequest(
 );
 
 // ── Features ──────────────────────────────────────────────
+
+public record ClearFeaturesRequest(
+    [property: JsonPropertyName("confirm")] bool Confirm
+);
 
 public record FeatureSaveRequest(
     [Required] string Type,

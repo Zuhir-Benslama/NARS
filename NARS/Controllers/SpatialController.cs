@@ -4,8 +4,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
 using NarsApi.DTOs;
-using NarsApi.Infrastructure;
 using NarsApi.Models;
+using NarsApi.Services;
 
 namespace NarsApi.Controllers;
 
@@ -16,7 +16,7 @@ namespace NarsApi.Controllers;
 /// </summary>
 [ApiController]
 [Tags("Spatial")]
-public class SpatialController(AppDbContext db) : NarsControllerBase
+public class SpatialController(AppDbContext db, IScatteredAreaService scatteredService) : NarsControllerBase
 {
     // ── POST /api/road-side ───────────────────────────────────────────────────
 
@@ -41,7 +41,7 @@ public class SpatialController(AppDbContext db) : NarsControllerBase
 
         // Find the nearest segment midpoint to the marker
         double markerLat = body.Lat, markerLng = body.Lng;
-        double minDist   = double.MaxValue;
+        double minDist    = double.MaxValue;
         int    nearestIdx = 0;
 
         for (int i = 0; i < roadCoords.Count - 1; i++)
@@ -62,12 +62,12 @@ public class SpatialController(AppDbContext db) : NarsControllerBase
 
         string side = cross >= 0 ? "left" : "right";
 
-        // fix #8: filter entrances by roadDbId inside PostgreSQL via JSONB operators
+        // Filter entrances by roadDbId inside PostgreSQL via JSONB operators
         // instead of loading all entrances into memory and filtering in C#.
         var usedNumbers = new HashSet<int>();
         var conn        = db.Database.GetDbConnection();
 
-        // fix #10: guard against already-open pooled connection
+        // Guard against already-open pooled connection
         if (conn.State != ConnectionState.Open)
             await conn.OpenAsync();
         try
@@ -99,75 +99,12 @@ public class SpatialController(AppDbContext db) : NarsControllerBase
     }
 
     // ── POST /api/areas/refresh-scattered ────────────────────────────────────
-    // fix #3: replaced null-forgiving ! operators with proper null guards.
-    // fix #2: replaced manual cookie→JWT dance with CurrentCommuneId from [Authorize].
+    // Delegates to IScatteredAreaService — SQL lives in one place.
 
     [HttpPost("/api/areas/refresh-scattered")]
     public async Task<IActionResult> RefreshScattered()
     {
-        int communeId = CurrentCommuneId;   // fix #3: no NRE — claim is guaranteed by [Authorize]
-
-        var conn = db.Database.GetDbConnection();
-
-        // fix #10: guard against already-open pooled connection
-        if (conn.State != ConnectionState.Open)
-            await conn.OpenAsync();
-        string? scatteredGeoJson = null;
-        try
-        {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = $@"
-                WITH
-                boundary AS (
-                    SELECT geometry AS geom
-                    FROM communes_boundaries
-                    WHERE commune_id = @cid
-                ),
-                urban AS (
-                    SELECT ST_Union({SqlFragments.PolygonFromData}) AS geom
-                    FROM areas f
-                    WHERE f.user_id = @uid
-                      AND f.layer  IN ('central_urban', 'secondary_urban')
-                )
-                SELECT ST_AsGeoJSON(
-                    ST_Difference(
-                        boundary.geom,
-                        COALESCE(urban.geom, ST_GeomFromText('GEOMETRYCOLLECTION EMPTY', 4326))
-                    )
-                )
-                FROM boundary
-                LEFT JOIN urban ON true";
-            AddParam(cmd, "@cid", communeId);
-            AddParam(cmd, "@uid", CurrentUserId);
-
-            scatteredGeoJson = await cmd.ExecuteScalarAsync() as string;
-        }
-        finally { await conn.CloseAsync(); }
-
-        if (scatteredGeoJson is null)
-            return Ok(new ScatteredRefreshResponse(false, null, "Municipal boundary not found."));
-
-        await db.Areas
-            .Where(f => f.UserId == CurrentUserId &&
-                        f.Layer  == FeatureTypes.AreaLayers.Scattered)
-            .ExecuteDeleteAsync();
-
-        var scattered = new Area
-        {
-            UserId = CurrentUserId,
-            Layer  = FeatureTypes.AreaLayers.Scattered,
-            Label  = "Scattered Area",
-            Data   = JsonSerializer.Serialize(new
-            {
-                type     = "areas",
-                label    = "Scattered Area",
-                layer    = "scattered",
-                geometry = scatteredGeoJson,
-            }),
-        };
-        db.Areas.Add(scattered);
-        await db.SaveChangesAsync();
-
-        return Ok(new ScatteredRefreshResponse(true, scatteredGeoJson, "Scattered area recomputed."));
+        await scatteredService.RefreshAsync(CurrentUserId, CurrentCommuneId);
+        return Ok(new ScatteredRefreshResponse(true, null, "Scattered area recomputed."));
     }
 }
