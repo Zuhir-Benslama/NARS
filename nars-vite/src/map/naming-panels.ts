@@ -91,7 +91,6 @@ function roadStations(line: L.Polyline): L.LatLng[] {
 async function addPanelIfMissing(label: string, ll: L.LatLng, color: string): Promise<void> {
   if (nearExisting(ll)) return
 
-  const phase = getNamingPanelsPhase()
   const data: FeatureData = {
     type: 'namingPanels',
     label,
@@ -101,7 +100,7 @@ async function addPanelIfMissing(label: string, ll: L.LatLng, color: string): Pr
     lng:            ll.lng,
   }
 
-  // Use the source feature's phase color so panels are visually linked to their origin.
+  // Create marker with source-feature color
   const icon = createEntranceIcon(label, color)
   // Ensure naming panels render on top by using a dedicated high z-index pane
   if (!ctx.map.getPane('namingPanelsPane')) {
@@ -112,9 +111,18 @@ async function addPanelIfMissing(label: string, ll: L.LatLng, color: string): Pr
   ;(marker as any).pm?.setOptions?.({ pmIgnore: true })
 
   // Add to map and featureLayers (no context menu, no DB id)
+  const phase = getNamingPanelsPhase()
   ctx.drawnItems.addLayer(marker)
   marker.bindPopup(buildPopup(data, phase))
   ;(featureLayers.namingPanels as LayerEntry[]).push({ layer: marker, data })
+}
+
+// Per-source colors matching each phase
+const PANEL_COLORS = {
+  districts:       '#f39c12',
+  roads:           '#3498db',
+  publicBuildings: '#e67e22',
+  publicSpaces:    '#2ecc71',
 }
 
 export async function generateNamingPanels(): Promise<void> {
@@ -124,28 +132,28 @@ export async function generateNamingPanels(): Promise<void> {
   for (const e of featureLayers.districts as LayerEntry[]) {
     if (!(e.layer instanceof L.Polygon)) continue
     const verts = polygonVertices(e.layer)
-    for (const v of verts) tasks.push(addPanelIfMissing(e.data.label, v, '#f39c12'))
+    for (const v of verts) tasks.push(addPanelIfMissing(e.data.label, v, PANEL_COLORS.districts))
   }
 
   // Roads: start, end, every 100m
   for (const e of featureLayers.roads as LayerEntry[]) {
     if (!(e.layer instanceof L.Polyline) || (e.layer instanceof L.Polygon)) continue
     const stations = roadStations(e.layer)
-    for (const v of stations) tasks.push(addPanelIfMissing(e.data.label, v, '#3498db'))
+    for (const v of stations) tasks.push(addPanelIfMissing(e.data.label, v, PANEL_COLORS.roads))
   }
 
   // Public Buildings: first vertex
   for (const e of featureLayers.publicBuildings as LayerEntry[]) {
     if (!(e.layer instanceof L.Polygon)) continue
     const v = firstVertex(e.layer)
-    if (v) tasks.push(addPanelIfMissing(e.data.label, v, '#e67e22'))
+    if (v) tasks.push(addPanelIfMissing(e.data.label, v, PANEL_COLORS.publicBuildings))
   }
 
   // Public Spaces: first vertex
   for (const e of featureLayers.publicSpaces as LayerEntry[]) {
     if (!(e.layer instanceof L.Polygon)) continue
     const v = firstVertex(e.layer)
-    if (v) tasks.push(addPanelIfMissing(e.data.label, v, '#2ecc71'))
+    if (v) tasks.push(addPanelIfMissing(e.data.label, v, PANEL_COLORS.publicSpaces))
   }
 
   await Promise.all(tasks)

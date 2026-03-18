@@ -150,10 +150,17 @@ public class FeaturesController(AppDbContext db, IScatteredAreaService scattered
     }
 
     // ── POST /api/clear ───────────────────────────────────────────────────────
+    // Requires { "confirm": true } in the request body as an explicit opt-in
+    // guard against accidental data loss (e.g. a stray curl or test harness call).
 
     [HttpPost("/api/clear")]
-    public async Task<IActionResult> ClearFeatures()
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ClearFeatures([FromBody] ClearFeaturesRequest body)
     {
+        if (!body.Confirm)
+            return BadRequest(new { detail = "Set \"confirm\": true to delete all features." });
+
         var uid = CurrentUserId;
         int total = 0;
         total += await db.Areas.Where(f => f.UserId == uid).ExecuteDeleteAsync();

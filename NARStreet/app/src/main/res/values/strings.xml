@@ -1,0 +1,64 @@
+<resources>
+    <string name="app_name">NARStreet</string>
+
+    <!-- Auth -->
+    <string name="login_title">Sign in to NARStreet</string>
+    <string name="login_username">Username</string>
+    <string name="login_password">Password</string>
+    <string name="login_button">Sign in</string>
+    <string name="login_error_empty">Username and password are required</string>
+
+    <!-- Phases -->
+    <string name="phase04_title">Roads</string>
+    <string name="phase05_title">House Entrances</string>
+    <string name="phase06_title">Public Buildings</string>
+    <string name="phase07_title">Public Spaces</string>
+    <string name="phase08_title">Naming Panels</string>
+
+    <!-- Sync -->
+    <string name="sync_pending">Changes pending sync</string>
+    <string name="sync_syncing">Syncing…</string>
+    <string name="sync_done">All changes synced</string>
+    <string name="sync_offline">Offline — changes saved locally</string>
+    <string name="sync_error">Sync failed — will retry</string>
+
+    <!-- Phase 04 -->
+    <string name="road_lanes">Number of lanes</string>
+    <string name="road_traffic">Traffic capacity</string>
+    <string name="road_trad">Traditional activity</string>
+    <string name="road_median">Median strip</string>
+    <string name="road_greenery">Greenery on sidewalks</string>
+    <string name="road_dead_end">Dead-end</string>
+    <string name="road_save">Save road</string>
+
+    <!-- Phase 05 -->
+    <string name="entrance_capture">Capture my position</string>
+    <string name="entrance_numbered">Is it numbered?</string>
+    <string name="entrance_number_correct">Is the number correct?</string>
+    <string name="entrance_order_plate">Order new plate</string>
+    <string name="entrance_notify_plate">Notify: order a numbering plate</string>
+
+    <!-- Phase 06 / 07 -->
+    <string name="geometry_edit">Edit geometry</string>
+    <string name="geometry_save">Save geometry</string>
+    <string name="geometry_instructions">Drag vertices to reshape. Tap a vertex to delete it.</string>
+
+    <!-- Phase 08 -->
+    <string name="panel_placed">Panel placed?</string>
+    <string name="panel_correct_location">Correct location?</string>
+    <string name="panel_order">Order naming panel</string>
+    <string name="panel_relocate">Notify: relocate panel</string>
+
+    <!-- Common -->
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="confirm">Confirm</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="high">High</string>
+    <string name="medium">Medium</string>
+    <string name="low">Low</string>
+    <string name="loading">Loading…</string>
+    <string name="retry">Retry</string>
+    <string name="logout">Sign out</string>
+</resources>

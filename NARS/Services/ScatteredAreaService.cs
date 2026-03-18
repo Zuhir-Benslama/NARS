@@ -66,8 +66,8 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
                     )
                     FROM boundary LEFT JOIN urban ON true";
 
-                AddParam(cmd, "@cid", communeId);
-                AddParam(cmd, "@uid", userId);
+                SqlFragments.AddParam(cmd, "@cid", communeId);
+                SqlFragments.AddParam(cmd, "@uid", userId);
 
                 // CommandBehavior.SequentialAccess streams the large GeoJSON column
                 // instead of buffering it in Npgsql's internal buffer.
@@ -103,13 +103,5 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
         {
             Console.Error.WriteLine($"[ScatteredAreaService] Refresh error: {ex.Message}");
         }
-    }
-
-    private static void AddParam(IDbCommand cmd, string name, object value)
-    {
-        var p = cmd.CreateParameter();
-        p.ParameterName = name;
-        p.Value         = value;
-        cmd.Parameters.Add(p);
     }
 }

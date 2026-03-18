@@ -1,9 +1,12 @@
+using System.Data;
+
 namespace NarsApi.Infrastructure;
 
 /// <summary>
-/// Shared PostGIS SQL fragment constants used by ValidationController and
-/// FeaturesController.  A single source of truth prevents the two locations
-/// from drifting (e.g. one missing ST_MakeValid — see security issue #4).
+/// Shared PostGIS SQL fragment constants and ADO.NET helpers used across
+/// ValidationController, SpatialController, and ScatteredAreaService.
+/// A single source of truth prevents SQL fragments from drifting between
+/// locations (e.g. one missing ST_MakeValid).
 /// </summary>
 internal static class SqlFragments
 {
@@ -45,4 +48,16 @@ internal static class SqlFragments
                 )
             )::text
         ), 4326))";
+
+    /// <summary>
+    /// Adds a named parameter to an ADO.NET command.
+    /// Shared by NarsControllerBase and ScatteredAreaService to avoid duplication.
+    /// </summary>
+    internal static void AddParam(IDbCommand cmd, string name, object value)
+    {
+        var p = cmd.CreateParameter();
+        p.ParameterName = name;
+        p.Value         = value;
+        cmd.Parameters.Add(p);
+    }
 }
