@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
 using NarsApi.DTOs;
@@ -20,6 +21,7 @@ public class AuthController(
     // ── POST /api/signup ──────────────────────────────────────
 
     [HttpPost("/api/signup")]
+    [EnableRateLimiting("auth")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> SignUp([FromBody] SignUpRequest body)
@@ -52,6 +54,7 @@ public class AuthController(
     // ── POST /api/signin ──────────────────────────────────────
 
     [HttpPost("/api/signin")]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> SignIn([FromBody] SignInRequest body)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Username == body.Username);
@@ -77,9 +80,8 @@ public class AuthController(
 
         return Ok(new
         {
-            success      = true,
-            access_token = token,
-            token_type   = "bearer",
+            success    = true,
+            token_type = "bearer",
             user = new
             {
                 id       = user.Id,

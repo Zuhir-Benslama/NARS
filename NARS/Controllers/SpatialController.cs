@@ -39,8 +39,11 @@ public class SpatialController(AppDbContext db, IScatteredAreaService scatteredS
         if (roadCoords.Count < 2)
             return BadRequest(new { detail = "Road has insufficient coordinates." });
 
-        // Find the nearest segment midpoint to the marker
+        // Find the nearest segment midpoint to the marker.
+        // Apply cosine correction so the Δlng component is in the same
+        // unit scale as Δlat (important at Algeria's latitudes ~28–37°N).
         double markerLat = body.Lat, markerLng = body.Lng;
+        double cosLat     = Math.Cos(markerLat * Math.PI / 180.0);
         double minDist    = double.MaxValue;
         int    nearestIdx = 0;
 
@@ -48,8 +51,9 @@ public class SpatialController(AppDbContext db, IScatteredAreaService scatteredS
         {
             var mid = ((roadCoords[i].Lat + roadCoords[i + 1].Lat) / 2,
                        (roadCoords[i].Lng + roadCoords[i + 1].Lng) / 2);
-            double d = Math.Sqrt(Math.Pow(markerLat - mid.Item1, 2) +
-                                 Math.Pow(markerLng - mid.Item2, 2));
+            double dLat = markerLat - mid.Item1;
+            double dLng = (markerLng - mid.Item2) * cosLat;
+            double d    = Math.Sqrt(dLat * dLat + dLng * dLng);
             if (d < minDist) { minDist = d; nearestIdx = i; }
         }
 

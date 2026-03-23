@@ -109,15 +109,20 @@ export async function loadFromDatabase(): Promise<void> {
         }
 
         // ── Determine resume phase ────────────────────────────────────────────
-
-        let resumeAt = 0
+        // Walk ALL phases and record the highest index that has data.
+        // Never break early — a gap (e.g. no city center) must not hide later
+        // phases (e.g. roads, entrances) that were drawn after it.
+        let lastFilledPhase = -1
         for (let i = 0; i < PHASES.length; i++) {
             const key = PHASES[i].key
-            if      (featureLayers[key].length > 0)                         resumeAt = i
-            else if (key === 'cityCenter' && store.cityCenterMode !== null)  resumeAt = i
-            else                                                             { resumeAt = i; break }
+            const hasDatta = featureLayers[key]?.length > 0
+                || (key === 'cityCenter' && store.cityCenterMode !== null)
+            if (hasDatta) lastFilledPhase = i
         }
-        store.currentPhase = resumeAt
+        // Resume at the phase after the last filled one, capped at the final phase.
+        store.currentPhase = lastFilledPhase < 0
+            ? 0
+            : Math.min(lastFilledPhase + 1, PHASES.length - 1)
 
         const savedPhase = parseInt(localStorage.getItem('nars_resume_phase') ?? '', 10)
         if (!isNaN(savedPhase) && savedPhase >= 0 && savedPhase < PHASES.length)
@@ -151,7 +156,7 @@ export async function loadFromDatabase(): Promise<void> {
         }
 
         console.log(`✓ Loaded ${loaded} features (${skipped} skipped)`)
-    } catch (err) { console.error('Load error:', err) }
+    } catch (err) { console.error('Load error:', err); store.loadError = true }
 }
 
 // ─── USER / COMMUNE BOOTSTRAP ─────────────────────────────────────────────────

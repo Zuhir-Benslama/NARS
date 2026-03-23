@@ -9,6 +9,9 @@
     <string name="login_error_empty">Username and password are required</string>
 
     <!-- Phases -->
+    <string name="phase01_title">Areas</string>
+    <string name="phase02_title">Districts</string>
+    <string name="phase03_title">City Center</string>
     <string name="phase04_title">Roads</string>
     <string name="phase05_title">House Entrances</string>
     <string name="phase06_title">Public Buildings</string>
@@ -61,4 +64,5 @@
     <string name="loading">Loading…</string>
     <string name="retry">Retry</string>
     <string name="logout">Sign out</string>
+    <string name="settings">Settings</string>
 </resources>

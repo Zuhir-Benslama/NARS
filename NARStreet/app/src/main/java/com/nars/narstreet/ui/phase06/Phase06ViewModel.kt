@@ -1,12 +1,16 @@
 package com.nars.narstreet.ui.phase06
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nars.narstreet.core.session.SessionManager
 import com.nars.narstreet.core.sync.ConnectivityObserver
 import com.nars.narstreet.data.model.BuildingEntity
+import com.nars.narstreet.repository.AreaRepository
 import com.nars.narstreet.repository.BuildingRepository
+import com.nars.narstreet.repository.CommuneRepository
+import com.nars.narstreet.ui.components.MapLayersState
 import com.nars.narstreet.ui.components.SyncState
+import com.nars.narstreet.ui.components.parseCoordinatesJson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -14,40 +18,58 @@ import org.maplibre.android.geometry.LatLng
 import javax.inject.Inject
 
 data class Phase06UiState(
-    val building: BuildingEntity? = null,
-    val vertices: List<LatLng>    = emptyList(),
-    val isLoading: Boolean        = true,
-    val isSaved: Boolean          = false,
-    val syncState: SyncState      = SyncState.IDLE,
+    val buildings: List<BuildingEntity>   = emptyList(),
+    val isLoading: Boolean                = true,
+    val infoBuilding: BuildingEntity?     = null,
+    val communeCenter: LatLng             = LatLng(36.7, 3.05),
+    val mapLayers: MapLayersState         = MapLayersState(),
+    val username: String                  = "",
+    val syncState: SyncState              = SyncState.IDLE,
 )
 
 @HiltViewModel
 class Phase06ViewModel @Inject constructor(
-    savedState: SavedStateHandle,
     private val repo: BuildingRepository,
+    private val areaRepo: AreaRepository,
+    private val communeRepo: CommuneRepository,
     private val connectivity: ConnectivityObserver,
+    private val session: SessionManager,
 ) : ViewModel() {
 
-    private val buildingId: Long = savedState["buildingId"] ?: 0L
-
-    private val _uiState = MutableStateFlow(Phase06UiState())
+    private val _uiState = MutableStateFlow(Phase06UiState(
+        communeCenter = session.communeCenterState.value,
+        mapLayers     = MapLayersState(communeCenter = session.communeCenterState.value),
+    ))
     val uiState: StateFlow<Phase06UiState> = _uiState.asStateFlow()
 
     init {
+        viewModelScope.launch { session.username.collect { _uiState.update { s -> s.copy(username = it ?: "") } } }
+        viewModelScope.launch {
+            session.communeCenter.collect { c ->
+                _uiState.update { s -> s.copy(communeCenter = c, mapLayers = s.mapLayers.copy(communeCenter = c)) }
+            }
+        }
         viewModelScope.launch {
             repo.buildings.collect { list ->
-                val building = list.find { it.id == buildingId }
-                if (building != null) {
-                    _uiState.update {
-                        it.copy(
-                            building  = building,
-                            vertices  = parseVertices(building.coordinatesJson),
-                            isLoading = false,
-                        )
-                    }
-                } else {
-                    _uiState.update { it.copy(isLoading = false) }
-                }
+                // Buildings are POINT features — lat/lng, not polygons
+                val points = list.map { LatLng(it.lat, it.lng) }
+                _uiState.update { s -> s.copy(
+                    buildings = list,
+                    isLoading = false,
+                    mapLayers = s.mapLayers.copy(
+                        buildingPoints = points,
+                        buildingLabels = list.map { it.label },
+                        buildingDbIds  = list.map { it.id },
+                    ),
+                ) }
+            }
+        }
+        // Areas shown as context (per spreadsheet: Phase06 shows Areas ✓)
+        viewModelScope.launch {
+            areaRepo.areas.collect { areas ->
+                val polys  = areas.map { parseCoordinatesJson(it.coordinatesJson) }
+                val labels = areas.map { it.label }
+                _uiState.update { s -> s.copy(mapLayers = s.mapLayers.copy(areaPolygons = polys, areaLabels = labels)) }
             }
         }
         viewModelScope.launch {
@@ -59,33 +81,19 @@ class Phase06ViewModel @Inject constructor(
                 }
             }.collect { s -> _uiState.update { it.copy(syncState = s) } }
         }
-    }
-
-    fun onVerticesMoved(vertices: List<LatLng>) {
-        _uiState.update { it.copy(vertices = vertices) }
-    }
-
-    fun saveGeometry() {
-        val building  = _uiState.value.building ?: return
-        val vertices  = _uiState.value.vertices
         viewModelScope.launch {
-            repo.saveGeometry(
-                building.copy(coordinatesJson = serializeVertices(vertices))
-            )
-            _uiState.update { it.copy(isSaved = true) }
+            communeRepo.context.collect { ctx ->
+                _uiState.update { it.copy(mapLayers = it.mapLayers.copy(communeContext = ctx)) }
+            }
+        }
+        viewModelScope.launch { communeRepo.refresh() }
+        viewModelScope.launch {
+            repo.refresh()
+            areaRepo.refresh()
+            _uiState.update { it.copy(isLoading = false) }
         }
     }
 
-    private fun parseVertices(json: String): List<LatLng> = try {
-        val trimmed = json.trim().removePrefix("[").removeSuffix("]")
-        if (trimmed.isBlank()) return emptyList()
-        trimmed.split("},{").map { entry ->
-            val lat = Regex("\"lat\":([-\\d.]+)").find(entry)?.groupValues?.get(1)?.toDouble() ?: 0.0
-            val lng = Regex("\"lng\":([-\\d.]+)").find(entry)?.groupValues?.get(1)?.toDouble() ?: 0.0
-            LatLng(lat, lng)
-        }
-    } catch (_: Exception) { emptyList() }
-
-    private fun serializeVertices(vertices: List<LatLng>): String =
-        "[" + vertices.joinToString(",") { """{"lat":${it.latitude},"lng":${it.longitude}}""" } + "]"
+    fun showInfo(b: BuildingEntity) = _uiState.update { it.copy(infoBuilding = b) }
+    fun dismissInfo()               = _uiState.update { it.copy(infoBuilding = null) }
 }

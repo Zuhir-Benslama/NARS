@@ -1,14 +1,17 @@
 package com.nars.narstreet.repository
 
-import androidx.work.*
+import android.util.Log
 import com.nars.narstreet.core.network.ApiService
 import com.nars.narstreet.core.sync.ConnectivityObserver
-import com.nars.narstreet.core.sync.SyncWorker
+import com.nars.narstreet.core.sync.SyncScheduler
+import com.nars.narstreet.core.util.extractCoords
 import com.nars.narstreet.data.dao.RoadDao
 import com.nars.narstreet.data.model.RoadEntity
 import com.nars.narstreet.data.model.SyncStatus
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -17,50 +20,73 @@ class RoadRepository @Inject constructor(
     private val dao: RoadDao,
     private val api: ApiService,
     private val connectivity: ConnectivityObserver,
-    private val workManager: WorkManager,
+    private val syncScheduler: SyncScheduler,
 ) {
     val roads: Flow<List<RoadEntity>> = dao.getAll()
     val pendingCount: Flow<Int>       = dao.pendingCount()
 
-    /** Pull all roads from the server and cache them locally. */
+    private val _lastError = MutableStateFlow<String?>(null)
+    val lastError: StateFlow<String?> = _lastError.asStateFlow()
+
+
+    private val roadLayers = listOf(
+        "boulevard", "avenue", "street", "drive", "lane", "cul_de_sac", "way"
+    )
+
     suspend fun refresh() {
+        _lastError.value = null
         try {
-            val features = api.loadLayer("road")
+            Log.d("NARStreet", "RoadRepo: starting refresh")
+            val features = try {
+                Log.d("NARStreet", "RoadRepo: trying loadByType(road)")
+                api.loadByType("road")
+            } catch (e: Exception) {
+                Log.e("NARStreet", "RoadRepo: loadByType failed: ${e.message}")
+                _lastError.value = "loadByType failed: ${e.message}, trying sub-layers..."
+                roadLayers.flatMap { layer ->
+                    try { api.loadLayer(layer) }
+                    catch (_: Exception) { emptyList() }
+                }
+            }
+
+            Log.d("NARStreet", "RoadRepo: fetched ${features.size} features")
+            if (features.isEmpty()) {
+                _lastError.value = "No roads returned from server (check loadByType or sub-layers)"
+                return
+            }
+
             val entities = features.map { f ->
-                val existing = dao.getByRemoteId(f.id)
+                val existing   = dao.getByRemoteId(f.id)
+                val parsed     = f.data.parse()
+                val coordsJson = extractCoords(parsed)
                 RoadEntity(
-                    id           = existing?.id ?: 0,
-                    remoteId     = f.id,
-                    label        = f.label,
-                    dataJson     = f.data.toString(),
-                    // preserve any locally-entered characteristics
-                    lanes          = existing?.lanes,
-                    trafficCapacity= existing?.trafficCapacity,
-                    tradActivity   = existing?.tradActivity,
-                    hasMedianStrip = existing?.hasMedianStrip,
-                    hasGreenery    = existing?.hasGreenery,
-                    isDeadEnd      = existing?.isDeadEnd,
-                    syncStatus     = existing?.syncStatus ?: SyncStatus.SYNCED,
+                    id              = existing?.id ?: 0,
+                    remoteId        = f.id,
+                    label           = f.label,
+                    layer           = f.layer,
+                    coordinatesJson = coordsJson,
+                    dataJson        = f.data.json,
+                    lanes           = existing?.lanes,
+                    trafficCapacity = existing?.trafficCapacity,
+                    tradActivity    = existing?.tradActivity,
+                    hasMedianStrip  = existing?.hasMedianStrip,
+                    hasGreenery     = existing?.hasGreenery,
+                    isDeadEnd       = existing?.isDeadEnd,
+                    syncStatus      = existing?.syncStatus ?: SyncStatus.SYNCED,
                 )
             }
+            Log.d("NARStreet", "RoadRepo: inserting ${entities.size} roads. First coordsJson: ${entities.firstOrNull()?.coordinatesJson?.take(80)}")
             dao.insertAll(entities)
-        } catch (_: Exception) { /* offline — use cached data */ }
+            _lastError.value = null
+
+        } catch (e: Exception) {
+            Log.e("NARStreet", "RoadRepo: refresh exception: ${e.message}", e)
+            _lastError.value = "Refresh failed: ${e.message}"
+        }
     }
 
-    /** Save road characteristics locally, schedule sync if online. */
     suspend fun saveCharacteristics(road: RoadEntity) {
         dao.update(road.copy(syncStatus = SyncStatus.PENDING))
-        if (connectivity.isCurrentlyOnline()) enqueueSyncWork()
-    }
-
-    private fun enqueueSyncWork() {
-        workManager.enqueueUniqueWork(
-            SyncWorker.TAG,
-            ExistingWorkPolicy.KEEP,
-            OneTimeWorkRequestBuilder<SyncWorker>()
-                .setConstraints(Constraints(NetworkType.CONNECTED))
-                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, java.util.concurrent.TimeUnit.SECONDS)
-                .build(),
-        )
+        if (connectivity.isCurrentlyOnline()) syncScheduler.schedule()
     }
 }

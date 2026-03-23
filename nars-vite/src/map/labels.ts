@@ -3,7 +3,7 @@
 import { ctx }             from './state'
 import { AREA_TYPES, PHASES } from '../phases'
 import { featureLayers, store } from '../store'
-import { areaStyle }        from './styles'
+import { areaStyle, createEndpointIcon } from './styles'
 import type { LayerEntry }  from '../types'
 
 declare const L: typeof import('leaflet')
@@ -14,8 +14,6 @@ function segmentAngle(a: L.LatLng, b: L.LatLng): number {
     const fp = ctx.map.latLngToLayerPoint(a), tp = ctx.map.latLngToLayerPoint(b)
     return Math.atan2(tp.y - fp.y, tp.x - fp.x) * (180 / Math.PI)
 }
-
-import { createEndpointIcon } from './styles'
 
 export function addPolylineEndpoints(layer: L.Layer): void {
     if (!(layer instanceof L.Polyline) || layer instanceof L.Polygon) return
@@ -129,87 +127,110 @@ export function createAreaPerimeterLabel(layer: L.Layer, areaTypeKey: string): v
     createPolygonEdgeLabel(layer, 'Urban Perimeter Limit', at.color)
 }
 
+
+// ─── VISIBILITY RULES MAP (From Phases.xlsx) ──────────────────────────────────
+// Maps a phase key to an array of layer keys that should be visible during that phase.
+const PHASE_VISIBILITY: Record<string, string[]> = {
+    areas:           ['areas'],
+    districts:       ['areas', 'districts'],
+    cityCenter:      ['areas', 'cityCenter'],
+    roads:           ['areas', 'cityCenter', 'roads'],
+    houseEntrances:  ['areas', 'cityCenter', 'roads', 'houseEntrances'],
+    publicBuildings: ['areas', 'publicBuildings'],
+    publicSpaces:    ['areas', 'publicSpaces'],
+    namingPanels:    ['areas', 'districts', 'roads', 'publicBuildings', 'publicSpaces', 'namingPanels']
+};
+
 // ─── LAYER VISIBILITY ─────────────────────────────────────────────────────────
+
 export function refreshLayerVisibility(): void {
-    const currentKey = PHASES[store.currentPhase]?.key
+    const currentPhaseKey = PHASES[store.currentPhase]?.key;
+    
+    // Fallback to showing only the current phase layer if not defined in the map
+    const visibleLayers = PHASE_VISIBILITY[currentPhaseKey] || [currentPhaseKey];
 
-    for (const [key, entries] of Object.entries(featureLayers)) {
-        const isCurrent     = key === currentKey
-        const isRoads       = (key as string) === 'roads'
-        const alwaysVisible = key === 'areas'
-            || (key === 'cityCenter' && (currentKey === 'roads' || currentKey === 'houseEntrances'))
-            || (key === 'publicBuildings' && currentKey === 'publicSpaces')
-        // Roads are shown only up to and including the House Entrances phase.
-        const roadsVisible  = isRoads && currentKey !== 'publicBuildings' && currentKey !== 'publicSpaces'
-        // Phase 08 (namingPanels): show districts, public buildings and public spaces in addition to current phase.
-        const phase08Extra  = currentKey === 'namingPanels' && (key === 'districts' || key === 'publicBuildings' || key === 'publicSpaces')
-        const show = isCurrent || alwaysVisible || roadsVisible || phase08Extra
+    for (const [layerKey, entries] of Object.entries(featureLayers)) {
+        const isCurrentPhaseLayer = layerKey === currentPhaseKey;
+        const isVisible = visibleLayers.includes(layerKey);
+        const isRoads = layerKey === 'roads';
 
-        // Roads stay interactive during houseEntrances for right-click menus.
-        // Areas are never interactive outside the areas phase.
-        const isRoadOverlay = isRoads && currentKey === 'houseEntrances'
-        let interactive   = isRoadOverlay || key !== 'areas' || currentKey === 'areas'
-        // In namingPanels phase, only free-hand mode: non-current layers are non-interactive.
-        if (currentKey === 'namingPanels' && key !== 'namingPanels') interactive = false
+        // 1. Determine Interaction Rules
+        let interactive = true;
+        if (currentPhaseKey === 'namingPanels') {
+            interactive = isCurrentPhaseLayer; // Only current layer is interactive
+        } else if (layerKey === 'areas') {
+            interactive = isCurrentPhaseLayer; // Areas are only interactive in the 'areas' phase
+        }
 
+        // 2. Apply Visibility and Styling
         for (const { layer } of entries as LayerEntry[]) {
-            // Roads live permanently in roadsDisplayLayer — never touch drawnItems for them.
-            // All other layers: add to / remove from drawnItems.
+            
+            // Handle DrawnItems (Everything except roads which live in their own display layer)
             if (!isRoads) {
-                if (isCurrent || alwaysVisible || phase08Extra) {
-                    if (!ctx.drawnItems.hasLayer(layer)) ctx.drawnItems.addLayer(layer)
-                    // Naming panels: ensure they render on top
-                    if (isCurrent && currentKey === 'namingPanels' && layer instanceof L.Marker)
-                        (layer as L.Marker).setZIndexOffset(500)
-                    // Ensure Phase 08 overlay layers render above roads visually.
-                    if (currentKey === 'namingPanels' && (key === 'districts' || key === 'publicBuildings' || key === 'publicSpaces')) {
-                        if (layer instanceof L.Path) (layer as L.Path).bringToFront()
+                if (isVisible) {
+                    if (!ctx.drawnItems.hasLayer(layer)) ctx.drawnItems.addLayer(layer);
+                    
+                    // Z-Index / Rendering Order management for namingPanels phase
+                    if (currentPhaseKey === 'namingPanels') {
+                        if (isCurrentPhaseLayer && layer instanceof L.Marker) {
+                            (layer as L.Marker).setZIndexOffset(500);
+                        } else if (layer instanceof L.Path) {
+                            (layer as L.Path).bringToFront();
+                        }
                     }
                 } else {
-                    if (ctx.drawnItems.hasLayer(layer)) ctx.drawnItems.removeLayer(layer)
+                    if (ctx.drawnItems.hasLayer(layer)) ctx.drawnItems.removeLayer(layer);
                 }
             } else {
-                // Roads: push behind overlays during Phase 08 to avoid visual overlap.
-                if (currentKey === 'namingPanels' && layer instanceof L.Path) (layer as L.Path).bringToBack()
+                // Roads specific ordering: push behind overlays during Phase 08
+                if (currentPhaseKey === 'namingPanels' && layer instanceof L.Path) {
+                    (layer as L.Path).bringToBack();
+                }
             }
 
+            // Apply Pointer Events (Interactiveness)
             if (layer instanceof L.Path) {
-                const el = (layer as any).getElement?.() as SVGElement | undefined
-                if (el) el.style.pointerEvents = interactive ? '' : 'none'
+                const el = (layer as any).getElement?.() as SVGElement | undefined;
+                if (el) el.style.pointerEvents = interactive ? '' : 'none';
             }
 
-            // In namingPanels phase hide all labels except for areas
-            const labelsVisible = show && !(currentKey === 'namingPanels' && key !== 'areas')
+            // 3. Handle Tooltips and Labels Visibility
+            // In namingPanels phase, hide all labels except for areas
+            const labelsVisible = isVisible && !(currentPhaseKey === 'namingPanels' && layerKey !== 'areas');
 
-            const tooltip = (layer as any).getTooltip?.()
-            if (tooltip) { labelsVisible ? (layer as any).openTooltip?.() : (layer as any).closeTooltip?.() }
+            const tooltip = (layer as any).getTooltip?.();
+            if (tooltip) {
+                labelsVisible ? (layer as any).openTooltip?.() : (layer as any).closeTooltip?.();
+            }
 
-            const edgeMarkers = (layer as any)._edgeLabelMarkers as L.Marker[] | undefined
+            const edgeMarkers = (layer as any)._edgeLabelMarkers as L.Marker[] | undefined;
             edgeMarkers?.forEach(m => {
-                const el = (m as any)._icon as HTMLElement | undefined
-                if (el) el.style.display = labelsVisible ? '' : 'none'
-            })
-            const perimLabel = (layer as any)._perimeterLabel as L.Layer | undefined
+                const el = (m as any)._icon as HTMLElement | undefined;
+                if (el) el.style.display = labelsVisible ? '' : 'none';
+            });
+
+            const perimLabel = (layer as any)._perimeterLabel as L.Layer | undefined;
             if (perimLabel) {
-                const pl = perimLabel as any
-                if (pl._icon) pl._icon.style.display = labelsVisible ? '' : 'none'
+                const pl = perimLabel as any;
+                if (pl._icon) pl._icon.style.display = labelsVisible ? '' : 'none';
             }
         }
     }
 
+    // 4. Handle Global Utility Layers
+    
     // Endpoint arrows — visible during Roads and House Entrances phases only.
-    // Hidden in namingPanels phase (display-only, no road interaction needed).
-    if (currentKey === 'roads' || currentKey === 'houseEntrances') {
-        if (!ctx.map.hasLayer(ctx.lineEndpointLayer)) ctx.map.addLayer(ctx.lineEndpointLayer)
+    if (currentPhaseKey === 'roads' || currentPhaseKey === 'houseEntrances') {
+        if (!ctx.map.hasLayer(ctx.lineEndpointLayer)) ctx.map.addLayer(ctx.lineEndpointLayer);
     } else {
-        if (ctx.map.hasLayer(ctx.lineEndpointLayer)) ctx.map.removeLayer(ctx.lineEndpointLayer)
+        if (ctx.map.hasLayer(ctx.lineEndpointLayer)) ctx.map.removeLayer(ctx.lineEndpointLayer);
     }
 
-    // Roads layer group — hidden in Public Buildings and Public Spaces phases.
-    const showRoads = currentKey !== 'publicBuildings' && currentKey !== 'publicSpaces'
-    if (showRoads) {
-        if (!ctx.map.hasLayer(ctx.roadsDisplayLayer)) ctx.map.addLayer(ctx.roadsDisplayLayer)
+    // Roads layer group — visible wherever the matrix says 'roads' is visible.
+    const showRoadsGroup = visibleLayers.includes('roads');
+    if (showRoadsGroup) {
+        if (!ctx.map.hasLayer(ctx.roadsDisplayLayer)) ctx.map.addLayer(ctx.roadsDisplayLayer);
     } else {
-        if (ctx.map.hasLayer(ctx.roadsDisplayLayer)) ctx.map.removeLayer(ctx.roadsDisplayLayer)
+        if (ctx.map.hasLayer(ctx.roadsDisplayLayer)) ctx.map.removeLayer(ctx.roadsDisplayLayer);
     }
 }

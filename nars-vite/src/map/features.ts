@@ -11,13 +11,37 @@ declare const L: typeof import('leaflet')
 // ─── FEATURE DATA BUILDER ────────────────────────────────────────────────────
 
 export function buildFeatureData(layer: L.Layer, phase: typeof PHASES[number], modalResult: Record<string, unknown>): FeatureData {
+    // Explicitly pick only the fields that belong in the persisted DB record.
+    // Never spread the full modalResult — it contains UI-only state (errors,
+    // roadOptions[], mainEntranceOptions[], entranceSideLoading, etc.) that
+    // would bloat the stored JSON and cause subtle re-hydration bugs.
     const base: FeatureData = {
-        type:           phase.key,
-        label:          modalResult.label as string,
-        decisionNumber: modalResult.decisionNumber as string,
-        decisionDate:   modalResult.decisionDate as string,
-        ...modalResult as Partial<FeatureData>,
+        type:             phase.key,
+        label:            modalResult.label            as string,
+        decisionNumber:   modalResult.decisionNumber   as string,
+        decisionDate:     modalResult.decisionDate     as string,
+        // Per-phase persisted fields:
+        areaTypeKey:      modalResult.areaTypeKey      as string | undefined,
+        districtTypeKey:  modalResult.districtTypeKey  as string | undefined,
+        roadTypeKey:      modalResult.roadTypeKey      as string | undefined,
+        entranceTypeKey:  modalResult.entranceTypeKey  as 'main_entrance' | 'secondary_entrance' | undefined,
+        roadDbId:         modalResult.roadDbId         as number | undefined,
+        roadLabel:        modalResult.roadLabel        as string | undefined,
+        side:             modalResult.side             as 'left' | 'right' | undefined,
+        entranceNumber:   modalResult.entranceNumber   as number | undefined,
+        mainEntranceDbId: modalResult.mainEntranceDbId as number | undefined,
+        mainEntranceLabel:modalResult.mainEntranceLabel as string | undefined,
+        bisNumber:        modalResult.bisNumber        as number | undefined,
+        spaceTypeKey:     modalResult.spaceTypeKey     as string | undefined,
+        sectorKey:        modalResult.sectorKey        as string | undefined,
+        buildingTypeKey:  modalResult.buildingTypeKey  as string | undefined,
     }
+
+    // Strip undefined keys so the stored JSON stays lean.
+    for (const k of Object.keys(base) as (keyof FeatureData)[]) {
+        if (base[k] === undefined) delete base[k]
+    }
+
     if (phase.drawType === 'marker') {
         const ll = (layer as L.Marker).getLatLng()
         return { ...base, lat: ll.lat, lng: ll.lng }
@@ -97,13 +121,12 @@ export async function prepareModalExtras(phase: typeof PHASES[number], _layer: L
                 || (store.user as any)?.commune?.name_fr
                 || (store.user as any)?.commune?.name_ar
                 || ''
-            m.label       = name
-            m.areaTypeKey = 'central_urban'
+            m.label = name
         } else {
             // Secondary urban area — name is editable, start empty
-            m.label       = ''
-            m.areaTypeKey = 'secondary_urban'
+            m.label = ''
         }
+        // Single authoritative assignment — no double-write.
         m.areaTypeKey = m.mainUrbanExists ? 'secondary_urban' : 'central_urban'
     }
 

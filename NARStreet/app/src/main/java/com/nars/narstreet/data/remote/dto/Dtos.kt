@@ -2,6 +2,12 @@ package com.nars.narstreet.data.remote.dto
 
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
+import com.squareup.moshi.JsonAdapter
+import com.squareup.moshi.JsonReader
+import com.squareup.moshi.JsonWriter
+import com.squareup.moshi.Moshi
+import okio.Buffer
+import java.lang.reflect.Type
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -36,12 +42,20 @@ data class UserDto(
 
 @JsonClass(generateAdapter = true)
 data class CommuneDto(
-    @Json(name = "id")      val id: Int,
-    @Json(name = "name_fr") val nameFr: String?,
-    @Json(name = "name_ar") val nameAr: String?,
+    @Json(name = "id")        val id: Int,
+    @Json(name = "name_fr")   val nameFr: String?,
+    @Json(name = "name_ar")   val nameAr: String?,
+    @Json(name = "latitude")  val latitude: Double?,
+    @Json(name = "longitude") val longitude: Double?,
 )
 
 // ── Feature load ──────────────────────────────────────────────────────────────
+//
+// FeatureDto.data is typed as RawJson — a raw JSON string captured verbatim.
+//
+// We CANNOT use Map<String, Any?> here because Moshi KSP codegen does not
+// generate an adapter for Any?, causing silent deserialization failures.
+// RawJson captures the raw bytes and exposes parse() for field extraction.
 
 @JsonClass(generateAdapter = true)
 data class FeatureDto(
@@ -49,7 +63,7 @@ data class FeatureDto(
     @Json(name = "type")       val type: String,
     @Json(name = "layer")      val layer: String,
     @Json(name = "label")      val label: String,
-    @Json(name = "data")       val data: Map<String, Any?>,
+    @Json(name = "data")       val data: RawJson,
     @Json(name = "created_at") val createdAt: String?,
     @Json(name = "updated_at") val updatedAt: String?,
 )
@@ -81,4 +95,13 @@ data class FeatureUpdateResponseDto(
     @Json(name = "success")    val success: Boolean,
     @Json(name = "id")         val id: Long,
     @Json(name = "updated_at") val updatedAt: String?,
+)
+
+// ── Commune context ───────────────────────────────────────────────────────────
+
+@JsonClass(generateAdapter = true)
+data class CommuneContextDto(
+    @Json(name = "boundary_geojson")        val boundaryGeoJson: String?,
+    @Json(name = "main_area_geojson")       val mainAreaGeoJson: String?,
+    @Json(name = "secondary_areas_geojson") val secondaryAreasGeoJson: List<String>,
 )

@@ -9,10 +9,13 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.Tasks
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -39,6 +42,7 @@ class LocationClient @Inject constructor(
     }
 
     @SuppressLint("MissingPermission")
-    suspend fun lastKnownLocation(): Location? =
-        kotlinx.coroutines.tasks.await(fusedClient.lastLocation)
+    suspend fun lastKnownLocation(): Location? = withContext(Dispatchers.IO) {
+        Tasks.await(fusedClient.lastLocation)
+    }
 }

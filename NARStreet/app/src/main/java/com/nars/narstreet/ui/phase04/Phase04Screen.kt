@@ -1,25 +1,28 @@
 package com.nars.narstreet.ui.phase04
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nars.narstreet.R
 import com.nars.narstreet.data.model.RoadEntity
 import com.nars.narstreet.data.model.SyncStatus
-import com.nars.narstreet.ui.components.PhaseScaffold
-import com.nars.narstreet.ui.components.SyncState
+import android.webkit.WebView
+import com.nars.narstreet.ui.components.*
+import com.nars.narstreet.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,38 +33,80 @@ fun Phase04Screen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // True while the edit sheet OR info sheet is open — locks map gestures
+    val mapLocked = state.editingRoad != null || state.infoRoad != null
+
     PhaseScaffold(
-        title     = stringResource(R.string.phase04_title),
-        syncState = state.syncState,
-        onLogout  = { viewModel.logout(onLogout) },
-    ) { padding ->
+        title             = "Roads",
+        syncState         = state.syncState,
+        currentPhaseIndex = PhaseIndex.ROADS,
+        onNavigateTo      = onNavigateTo,
+        username          = state.username,
+        onLogout          = { viewModel.logout(onLogout) },
+    ) { _ ->
         if (state.isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(color = NarsTeal)
             }
         } else {
-            LazyColumn(
-                contentPadding = PaddingValues(
-                    top    = padding.calculateTopPadding() + 8.dp,
-                    bottom = padding.calculateBottomPadding() + 8.dp,
-                    start  = 16.dp,
-                    end    = 16.dp,
-                ),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                item {
-                    // Navigation row to other phases
-                    PhaseNavRow(onNavigateTo)
-                    Spacer(Modifier.height(8.dp))
-                }
-                items(state.roads, key = { it.id }) { road ->
-                    RoadCard(road = road, onClick = { viewModel.startEditing(road) })
+            Box(Modifier.fillMaxSize()) {
+                var webView by remember { mutableStateOf<WebView?>(null) }
+                var ready   by remember { mutableStateOf(false) }
+
+                NarsMapView(
+                    modifier = Modifier.fillMaxSize(),
+                    onBridge = { b, wv ->
+                        b.onMapReady = { ready = true }
+                        b.onFeatureClick = { _, dbId ->
+                            state.roads.find { it.remoteId == dbId }?.let { viewModel.showInfo(it) }
+                        }
+                        b.onFeatureLongClick = { _, dbId ->
+                            state.roads.find { it.remoteId == dbId }?.let { viewModel.startEditing(it) }
+                        }
+                        webView = wv
+                    },
+                )
+
+                // Push data to map whenever state changes and map is ready
+                val L = state.mapLayers
+                LaunchedEffect(ready, L) {
+                    if (!ready) return@LaunchedEffect
+                    
+                        val wv = webView ?: return@LaunchedEffect
+                        val cc = L.communeCenter
+                        wv.flyTo(cc.latitude, cc.longitude, 14.0)
+                        wv.setContext(L.communeContext)
+                        wv.setAreas(L.areaPolygons, L.areaLabels)
+                        L.cityCenterPoint?.let { wv.setCityCenter(it.latitude, it.longitude) }
+                        wv.setRoads(L.roadPolylines, L.roadDbIds, L.roadLabels, L.highlightPolyline)
                 }
             }
         }
     }
 
-    // Bottom sheet editor
+    // ── Error banner — non-blocking, auto-dismisses when error clears ──────────
+    state.loadError?.let { err ->
+        LaunchedEffect(err) {
+            kotlinx.coroutines.delay(4000)
+            viewModel.clearError()
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(androidx.compose.ui.graphics.Color(0xFFB71C1C))
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) {
+            Text(err, color = androidx.compose.ui.graphics.Color.White,
+                fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        }
+    }
+
+    // ── Info sheet (single tap) ────────────────────────────────────────────────
+    state.infoRoad?.let { road ->
+        RoadInfoSheet(road = road, onDismiss = viewModel::dismissInfo)
+    }
+
+    // ── Edit sheet (long press) ────────────────────────────────────────────────
     state.editingRoad?.let { road ->
         RoadCharacteristicsSheet(
             road      = road,
@@ -73,72 +118,47 @@ fun Phase04Screen(
     }
 }
 
-@Composable
-private fun PhaseNavRow(onNavigateTo: (String) -> Unit) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        listOf(
-            "Entrances" to "phase05",
-            "Buildings" to "phase06/0",
-            "Spaces"    to "phase07/0",
-            "Panels"    to "phase08/0",
-        ).forEach { (label, route) ->
-            OutlinedButton(
-                onClick  = { onNavigateTo(route) },
-                modifier = Modifier.weight(1f),
-            ) { Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1) }
-        }
-    }
-}
+// ── Info bottom sheet ─────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun RoadCard(road: RoadEntity, onClick: () -> Unit) {
-    Card(
-        modifier  = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+private fun RoadInfoSheet(road: RoadEntity, onDismiss: () -> Unit) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor   = NarsNavy,
+        dragHandle       = { GlassDragHandle() },
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier            = Modifier
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(road.label, style = MaterialTheme.typography.titleMedium)
-                val filled = listOfNotNull(
-                    road.lanes?.let { "Lanes: $it" },
-                    road.trafficCapacity?.let { "Traffic: $it" },
-                    road.tradActivity?.let { "Trad: $it" },
-                ).joinToString(" · ")
-                if (filled.isNotEmpty()) {
-                    Text(filled, style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+            Text(road.label, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+
+            val layerLabel = road.layer.replace("_", " ").replaceFirstChar { it.uppercase() }
+            InfoChip(layerLabel, Color(0xFF3498DB))
+
+            HorizontalDivider(color = Color(0x1AFFFFFF))
+
+            if (road.lanes != null || road.trafficCapacity != null || road.tradActivity != null) {
+                InfoRow("Lanes",    road.lanes?.toString() ?: "—")
+                InfoRow("Traffic",  road.trafficCapacity ?: "—")
+                InfoRow("Activity", road.tradActivity ?: "—")
+                InfoRow("Median strip",      if (road.hasMedianStrip == true) "Yes" else "No")
+                InfoRow("Greenery",          if (road.hasGreenery == true) "Yes" else "No")
+                InfoRow("Dead-end",          if (road.isDeadEnd == true) "Yes" else "No")
+            } else {
+                Text("No characteristics recorded yet.\nLong-press the road on the map to fill them in.",
+                    fontSize = 13.sp, color = TextMuted)
             }
-            SyncChip(road.syncStatus)
-            Spacer(Modifier.width(8.dp))
-            Icon(Icons.Default.ChevronRight, contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant)
+
+            NarsSyncBadge(road.syncStatus)
         }
     }
 }
 
-@Composable
-private fun SyncChip(status: SyncStatus) {
-    val (label, color) = when (status) {
-        SyncStatus.PENDING -> "Pending" to MaterialTheme.colorScheme.tertiary
-        SyncStatus.SYNCED  -> "Synced"  to MaterialTheme.colorScheme.primary
-        SyncStatus.ERROR   -> "Error"   to MaterialTheme.colorScheme.error
-    }
-    SuggestionChip(
-        onClick = {},
-        label   = { Text(label, style = MaterialTheme.typography.labelLarge) },
-        colors  = SuggestionChipDefaults.suggestionChipColors(
-            containerColor = color.copy(alpha = 0.12f),
-            labelColor     = color,
-        ),
-    )
-}
+// ── Edit characteristics sheet ────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -154,82 +174,138 @@ private fun RoadCharacteristicsSheet(
     var greenery by remember { mutableStateOf(road.hasGreenery ?: false) }
     var deadEnd  by remember { mutableStateOf(road.isDeadEnd ?: false) }
 
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState       = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor   = NarsNavy,
+        dragHandle       = { GlassDragHandle() },
+    ) {
         Column(
-            modifier            = Modifier.padding(horizontal = 24.dp).padding(bottom = 32.dp),
+            modifier            = Modifier
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(road.label, style = MaterialTheme.typography.titleLarge)
+            Text(road.label, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
 
-            OutlinedTextField(
-                value         = lanes,
-                onValueChange = { lanes = it.filter(Char::isDigit) },
-                label         = { Text(stringResource(R.string.road_lanes)) },
-                modifier      = Modifier.fillMaxWidth(),
-                singleLine    = true,
-            )
-
-            SegmentedPicker(
-                label    = stringResource(R.string.road_traffic),
-                options  = listOf("HIGH", "MEDIUM", "LOW"),
-                selected = traffic,
-                onSelect = { traffic = it },
-            )
-
-            SegmentedPicker(
-                label    = stringResource(R.string.road_trad),
-                options  = listOf("HIGH", "MEDIUM", "LOW"),
-                selected = trad,
-                onSelect = { trad = it },
-            )
-
-            BooleanToggle(stringResource(R.string.road_median),   median,   { median = it })
-            BooleanToggle(stringResource(R.string.road_greenery), greenery, { greenery = it })
-            BooleanToggle(stringResource(R.string.road_dead_end), deadEnd,  { deadEnd = it })
+            GlassTextField(value = lanes, onValueChange = { lanes = it.filter(Char::isDigit) },
+                label = stringResource(R.string.road_lanes))
+            GlassSegmentedPicker(label = stringResource(R.string.road_traffic),
+                options = listOf("HIGH", "MEDIUM", "LOW"), selected = traffic, onSelect = { traffic = it })
+            GlassSegmentedPicker(label = stringResource(R.string.road_trad),
+                options = listOf("HIGH", "MEDIUM", "LOW"), selected = trad, onSelect = { trad = it })
+            GlassToggle(stringResource(R.string.road_median),   median,   { median = it })
+            GlassToggle(stringResource(R.string.road_greenery), greenery, { greenery = it })
+            GlassToggle(stringResource(R.string.road_dead_end), deadEnd,  { deadEnd = it })
 
             Button(
-                onClick  = {
-                    onSave(lanes.toIntOrNull(), traffic, trad, median, greenery, deadEnd)
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(R.string.road_save)) }
+                onClick  = { onSave(lanes.toIntOrNull(), traffic, trad, median, greenery, deadEnd) },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape    = RoundedCornerShape(8.dp),
+                colors   = ButtonDefaults.buttonColors(containerColor = NarsTeal, contentColor = Color.White),
+            ) { Text(stringResource(R.string.road_save), fontWeight = FontWeight.Bold) }
         }
+    }
+}
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
+
+@Composable
+private fun GlassDragHandle() {
+    Box(
+        modifier = Modifier
+            .padding(vertical = 12.dp)
+            .size(width = 36.dp, height = 4.dp)
+            .clip(RoundedCornerShape(2.dp))
+            .background(Color(0x33FFFFFF))
+    )
+}
+
+@Composable
+private fun InfoChip(label: String, color: Color) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50.dp))
+            .background(color.copy(alpha = 0.15f))
+            .border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(50.dp))
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    ) { Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = color) }
+}
+
+@Composable
+private fun InfoRow(label: String, value: String) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, fontSize = 13.sp, color = TextSecondary)
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+    }
+}
+
+@Composable
+private fun NarsSyncBadge(status: SyncStatus) {
+    val (label, color) = when (status) {
+        SyncStatus.PENDING -> "Pending sync" to NarsTeal
+        SyncStatus.SYNCED  -> "Synced"       to Color(0xFF27AE60)
+        SyncStatus.ERROR   -> "Sync error"   to SyncError
+    }
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50.dp))
+            .background(color.copy(alpha = 0.15f))
+            .border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(50.dp))
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    ) { Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = color) }
+}
+
+@Composable
+private fun GlassTextField(value: String, onValueChange: (String) -> Unit, label: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+        OutlinedTextField(
+            value = value, onValueChange = onValueChange, singleLine = true,
+            modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor   = Color(0x1AFFFFFF),
+                unfocusedContainerColor = Color(0x1AFFFFFF),
+                focusedBorderColor      = Color(0x8CFFFFFF),
+                unfocusedBorderColor    = Color(0x33FFFFFF),
+                focusedTextColor        = TextPrimary, unfocusedTextColor = TextPrimary,
+                cursorColor             = TextPrimary,
+            ),
+        )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SegmentedPicker(
-    label: String,
-    options: List<String>,
-    selected: String,
-    onSelect: (String) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun GlassSegmentedPicker(label: String, options: List<String>, selected: String, onSelect: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             options.forEachIndexed { i, opt ->
                 SegmentedButton(
-                    selected = opt == selected,
-                    onClick  = { onSelect(opt) },
+                    selected = opt == selected, onClick = { onSelect(opt) },
                     shape    = SegmentedButtonDefaults.itemShape(i, options.size),
-                ) { Text(opt, style = MaterialTheme.typography.labelLarge) }
+                    colors   = SegmentedButtonDefaults.colors(
+                        activeContainerColor   = Color(0x33FFFFFF), activeContentColor  = TextPrimary,
+                        inactiveContainerColor = Color(0x0DFFFFFF), inactiveContentColor = TextSecondary,
+                        activeBorderColor      = Color(0x66FFFFFF), inactiveBorderColor  = Color(0x1AFFFFFF),
+                    ),
+                ) { Text(opt, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
             }
         }
     }
 }
 
 @Composable
-private fun BooleanToggle(label: String, value: Boolean, onToggle: (Boolean) -> Unit) {
-    Row(
-        modifier              = Modifier.fillMaxWidth(),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge)
-        Switch(checked = value, onCheckedChange = onToggle)
+private fun GlassToggle(label: String, value: Boolean, onToggle: (Boolean) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, fontSize = 14.sp, color = TextSecondary)
+        Switch(checked = value, onCheckedChange = onToggle,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor   = Color.White, checkedTrackColor   = NarsTeal,
+                uncheckedThumbColor = TextMuted,   uncheckedTrackColor = Color(0x33FFFFFF),
+            ))
     }
 }
+
