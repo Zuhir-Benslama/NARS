@@ -28,6 +28,9 @@ interface RoadDao {
     @Query("UPDATE roads SET syncStatus = 'ERROR' WHERE id = :id")
     suspend fun markError(id: Long)
 
+    @Query("UPDATE roads SET syncStatus = 'PENDING' WHERE syncStatus = 'ERROR'")
+    suspend fun resetErrors()
+
     @Query("SELECT COUNT(*) FROM roads WHERE syncStatus = 'PENDING'")
     fun pendingCount(): Flow<Int>
 }

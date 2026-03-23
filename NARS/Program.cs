@@ -2,10 +2,12 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using NarsApi.Data;
 using NarsApi.Services;
+using System.Threading.RateLimiting;
 
 // Npgsql 6+ maps DateTime to timestamptz by default. Our DB uses
 // 'timestamp without time zone', so we restore the legacy behaviour that
@@ -136,6 +138,26 @@ builder.Services.AddOpenApi(options =>
     });
 });
 
+// ─────────────────────────────────────────────
+// 7. Rate limiting — protect auth endpoints
+//    5 requests per 30 seconds per IP address.
+//    Uses a sliding window so bursts are smoothed
+//    rather than gated on a hard reset boundary.
+// ─────────────────────────────────────────────
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddSlidingWindowLimiter("auth", limiter =>
+    {
+        limiter.PermitLimit         = 5;
+        limiter.Window              = TimeSpan.FromSeconds(30);
+        limiter.SegmentsPerWindow   = 3;
+        limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiter.QueueLimit          = 0;
+    });
+});
+
 // ═════════════════════════════════════════════
 // Build & configure middleware pipeline
 // ═════════════════════════════════════════════
@@ -193,9 +215,10 @@ if (app.Environment.IsDevelopment())
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-// Middleware order: Routing → CORS → Auth → Controllers
+// Middleware order: Routing → CORS → RateLimit → Auth → Controllers
 app.UseRouting();
 app.UseCors();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

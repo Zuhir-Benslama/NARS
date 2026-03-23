@@ -123,9 +123,10 @@ export const store = reactive<AppStore>({
     cityCenterLatLng: null,
 
     user:             null,
+    municipalityName: '',
+    loadError:        false,
     referenceRoadDbId:     null,
     referenceEntranceDbId: null,
-    municipalityName: '',
 
 
     modal: {

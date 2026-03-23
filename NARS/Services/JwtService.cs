@@ -13,7 +13,7 @@ public class JwtService(IConfiguration config)
 
     public string CreateToken(int userId, string username, string name, string email, int communeId)
     {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
+        var key   = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var claims = new[]
@@ -26,29 +26,34 @@ public class JwtService(IConfiguration config)
         };
 
         var token = new JwtSecurityToken(
-            claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(_expiresMinutes),
+            claims:             claims,
+            expires:            DateTime.UtcNow.AddMinutes(_expiresMinutes),
             signingCredentials: creds
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
+    /// <summary>
+    /// Validates a raw JWT string and returns the principal on success, or null
+    /// if the token is missing, expired, or tampered with.
+    /// Used by <see cref="NarsApi.Controllers.PagesController"/> to guard
+    /// server-rendered HTML page routes before the SPA boots.
+    /// </summary>
     public ClaimsPrincipal? ValidateToken(string token)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
         try
         {
-            var principal = new JwtSecurityTokenHandler().ValidateToken(token,
+            return new JwtSecurityTokenHandler().ValidateToken(token,
                 new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = key,
-                    ValidateIssuer = false,
-                    ValidateAudience = false,
-                    ClockSkew = TimeSpan.Zero,
+                    IssuerSigningKey         = key,
+                    ValidateIssuer           = false,
+                    ValidateAudience         = false,
+                    ClockSkew                = TimeSpan.Zero,
                 }, out _);
-            return principal;
         }
         catch
         {

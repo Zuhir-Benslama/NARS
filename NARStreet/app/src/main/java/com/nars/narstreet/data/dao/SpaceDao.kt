@@ -27,6 +27,9 @@ interface SpaceDao {
     @Query("UPDATE spaces SET syncStatus = 'ERROR' WHERE id = :id")
     suspend fun markError(id: Long)
 
+    @Query("UPDATE spaces SET syncStatus = 'PENDING' WHERE syncStatus = 'ERROR'")
+    suspend fun resetErrors()
+
     @Query("SELECT COUNT(*) FROM spaces WHERE syncStatus = 'PENDING'")
     fun pendingCount(): Flow<Int>
 }

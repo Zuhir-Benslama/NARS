@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.NARStreet.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#1D9E75</item>
+        <item name="windowSplashScreenAnimatedIcon">@android:drawable/ic_menu_mylocation</item>
+        <item name="postSplashScreenTheme">@style/Theme.NARStreet</item>
+    </style>
+
+    <style name="Theme.NARStreet" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

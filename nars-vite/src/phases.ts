@@ -1,44 +1,55 @@
-import type { Phase, AreaType, DistrictType, RoadType, PublicSpaceType } from './types'
+// ─── PHASE PIPELINE ───────────────────────────────────────────────────────────
+// Defines the 8 mapping phases and the API-layer → phase-key lookup table.
+//
+// Feature sub-type data (AREA_TYPES, DISTRICT_TYPES, ROAD_TYPES, etc.) has been
+// moved to feature-types.ts. They are re-exported here for backward compatibility
+// so existing imports don't need updating.
 
-// ─── PHASE DEFINITIONS ────────────────────────────────────────────────────────
+import type { Phase } from './types'
+
+export type {
+    PublicBuildingType,
+    PublicBuildingSector,
+} from './feature-types'
+
+export {
+    AREA_TYPES,
+    DISTRICT_TYPES,
+    ROAD_TYPES,
+    PUBLIC_SPACE_TYPES,
+    PUBLIC_BUILDING_SECTORS,
+} from './feature-types'
+
+// ─── PHASES ───────────────────────────────────────────────────────────────────
 
 export const PHASES: Phase[] = [
-    { index: 0, key: 'areas',              label: 'phase_areas_label',               drawType: 'polygon',
-      color: '#8e44ad',
-      hint: 'phase_areas_hint' },
-    { index: 1, key: 'districts',          label: 'phase_districts_label',           drawType: 'polygon',
-      color: '#f39c12',
-      hint: 'phase_districts_hint' },
-    { index: 2, key: 'cityCenter',         label: 'phase_cityCenter_label',         drawType: 'circle',
-      color: '#e74c3c',
-      hint: 'phase_cityCenter_hint' },
-    { index: 3, key: 'roads',              label: 'phase_roads_label',               drawType: 'polyline',
-      color: '#3498db',
-      hint: 'phase_roads_hint' },
-    { index: 4, key: 'houseEntrances',     label: 'phase_houseEntrances_label',     drawType: 'marker',
-      color: '#27ae60',
-      hint: 'phase_houseEntrances_hint' },
-    { index: 5, key: 'publicBuildings',    label: 'phase_publicBuildings_label',    drawType: 'polygon',
-      color: '#e67e22',
-      hint: 'phase_publicBuildings_hint' },
-    { index: 6, key: 'publicSpaces',       label: 'phase_publicSpaces_label',       drawType: 'polygon',
-      color: '#2ecc71',
-      hint: 'phase_publicSpaces_hint' },
-    { index: 7, key: 'namingPanels',       label: 'phase_namingPanels_label',       drawType: 'marker',
-      color: '#9b59b6',
-      hint: 'phase_namingPanels_hint' },
+    { index: 0, key: 'areas',           label: 'phase_areas_label',           drawType: 'polygon',  color: '#8e44ad', hint: 'phase_areas_hint'           },
+    { index: 1, key: 'districts',       label: 'phase_districts_label',       drawType: 'polygon',  color: '#f39c12', hint: 'phase_districts_hint'       },
+    { index: 2, key: 'cityCenter',      label: 'phase_cityCenter_label',      drawType: 'circle',   color: '#e74c3c', hint: 'phase_cityCenter_hint'      },
+    { index: 3, key: 'roads',           label: 'phase_roads_label',           drawType: 'polyline', color: '#3498db', hint: 'phase_roads_hint'           },
+    { index: 4, key: 'houseEntrances',  label: 'phase_houseEntrances_label',  drawType: 'marker',   color: '#27ae60', hint: 'phase_houseEntrances_hint'  },
+    { index: 5, key: 'publicBuildings', label: 'phase_publicBuildings_label', drawType: 'polygon',  color: '#e67e22', hint: 'phase_publicBuildings_hint' },
+    { index: 6, key: 'publicSpaces',    label: 'phase_publicSpaces_label',    drawType: 'polygon',  color: '#2ecc71', hint: 'phase_publicSpaces_hint'    },
+    { index: 7, key: 'namingPanels',    label: 'phase_namingPanels_label',    drawType: 'marker',   color: '#9b59b6', hint: 'phase_namingPanels_hint'    },
 ]
 
-// API layer value → phase key (for loading saved features from the database)
+// ─── API_LAYER_TO_PHASE ───────────────────────────────────────────────────────
+// Maps every possible value of the `layer` column in the DB back to the phase
+// key used in featureLayers. Used by loader.ts when hydrating saved features.
+
 export const API_LAYER_TO_PHASE: Record<string, string> = {
+    // Areas
     central_urban:      'areas',
     secondary_urban:    'areas',
+    // City center
     city_center:        'cityCenter',
+    // Districts
     housing_estate:         'districts',
     urban_pole:             'districts',
     district:               'districts',
     trad_activities_zone:   'districts',
     industry_zone:          'districts',
+    // Roads
     boulevard:          'roads',
     avenue:             'roads',
     street:             'roads',
@@ -46,10 +57,11 @@ export const API_LAYER_TO_PHASE: Record<string, string> = {
     lane:               'roads',
     cul_de_sac:         'roads',
     way:                'roads',
+    // House entrances
     main_entrance:      'houseEntrances',
     secondary_entrance: 'houseEntrances',
-    public_building:    'publicBuildings',
-    // building sub-type keys
+    // Public buildings (top-level type key + all sub-type keys)
+    public_building:                 'publicBuildings',
     bank:                            'publicBuildings',
     post_office:                     'publicBuildings',
     convention_centre:               'publicBuildings',
@@ -93,122 +105,7 @@ export const API_LAYER_TO_PHASE: Record<string, string> = {
     swimming_pool:                   'publicBuildings',
     youth_clubs:                     'publicBuildings',
     youth_hostel:                    'publicBuildings',
-    garden:             'publicSpaces',
-    square:             'publicSpaces',
+    // Public spaces
+    garden: 'publicSpaces',
+    square: 'publicSpaces',
 }
-
-// ─── FEATURE SUB-TYPES ────────────────────────────────────────────────────────
-
-export const AREA_TYPES: AreaType[] = [
-    { key: 'central_urban',   label: 'Main Urban Area',      color: '#c0392b' },
-    { key: 'secondary_urban', label: 'Secondary Urban Area', color: '#8e44ad' },
-]
-
-export const DISTRICT_TYPES: DistrictType[] = [
-    { key: 'housing_estate',        label: 'Housing Estate'        },
-    { key: 'urban_pole',            label: 'Urban Pole'            },
-    { key: 'district',              label: 'District'              },
-    { key: 'trad_activities_zone',  label: 'Trad. Activities Zone' },
-    { key: 'industry_zone',         label: 'Industry Zone', allowInScattered: true },
-]
-
-export const ROAD_TYPES: RoadType[] = [
-    { key: 'boulevard',  label: 'Boulevard',  category: 'primary'   },
-    { key: 'avenue',     label: 'Avenue',     category: 'primary'   },
-    { key: 'street',     label: 'Street',     category: 'secondary' },
-    { key: 'drive',      label: 'Drive',      category: 'tertiary'  },
-    { key: 'lane',       label: 'Lane',       category: 'tertiary'  },
-    { key: 'cul_de_sac', label: 'Cul-de-sac', category: 'tertiary'  },
-    { key: 'way',        label: 'Way',        category: 'tertiary'  },
-]
-
-export const PUBLIC_SPACE_TYPES: PublicSpaceType[] = [
-    { key: 'garden', label: 'Garden', color: '#27ae60' },
-    { key: 'square', label: 'Square', color: '#2980b9' },
-]
-
-// ─── PUBLIC BUILDING SECTORS & TYPES ─────────────────────────────────────────
-
-export interface PublicBuildingType {
-    key:   string
-    label: string
-}
-
-export interface PublicBuildingSector {
-    key:       string
-    label:     string
-    buildings: PublicBuildingType[]
-}
-
-export const PUBLIC_BUILDING_SECTORS: PublicBuildingSector[] = [
-    { key: 'banking_postal', label: 'Banking & Postal', buildings: [
-        { key: 'bank',        label: 'Bank'         },
-        { key: 'post_office', label: 'Post Offices'  },
-    ]},
-    { key: 'commerce', label: 'Commerce', buildings: [
-        { key: 'convention_centre', label: 'Convention Centres' },
-        { key: 'public_market',     label: 'Public Markets'     },
-        { key: 'trade_centre',      label: 'Trade Centres'      },
-    ]},
-    { key: 'culture', label: 'Culture', buildings: [
-        { key: 'library', label: 'Libraries' },
-        { key: 'museum',  label: 'Museum'    },
-        { key: 'theater', label: 'Theaters'  },
-    ]},
-    { key: 'defence_security', label: 'Defence and Security', buildings: [
-        { key: 'borders_guard',    label: 'Borders Guard Unit' },
-        { key: 'customs',          label: 'Customs Unit'       },
-        { key: 'fire_station',     label: 'Fire Station Unit'  },
-        { key: 'gendarmes',        label: 'Gendarmes Unit'     },
-        { key: 'military_barrack', label: 'Military Barrack'   },
-        { key: 'police_station',   label: 'Police Station'     },
-    ]},
-    { key: 'government_law', label: 'Government & Law', buildings: [
-        { key: 'administrative_branch', label: 'Administrative Branch' },
-    ]},
-    { key: 'healthcare', label: 'Healthcare', buildings: [
-        { key: 'public_hospital',     label: 'Public Hospital Establishment'              },
-        { key: 'neighborhood_health', label: 'Public Neighborhood Health Establishment'   },
-        { key: 'specialized_hospital',label: 'Specialized Hospital Establishment'         },
-        { key: 'treatment_room',      label: 'Treatment Room'                             },
-        { key: 'university_hospital', label: 'University Hospital Center'                 },
-    ]},
-    { key: 'higher_education', label: 'Higher Education', buildings: [
-        { key: 'research_institute', label: 'Research Institute' },
-        { key: 'university',         label: 'University'         },
-    ]},
-    { key: 'national_education', label: 'National Education', buildings: [
-        { key: 'college', label: 'College'   },
-        { key: 'library', label: 'Libraries' },
-        { key: 'school',  label: 'School'    },
-    ]},
-    { key: 'religious', label: 'Religious', buildings: [
-        { key: 'cemetery', label: 'Cemetery' },
-        { key: 'mosque',   label: 'Mosque'   },
-    ]},
-    { key: 'tourism', label: 'Tourism', buildings: [
-        { key: 'hostel', label: 'Hostel' },
-        { key: 'hotel',  label: 'Hotel'  },
-        { key: 'motel',  label: 'Motel'  },
-    ]},
-    { key: 'transport', label: 'Transport', buildings: [
-        { key: 'airport',       label: 'Airport'       },
-        { key: 'bus_station',   label: 'Bus Station'   },
-        { key: 'train_station', label: 'Train Station' },
-    ]},
-    { key: 'vocational_training', label: 'Vocational Training and Education', buildings: [
-        { key: 'specialized_vocational_institute',   label: 'National Specialized Vocational Training Institute' },
-        { key: 'vocational_education_institute',     label: 'Vocational Education Institute'                    },
-        { key: 'vocational_apprenticeship_center',   label: 'Vocational Training and Apprenticeship Center'     },
-        { key: 'vocational_training_institute',      label: 'Vocational Training Institute'                     },
-    ]},
-    { key: 'youth_sports', label: 'Youth & Sports', buildings: [
-        { key: 'indoor_arena',   label: 'Indoor Arena'   },
-        { key: 'leisure_center', label: 'Leisure Center' },
-        { key: 'sports_complex', label: 'Sports Complex' },
-        { key: 'stadium',        label: 'Stadium'        },
-        { key: 'swimming_pool',  label: 'Swimming Pool'  },
-        { key: 'youth_clubs',    label: 'Youth Clubs'    },
-        { key: 'youth_hostel',   label: 'Youth Hostel'   },
-    ]},
-]

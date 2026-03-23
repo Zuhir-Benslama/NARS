@@ -27,6 +27,9 @@ interface PanelDao {
     @Query("UPDATE panels SET syncStatus = 'ERROR' WHERE id = :id")
     suspend fun markError(id: Long)
 
+    @Query("UPDATE panels SET syncStatus = 'PENDING' WHERE syncStatus = 'ERROR'")
+    suspend fun resetErrors()
+
     @Query("SELECT COUNT(*) FROM panels WHERE syncStatus = 'PENDING'")
     fun pendingCount(): Flow<Int>
 }
