@@ -1,8 +1,8 @@
 package com.nars.narstreet.core.network
 
 import com.nars.narstreet.BuildConfig
+import com.nars.narstreet.data.remote.dto.RawJson
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -20,7 +20,11 @@ object NetworkModule {
 
     @Provides @Singleton
     fun provideMoshi(): Moshi = Moshi.Builder()
-        .addLast(KotlinJsonAdapterFactory())
+        // RawJson.ADAPTER_FACTORY reads FeatureDto.data as a raw JSON string,
+        // completely bypassing the Map<String,Any?> KSP codegen problem.
+        .add(RawJson.ADAPTER_FACTORY)
+        // AnyAdapter handles Map<String,Any?> in FeatureSaveDto / FeatureUpdateDto.
+        .add(AnyAdapter.Factory)
         .build()
 
     @Provides @Singleton

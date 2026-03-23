@@ -8,61 +8,17 @@ using NarsApi.Services;
 
 namespace NarsApi.Controllers;
 
+/// <summary>
+/// CRUD operations on saved map features: save, load, update, delete, clear, stats.
+/// Feature-type metadata and layer queries live in FeatureCatalogController.
+/// </summary>
 [ApiController]
 [Tags("Features")]
-public class FeaturesController(AppDbContext db, IScatteredAreaService scatteredService) : NarsControllerBase
+public class FeaturesController(
+    AppDbContext db,
+    IDbContextFactory<AppDbContext> dbFactory,
+    IScatteredAreaService scatteredService) : NarsControllerBase
 {
-    [HttpGet("/api/feature-types")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    public IActionResult GetFeatureTypes()
-    {
-        var types = new List<FeatureTypeDefinition>
-        {
-            new(Key: FeatureTypes.Area, Label: "Area", Icon: "⬟",
-                Layers: new[]
-                {
-                    new LayerOption(FeatureTypes.AreaLayers.CentralUrban,   "Central Urban Area"),
-                    new LayerOption(FeatureTypes.AreaLayers.SecondaryUrban, "Secondary Urban Area"),
-                    new LayerOption(FeatureTypes.AreaLayers.Scattered,      "Scattered Area"),
-                }),
-            new(Key: FeatureTypes.Road, Label: "Road", Icon: "🛣️",
-                Layers: new[]
-                {
-                    new LayerOption(FeatureTypes.RoadLayers.Boulevard, "Boulevard", "primary"),
-                    new LayerOption(FeatureTypes.RoadLayers.Avenue,    "Avenue",    "primary"),
-                    new LayerOption(FeatureTypes.RoadLayers.Street,    "Street",    "secondary"),
-                    new LayerOption(FeatureTypes.RoadLayers.Drive,     "Drive",     "tertiary"),
-                    new LayerOption(FeatureTypes.RoadLayers.Lane,      "Lane",      "tertiary"),
-                    new LayerOption(FeatureTypes.RoadLayers.CulDeSac,  "Cul-de-sac","tertiary"),
-                    new LayerOption(FeatureTypes.RoadLayers.Way,       "Way",       "tertiary"),
-                }),
-            new(Key: FeatureTypes.District, Label: "District", Icon: "🏘️",
-                Layers: new[]
-                {
-                    new LayerOption(FeatureTypes.DistrictLayers.HousingEstate,      "Housing Estate"),
-                    new LayerOption(FeatureTypes.DistrictLayers.UrbanPole,          "Urban Pole"),
-                    new LayerOption(FeatureTypes.DistrictLayers.District,           "District"),
-                    new LayerOption(FeatureTypes.DistrictLayers.TradActivitiesZone, "Trad. Activities Zone"),
-                    new LayerOption(FeatureTypes.DistrictLayers.IndustryZone,       "Industry Zone"),
-                }),
-            new(Key: FeatureTypes.HouseEntrance, Label: "House Entrance", Icon: "🚪",
-                Layers: new[]
-                {
-                    new LayerOption(FeatureTypes.HouseEntranceLayers.Main,      "Main Entrance"),
-                    new LayerOption(FeatureTypes.HouseEntranceLayers.Secondary, "Secondary Entrance"),
-                }),
-            new(Key: FeatureTypes.PublicBuilding, Label: "Public Building", Icon: "🏛️",
-                Layers: new[] { new LayerOption(FeatureTypes.PublicBuildingLayers.Default, "Public Building") }),
-            new(Key: FeatureTypes.PublicSpace, Label: "Public Space", Icon: "🌳",
-                Layers: new[]
-                {
-                    new LayerOption(FeatureTypes.PublicSpaceLayers.Garden, "Garden"),
-                    new LayerOption(FeatureTypes.PublicSpaceLayers.Square, "Square"),
-                }),
-        };
-        return Ok(types);
-    }
-
     // ── POST /api/save ────────────────────────────────────────────────────────
 
     [HttpPost("/api/save")]
@@ -84,6 +40,10 @@ public class FeaturesController(AppDbContext db, IScatteredAreaService scattered
                 roadId = rid;
 
         long newId;
+
+        // Wrap the feature insert + registry insert in a single transaction so
+        // a failure on the second save never leaves an orphaned feature row.
+        using var tx = await db.Database.BeginTransactionAsync();
 
         switch (body.Type)
         {
@@ -125,6 +85,7 @@ public class FeaturesController(AppDbContext db, IScatteredAreaService scattered
 
         db.FeatureRegistry.Add(new FeatureRegistry { Id = newId, FeatureType = body.Type });
         await db.SaveChangesAsync();
+        await tx.CommitAsync();
 
         return StatusCode(201, new { success = true, id = newId, message = "Feature saved successfully" });
     }
@@ -134,17 +95,40 @@ public class FeaturesController(AppDbContext db, IScatteredAreaService scattered
     [HttpGet("/api/load")]
     public async Task<IActionResult> LoadFeatures()
     {
-        var uid  = CurrentUserId;
-        var rows = new List<object>();
+        var uid = CurrentUserId;
 
-        rows.AddRange((await db.Areas.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt).ToListAsync()).Select(f => ToDto(f, "area")));
-        rows.AddRange((await db.Districts.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt).ToListAsync()).Select(f => ToDto(f, "district")));
-        rows.AddRange((await db.CityCenters.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt).ToListAsync()).Select(f => ToDto(f, "city_center")));
-        rows.AddRange((await db.Roads.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt).ToListAsync()).Select(f => ToDto(f, "road")));
-        rows.AddRange((await db.HouseEntrances.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt).ToListAsync()).Select(f => ToDto(f, "house_entrance")));
-        rows.AddRange((await db.PublicBuildings.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt).ToListAsync()).Select(f => ToDto(f, "public_building")));
-        rows.AddRange((await db.PublicSpaces.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt).ToListAsync()).Select(f => ToDto(f, "public_space")));
-        rows.AddRange((await db.NamingPanels.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt).ToListAsync()).Select(f => ToDto(f, "naming_panel")));
+        // EF Core DbContext is NOT thread-safe — parallel queries must each own
+        // their own context instance. dbFactory.CreateDbContextAsync() pulls a
+        // fresh, independently-owned context from the same pool configuration.
+        // Each 'await using' disposes its context when the task completes.
+        static async Task<List<T>> Query<T>(
+            IDbContextFactory<AppDbContext> f,
+            Func<AppDbContext, IQueryable<T>> selector) where T : class
+        {
+            await using var ctx = await f.CreateDbContextAsync();
+            return await selector(ctx).ToListAsync();
+        }
+
+        var tAreas     = Query(dbFactory, c => c.Areas.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt));
+        var tDistricts = Query(dbFactory, c => c.Districts.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt));
+        var tCCenters  = Query(dbFactory, c => c.CityCenters.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt));
+        var tRoads     = Query(dbFactory, c => c.Roads.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt));
+        var tEntrances = Query(dbFactory, c => c.HouseEntrances.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt));
+        var tBuildings = Query(dbFactory, c => c.PublicBuildings.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt));
+        var tSpaces    = Query(dbFactory, c => c.PublicSpaces.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt));
+        var tPanels    = Query(dbFactory, c => c.NamingPanels.Where(f => f.UserId == uid).OrderBy(f => f.CreatedAt));
+
+        await Task.WhenAll(tAreas, tDistricts, tCCenters, tRoads, tEntrances, tBuildings, tSpaces, tPanels);
+
+        var rows = new List<object>();
+        rows.AddRange(tAreas.Result.Select(f     => ToDto(f, "area")));
+        rows.AddRange(tDistricts.Result.Select(f => ToDto(f, "district")));
+        rows.AddRange(tCCenters.Result.Select(f  => ToDto(f, "city_center")));
+        rows.AddRange(tRoads.Result.Select(f     => ToDto(f, "road")));
+        rows.AddRange(tEntrances.Result.Select(f => ToDto(f, "house_entrance")));
+        rows.AddRange(tBuildings.Result.Select(f => ToDto(f, "public_building")));
+        rows.AddRange(tSpaces.Result.Select(f    => ToDto(f, "public_space")));
+        rows.AddRange(tPanels.Result.Select(f    => ToDto(f, "naming_panel")));
 
         return Ok(rows);
     }
@@ -171,6 +155,22 @@ public class FeaturesController(AppDbContext db, IScatteredAreaService scattered
         total += await db.PublicBuildings.Where(f => f.UserId == uid).ExecuteDeleteAsync();
         total += await db.PublicSpaces.Where(f => f.UserId == uid).ExecuteDeleteAsync();
         total += await db.NamingPanels.Where(f => f.UserId == uid).ExecuteDeleteAsync();
+
+        // Remove all registry entries whose IDs no longer exist in any feature table.
+        // (Simpler than a user_id column on feature_registry — IDs are globally unique.)
+        await db.Database.ExecuteSqlRawAsync(@"
+            DELETE FROM feature_registry
+            WHERE id NOT IN (
+                SELECT id FROM areas          UNION ALL
+                SELECT id FROM districts      UNION ALL
+                SELECT id FROM city_centers   UNION ALL
+                SELECT id FROM roads          UNION ALL
+                SELECT id FROM house_entrances UNION ALL
+                SELECT id FROM public_buildings UNION ALL
+                SELECT id FROM public_spaces  UNION ALL
+                SELECT id FROM naming_panels
+            )");
+
         return Ok(new { success = true, message = $"Deleted {total} features" });
     }
 
@@ -210,18 +210,38 @@ public class FeaturesController(AppDbContext db, IScatteredAreaService scattered
     public async Task<IActionResult> GetStats()
     {
         var uid = CurrentUserId;
-        var stats = new Dictionary<string, object>
+
+        // Each CountAsync runs on its own context — same reason as LoadFeatures.
+        static async Task<int> Count<T>(
+            IDbContextFactory<AppDbContext> f,
+            Func<AppDbContext, IQueryable<T>> selector) where T : class
         {
-            ["area"]            = await db.Areas.CountAsync(f => f.UserId == uid),
-            ["district"]        = await db.Districts.CountAsync(f => f.UserId == uid),
-            ["city_center"]     = await db.CityCenters.CountAsync(f => f.UserId == uid),
-            ["road"]            = await db.Roads.CountAsync(f => f.UserId == uid),
-            ["house_entrance"]  = await db.HouseEntrances.CountAsync(f => f.UserId == uid),
-            ["public_building"] = await db.PublicBuildings.CountAsync(f => f.UserId == uid),
-            ["public_space"]    = await db.PublicSpaces.CountAsync(f => f.UserId == uid),
-        };
-        stats["total"] = stats.Values.Cast<int>().Sum();
-        return Ok(stats);
+            await using var ctx = await f.CreateDbContextAsync();
+            return await selector(ctx).CountAsync();
+        }
+
+        var tAreas     = Count(dbFactory, c => c.Areas.Where(f => f.UserId == uid));
+        var tDistricts = Count(dbFactory, c => c.Districts.Where(f => f.UserId == uid));
+        var tCCenters  = Count(dbFactory, c => c.CityCenters.Where(f => f.UserId == uid));
+        var tRoads     = Count(dbFactory, c => c.Roads.Where(f => f.UserId == uid));
+        var tEntrances = Count(dbFactory, c => c.HouseEntrances.Where(f => f.UserId == uid));
+        var tBuildings = Count(dbFactory, c => c.PublicBuildings.Where(f => f.UserId == uid));
+        var tSpaces    = Count(dbFactory, c => c.PublicSpaces.Where(f => f.UserId == uid));
+
+        await Task.WhenAll(tAreas, tDistricts, tCCenters, tRoads, tEntrances, tBuildings, tSpaces);
+
+        return Ok(new
+        {
+            area            = tAreas.Result,
+            district        = tDistricts.Result,
+            city_center     = tCCenters.Result,
+            road            = tRoads.Result,
+            house_entrance  = tEntrances.Result,
+            public_building = tBuildings.Result,
+            public_space    = tSpaces.Result,
+            total           = tAreas.Result + tDistricts.Result + tCCenters.Result +
+                              tRoads.Result + tEntrances.Result + tBuildings.Result + tSpaces.Result,
+        });
     }
 
     // ── PUT /api/update/{id} ──────────────────────────────────────────────────
@@ -247,28 +267,6 @@ public class FeaturesController(AppDbContext db, IScatteredAreaService scattered
 
         if (rows == 0) return NotFound(new { detail = "Feature not found" });
         return Ok(new { success = true, id = featureId, updated_at = updatedAt });
-    }
-
-    // ── POST /api/feature-types/custom ───────────────────────────────────────
-
-    [HttpPost("/api/feature-types/custom")]
-    public IActionResult AddCustomFeatureType([FromBody] JsonElement body) =>
-        Ok(new { success = true, message = "Custom feature type registered successfully." });
-
-    // ── GET /api/load/layer/{layerType} ───────────────────────────────────────
-
-    [HttpGet("/api/load/layer/{layerType}")]
-    public async Task<IActionResult> LoadByLayer(string layerType)
-    {
-        var uid = CurrentUserId;
-        var rows = new List<object>();
-        rows.AddRange((await db.Areas.Where(f => f.UserId == uid && f.Layer == layerType).ToListAsync()).Select(f => ToDto(f, "area")));
-        rows.AddRange((await db.Districts.Where(f => f.UserId == uid && f.Layer == layerType).ToListAsync()).Select(f => ToDto(f, "district")));
-        rows.AddRange((await db.Roads.Where(f => f.UserId == uid && f.Layer == layerType).ToListAsync()).Select(f => ToDto(f, "road")));
-        rows.AddRange((await db.HouseEntrances.Where(f => f.UserId == uid && f.Layer == layerType).ToListAsync()).Select(f => ToDto(f, "house_entrance")));
-        rows.AddRange((await db.PublicBuildings.Where(f => f.UserId == uid && f.Layer == layerType).ToListAsync()).Select(f => ToDto(f, "public_building")));
-        rows.AddRange((await db.PublicSpaces.Where(f => f.UserId == uid && f.Layer == layerType).ToListAsync()).Select(f => ToDto(f, "public_space")));
-        return Ok(rows);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

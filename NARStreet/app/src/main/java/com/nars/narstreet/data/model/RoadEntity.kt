@@ -9,15 +9,17 @@ data class RoadEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val remoteId: Long,
     val label: String,
-    val dataJson: String,          // full feature data blob from NARS API
+    val layer: String                = "",
+    val coordinatesJson: String      = "[]",   // JSON [{lat,lng}] — road LineString vertices
+    val dataJson: String,                      // full feature data blob from NARS API
 
     // Phase 04 characteristics — null = not yet filled by field worker
-    val lanes: Int?           = null,
-    val trafficCapacity: String?  = null,   // HIGH / MEDIUM / LOW
-    val tradActivity: String?     = null,   // HIGH / MEDIUM / LOW
-    val hasMedianStrip: Boolean?  = null,
-    val hasGreenery: Boolean?     = null,
-    val isDeadEnd: Boolean?       = null,
+    val lanes: Int?              = null,
+    val trafficCapacity: String? = null,   // HIGH / MEDIUM / LOW
+    val tradActivity: String?    = null,   // HIGH / MEDIUM / LOW
+    val hasMedianStrip: Boolean? = null,
+    val hasGreenery: Boolean?    = null,
+    val isDeadEnd: Boolean?      = null,
 
     val syncStatus: SyncStatus = SyncStatus.SYNCED,
 ) {

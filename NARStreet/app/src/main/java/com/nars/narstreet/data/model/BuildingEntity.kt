@@ -10,12 +10,14 @@ data class BuildingEntity(
     val remoteId: Long,
     val label: String,
     val layer: String,
-    val coordinatesJson: String,   // JSON array of {lat, lng} — edited on device
-    val dataJson: String,          // full original blob from NARS API
+    // public_building is a POINT feature — data = {lat, lng}
+    val lat: Double = 0.0,
+    val lng: Double = 0.0,
+    val dataJson: String,
     val syncStatus: SyncStatus = SyncStatus.SYNCED,
 ) {
     fun toUpdateDto(): FeatureUpdateDto = FeatureUpdateDto(
         label = label,
-        data  = mapOf("coordinates" to coordinatesJson),
+        data  = mapOf("lat" to lat, "lng" to lng),
     )
 }

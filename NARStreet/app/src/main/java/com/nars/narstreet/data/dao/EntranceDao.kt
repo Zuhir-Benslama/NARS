@@ -12,6 +12,9 @@ interface EntranceDao {
     @Query("SELECT * FROM entrances WHERE syncStatus = 'PENDING'")
     suspend fun getPending(): List<EntranceEntity>
 
+    @Query("SELECT * FROM entrances WHERE remoteId = :remoteId LIMIT 1")
+    suspend fun getByRemoteId(remoteId: Long): EntranceEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entrance: EntranceEntity): Long
 
@@ -29,6 +32,9 @@ interface EntranceDao {
 
     @Query("UPDATE entrances SET syncStatus = 'ERROR' WHERE id = :id")
     suspend fun markError(id: Long)
+
+    @Query("UPDATE entrances SET syncStatus = 'PENDING' WHERE syncStatus = 'ERROR'")
+    suspend fun resetErrors()
 
     @Query("SELECT COUNT(*) FROM entrances WHERE syncStatus = 'PENDING'")
     fun pendingCount(): Flow<Int>

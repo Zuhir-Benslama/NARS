@@ -27,6 +27,9 @@ interface BuildingDao {
     @Query("UPDATE buildings SET syncStatus = 'ERROR' WHERE id = :id")
     suspend fun markError(id: Long)
 
+    @Query("UPDATE buildings SET syncStatus = 'PENDING' WHERE syncStatus = 'ERROR'")
+    suspend fun resetErrors()
+
     @Query("SELECT COUNT(*) FROM buildings WHERE syncStatus = 'PENDING'")
     fun pendingCount(): Flow<Int>
 }

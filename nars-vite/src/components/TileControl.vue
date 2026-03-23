@@ -20,9 +20,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ctx } from '../map/state'
-
-declare const L: typeof import('leaflet')
+import { setBaseLayer } from '../map/index'
 
 const { t } = useI18n()
 const open      = ref(false)
@@ -42,8 +40,7 @@ function select(key: string) {
     if (key === activeKey.value) { close(); return }
     activeKey.value = key
     close()
-    // Signal index.ts to swap the active base layer
-    ;(window as any).__narsSetBaseLayer?.(key)
+    setBaseLayer(key)
 }
 </script>
 

@@ -1,42 +1,59 @@
 package com.nars.narstreet.ui.theme
 
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 
-private val LightFallback = lightColorScheme(
-    primary       = NarsTeal,
-    onPrimary     = NarsOnTeal,
-    primaryContainer    = Color(0xFFE1F5EE),
-    onPrimaryContainer  = Color(0xFF04342C),
-)
+// ── NARS dark navy colour scheme ─────────────────────────────────────────────
+// Mirrors the web frontend exactly — no dynamic/system colour override.
 
-private val DarkFallback = darkColorScheme(
-    primary       = Color(0xFF5DCAA5),
-    onPrimary     = Color(0xFF04342C),
-    primaryContainer    = Color(0xFF0F6E56),
-    onPrimaryContainer  = Color(0xFF9FE1CB),
+private val NarsColorScheme = darkColorScheme(
+    // Primary — teal green (save / confirm actions)
+    primary              = NarsTeal,
+    onPrimary            = NarsOnTeal,
+    primaryContainer     = Color(0xFF0F6E56),
+    onPrimaryContainer   = Color(0xFF9FE1CB),
+
+    // Secondary — blue (focus / info)
+    secondary            = NarsBlue,
+    onSecondary          = NarsOnTeal,
+    secondaryContainer   = Color(0xFF1A3A5C),
+    onSecondaryContainer = Color(0xFFADD8F7),
+
+    // Background — deep navy
+    background           = NarsNavyDeep,
+    onBackground         = TextPrimary,
+
+    // Surface hierarchy
+    surface              = NarsNavy,
+    onSurface            = TextPrimary,
+    surfaceVariant       = NarsNavyLight,
+    onSurfaceVariant     = TextSecondary,
+    surfaceContainerHigh = NarsNavyLight,
+    surfaceContainerLow  = NarsNavyDeep,
+    surfaceContainer     = NarsNavy,
+
+    // Outline
+    outline              = GlassBorder,
+    outlineVariant       = Color(0x1FFFFFFF),
+
+    // Error
+    error                = SyncError,
+    onError              = NarsOnTeal,
+    errorContainer       = Color(0x33E24B4A),
+    onErrorContainer     = Color(0xFFFFAAAA),
+
+    // Inverse
+    inverseSurface       = TextPrimary,
+    inverseOnSurface     = NarsNavyDeep,
 )
 
 @Composable
 fun NARStreetTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    val colorScheme = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context)
-            else           dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkFallback
-        else      -> LightFallback
-    }
-
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = NarsColorScheme,
         typography  = NARStreetTypography,
         content     = content,
     )

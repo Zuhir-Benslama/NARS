@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+<title>NARS Map</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body,#map { width:100%; height:100%; overflow:hidden; background:#1a1a2e; }
+  #status { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+    color:#fff; font:14px monospace; text-align:center; pointer-events:none; z-index:9999; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="status">Loading map...</div>
+
+<script>
+// ── CDN loader with fallback ──────────────────────────────────────────────────
+const MAPLIBRE_CSS = 'https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css';
+const MAPLIBRE_JS  = 'https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js';
+const GEOMAN_CSS   = 'https://cdn.jsdelivr.net/npm/@geoman-io/maplibre-geoman-free@1.0.9/dist/maplibre-geoman.css';
+const GEOMAN_JS    = 'https://cdn.jsdelivr.net/npm/@geoman-io/maplibre-geoman-free@1.0.9/dist/maplibre-geoman.js';
+
+// Fallback CDNs
+const MAPLIBRE_JS_FB  = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
+const GEOMAN_JS_FB    = 'https://unpkg.com/@geoman-io/maplibre-geoman-free@1.0.9/dist/maplibre-geoman.js';
+
+function loadCSS(href) {
+  return new Promise(resolve => {
+    const l = document.createElement('link');
+    l.rel = 'stylesheet'; l.href = href;
+    l.onload = resolve; l.onerror = resolve; // non-fatal
+    document.head.appendChild(l);
+  });
+}
+
+function loadJS(src, fallback) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => {
+      if (fallback) {
+        const s2 = document.createElement('script');
+        s2.src = fallback;
+        s2.onload = resolve;
+        s2.onerror = reject;
+        document.head.appendChild(s2);
+      } else reject(new Error('Failed: ' + src));
+    };
+    document.head.appendChild(s);
+  });
+}
+
+async function boot() {
+  const status = document.getElementById('status');
+  try {
+    status.textContent = 'Loading MapLibre...';
+    await loadCSS(MAPLIBRE_CSS);
+    await loadJS(MAPLIBRE_JS, MAPLIBRE_JS_FB);
+
+    status.textContent = 'Loading Geoman...';
+    await loadCSS(GEOMAN_CSS);
+    await loadJS(GEOMAN_JS, GEOMAN_JS_FB);
+
+    status.textContent = 'Initializing...';
+    initMap();
+  } catch (e) {
+    status.innerHTML = 'Map failed to load.<br>' + e.message + '<br>Check internet connection.';
+    if (window.NarsAndroid) window.NarsAndroid.onMapReady(); // still notify so app doesn't hang
+  }
+}
+
+boot();
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+const C = {
+  ROAD:        '#3498DB',
+  ROAD_HL:     '#F39C12',
+  ENTRANCE:    '#27AE60',
+  GPS:         '#E74C3C',
+  BUILDING:    '#E67E22',
+  SPACE:       '#2ECC71',
+  PANEL:       '#9B59B6',
+  AREA_MAIN:   '#C0392B',
+  AREA_SEC:    '#8E44AD',
+  DISTRICT:    '#F39C12',
+  BOUNDARY:    '#E74C3C',
+  CITY_CENTER: '#E74C3C',
+};
+
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+
+let map = null;
+
+function initMap() {
+  const status = document.getElementById('status');
+  try {
+    map = new maplibregl.Map({
+      container: 'map',
+      style: {
+        version: 8,
+        sources: {
+          esri: { type: 'raster', tiles: [ESRI], tileSize: 256, maxzoom: 19 }
+        },
+        layers: [{ id: 'esri-layer', type: 'raster', source: 'esri' }]
+      },
+      center: [3.05, 36.7],
+      zoom: 10,
+      maxZoom: 19,
+      attributionControl: false,
+    });
+
+    map.on('load', () => {
+      status.style.display = 'none';
+      // Wire tap/edit events
+      map.on('click', e => handleTap(e, false));
+      map.on('contextmenu', e => handleTap(e, true));
+      // Add Geoman controls (edit only, no draw buttons)
+      try {
+        const gm = new maplibreGeoman.GeoManControl({ drawControls: false, editControls: true });
+        map.addControl(gm, 'top-right');
+        map.on('pm:update', onGeomanUpdate);
+      } catch(e) { console.warn('Geoman init failed:', e); }
+
+      if (window.NarsAndroid) window.NarsAndroid.onMapReady();
+    });
+
+    map.on('error', e => {
+      console.error('MapLibre error:', e);
+    });
+
+  } catch(e) {
+    status.innerHTML = 'Map init error:<br>' + e.message;
+    console.error('initMap error:', e);
+    if (window.NarsAndroid) window.NarsAndroid.onMapReady();
+  }
+}
+
+// ── Source/layer helpers ──────────────────────────────────────────────────────
+function ensureSource(id, data) {
+  if (!map) return;
+  if (map.getSource(id)) {
+    map.getSource(id).setData(data);
+  } else {
+    map.addSource(id, { type: 'geojson', data: data || { type:'FeatureCollection', features:[] } });
+  }
+}
+
+function ensureLineLayer(id, src, color, width, dashArray) {
+  if (!map || map.getLayer(id)) return;
+  const paint = { 'line-color': color, 'line-width': width };
+  if (dashArray) paint['line-dasharray'] = dashArray;
+  map.addLayer({ id, type: 'line', source: src, paint });
+}
+
+function ensureCircleLayer(id, src, color, radius) {
+  if (!map || map.getLayer(id)) return;
+  map.addLayer({ id, type: 'circle', source: src, paint: {
+    'circle-color': color, 'circle-radius': radius,
+    'circle-stroke-width': 2, 'circle-stroke-color': '#FFFFFF'
+  }});
+}
+
+function ensureLabelLayer(id, src, color, placement) {
+  if (!map || map.getLayer(id)) return;
+  map.addLayer({ id, type: 'symbol', source: src,
+    layout: {
+      'text-field': ['get', 'label'], 'text-size': 11,
+      'symbol-placement': placement || 'point',
+      'text-allow-overlap': false, 'text-padding': 4,
+    },
+    paint: { 'text-color': color, 'text-halo-color': '#000', 'text-halo-width': 1.5 }
+  });
+}
+
+// ── Public API (called from Kotlin) ───────────────────────────────────────────
+window.nars = {
+
+  flyTo(lat, lng, zoom) {
+    if (!map) return;
+    map.flyTo({ center: [lng, lat], zoom: zoom || 14, duration: 500 });
+  },
+
+  setContext(boundaryGeoJson, mainAreaGeoJson, secondaryAreasGeoJson) {
+    if (!map) return;
+    try {
+      if (boundaryGeoJson && boundaryGeoJson !== 'null') {
+        const geom = JSON.parse(boundaryGeoJson);
+        ensureSource('ctx-boundary', { type:'Feature', geometry:geom, properties:{} });
+        ensureLineLayer('ctx-boundary-line', 'ctx-boundary', C.BOUNDARY, 2.5);
+      }
+      if (mainAreaGeoJson && mainAreaGeoJson !== 'null') {
+        const geom = JSON.parse(mainAreaGeoJson);
+        ensureSource('ctx-main', { type:'Feature', geometry:geom, properties:{} });
+        ensureLineLayer('ctx-main-line', 'ctx-main', C.AREA_MAIN, 2);
+      }
+      const secFeats = (secondaryAreasGeoJson || []).map(gj => ({
+        type:'Feature', geometry:JSON.parse(gj), properties:{}
+      }));
+      ensureSource('ctx-sec', { type:'FeatureCollection', features:secFeats });
+      ensureLineLayer('ctx-sec-line', 'ctx-sec', C.AREA_SEC, 2);
+    } catch(e) { console.error('setContext', e); }
+  },
+
+  setAreas(areasJson) {
+    if (!map) return;
+    try {
+      ensureSource('areas', JSON.parse(areasJson));
+      ensureLineLayer('areas-line', 'areas', C.AREA_SEC, 1.5);
+      ensureLabelLayer('areas-label', 'areas', C.AREA_SEC);
+    } catch(e) { console.error('setAreas', e); }
+  },
+
+  setDistricts(districtsJson) {
+    if (!map) return;
+    try {
+      ensureSource('districts', JSON.parse(districtsJson));
+      ensureLineLayer('districts-line', 'districts', C.DISTRICT, 1.5);
+      ensureLabelLayer('districts-label', 'districts', C.DISTRICT);
+    } catch(e) { console.error('setDistricts', e); }
+  },
+
+  setRoads(roadsJson, highlightedJson) {
+    if (!map) return;
+    try {
+      ensureSource('roads', JSON.parse(roadsJson));
+      ensureLineLayer('roads-line', 'roads', C.ROAD, 3);
+      ensureLabelLayer('roads-label', 'roads', C.ROAD, 'line');
+      if (highlightedJson && highlightedJson !== 'null') {
+        ensureSource('roads-hl', JSON.parse(highlightedJson));
+        ensureLineLayer('roads-hl-line', 'roads-hl', C.ROAD_HL, 6);
+      }
+    } catch(e) { console.error('setRoads', e); }
+  },
+
+  setEntrances(entrancesJson) {
+    if (!map) return;
+    try {
+      ensureSource('entrances', JSON.parse(entrancesJson));
+      ensureCircleLayer('entrances-circle', 'entrances', C.ENTRANCE, 8);
+      ensureLabelLayer('entrances-label', 'entrances', C.ENTRANCE);
+    } catch(e) { console.error('setEntrances', e); }
+  },
+
+  setGps(lat, lng) {
+    if (!map) return;
+    try {
+      const feat = { type:'Feature', geometry:{ type:'Point', coordinates:[lng,lat] }, properties:{} };
+      ensureSource('gps', feat);
+      ensureCircleLayer('gps-circle', 'gps', C.GPS, 12);
+    } catch(e) { console.error('setGps', e); }
+  },
+
+  setCityCenter(lat, lng) {
+    if (!map) return;
+    try {
+      const feat = { type:'Feature', geometry:{ type:'Point', coordinates:[lng,lat] }, properties:{ label:'City Center' } };
+      ensureSource('city-center', feat);
+      ensureCircleLayer('city-center-circle', 'city-center', C.CITY_CENTER, 10);
+      ensureLabelLayer('city-center-label', 'city-center', C.CITY_CENTER);
+    } catch(e) { console.error('setCityCenter', e); }
+  },
+
+  setBuildings(buildingsJson) {
+    if (!map) return;
+    try {
+      ensureSource('buildings', JSON.parse(buildingsJson));
+      ensureCircleLayer('buildings-circle', 'buildings', C.BUILDING, 8);
+      ensureLabelLayer('buildings-label', 'buildings', C.BUILDING);
+    } catch(e) { console.error('setBuildings', e); }
+  },
+
+  setSpaces(spacesJson) {
+    if (!map) return;
+    try {
+      ensureSource('spaces', JSON.parse(spacesJson));
+      ensureLineLayer('spaces-line', 'spaces', C.SPACE, 1.5);
+      ensureLabelLayer('spaces-label', 'spaces', C.SPACE);
+    } catch(e) { console.error('setSpaces', e); }
+  },
+
+  setPanels(panelsJson) {
+    if (!map) return;
+    try {
+      ensureSource('panels', JSON.parse(panelsJson));
+      ensureCircleLayer('panels-circle', 'panels', C.PANEL, 10);
+      ensureLabelLayer('panels-label', 'panels', C.PANEL);
+    } catch(e) { console.error('setPanels', e); }
+  },
+
+  startEditPolygon(featureId, featureJson, color) {
+    if (!map) return;
+    try {
+      const feat = JSON.parse(featureJson);
+      ensureSource('edit-feature', { type:'FeatureCollection', features:[feat] });
+      if (!map.getLayer('edit-fill'))
+        map.addLayer({ id:'edit-fill', type:'fill', source:'edit-feature',
+          paint:{ 'fill-color': color, 'fill-opacity': 0.15 } });
+      if (!map.getLayer('edit-line'))
+        map.addLayer({ id:'edit-line', type:'line', source:'edit-feature',
+          paint:{ 'line-color': color, 'line-width': 2.5 } });
+      try { map.pm?.enableEditing?.('edit-feature'); } catch(_) {}
+    } catch(e) { console.error('startEditPolygon', e); }
+  },
+
+  startEditPolyline(featureId, featureJson, color) {
+    if (!map) return;
+    try {
+      const feat = JSON.parse(featureJson);
+      ensureSource('edit-feature', { type:'FeatureCollection', features:[feat] });
+      if (!map.getLayer('edit-line'))
+        map.addLayer({ id:'edit-line', type:'line', source:'edit-feature',
+          paint:{ 'line-color': color, 'line-width': 3 } });
+      try { map.pm?.enableEditing?.('edit-feature'); } catch(_) {}
+    } catch(e) { console.error('startEditPolyline', e); }
+  },
+
+  startEditPoint(featureId, featureJson, color) {
+    if (!map) return;
+    try {
+      const feat = JSON.parse(featureJson);
+      ensureSource('edit-feature', { type:'FeatureCollection', features:[feat] });
+      if (!map.getLayer('edit-circle'))
+        map.addLayer({ id:'edit-circle', type:'circle', source:'edit-feature',
+          paint:{ 'circle-color': color, 'circle-radius': 14,
+                  'circle-stroke-width': 3, 'circle-stroke-color': '#FFFFFF' } });
+      try { map.pm?.enableEditing?.('edit-feature'); } catch(_) {}
+    } catch(e) { console.error('startEditPoint', e); }
+  },
+
+  stopEdit() {
+    if (!map) return;
+    try { map.pm?.disableEditing?.(); } catch(_) {}
+    ['edit-fill','edit-line','edit-circle'].forEach(l => {
+      try { if (map.getLayer(l)) map.removeLayer(l); } catch(_) {}
+    });
+    try { if (map.getSource('edit-feature')) map.removeSource('edit-feature'); } catch(_) {}
+  },
+};
+
+// ── Geoman edit events → Kotlin ───────────────────────────────────────────────
+function onGeomanUpdate() {
+  if (!window.NarsAndroid) return;
+  try {
+    const src = map?.getSource('edit-feature');
+    if (!src) return;
+    const data = src._data;
+    const feat = data?.type === 'FeatureCollection' ? data.features?.[0] : data;
+    if (!feat?.geometry) return;
+    const coords = feat.geometry.coordinates;
+    let points;
+    const t = feat.geometry.type;
+    if (t === 'Point') points = [{ lat: coords[1], lng: coords[0] }];
+    else if (t === 'LineString') points = coords.map(c => ({ lat:c[1], lng:c[0] }));
+    else if (t === 'Polygon') points = coords[0].map(c => ({ lat:c[1], lng:c[0] }));
+    if (points) window.NarsAndroid.onGeometryChanged('edit', JSON.stringify(points));
+  } catch(e) { console.error('geoman update', e); }
+}
+
+// ── Tap handlers → Kotlin ─────────────────────────────────────────────────────
+const TAPPABLE = [
+  { layer:'roads-line',        type:'road' },
+  { layer:'entrances-circle',  type:'entrance' },
+  { layer:'buildings-circle',  type:'building' },
+  { layer:'spaces-line',       type:'space' },
+  { layer:'panels-circle',     type:'panel' },
+  { layer:'districts-line',    type:'district' },
+  { layer:'areas-line',        type:'area' },
+];
+
+function handleTap(e, isLong) {
+  if (!window.NarsAndroid || !map) return;
+  for (const { layer, type } of TAPPABLE) {
+    if (!map.getLayer(layer)) continue;
+    const feats = map.queryRenderedFeatures(e.point, { layers:[layer] });
+    if (feats.length > 0) {
+      const dbId = feats[0].properties?.dbId;
+      if (dbId != null) {
+        if (isLong) window.NarsAndroid.onFeatureLongClick(type, String(dbId));
+        else        window.NarsAndroid.onFeatureClick(type, String(dbId));
+        return;
+      }
+    }
+  }
+}
+
+
+</script>
+</body>
+</html>

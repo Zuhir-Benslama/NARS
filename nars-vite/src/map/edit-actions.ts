@@ -2,7 +2,8 @@
 // Implements the three context-menu edit operations (remove, edit geometry,
 // edit info) and registers them as window globals so the menu click handler
 // can call them without a circular import chain.
-// Extracted from context-menu.ts for size.
+// Extracted from context-menu.ts. All three functions are exported directly;
+// context-menu.ts imports them instead of going through window globals.
 
 import { apiFetch }                                               from '../api'
 import { PHASES }                                                 from '../phases'
@@ -20,7 +21,7 @@ declare const L: typeof import('leaflet')
 
 // ─── REMOVE ───────────────────────────────────────────────────────────────────
 
-async function removeFeature(dbId: number): Promise<void> {
+export async function removeFeature(dbId: number): Promise<void> {
     if (!confirm(t('msg_confirm_remove'))) return
 
     const phaseKey = Object.keys(featureLayers).find(k =>
@@ -61,7 +62,7 @@ async function removeFeature(dbId: number): Promise<void> {
 
 // ─── EDIT GEOMETRY ────────────────────────────────────────────────────────────
 
-async function editGeometry(dbId: number): Promise<void> {
+export async function editGeometry(dbId: number): Promise<void> {
     const phaseKey = Object.keys(featureLayers).find(k =>
         featureLayers[k].some((e: LayerEntry) => (e.layer as any)._dbId === dbId))
     const entry = phaseKey
@@ -171,7 +172,7 @@ async function editGeometry(dbId: number): Promise<void> {
 
 // ─── EDIT FEATURE INFO ────────────────────────────────────────────────────────
 
-async function editFeatureInfo(dbId: number): Promise<void> {
+export async function editFeatureInfo(dbId: number): Promise<void> {
     ctx.map.closePopup()
 
     const phaseKey = Object.keys(featureLayers).find(k =>

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,9 +8,16 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
+// Read developer-specific config from local.properties (never committed to VCS)
+val localProps = Properties().also { props ->
+    val f = rootProject.file("local.properties")
+    if (f.exists()) props.load(f.inputStream())
+}
+
 android {
     namespace   = "com.nars.narstreet"
     compileSdk  = 35
+    ndkVersion  = "27.3.13750724"
 
     defaultConfig {
         applicationId   = "com.nars.narstreet"
@@ -16,13 +25,23 @@ android {
         targetSdk       = 35
         versionCode     = 1
         versionName     = "1.0.0-alpha"
-
-        // NARS API base URL — override in local.properties or CI secrets
-        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:5000\"")
     }
 
     buildTypes {
+        debug {
+            // Reads DEV_API_URL from local.properties.
+            // Falls back to the Android emulator loopback (10.0.2.2) so the
+            // project builds out-of-the-box without any local.properties entry.
+            val devUrl = localProps.getProperty("DEV_API_URL", "http://10.0.2.2:5000")
+            buildConfigField("String", "API_BASE_URL", "\"$devUrl\"")
+        }
         release {
+            // Reads PROD_API_URL from local.properties (or CI secret).
+            // Fails the build explicitly if missing — better than shipping a
+            // placeholder URL that silently fails at runtime.
+            val prodUrl = localProps.getProperty("PROD_API_URL")
+                ?: error("PROD_API_URL must be set in local.properties for a release build")
+            buildConfigField("String", "API_BASE_URL", "\"$prodUrl\"")
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
@@ -33,7 +52,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions { jvmTarget = "17" }
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        }
+    }
 
     buildFeatures {
         compose     = true
@@ -78,7 +101,6 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.moshi)
     implementation(libs.okhttp.logging)
-    implementation(libs.moshi.kotlin)
     ksp(libs.moshi.codegen)
 
     // Coroutines
@@ -87,11 +109,22 @@ dependencies {
     // WorkManager
     implementation(libs.work.runtime.ktx)
 
-    // Map
+
+    // Map (MapLibre native SDK — LatLng type + MapView.kt legacy composables)
     implementation(libs.maplibre.android)
 
     // GPS
     implementation(libs.play.services.location)
 
     debugImplementation(libs.androidx.ui.tooling.preview)
+}
+// Tell Room KSP where to write the exported schema JSON files.
+// Commit the generated schemas/ directory to VCS for migration audits.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+    arg("room.incremental", "true")
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.compilerArgs.add("-Xlint:-processing")
 }

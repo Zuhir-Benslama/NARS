@@ -29,23 +29,27 @@ data class EntranceEntity(
         layer = entranceTypeKey,
         label = label,
         data  = mapOf(
-            "lat"             to lat,
-            "lng"             to lng,
-            "roadDbId"        to roadDbId,
-            "entranceNumber"  to entranceNumber,
-            "entranceTypeKey" to entranceTypeKey,
-            "isNumbered"      to isNumbered,
-            "isNumberCorrect" to isNumberCorrect,
+            "lat"              to lat,
+            "lng"              to lng,
+            "roadDbId"         to roadDbId,
+            "entranceNumber"   to entranceNumber,
+            "entranceTypeKey"  to entranceTypeKey,
+            "isNumbered"       to isNumbered,
+            "isNumberCorrect"  to isNumberCorrect,
+            "orderPlateNeeded" to orderPlateNeeded,
+            "relocateNeeded"   to relocateNeeded,
         ),
     )
 
     fun toUpdateDto(): FeatureUpdateDto = FeatureUpdateDto(
         label = label,
         data  = mapOf(
-            "lat"             to lat,
-            "lng"             to lng,
-            "isNumbered"      to isNumbered,
-            "isNumberCorrect" to isNumberCorrect,
+            "lat"              to lat,
+            "lng"              to lng,
+            "isNumbered"       to isNumbered,
+            "isNumberCorrect"  to isNumberCorrect,
+            "orderPlateNeeded" to orderPlateNeeded,
+            "relocateNeeded"   to relocateNeeded,
         ),
     )
 }

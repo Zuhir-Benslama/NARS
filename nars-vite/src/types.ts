@@ -182,6 +182,7 @@ export interface AppStore {
     cityCenterLatLng:        LatLng | null
     user:                    UserInfo | null
     municipalityName:        string
+    loadError:               boolean         // true when the initial /api/load call failed
     modal:                   ModalState
     // House entrances phase — selected references
     referenceRoadDbId:       number | null   // road chosen as reference for main entrances
