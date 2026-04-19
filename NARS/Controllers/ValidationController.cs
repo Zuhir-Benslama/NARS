@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +18,11 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
     // fix #13: named constant replaces the magic number tolerance buffer.
     private const double DistrictBoundaryToleranceMeters = 10.0;
 
+    // Maximum number of coordinates allowed in a single validation request.
+    // Prevents DoS via extremely large coordinate payloads (memory exhaustion
+    // on both server and database during WKT construction and PostGIS queries).
+    private const int MaxCoordinateCount = 10_000;
+
     // fix #4: PolygonFromDataSql and LineStringFromDataSql are now imported from
     // SqlFragments (both include ST_MakeValid) instead of being declared locally.
     // Use the shared constants directly in all queries below.
@@ -28,7 +34,7 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
     {
         var exists = await db.Areas.AnyAsync(f =>
             f.UserId == CurrentUserId &&
-            f.Layer  == FeatureTypes.AreaLayers.CentralUrban);
+            f.Layer == FeatureTypes.AreaLayers.CentralUrban);
 
         return Ok(new { exists });
     }
@@ -40,6 +46,18 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
     {
         if (body.Coordinates.Count < 2)
             return BadRequest(new ValidateRoadResponse(false, "A road must have at least 2 points."));
+
+        // Bounds checking: prevent DoS via excessive coordinate counts.
+        if (body.Coordinates.Count > MaxCoordinateCount)
+            return BadRequest(new ValidateRoadResponse(false, $"Too many coordinates (max {MaxCoordinateCount:N0})."));
+
+        // Validate for NaN/Infinity values that would produce invalid WKT.
+        foreach (var c in body.Coordinates)
+        {
+            if (double.IsNaN(c.Lat) || double.IsInfinity(c.Lat) ||
+                double.IsNaN(c.Lng) || double.IsInfinity(c.Lng))
+                return BadRequest(new ValidateRoadResponse(false, "Invalid coordinate values (NaN or Infinity)."));
+        }
 
         // Rule 1: angle check (pure C#)
         for (int i = 0; i < body.Coordinates.Count - 2; i++)
@@ -56,7 +74,7 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
 
             if (len1 < 1e-10 || len2 < 1e-10) continue;
 
-            double dot   = (v1x * v2x + v1y * v2y) / (len1 * len2);
+            double dot = (v1x * v2x + v1y * v2y) / (len1 * len2);
             double angle = Math.Acos(Math.Clamp(dot, -1.0, 1.0)) * (180.0 / Math.PI);
 
             if (angle > 90.0)
@@ -70,12 +88,10 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
         if (existingCount == 0)
             return Ok(new ValidateRoadResponse(true, null));
 
-        var wkt  = BuildLineStringWkt(body.Coordinates);
+        var wkt = BuildLineStringWkt(body.Coordinates);
         var conn = db.Database.GetDbConnection();
 
-        // fix #10: guard against already-open pooled connection
-        if (conn.State != ConnectionState.Open)
-            await conn.OpenAsync();
+        await db.Database.OpenConnectionAsync();
         try
         {
             using var cmd = conn.CreateCommand();
@@ -93,14 +109,17 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
             AddParam(cmd, "@uid", CurrentUserId);
             AddParam(cmd, "@wkt", wkt);
 
-            var result    = await cmd.ExecuteScalarAsync();
+            var result = await cmd.ExecuteScalarAsync();
             bool connected = Convert.ToBoolean(result);
 
             if (!connected)
                 return Ok(new ValidateRoadResponse(false,
                     "This road must connect to at least one existing road (within 20 m of an endpoint)."));
         }
-        finally { await conn.CloseAsync(); }
+        finally
+        {
+            await db.Database.CloseConnectionAsync();
+        }
 
         return Ok(new ValidateRoadResponse(true, null));
     }
@@ -113,21 +132,33 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
         if (body.Coordinates.Count < 3)
             return BadRequest(new ValidateDistrictResponse(false, "A district must have at least 3 points."));
 
+        // Bounds checking: prevent DoS via excessive coordinate counts.
+        if (body.Coordinates.Count > MaxCoordinateCount)
+            return BadRequest(new ValidateDistrictResponse(false, $"Too many coordinates (max {MaxCoordinateCount:N0})."));
+
+        // Validate for NaN/Infinity values that would produce invalid WKT.
+        foreach (var c in body.Coordinates)
+        {
+            if (double.IsNaN(c.Lat) || double.IsInfinity(c.Lat) ||
+                double.IsNaN(c.Lng) || double.IsInfinity(c.Lng))
+                return BadRequest(new ValidateDistrictResponse(false, "Invalid coordinate values (NaN or Infinity)."));
+        }
+
         var existingCount = await db.Districts.CountAsync(f => f.UserId == CurrentUserId);
 
         // First district ever is always exempt from adjacency.
         if (existingCount == 0)
             return Ok(new ValidateDistrictResponse(true, null));
 
-        var wkt  = BuildPolygonWkt(body.Coordinates);
+        var wkt = BuildPolygonWkt(body.Coordinates);
         var conn = db.Database.GetDbConnection();
 
-        // fix #10: guard against already-open pooled connection
-        if (conn.State != ConnectionState.Open)
-            await conn.OpenAsync();
+        await db.Database.OpenConnectionAsync();
         try
         {
             // Check overlap — hard block (always required)
+            // ST_Intersects catches all intersection cases including containment
+            // (ST_Overlaps returns false when one polygon is fully inside another).
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = $@"
@@ -135,7 +166,7 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
                         SELECT 1
                         FROM districts f
                         WHERE f.user_id = @uid
-                          AND ST_Overlaps(
+                          AND ST_Intersects(
                                 ({SqlFragments.PolygonFromData}),
                                 ST_SetSRID(ST_GeomFromText(@wkt), 4326)
                               )
@@ -177,12 +208,12 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
                               WHERE a.user_id = @uid
                                 AND a.layer   IN ('central_urban', 'secondary_urban')
                                 AND ST_Intersects(
-                                    ({SqlFragments.PolygonFromData.Replace("f.", "a.")}),
+                                    ({SqlFragments.PolygonFromDataWithAlias("a")}),
                                     ST_SetSRID(ST_GeomFromText(@wkt), 4326)
                                 )
                                 AND ST_Intersects(
-                                    ({SqlFragments.PolygonFromData.Replace("f.", "a.")}),
-                                    ({SqlFragments.PolygonFromData.Replace("f.", "d.")})
+                                    ({SqlFragments.PolygonFromDataWithAlias("a")}),
+                                    ({SqlFragments.PolygonFromDataWithAlias("d")})
                                 )
                           )";
                     AddParam(cmd, "@uid", CurrentUserId);
@@ -217,12 +248,12 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
                                       WHERE a.user_id = @uid
                                         AND a.layer   IN ('central_urban', 'secondary_urban')
                                         AND ST_Intersects(
-                                            ({SqlFragments.PolygonFromData.Replace("f.", "a.")}),
+                                            ({SqlFragments.PolygonFromDataWithAlias("a")}),
                                             ST_SetSRID(ST_GeomFromText(@wkt), 4326)
                                         )
                                         AND ST_Intersects(
-                                            ({SqlFragments.PolygonFromData.Replace("f.", "a.")}),
-                                            ({SqlFragments.PolygonFromData.Replace("f.", "f.")})
+                                            ({SqlFragments.PolygonFromDataWithAlias("a")}),
+                                            ({SqlFragments.PolygonFromDataWithAlias("f")})
                                         )
                                   )
                             )";
@@ -237,7 +268,10 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
                 }
             }
         }
-        finally { await conn.CloseAsync(); }
+        finally
+        {
+            await db.Database.CloseConnectionAsync();
+        }
 
         return Ok(new ValidateDistrictResponse(true, null));
     }
@@ -262,11 +296,8 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
                 "No districts have been drawn yet. Districts must fully cover all urban areas."));
 
         var conn = db.Database.GetDbConnection();
-
-        // fix #10: guard against already-open pooled connection
-        if (conn.State != ConnectionState.Open)
-            await conn.OpenAsync();
         bool covered;
+        await db.Database.OpenConnectionAsync();
         try
         {
             using var cmd = conn.CreateCommand();
@@ -295,7 +326,10 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
             var result = await cmd.ExecuteScalarAsync();
             covered = result is not null && Convert.ToBoolean(result);
         }
-        finally { await conn.CloseAsync(); }
+        finally
+        {
+            await db.Database.CloseConnectionAsync();
+        }
 
         return Ok(new DistrictCoverageResponse(
             covered,
@@ -306,12 +340,16 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    // Use InvariantCulture so doubles always format with '.' decimal separator,
+    // regardless of server locale (e.g. fr-DZ would use ',' otherwise).
+    private static string F(double v) => v.ToString(CultureInfo.InvariantCulture);
+
     private static string BuildLineStringWkt(List<CoordDto> coords) =>
-        $"LINESTRING({string.Join(",", coords.Select(c => $"{c.Lng} {c.Lat}"))})";
+        $"LINESTRING({string.Join(",", coords.Select(c => $"{F(c.Lng)} {F(c.Lat)}"))})";
 
     private static string BuildPolygonWkt(List<CoordDto> coords)
     {
-        var pts = coords.Select(c => $"{c.Lng} {c.Lat}").ToList();
+        var pts = coords.Select(c => $"{F(c.Lng)} {F(c.Lat)}").ToList();
         if (pts[0] != pts[^1]) pts.Add(pts[0]);
         return $"POLYGON(({string.Join(",", pts)}))";
     }

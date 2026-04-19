@@ -8,22 +8,23 @@ public class AppDbContext : DbContext
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     // ── Feature tables ────────────────────────────────────────────────────────
-    public DbSet<FeatureRegistry>  FeatureRegistry  { get; set; }
-    public DbSet<Area>             Areas            { get; set; }
-    public DbSet<District>         Districts        { get; set; }
-    public DbSet<CityCenter>       CityCenters      { get; set; }
-    public DbSet<Road>             Roads            { get; set; }
-    public DbSet<HouseEntrance>    HouseEntrances   { get; set; }
-    public DbSet<PublicBuilding>   PublicBuildings  { get; set; }
-    public DbSet<PublicSpace>      PublicSpaces     { get; set; }
-    public DbSet<NamingPanel>      NamingPanels     { get; set; }
+    public DbSet<FeatureRegistry> FeatureRegistry { get; set; }
+    public DbSet<Area> Areas { get; set; }
+    public DbSet<District> Districts { get; set; }
+    public DbSet<CityCenter> CityCenters { get; set; }
+    public DbSet<Road> Roads { get; set; }
+    public DbSet<HouseEntrance> HouseEntrances { get; set; }
+    public DbSet<PublicBuilding> PublicBuildings { get; set; }
+    public DbSet<PublicSpace> PublicSpaces { get; set; }
+    public DbSet<NamingPanel> NamingPanels { get; set; }
 
     // ── Reference tables ──────────────────────────────────────────────────────
-    public DbSet<User>             Users            { get; set; }
-    public DbSet<Wilaya>           Wilayas          { get; set; }
-    public DbSet<Daira>            Dairas           { get; set; }
-    public DbSet<Commune>          Communes         { get; set; }
-    public DbSet<CommuneBoundary>  CommuneBoundaries { get; set; }
+    public DbSet<User> Users { get; set; }
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
+    public DbSet<Wilaya> Wilayas { get; set; }
+    public DbSet<Daira> Dairas { get; set; }
+    public DbSet<Commune> Communes { get; set; }
+    public DbSet<CommuneBoundary> CommuneBoundaries { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -36,24 +37,7 @@ public class AppDbContext : DbContext
             .HasIndex(u => u.Username).IsUnique();
 
         // ── feature_registry ───────────────────────────────────────────────────
-        // id comes from the shared feature_id_seq — tell EF not to auto-generate it.
-        modelBuilder.Entity<FeatureRegistry>()
-            .Property(r => r.Id)
-            .ValueGeneratedNever();
-
-        // ── feature tables: shared sequence ───────────────────────────────────
-        // All feature PKs draw from feature_id_seq defined in the SQL schema.
-        foreach (var featureType in new[]
-        {
-            typeof(Area), typeof(District), typeof(CityCenter),
-            typeof(Road), typeof(HouseEntrance),
-            typeof(PublicBuilding), typeof(PublicSpace), typeof(NamingPanel)
-        })
-        {
-            modelBuilder.Entity(featureType)
-                .Property("Id")
-                .HasDefaultValueSql("nextval('feature_id_seq')");
-        }
+        // UUID primary keys — no sequence needed, generated client-side.
 
         // ── areas ──────────────────────────────────────────────────────────────
         modelBuilder.Entity<Area>()
@@ -107,5 +91,10 @@ public class AppDbContext : DbContext
             .HasIndex(cb => cb.Geometry)
             .HasDatabaseName("ix_communes_boundaries_geometry")
             .HasMethod("GIST");
+
+        // ── refresh_tokens: index on token_hash for efficient refresh lookups ──
+        modelBuilder.Entity<RefreshToken>()
+            .HasIndex(rt => rt.TokenHash)
+            .HasDatabaseName("ix_refresh_tokens_token_hash");
     }
 }

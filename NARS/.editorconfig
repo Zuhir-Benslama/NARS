@@ -1,0 +1,43 @@
+# EditorConfig: https://editorconfig.org
+# Root configuration for NARS Backend
+
+root = true
+
+# ── All files ──────────────────────────────────────────────────────────────────
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# ── C# source files ────────────────────────────────────────────────────────────
+[*.cs]
+indent_size = 4
+
+# ── JSON files ─────────────────────────────────────────────────────────────────
+[*.json]
+indent_size = 2
+
+# ── YAML files ─────────────────────────────────────────────────────────────────
+[*.{yml,yaml}]
+indent_size = 2
+
+# ── SQL files ──────────────────────────────────────────────────────────────────
+[*.sql]
+indent_size = 2
+keyword_case = upper
+
+# ── Shell scripts ──────────────────────────────────────────────────────────────
+[*.sh]
+indent_size = 2
+
+# ── Dotfiles ───────────────────────────────────────────────────────────────────
+[{*.md,*.txt}]
+trim_trailing_whitespace = false
+
+# ── Generated/minified files ───────────────────────────────────────────────────
+[{*.min.js,*.min.css,bundle.js}]
+indent_size = 2
+trim_trailing_whitespace = false

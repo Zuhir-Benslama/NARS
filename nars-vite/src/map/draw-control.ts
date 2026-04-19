@@ -1,71 +1,71 @@
 // ─── DRAW CONTROL ─────────────────────────────────────────────────────────────
-// Builds and activates Geoman draw mode for a given phase, and stamps pmIgnore
-// on all non-current-phase layers so Geoman's global edit mode only touches the
-// active phase. Extracted from index.ts to break the loader ↔ index circular dep.
+// Uses Geoman's native enableDraw() for the current phase's geometry type.
+// Mirrors the reference implementation in nars-vite/src/map/draw-control.ts
 
-import { ctx, POLYLINE_WEIGHT } from './state'
-import { createEntranceIcon }   from './styles'
-import { editModeActive }       from './snapping'
-import { featureLayers }        from '../store'
-import type { LayerEntry }      from '../types'
-
-declare const L: typeof import('leaflet')
+import { ctx } from './state'
+import { debugLog, debugError } from '../utils/debug'
+import type { DrawModeName } from '@geoman-io/maplibre-geoman-free'
 
 type PhaseConfig = { key: string; drawType: string; color: string }
 
-// ─── LAYER EDITABILITY ────────────────────────────────────────────────────────
-// Sets pmIgnore:true on every non-current-phase feature so Geoman's global
-// edit mode never picks them up, regardless of which LayerGroup they live in.
-
-export function updateLayerEditability(currentPhaseKey: string): void {
-    for (const [key, entries] of Object.entries(featureLayers)) {
-        const editable = key === currentPhaseKey
-        for (const { layer } of entries as LayerEntry[]) {
-            ;(layer as any).options.pmIgnore = !editable
-            ;(layer as any).pm?.setOptions?.({ pmIgnore: !editable })
-        }
-    }
+// Map NARS drawType strings to Geoman shape names
+const DRAW_TYPE_MAP: Record<string, DrawModeName> = {
+    polygon: 'polygon',
+    polyline: 'line',
+    marker: 'marker',
+    circle: 'circle',
 }
 
-// ─── BUILD DRAW CONTROL ───────────────────────────────────────────────────────
-// Configures Geoman drawing styles for the given phase and auto-starts draw
-// mode (unless edit mode is active). No toolbar is rendered — all draw controls
-// are programmatic.
+// Track the last phase key we built for — skip if unchanged
+let lastPhaseKey: string | null = null
+let modeSwitchToken = 0
 
 export function buildDrawControl(phase: PhaseConfig): void {
-    ctx.map.pm.removeControls()
+    const gm = ctx.geoman
+    if (!gm) return
 
-    if (phase.drawType === 'polygon') {
-        ctx.map.pm.setGlobalOptions({
-            pathOptions: {
-                color:       phase.color,
-                weight:      2.5,
-                fillOpacity: phase.key === 'areas' ? 0 : 0.15,
-                dashArray:   phase.key === 'areas' ? '10, 6' : undefined,
-            },
-            snappable: false,
-        } as any)
-    } else if (phase.drawType === 'polyline') {
-        ctx.map.pm.setGlobalOptions({
-            templineStyle: { color: phase.color, weight: POLYLINE_WEIGHT },
-            hintlineStyle: { color: phase.color, weight: POLYLINE_WEIGHT },
-            snappable: false,
-        } as any)
-    } else if (phase.drawType === 'circle') {
-        ctx.map.pm.setGlobalOptions({
-            pathOptions: { color: '#e74c3c', weight: 2, fillColor: '#e74c3c', fillOpacity: 0.15 },
-        } as any)
-    } else if (phase.drawType === 'marker') {
-        const icon = createEntranceIcon('?', phase.color)
-        ctx.map.pm.setGlobalOptions({ markerStyle: { icon } } as any)
+    const shapeName = DRAW_TYPE_MAP[phase.drawType]
+    if (!shapeName) return
+
+    debugLog('[DRAW CONTROL] Phase:', phase.key, '| drawType:', phase.drawType, '| shape:', shapeName)
+
+    // Check if we're already in the correct draw mode.
+    // Note: getActiveDrawModes may not exist on all Geoman versions; falls back to [].
+    const activeModes = gm.getActiveDrawModes?.() || []
+    if (lastPhaseKey === phase.key && activeModes.length > 0 && activeModes[0] === shapeName) {
+        debugLog('[DRAW CONTROL] Already in correct draw mode:', shapeName)
+        return
     }
 
-    if (!editModeActive) {
-        if      (phase.drawType === 'polygon')  setTimeout(() => (ctx.map as any).pm.enableDraw('Polygon', { snappable: false }), 0)
-        else if (phase.drawType === 'polyline') setTimeout(() => (ctx.map as any).pm.enableDraw('Line',    { snappable: false }), 0)
-        else if (phase.drawType === 'marker')   setTimeout(() => (ctx.map as any).pm.enableDraw('Marker',  { snappable: false }), 0)
-        else if (phase.drawType === 'circle')   setTimeout(() => (ctx.map as any).pm.enableDraw('Circle',  { snappable: false }), 0)
-    }
+    lastPhaseKey = phase.key
+    const token = ++modeSwitchToken
 
-    updateLayerEditability(phase.key)
+    void (async () => {
+        // Disable current draw mode only if one is active
+        if (activeModes.length > 0) {
+            debugLog('[DRAW CONTROL] Disabling current draw mode:', activeModes)
+            try {
+                await gm.disableDraw()
+            } catch (err) {
+                debugError('[DRAW CONTROL] Failed to disable draw mode:', err)
+            }
+        }
+
+        // Use a short delay to let Geoman settle before enabling new draw mode.
+        await new Promise((resolve) => setTimeout(resolve, 50))
+
+        // Double-check we haven't been superseded.
+        if (token !== modeSwitchToken || lastPhaseKey !== phase.key) return
+
+        // Re-read ctx.geoman in case it was replaced or nulled after the timeout was scheduled.
+        const currentGm = ctx.geoman
+        if (!currentGm) return
+
+        // Enable the correct draw mode for this phase.
+        debugLog('[DRAW CONTROL] Enabling draw mode:', shapeName)
+        currentGm
+            .enableDraw(shapeName)
+            .then(() => debugLog('[DRAW CONTROL] Enabled draw mode:', shapeName))
+            .catch((err) => debugError('[DRAW CONTROL] Failed to enable draw mode:', shapeName, err))
+    })()
 }

@@ -1,0 +1,9 @@
+# MapLibre GL Native token (if needed)
+# MAPLIBRE_NATIVE_TOKEN=
+
+# API Base URL
+# NARS_API_BASE_URL=https://api.nars.example.com
+
+# Feature flags
+# ENABLE_ANALYTICS=false
+# ENABLE_CRASHLYTICS=false

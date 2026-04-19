@@ -57,7 +57,15 @@ internal static class SqlFragments
     {
         var p = cmd.CreateParameter();
         p.ParameterName = name;
-        p.Value         = value;
+        p.Value = value;
         cmd.Parameters.Add(p);
     }
+
+    /// <summary>
+    /// Returns PolygonFromData with the table alias replaced from "f." to the
+    /// specified alias. Uses word-boundary matching to avoid accidental replacements
+    /// inside string literals or column names.
+    /// </summary>
+    internal static string PolygonFromDataWithAlias(string alias) =>
+        PolygonFromData.Replace("f.data", $"{alias}.data").Replace("f.user_id", $"{alias}.user_id");
 }

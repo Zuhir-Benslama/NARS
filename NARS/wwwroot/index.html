@@ -3,28 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NARS - National Addressing Reference System</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
-    <link rel="icon" type="image/x-icon" href="/assets/favicon-CUNQIETI.ico">
-  <script type="module" crossorigin src="/assets/index-Bu_advnI.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/rolldown-runtime-COnpUsM8.js">
-  <link rel="modulepreload" crossorigin href="/assets/en-BVebkhea.js">
-  <link rel="modulepreload" crossorigin href="/assets/styles-MEoqLN36.js">
-  <link rel="modulepreload" crossorigin href="/assets/vendor-geoman-C8da8lVv.js">
-  <link rel="stylesheet" crossorigin href="/assets/vendor-geoman-Dy_futJD.css">
-  <link rel="stylesheet" crossorigin href="/assets/index-CFti50vQ.css">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <!-- Content Security Policy:
+         - script-src: 'unsafe-inline' removed; Vite dev needs it for HMR.
+           In PRODUCTION the server MUST replace this with a per-request nonce:
+           script-src 'nonce-<RANDOM>' 'strict-dynamic';
+         - style-src: 'unsafe-inline' required for SPA dynamic style injection.
+         - connect-src: data: needed for base64 tile sources. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' http: https: data: ws://127.0.0.1:* http://127.0.0.1:* https://*.arcgisonline.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com; worker-src 'self' blob:;">
+    <title>NARS - National Addressing Reference System (Maplibre)</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <style>
+        /* Prevent FOUC */
+        [v-cloak] { display: none !important; }
+        html, body, #map { margin: 0; padding: 0; height: 100%; width: 100%; }
+    </style>
+  <script type="module" crossorigin src="/assets/index-ccgPsYWW.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/rolldown-runtime-Dw2cE7zH.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-i18n-8FwRyY5v.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-turf-C4JqJWnF.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-sanitize-ChixalA3.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-maplibre-DYa4WPC5.js">
+  <link rel="stylesheet" crossorigin href="/assets/vendor-maplibre-B2k4QVOw.css">
+  <link rel="stylesheet" crossorigin href="/assets/index-B4NXCG65.css">
 </head>
 <body>
-
     <div id="map"></div>
     <div id="app" v-cloak></div>
-
-    <!--
-        Leaflet is loaded from CDN. Leaflet-Geoman is imported via npm in the Vue module.
-    -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-
 </body>
 </html>
