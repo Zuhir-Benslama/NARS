@@ -29,7 +29,7 @@ export function setTheme(mode: ThemeMode): void {
 // Watches the ref and syncs to DOM + localStorage.
 // Called once at startup so the watcher is active for the whole app lifetime.
 export function initTheme(): void {
-    applyTheme(theme.value)                   // apply immediately, before mount
+    applyTheme(theme.value) // apply immediately, before mount
     watch(theme, (mode) => {
         localStorage.setItem(STORAGE_KEY, mode)
         applyTheme(mode)

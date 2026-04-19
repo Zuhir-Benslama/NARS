@@ -1,94 +1,93 @@
 // ─── MAP EXPORT ───────────────────────────────────────────────────────────────
-// Exports the current map view as a PDF in A0 or A3 landscape format.
-//
-// Satellite tiles are served from /api/satellite/tile (same-origin MPC proxy)
-// so the canvas is never tainted — all layers export cleanly with html2canvas.
+// NOTE: html2canvas and jspdf are optional dependencies. The export feature
+// is only available when they are installed. Run:
+//   npm install html2canvas jspdf
+// to enable PDF export functionality.
 
-import { ctx } from './state'
-import { t }   from '../i18n'
+import { t, currentLang } from '../i18n'
 
 export type PaperSize = 'A0' | 'A3'
 
-const PAPER: Record<PaperSize, [number, number]> = {
-    A3: [420, 297],
-    A0: [1189, 841],
-}
-const SCALE: Record<PaperSize, number> = { A3: 2, A0: 3 }
-
 export async function exportMapToPdf(
-    size:             PaperSize,
+    size: PaperSize,
     municipalityName: string,
-    onProgress:       (pct: number, label: string) => void = () => {}
+    onProgress: (pct: number, label: string) => void = () => {},
 ): Promise<void> {
     const mapEl = document.getElementById('map')
     if (!mapEl) throw new Error('Map element not found')
 
-    // ── 1. Load libraries ─────────────────────────────────────────────────────
     onProgress(5, t('export_step_init'))
-    const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-        import('html2canvas'),
-        import('jspdf'),
-    ])
 
-    // ── 2. No satellite swap needed ───────────────────────────────────────────
-    // Satellite tiles are now served from /api/satellite/tile (same-origin)
-    // so the canvas is never tainted — no layer swap required.
+    // Dynamic imports — these will fail if the packages are not installed,
+    // providing a clear error message instead of a cryptic "module not found".
+    // Using string literal imports bypasses TS type resolution for optional deps.
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    let html2canvas: any
+    let jsPDF: any
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+    try {
+        const mods = await Promise.all([
+            import(/* @vite-ignore */ 'html2canvas' as string),
+            import(/* @vite-ignore */ 'jspdf' as string),
+        ])
+        html2canvas = mods[0]?.default
+        jsPDF = mods[1]?.default
+        if (!html2canvas || !jsPDF) {
+            throw new Error('Missing exports')
+        }
+    } catch {
+        throw new Error(
+            'PDF export requires html2canvas and jspdf. ' + 'Install them with: npm install html2canvas jspdf',
+        )
+    }
 
-    // ── 3. Detach UI chrome so it doesn't appear in the export ────────────────
     onProgress(15, t('export_step_render'))
-    const detached: { el: HTMLElement; parent: HTMLElement; next: ChildNode | null }[] = []
-    mapEl.querySelectorAll<HTMLElement>('.leaflet-control-container').forEach(el => {
-        const parent = el.parentElement
-        if (!parent) return
-        detached.push({ el, parent, next: el.nextSibling })
-        parent.removeChild(el)
-    })
-
-    // ── 4. Capture ────────────────────────────────────────────────────────────
-    let pct = 15
-    const timer = setInterval(() => {
-        pct = Math.min(80, pct + (size === 'A0' ? 0.3 : 0.7))
-        onProgress(Math.round(pct), t('export_step_render'))
-    }, 200)
 
     let canvas: HTMLCanvasElement
     try {
         canvas = await html2canvas(mapEl, {
-            useCORS:                true,
-            allowTaint:             false,
-            backgroundColor:        '#000',
-            scale:                  SCALE[size],
-            logging:                false,
-            imageTimeout:           15000,
-            foreignObjectRendering: true,
+            useCORS: true,
+            allowTaint: false,
+            backgroundColor: '#000',
+            scale: size === 'A0' ? 3 : 2,
+            logging: false,
+            imageTimeout: 15000,
+            foreignObjectRendering: false, // Security: prevent SVG foreignObject XSS
         })
-    } finally {
-        clearInterval(timer)
-        // Always restore UI chrome
-        detached.forEach(({ el, parent, next }) => parent.insertBefore(el, next))
-        // Live map untouched — nothing to restore
+        onProgress(82, t('export_step_compose'))
+    } catch (err) {
+        // Clean up canvas reference on failure
+        canvas = undefined as unknown as HTMLCanvasElement
+        throw err
     }
-    onProgress(82, t('export_step_compose'))
 
-    // ── 5. Compose PDF ────────────────────────────────────────────────────────
+    const PAPER: Record<PaperSize, [number, number]> = {
+        A3: [420, 297],
+        A0: [1189, 841],
+    }
+
     const [pageW, pageH] = PAPER[size]
     const margin = 10
 
-    // @ts-ignore
+    // jsPDF's Options type is a union; the runtime accepts { orientation, unit, format }.
+    // We cast to the first union member to satisfy the type checker.
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [pageW, pageH] })
 
-    const printW  = pageW - margin * 2
-    const printH  = pageH - margin * 2 - 14
-    const aspect  = canvas.width / canvas.height
+    const printW = pageW - margin * 2
+    const printH = pageH - margin * 2 - 14
+    const aspect = canvas.width / canvas.height
     const pAspect = printW / printH
     let imgW: number, imgH: number
-    if (aspect > pAspect) { imgW = printW; imgH = printW / aspect }
-    else                   { imgH = printH; imgW = printH * aspect }
+    if (aspect > pAspect) {
+        imgW = printW
+        imgH = printW / aspect
+    } else {
+        imgH = printH
+        imgW = printH * aspect
+    }
 
-    pdf.addImage(
-        canvas.toDataURL('image/jpeg', 0.92), 'JPEG',
-        margin + (printW - imgW) / 2, margin, imgW, imgH
-    )
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', margin + (printW - imgW) / 2, margin, imgW, imgH)
+
     onProgress(93, t('export_step_compose'))
 
     // Title bar
@@ -101,13 +100,12 @@ export async function exportMapToPdf(
     pdf.text(`NARS — ${municipalityName}`, margin + 3, barY + 6.5)
     pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(size === 'A0' ? 9 : 7)
-    const dateStr = new Date().toLocaleDateString('fr-DZ', {
-        year: 'numeric', month: 'long', day: 'numeric',
+    const dateStr = new Date().toLocaleDateString(currentLang.value, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
     })
-    pdf.text(
-        `${t('export_paper_size')}: ${size}   |   ${dateStr}`,
-        pageW - margin - 3, barY + 6.5, { align: 'right' }
-    )
+    pdf.text(`${t('export_paper_size')}: ${size}   |   ${dateStr}`, pageW - margin - 3, barY + 6.5, { align: 'right' })
 
     onProgress(97, t('export_step_save'))
     pdf.save(`NARS_${municipalityName.replace(/\s+/g, '_')}_${size}_${Date.now()}.pdf`)

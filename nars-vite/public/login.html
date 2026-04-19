@@ -3,6 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Content Security Policy:
+         script-src 'unsafe-inline' required for this static HTML page.
+         In PRODUCTION the server MUST replace with a per-request nonce. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http: https: data: ws://127.0.0.1:* http://127.0.0.1:*; frame-ancestors 'none';">
+    <!-- CSRF token — set by the server. Client reads it and sends X-CSRF-Token on non-GET requests. -->
+    <meta name="csrf-token" content="">
     <title>Login - NARS</title>
     <link rel="stylesheet" href="login.css" />
 </head>
@@ -351,19 +357,26 @@
             }
         });
 
+        // CSRF helper — reads token from meta tag, returns header object for non-GET requests
+        function csrfHeaders() {
+            const token = document.querySelector('meta[name="csrf-token"]')?.content
+            return token ? { 'X-CSRF-Token': token } : {}
+        }
+
         // Sign In
         signinForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
             const username = document.getElementById('signin-username').value;
             const password = document.getElementById('signin-password').value;
             const errorDiv = document.getElementById('signinError');
-            
+
             try {
                 const response = await fetch('/api/signin', { credentials: 'include',
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        ...csrfHeaders(),
                     },
                     body: JSON.stringify({ username, password })
                 });
@@ -408,6 +421,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        ...csrfHeaders(),
                     },
                     body: JSON.stringify({
                         name,

@@ -9,3 +9,101 @@
 @import './styles/modal.css';
 @import './styles/ui-chrome.css';
 @import './styles/map-labels.css';
+
+/* Maplibre GL JS specific styles */
+#map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 0;
+}
+
+/*
+ * MapLibre sets grab/grabbing on .maplibregl-interactive and the canvas itself.
+ * Override all of them to crosshair — this is the default drawing cursor.
+ */
+#map .maplibregl-canvas-container.maplibregl-interactive,
+#map .maplibregl-canvas-container.maplibregl-interactive:active,
+#map .maplibregl-canvas-container.maplibregl-interactive .maplibregl-canvas {
+    cursor: crosshair !important;
+}
+
+/* Maplibre Draw overrides */
+.maplibregl-ctrl-group button.maplibregl-ctrl {
+    background-image: none;
+}
+
+.maplibregl-ctrl-group button.maplibregl-ctrl[title*='polygon']::before {
+    content: '⬠';
+}
+
+.maplibregl-ctrl-group button.maplibregl-ctrl[title*='line']::before {
+    content: '╱';
+}
+
+.maplibregl-ctrl-group button.maplibregl-ctrl[title*='point']::before {
+    content: '+';
+}
+
+/* Rotation control */
+.nars-rotation-control {
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+}
+
+.nars-rotation-control button {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+}
+
+.nars-rotation-control button:hover {
+    background: #f0f0f0;
+}
+
+/* Context menu */
+.nars-ctx-menu {
+    font-family: inherit;
+    font-size: 13px;
+}
+
+.nars-ctx-item:hover {
+    background: #f0f0f0;
+}
+
+/* Entrance markers */
+.entrance-marker {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Custom shape labels */
+.custom-shape-label {
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+/* Phase bar and UI */
+#app {
+    position: relative;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+#app > * {
+    pointer-events: auto;
+}
+
+[v-cloak] {
+    display: none;
+}

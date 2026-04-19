@@ -1,6 +1,10 @@
 /* ── Reset & base ──────────────────────────────────────────────────────────── */
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -8,6 +12,11 @@ body {
 }
 
 /* Hide Vue app until mounted — prevents FOUC */
-[v-cloak] { display: none; }
+[v-cloak] {
+    display: none;
+}
 
-#map { height: 100vh; width: 100%; }
+#map {
+    height: 100vh;
+    width: 100%;
+}

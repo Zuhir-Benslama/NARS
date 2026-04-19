@@ -1,47 +1,103 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-export default defineConfig({
-  // Files in publicDir are copied as-is to outDir (wwwroot).
-  // login.html, login.css and NARS.jpg must live here so emptyOutDir
-  // doesn't delete them from wwwroot on each build.
+export default defineConfig(({ command, mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const devBackend = env.VITE_DEV_BACKEND || 'http://localhost:5000'
+
+  const plugins = [
+    vue(),
+    // Meta CSP in index.html is for production; in Vite dev it often triggers
+    // console violations (eval/HMR) and can block tooling. Production CSP must
+    // come from the reverse proxy / ASP.NET host instead.
+    ...(command === 'serve'
+      ? [{
+          name: 'nars-strip-csp-meta-dev',
+          transformIndexHtml(html: string) {
+            return html.replace(
+              /<meta\s+http-equiv="Content-Security-Policy"\s+content="[^"]*"\s*\/?>/i,
+              '<!-- CSP meta omitted in Vite dev; use server headers in production -->',
+            )
+          },
+        }]
+      : []),
+  ]
+
+  return {
   publicDir: 'public',
 
-  plugins: [
-    vue(),
-  ],
+  plugins,
 
   build: {
-    outDir: '../NARS/wwwroot',
+    outDir: 'dist',
     emptyOutDir: true,
-    // Turf + Geoman make any GIS bundle large. 800 kB is a realistic ceiling
-    // for this dependency set; the split below keeps each chunk well under it.
-    chunkSizeWarningLimit: 800,
-
-    // Vite 8 uses Rolldown — manual chunking goes under rolldownOptions.
-    rolldownOptions: {
+    sourcemap: true,
+    rollupOptions: {
+      input: {
+        main: './index.html',
+        login: './login.html',
+      },
+    },
+    // Maplibre GL JS is ~1MB - separated into its own chunk
+    chunkSizeWarningLimit: 1500,
+    // Add cache-busting to all assets
+    rollupOptions: {
       output: {
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
         manualChunks(id: string) {
           if (!id.includes('node_modules')) return
 
-          // Geoman + its large polyclip-ts polygon engine — together, always cached.
-          if (id.includes('leaflet-geoman-free') || id.includes('polyclip-ts'))
-            return 'vendor-geoman'
+          // Maplibre GL JS - core library
+          if (id.includes('maplibre-gl'))
+            return 'vendor-maplibre'
 
-          // Leaflet core — small and very stable.
-          if (id.includes('/leaflet/'))
-            return 'vendor-leaflet'
-
-          // Turf is ~500 kB minified. Keep it separate so it can be cached
-          // independently, and because road-directions.ts already lazy-imports it.
+          // Turf.js - GIS operations (submodules only)
           if (id.includes('@turf'))
             return 'vendor-turf'
 
-          // Graphology (graph library for road directions) — also stable.
-          if (id.includes('graphology'))
-            return 'vendor-graphology'
+          // Vue i18n - locale files
+          if (id.includes('vue-i18n'))
+            return 'vendor-i18n'
+
+          // Vue core + runtime (inlined into main chunk — needed everywhere)
+          // HTML export libs (lazy-loaded, kept separate)
+          // DOMPurify - sanitization
+          if (id.includes('dompurify'))
+            return 'vendor-sanitize'
         },
       },
     },
   },
+
+  server: {
+    proxy: {
+      // Same-origin API + login while the UI is served from port 5173.
+      '/api': {
+        target: devBackend,
+        changeOrigin: true,
+        secure: false,
+      },
+      '/login': {
+        target: devBackend,
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
+
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.ts',
+    include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      include: ['src/**/*.ts', 'src/**/*.vue'],
+      exclude: ['src/**/*.d.ts', 'src/test/**'],
+    },
+  },
+  }
 })
