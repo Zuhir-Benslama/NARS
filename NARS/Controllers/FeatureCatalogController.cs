@@ -1,8 +1,8 @@
-using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
 using NarsApi.DTOs;
+using NarsApi.Infrastructure;
 using NarsApi.Models;
 
 namespace NarsApi.Controllers;
@@ -71,49 +71,27 @@ public class FeatureCatalogController(AppDbContext db) : NarsControllerBase
         return Ok(types);
     }
 
-    // ── POST /api/feature-types/custom ───────────────────────────────────────
-    // Stub for future custom type registration.
-
-    [HttpPost("/api/feature-types/custom")]
-    public IActionResult AddCustomFeatureType([FromBody] JsonElement body) =>
-        Ok(new { success = true, message = "Custom feature type registered successfully." });
-
     // ── GET /api/load/layer/{layerType} ───────────────────────────────────────
     // Returns all features for the current user that belong to a specific layer.
     // Useful for targeted refreshes (e.g. reload only roads after direction compute).
+    // Supports pagination via ?skip=0&take=100 query parameters.
+    // Uses UNION ALL across tables so pagination applies to the combined result.
 
     [HttpGet("/api/load/layer/{layerType}")]
-    public async Task<IActionResult> LoadByLayer(string layerType)
+    public async Task<IActionResult> LoadByLayer(string layerType, [FromQuery] int skip = 0, [FromQuery] int take = 100)
     {
-        var uid  = CurrentUserId;
-        var rows = new List<object>();
+        // Cap page size to prevent oversized responses.
+        take = Math.Clamp(take, 1, 500);
 
-        rows.AddRange((await db.Areas.Where(f => f.UserId == uid && f.Layer == layerType).ToListAsync())
-            .Select(f => ToDto(f, "area")));
-        rows.AddRange((await db.Districts.Where(f => f.UserId == uid && f.Layer == layerType).ToListAsync())
-            .Select(f => ToDto(f, "district")));
-        rows.AddRange((await db.Roads.Where(f => f.UserId == uid && f.Layer == layerType).ToListAsync())
-            .Select(f => ToDto(f, "road")));
-        rows.AddRange((await db.HouseEntrances.Where(f => f.UserId == uid && f.Layer == layerType).ToListAsync())
-            .Select(f => ToDto(f, "house_entrance")));
-        rows.AddRange((await db.PublicBuildings.Where(f => f.UserId == uid && f.Layer == layerType).ToListAsync())
-            .Select(f => ToDto(f, "public_building")));
-        rows.AddRange((await db.PublicSpaces.Where(f => f.UserId == uid && f.Layer == layerType).ToListAsync())
-            .Select(f => ToDto(f, "public_space")));
+        var (features, totalCount) = await FeatureQueryHelper.LoadByLayerAsync(
+            db.Database.GetDbConnection(), CurrentUserId, layerType, skip, take);
 
-        return Ok(rows);
+        return Ok(new
+        {
+            features,
+            count = totalCount,
+            skip,
+            take,
+        });
     }
-
-    // ── Helper ────────────────────────────────────────────────────────────────
-
-    private static object ToDto(FeatureBase f, string type) => new
-    {
-        id         = f.Id,
-        type,
-        layer      = f.Layer,
-        label      = f.Label,
-        data       = JsonSerializer.Deserialize<JsonElement>(f.Data),
-        created_at = f.CreatedAt.ToString("o"),
-        updated_at = f.UpdatedAt?.ToString("o"),
-    };
 }

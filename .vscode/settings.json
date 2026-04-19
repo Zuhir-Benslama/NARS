@@ -10,5 +10,6 @@
             "username": "postgres",
             "database": "nars_db"
         }
-    ]
+    ],
+    "git.ignoreLimitWarning": true
 }

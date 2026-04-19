@@ -1,55 +1,97 @@
 /* ── Area centre label ──────────────────────────────────────────────────────── */
 
 .area-center-label {
-    font-size: 12px; font-weight: 700; white-space: nowrap;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
     pointer-events: none;
-    text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
+    text-shadow:
+        -1px -1px 0 #fff,
+        1px -1px 0 #fff,
+        -1px 1px 0 #fff,
+        1px 1px 0 #fff;
+    -webkit-user-select: none;
     user-select: none;
 }
 
 /* ── Polygon edge label (areas + districts) ─────────────────────────────────── */
 
 .poly-edge-label {
-    font-weight: 700; white-space: nowrap; pointer-events: none; user-select: none;
-    line-height: 1; text-align: center;
+    font-weight: 700;
+    white-space: nowrap;
+    pointer-events: none;
+    -webkit-user-select: none;
+    user-select: none;
+    line-height: 1;
+    text-align: center;
     text-shadow:
-        -1px -1px 0 rgba(0,0,0,0.85),  1px -1px 0 rgba(0,0,0,0.85),
-        -1px  1px 0 rgba(0,0,0,0.85),   1px  1px 0 rgba(0,0,0,0.85);
+        -1px -1px 0 rgba(0, 0, 0, 0.85),
+        1px -1px 0 rgba(0, 0, 0, 0.85),
+        -1px 1px 0 rgba(0, 0, 0, 0.85),
+        1px 1px 0 rgba(0, 0, 0, 0.85);
 }
 
 /* ── Centred shape label (roads, buildings, spaces) ─────────────────────────── */
 
 .custom-shape-label {
-    background: transparent !important; border: none !important; box-shadow: none !important;
-    font-weight: 700 !important; font-size: 13px !important; color: #fff !important;
-    text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    font-weight: 700 !important;
+    font-size: 13px !important;
+    color: #fff !important;
+    text-shadow:
+        -1px -1px 0 #000,
+        1px -1px 0 #000,
+        -1px 1px 0 #000,
+        1px 1px 0 #000 !important;
     padding: 4px 8px !important;
 }
-.custom-shape-label::before { display: none !important; }
+.custom-shape-label::before {
+    display: none !important;
+}
 
 /* ── Municipal boundary tooltip ─────────────────────────────────────────────── */
 
 .boundary-tooltip {
-    background: rgba(231,76,60,0.9) !important; border: 2px solid #fff !important;
-    border-radius: 4px !important; color: #fff !important; font-weight: 700 !important;
-    font-size: 12px !important; padding: 4px 10px !important;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3) !important;
+    background: rgba(231, 76, 60, 0.9) !important;
+    border: 2px solid #fff !important;
+    border-radius: 4px !important;
+    color: #fff !important;
+    font-weight: 700 !important;
+    font-size: 12px !important;
+    padding: 4px 10px !important;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3) !important;
 }
 
 /* ── House entrance marker icon ─────────────────────────────────────────────── */
 
 .entrance-icon {
-    color: #fff; height: 16px; border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 700; font-size: 8px;
-    border: 1.5px solid rgba(255,255,255,0.85);
-    box-shadow: 0 1px 4px rgba(0,0,0,0.4); letter-spacing: 0.3px;
+    color: #fff;
+    height: 16px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 8px;
+    border: 1.5px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    letter-spacing: 0.3px;
 }
 
 /* ── Polyline endpoint arrow marker ─────────────────────────────────────────── */
 
 .endpoint-icon {
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 900; line-height: 1; transform-origin: center;
-    text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    line-height: 1;
+    transform-origin: center;
+    text-shadow:
+        -1px -1px 0 #fff,
+        1px -1px 0 #fff,
+        -1px 1px 0 #fff,
+        1px 1px 0 #fff;
 }

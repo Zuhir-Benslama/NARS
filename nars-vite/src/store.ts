@@ -1,171 +1,132 @@
-import { reactive } from 'vue'
-import type * as L from 'leaflet'
-import { PHASES }   from './phases'
-import type { AppStore, LayerEntry, ModalResult } from './types'
+// ─── STORE COMPATIBILITY LAYER ───────────────────────────────────────────────
+// Legacy exports redirect to Pinia stores.
+// Migrate component imports to use Pinia stores directly when convenient.
+//   import { useAppStore } from './stores/appStore'
+//   import { useModalStore } from './stores/modalStore'
+//   import { useLayerStore } from './stores/layerStore'
 
-// ─── NON-REACTIVE LAYER STORE ─────────────────────────────────────────────────
-// Leaflet layers must NEVER enter Vue's reactive() proxy.
+import { useAppStore } from './stores/appStore'
+import { useModalStore, awaitModalResult, setCurrentModalFeatureId } from './stores/modalStore'
+import { useLayerStore } from './stores/layerStore'
+import type { AppStore, ModalResult, LayerEntry } from './types'
+import type { LayerState } from './stores/layerStore'
+import { PHASES } from './phases'
+import { t } from './i18n'
 
-export const featureLayers: Record<string, LayerEntry[]> = {
-    areas:               [],
-    cityCenter:          [],
-    districts:           [],
-    roads:               [],
-    houseEntrances:      [],
-    publicBuildings:     [],
-    publicSpaces:        [],
-    namingPanels:        [],
-}
+// ─── REACTIVE STORE (backward-compatible — redirects to Pinia) ───────────────
+// Typed Proxy that safely reads/writes Pinia store state without unsafe casts.
 
-// The Leaflet layer currently being processed inside the open modal.
-export let currentModalLayer: L.Layer | null = null
+export const store: AppStore = new Proxy({} as AppStore, {
+    get(_, prop: keyof AppStore) {
+        const appStore = useAppStore()
+        const modalStore = useModalStore()
 
-// ─── MODAL BRIDGE ─────────────────────────────────────────────────────────────
+        // Modal properties
+        if (prop === 'modal') return modalStore.$state
 
-let _modalResolve: ((result: ModalResult | null) => void) | null = null
+        // App store properties — typed access without `as unknown`
+        const state = appStore.$state as AppStore
+        if (prop in state) return state[prop]
 
-// ─── MODAL DEFAULTS ───────────────────────────────────────────────────────────
-// Fields shared by both openModal (new) and openEditModal (edit).
-// Callers Object.assign() these over the store and then override what differs.
-
-function modalDefaults() {
-    return {
-        errors:              {} as Record<string, string>,
-        roadOptions:         [] as import('./types').RoadOption[],
-        selectedRoadIdx:     '' as number | '',
-        entranceSide:        null as 'left' | 'right' | null,
-        entranceNumber:      null as number | null,
-        entranceSideLoading: false,
-        mainEntranceOptions: [] as import('./types').EntranceOption[],
-        selectedMainIdx:     '' as number | '',
-        bisNumber:           null as number | null,
-    }
-}
-
-export function openModal(phaseIndex: number, layer: L.Layer): Promise<ModalResult | null> {
-    PHASES[phaseIndex] // validate index (throws if out of bounds)
-
-    return new Promise((resolve) => {
-        _modalResolve     = resolve
-        currentModalLayer = layer
-
-        Object.assign(store.modal, {
-            ...modalDefaults(),
-            visible:         true,
-            phaseIndex,
-            isEdit:          false,
-            editDbId:        null,
-            label:           PHASES[phaseIndex]?.key === 'cityCenter' ? 'City Center' : '',
-            decisionNumber:  '',
-            decisionDate:    '',
-            // areaTypeKey and mainUrbanExists are set by prepareModalExtras before
-            // openModal is called — preserve them rather than resetting to defaults.
-            areaTypeKey:     store.modal.mainUrbanExists ? 'secondary_urban' : 'central_urban',
-            mainUrbanExists: store.modal.mainUrbanExists,
-            districtTypeKey: 'district',
-            roadTypeKey:     'street',
-            entranceTypeKey: 'main_entrance',
-            spaceTypeKey:    'garden',
-            sectorKey:       'banking_postal',
-            buildingTypeKey: 'bank',
-        })
-    })
-}
-
-export function openEditModal(phaseIndex: number, dbId: number, existing: import('./types').FeatureData): Promise<ModalResult | null> {
-    return new Promise((resolve) => {
-        _modalResolve     = resolve
-        currentModalLayer = null
-
-        Object.assign(store.modal, {
-            ...modalDefaults(),
-            visible:         true,
-            phaseIndex,
-            isEdit:          true,
-            editDbId:        dbId,
-            label:           existing.label           ?? '',
-            decisionNumber:  existing.decisionNumber  ?? '',
-            decisionDate:    existing.decisionDate    ?? '',
-            areaTypeKey:     existing.areaTypeKey     ?? 'central_urban',
-            mainUrbanExists: false,
-            districtTypeKey: existing.districtTypeKey ?? 'district',
-            roadTypeKey:     existing.roadTypeKey     ?? 'street',
-            entranceTypeKey: existing.entranceTypeKey ?? (existing.roadDbId != null ? 'main_entrance' : 'secondary_entrance'),
-            entranceSide:    (existing.side           ?? null) as 'left' | 'right' | null,
-            entranceNumber:  existing.entranceNumber  ?? null,
-            bisNumber:       existing.bisNumber       ?? null,
-            spaceTypeKey:    existing.spaceTypeKey    ?? 'garden',
-            sectorKey:       existing.sectorKey       ?? 'banking_postal',
-            buildingTypeKey: existing.buildingTypeKey ?? 'bank',
-        })
-    })
-}
-
-export function resolveModal(result: ModalResult | null): void {
-    store.modal.visible = false
-    if (_modalResolve) {
-        _modalResolve(result)
-        _modalResolve = null
-    }
-}
-
-// ─── REACTIVE STORE ───────────────────────────────────────────────────────────
-
-export const store = reactive<AppStore>({
-    currentPhase: 0,
-
-    counts: {
-        areas: 0, cityCenter: 0, districts: 0, roads: 0,
-        mainEntrances: 0, secondaryEntrances: 0, publicBuildings: 0, publicSpaces: 0,
+        return undefined
     },
+    set(_, prop: keyof AppStore, value: AppStore[keyof AppStore]) {
+        const appStore = useAppStore()
+        const modalStore = useModalStore()
 
-    cityCenterMode:   null,
-    cityCenterLatLng: null,
+        if (prop === 'modal') {
+            Object.assign(modalStore, value)
+            return true
+        }
 
-    user:             null,
-    municipalityName: '',
-    loadError:        false,
-    referenceRoadDbId:     null,
-    referenceEntranceDbId: null,
+        const state = appStore.$state as unknown as Record<string, unknown>
+        if (prop in state) {
+            state[prop as string] = value
+            return true
+        }
 
-
-    modal: {
-        visible:             false,
-        phaseIndex:          null,
-        isEdit:              false,
-        editDbId:            null,
-        label:               '',
-        decisionNumber:      '',
-        decisionDate:        '',
-        errors:              {},
-        areaTypeKey:         'central_urban',
-        mainUrbanExists:     false,
-        districtTypeKey:     'district',
-        roadTypeKey:         'street',
-        entranceTypeKey:     'main_entrance',
-        roadOptions:         [],
-        selectedRoadIdx:     '',
-        entranceSide:        null,
-        entranceNumber:      null,
-        entranceSideLoading: false,
-        mainEntranceOptions: [],
-        selectedMainIdx:     '',
-        bisNumber:           null,
-        spaceTypeKey:        'garden',
-        sectorKey:           'banking_postal',
-        buildingTypeKey:     'bank',
+        return false
     },
 })
 
-// ── Sync helper ───────────────────────────────────────────────────────────────
+// ─── SELECTION ────────────────────────────────────────────────────────────────
+
+export { selectedFeatureDbId, setSelectedFeature } from './stores/layerStore'
+
+// ─── MODAL BRIDGE ─────────────────────────────────────────────────────────────
+
+export { awaitModalResult, setCurrentModalFeatureId, currentModalFeatureId } from './stores/modalStore'
+
+export function openModal(
+    phaseIndex: number,
+    featureId: string,
+    extras?: { radius?: number },
+): Promise<ModalResult | null> {
+    const modalStore = useModalStore()
+
+    setCurrentModalFeatureId(featureId)
+    modalStore.openCreate(phaseIndex, extras)
+
+    // Phase-specific defaults (city center always named "City Center")
+    const phase = PHASES[phaseIndex]
+    if (phase?.key === 'cityCenter') {
+        modalStore.label = t('phase_cityCenter_label')
+    }
+
+    return awaitModalResult()
+}
+
+export function openEditModal(
+    phaseIndex: number,
+    dbId: string,
+    existing: import('./types').FeatureData,
+): Promise<ModalResult | null> {
+    const modalStore = useModalStore()
+
+    modalStore.openEdit(phaseIndex, dbId, existing)
+    return awaitModalResult()
+}
+
+export function resolveModal(result: ModalResult | null): void {
+    const modalStore = useModalStore()
+    modalStore.close(result)
+}
+
+// ─── FEATURE LAYERS (backward-compatible — redirects to Pinia) ───────────────
+
+// Legacy non-reactive export — now proxies the Pinia layer store state with typed access.
+export const featureLayers: Record<string, LayerEntry[]> = new Proxy({} as Record<string, LayerEntry[]>, {
+    get(_, prop: keyof LayerState | string) {
+        const layerStore = useLayerStore()
+        const state = layerStore.$state as LayerState
+        return (state[prop as keyof LayerState] as LayerEntry[]) ?? []
+    },
+    set(_, prop: keyof LayerState | string, value: LayerEntry[]) {
+        const layerStore = useLayerStore()
+        const state = layerStore.$state as unknown as Record<string, unknown>
+        if (prop in state) {
+            state[prop as string] = value
+            return true
+        }
+        return false
+    },
+})
+
+// ── Sync helper (legacy — counts are now computed in Pinia) ──────────────────
 
 export function syncCounts(): void {
-    store.counts.areas              = featureLayers.areas?.length             ?? 0
-    store.counts.cityCenter         = featureLayers.cityCenter?.length        ?? 0
-    store.counts.districts          = featureLayers.districts?.length         ?? 0
-    store.counts.roads              = featureLayers.roads?.length             ?? 0
-    store.counts.mainEntrances      = featureLayers.houseEntrances?.filter((e: LayerEntry) => e.data.entranceTypeKey === 'main_entrance').length      ?? 0
-    store.counts.secondaryEntrances = featureLayers.houseEntrances?.filter((e: LayerEntry) => e.data.entranceTypeKey === 'secondary_entrance').length ?? 0
-    store.counts.publicBuildings    = featureLayers.publicBuildings?.length   ?? 0
-    store.counts.publicSpaces       = featureLayers.publicSpaces?.length      ?? 0
+    const appStore = useAppStore()
+    const layerStore = useLayerStore()
+
+    appStore.counts = {
+        areas: layerStore.areaCount,
+        cityCenter: layerStore.cityCenterCount,
+        districts: layerStore.districtCount,
+        roads: layerStore.roadCount,
+        mainEntrances: layerStore.mainEntranceCount,
+        secondaryEntrances: layerStore.secondaryEntranceCount,
+        publicBuildings: layerStore.publicBuildingCount,
+        publicSpaces: layerStore.publicSpaceCount,
+        namingPanels: layerStore.namingPanelCount,
+    }
 }

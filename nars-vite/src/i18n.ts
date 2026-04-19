@@ -14,23 +14,22 @@
 import { type Ref } from 'vue'
 import { createI18n } from 'vue-i18n'
 import en from './locales/en.json'
+import { debugError } from './utils/debug'
 
 // ─── KEY HUMANISER ────────────────────────────────────────────────────────────
-// Last-resort fallback when a key is missing from every locale and the fallback
-// locale. Turns 'alert_outside_boundary' into 'Alert: Outside Boundary'.
 
 function decamel(value: string): string {
     return value.replace(/([a-z])([A-Z])/g, '$1 $2')
 }
 
 function titleCase(value: string): string {
-    return value.replace(/\b\w/g, c => c.toUpperCase())
+    return value.replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 function humanizeKey(key: string): string {
-    const parts  = key.split('_')
+    const parts = key.split('_')
     const prefix = parts[0]
-    let   body   = parts.slice(1)
+    let body = parts.slice(1)
 
     if (prefix === 'phase' && body.length > 1) {
         const last = body[body.length - 1]
@@ -39,67 +38,77 @@ function humanizeKey(key: string): string {
     if (body.length === 0) body = parts
 
     const words = body
-        .flatMap(part => decamel(part).split(' '))
+        .flatMap((part) => decamel(part).split(' '))
         .filter(Boolean)
         .join(' ')
 
     const titled = titleCase(words)
     if (prefix === 'alert') return `Alert: ${titled}`
-    if (prefix === 'msg')   return `${titled}?`
+    if (prefix === 'msg') return `${titled}?`
     return titled
 }
 
 // ─── INSTANCE ─────────────────────────────────────────────────────────────────
 
 export const i18n = createI18n({
-    legacy:         false,           // Composition API mode
-    locale:         localStorage.getItem('nars_lang') || 'en',
+    legacy: false,
+    locale: localStorage.getItem('nars_lang') || 'en',
     fallbackLocale: 'en',
-    messages:       { en },          // bundle English inline; others lazy-loaded
-    missing:        (_locale: string, key: string) => humanizeKey(key),
-    missingWarn:    false,
-    fallbackWarn:   false,
+    messages: { en },
+    missing: (_locale: string, key: string) => humanizeKey(key),
+    missingWarn: false,
+    fallbackWarn: false,
 })
-
-// ─── EXPORTS FOR NON-COMPONENT FILES ─────────────────────────────────────────
-// map/*.ts files cannot call useI18n() (no component context), so they import
-// t() directly. The wrapper normalises the return type to string.
 
 export function t(key: string, replacements?: Record<string, string | number>): string {
     return String(i18n.global.t(key, replacements ?? {}))
 }
 
-// Watchable locale ref — same interface as before for watch(currentLang, …)
 export const currentLang = i18n.global.locale as Ref<string>
 
 // ─── LANGUAGE SWITCHING ───────────────────────────────────────────────────────
 
+// Dynamic imports for non-English locales only
+// English is loaded statically above
+const localeImports = {
+    fr: () => import('./locales/fr.json'),
+    ar: () => import('./locales/ar.json'),
+} as const
+
+type LocaleKey = keyof typeof localeImports
+
 const loadedLocales = new Set<string>(['en'])
 
 export async function setLang(lang: string): Promise<void> {
+    // English already loaded statically - just set it
+    if (lang === 'en') {
+        ;(i18n.global.locale as Ref<string>).value = 'en'
+        localStorage.setItem('nars_lang', lang)
+        document.documentElement.dir = 'ltr'
+        document.documentElement.lang = 'en'
+        return
+    }
+
     if (!loadedLocales.has(lang)) {
         try {
-            // Lazy-load fr / ar on first use. Vite bundles them as separate chunks.
-            const messages = await import(`./locales/${lang}.json`)
-            i18n.global.setLocaleMessage(lang, messages.default ?? messages)
-            loadedLocales.add(lang)
+            const localeKey = lang as LocaleKey
+            if (localeKey in localeImports) {
+                const messages = await localeImports[localeKey]()
+                i18n.global.setLocaleMessage(lang, messages.default ?? messages)
+                loadedLocales.add(lang)
+            }
         } catch (e) {
-            console.error(`Failed to load language: ${lang}`, e)
+            debugError(`Failed to load language: ${lang}`, e)
             return
         }
     }
 
-    // Cast needed because vue-i18n infers locale as a narrow literal type
-    // when messages are provided at creation time.
     ;(i18n.global.locale as Ref<string>).value = lang
     localStorage.setItem('nars_lang', lang)
-    document.documentElement.dir  = lang === 'ar' ? 'rtl' : 'ltr'
+    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr'
     document.documentElement.lang = lang
-    if (typeof (window as any).L?.PM?.setLang === 'function') (window as any).L.PM.setLang(lang)
-    if ((window as any).__narsUpdateLayerControl) (window as any).__narsUpdateLayerControl()
 }
 
-// Called once from initMap() — awaitable so map init waits for locale to load.
 export function applyInitialLang(): Promise<void> {
     const lang = localStorage.getItem('nars_lang') || 'en'
     return setLang(lang)

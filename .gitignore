@@ -21,9 +21,30 @@ nars-vite/yarn-error.log*
 nars-vite/.vscode/
 
 # === General / IDE ===
+
+maplibre-geoman-0.7.1/
 .idea/
 .vscode/
 *.swp
 *.log
 *.Rhistory
 .DS_Store
+.aider*
+
+# === Android / Kotlin (nars-android-maplibre, maplibre-geoman-android) ===
+*.apk
+*.aar
+*.aab
+local.properties
+.gradle/
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/

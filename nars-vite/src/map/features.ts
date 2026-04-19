@@ -1,83 +1,123 @@
 // ─── FEATURE DATA, SAVE & MODAL HELPERS ──────────────────────────────────────
 
-import { PHASES }              from '../phases'
-import { store, featureLayers, currentModalLayer } from '../store'
-import { apiFetch }            from '../api'
-import { getRoadSide, checkMainUrbanExists } from '../validation'
-import type { FeatureData, LayerEntry, SaveResult } from '../types'
-
-declare const L: typeof import('leaflet')
+import { PHASES } from '../phases'
+import { store } from '../store'
+import { useLayerStore } from '../stores/layerStore'
+import type { LayerState } from '../stores/layerStore'
+import { apiFetch } from '../api'
+import { checkMainUrbanExists, getRoadSide } from '../validation'
+import { debugLog, debugError } from '../utils/debug'
+import type { FeatureData, LayerEntry, SaveResult, ModalResult } from '../types'
 
 // ─── FEATURE DATA BUILDER ────────────────────────────────────────────────────
 
-export function buildFeatureData(layer: L.Layer, phase: typeof PHASES[number], modalResult: Record<string, unknown>): FeatureData {
-    // Explicitly pick only the fields that belong in the persisted DB record.
-    // Never spread the full modalResult — it contains UI-only state (errors,
-    // roadOptions[], mainEntranceOptions[], entranceSideLoading, etc.) that
-    // would bloat the stored JSON and cause subtle re-hydration bugs.
+export function buildFeatureData(
+    geometry: GeoJSON.Geometry,
+    phase: (typeof PHASES)[number],
+    modalResult: ModalResult,
+): FeatureData {
     const base: FeatureData = {
-        type:             phase.key,
-        label:            modalResult.label            as string,
-        decisionNumber:   modalResult.decisionNumber   as string,
-        decisionDate:     modalResult.decisionDate     as string,
-        // Per-phase persisted fields:
-        areaTypeKey:      modalResult.areaTypeKey      as string | undefined,
-        districtTypeKey:  modalResult.districtTypeKey  as string | undefined,
-        roadTypeKey:      modalResult.roadTypeKey      as string | undefined,
-        entranceTypeKey:  modalResult.entranceTypeKey  as 'main_entrance' | 'secondary_entrance' | undefined,
-        roadDbId:         modalResult.roadDbId         as number | undefined,
-        roadLabel:        modalResult.roadLabel        as string | undefined,
-        side:             modalResult.side             as 'left' | 'right' | undefined,
-        entranceNumber:   modalResult.entranceNumber   as number | undefined,
-        mainEntranceDbId: modalResult.mainEntranceDbId as number | undefined,
-        mainEntranceLabel:modalResult.mainEntranceLabel as string | undefined,
-        bisNumber:        modalResult.bisNumber        as number | undefined,
-        spaceTypeKey:     modalResult.spaceTypeKey     as string | undefined,
-        sectorKey:        modalResult.sectorKey        as string | undefined,
-        buildingTypeKey:  modalResult.buildingTypeKey  as string | undefined,
+        type: phase.key,
+        label: modalResult.label,
+        decisionNumber: modalResult.decisionNumber,
+        decisionDate: modalResult.decisionDate,
+        areaTypeKey: modalResult.areaTypeKey,
+        districtTypeKey: modalResult.districtTypeKey,
+        roadTypeKey: modalResult.roadTypeKey,
+        entranceTypeKey: modalResult.entranceTypeKey,
+        roadDbId: modalResult.roadDbId,
+        roadLabel: modalResult.roadLabel,
+        side: modalResult.side,
+        entranceNumber: modalResult.entranceNumber,
+        mainEntranceDbId: modalResult.mainEntranceDbId,
+        mainEntranceLabel: modalResult.mainEntranceLabel,
+        bisNumber: modalResult.bisNumber,
+        spaceTypeKey: modalResult.spaceTypeKey,
+        sectorKey: modalResult.sectorKey,
+        buildingTypeKey: modalResult.buildingTypeKey,
     }
 
-    // Strip undefined keys so the stored JSON stays lean.
+    // City center: persist radius
+    if (phase.key === 'cityCenter') {
+        base.radius = modalResult.radius as number | undefined
+    }
+
     for (const k of Object.keys(base) as (keyof FeatureData)[]) {
-        if (base[k] === undefined) delete base[k]
+        if (base[k] === undefined) {
+            ;(base as unknown as Record<string, unknown>)[k] = undefined
+        }
     }
 
-    if (phase.drawType === 'marker') {
-        const ll = (layer as L.Marker).getLatLng()
-        return { ...base, lat: ll.lat, lng: ll.lng }
-    }
-    if (phase.drawType === 'circle') {
-        const ll = (layer as L.Circle).getLatLng()
-        const radius = (layer as L.Circle).getRadius()
-        return { ...base, lat: ll.lat, lng: ll.lng, radius }
-    }
-    const lls = phase.drawType === 'polygon'
-        ? ((layer as L.Polygon).getLatLngs()[0] as L.LatLng[])
-        : ((layer as L.Polyline).getLatLngs() as L.LatLng[])
+    let result: FeatureData
 
-    // PostGIS/GEOS requires closed rings — close if snapping drifted first/last apart
-    let coords = lls.map(ll => ({ lat: ll.lat, lng: ll.lng }))
-    if (phase.drawType === 'polygon' && coords.length >= 3) {
-        const first = coords[0], last = coords[coords.length - 1]
-        if (first.lat !== last.lat || first.lng !== last.lng)
-            coords = [...coords, { lat: first.lat, lng: first.lng }]
+    if (geometry.type === 'Point') {
+        const coords = [{ lat: geometry.coordinates[1], lng: geometry.coordinates[0] }]
+        result = { ...base, lat: coords[0].lat, lng: coords[0].lng, coordinates: coords }
+        // Circle radius from geometry (extracted from Geoman's polygon approximation)
+        /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+        if ((geometry as any).radius != null) {
+            /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+            result.radius = (geometry as any).radius
+        }
+    } else if (geometry.type === 'LineString') {
+        const coords = geometry.coordinates.map((c: number[]) => ({ lat: c[1], lng: c[0] }))
+        result = { ...base, coordinates: coords }
+    } else if (geometry.type === 'Polygon') {
+        // Polygon: coordinates[0] is the outer ring
+        const coords = geometry.coordinates[0].map((c: number[]) => ({ lat: c[1], lng: c[0] }))
+        result = { ...base, coordinates: coords }
+    } else if (geometry.type === 'MultiPolygon') {
+        // MultiPolygon: flatten by taking first (largest) ring from first polygon.
+        // This can happen when Geoman produces self-intersecting or multi-ring shapes.
+        /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+        const coords = (geometry as any).coordinates[0][0].map((c: [number, number]) => ({ lat: c[1], lng: c[0] }))
+        result = { ...base, coordinates: coords }
+        debugLog('[SAVE] MultiPolygon flattened to single Polygon (first ring)')
+    } else {
+        // Unknown geometry type — log and return base without geometry
+        debugError('[SAVE] Unknown geometry type:', (geometry as { type: string }).type, geometry)
+        result = base
     }
-    return { ...base, coordinates: coords }
+
+    // Log the saved data for debugging
+    debugLog(
+        '[SAVE] buildFeatureData — type:',
+        result.type,
+        'geometry:',
+        result.lat != null
+            ? `Point(${result.lat}, ${result.lng})`
+            : result.coordinates
+              ? `${result.coordinates.length} coords`
+              : 'NONE',
+        'keys:',
+        Object.keys(result),
+    )
+
+    return result
 }
 
 // ─── API SHAPE MAPPING ────────────────────────────────────────────────────────
 
 export function toApiSaveShape(fd: FeatureData): { type: string; layer: string } | null {
     switch (fd.type) {
-        case 'areas':           return { type: 'area',            layer: fd.areaTypeKey     ?? 'central_urban' }
-        case 'cityCenter':      return { type: 'city_center',     layer: 'city_center' }
-        case 'districts':       return { type: 'district',        layer: fd.districtTypeKey ?? 'district' }
-        case 'roads':           return { type: 'road',            layer: fd.roadTypeKey     ?? 'street' }
-        case 'houseEntrances':  return { type: 'house_entrance',  layer: fd.entranceTypeKey ?? 'main_entrance' }
-        case 'publicBuildings': return { type: 'public_building', layer: fd.buildingTypeKey ?? 'public_building' }
-        case 'publicSpaces':    return { type: 'public_space',    layer: fd.spaceTypeKey    ?? 'garden' }
-        case 'namingPanels':    return { type: 'naming_panel',    layer: 'naming_panel' }
-        default: return null
+        case 'areas':
+            return { type: 'area', layer: fd.areaTypeKey ?? 'central_urban' }
+        case 'cityCenter':
+            return { type: 'city_center', layer: 'city_center' }
+        case 'districts':
+            return { type: 'district', layer: fd.districtTypeKey ?? 'district' }
+        case 'roads':
+            return { type: 'road', layer: fd.roadTypeKey ?? 'street' }
+        case 'houseEntrances':
+            return { type: 'house_entrance', layer: fd.entranceTypeKey ?? 'main_entrance' }
+        case 'publicBuildings':
+            return { type: 'public_building', layer: fd.buildingTypeKey ?? 'public_building' }
+        case 'publicSpaces':
+            return { type: 'public_space', layer: fd.spaceTypeKey ?? 'garden' }
+        case 'namingPanels':
+            return { type: 'naming_panel', layer: 'naming_panel' }
+        default:
+            return null
     }
 }
 
@@ -88,88 +128,110 @@ export async function saveToDatabase(featureData: FeatureData): Promise<SaveResu
         const shape = toApiSaveShape(featureData)
         if (!shape) return { ok: false, error: `Unknown type '${featureData.type}'.` }
 
-        const res = await apiFetch('/api/save', {
-            method:  'POST',
+        const data = (await apiFetch('/api/save', {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ type: shape.type, layer: shape.layer, label: featureData.label, data: featureData }),
-        })
-        if (!res.ok) {
-            const raw = await res.text()
-            let detail = raw || `HTTP ${res.status}`
-            try { const p = JSON.parse(raw) as { detail?: string; title?: string }; detail = p?.detail ?? p?.title ?? detail } catch { /* ignore */ }
-            return { ok: false, error: `HTTP ${res.status}: ${String(detail).slice(0, 240)}` }
-        }
-        return { ok: true, data: await res.json() as { id: number } }
+            body: JSON.stringify({ type: shape.type, layer: shape.layer, label: featureData.label, data: featureData }),
+        }).then((r) => r.json())) as { id: string }
+        return { ok: true, data }
     } catch (err) {
-        return { ok: false, error: (err as Error)?.message ?? 'Network error' }
+        const message = err instanceof Error ? err.message : 'Unknown error'
+        const context =
+            err instanceof Error && 'cause' in err ? String((err as Error & { cause?: unknown }).cause) : undefined
+        debugError('[SAVE] Database save failed:', {
+            message,
+            context,
+            stack: err instanceof Error ? err.stack : undefined,
+        })
+        return { ok: false, error: message }
     }
 }
 
 // ─── MODAL EXTRA PREPARATION ──────────────────────────────────────────────────
 
-export async function prepareModalExtras(phase: typeof PHASES[number], _layer: L.Layer): Promise<void> {
+export async function prepareModalExtras(phase: (typeof PHASES)[number]): Promise<void> {
     const m = store.modal
+    const layerStore = useLayerStore()
+    const state = layerStore.$state as LayerState
 
     if (phase.key === 'areas') {
         m.mainUrbanExists = await checkMainUrbanExists()
-        // Central urban area always takes the commune name as its label.
-        // Fall back to store.user.commune.name_fr in case municipalityName
-        // hasn't been populated yet (race condition on first load).
         if (!m.mainUrbanExists) {
-            // Central urban area — always named after the commune, field is disabled
-            const name = store.municipalityName
-                || (store.user as any)?.commune?.name_fr
-                || (store.user as any)?.commune?.name_ar
-                || ''
+            const name = store.municipalityName || store.user?.commune.name_fr || store.user?.commune.name_ar || ''
             m.label = name
         } else {
-            // Secondary urban area — name is editable, start empty
             m.label = ''
         }
-        // Single authoritative assignment — no double-write.
         m.areaTypeKey = m.mainUrbanExists ? 'secondary_urban' : 'central_urban'
     }
 
     if (phase.key === 'houseEntrances') {
-        m.roadOptions = featureLayers.roads.map((r, i) => ({
-            idx:   i,
+        m.roadOptions = (state.roads || []).map((r, i) => ({
+            idx: i,
             label: r.data.label || `Road ${i + 1}`,
-            dbId:  (r.layer as any)._dbId as number,
+            dbId: String(r.dbId),
         }))
-        m.mainEntranceOptions = featureLayers.houseEntrances
+        ;(state.houseEntrances || [])
             .filter((e: LayerEntry) => e.data.entranceTypeKey === 'main_entrance')
             .map((e, i) => ({
-                idx:   i,
+                idx: i,
                 label: e.data.label || `Entrance ${i + 1}`,
-                dbId:  (e.layer as any)._dbId as number,
+                dbId: String(e.dbId),
             }))
     }
 }
 
 // ─── ROAD-SIDE & BIS HELPERS ──────────────────────────────────────────────────
 
-export async function fetchRoadSide(roadDbId: number, _roadIdx: number): Promise<void> {
+export async function fetchRoadSide(roadDbId: string): Promise<void> {
     const m = store.modal
+    const layerStore = useLayerStore()
+    const state = layerStore.$state as LayerState
     m.entranceSideLoading = true
-    m.entranceSide        = null
-    m.entranceNumber      = null
-    try {
-        const ll = currentModalLayer ? (currentModalLayer as L.Marker).getLatLng() : null
-        if (!ll) return
-        const result = await getRoadSide(roadDbId, ll.lat, ll.lng)
+    m.entranceSide = null
+    m.entranceNumber = null
+
+    // Try to get position from current drawing geometry first (dev-only global)
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+    const currentGeometry = (import.meta.env.DEV ? (window as any).__narsCurrentGeometry : undefined) as
+        | [number, number][]
+        | null
+        | undefined
+    let lat: number | undefined
+    let lng: number | undefined
+
+    if (currentGeometry && currentGeometry.length > 0) {
+        // Use the last vertex position (the one being placed)
+        ;[lng, lat] = currentGeometry[currentGeometry.length - 1]
+    } else {
+        // Fallback to existing entrance (edit mode or if geometry not available)
+        const feature = (state.houseEntrances || []).find(
+            (e) => e.data.entranceTypeKey === 'main_entrance' && e.data.lat && e.data.lng,
+        )
+        if (feature) {
+            lat = feature.data.lat
+            lng = feature.data.lng
+        }
+    }
+
+    if (lat && lng) {
+        const result = await getRoadSide(roadDbId, lat, lng)
         if (result) {
-            m.entranceSide   = result.side
+            m.entranceSide = result.side
             m.entranceNumber = result.suggestedNumber
         }
-    } finally {
-        m.entranceSideLoading = false
     }
+
+    m.entranceSideLoading = false
 }
 
-export function computeBisNumber(mainEntranceDbId: number): void {
-    const count = featureLayers.houseEntrances.filter((s: LayerEntry) =>
-        s.data.entranceTypeKey === 'secondary_entrance' &&
-        s.data.mainEntranceDbId === mainEntranceDbId).length
+export function computeBisNumber(mainEntranceDbId: string): void {
+    const layerStore = useLayerStore()
+    const st = layerStore.$state as LayerState
+    const count = (st.houseEntrances || []).filter(
+        (e: LayerEntry) =>
+            e.data.entranceTypeKey === 'secondary_entrance' && e.data.mainEntranceDbId === mainEntranceDbId,
+    ).length
     store.modal.bisNumber = count + 1
-    store.modal.label     = 'BIS' + String(count + 1).padStart(2, '0')
+    store.modal.label = 'BIS' + String(count + 1).padStart(2, '0')
 }

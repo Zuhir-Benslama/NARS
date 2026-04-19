@@ -1,274 +1,596 @@
 // ─── DRAW EVENTS ──────────────────────────────────────────────────────────────
-// Wires all Geoman (pm:*) and Leaflet map events: draw start/end, edit
-// start/end, vertex added, per-feature edit persistence, feature removal,
-// left-click draw restart, ESC cancel, and right-click context menu.
-// Extracted from index.ts for size.
+// Custom drawing event registration:
+// - Phase watch → enable draw mode
+// - gm:create → complete drawing with geometry
+// - Right click → remove last vertex or cancel draw
+// - Left click → restart draw mode
+// - ESC → cancel draw or edit
+// - Ctrl+Z → undo last deletion
+// - Geoman marker pointer patch for snap integration
 
-import { apiFetch }                                               from '../api'
-import { PHASES }                                                 from '../phases'
-import { store, featureLayers, syncCounts }                       from '../store'
-import type { LayerEntry }                                        from '../types'
-import { ctx }                                                    from './state'
-import { buildPopup }                                             from './styles'
-import { addPolylineEndpoints, createAreaPerimeterLabel,
-         createPolygonEdgeLabel, refreshLayerVisibility }         from './labels'
-import { refreshScatteredAreas }                                  from './geometry'
-import { enableSnapping, disableSnapping,
-         hookEditHandles, hookAllEditMarkers, editModeActive }    from './snapping'
-import { showMapContextMenu }                                     from './context-menu'
-import { handlePmCreate, bindHoverPopup, getDistrictLabel }       from './create-handler'
+import { watch } from 'vue'
+import { PHASES } from '../phases'
+import { store, setSelectedFeature } from '../store'
+import { ctx, updateSelectionHighlight, featuresStore } from './state'
+import { showContextMenu, showMapContextMenu } from './context-menu'
+import {
+    enableCrosshair,
+    enableSnapping,
+    disableSnapping,
+    installSnapInterceptors,
+    getFrozenSnapPos,
+    getActiveSnapPhases,
+    findNearestSnap,
+    mergeExternalSnapWithDrawFirstVertex,
+} from './snapping'
+import { buildDrawControl } from './draw-control'
+import {
+    setDrawingPhase,
+    getDrawingPhase,
+    completeDrawingWithGeometry,
+    isSavingFeature,
+    removeLastVertex,
+    getFeatureStyle,
+    setRepatchMarkerPointer,
+    registerGeomanMarker,
+} from './draw-complete'
+import { isEditMode, enableEditMode, commitEditMode, cancelEditMode, suppressGeomanFill } from './edit-mode'
+import { registerGeomanEvents } from './geoman-events'
+import { undo } from './undo'
+import { debugLog, debugError, debugWarn } from '../utils/debug'
+import type { GeomanCreateEvent, ActionInstances } from './geoman-types'
+import type { GeomanMarkerPointer } from './geoman-types'
+import type { MapMouseEvent as MapLibreMapMouseEvent } from 'maplibre-gl'
 
-declare const L: typeof import('leaflet')
+// Re-export state and functions used by other modules
+export { isEditMode, enableEditMode, commitEditMode, cancelEditMode, suppressGeomanFill, getFeatureStyle }
 
-// ─── REGISTER ALL MAP / GEOMAN EVENTS ────────────────────────────────────────
+// ─── GEOMETRY HELPERS ─────────────────────────────────────────────────────────
 
-export function registerDrawEvents(): void {
-    let drawModeActive = false
+function pointToSegmentDist(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
+    const dx = x2 - x1
+    const dy = y2 - y1
+    const lenSq = dx * dx + dy * dy
+    if (lenSq === 0) return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2)
+    const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / lenSq))
+    const nearX = x1 + t * dx
+    const nearY = y1 + t * dy
+    return Math.sqrt((px - nearX) ** 2 + (py - nearY) ** 2)
+}
 
-    // ── Draw mode tracking ────────────────────────────────────────────────────
+// ─── GEOMAN MARKER POINTER PATCH ──────────────────────────────────────────────
+// Geoman's MarkerPointer.onMouseMove is the SINGLE entry point for cursor
+// positioning during ALL drawing modes (polygon, line, circle, marker, etc).
+//
+// Flow:
+//   1. MapLibre fires mousemove event
+//   2. MarkerPointer.onMouseMove(e) is called (throttled)
+//   3. It calls this.snappingHelper.getSnappedLngLat() IF snapping is on
+//   4. It calls this.marker.setLngLat(snappedCoords)
+//   5. All draw classes read marker.getLngLat() for vertex placement
+//
+// Problem: The snapping helper action instance (helper__snapping) is only
+// active during explicit snapping helper mode, not during regular drawing.
+// So getSnappedLngLat returns the raw coordinates unchanged.
+//
+// Solution: Monkey-patch MarkerPointer.onMouseMove to use our NARS snap logic
+// directly, bypassing the snapping helper entirely. This is the earliest
+// interception point — we control the marker position before any draw class
+// reads it.
 
-    ctx.map.on('pm:drawstart', (e: any) => {
-        drawModeActive = true
-        const key = PHASES[store.currentPhase]?.key
-        if      (key === 'areas')     enableSnapping('districts', undefined, 'areas')
-        else if (key === 'districts') enableSnapping('districts', undefined, 'districts')
-        else if (key === 'roads')     enableSnapping('roads',     undefined, 'roads')
-    })
+function patchGeomanMarkerPointerSnap(): void {
+    const gm = ctx.geoman
+    if (!gm?.markerPointer) {
+        debugWarn('[SNAP] No markerPointer')
+        return
+    }
 
-    ctx.map.on('pm:drawend', () => {
-        drawModeActive = false
-        if (!editModeActive) disableSnapping()
-    })
+    const mp = gm.markerPointer as GeomanMarkerPointer
 
-    // ── ESC — cancel draw or edit ─────────────────────────────────────────────
+    // Flag to prevent double-patching
+    if (mp._narsSnapPatched) return
+    mp._narsSnapPatched = true
 
-    document.addEventListener('keydown', (e: KeyboardEvent) => {
-        if (e.key !== 'Escape') return
-        if (drawModeActive) (ctx.map as any).pm.disableDraw()
-        if (editModeActive) (ctx.map as any).pm.disableGlobalEditMode()
-    })
+    const PATCH_TIMEOUT_MS = 15_000
+    const startTime = performance.now()
+    let rafId: number | null = null
 
-    // ── Left-click — restart draw mode if idle ────────────────────────────────
+    const tryPatch = () => {
+        if (mp.marker && typeof mp.marker.setLngLat === 'function') {
+            if (mp.marker._narsSnapPatchedInstance) {
+                if (rafId !== null) cancelAnimationFrame(rafId)
+                rafId = null
+                return
+            }
 
-    ctx.map.on('click', () => {
-        if (drawModeActive || editModeActive) return
-        const phase = PHASES[store.currentPhase]
-        if (!phase || phase.key === 'namingPanels') return
-        if      (phase.drawType === 'polygon')  (ctx.map as any).pm.enableDraw('Polygon', { snappable: false })
-        else if (phase.drawType === 'polyline') (ctx.map as any).pm.enableDraw('Line',    { snappable: false })
-        else if (phase.drawType === 'marker')   (ctx.map as any).pm.enableDraw('Marker',  { snappable: false })
-    })
+            const orig = mp.marker.setLngLat.bind(mp.marker)
+            registerGeomanMarker(mp, mp.marker, orig)
+            mp.marker._narsSnapPatchedInstance = true
 
-    // ── Zoom — re-apply layer visibility (Leaflet re-renders SVG on zoom) ─────
+            mp.marker.setLngLat = function (
+                lngLat: [number, number] | { lng: number; lat: number; toArray?(): [number, number] },
+            ) {
+                const rawPair = Array.isArray(lngLat)
+                    ? lngLat
+                    : (lngLat.toArray?.() ?? [lngLat.lng ?? 0, lngLat.lat ?? 0])
+                const lng0 = Number(rawPair[0])
+                const lat0 = Number(rawPair[1])
+                const rawPx = ctx.map.project([lng0, lat0] as [number, number])
 
-    ctx.map.on('zoomend', () => refreshLayerVisibility())
+                const frozen = getFrozenSnapPos()
+                if (frozen) {
+                    orig.call(mp.marker!, [frozen.lng, frozen.lat])
+                    return
+                }
 
-    // ── Right-click — cancel draw/edit, or open context menu ─────────────────
+                const phases = getActiveSnapPhases()
+                const project = (ll: [number, number]) => ctx.map.project(ll)
+                const external = phases.length > 0 ? findNearestSnap(rawPx.x, rawPx.y, phases, true) : null
+                const snap = mergeExternalSnapWithDrawFirstVertex(rawPx.x, rawPx.y, external, project)
+                if (snap) {
+                    orig.call(mp.marker!, [snap.lng, snap.lat])
+                } else {
+                    orig.call(mp.marker!, lngLat)
+                }
+            }
 
-    ctx.map.on('contextmenu', (e: any) => {
-        e.originalEvent.preventDefault()
-        e.originalEvent.stopPropagation()
-        if (drawModeActive) { ;(ctx.map as any).pm.disableDraw(); return }
-        if (editModeActive) { ;(ctx.map as any).pm.disableGlobalEditMode(); return }
-        // Leaflet always re-fires contextmenu to the map even after a layer handled it.
-        if ((ctx.map as any)._narsFeatureCtxHandled) {
-            ;(ctx.map as any)._narsFeatureCtxHandled = false
+            debugLog('[SNAP] marker setLngLat patched')
+            if (rafId !== null) cancelAnimationFrame(rafId)
+            rafId = null
             return
         }
-        const phase = PHASES[store.currentPhase]
-        if (!phase) return
-        showMapContextMenu(e.originalEvent.clientX, e.originalEvent.clientY, phase)
+
+        if (performance.now() - startTime > PATCH_TIMEOUT_MS) {
+            debugWarn('[SNAP] Timed out waiting for Geoman marker — snapping disabled')
+            if (rafId !== null) cancelAnimationFrame(rafId)
+            rafId = null
+            return
+        }
+
+        rafId = requestAnimationFrame(tryPatch)
+    }
+
+    rafId = requestAnimationFrame(tryPatch)
+
+    debugLog('[SNAP] Snap patching started (rAF polling for marker)')
+}
+
+// ─── REGISTRATION ─────────────────────────────────────────────────────────────
+
+export function registerDrawEvents(): void {
+    const map = ctx.map
+
+    debugLog('Registering custom draw events')
+
+    // Wire up the marker re-patch callback so draw-complete can re-patch
+    // the fresh Geoman marker after resetDrawMode creates a new one.
+    setRepatchMarkerPointer(repatchMarkerPointer)
+
+    // Fix #4 — Vue watch keeps drawType in sync with the active phase reactively
+    watchDrawType()
+
+    // Drawing is handled by Geoman's native enableDraw() (like nars-vite reference).
+    // Geoman forwards the create event to MapLibre as 'gm:create'.
+    map.on('gm:create', async (e: GeomanCreateEvent) => {
+        if (isSavingFeature()) return
+
+        const featureData = e.featureData || e.feature
+        if (!featureData) return
+        const shape = e.shape || (featureData as { shape?: string }).shape
+
+        debugLog('Geoman created feature:', shape, featureData)
+
+        const geoJson = featureData.getGeoJson?.() || featureData._geoJson
+        if (!geoJson?.geometry) return
+
+        // Map Geoman shape names back to NARS drawType
+        const shapeToDrawType: Record<string, string> = {
+            polygon: 'polygon',
+            line: 'line',
+            marker: 'marker',
+            circle: 'circle',
+        }
+        const drawingPhase = getDrawingPhase()
+        const narsDrawType = (shape ? shapeToDrawType[shape] : undefined) ?? drawingPhase?.drawType ?? 'polygon'
+
+        let geometry = geoJson.geometry
+
+        // Circle: convert Polygon to Point with radius
+        if (shape === 'circle' && geoJson.geometry.type === 'Polygon') {
+            const coords = geoJson.geometry.coordinates[0] as [number, number][]
+            debugLog('[CIRCLE DRAW] Converting circle Polygon to Point with radius, coords count:', coords.length)
+
+            if (coords.length >= 3) {
+                let sumLat = 0,
+                    sumLng = 0
+                for (const [lng, lat] of coords) {
+                    sumLat += lat
+                    sumLng += lng
+                }
+                const centerLat = sumLat / coords.length
+                const centerLng = sumLng / coords.length
+                let totalDist = 0
+                for (const [lng, lat] of coords) {
+                    const dlat = ((lat - centerLat) * Math.PI) / 180
+                    const dlng = ((lng - centerLng) * Math.PI) / 180
+                    const a =
+                        Math.sin(dlat / 2) ** 2 +
+                        Math.cos((centerLat * Math.PI) / 180) *
+                            Math.cos((lat * Math.PI) / 180) *
+                            Math.sin(dlng / 2) ** 2
+                    totalDist += 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+                }
+                const radius = totalDist / coords.length
+                debugLog('[CIRCLE DRAW] Circle center:', centerLat, centerLng, 'radius:', radius, 'meters')
+
+                geometry = { type: 'Point', coordinates: [centerLng, centerLat] } as GeoJSON.Point
+                ;(geometry as GeoJSON.Point & { radius: number }).radius = radius
+            } else {
+                debugError('[CIRCLE DRAW] Circle has too few coordinates:', coords.length)
+            }
+        } else if (shape === 'polygon' && geoJson.geometry.type === 'MultiPolygon') {
+            // Geoman can produce MultiPolygon when the user draws a self-intersecting
+            // shape or creates multiple rings. Flatten to single Polygon by taking
+            // the first (largest) ring — this matches the backend's expectation.
+            const mp = geoJson.geometry as GeoJSON.MultiPolygon
+            if (mp.coordinates.length > 0 && mp.coordinates[0].length > 0) {
+                geometry = {
+                    type: 'Polygon',
+                    coordinates: mp.coordinates[0],
+                } as unknown as GeoJSON.Polygon
+            }
+        }
+
+        try {
+            await completeDrawingWithGeometry(
+                geometry as GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon,
+                narsDrawType,
+                featureData,
+            )
+        } catch (err) {
+            debugError('[GM:CREATE] Error:', err)
+        }
     })
 
-    // ── pm:editstart — park non-current layers, enable snapping ──────────────
-
-    ctx.map.on('pm:editstart', (e: any) => {
-        try {
-            const key = PHASES[store.currentPhase]?.key
-            if (drawModeActive) (ctx.map as any).pm.disableDraw()
-
-            const parked:  L.Layer[] = []
-            const display: L.Layer[] = []
-
-            if (!(ctx as any)._displayLayer) {
-                (ctx as any)._displayLayer = L.layerGroup().addTo(ctx.map)
+    // RIGHT CLICK — during polygon/line drawing, remove last vertex or cancel draw.
+    // Otherwise: show context menu.
+    // Listened on window during capture phase to beat Geoman / MapLibre.
+    window.addEventListener(
+        'contextmenu',
+        (e: MouseEvent) => {
+            const mapEl = ctx.map.getContainer()
+            if (!mapEl.contains(e.target as Node)) return
+            if (isEditMode) {
+                e.preventDefault()
+                void commitEditMode()
+                return
             }
-            const displayLayer: L.LayerGroup = (ctx as any)._displayLayer
+            const actionInstances = ctx.geoman?.actionInstances as ActionInstances | undefined
+            const polygonInst = actionInstances?.['draw__polygon']
+            const lineInst = actionInstances?.['draw__line']
+            const drawInstance = polygonInst ?? lineInst
+            const lineDrawer = drawInstance?.lineDrawer
+            const midDraw = lineDrawer?.shapeLngLats && lineDrawer.shapeLngLats.length > 0
+            if (midDraw) {
+                e.preventDefault()
+                e.stopPropagation()
+                const coords: [number, number][] = lineDrawer.shapeLngLats
+                if (coords.length <= 1) {
+                    const phase = PHASES[store.currentPhase]
+                    void ctx.geoman!.disableDraw().then(() => {
+                        if (phase && phase.key !== 'namingPanels') buildDrawControl(phase)
+                    })
+                    return
+                }
+                void removeLastVertex()
+                return
+            }
+            // Not drawing — show context menu
+            e.preventDefault()
+            e.stopImmediatePropagation()
+            const phase = PHASES[store.currentPhase]
+            if (!phase) return
 
-            Object.entries(featureLayers).forEach(([phaseKey, entries]) => {
-                if (phaseKey === key) return
-                ;(entries as LayerEntry[]).forEach(({ layer }) => {
-                    if (phaseKey === 'roads') return
-                    if (!ctx.drawnItems.hasLayer(layer)) return
-                    ctx.drawnItems.removeLayer(layer)
-                    if (phaseKey === 'areas') {
-                        displayLayer.addLayer(layer); display.push(layer)
-                    } else {
-                        parked.push(layer)
+            const rect = ctx.map.getContainer().getBoundingClientRect()
+            const px = e.clientX - rect.left
+            const py = e.clientY - rect.top
+
+            // Try queryRenderedFeatures first
+            const features = ctx.map.queryRenderedFeatures([px, py] as [number, number])
+            let feature
+            if (phase.key === 'cityCenter') {
+                feature = features.find((f) => f.source === 'features' && f.properties?.phaseKey === 'cityCenter')
+            } else {
+                feature = features.find((f) => f.source === 'features' && f.properties?.dbId)
+            }
+            if (feature && feature.properties?.dbId && feature.properties?.phaseKey) {
+                showContextMenu(e.clientX, e.clientY, feature.properties.dbId, feature.properties.phaseKey)
+            } else {
+                // Fallback: find nearest road/feature from featuresStore
+                const allFeatures = featuresStore.getAll()
+                let nearestDbId: string | null = null
+                let nearestPhaseKey: string | null = null
+                let nearestDist = 20 // pixels threshold
+
+                for (const f of allFeatures) {
+                    const fPhaseKey = f.properties?.phaseKey
+                    const fDbId = f.properties?.dbId
+                    if (!fDbId || !fPhaseKey) continue
+
+                    // Check if feature is visible in current phase
+                    if (fPhaseKey === 'roads' || fPhaseKey === 'houseEntrances') {
+                        // For points (entrances)
+                        if (f.geometry.type === 'Point') {
+                            const point = ctx.map.project([f.geometry.coordinates[0], f.geometry.coordinates[1]])
+                            const dist = Math.sqrt((point.x - px) ** 2 + (point.y - py) ** 2)
+                            if (dist < nearestDist) {
+                                nearestDist = dist
+                                nearestDbId = fDbId
+                                nearestPhaseKey = fPhaseKey
+                            }
+                        }
+                        // For lines (roads) - check if click is near the line
+                        if (f.geometry.type === 'LineString') {
+                            const coords = f.geometry.coordinates
+                            for (let i = 0; i < coords.length - 1; i++) {
+                                const p1 = ctx.map.project([coords[i][0], coords[i][1]])
+                                const p2 = ctx.map.project([coords[i + 1][0], coords[i + 1][1]])
+                                const dist = pointToSegmentDist(px, py, p1.x, p1.y, p2.x, p2.y)
+                                if (dist < nearestDist) {
+                                    nearestDist = dist
+                                    nearestDbId = fDbId
+                                    nearestPhaseKey = fPhaseKey
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (nearestDbId && nearestPhaseKey) {
+                    showContextMenu(e.clientX, e.clientY, nearestDbId, nearestPhaseKey)
+                } else {
+                    showMapContextMenu(e.clientX, e.clientY, phase)
+                }
+            }
+        },
+        true,
+    )
+
+    // LEFT CLICK — select feature or restart draw mode
+    // Clicking on a feature selects it for editing; clicking on empty space
+    // clears selection and re-enables draw mode.
+    map.on('click', (e: MapLibreMapMouseEvent & { point: { x: number; y: number } }) => {
+        if (isEditMode) return
+        // If Geoman draw mode is active, do nothing (user is actively drawing)
+        if (ctx.geoman && ctx.geoman.getActiveDrawModes?.().length > 0) return
+
+        const phase = PHASES[store.currentPhase]
+        const features = map.queryRenderedFeatures(e.point)
+
+        // When current phase is cityCenter, prioritize cityCenter features
+        // because clicking inside the circle ring may hit area polygons underneath
+        let feature
+        if (phase?.key === 'cityCenter') {
+            feature = features.find((f) => f.source === 'features' && f.properties?.phaseKey === 'cityCenter')
+            // If no city center found, don't select anything (don't select areas)
+        } else {
+            feature = features.find((f) => f.source === 'features')
+        }
+
+        if (feature) {
+            // User clicked on a feature — select it
+            const dbId = feature.properties?.dbId
+            if (dbId) {
+                setSelectedFeature(dbId)
+                updateSelectionHighlight(dbId)
+                debugLog('[SELECT] Selected feature:', dbId)
+            }
+        } else {
+            // User clicked on empty space — clear selection
+            setSelectedFeature(null)
+            updateSelectionHighlight(null)
+            // Re-enable draw mode for the current phase
+            const phase = PHASES[store.currentPhase]
+            if (phase && phase.key !== 'namingPanels') {
+                buildDrawControl(phase)
+            }
+        }
+    })
+
+    // ESC — cancel draw or edit (capture phase so we beat Geoman / modal focus).
+    document.addEventListener(
+        'keydown',
+        (e: KeyboardEvent) => {
+            if (e.key !== 'Escape') return
+            // If modal is visible, let it handle ESC — don't interfere.
+            if (store.modal.visible) return
+
+            const drawing = (ctx.geoman?.getActiveDrawModes?.().length ?? 0) > 0
+            if (drawing) {
+                e.preventDefault()
+                e.stopImmediatePropagation()
+                // Cancel draw and re-enable for the current phase so user can draw again
+                const phase = PHASES[store.currentPhase]
+                void ctx.geoman!.disableDraw().then(() => {
+                    if (phase && phase.key !== 'namingPanels') {
+                        buildDrawControl(phase)
                     }
                 })
-            })
-            ;(ctx as any)._parkedLayers  = parked
-            ;(ctx as any)._displayLayers = display
+                return
+            }
+            if (isEditMode) {
+                e.preventDefault()
+                e.stopImmediatePropagation()
+                void cancelEditMode()
+            }
+        },
+        true,
+    )
 
-            if      (key === 'districts' || key === 'areas') enableSnapping('districts', undefined, key)
-            else if (key === 'roads')                        enableSnapping('roads',     undefined, key)
-            hookEditHandles()
-        } catch (err) { console.error('pm:editstart error:', err) }
+    // Ctrl+Z — restore last deleted feature
+    document.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault()
+            undo()
+        }
     })
 
-    // ── pm:vertexadded — refresh edit handles after midpoint insertion ────────
+    // ── CUSTOM SNAPPING: Patch Geoman MarkerPointer ──────────────────────────
+    // Geoman's MarkerPointer uses its own internal snapping helper. We disable it
+    // and patch the mousemove handler to use our custom NARS snap logic instead.
+    // This ensures BOTH the visual crosshair cursor and the created geometry use
+    // snapped coordinates.
+    patchGeomanMarkerPointerSnap()
 
-    let editVertexTimeout: ReturnType<typeof setTimeout> | null = null
-    ctx.map.on('pm:vertexadded', () => {
-        if (editVertexTimeout) clearTimeout(editVertexTimeout)
-        editVertexTimeout = setTimeout(() => hookAllEditMarkers(), 150)
-    })
+    // Also patch map events so any other code reading e.lngLat gets snapped coords.
+    installSnapInterceptors()
 
-    // ── pm:editend — restore parked layers, re-enable draw, belt-and-suspenders save
+    // ── GEOMAN EVENTS: vertex drag, editend, remove ──────────────────────────
+    registerGeomanEvents()
+}
 
-    ctx.map.on('pm:editend', () => {
-        const parked:        L.Layer[]             = (ctx as any)._parkedLayers  ?? []
-        const display:       L.Layer[]             = (ctx as any)._displayLayers ?? []
-        const displayLayer:  L.LayerGroup | undefined = (ctx as any)._displayLayer
+// ─── RE-PATCH MARKER AFTER DRAW RESET ─────────────────────────────────────────
+// Called by draw-complete.ts after resetDrawMode creates a fresh Geoman marker.
+// The previous marker was destroyed by disableDraw(), so the new one needs
+// the setLngLat snap patch applied again.
 
-        display.forEach(layer => { displayLayer?.removeLayer(layer); ctx.drawnItems.addLayer(layer) })
-        parked.forEach(layer => ctx.drawnItems.addLayer(layer))
-        ;(ctx as any)._parkedLayers  = []
-        ;(ctx as any)._displayLayers = []
-        disableSnapping()
+let _patchRafId: number | null = null
 
-        const phaseAfterEdit = PHASES[store.currentPhase]
-        if      (phaseAfterEdit?.drawType === 'polygon')  setTimeout(() => (ctx.map as any).pm.enableDraw('Polygon', { snappable: false }), 50)
-        else if (phaseAfterEdit?.drawType === 'polyline') setTimeout(() => (ctx.map as any).pm.enableDraw('Line',    { snappable: false }), 50)
-        else if (phaseAfterEdit?.drawType === 'marker')   setTimeout(() => (ctx.map as any).pm.enableDraw('Marker',  { snappable: false }), 50)
+export function repatchMarkerPointer(): void {
+    const gm = ctx.geoman
+    if (!gm?.markerPointer) return
+    const mp = gm.markerPointer as GeomanMarkerPointer
+    if (!mp) return
 
-        // Belt-and-suspenders save — catches any geometry changes pm:edit missed
-        // (snap edge-cases, version differences). Runs 30 ms after editend to
-        // let any pending snap redraw settle before reading coordinates.
-        const currentKey = PHASES[store.currentPhase]?.key
-        if (currentKey) {
-            setTimeout(async () => {
-                for (const entry of (featureLayers[currentKey] ?? []) as LayerEntry[]) {
-                    const dbId = (entry.layer as any)._dbId
-                    if (!dbId) continue
-                    try {
-                        const updatedData = { ...entry.data }
-                        if (entry.layer instanceof L.Marker) {
-                            const ll = (entry.layer as L.Marker).getLatLng()
-                            updatedData.lat = ll.lat; updatedData.lng = ll.lng
-                            entry.data.lat  = ll.lat; entry.data.lng  = ll.lng
-                        } else if (entry.layer instanceof L.Polygon) {
-                            let coords = ((entry.layer as L.Polygon).getLatLngs()[0] as L.LatLng[])
-                                .map(ll => ({ lat: ll.lat, lng: ll.lng }))
-                            if (coords.length >= 3) {
-                                const f = coords[0], l = coords[coords.length - 1]
-                                if (f.lat !== l.lat || f.lng !== l.lng)
-                                    coords = [...coords, { lat: f.lat, lng: f.lng }]
-                            }
-                            updatedData.coordinates = coords; entry.data.coordinates = coords
-                        } else if (entry.layer instanceof L.Polyline) {
-                            const coords = ((entry.layer as L.Polyline).getLatLngs() as L.LatLng[])
-                                .map(ll => ({ lat: ll.lat, lng: ll.lng }))
-                            updatedData.coordinates = coords; entry.data.coordinates = coords
+    // Cancel any previous rAF loop so we don't have multiple polling loops
+    if (_patchRafId !== null) {
+        cancelAnimationFrame(_patchRafId)
+        _patchRafId = null
+    }
+
+    const PATCH_TIMEOUT_MS = 5_000
+    const startTime = performance.now()
+
+    const tryPatch = () => {
+        if (mp.marker && typeof mp.marker.setLngLat === 'function') {
+            if (mp.marker._narsSnapPatchedInstance) return
+
+            const orig = mp.marker.setLngLat.bind(mp.marker)
+            registerGeomanMarker(mp, mp.marker, orig)
+            mp.marker._narsSnapPatchedInstance = true
+
+            mp.marker.setLngLat = function (
+                lngLat: [number, number] | { lng: number; lat: number; toArray?(): [number, number] },
+            ) {
+                const rawPair = Array.isArray(lngLat)
+                    ? lngLat
+                    : (lngLat.toArray?.() ?? [lngLat.lng ?? 0, lngLat.lat ?? 0])
+                const lng0 = Number(rawPair[0])
+                const lat0 = Number(rawPair[1])
+                const rawPx = ctx.map.project([lng0, lat0] as [number, number])
+
+                const frozen = getFrozenSnapPos()
+                if (frozen) {
+                    orig.call(mp.marker!, [frozen.lng, frozen.lat])
+                    return
+                }
+
+                const phases = getActiveSnapPhases()
+                const project = (ll: [number, number]) => ctx.map.project(ll)
+                const external = phases.length > 0 ? findNearestSnap(rawPx.x, rawPx.y, phases, true) : null
+                const snap = mergeExternalSnapWithDrawFirstVertex(rawPx.x, rawPx.y, external, project)
+                if (snap) {
+                    orig.call(mp.marker!, [snap.lng, snap.lat])
+                } else {
+                    orig.call(mp.marker!, lngLat)
+                }
+            }
+
+            debugLog('[SNAP] marker re-patched after draw reset')
+            _patchRafId = null
+            return
+        }
+
+        if (performance.now() - startTime > PATCH_TIMEOUT_MS) {
+            debugWarn('[SNAP] Timed out waiting for marker after draw reset')
+            _patchRafId = null
+            return
+        }
+
+        _patchRafId = requestAnimationFrame(tryPatch)
+    }
+
+    _patchRafId = requestAnimationFrame(tryPatch)
+}
+
+// ─── FIX #4: REACTIVE DRAW TYPE ───────────────────────────────────────────────
+
+function watchDrawType() {
+    watch(
+        () => store.currentPhase,
+        (phaseIdx) => {
+            // Always sync phase even if a draw mode is active.
+            // Otherwise _drawingPhase can drift (e.g. still "publicBuildings"
+            // while UI is in "houseEntrances"), causing wrong modal/geometry behavior.
+            const activeDrawModes = ctx.geoman?.getActiveDrawModes?.() || []
+            if (activeDrawModes.length > 0) {
+                debugWarn('[WATCH] Phase changed while draw mode is active; forcing mode sync')
+            }
+
+            const phase = PHASES[phaseIdx]
+            if (phase) {
+                setDrawingPhase(phase)
+                buildDrawControl(phase)
+
+                // City center: fly camera to user's location when phase is selected
+                if (phase.key === 'cityCenter') {
+                    const map = ctx.map
+
+                    // Use requestAnimationFrame to ensure map is ready
+                    requestAnimationFrame(() => {
+                        const userLat = store.user?.commune?.latitude
+                        const userLng = store.user?.commune?.longitude
+
+                        if (userLat && userLng) {
+                            debugLog('[CITY CENTER] Flying to user location:', userLat, userLng)
+                            map.flyTo({
+                                center: [userLng, userLat],
+                                zoom: 16,
+                                duration: 1500,
+                                essential: true,
+                            })
+                        } else if (store.cityCenterLatLng) {
+                            // Fly to existing city center if one exists
+                            debugLog('[CITY CENTER] Flying to existing city center:', store.cityCenterLatLng)
+                            map.flyTo({
+                                center: [store.cityCenterLatLng.lng, store.cityCenterLatLng.lat],
+                                zoom: 17,
+                                duration: 1500,
+                                essential: true,
+                            })
                         }
-                        await apiFetch(`/api/update/${dbId}`, {
-                            method: 'PUT', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ data: updatedData }),
-                        })
-                    } catch (err) { console.error('editend save error for', dbId, err) }
+                    })
                 }
-            }, 30)
-        }
-
-        setTimeout(refreshLayerVisibility, 0)
-    })
-
-    // ── pm:create — delegate to create-handler ────────────────────────────────
-
-    ctx.map.on('pm:create', async (event: any) => {
-        await handlePmCreate(event)
-    })
-
-    // ── pm:edit — persist geometry change for a single edited layer ───────────
-
-    ctx.map.on('pm:edit', async (event: any) => {
-        // Defer one tick so any pending snap commits (setTimeout 0) run first.
-        await new Promise(r => setTimeout(r, 0))
-        const layer = event.layer as L.Layer
-        if (!(layer as any)._dbId) return
-        try {
-            const phase = PHASES.find(p => featureLayers[p.key].some((f: LayerEntry) => f.layer === layer))
-            const entry = phase ? featureLayers[phase.key].find((f: LayerEntry) => f.layer === layer) : null
-            if (!entry) return
-
-            if (layer instanceof L.Marker) {
-                const ll = layer.getLatLng()
-                entry.data.lat = ll.lat; entry.data.lng = ll.lng
-            } else if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
-                entry.data.coordinates = (layer.getLatLngs() as L.LatLng[])
-                    .map(ll => ({ lat: ll.lat, lng: ll.lng }))
-            } else if (layer instanceof L.Polygon) {
-                let coords = (layer.getLatLngs()[0] as L.LatLng[]).map(ll => ({ lat: ll.lat, lng: ll.lng }))
-                if (coords.length >= 3) {
-                    const first = coords[0], last = coords[coords.length - 1]
-                    if (first.lat !== last.lat || first.lng !== last.lng)
-                        coords = [...coords, { lat: first.lat, lng: first.lng }]
-                }
-                entry.data.coordinates = coords
             }
-
-            await apiFetch(`/api/update/${(layer as any)._dbId}`, {
-                method: 'PUT', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ data: entry.data }),
-            })
-
-            if (phase) bindHoverPopup(layer, buildPopup(entry.data, phase, (layer as any)._dbId))
-            if (phase?.key === 'areas') {
-                createAreaPerimeterLabel(layer, entry.data.areaTypeKey ?? 'central_urban')
-                await refreshScatteredAreas()
+            // Show crosshair and enable snapping as soon as a drawing phase is active.
+            if (!isEditMode) {
+                enableCrosshair()
+                disableSnapping()
+                enableSnapping()
             }
-            if (phase?.key === 'districts')
-                createPolygonEdgeLabel(layer, getDistrictLabel(entry.data.districtTypeKey ?? 'district', entry.data.label), '#f39c12')
-        } catch (err) { console.error('Edit persist error:', err) }
+        },
+        { immediate: true },
+    )
+}
 
-        ctx.lineEndpointLayer.clearLayers()
-        ctx.drawnItems.eachLayer(l => {
-            if (l instanceof L.Polyline && !(l instanceof L.Polygon)) addPolylineEndpoints(l)
-        })
-    })
+// ─── HMR CLEANUP ─────────────────────────────────────────────────────────────
+// Cancel orphaned rAF loops when the module is hot-replaced during development.
 
-    // ── pm:remove — delete from DB and clean up all associated markers ────────
-
-    ctx.map.on('pm:remove', async (event: any) => {
-        const layer = event.layer as L.Layer
-        let areaDeleted = false
-
-        if ((layer as any)._dbId) {
-            try {
-                const res = await apiFetch(`/api/delete/${(layer as any)._dbId}`, { method: 'DELETE' })
-                if (!res.ok) console.error(`Delete failed: ${(layer as any)._dbId}`, res.status)
-                if (featureLayers.areas.some((f: LayerEntry) => f.layer === layer)) areaDeleted = true
-            } catch (err) { console.error('Delete error:', err) }
+if (import.meta.hot) {
+    import.meta.hot.dispose(() => {
+        if (_patchRafId !== null) {
+            cancelAnimationFrame(_patchRafId)
+            _patchRafId = null
         }
-
-        if ((layer as any)._endpointMarkers)
-            (layer as any)._endpointMarkers.forEach((m: L.Layer) => ctx.lineEndpointLayer.removeLayer(m))
-        if ((layer as any)._perimeterLabel)
-            ctx.perimeterLabelLayer.removeLayer((layer as any)._perimeterLabel)
-        if ((layer as any)._edgeLabelMarkers)
-            (layer as any)._edgeLabelMarkers.forEach((m: L.Marker) => ctx.polygonEdgeLabelLayer.removeLayer(m))
-
-        ctx.lineEndpointLayer.clearLayers()
-        ctx.drawnItems.eachLayer(l => {
-            if (l instanceof L.Polyline && !(l instanceof L.Polygon)) addPolylineEndpoints(l)
-        })
-
-        for (const key of Object.keys(featureLayers))
-            featureLayers[key] = featureLayers[key].filter((f: LayerEntry) =>
-                ctx.drawnItems.hasLayer(f.layer) || ctx.roadsDisplayLayer.hasLayer(f.layer))
-
-        if (areaDeleted) await refreshScatteredAreas()
-        syncCounts()
     })
 }

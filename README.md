@@ -1,15 +1,15 @@
 # NARS — National Addressing Reference System
 
 A full-stack GIS web application for Algerian municipal addressing.  
-**Stack:** ASP.NET Core 10 · Vue 3 · TypeScript · Vite 8 · Leaflet · Leaflet-Geoman 2.19.2 · Turf.js · Graphology · vue-i18n 10 · @vueuse/core · leaflet-rotate
+**Stack:** ASP.NET Core 10 · Vue 3 · TypeScript · Vite 8 · **Maplibre GL JS** · Maplibre-Geoman 0.7.1 · Turf.js · Graphology · vue-i18n 10 · @vueuse_core · maplibre-rotate
 
 ---
 
 ## Project Status
 
-**Version 1.1-Beta** — All 8 mapping phases fully operational. UI polish, map controls, PDF export, and database restructuring complete. Approaching 1.0-Stable.
+**Version 1.1-Beta** — All 8 mapping phases fully operational. Greatest migration from Leaflet to Maplibre GL JS complete. Approaching 1.0-Stable.
 
-> **Up next:** 1.0-Stable → then **NARStreet**, the companion field-worker mobile app.
+> **Up next:** 1.0-Stable → then **NARStreet** companion mobile app (Android/Kotlin native app very close).
 
 ---
 
@@ -166,8 +166,8 @@ Districts: every vertex · Roads: start + end + every 100 m · Buildings/Spaces:
 
 | Package | Purpose |
 |---|---|
-| `leaflet` | Map rendering |
-| `@geoman-io/leaflet-geoman-free` | Draw / edit tools |
+| `maplibre-gl` | Map rendering |
+| `maplibre-geoman` | Draw / edit tools |
 | `@turf/turf` | Spatial math |
 | `graphology` + `graphology-traversal` | Road network graph |
 | `vue` | Reactive UI |
@@ -231,4 +231,4 @@ psql -U <user> -d <dbname> -f move_features.sql      # migrate from Pre-Alpha
 | 1.1-Alpha | ✅ Released |
 | **1.1-Beta** | ✅ Current |
 | 1.0-Stable | 🔜 Final QA + edge case hardening |
-| **NARStreet** | 📱 Field worker mobile app — offline-first, GPS-assisted entrance placement |
+| **NARStreet** | 📱 Android/Kotlin native app very close |
