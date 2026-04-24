@@ -13,6 +13,7 @@ import { PHASES } from '../phases'
 import { store, setSelectedFeature } from '../store'
 import { ctx, updateSelectionHighlight, featuresStore } from './state'
 import { showContextMenu, showMapContextMenu } from './context-menu'
+import { GEOMETRY_CONFIG } from '../config'
 import {
     enableCrosshair,
     enableSnapping,
@@ -106,33 +107,7 @@ function patchGeomanMarkerPointerSnap(): void {
             const orig = mp.marker.setLngLat.bind(mp.marker)
             registerGeomanMarker(mp, mp.marker, orig)
             mp.marker._narsSnapPatchedInstance = true
-
-            mp.marker.setLngLat = function (
-                lngLat: [number, number] | { lng: number; lat: number; toArray?(): [number, number] },
-            ) {
-                const rawPair = Array.isArray(lngLat)
-                    ? lngLat
-                    : (lngLat.toArray?.() ?? [lngLat.lng ?? 0, lngLat.lat ?? 0])
-                const lng0 = Number(rawPair[0])
-                const lat0 = Number(rawPair[1])
-                const rawPx = ctx.map.project([lng0, lat0] as [number, number])
-
-                const frozen = getFrozenSnapPos()
-                if (frozen) {
-                    orig.call(mp.marker!, [frozen.lng, frozen.lat])
-                    return
-                }
-
-                const phases = getActiveSnapPhases()
-                const project = (ll: [number, number]) => ctx.map.project(ll)
-                const external = phases.length > 0 ? findNearestSnap(rawPx.x, rawPx.y, phases, true) : null
-                const snap = mergeExternalSnapWithDrawFirstVertex(rawPx.x, rawPx.y, external, project)
-                if (snap) {
-                    orig.call(mp.marker!, [snap.lng, snap.lat])
-                } else {
-                    orig.call(mp.marker!, lngLat)
-                }
-            }
+            mp.marker.setLngLat = makeSnapSetLngLat(mp, orig)
 
             debugLog('[SNAP] marker setLngLat patched')
             if (rafId !== null) cancelAnimationFrame(rafId)
@@ -153,6 +128,43 @@ function patchGeomanMarkerPointerSnap(): void {
     rafId = requestAnimationFrame(tryPatch)
 
     debugLog('[SNAP] Snap patching started (rAF polling for marker)')
+}
+
+// ─── SNAP SET-LNG-LAT FACTORY ─────────────────────────────────────────────────
+// Shared factory for the snap-aware setLngLat override applied to Geoman's
+// markerPointer.marker. Both the initial patch (patchGeomanMarkerPointerSnap)
+// and the re-patch after draw reset (repatchMarkerPointer) use identical logic.
+// Centralising here means a future change to snap behaviour only needs one edit.
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function makeSnapSetLngLat(
+    mp: GeomanMarkerPointer,
+    orig: (...args: any[]) => void,
+): (lngLat: [number, number] | { lng: number; lat: number; toArray?(): [number, number] }) => void {
+    return function (lngLat) {
+        const rawPair = Array.isArray(lngLat)
+            ? lngLat
+            : (lngLat.toArray?.() ?? [lngLat.lng ?? 0, lngLat.lat ?? 0])
+        const lng0 = Number(rawPair[0])
+        const lat0 = Number(rawPair[1])
+        const rawPx = ctx.map.project([lng0, lat0] as [number, number])
+
+        const frozen = getFrozenSnapPos()
+        if (frozen) {
+            orig.call(mp.marker!, [frozen.lng, frozen.lat])
+            return
+        }
+
+        const phases = getActiveSnapPhases()
+        const project = (ll: [number, number]) => ctx.map.project(ll)
+        const external = phases.length > 0 ? findNearestSnap(rawPx.x, rawPx.y, phases, true) : null
+        const snap = mergeExternalSnapWithDrawFirstVertex(rawPx.x, rawPx.y, external, project)
+        if (snap) {
+            orig.call(mp.marker!, [snap.lng, snap.lat])
+        } else {
+            orig.call(mp.marker!, lngLat)
+        }
+    }
 }
 
 // ─── REGISTRATION ─────────────────────────────────────────────────────────────
@@ -218,7 +230,7 @@ export function registerDrawEvents(): void {
                         Math.cos((centerLat * Math.PI) / 180) *
                             Math.cos((lat * Math.PI) / 180) *
                             Math.sin(dlng / 2) ** 2
-                    totalDist += 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+                    totalDist += GEOMETRY_CONFIG.earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
                 }
                 const radius = totalDist / coords.length
                 debugLog('[CIRCLE DRAW] Circle center:', centerLat, centerLng, 'radius:', radius, 'meters')
@@ -478,33 +490,7 @@ export function repatchMarkerPointer(): void {
             const orig = mp.marker.setLngLat.bind(mp.marker)
             registerGeomanMarker(mp, mp.marker, orig)
             mp.marker._narsSnapPatchedInstance = true
-
-            mp.marker.setLngLat = function (
-                lngLat: [number, number] | { lng: number; lat: number; toArray?(): [number, number] },
-            ) {
-                const rawPair = Array.isArray(lngLat)
-                    ? lngLat
-                    : (lngLat.toArray?.() ?? [lngLat.lng ?? 0, lngLat.lat ?? 0])
-                const lng0 = Number(rawPair[0])
-                const lat0 = Number(rawPair[1])
-                const rawPx = ctx.map.project([lng0, lat0] as [number, number])
-
-                const frozen = getFrozenSnapPos()
-                if (frozen) {
-                    orig.call(mp.marker!, [frozen.lng, frozen.lat])
-                    return
-                }
-
-                const phases = getActiveSnapPhases()
-                const project = (ll: [number, number]) => ctx.map.project(ll)
-                const external = phases.length > 0 ? findNearestSnap(rawPx.x, rawPx.y, phases, true) : null
-                const snap = mergeExternalSnapWithDrawFirstVertex(rawPx.x, rawPx.y, external, project)
-                if (snap) {
-                    orig.call(mp.marker!, [snap.lng, snap.lat])
-                } else {
-                    orig.call(mp.marker!, lngLat)
-                }
-            }
+            mp.marker.setLngLat = makeSnapSetLngLat(mp, orig)
 
             debugLog('[SNAP] marker re-patched after draw reset')
             _patchRafId = null

@@ -1,16 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">NARS</string>
-    <string name="national_addressing_reference_system">National Addressing Reference System</string>
+    <string name="app_name">NARStreet</string>
+    <string name="national_addressing_reference_system">National Addressing Reference System - Field Mode</string>
     
-    <!-- Phases -->
-    <string name="phase_areas">Urban Areas</string>
-    <string name="phase_districts">Districts</string>
-    <string name="phase_city_center">City Center</string>
+    <!-- Phases (Field Mode) -->
     <string name="phase_roads">Roads</string>
     <string name="phase_house_entrances">House Entrances</string>
-    <string name="phase_public_buildings">Public Buildings</string>
-    <string name="phase_public_spaces">Public Spaces</string>
     <string name="phase_naming_panels">Naming Panels</string>
     
     <!-- Drawing tools -->
@@ -20,6 +15,7 @@
     <string name="tool_marker">Marker</string>
     <string name="tool_edit">Edit</string>
     <string name="tool_delete">Delete</string>
+    <string name="tool_select">Select</string>
     
     <!-- Base layers -->
     <string name="layer_satellite">Satellite</string>
@@ -34,6 +30,10 @@
     <string name="action_edit">Edit</string>
     <string name="action_settings">Settings</string>
     <string name="action_export">Export</string>
+    <string name="action_verify">Verify</string>
+    <string name="action_skip">Skip</string>
+    <string name="action_add">Add</string>
+    <string name="action_notify">Notify</string>
     
     <!-- Feature types -->
     <string name="feature_main_entrance">Main Entrance</string>
@@ -59,14 +59,53 @@
     <string name="menu_edit_info">Edit Info</string>
     <string name="menu_delete">Delete</string>
     <string name="menu_compute_directions">Compute Directions</string>
+    <string name="menu_update_attributes">Update Attributes</string>
 
     <!-- Phase Navigation Alerts -->
-    <string name="alert_at_least_one_urban_area">At least one urban area required before proceeding</string>
     <string name="alert_at_least_one_road">At least one road required before proceeding</string>
-    <string name="alert_at_least_one_entrance">At least one main entrance required before proceeding</string>
-    <string name="alert_coverage_error">Districts must fully cover all urban areas</string>
+    <string name="alert_at_least_one_entrance">At least one entrance required before proceeding</string>
     <string name="alert_no_phase">No phase selected</string>
     <string name="alert_invalid_phase">Invalid phase</string>
+
+    <!-- Field Mode - Roads -->
+    <string name="road_traffic">Road Traffic</string>
+    <string name="road_traffic_high">High</string>
+    <string name="road_traffic_medium">Medium</string>
+    <string name="road_traffic_low">Low</string>
+    <string name="trad_activity">Traditional Activity</string>
+    <string name="trad_activity_high">High</string>
+    <string name="trad_activity_medium">Medium</string>
+    <string name="trad_activity_low">Low</string>
+    <string name="num_lanes">Number of Lanes</string>
+    <string name="has_median">Has Median</string>
+    <string name="has_vegetation">Has Vegetation</string>
+    <string name="is_dead_end">Dead End</string>
+    <string name="has_sidewalk">Has Sidewalk</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+
+    <!-- Field Mode - House Entrances -->
+    <string name="has_entrance">Has Entrance</string>
+    <string name="has_numbering_panel">Has Numbering Panel</string>
+    <string name="numbering_panel_correct">Number Correct</string>
+    <string name="numbering_panel_position_correct">Position Correct</string>
+    <string name="entrance_verified">Entrance Verified</string>
+    <string name="entrance_issue">Entrance Issue Found</string>
+
+    <!-- Field Mode - Naming Panels -->
+    <string name="has_naming_panel_location">Has Location</string>
+    <string name="has_naming_panel">Has Naming Panel</string>
+    <string name="naming_correct">Name Correct</string>
+    <string name="naming_panel_position_correct">Position Correct</string>
+    <string name="naming_panel_verified">Naming Panel Verified</string>
+    <string name="naming_panel_issue">Naming Panel Issue Found</string>
+
+    <!-- Notifications -->
+    <string name="notify_entrance_missing">Entrance missing - will be added</string>
+    <string name="notify_numbering_panel_missing">Numbering panel missing</string>
+    <string name="notify_numbering_panel_position_wrong">Numbering panel position incorrect</string>
+    <string name="notify_naming_panel_missing">Naming panel missing</string>
+    <string name="notify_naming_panel_position_wrong">Naming panel position incorrect</string>
 
     <!-- Road Directions -->
     <string name="road_directions_applied">Road directions applied to %d roads</string>

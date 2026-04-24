@@ -25,7 +25,8 @@ import kotlinx.coroutines.launch
  */
 class NarsViewModel(
     val featureStore: FeatureStore,
-    private val appPreferences: AppPreferences
+    private val appPreferences: AppPreferences,
+    private val application: NarsApplication
 ) : ViewModel() {
 
     // Phase navigator for validation
@@ -77,7 +78,7 @@ class NarsViewModel(
     val canUndo: Boolean get() = featureStore.canUndo
 
     init {
-        // Always start with first phase (Urban Areas)
+        // Start with first phase (Roads for field mode)
         featureStore.setCurrentPhase(Phases.ALL.first())
 
         // Observe current phase features
@@ -167,15 +168,14 @@ class NarsViewModel(
     }
 
     /**
-     * Compute road directions
+     * Compute road directions (field mode - no cityCenter needed)
      */
     fun computeRoadDirections() {
         viewModelScope.launch {
             try {
                 val roads = featureStore.getFeaturesByPhase("roads")
-                val cityCenter = featureStore.getFeaturesByPhase("cityCenter").firstOrNull()
 
-                val result = roadDirectionsCalculator.computeDirections(roads, cityCenter)
+                val result = roadDirectionsCalculator.computeDirectionsFromRoads(roads)
 
                 // Apply reversals
                 for (roadId in result.reversedRoadIds) {
@@ -204,27 +204,27 @@ class NarsViewModel(
     }
 
     /**
-     * Generate naming panels
+     * Generate naming panels (for field mode - only uses roads)
      */
     fun generateNamingPanels() {
         viewModelScope.launch {
             try {
-                val districts = featureStore.getFeaturesByPhase("districts")
                 val roads = featureStore.getFeaturesByPhase("roads")
-                val buildings = featureStore.getFeaturesByPhase("publicBuildings")
-                val spaces = featureStore.getFeaturesByPhase("publicSpaces")
 
-                val panels = namingPanelGenerator.generatePanels(
-                    districts = districts,
-                    roads = roads,
-                    publicBuildings = buildings,
-                    publicSpaces = spaces
-                )
+                val panels = namingPanelGenerator.generatePanelsFromRoads(roads)
 
-                // Add panels to store
+                // Add panels to store and save to backend
                 panels.forEach { panel ->
                     featureStore.addFeature(panel)
-                    // TODO: Save to backend
+                    // Save to backend
+                    try {
+                        val saveResult = application.apiClient.saveFeature(panel)
+                        saveResult.onSuccess { savedId ->
+                            Log.d("NarsViewModel", "Saved naming panel: $savedId")
+                        }
+                    } catch (e: Exception) {
+                        Log.w("NarsViewModel", "Failed to save naming panel: ${e.message}")
+                    }
                 }
 
                 showSuccess("Generated ${panels.size} naming panels")

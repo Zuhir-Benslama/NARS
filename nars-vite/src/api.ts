@@ -12,7 +12,7 @@ import {
     withRetry,
     logError,
 } from './errors'
-import { API_CONFIG, getApiBaseUrl } from './config'
+import { API_CONFIG, getApiBaseUrl, getLoginPath } from './config'
 import { debugLog } from './utils/debug'
 
 const DEFAULT_TIMEOUT = API_CONFIG.defaultTimeout
@@ -57,7 +57,7 @@ async function handleResponse(response: Response, context: { url: string; method
     // 401 = session expired → redirect to login with return URL
     if (response.status === 401) {
         const returnTo = encodeURIComponent(window.location.pathname + window.location.search)
-        window.location.href = `/login?returnTo=${returnTo}`
+        window.location.href = `${getLoginPath()}?returnTo=${returnTo}`
         // Throw to prevent further execution
         const error = createAuthError('Session expired. Redirecting to login.', { ...context, status: 401 })
         logError(error)

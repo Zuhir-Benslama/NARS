@@ -3,13 +3,17 @@
 A full-stack GIS web application for Algerian municipal addressing.  
 **Stack:** ASP.NET Core 10 · Vue 3 · TypeScript · Vite 8 · **Maplibre GL JS** · Maplibre-Geoman 0.7.1 · Turf.js · Graphology · vue-i18n 10 · @vueuse_core · maplibre-rotate
 
+**NARStreet (Mobile):** Kotlin · Jetpack Compose · MapLibre Native 11.x · MapLibre-Geoman (Android)
+
 ---
 
 ## Project Status
 
 **Version 1.1-Beta** — All 8 mapping phases fully operational. Greatest migration from Leaflet to Maplibre GL JS complete. Approaching 1.0-Stable.
 
-> **Up next:** 1.0-Stable → then **NARStreet** companion mobile app (Android/Kotlin native app very close).
+> **NARStreet** — Android/Kotlin companion app in active development (MapLibre Native 11.x).
+
+> ⚠️ **Known Issue:** MapLibre Native fails to render text labels for NARStreet when using Arabic/RTL scripts. The default glyphs endpoint (`demotiles.maplibre.org`) does not include Noto Sans Arabic fonts. Text labels appear blank or missing on the map. Fix requires hosting custom glyphs with Arabic font support or using MapLibre GL JS (web) which loads fonts differently.
 
 ---
 
@@ -179,6 +183,42 @@ Districts: every vertex · Roads: start + end + every 100 m · Buildings/Spaces:
 
 ---
 
+## NARStreet — Android Companion App
+
+Native Android app (Kotlin + Jetpack Compose) using MapLibre Native 11.x + MapLibre-Geoman for field data collection. Mirrors NARS web workflow on mobile.
+
+### Architecture
+
+```
+app/src/main/java/com/nars/maplibre/
+├── MainActivity.kt              # Entry point
+├── NarsViewModel.kt             # UI state management
+├── data/
+│   ├── api/ApiClient.kt         # REST client
+│   ├── model/                   # NarsFeature, FeatureTypes, User, etc.
+│   └── repository/              # FeatureRepository, LocalFeatureRepository
+├── modes/NarsGeoman.kt         # Drawing mode integration
+├── ui/
+│   ├── components/             # PhaseBar, InfoPanel, FeatureModal, etc.
+│   ├── screens/                # MapScreen, LoginScreen, SettingsScreen
+│   └── theme/Theme.kt          # Material 3 theming
+└── utils/                      # RoadDirectionsCalculator, HouseNumberingManager, etc.
+```
+
+### Known Issue: Text Rendering with Arabic/RTL
+
+MapLibre Native's `SymbolLayer.textField` requires glyphs from a PBF font endpoint. The default `demotiles.maplibre.org` glyphs only include Latin characters — Arabic text (including district/road names in Arabic) renders as blank/missing.
+
+**Workaround (in progress):** Host custom glyphs with Noto Sans Arabic bundled, or use web-based MapLibre GL JS which handles fonts differently.
+
+### Build
+
+```bash
+cd NARStreet && ./gradlew assembleDebug
+```
+
+---
+
 ## Development
 
 ```bash
@@ -231,4 +271,4 @@ psql -U <user> -d <dbname> -f move_features.sql      # migrate from Pre-Alpha
 | 1.1-Alpha | ✅ Released |
 | **1.1-Beta** | ✅ Current |
 | 1.0-Stable | 🔜 Final QA + edge case hardening |
-| **NARStreet** | 📱 Android/Kotlin native app very close |
+| **NARStreet** | 📱 Android/Kotlin app (MapLibre Native 11.x) — Text rendering issue with Arabic/RTL fonts |

@@ -50,6 +50,10 @@ public static class RateLimitExtensions
                 limiter.QueueLimit = 0;
             });
 
+            // "clear" uses a fixed window intentionally: deleting all features is an
+            // infrequent admin-level action, not a latency-sensitive user operation.
+            // A fixed window is simpler and sufficient — bursting 3 requests in the
+            // first second then waiting 10 minutes is not a real concern here.
             rateOptions.AddFixedWindowLimiter("clear", limiter =>
             {
                 limiter.PermitLimit = options.ClearPermitLimit;

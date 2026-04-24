@@ -169,6 +169,7 @@ private fun getStyleJson(layer: BaseLayerType): String {
                     "attribution": "Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community"
                 }
             },
+            "glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
             "layers": [{
                 "id": "satellite-layer",
                 "type": "raster",
@@ -190,6 +191,7 @@ private fun getStyleJson(layer: BaseLayerType): String {
                     "attribution": "© OpenStreetMap contributors"
                 }
             },
+            "glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
             "layers": [{
                 "id": "osm-layer",
                 "type": "raster",
@@ -211,6 +213,7 @@ private fun getStyleJson(layer: BaseLayerType): String {
                     "attribution": "© OpenStreetMap contributors, © CARTO"
                 }
             },
+            "glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
             "layers": [{
                 "id": "carto-light-layer",
                 "type": "raster",
@@ -232,6 +235,7 @@ private fun getStyleJson(layer: BaseLayerType): String {
                     "attribution": "© OpenStreetMap contributors, © CARTO"
                 }
             },
+            "glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
             "layers": [{
                 "id": "carto-dark-layer",
                 "type": "raster",

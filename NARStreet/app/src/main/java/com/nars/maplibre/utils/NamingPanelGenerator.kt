@@ -35,7 +35,44 @@ class NamingPanelGenerator {
     }
 
     /**
-     * Generate all naming panels for the current dataset
+     * Generate naming panels for field mode - only from roads
+     * @return List of new NarsFeature (naming panels)
+     */
+    fun generatePanelsFromRoads(
+        roads: List<NarsFeature>
+    ): List<NarsFeature> {
+        Log.d(TAG, "Generating panels for ${roads.size} roads (field mode)")
+
+        val panels = mutableListOf<NarsFeature>()
+        val seenPositions = mutableListOf<Pair<Double, Double>>()
+
+        // Roads: start, end, every 100m
+        for ((idx, road) in roads.withIndex()) {
+            val geom = road.geometry as? LineStringGeometry ?: continue
+            val stations = getRoadStations(geom.coordinates)
+
+            for ((sIdx, station) in stations.withIndex()) {
+                val (lng, lat) = station
+
+                if (isDuplicate(lat, lng, seenPositions)) continue
+
+                val label = road.properties.name ?: "Road ${idx + 1}"
+                val fullLabel = if (sIdx > 0 && sIdx < stations.size - 1) {
+                    "${label} (${sIdx * 100}m)"
+                } else {
+                    label
+                }
+                panels.add(createPanel(fullLabel, lat, lng, COLOR_ROADS))
+                seenPositions.add(lat to lng)
+            }
+        }
+
+        Log.d(TAG, "Generated ${panels.size} naming panels (field mode)")
+        return panels
+    }
+
+    /**
+     * Generate all naming panels for the full dataset
      * @return List of new NarsFeature (naming panels)
      */
     fun generatePanels(

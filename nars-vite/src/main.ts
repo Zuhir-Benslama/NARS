@@ -9,6 +9,7 @@ import { i18n } from './i18n'
 import { initTheme } from './composables/useTheme'
 import { initMap, loadFromDatabase, loadUserAndCommune } from './map'
 import { apiUrl } from './api'
+import { getLoginPath } from './config'
 import { logError, createServerError } from './errors'
 import { showToast } from './toast'
 import { debugLog, debugError } from './utils/debug'
@@ -35,7 +36,7 @@ initTheme()
         }
 
         if (!authCheck.ok) {
-            window.location.href = '/login'
+            window.location.href = getLoginPath()
             return
         }
     } catch (error) {
@@ -44,7 +45,7 @@ initTheme()
         logError(
             createServerError('Auth check failed during app initialization', { action: 'auth-guard' }, error as Error),
         )
-        window.location.href = '/login'
+        window.location.href = getLoginPath()
         return
     }
 

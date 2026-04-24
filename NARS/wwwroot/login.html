@@ -143,6 +143,23 @@
         let selectedDaira = null;   // {id, name_fr, name_ar}
         let selectedCommune = null; // {id, name_fr, name_ar}
 
+        // Locations API may return either a plain array (legacy)
+        // or a paged payload with an items array.
+        function toItems(payload) {
+            if (Array.isArray(payload)) return payload;
+            if (Array.isArray(payload?.items)) return payload.items;
+            if (Array.isArray(payload?.data)) return payload.data;
+            return [];
+        }
+
+        function displayName(item) {
+            return item?.nameFr ?? item?.name_fr ?? '';
+        }
+
+        function itemId(item) {
+            return item?.id ?? item?.Id ?? '';
+        }
+
         // Wilaya searchable dropdown
         const wilayaInput = document.getElementById('signup-wilaya');
         const wilayaDropdown = document.getElementById('wilaya-dropdown');
@@ -165,7 +182,7 @@
         async function loadWilayas(search) {
             try {
                 const response = await fetch(`/api/wilayas?search=${encodeURIComponent(search)}`);
-                const wilayas = await response.json();
+                const wilayas = toItems(await response.json());
                 
                 wilayaDropdown.innerHTML = '';
                 
@@ -175,7 +192,7 @@
                     wilayas.forEach(wilaya => {
                         const div = document.createElement('div');
                         div.className = 'dropdown-item';
-                        div.textContent = wilaya.name_fr;
+                        div.textContent = displayName(wilaya);
                         div.addEventListener('click', () => {
                             selectWilaya(wilaya);
                         });
@@ -191,8 +208,8 @@
 
         function selectWilaya(wilaya) {
             selectedWilaya = wilaya;
-            wilayaInput.value = wilaya.name_fr;
-            wilayaValue.value = wilaya.id;
+            wilayaInput.value = displayName(wilaya);
+            wilayaValue.value = itemId(wilaya);
             wilayaDropdown.style.display = 'none';
             
             // Enable daira and reset
@@ -241,8 +258,8 @@
 
         async function loadDairas(search) {
             try {
-                const response = await fetch(`/api/dairas?wilaya_id=${selectedWilaya.id}&search=${encodeURIComponent(search)}`);
-                const dairas = await response.json();
+                const response = await fetch(`/api/dairas?wilaya_id=${itemId(selectedWilaya)}&search=${encodeURIComponent(search)}`);
+                const dairas = toItems(await response.json());
                 
                 dairaDropdown.innerHTML = '';
                 
@@ -252,7 +269,7 @@
                     dairas.forEach(daira => {
                         const div = document.createElement('div');
                         div.className = 'dropdown-item';
-                        div.textContent = daira.name_fr;
+                        div.textContent = displayName(daira);
                         div.addEventListener('click', () => {
                             selectDaira(daira);
                         });
@@ -268,8 +285,8 @@
 
         function selectDaira(daira) {
             selectedDaira = daira;
-            dairaInput.value = daira.name_fr;
-            dairaValue.value = daira.id;
+            dairaInput.value = displayName(daira);
+            dairaValue.value = itemId(daira);
             dairaDropdown.style.display = 'none';
             
             // Enable commune
@@ -312,8 +329,8 @@
 
         async function loadCommunes(search) {
             try {
-                const response = await fetch(`/api/communes?daira_id=${selectedDaira.id}&search=${encodeURIComponent(search)}`);
-                const communes = await response.json();
+                const response = await fetch(`/api/communes?daira_id=${itemId(selectedDaira)}&search=${encodeURIComponent(search)}`);
+                const communes = toItems(await response.json());
                 
                 communeDropdown.innerHTML = '';
                 
@@ -323,7 +340,7 @@
                     communes.forEach(commune => {
                         const div = document.createElement('div');
                         div.className = 'dropdown-item';
-                        div.textContent = commune.name_fr;
+                        div.textContent = displayName(commune);
                         div.addEventListener('click', () => {
                             selectCommune(commune);
                         });
@@ -339,8 +356,8 @@
 
         function selectCommune(commune) {
             selectedCommune = commune;
-            communeInput.value = commune.name_fr;
-            communeValue.value = commune.id;
+            communeInput.value = displayName(commune);
+            communeValue.value = itemId(commune);
             communeDropdown.style.display = 'none';
         }
 
@@ -429,7 +446,7 @@
                         phone,
                         username,
                         password,
-                        commune_id: selectedCommune.id
+                        commune_id: itemId(selectedCommune)
                     })
                 });
                 

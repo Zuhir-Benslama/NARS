@@ -79,7 +79,7 @@ export default defineConfig(({ command, mode }) => {
         changeOrigin: true,
         secure: false,
       },
-      '/login': {
+      '^/login$': {
         target: devBackend,
         changeOrigin: true,
         secure: false,

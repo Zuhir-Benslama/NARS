@@ -56,8 +56,11 @@ public class LocationsController(AppDbContext db, IMemoryCache cache) : Controll
 
         var q = db.Wilayas.AsQueryable();
         if (!string.IsNullOrEmpty(search))
-            q = q.Where(w => EF.Functions.ILike(w.WilayaFr!, $"%{search}%")
-                          || EF.Functions.ILike(w.WilayaAr!, $"%{search}%"));
+        {
+            var escaped = search.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+            q = q.Where(w => EF.Functions.ILike(w.WilayaFr!, $"%{escaped}%", "\\")
+                          || EF.Functions.ILike(w.WilayaAr!, $"%{escaped}%", "\\"));
+        }
 
         var total = await q.CountAsync();
         var result = await q.OrderBy(w => w.WilayaFr).Skip(skip).Take(take).ToListAsync();
@@ -103,8 +106,11 @@ public class LocationsController(AppDbContext db, IMemoryCache cache) : Controll
 
         var q = db.Dairas.Where(d => d.WilayaId == wilaya_id);
         if (!string.IsNullOrEmpty(search))
-            q = q.Where(d => EF.Functions.ILike(d.DairaFr!, $"%{search}%")
-                          || EF.Functions.ILike(d.DairaAr!, $"%{search}%"));
+        {
+            var escaped = search.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+            q = q.Where(d => EF.Functions.ILike(d.DairaFr!, $"%{escaped}%", "\\")
+                          || EF.Functions.ILike(d.DairaAr!, $"%{escaped}%", "\\"));
+        }
 
         var total = await q.CountAsync();
         var result = await q.OrderBy(d => d.DairaFr).Skip(skip).Take(take).ToListAsync();
@@ -150,8 +156,11 @@ public class LocationsController(AppDbContext db, IMemoryCache cache) : Controll
 
         var q = db.Communes.Where(c => c.DairaId == daira_id);
         if (!string.IsNullOrEmpty(search))
-            q = q.Where(c => EF.Functions.ILike(c.CommuneFr, $"%{search}%")
-                          || EF.Functions.ILike(c.CommuneAr, $"%{search}%"));
+        {
+            var escaped = search.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+            q = q.Where(c => EF.Functions.ILike(c.CommuneFr, $"%{escaped}%", "\\")
+                          || EF.Functions.ILike(c.CommuneAr, $"%{escaped}%", "\\"));
+        }
 
         var total = await q.CountAsync();
         var result = await q.OrderBy(c => c.CommuneFr).Skip(skip).Take(take).ToListAsync();
@@ -175,9 +184,9 @@ public class LocationsController(AppDbContext db, IMemoryCache cache) : Controll
         var conn = db.Database.GetDbConnection();
 
         string? geoJson = null;
-        using (conn as System.Data.IDbConnection)
+        await conn.OpenAsync();
+        try
         {
-            await conn.OpenAsync();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT ST_AsGeoJSON(geometry) FROM communes_boundaries WHERE commune_id = @id";
             var param = cmd.CreateParameter();
@@ -187,6 +196,10 @@ public class LocationsController(AppDbContext db, IMemoryCache cache) : Controll
 
             var scalar = await cmd.ExecuteScalarAsync();
             geoJson = scalar as string;
+        }
+        finally
+        {
+            await conn.CloseAsync();
         }
 
         if (geoJson is null)
