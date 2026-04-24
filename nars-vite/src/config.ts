@@ -121,6 +121,15 @@ export function getApiBaseUrl(): string {
     return API_CONFIG.baseUrl
 }
 
+/**
+ * Login page path.
+ * In Vite dev we use the static public login page; in production we keep
+ * backend /login to preserve server-side token/nonce injection behavior.
+ */
+export function getLoginPath(): string {
+    return isDev() ? '/login.html' : '/login'
+}
+
 /** Check if running in development mode */
 export function isDev(): boolean {
     return import.meta.env?.DEV ?? false

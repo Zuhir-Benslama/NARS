@@ -348,7 +348,7 @@ public class FeaturesController(
             try
             {
                 var svc = sp.GetRequiredService<IScatteredAreaService>();
-                await svc.RefreshAsync(CurrentUserId, CurrentCommuneId);
+                await svc.RefreshAsync(CurrentUserId, RequiredCommuneId);
             }
             catch (Exception ex)
             {

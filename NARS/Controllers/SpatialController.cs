@@ -71,10 +71,10 @@ public class SpatialController(AppDbContext db, IScatteredAreaService scatteredS
         var usedNumbers = new HashSet<int>();
         var conn = db.Database.GetDbConnection();
 
-        using (conn as System.Data.IDbConnection)
+        if (conn.State != ConnectionState.Open)
+            await conn.OpenAsync();
+        try
         {
-            if (conn.State != ConnectionState.Open)
-                await conn.OpenAsync();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 SELECT (data::jsonb->>'entranceNumber')::int
@@ -91,6 +91,10 @@ public class SpatialController(AppDbContext db, IScatteredAreaService scatteredS
                 if (!reader.IsDBNull(0))
                     usedNumbers.Add(reader.GetInt32(0));
         }
+        finally
+        {
+            await conn.CloseAsync();
+        }
 
         // Next available odd (left) or even (right) number
         int suggested = side == "left" ? 1 : 2;
@@ -105,7 +109,7 @@ public class SpatialController(AppDbContext db, IScatteredAreaService scatteredS
     [HttpPost("/api/areas/refresh-scattered")]
     public async Task<IActionResult> RefreshScattered()
     {
-        await scatteredService.RefreshAsync(CurrentUserId, CurrentCommuneId);
+        await scatteredService.RefreshAsync(CurrentUserId, RequiredCommuneId);
         return Ok(new ScatteredRefreshResponse(true, null, "Scattered area recomputed."));
     }
 }

@@ -58,6 +58,17 @@ class RoadDirectionsCalculator {
     )
 
     /**
+     * Compute and apply road directions (field mode - no cityCenter)
+     * @param roads List of road features
+     * @return Result with list of reversed road IDs
+     */
+    fun computeDirectionsFromRoads(
+        roads: List<NarsFeature>
+    ): RoadDirectionsResult {
+        return computeDirections(roads, null)
+    }
+
+    /**
      * Compute and apply road directions
      * @param roads List of road features
      * @param cityCenter City center feature (optional)

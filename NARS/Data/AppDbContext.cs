@@ -35,6 +35,21 @@ public class AppDbContext : DbContext
             .HasIndex(u => u.Email).IsUnique();
         modelBuilder.Entity<User>()
             .HasIndex(u => u.Username).IsUnique();
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.Role)
+            .HasDatabaseName("ix_users_role");
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.DairaId)
+            .HasDatabaseName("ix_users_daira_id")
+            .HasFilter("daira_id IS NOT NULL");
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.WilayaId)
+            .HasDatabaseName("ix_users_wilaya_id")
+            .HasFilter("wilaya_id IS NOT NULL");
+        modelBuilder.Entity<User>()
+            .HasIndex(u => new { u.CommuneId, u.Role })
+            .HasDatabaseName("ix_users_commune_role")
+            .HasFilter("commune_id IS NOT NULL");
 
         // ── feature_registry ───────────────────────────────────────────────────
         // UUID primary keys — no sequence needed, generated client-side.

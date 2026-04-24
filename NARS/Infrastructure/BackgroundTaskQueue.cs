@@ -11,7 +11,9 @@ namespace NarsApi.Infrastructure;
 public interface IBackgroundTaskQueue
 {
     ValueTask QueueBackgroundWorkItemAsync(Func<IServiceProvider, CancellationToken, Task> workItem);
-    ValueTask<Func<IServiceProvider, CancellationToken, Task>?> DequeueAsync(CancellationToken ct);
+    // Channel.Reader.ReadAsync never returns null — it throws OperationCanceledException
+    // on cancellation. The return type is non-nullable to make this contract explicit.
+    ValueTask<Func<IServiceProvider, CancellationToken, Task>> DequeueAsync(CancellationToken ct);
 }
 
 /// <summary>
@@ -38,7 +40,7 @@ public class BackgroundTaskQueue : IBackgroundTaskQueue
         return _queue.Writer.WriteAsync(workItem);
     }
 
-    public async ValueTask<Func<IServiceProvider, CancellationToken, Task>?> DequeueAsync(CancellationToken ct)
+    public async ValueTask<Func<IServiceProvider, CancellationToken, Task>> DequeueAsync(CancellationToken ct)
     {
         var workItem = await _queue.Reader.ReadAsync(ct);
         return workItem;

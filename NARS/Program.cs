@@ -203,8 +203,24 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 
 app.UseDefaultFiles();
+
+// Explicitly register MIME types so Content-Type is always set.
+// Without this, the default FileExtensionContentTypeProvider maps .js to the
+// deprecated "application/javascript". When combined with X-Content-Type-Options: nosniff,
+// any missing or incorrect Content-Type causes browsers to block the resource entirely.
+var contentTypeProvider = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
+contentTypeProvider.Mappings[".js"]    = "text/javascript";    // RFC 9239 (supersedes application/javascript)
+contentTypeProvider.Mappings[".mjs"]   = "text/javascript";
+contentTypeProvider.Mappings[".css"]   = "text/css";
+contentTypeProvider.Mappings[".woff2"] = "font/woff2";
+contentTypeProvider.Mappings[".woff"]  = "font/woff";
+contentTypeProvider.Mappings[".ico"]   = "image/x-icon";
+contentTypeProvider.Mappings[".svg"]   = "image/svg+xml";
+contentTypeProvider.Mappings[".map"]   = "application/json";   // source maps
+
 app.UseStaticFiles(new StaticFileOptions
 {
+    ContentTypeProvider = contentTypeProvider,
     OnPrepareResponse = ctx =>
     {
         var name = ctx.File.Name;
@@ -217,7 +233,7 @@ app.UseStaticFiles(new StaticFileOptions
         }
         // Vite-hashed assets (e.g. index-C3VuOP09.js) are content-addressed.
         // Cache them indefinitely — the hash changes whenever content changes.
-        if (name.EndsWith(".js") || name.EndsWith(".css") || name.EndsWith(".woff2"))
+        if (name.EndsWith(".js") || name.EndsWith(".mjs") || name.EndsWith(".css") || name.EndsWith(".woff2"))
         {
             ctx.Context.Response.Headers.Append("Cache-Control", "public, max-age=31536000, immutable");
         }

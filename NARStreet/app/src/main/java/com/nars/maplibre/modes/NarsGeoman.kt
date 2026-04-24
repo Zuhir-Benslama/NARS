@@ -851,6 +851,125 @@ class NarsGeoman(
         
         // Re-add only features for current phase
         addFeatures(allFeatures)
+        
+        // Add road endpoint markers for roads phase
+        if (currentPhase?.key == "roads") {
+            addRoadEndpointMarkers(allFeatures)
+        }
+    }
+    
+    /**
+     * Add road endpoint markers (green/red circles)
+     */
+    private fun addRoadEndpointMarkers(allFeatures: List<NarsFeature>) {
+        val roads = allFeatures.filter { it.properties.phase == "roads" }
+        if (roads.isEmpty()) return
+        
+        for (road in roads) {
+            val geometry = road.geometry as? LineStringGeometry ?: continue
+            val coords = geometry.coordinates.chunked(2)
+            if (coords.size < 2) continue
+            
+            // Add start endpoint (green circle)
+            addEndpointMarker(
+                id = "${road.id}_start",
+                lon = coords[0][0],
+                lat = coords[0][1],
+                isStart = true
+            )
+            
+            // Add end endpoint (red circle)
+            addEndpointMarker(
+                id = "${road.id}_end",
+                lon = coords.last()[0],
+                lat = coords.last()[1],
+                isStart = false
+            )
+            
+            // Add label marker (text label at midpoint with road name)
+            val midIdx = coords.size / 2
+            addLabelLayer(
+                layerName = "${road.id}_label",
+                labelText = road.properties.name,
+                lon = coords[midIdx][0],
+                lat = coords[midIdx][1]
+            )
+        }
+        
+        Log.d("NarsGeoman", "Added road endpoint markers")
+    }
+    
+    /**
+     * Add text label layer (uses SymbolLayer with glyphs)
+     */
+    private fun addLabelLayer(layerName: String, labelText: String?, lon: Double, lat: Double) {
+        if (labelText.isNullOrBlank()) return
+        
+        val sourceName = "${layerName}_src"
+        val labelLayerName = layerName
+        
+        val geoJson = """
+            {"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [$lon, $lat]}, "properties": {"text": "$labelText"}}]}
+        """.trimIndent()
+        
+        try {
+            map.style?.addSource(GeoJsonSource(sourceName, geoJson))
+        } catch (e: Exception) {
+            // Source may already exist
+        }
+        
+        val symbolLayer = SymbolLayer(labelLayerName, sourceName)
+        symbolLayer.setProperties(
+            org.maplibre.android.style.layers.PropertyFactory.textField(
+                org.maplibre.android.style.expressions.Expression.get("text")
+            ),
+            org.maplibre.android.style.layers.PropertyFactory.textColor(android.graphics.Color.BLACK),
+            org.maplibre.android.style.layers.PropertyFactory.textSize(14f),
+            org.maplibre.android.style.layers.PropertyFactory.textFont(
+                arrayOf("Roboto Regular", "Arial Unicode MS Regular")
+            ),
+            org.maplibre.android.style.layers.PropertyFactory.textAllowOverlap(true),
+            org.maplibre.android.style.layers.PropertyFactory.textHaloColor(android.graphics.Color.WHITE),
+            org.maplibre.android.style.layers.PropertyFactory.textHaloWidth(3f)
+        )
+        
+        try {
+            map.style?.addLayer(symbolLayer)
+            Log.d("NarsGeoman", "Added text label $labelText at $lon,$lat")
+        } catch (e: Exception) {}
+    }
+    
+    /**
+     * Add endpoint marker
+     */
+    private fun addEndpointMarker(id: String, lon: Double, lat: Double, isStart: Boolean) {
+        val layerName = "nars_$id"
+        val sourceName = "${layerName}_src"
+        
+        val geoJson = """
+            {"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [$lon, $lat]}, "properties": {}}]}
+        """.trimIndent()
+        
+        try {
+            val source = GeoJsonSource(sourceName, geoJson)
+            map.style?.addSource(source)
+        } catch (e: Exception) {
+            return
+        }
+        
+        val color = if (isStart) android.graphics.Color.parseColor("#2ecc71") else android.graphics.Color.parseColor("#e74c3c")
+        
+        val circleLayer = CircleLayer("${layerName}_circle", sourceName)
+        circleLayer.setProperties(
+            org.maplibre.android.style.layers.PropertyFactory.circleColor(color),
+            org.maplibre.android.style.layers.PropertyFactory.circleRadius(14f),
+            org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor(android.graphics.Color.WHITE),
+            org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth(3f)
+        )
+        
+        try {
+            map.style?.addLayer(circleLayer)
+        } catch (e: Exception) {}
     }
 
     /**

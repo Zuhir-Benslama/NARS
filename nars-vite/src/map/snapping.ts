@@ -651,11 +651,15 @@ export function installSnapInterceptors(): void {
     const snapLngLat = (e: any): void => {
         if (!snapActive || !snapLatLng) return
         const { lng, lat } = snapLatLng
-        Object.defineProperty(e, 'lngLat', {
-            value: { lng, lat, toArray: () => [lng, lat] },
-            writable: true,
-            configurable: true,
-        })
+        try {
+            Object.defineProperty(e, 'lngLat', {
+                value: { lng, lat, toArray: () => [lng, lat] },
+                writable: true,
+                configurable: true,
+            })
+        } catch {
+            // Property is non-configurable in this MapLibre version — skip safely.
+        }
     }
 
     map.on('click', snapLngLat)
