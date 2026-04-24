@@ -38,9 +38,6 @@ export async function loadFromDatabase(): Promise<void> {
                 '[LOAD] First feature layer values:',
                 features.map((f) => f.layer).filter((v, i, a) => a.indexOf(v) === i),
             )
-        }
-        if (features.length > 0) {
-            debugLog('[LOAD] First feature raw keys:', Object.keys(features[0]))
             debugLog('[LOAD] First feature:', JSON.stringify(features[0]).substring(0, 200))
         }
         if (!features.length) {

@@ -11,16 +11,11 @@ namespace NarsApi.Controllers;
 /// Applying [Authorize] here routes unauthenticated requests through the
 /// JWT bearer pipeline (OnMessageReceived -> 401) instead of duplicating
 /// manual cookie->token->principal validation in every controller.
-/// Fixes security issues #2 and #9.
 /// </summary>
 [Authorize]
 public abstract class NarsControllerBase : ControllerBase
 {
-    /// <summary>
-    /// The authenticated user's database ID (UUID v7).
-    /// Throws <see cref="InvalidOperationException"/> if the <c>user_id</c> claim is absent
-    /// or not a valid GUID — this indicates a server-side token misconfiguration.
-    /// </summary>
+    /// <summary>The authenticated user's database ID (UUID v7).</summary>
     protected Guid CurrentUserId =>
         Guid.TryParse(User.FindFirstValue("user_id"), out Guid id)
             ? id
@@ -31,13 +26,42 @@ public abstract class NarsControllerBase : ControllerBase
         User.FindFirstValue("username") ?? string.Empty;
 
     /// <summary>
-    /// The commune ID the authenticated user is registered to.
-    /// Throws <see cref="InvalidOperationException"/> if the claim is absent or non-numeric.
+    /// The role of the authenticated user (e.g. "commune_user", "daira_admin").
+    /// Defaults to "commune_user" if the claim is absent (backward-compatible with
+    /// tokens issued before the roles migration).
     /// </summary>
-    protected int CurrentCommuneId =>
+    protected string CurrentUserRole =>
+        User.FindFirstValue("role") ?? UserRoles.CommuneUser;
+
+    /// <summary>
+    /// The commune ID for commune_user accounts, or null for admin accounts.
+    /// Returns null rather than throwing so admin controllers that don't need
+    /// a commune_id don't need to catch exceptions.
+    /// </summary>
+    protected int? CurrentCommuneId =>
         int.TryParse(User.FindFirstValue("commune_id"), out int id) && id > 0
             ? id
-            : throw new InvalidOperationException("commune_id claim missing or invalid in authenticated token.");
+            : null;
+
+    /// <summary>
+    /// The commune ID, guaranteed non-null. Throws if the claim is absent —
+    /// use only in endpoints restricted to commune_user accounts.
+    /// </summary>
+    protected int RequiredCommuneId =>
+        CurrentCommuneId
+            ?? throw new InvalidOperationException("commune_id claim missing — endpoint requires commune_user role.");
+
+    /// <summary>The daira ID for daira_admin accounts, or null for other roles.</summary>
+    protected int? CurrentDairaId =>
+        int.TryParse(User.FindFirstValue("daira_id"), out int id) && id > 0
+            ? id
+            : null;
+
+    /// <summary>The wilaya ID for wilaya_admin accounts, or null for other roles.</summary>
+    protected int? CurrentWilayaId =>
+        int.TryParse(User.FindFirstValue("wilaya_id"), out int id) && id > 0
+            ? id
+            : null;
 
     /// <summary>
     /// Adds a named parameter to an ADO.NET command.

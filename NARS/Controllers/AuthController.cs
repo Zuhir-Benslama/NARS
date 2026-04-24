@@ -56,6 +56,7 @@ public class AuthController(
             Username = body.Username,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(body.Password),
             CommuneId = body.CommuneId,
+            Role = NarsApi.Infrastructure.UserRoles.CommuneUser,
             FailedLoginAttempts = 0,
             LockedUntil = null,
         };
@@ -97,7 +98,8 @@ public class AuthController(
             await db.SaveChangesAsync();
         }
 
-        var token = jwt.CreateToken(user.Id, user.Username, user.Name, user.Email, user.CommuneId);
+        var token = jwt.CreateToken(user.Id, user.Username, user.Name, user.Email,
+            communeId: user.CommuneId, role: user.Role, dairaId: user.DairaId, wilayaId: user.WilayaId);
 
         // Issue a refresh token for silent re-authentication before the access token expires.
         var (refreshRaw, refreshHash) = JwtService.CreateRefreshToken();
@@ -126,7 +128,9 @@ public class AuthController(
 
         // fix #7: single joined query instead of 3 sequential round-trips.
         // fix #11: wilaya is not part of the SignIn response — not loaded here.
-        var loc = await LoadCommuneWithDairaAsync(user.CommuneId);
+        var loc = user.CommuneId.HasValue
+            ? await LoadCommuneWithDairaAsync(user.CommuneId.Value)
+            : new CommuneWithDaira(null, null);
 
         return Ok(new
         {
@@ -139,6 +143,7 @@ public class AuthController(
                 username = user.Username,
                 name = user.Name,
                 email = user.Email,
+                role = user.Role,
                 commune = new
                 {
                     id = user.CommuneId,
@@ -194,9 +199,9 @@ public class AuthController(
 
         var stored = await db.RefreshTokens
             .FromSqlRaw(
-                "SELECT * FROM refresh_tokens WHERE token_hash = {0} AND revoked = false AND expires_at > NOW() FOR UPDATE SKIP LOCKED",
+                "SELECT * FROM refresh_tokens WHERE token_hash = {0} AND revoked = false AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1 FOR UPDATE SKIP LOCKED",
                 hash)
-            .FirstOrDefaultAsync();
+            .SingleOrDefaultAsync();
 
         if (stored is null)
         {
@@ -227,7 +232,8 @@ public class AuthController(
         await db.SaveChangesAsync();
         await tx.CommitAsync();
 
-        var newToken = jwt.CreateToken(user.Id, user.Username, user.Name, user.Email, user.CommuneId);
+        var newToken = jwt.CreateToken(user.Id, user.Username, user.Name, user.Email,
+            communeId: user.CommuneId, role: user.Role, dairaId: user.DairaId, wilayaId: user.WilayaId);
 
         var cookieMaxAge = refreshExpiry - DateTime.UtcNow;
 
@@ -258,10 +264,29 @@ public class AuthController(
             return Unauthorized(new { detail = "User no longer exists." });
 
         if (!int.TryParse(User.FindFirstValue("commune_id"), out int communeId))
-            communeId = user.CommuneId;
+            communeId = user.CommuneId ?? 0;
 
-        // fix #7: single joined query for commune → daira → wilaya.
-        var loc = await LoadLocationChainAsync(communeId);
+        // Load location chain only if we have a commune to look up.
+        LocationChain loc;
+        if (communeId > 0)
+        {
+            loc = await LoadLocationChainAsync(communeId);
+        }
+        else if (user.DairaId.HasValue)
+        {
+            var daira = await db.Dairas.FindAsync(user.DairaId.Value);
+            var wilaya = daira is not null ? await db.Wilayas.FindAsync(daira.WilayaId) : null;
+            loc = new LocationChain(null, daira, wilaya);
+        }
+        else if (user.WilayaId.HasValue)
+        {
+            var wilaya = await db.Wilayas.FindAsync(user.WilayaId.Value);
+            loc = new LocationChain(null, null, wilaya);
+        }
+        else
+        {
+            loc = new LocationChain(null, null, null);
+        }
 
         return Ok(new
         {
@@ -269,6 +294,7 @@ public class AuthController(
             username = user.Username,
             name = user.Name,
             email = user.Email,
+            role = user.Role,
             wilaya = new
             {
                 id = loc.Wilaya?.WilayaId,
@@ -287,7 +313,7 @@ public class AuthController(
             },
             commune = new
             {
-                id = communeId,
+                id = communeId > 0 ? communeId : null as int?,
                 name_fr = loc.Commune?.CommuneFr,
                 name_ar = loc.Commune?.CommuneAr,
                 latitude = loc.Commune?.CommuneLatitude,

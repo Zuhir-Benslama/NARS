@@ -126,6 +126,27 @@ data class FeatureProperties(
     val entranceNumber: Int? = null,
     val mainEntranceDbId: Long? = null,
     val mainEntranceLabel: String? = null,
+    // --- Roads Phase Fields (Field Mode) ---
+    val roadTraffic: String? = null, // "high" | "medium" | "low"
+    val tradActivity: String? = null, // "high" | "medium" | "low"
+    val numLanes: Int? = null,
+    val hasMedian: Boolean? = null,
+    val hasVegetation: Boolean? = null,
+    val isDeadEnd: Boolean? = null,
+    val hasSidewalk: Boolean? = null,
+    // --- HouseEntrances Phase Fields (Field Mode) ---
+    val hasEntrance: Boolean? = null,
+    val hasNumberingPanel: Boolean? = null,
+    val numberingPanelCorrect: Boolean? = null,
+    val numberingPanelPositionCorrect: Boolean? = null,
+    // --- NamingPanels Phase Fields (Field Mode) ---
+    val hasNamingPanelLocation: Boolean? = null,
+    val hasNamingPanel: Boolean? = null,
+    val namingCorrect: Boolean? = null,
+    val namingPanelPositionCorrect: Boolean? = null,
+    // Road endpoint marker type ("start" | "end") for roads phase
+    val markerType: String? = null,
+    // Additional data for extensibility
     val additionalData: Map<String, String> = emptyMap()
 )
 
@@ -149,39 +170,15 @@ enum class DrawType {
 }
 
 /**
- * The 8 phases of NARS matching the web version (phases.ts: PHASES)
+ * The 3 phases of NARStreet Field Mode
  * 
- * Note: Labels and hints are i18n keys. In the web version, these are
- * translated using vue-i18n. For Android, implement similar i18n support.
+ * Only Roads, HouseEntrances, and NamingPanels are available for field validation.
+ * Labels are i18n keys - implement proper string resource lookup in production.
  */
 object Phases {
     val ALL = listOf(
         PhaseDefinition(
             index = 0,
-            key = "areas",
-            label = "phase_areas_label",
-            drawType = DrawType.POLYGON,
-            color = "#8e44ad",
-            hint = "phase_areas_hint"
-        ),
-        PhaseDefinition(
-            index = 1,
-            key = "districts",
-            label = "phase_districts_label",
-            drawType = DrawType.POLYGON,
-            color = "#f39c12",
-            hint = "phase_districts_hint"
-        ),
-        PhaseDefinition(
-            index = 2,
-            key = "cityCenter",
-            label = "phase_cityCenter_label",
-            drawType = DrawType.CIRCLE,
-            color = "#e74c3c",
-            hint = "phase_cityCenter_hint"
-        ),
-        PhaseDefinition(
-            index = 3,
             key = "roads",
             label = "phase_roads_label",
             drawType = DrawType.POLYLINE,
@@ -189,7 +186,7 @@ object Phases {
             hint = "phase_roads_hint"
         ),
         PhaseDefinition(
-            index = 4,
+            index = 1,
             key = "houseEntrances",
             label = "phase_houseEntrances_label",
             drawType = DrawType.MARKER,
@@ -197,23 +194,7 @@ object Phases {
             hint = "phase_houseEntrances_hint"
         ),
         PhaseDefinition(
-            index = 5,
-            key = "publicBuildings",
-            label = "phase_publicBuildings_label",
-            drawType = DrawType.POLYGON,
-            color = "#e67e22",
-            hint = "phase_publicBuildings_hint"
-        ),
-        PhaseDefinition(
-            index = 6,
-            key = "publicSpaces",
-            label = "phase_publicSpaces_label",
-            drawType = DrawType.POLYGON,
-            color = "#2ecc71",
-            hint = "phase_publicSpaces_hint"
-        ),
-        PhaseDefinition(
-            index = 7,
+            index = 2,
             key = "namingPanels",
             label = "phase_namingPanels_label",
             drawType = DrawType.MARKER,
@@ -236,13 +217,8 @@ object Phases {
         // TODO: Implement i18n lookup
         // For now, return the key - implement proper string resource lookup
         return when (phase.label) {
-            "phase_areas_label" -> "Urban Areas"
-            "phase_districts_label" -> "Districts"
-            "phase_cityCenter_label" -> "City Center"
             "phase_roads_label" -> "Roads"
             "phase_houseEntrances_label" -> "House Entrances"
-            "phase_publicBuildings_label" -> "Public Buildings"
-            "phase_publicSpaces_label" -> "Public Spaces"
             "phase_namingPanels_label" -> "Naming Panels"
             else -> phase.label
         }
@@ -252,14 +228,9 @@ object Phases {
     fun getHint(phase: PhaseDefinition, context: android.content.Context): String {
         // TODO: Implement i18n lookup
         return when (phase.hint) {
-            "phase_areas_hint" -> "Draw urban area boundaries"
-            "phase_districts_hint" -> "Define district divisions"
-            "phase_cityCenter_hint" -> "Mark the city center"
-            "phase_roads_hint" -> "Draw road networks"
-            "phase_houseEntrances_hint" -> "Add building entrances"
-            "phase_publicBuildings_hint" -> "Map public facilities"
-            "phase_publicSpaces_hint" -> "Define public areas"
-            "phase_namingPanels_hint" -> "Add street naming information"
+            "phase_roads_hint" -> "Update road attributes (traffic, lanes, etc.)"
+            "phase_houseEntrances_hint" -> "Verify entrances and numbering panels"
+            "phase_namingPanels_hint" -> "Verify naming panel locations"
             else -> ""
         }
     }

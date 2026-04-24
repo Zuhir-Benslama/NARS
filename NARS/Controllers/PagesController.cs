@@ -19,6 +19,7 @@ public class PagesController(
     JwtService jwt,
     IAntiforgery antiforgery,
     IMemoryCache cache,
+    IHostEnvironment env,
     IConfiguration config,
     ILogger<PagesController> logger) : ControllerBase
 {
@@ -45,12 +46,7 @@ public class PagesController(
         var tokens = antiforgery.GetAndStoreTokens(HttpContext);
         var nonce = HttpContext.Items["csp-nonce"] as string ?? string.Empty;
 
-        var template = cache.GetOrCreate("login_html", entry =>
-        {
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
-            return System.IO.File.ReadAllText(
-                Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "login.html"));
-        });
+        var template = LoadPageTemplate("login_html", "login.html");
 
         var html = template!
             // Inject the CSRF token into the <meta name="csrf-token"> placeholder
@@ -101,12 +97,7 @@ public class PagesController(
         var tokens = antiforgery.GetAndStoreTokens(HttpContext);
         var nonce = HttpContext.Items["csp-nonce"] as string ?? string.Empty;
 
-        var template = cache.GetOrCreate("index_html", entry =>
-        {
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
-            return System.IO.File.ReadAllText(
-                Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "index.html"));
-        });
+        var template = LoadPageTemplate("index_html", "index.html");
 
         var html = template!
             // Inject CSRF token into the meta placeholder
@@ -120,8 +111,29 @@ public class PagesController(
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    private string LoadPageTemplate(string cacheKey, string fileName)
+    {
+        var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", fileName);
+        // In development, avoid template caching so HTML updates are reflected immediately.
+        if (env.IsDevelopment())
+            return System.IO.File.ReadAllText(path);
+
+        return cache.GetOrCreate(cacheKey, entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
+            return System.IO.File.ReadAllText(path);
+        }) ?? string.Empty;
+    }
+
     private async Task<bool> IsAuthenticatedAsync()
     {
+        // Respect the principal populated by UseAuthentication() first.
+        if (User.Identity?.IsAuthenticated == true)
+        {
+            logger.LogDebug("[Pages] HttpContext.User is already authenticated.");
+            return true;
+        }
+
         var accessToken = Request.Cookies["access_token"];
         if (!string.IsNullOrEmpty(accessToken))
         {
@@ -136,6 +148,22 @@ public class PagesController(
         else
         {
             logger.LogInformation("[Pages] access_token cookie NOT FOUND.");
+        }
+
+        // Support authenticated clients that send a bearer token header.
+        var bearerHeader = Request.Headers.Authorization.FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(bearerHeader)
+            && bearerHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            var bearerToken = bearerHeader["Bearer ".Length..].Trim();
+            if (!string.IsNullOrEmpty(bearerToken) && jwt.ValidateToken(bearerToken) is not null)
+            {
+                logger.LogInformation("[Pages] Valid bearer token header found. Setting access_token cookie.");
+                Response.Cookies.Append("access_token", bearerToken, MakeCookieOptions(TimeSpan.FromHours(24)));
+                return true;
+            }
+
+            logger.LogInformation("[Pages] Bearer token header is invalid or expired.");
         }
 
         // Access token missing or expired — try silent refresh via refresh_token
@@ -162,9 +190,9 @@ public class PagesController(
         {
             var stored = await db.RefreshTokens
                 .FromSqlRaw(
-                    "SELECT * FROM refresh_tokens WHERE token_hash = {0} AND revoked = false AND expires_at > NOW() FOR UPDATE SKIP LOCKED",
+                    "SELECT * FROM refresh_tokens WHERE token_hash = {0} AND revoked = false AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1 FOR UPDATE SKIP LOCKED",
                     hash)
-                .FirstOrDefaultAsync();
+                .SingleOrDefaultAsync();
 
             if (stored is null)
             {
@@ -197,7 +225,8 @@ public class PagesController(
             await db.SaveChangesAsync();
             await tx.CommitAsync();
 
-            var newToken = jwt.CreateToken(user.Id, user.Username, user.Name, user.Email, user.CommuneId);
+            var newToken = jwt.CreateToken(user.Id, user.Username, user.Name, user.Email,
+                communeId: user.CommuneId, role: user.Role, dairaId: user.DairaId, wilayaId: user.WilayaId);
             var maxAge = refreshExpiry - DateTime.UtcNow;
 
             logger.LogInformation("[Pages] Silent refresh SUCCESS. Issuing new cookies for {Username}", user.Username);

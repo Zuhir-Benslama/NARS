@@ -27,7 +27,8 @@ class MainActivity : ComponentActivity() {
         val application = application as NarsApplication
         viewModel = NarsViewModel(
             featureStore = application.featureStore,
-            appPreferences = application.appPreferences
+            appPreferences = application.appPreferences,
+            application = application
         )
         
         setContent {

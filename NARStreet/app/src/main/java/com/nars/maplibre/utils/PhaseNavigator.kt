@@ -5,7 +5,8 @@ import com.nars.maplibre.data.model.Phases
 import com.nars.maplibre.data.store.FeatureStore
 
 /**
- * Phase navigation validation matching web version (phase-nav.ts)
+ * Phase navigation validation for NARStreet Field Mode
+ * Only 3 phases: Roads, HouseEntrances, NamingPanels
  */
 class PhaseNavigator(private val featureStore: FeatureStore) {
 
@@ -22,22 +23,13 @@ class PhaseNavigator(private val featureStore: FeatureStore) {
         if (targetPhaseIndex <= currentIndex) return null
 
         when (currentPhase.key) {
-            "areas" -> {
-                val areas = featureStore.getFeaturesByPhase("areas")
-                if (areas.isEmpty()) return "alert_at_least_one_urban_area"
-            }
-            "districts" -> {
-                val coverage = checkDistrictCoverage()
-                if (!coverage.covered) return "alert_coverage_error: ${coverage.message}"
-            }
             "roads" -> {
                 val roads = featureStore.getFeaturesByPhase("roads")
                 if (roads.isEmpty()) return "alert_at_least_one_road"
             }
             "houseEntrances" -> {
                 val entrances = featureStore.getFeaturesByPhase("houseEntrances")
-                val mainEntrances = entrances.filter { it.properties.entranceTypeKey == "main_entrance" }
-                if (mainEntrances.isEmpty()) return "alert_at_least_one_entrance"
+                if (entrances.isEmpty()) return "alert_at_least_one_entrance"
             }
         }
 
@@ -45,23 +37,15 @@ class PhaseNavigator(private val featureStore: FeatureStore) {
     }
 
     /**
-     * Check district coverage - districts must cover all areas
-     * This is a simplified implementation - full version would use polygon intersection
+     * Check road coverage - at least one road must exist
      */
-    fun checkDistrictCoverage(): CoverageResult {
-        val areas = featureStore.getFeaturesByPhase("areas")
-        val districts = featureStore.getFeaturesByPhase("districts")
+    fun checkRoadCoverage(): CoverageResult {
+        val roads = featureStore.getFeaturesByPhase("roads")
 
-        if (areas.isEmpty()) {
-            return CoverageResult(true, "No areas to cover")
+        if (roads.isEmpty()) {
+            return CoverageResult(false, "No roads defined")
         }
 
-        if (districts.isEmpty()) {
-            return CoverageResult(false, "No districts defined")
-        }
-
-        // Simplified check: at least one district exists
-        // Full implementation would verify polygon coverage using JTS
         return CoverageResult(true, "OK")
     }
 

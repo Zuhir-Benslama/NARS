@@ -96,11 +96,16 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
                             f.Layer == FeatureTypes.AreaLayers.Scattered)
                 .ExecuteDeleteAsync();
 
-            // Extract coordinates from the GeoJSON for compatibility with
-            // SqlFragments.PolygonFromData (which reads f.data::jsonb->'coordinates').
-            // The GeoJSON string is kept as 'geometry' for full-fidelity frontend rendering.
+            // Extract per-polygon coordinate rings for SqlFragments.PolygonFromData
+            // compatibility (reads f.data::jsonb->'coordinates').
+            // For MultiPolygon results (common with Algerian communes), ALL rings are
+            // stored so PostGIS spatial queries see the complete scattered geometry.
+            // The full GeoJSON is also kept in 'geometry' for frontend rendering.
             using var geoDoc = JsonDocument.Parse(scatteredGeoJson);
-            var coordinates = ExtractCoordinatesArray(geoDoc.RootElement);
+            var allRings = ExtractAllRings(geoDoc.RootElement);
+            // coordinates = flat list of rings; for a simple Polygon this is a
+            // single-element list, for MultiPolygon it has one ring per polygon.
+            var coordinates = allRings.Count == 1 ? (object)allRings[0] : allRings;
 
             db.Areas.Add(new Area
             {
@@ -126,38 +131,44 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
     }
 
     /// <summary>
-    /// Extracts the first polygon's outer ring from a GeoJSON geometry as
-    /// an array of {lat, lng} objects — the format expected by
+    /// Extracts polygon coordinates from a GeoJSON geometry as a list of
+    /// {lat, lng} ring arrays — the format expected by
     /// <see cref="SqlFragments.PolygonFromData"/>.
-    /// Handles Point, Polygon, and MultiPolygon types.
+    ///
+    /// For Polygon: returns the outer ring.
+    /// For MultiPolygon: returns the outer rings of ALL constituent polygons
+    /// so that spatial queries see the complete scattered geometry, not just
+    /// the first disconnected piece (which is the common case for Algerian communes).
     /// </summary>
-    private static List<object> ExtractCoordinatesArray(JsonElement geo)
+    private static List<List<object>> ExtractAllRings(JsonElement geo)
     {
-        var result = new List<object>();
+        var result = new List<List<object>>();
         if (!geo.TryGetProperty("type", out var typeProp)) return result;
 
         var geomType = typeProp.GetString();
+
         if (geomType == "Polygon" && geo.TryGetProperty("coordinates", out var coords))
         {
-            // coords[0] = outer ring
-            foreach (var point in coords.EnumerateArray().FirstOrDefault().EnumerateArray())
-            {
-                var arr = point.EnumerateArray().ToArray();
-                if (arr.Length >= 2)
-                    result.Add(new { lng = arr[0].GetDouble(), lat = arr[1].GetDouble() });
-            }
+            result.Add(RingToLatLngList(coords.EnumerateArray().FirstOrDefault()));
         }
         else if (geomType == "MultiPolygon" && geo.TryGetProperty("coordinates", out var multiCoords))
         {
-            // First polygon's outer ring
-            foreach (var point in multiCoords.EnumerateArray().FirstOrDefault().EnumerateArray().FirstOrDefault().EnumerateArray())
-            {
-                var arr = point.EnumerateArray().ToArray();
-                if (arr.Length >= 2)
-                    result.Add(new { lng = arr[0].GetDouble(), lat = arr[1].GetDouble() });
-            }
+            foreach (var polygon in multiCoords.EnumerateArray())
+                result.Add(RingToLatLngList(polygon.EnumerateArray().FirstOrDefault()));
         }
 
         return result;
+    }
+
+    private static List<object> RingToLatLngList(JsonElement ring)
+    {
+        var points = new List<object>();
+        foreach (var point in ring.EnumerateArray())
+        {
+            var arr = point.EnumerateArray().ToArray();
+            if (arr.Length >= 2)
+                points.Add(new { lng = arr[0].GetDouble(), lat = arr[1].GetDouble() });
+        }
+        return points;
     }
 }

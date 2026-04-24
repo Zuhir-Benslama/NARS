@@ -33,7 +33,8 @@ public record PagedResponse<T>(
 // ─── AUTH DTOs ───────────────────────────────────────────────────────────────
 
 /// <summary>
-/// Request body for user registration.
+/// Request body for user registration (commune_user only).
+/// Admin accounts are created via POST /api/admin/users.
 /// </summary>
 public record SignUpRequest(
     [Required] string Name,

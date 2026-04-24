@@ -56,7 +56,7 @@ import com.nars.maplibre.ui.components.CompactBaseLayerSelector
 import com.nars.maplibre.ui.components.CompactInfoPanel
 import com.nars.maplibre.ui.components.CompactPhaseSelector
 import com.nars.maplibre.ui.components.DrawingControls
-import com.nars.maplibre.ui.components.FeatureModal
+import com.nars.maplibre.ui.components.FeatureValidationModal
 import com.nars.maplibre.ui.components.InfoPanel
 import com.nars.maplibre.ui.components.NarsMap
 import com.nars.maplibre.ui.components.PhaseBar
@@ -296,11 +296,46 @@ fun MapScreen(
         }
     }
 
-    // Handle map long click - forward to Geoman for finishing drawing
+    // Handle map long click - show validation panel for the clicked feature
     fun handleMapLongClick(latLng: org.maplibre.android.geometry.LatLng) {
-        Log.d("MapScreen", "handleMapLongClick: drawingEnabled=$drawingEnabled")
-        if (drawingEnabled) {
-            narsGeoman?.onMapLongClick(latLng)
+        android.util.Log.d("MapScreen", "handleMapLongClick: phase=${currentPhase?.key}, hasFeatures=${allFeatures.size}")
+        
+        // Find clicked feature
+        val currentPhaseKey = currentPhase?.key
+        val clickedFeature = allFeatures
+            .filter { it.properties.phase == currentPhaseKey }
+            .firstOrNull { feature ->
+                when (val geometry = feature.geometry) {
+                    is com.nars.maplibre.data.model.PointGeometry -> {
+                        val featurePoint = org.maplibre.android.geometry.LatLng(
+                            geometry.coordinates[1],
+                            geometry.coordinates[0]
+                        )
+                        val dist = latLng.distanceTo(featurePoint)
+                        android.util.Log.d("MapScreen", "Point: $dist meters")
+                        dist < 50.0
+                    }
+                    is com.nars.maplibre.data.model.LineStringGeometry -> {
+                        val coords = geometry.coordinates.chunked(2)
+                        coords.any { coord ->
+                            val linePoint = org.maplibre.android.geometry.LatLng(coord[1], coord[0])
+                            val dist = latLng.distanceTo(linePoint)
+                            android.util.Log.d("MapScreen", "Line: $dist meters")
+                            dist < 50.0
+                        }
+                    }
+                    else -> false
+                }
+            }
+
+        if (clickedFeature != null) {
+            android.util.Log.d("MapScreen", "Long clicked feature: ${clickedFeature.id}, phase=${clickedFeature.properties.phase}")
+            // Select and show validation modal
+            viewModel.selectFeature(clickedFeature)
+            editingFeature = clickedFeature
+            showFeatureModal = true
+        } else {
+            android.util.Log.d("MapScreen", "No feature clicked on long press, currentPhase=$currentPhaseKey, featuresWithPhase=${allFeatures.count { it.properties.phase == currentPhaseKey }}")
         }
     }
 
@@ -503,21 +538,18 @@ fun MapScreen(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Left side - Drawing controls
-            DrawingControls(
-                currentPhase = currentPhase,
-                isDrawing = drawingEnabled,
-                isEditing = editModeEnabled,
-                onDrawToggle = { toggleDrawing() },
-                onEditToggle = { toggleEditing() },
-                onSettingsClick = onNavigateToSettings,
-                onUndoClick = { viewModel.undo() },
-                onGenerateNamingPanels = { viewModel.generateNamingPanels() },
-                onComputeRoadDirections = { viewModel.computeRoadDirections() },
-                onSetHouseNumbers = { viewModel.setHouseNumbers() },
-                canUndo = viewModel.canUndo,
-                modifier = Modifier.align(Alignment.CenterStart)
-            )
+// Unused imports in field mode - commented out
+//import com.nars.maplibre.ui.components.DrawingControls (disabled in Field Mode - features load from backend)
+            // DrawingControls(
+            //     currentPhase = currentPhase,
+            //     isDrawing = drawingEnabled,
+            //     isEditing = editModeEnabled,
+            //     onDrawToggle = { toggleDrawing() },
+            //     onEditToggle = { toggleEditing() },
+            //     onSettingsClick = onNavigateToSettings,
+            //     canUndo = viewModel.canUndo,
+            //     modifier = Modifier.align(Alignment.CenterStart)
+            // )
 
             // Profile menu (top-right)
             ProfileMenu(
@@ -721,23 +753,15 @@ fun MapScreen(
                 }
             }
 
-            // Feature modal
-            if (showFeatureModal && currentPhase != null) {
-                FeatureModal(
-                    feature = editingFeature,
+            // Feature validation modal (opened on long-press)
+            if (showFeatureModal && currentPhase != null && editingFeature != null) {
+                FeatureValidationModal(
+                    feature = editingFeature!!,
                     phase = currentPhase!!,
                     onSave = { handleFeatureSave(it) },
                     onDismiss = {
-                        // If this was a new feature (not yet saved), remove it from the map
-                        editingFeature?.let { f ->
-                            if (f.dbId == 0L) {
-                                narsGeoman?.removeFeature(f.id)
-                                viewModel.deleteFeature(f.id)
-                            }
-                        }
                         showFeatureModal = false
                         editingFeature = null
-                        narsGeoman?.cancelEdits()
                     }
                 )
             }

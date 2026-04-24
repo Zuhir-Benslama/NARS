@@ -29,19 +29,27 @@ public class JwtService(string secret, string? issuer, string? audience, IConfig
         return defaultValue;
     }
 
-    public string CreateToken(Guid userId, string username, string name, string email, int communeId)
+    public string CreateToken(Guid userId, string username, string name, string email, int? communeId,
+        string role = "commune_user", int? dairaId = null, int? wilayaId = null)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim("user_id",    userId.ToString()),
-            new Claim("username",   username),
-            new Claim("name",       name),
-            new Claim("email",      email),
-            new Claim("commune_id", communeId.ToString()),
+            new("user_id",  userId.ToString()),
+            new("username", username),
+            new("name",     name),
+            new("email",    email),
+            new("role",     role),
         };
+
+        // Only include geographic claims that are relevant to this role.
+        // This keeps tokens minimal and avoids confusion when a claim is present
+        // but meaningless for the role.
+        if (communeId.HasValue) claims.Add(new Claim("commune_id", communeId.Value.ToString()));
+        if (dairaId.HasValue)   claims.Add(new Claim("daira_id",   dairaId.Value.ToString()));
+        if (wilayaId.HasValue)  claims.Add(new Claim("wilaya_id",  wilayaId.Value.ToString()));
 
         var token = new JwtSecurityToken(
             issuer: _issuer,

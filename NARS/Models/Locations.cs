@@ -12,7 +12,17 @@ public class User
     [Column("phone"), MaxLength(50), Required] public string Phone { get; set; } = string.Empty;
     [Column("username"), MaxLength(100), Required] public string Username { get; set; } = string.Empty;
     [Column("password_hash"), MaxLength(255), Required] public string PasswordHash { get; set; } = string.Empty;
-    [Column("commune_id"), Required] public int CommuneId { get; set; }
+    /// <summary>
+    /// Geographic scope for commune users. Null for admin accounts which are
+    /// scoped to a daira, wilaya, or the whole country instead.
+    /// </summary>
+    [Column("commune_id")] public int? CommuneId { get; set; }
+    /// <summary>Geographic scope for daira_admin accounts.</summary>
+    [Column("daira_id")]   public int? DairaId   { get; set; }
+    /// <summary>Geographic scope for wilaya_admin accounts.</summary>
+    [Column("wilaya_id")]  public int? WilayaId  { get; set; }
+    /// <summary>Role: commune_user | daira_admin | wilaya_admin | national_admin</summary>
+    [Column("role"), MaxLength(20), Required] public string Role { get; set; } = NarsApi.Infrastructure.UserRoles.CommuneUser;
     [Column("created_at")] public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     [Column("failed_login_attempts")] public int? FailedLoginAttempts { get; set; }
     [Column("locked_until")] public DateTime? LockedUntil { get; set; }

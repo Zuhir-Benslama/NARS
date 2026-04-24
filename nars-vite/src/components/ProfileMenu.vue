@@ -35,6 +35,7 @@
     import { useI18n } from 'vue-i18n'
     import { store } from '../store'
     import { apiFetch } from '../api'
+    import { getLoginPath } from '../config'
     import { showToast } from '../toast'
     import SettingsModal from './SettingsModal.vue'
 
@@ -66,7 +67,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
             })
-            if (res.ok) window.location.href = '/login'
+            if (res.ok) window.location.href = getLoginPath()
             else showToast(t('alert_logout_failed'), 'error')
         } catch {
             showToast(t('alert_logout_failed'), 'error')
