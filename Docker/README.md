@@ -5,21 +5,32 @@ These Dockerfiles are separate from app code and align with manifests under `k8s
 ## API image
 Build:
 ```bash
-docker build -f Docker/Dockerfile.nars-api -t your-registry/nars-api:latest .
+docker build -f Docker/Dockerfile.nars-api -t zuhirbenslama/nars-api:latest .
 ```
 Push:
 ```bash
-docker push your-registry/nars-api:latest
+docker push zuhirbenslama/nars-api:latest
 ```
-This matches `k8s/app-deployment.yaml`.
+This matches `k8s/app-deployment.yaml`.  
+Images are also built and pushed automatically via CI on pushes to `main`/`develop`.
 
-## Optional Postgres image
+## Postgres image (with schema auto-init)
 Build:
 ```bash
-docker build -f Docker/Dockerfile.postgres -t your-registry/nars-postgres:15 .
+docker build -f Docker/Dockerfile.postgres -t zuhirbenslama/nars-postgres:latest .
 ```
 Push:
 ```bash
-docker push your-registry/nars-postgres:15
+docker push zuhirbenslama/nars-postgres:latest
 ```
-If you use this custom image, update `image:` in `k8s/postgres.yaml`.
+Used by `k8s/postgres.yaml`. On first startup the schema from `docs/nars_db.sql` is automatically loaded into the `nars_db` database.
+
+## Kubernetes pull secret
+To pull images from your private Docker Hub repo, create a `regcred` secret in the `nars` namespace:
+```bash
+kubectl create secret docker-registry regcred \
+  --docker-server=https://index.docker.io/v1/ \
+  --docker-username=zuhirbenslama \
+  --docker-password=<your-token-or-password> \
+  --namespace=nars
+```

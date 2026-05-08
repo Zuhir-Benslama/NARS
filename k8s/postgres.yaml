@@ -25,9 +25,11 @@ spec:
       labels:
         app: postgres
     spec:
+      imagePullSecrets:
+        - name: regcred
       containers:
         - name: postgres
-          image: postgres:15
+          image: zuhirbenslama/nars-postgres:latest
           ports:
             - containerPort: 5432
           env:
