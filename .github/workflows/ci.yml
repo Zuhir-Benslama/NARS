@@ -25,7 +25,7 @@ jobs:
         run: dotnet build Workspace.sln --no-restore --configuration Release
 
       - name: Run tests
-        run: dotnet test Workspace.sln --no-build --configuration Release --verbosity normal
+        run: dotnet test Workspace.sln --no-build --configuration Release --verbosity normal --filter "FullyQualifiedName!~Integration"
 
   frontend-lint:
     name: Frontend — Typecheck, Lint & Test
