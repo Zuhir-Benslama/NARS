@@ -1,15 +1,17 @@
-using Xunit;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Moq;
 using NarsApi.Controllers;
 using NarsApi.Data;
 using NarsApi.DTOs;
+using NarsApi.Infrastructure;
 using NarsApi.Models;
 using NarsApi.Services;
+using Xunit;
 
 namespace NarsApi.Tests;
 
@@ -35,28 +37,58 @@ public class AuthControllerTests
 
     private static JwtService CreateJwtService(IConfiguration config)
     {
-        return new JwtService("test-secret-key-that-is-at-least-32-chars-long!!", null, null, config, Mock.Of<Microsoft.Extensions.Logging.ILogger<JwtService>>());
+        return new JwtService(
+            "test-secret-key-that-is-at-least-32-chars-long!!",
+            null,
+            null,
+            config,
+            Mock.Of<ILogger<JwtService>>());
+    }
+
+    private static AuthController CreateController(AppDbContext db, IConfiguration config)
+    {
+        return new AuthController(
+            db,
+            CreateJwtService(config),
+            config,
+            Mock.Of<ILogger<AuthController>>());
     }
 
     [Fact]
-    public async Task SignUp_ValidRequest_Returns201()
+    public void SignUp_PublicEndpointIsDisabled_Returns410()
     {
         var db = CreateInMemoryDbContext();
-        
         var configMock = CreateConfigMock();
-        var controller = new AuthController(db, CreateJwtService(configMock.Object), configMock.Object);
+        var controller = CreateController(db, configMock.Object);
 
-        // Seed a commune
-        db.Communes.Add(new Commune { CommuneId = 1, DairaId = 1 });
-        await db.SaveChangesAsync();
+        var result = controller.SignUp();
 
-        var result = await controller.SignUp(new SignUpRequest(
+        var statusCodeResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(410, statusCodeResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task AuthorizedAdminSignup_ValidRequest_Returns201()
+    {
+        var db = CreateInMemoryDbContext();
+        await SeedLocationDataAsync(db);
+        await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
+
+        var configMock = CreateConfigMock();
+        var controller = CreateController(db, configMock.Object);
+
+        var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
+            AdminUsername: "admin",
+            AdminPassword: "Str0ng!Pass",
             Name: "Test User",
             Email: "test@example.com",
             Phone: "0555123456",
             Username: "testuser",
             Password: "StrongP@ss1",
-            CommuneId: 1
+            Role: UserRoles.CommuneUser,
+            CommuneId: 1,
+            DairaId: null,
+            WilayaId: null
         ));
 
         var statusCodeResult = Assert.IsType<ObjectResult>(result);
@@ -64,99 +96,119 @@ public class AuthControllerTests
     }
 
     [Fact]
-    public async Task SignUp_WeakPassword_Returns400()
+    public async Task AuthorizedAdminSignup_WeakPassword_Returns400()
     {
         var db = CreateInMemoryDbContext();
-        
-        var configMock = CreateConfigMock();
-        var controller = new AuthController(db, CreateJwtService(configMock.Object), configMock.Object);
+        await SeedLocationDataAsync(db);
+        await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
 
-        var result = await controller.SignUp(new SignUpRequest(
+        var configMock = CreateConfigMock();
+        var controller = CreateController(db, configMock.Object);
+
+        var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
+            AdminUsername: "admin",
+            AdminPassword: "Str0ng!Pass",
             Name: "Test User",
             Email: "test@example.com",
             Phone: "0555123456",
             Username: "testuser",
             Password: "weak",
-            CommuneId: 1
+            Role: UserRoles.CommuneUser,
+            CommuneId: 1,
+            DairaId: null,
+            WilayaId: null
         ));
 
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
     [Fact]
-    public async Task SignUp_DuplicateUsername_Returns409()
+    public async Task AuthorizedAdminSignup_DuplicateUsername_Returns409()
     {
         var db = CreateInMemoryDbContext();
-        
-        var configMock = CreateConfigMock();
-
-        // Seed existing user
+        await SeedLocationDataAsync(db);
+        await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
         db.Users.Add(new User
         {
             Id = Guid.NewGuid(),
             Name = "Existing",
             Email = "existing@example.com",
+            Phone = "0555000000",
             Username = "existinguser",
             PasswordHash = BCrypt.Net.BCrypt.HashPassword("Str0ng!Pass"),
+            Role = UserRoles.CommuneUser,
             CommuneId = 1,
         });
-        db.Communes.Add(new Commune { CommuneId = 1, DairaId = 1 });
         await db.SaveChangesAsync();
 
-        var controller = new AuthController(db, CreateJwtService(configMock.Object), configMock.Object);
+        var configMock = CreateConfigMock();
+        var controller = CreateController(db, configMock.Object);
 
-        var result = await controller.SignUp(new SignUpRequest(
+        var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
+            AdminUsername: "admin",
+            AdminPassword: "Str0ng!Pass",
             Name: "New User",
             Email: "new@example.com",
             Phone: "0555123456",
             Username: "existinguser",
             Password: "StrongP@ss1",
-            CommuneId: 1
+            Role: UserRoles.CommuneUser,
+            CommuneId: 1,
+            DairaId: null,
+            WilayaId: null
         ));
 
         Assert.IsType<ConflictObjectResult>(result);
     }
 
     [Fact]
-    public async Task SignUp_InvalidCommune_Returns400()
+    public async Task AuthorizedAdminSignup_CommuneOutsideAdminScope_Returns403()
     {
         var db = CreateInMemoryDbContext();
-        
-        var configMock = CreateConfigMock();
-        var controller = new AuthController(db, CreateJwtService(configMock.Object), configMock.Object);
+        await SeedLocationDataAsync(db);
+        await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
 
-        var result = await controller.SignUp(new SignUpRequest(
+        var configMock = CreateConfigMock();
+        var controller = CreateController(db, configMock.Object);
+
+        var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
+            AdminUsername: "admin",
+            AdminPassword: "Str0ng!Pass",
             Name: "Test User",
             Email: "test@example.com",
             Phone: "0555123456",
             Username: "testuser",
             Password: "StrongP@ss1",
-            CommuneId: 99999  // Non-existent commune
+            Role: UserRoles.CommuneUser,
+            CommuneId: 2,
+            DairaId: null,
+            WilayaId: null
         ));
 
-        Assert.IsType<BadRequestObjectResult>(result);
+        var statusCodeResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(403, statusCodeResult.StatusCode);
     }
 
     [Fact]
     public async Task SignIn_WrongPassword_Returns401()
     {
         var db = CreateInMemoryDbContext();
-        
-        var configMock = CreateConfigMock();
-
+        await SeedLocationDataAsync(db);
         db.Users.Add(new User
         {
             Id = Guid.NewGuid(),
             Name = "Test User",
             Email = "test@example.com",
             Username = "testuser",
+            Phone = "0555000000",
             PasswordHash = BCrypt.Net.BCrypt.HashPassword("Str0ng!Pass"),
+            Role = UserRoles.CommuneUser,
             CommuneId = 1,
         });
-        db.Communes.Add(new Commune { CommuneId = 1, DairaId = 1 });
         await db.SaveChangesAsync();
 
-        var controller = new AuthController(db, CreateJwtService(configMock.Object), configMock.Object);
+        var configMock = CreateConfigMock();
+        var controller = CreateController(db, configMock.Object);
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
@@ -174,10 +226,8 @@ public class AuthControllerTests
     public async Task SignIn_UserNotFound_Returns401()
     {
         var db = CreateInMemoryDbContext();
-        
         var configMock = CreateConfigMock();
-
-        var controller = new AuthController(db, CreateJwtService(configMock.Object), configMock.Object);
+        var controller = CreateController(db, configMock.Object);
 
         var result = await controller.SignIn(new SignInRequest(
             Username: "nonexistent",
@@ -188,7 +238,7 @@ public class AuthControllerTests
     }
 
     [Fact]
-    public async Task Logout_WithAuthenticatedUser_Returns200()
+    public async Task Logout_WithAuthenticatedUser_ThrowsOnInMemoryExecuteUpdate()
     {
         var db = CreateInMemoryDbContext();
         var configMock = CreateConfigMock();
@@ -200,13 +250,13 @@ public class AuthControllerTests
             Id = userId,
             Name = "Test User",
             Email = "test@example.com",
+            Phone = "0555000000",
             Username = "testuser",
             PasswordHash = BCrypt.Net.BCrypt.HashPassword("Str0ng!Pass"),
+            Role = UserRoles.CommuneUser,
             CommuneId = 1,
         });
 
-        // Seed refresh tokens (InMemory doesn't support ExecuteUpdateAsync,
-        // so we test the controller's response logic rather than the DB update)
         db.RefreshTokens.Add(new RefreshToken
         {
             Id = Guid.NewGuid(),
@@ -217,28 +267,102 @@ public class AuthControllerTests
         });
         await db.SaveChangesAsync();
 
-        var controller = new AuthController(db, jwt, configMock.Object);
+        var controller = new AuthController(
+            db,
+            jwt,
+            configMock.Object,
+            Mock.Of<ILogger<AuthController>>());
 
-        // Simulate authenticated user via claims
         var claims = new List<Claim>
         {
-            new Claim("user_id", userId.ToString()),
+            new("user_id", userId.ToString()),
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
-        var httpContext = new DefaultHttpContext();
-        httpContext.User = new ClaimsPrincipal(identity);
+        var httpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) };
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = httpContext,
         };
 
-        // The Logout method calls ExecuteUpdateAsync which InMemory EF Core
-        // doesn't support (throws InvalidOperationException).
-        // This test documents the limitation — actual token revocation requires
-        // integration tests with PostgreSQL.
         var result = await Assert.ThrowsAsync<InvalidOperationException>(
             () => controller.Logout());
 
         Assert.Contains("ExecuteUpdate", result.Message);
+    }
+
+    private static async Task SeedLocationDataAsync(AppDbContext db)
+    {
+        db.Wilayas.Add(new Wilaya
+        {
+            WilayaId = 1,
+            WilayaFr = "Alger",
+            WilayaAr = "Alger",
+            WilayaLatitude = 36.75,
+            WilayaLongitude = 3.05,
+        });
+        db.Wilayas.Add(new Wilaya
+        {
+            WilayaId = 2,
+            WilayaFr = "Blida",
+            WilayaAr = "Blida",
+            WilayaLatitude = 36.47,
+            WilayaLongitude = 2.83,
+        });
+        db.Dairas.Add(new Daira
+        {
+            DairaId = 1,
+            WilayaId = 1,
+            DairaFr = "Draria",
+            DairaAr = "Draria",
+            DairaLatitude = 36.72,
+            DairaLongitude = 2.96,
+        });
+        db.Dairas.Add(new Daira
+        {
+            DairaId = 2,
+            WilayaId = 2,
+            DairaFr = "Blida Centre",
+            DairaAr = "Blida Centre",
+            DairaLatitude = 36.47,
+            DairaLongitude = 2.82,
+        });
+        db.Communes.Add(new Commune
+        {
+            CommuneId = 1,
+            DairaId = 1,
+            CommuneCode = 1001,
+            CommuneFr = "Draria Centre",
+            CommuneAr = "Draria Centre",
+            CommuneLatitude = 36.72,
+            CommuneLongitude = 2.96,
+        });
+        db.Communes.Add(new Commune
+        {
+            CommuneId = 2,
+            DairaId = 2,
+            CommuneCode = 2001,
+            CommuneFr = "Blida Centre",
+            CommuneAr = "Blida Centre",
+            CommuneLatitude = 36.47,
+            CommuneLongitude = 2.82,
+        });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task SeedAdminAsync(AppDbContext db, string username, string role, int? dairaId = null, int? wilayaId = null)
+    {
+        db.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            Name = "Admin User",
+            Email = $"admin-{Guid.NewGuid():N}@test.com",
+            Phone = "0555000000",
+            Username = username,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Str0ng!Pass"),
+            Role = role,
+            DairaId = dairaId,
+            WilayaId = wilayaId,
+        });
+        await db.SaveChangesAsync();
     }
 }

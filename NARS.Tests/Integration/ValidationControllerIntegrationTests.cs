@@ -25,7 +25,14 @@ public class ValidationControllerIntegrationTests : IAsyncLifetime
     {
         _fixture = fixture;
         _db = fixture.CreateDbContext();
-        _controller = new ValidationController(_db);
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Validation:MaxCoordinateCount"] = "10000",
+            ["Validation:RoadTurnAngleDegrees"] = "90",
+            ["Validation:RoadConnectivityMeters"] = "20",
+            ["Validation:DistrictBoundaryToleranceMeters"] = "10",
+        }).Build();
+        _controller = new ValidationController(_db, config);
     }
 
     public async Task InitializeAsync()

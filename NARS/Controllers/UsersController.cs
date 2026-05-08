@@ -10,10 +10,11 @@ namespace NarsApi.Controllers;
 /// Handles user profile and credential updates.
 /// </summary>
 [ApiController]
+[Route("/api")]
 [Tags("Users")]
 public class UsersController(AppDbContext db) : NarsControllerBase
 {
-    [HttpPut("/api/user/update")]
+    [HttpPut("user/update")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

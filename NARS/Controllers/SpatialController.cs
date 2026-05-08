@@ -15,12 +15,13 @@ namespace NarsApi.Controllers;
 /// <see cref="ValidationController"/>.
 /// </summary>
 [ApiController]
+[Route("/api")]
 [Tags("Spatial")]
 public class SpatialController(AppDbContext db, IScatteredAreaService scatteredService) : NarsControllerBase
 {
     // ── POST /api/road-side ───────────────────────────────────────────────────
 
-    [HttpPost("/api/road-side")]
+    [HttpPost("road-side")]
     public async Task<IActionResult> GetRoadSide([FromBody] RoadSideRequest body)
     {
         var road = await db.Roads.FirstOrDefaultAsync(f =>
@@ -88,7 +89,7 @@ public class SpatialController(AppDbContext db, IScatteredAreaService scatteredS
 
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
-                if (!reader.IsDBNull(0))
+                if (!await reader.IsDBNullAsync(0))
                     usedNumbers.Add(reader.GetInt32(0));
         }
         finally
@@ -106,7 +107,7 @@ public class SpatialController(AppDbContext db, IScatteredAreaService scatteredS
 
     // ── POST /api/areas/refresh-scattered ────────────────────────────────────
 
-    [HttpPost("/api/areas/refresh-scattered")]
+    [HttpPost("areas/refresh-scattered")]
     public async Task<IActionResult> RefreshScattered()
     {
         await scatteredService.RefreshAsync(CurrentUserId, RequiredCommuneId);

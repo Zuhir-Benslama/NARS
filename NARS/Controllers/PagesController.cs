@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -14,17 +15,17 @@ namespace NarsApi.Controllers;
 /// </summary>
 [ApiController]
 [ApiExplorerSettings(IgnoreApi = true)]
+#pragma warning disable S6931 // PagesController serves root-level paths (/, /login, /map), not API endpoints
 public class PagesController(
-    AppDbContext db,
     JwtService jwt,
     IAntiforgery antiforgery,
     IMemoryCache cache,
     IHostEnvironment env,
-    IConfiguration config,
-    ILogger<PagesController> logger) : ControllerBase
+    ILogger<PagesController> logger) : NarsControllerBase
 {
     // GET / — redirect to map if authenticated, otherwise to login
     [HttpGet("/")]
+    [AllowAnonymous]
     public async Task<IActionResult> Root()
     {
         logger.LogInformation("[Pages] Root request. Checking auth...");
@@ -40,15 +41,16 @@ public class PagesController(
 
     // GET /login — inject CSRF token and CSP nonce into the HTML
     [HttpGet("/login")]
+    [AllowAnonymous]
     public IActionResult LoginPage()
     {
         logger.LogInformation("[Pages] Serving login page");
         var tokens = antiforgery.GetAndStoreTokens(HttpContext);
         var nonce = HttpContext.Items["csp-nonce"] as string ?? string.Empty;
 
-        var template = LoadPageTemplate("login_html", "login.html");
+        var template = LoadPageTemplate("login_html", "login.html") ?? string.Empty;
 
-        var html = template!
+        var html = template
             // Inject the CSRF token into the <meta name="csrf-token"> placeholder
             .Replace("<meta name=\"csrf-token\" content=\"\">",
                 $"<meta name=\"csrf-token\" content=\"{tokens.RequestToken}\">")
@@ -62,34 +64,14 @@ public class PagesController(
     // Reads index.html as a template and injects the CSRF token + CSP nonce so
     // the SPA can send authenticated state-mutating requests without CSRF errors.
     [HttpGet("/map")]
+    [AllowAnonymous]
     public async Task<IActionResult> MapPage()
     {
         logger.LogInformation("[Pages] Map page request. Checking auth...");
         if (!await IsAuthenticatedAsync())
         {
-            logger.LogWarning("[Pages] Map page NOT authenticated.");
-            // Fallback: check URL query parameter for token (dev workaround)
-            var urlToken = Request.Query["token"].FirstOrDefault();
-            if (!string.IsNullOrEmpty(urlToken))
-            {
-                logger.LogInformation("[Pages] Found token in query string. Validating...");
-                if (jwt.ValidateToken(urlToken) is not null)
-                {
-                    logger.LogInformation("[Pages] Query token valid. Setting cookie.");
-                    // Set token cookie for future requests
-                    Response.Cookies.Append("access_token", urlToken, MakeCookieOptions(TimeSpan.FromHours(24)));
-                }
-                else
-                {
-                    logger.LogWarning("[Pages] Query token INVALID. Redirecting to /login");
-                    return Redirect("/login");
-                }
-            }
-            else
-            {
-                logger.LogWarning("[Pages] No query token. Redirecting to /login");
-                return Redirect("/login");
-            }
+            logger.LogWarning("[Pages] Map page NOT authenticated. Redirecting to /login");
+            return Redirect("/login");
         }
 
         logger.LogInformation("[Pages] Serving index.html for map");
@@ -97,9 +79,9 @@ public class PagesController(
         var tokens = antiforgery.GetAndStoreTokens(HttpContext);
         var nonce = HttpContext.Items["csp-nonce"] as string ?? string.Empty;
 
-        var template = LoadPageTemplate("index_html", "index.html");
+        var template = LoadPageTemplate("index_html", "index.html") ?? string.Empty;
 
-        var html = template!
+        var html = template
             // Inject CSRF token into the meta placeholder
             .Replace("<meta name=\"csrf-token\" content=\"\">",
                 $"<meta name=\"csrf-token\" content=\"{tokens.RequestToken}\">")
@@ -180,79 +162,34 @@ public class PagesController(
         }
 
         logger.LogInformation("[Pages] Found refresh_token. Attempting silent refresh...");
-        var hash = Convert.ToBase64String(
-            System.Security.Cryptography.SHA256.HashData(
-                System.Text.Encoding.UTF8.GetBytes(refreshToken)));
 
-        // Row-level lock to prevent race conditions during refresh rotation
-        await using var tx = await db.Database.BeginTransactionAsync();
         try
         {
-            var stored = await db.RefreshTokens
-                .FromSqlRaw(
-                    "SELECT * FROM refresh_tokens WHERE token_hash = {0} AND revoked = false AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1 FOR UPDATE SKIP LOCKED",
-                    hash)
-                .SingleOrDefaultAsync();
-
-            if (stored is null)
+            var refreshService = HttpContext.RequestServices.GetRequiredService<RefreshTokenService>();
+            var result = await refreshService.RotateRefreshTokenAsync(refreshToken);
+            if (!result.Success)
             {
-                logger.LogWarning("[Pages] refresh_token hash NOT FOUND or EXPIRED in DB.");
-                await tx.RollbackAsync();
+                logger.LogWarning("[Pages] Refresh failed: {Detail}", result.Detail);
                 return false;
             }
 
-            var user = await db.Users.FindAsync(stored.UserId);
-            if (user is null)
-            {
-                logger.LogWarning("[Pages] User for refresh_token NOT FOUND.");
-                await tx.RollbackAsync();
-                return false;
-            }
-
-            // Rotate: revoke old, issue new
-            stored.Revoked = true;
-            var (newRaw, newHash) = JwtService.CreateRefreshToken();
-            var refreshDays = int.TryParse(config["Jwt:RefreshExpiresInDays"], out var d) ? d : 30;
-            var refreshExpiry = DateTime.UtcNow.AddDays(refreshDays);
-
-            db.RefreshTokens.Add(new RefreshToken
-            {
-                UserId = user.Id,
-                TokenHash = newHash,
-                ExpiresAt = refreshExpiry,
-            });
-
-            await db.SaveChangesAsync();
-            await tx.CommitAsync();
-
-            var newToken = jwt.CreateToken(user.Id, user.Username, user.Name, user.Email,
-                communeId: user.CommuneId, role: user.Role, dairaId: user.DairaId, wilayaId: user.WilayaId);
-            var maxAge = refreshExpiry - DateTime.UtcNow;
-
-            logger.LogInformation("[Pages] Silent refresh SUCCESS. Issuing new cookies for {Username}", user.Username);
-            Response.Cookies.Append("access_token", newToken, MakeCookieOptions(TimeSpan.FromHours(24)));
-            Response.Cookies.Append("refresh_token", newRaw, MakeCookieOptions(maxAge));
+            var maxAge = result.RefreshExpiry!.Value - DateTime.UtcNow;
+            logger.LogInformation("[Pages] Silent refresh SUCCESS. Issuing new cookies for {Username}", result.User!.Username);
+            Response.Cookies.Append("access_token", result.NewAccessToken!, MakeCookieOptions(TimeSpan.FromHours(24)));
+            Response.Cookies.Append("refresh_token", result.NewRawToken!, MakeCookieOptions(maxAge));
 
             return true;
         }
-        catch (Exception ex)
+        catch (DbUpdateException ex)
         {
-            logger.LogError(ex, "[Pages] Error during silent refresh");
-            await tx.RollbackAsync();
+            logger.LogError(ex, "[Pages] Database error during silent refresh");
+            return false;
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogError(ex, "[Pages] Invalid operation during silent refresh");
             return false;
         }
     }
 
-    private CookieOptions MakeCookieOptions(TimeSpan maxAge)
-    {
-        return new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = Request.IsHttps,
-            SameSite = SameSiteMode.Lax,
-            MaxAge = maxAge,
-            Path = "/",
-            IsEssential = true,
-        };
-    }
 }

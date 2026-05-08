@@ -1,0 +1,220 @@
+#!/usr/bin/env bash
+# ─────────────────────────────────────────────────────────────────────────────
+# create_national_admin.sh
+#
+# Creates the NARS national_admin account directly in the PostgreSQL database.
+# This is the only way to bootstrap the first admin — no API endpoint exists
+# for national_admin creation by design.
+#
+# All user-supplied values are passed as psycopg2 parameters — never
+# interpolated into SQL strings, so there is no SQL injection risk.
+#
+# Requirements: python3, psycopg2-binary, bcrypt (auto-installed if missing)
+#
+# Usage:
+#   chmod +x create_national_admin.sh
+#   ./create_national_admin.sh
+#
+# Optional env overrides:
+#   NARS_DB_HOST  NARS_DB_PORT  NARS_DB_NAME  NARS_DB_USER  NARS_DB_PASSWORD
+# ─────────────────────────────────────────────────────────────────────────────
+
+set -euo pipefail
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
+info()    { echo -e "${CYAN}[INFO]${RESET}  $*"; }
+success() { echo -e "${GREEN}[OK]${RESET}    $*"; }
+warn()    { echo -e "${YELLOW}[WARN]${RESET}  $*"; }
+die()     { echo -e "${RED}[ERROR]${RESET} $*" >&2; exit 1; }
+
+echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${RESET}"
+echo -e "${BOLD}║       NARS — National Admin Account Creation             ║${RESET}"
+echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${RESET}"
+echo ""
+
+command -v python3 >/dev/null 2>&1 || die "python3 not found."
+
+# Auto-install Python dependencies
+for pkg in psycopg2-binary bcrypt; do
+    module="${pkg%%-*}"  # psycopg2-binary → psycopg2
+    if ! python3 -c "import ${module}" 2>/dev/null; then
+        warn "Python package '${pkg}' not found. Installing..."
+        pip3 install "${pkg}" --quiet --break-system-packages \
+            || pip3 install "${pkg}" --quiet \
+            || die "Failed to install ${pkg}. Run: pip3 install ${pkg}"
+        success "${pkg} installed."
+    fi
+done
+
+# ── Database connection ────────────────────────────────────────────────────────
+DB_HOST="${NARS_DB_HOST:-localhost}"
+DB_PORT="${NARS_DB_PORT:-5432}"
+DB_NAME="${NARS_DB_NAME:-nars_db}"
+DB_USER="${NARS_DB_USER:-postgres}"
+
+if [[ -z "${NARS_DB_PASSWORD:-}" ]]; then
+    read -r -s -p "$(echo -e "${CYAN}PostgreSQL password for ${DB_USER}@${DB_HOST}: ${RESET}")" DB_PASSWORD
+    echo ""
+else
+    DB_PASSWORD="${NARS_DB_PASSWORD}"
+fi
+
+# Test connection
+info "Testing database connection to ${DB_HOST}:${DB_PORT}/${DB_NAME}..."
+python3 -c "
+import psycopg2, sys
+try:
+    c = psycopg2.connect(host='${DB_HOST}', port=${DB_PORT}, dbname='${DB_NAME}',
+                          user='${DB_USER}', password='${DB_PASSWORD}')
+    c.close()
+except Exception as e:
+    print(f'Connection failed: {e}', file=sys.stderr); sys.exit(1)
+" || die "Cannot connect. Check credentials and that PostgreSQL is running."
+success "Database connection OK."
+echo ""
+
+# ── Check for existing national_admin ─────────────────────────────────────────
+EXISTING=$(python3 -c "
+import psycopg2
+c = psycopg2.connect(host='${DB_HOST}', port=${DB_PORT}, dbname='${DB_NAME}',
+                      user='${DB_USER}', password='${DB_PASSWORD}')
+cur = c.cursor()
+cur.execute(\"SELECT username FROM users WHERE role = 'national_admin' LIMIT 5\")
+for row in cur.fetchall(): print(row[0])
+c.close()
+")
+
+if [[ -n "${EXISTING}" ]]; then
+    warn "A national_admin account already exists:"
+    echo "${EXISTING}" | while read -r u; do echo "    • ${u}"; done
+    echo ""
+    read -r -p "$(echo -e "${YELLOW}Continue and create another? [y/N]: ${RESET}")" CONTINUE
+    [[ "${CONTINUE,,}" == "y" ]] || { info "Aborted."; exit 0; }
+    echo ""
+fi
+
+# ── Collect account details ────────────────────────────────────────────────────
+echo -e "${BOLD}Enter details for the new national admin account:${RESET}"
+echo ""
+
+read -r -p "  Full name:     " ADMIN_NAME
+[[ -n "${ADMIN_NAME}" ]] || die "Name cannot be empty."
+
+read -r -p "  Email:         " ADMIN_EMAIL
+[[ "${ADMIN_EMAIL}" == *"@"* ]] || die "Invalid email address."
+
+read -r -p "  Phone:         " ADMIN_PHONE
+[[ -n "${ADMIN_PHONE}" ]] || die "Phone cannot be empty."
+
+read -r -p "  Username:      " ADMIN_USERNAME
+[[ -n "${ADMIN_USERNAME}" ]] || die "Username cannot be empty."
+[[ "${#ADMIN_USERNAME}" -ge 3 ]] || die "Username must be at least 3 characters."
+
+while true; do
+    read -r -s -p "  Password:      " ADMIN_PASSWORD; echo ""
+    [[ "${#ADMIN_PASSWORD}" -ge 8 ]] || { warn "Password must be at least 8 characters."; continue; }
+    read -r -s -p "  Confirm:       " ADMIN_CONFIRM; echo ""
+    [[ "${ADMIN_PASSWORD}" == "${ADMIN_CONFIRM}" ]] && break
+    warn "Passwords do not match. Try again."
+done
+echo ""
+
+# ── Confirmation ───────────────────────────────────────────────────────────────
+echo -e "${BOLD}Review:${RESET}"
+echo "  Role:     national_admin"
+echo "  Name:     ${ADMIN_NAME}"
+echo "  Email:    ${ADMIN_EMAIL}"
+echo "  Phone:    ${ADMIN_PHONE}"
+echo "  Username: ${ADMIN_USERNAME}"
+echo ""
+read -r -p "$(echo -e "${YELLOW}Proceed? [y/N]: ${RESET}")" CONFIRM
+[[ "${CONFIRM,,}" == "y" ]] || { info "Aborted — no changes made."; exit 0; }
+
+# ── Insert via Python with parameterised query ─────────────────────────────────
+# All user-supplied values are passed as positional argv[] arguments and bound
+# as psycopg2 %s parameters — they are never interpolated into the SQL string.
+#
+# UUID: uuid.uuid4() generates a random UUID. The application normally uses
+# Guid.CreateVersion7() (time-ordered) for new rows, but the national_admin
+# is a bootstrap account — sequential ordering is not required here.
+info "Hashing password and inserting record..."
+
+python3 - "${ADMIN_NAME}" "${ADMIN_EMAIL}" "${ADMIN_PHONE}" \
+           "${ADMIN_USERNAME}" "${ADMIN_PASSWORD}" \
+           "${DB_HOST}" "${DB_PORT}" "${DB_NAME}" "${DB_USER}" "${DB_PASSWORD}" << 'PYEOF'
+import sys, uuid, bcrypt, psycopg2
+
+name, email, phone, username, password = sys.argv[1:6]
+host, port, dbname, user, pw           = sys.argv[6], int(sys.argv[7]), sys.argv[8], sys.argv[9], sys.argv[10]
+
+new_id   = str(uuid.uuid4())
+pwd_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=11)).decode()
+
+try:
+    conn = psycopg2.connect(host=host, port=port, dbname=dbname, user=user, password=pw)
+    cur  = conn.cursor()
+
+    # Uniqueness check — parameterised
+    cur.execute("SELECT 1 FROM users WHERE username = %s OR email = %s LIMIT 1", (username, email))
+    if cur.fetchone():
+        print("DUPE", file=sys.stderr)
+        conn.close(); sys.exit(2)
+
+    # Insert — all values as parameters, never interpolated into SQL
+    cur.execute("""
+        INSERT INTO users (
+            id, name, email, phone, username, password_hash,
+            role, commune_id, daira_id, wilaya_id,
+            created_at, failed_login_attempts, locked_until
+        ) VALUES (
+            %s, %s, %s, %s, %s, %s,
+            'national_admin', NULL, NULL, NULL,
+            NOW(), 0, NULL
+        )
+    """, (new_id, name, email, phone, username, pwd_hash))
+
+    conn.commit(); conn.close()
+    print(new_id)
+
+except Exception as e:
+    print(f"DB_ERROR: {e}", file=sys.stderr); sys.exit(1)
+PYEOF
+
+PYEXIT=$?
+if   [[ ${PYEXIT} -eq 2 ]]; then
+    die "Username '${ADMIN_USERNAME}' or email '${ADMIN_EMAIL}' is already in use."
+elif [[ ${PYEXIT} -ne 0 ]]; then
+    die "Insert failed. See error above."
+fi
+
+# Re-run to capture UUID (previous run had heredoc; capture requires subshell)
+NEW_UUID=$(python3 - "${ADMIN_NAME}" "${ADMIN_EMAIL}" "${ADMIN_PHONE}" \
+                      "${ADMIN_USERNAME}" "${ADMIN_PASSWORD}" \
+                      "${DB_HOST}" "${DB_PORT}" "${DB_NAME}" "${DB_USER}" "${DB_PASSWORD}" << 'PYEOF'
+import sys, uuid, bcrypt, psycopg2
+
+name, email, phone, username, password = sys.argv[1:6]
+host, port, dbname, user, pw           = sys.argv[6], int(sys.argv[7]), sys.argv[8], sys.argv[9], sys.argv[10]
+
+try:
+    conn = psycopg2.connect(host=host, port=port, dbname=dbname, user=user, password=pw)
+    cur  = conn.cursor()
+    cur.execute("SELECT id FROM users WHERE username = %s AND role = 'national_admin'", (username,))
+    row = cur.fetchone()
+    conn.close()
+    if row: print(row[0])
+except Exception as e:
+    print(f"ERR: {e}", file=sys.stderr)
+PYEOF
+)
+
+echo ""
+success "National admin account created successfully!"
+echo ""
+echo -e "${BOLD}Account details:${RESET}"
+echo "  UUID:     ${NEW_UUID}"
+echo "  Username: ${ADMIN_USERNAME}"
+echo "  Role:     national_admin"
+echo ""
+echo -e "${GREEN}You can now sign in at /login and create wilaya admins.${RESET}"

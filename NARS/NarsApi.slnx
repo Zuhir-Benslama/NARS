@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="NarsApi.csproj" />
+  <Project Path="../NARS.Tests/NarsApi.Tests.csproj" />
+</Solution>

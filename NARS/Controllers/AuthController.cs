@@ -12,64 +12,39 @@ using NarsApi.Services;
 namespace NarsApi.Controllers;
 
 [ApiController]
+[Route("/api")]
 [Tags("Auth")]
-public class AuthController(
+public partial class AuthController(
     AppDbContext db,
     JwtService jwt,
+    // config: read by SignIn + Refresh for Jwt:RefreshExpiresInDays.
+    // Accessed in the main AuthController.cs file; in scope for all partials.
     IConfiguration config,
     ILogger<AuthController> logger
-) : ControllerBase
+) : NarsControllerBase
 {
-    // ── POST /api/signup ──────────────────────────────────────
-
-    [HttpPost("/api/signup")]
-    [EnableRateLimiting("auth")]
-    [ProducesResponseType(StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> SignUp([FromBody] SignUpRequest body)
-    {
-        // Password strength: minimum 8 characters with complexity requirements
-        var pwdErr = PasswordValidator.Validate(body.Password);
-        if (pwdErr is not null)
-            return BadRequest(new { detail = pwdErr });
-
-        // Validate that the commune actually exists
-        var communeExists = await db.Communes.AnyAsync(c => c.CommuneId == body.CommuneId);
-        if (!communeExists)
-            return BadRequest(new { detail = "Invalid commune. Please select a valid commune." });
-
-        var existing = await db.Users.FirstOrDefaultAsync(u =>
-            u.Username == body.Username || u.Email == body.Email);
-
-        if (existing is not null)
+    // ── POST /api/signup — DISABLED ────────────────────────────────────────
+    // Self-registration is not allowed. All accounts must be created by an
+    // admin of the appropriate level:
+    //   commune_user  → created by the daira_admin of the user's daira
+    //   daira_admin   → created by the wilaya_admin of the daira's wilaya
+    //   wilaya_admin  → created by the national_admin
+    //   national_admin → created directly in the database
+    // Use POST /api/admin/authorized-signup from the login page instead.
+    [HttpPost("signup")]
+    [AllowAnonymous]
+    public IActionResult SignUp() =>
+        StatusCode(410, new
         {
-            var field = existing.Username == body.Username ? "Username" : "Email";
-            return Conflict(new { detail = $"{field} already exists" });
-        }
-
-        var user = new User
-        {
-            Name = body.Name,
-            Email = body.Email,
-            Phone = body.Phone,
-            Username = body.Username,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(body.Password),
-            CommuneId = body.CommuneId,
-            Role = NarsApi.Infrastructure.UserRoles.CommuneUser,
-            FailedLoginAttempts = 0,
-            LockedUntil = null,
-        };
-
-        db.Users.Add(user);
-        await db.SaveChangesAsync();
-
-        return StatusCode(201, new { success = true, message = "User registered successfully", user_id = user.Id });
-    }
+            detail = "Self-registration is disabled. " +
+                     "Contact your daira admin to create a commune user account, " +
+                     "or use POST /api/admin/authorized-signup for admin accounts."
+        });
 
     // ── POST /api/signin ──────────────────────────────────────
 
-    [HttpPost("/api/signin")]
+    [HttpPost("signin")]
+    [AllowAnonymous]
     [EnableRateLimiting("auth")]
     public async Task<IActionResult> SignIn([FromBody] SignInRequest body)
     {
@@ -128,9 +103,7 @@ public class AuthController(
 
         // fix #7: single joined query instead of 3 sequential round-trips.
         // fix #11: wilaya is not part of the SignIn response — not loaded here.
-        var loc = user.CommuneId.HasValue
-            ? await LoadCommuneWithDairaAsync(user.CommuneId.Value)
-            : new CommuneWithDaira(null, null);
+        var loc = await LoadCommuneWithDairaAsync(user.CommuneId ?? 0);
 
         return Ok(new
         {
@@ -158,7 +131,7 @@ public class AuthController(
 
     // ── POST /api/logout ──────────────────────────────────────
 
-    [HttpPost("/api/logout")]
+    [HttpPost("logout")]
     [Authorize]
     public async Task<IActionResult> Logout()
     {
@@ -180,65 +153,19 @@ public class AuthController(
 
     // ── POST /api/refresh — issue a new access token using a valid refresh token
     // Rate-limited to prevent refresh token brute-force attacks.
-    [HttpPost("/api/refresh")]
+    [HttpPost("refresh")]
+    [AllowAnonymous]
     [EnableRateLimiting("auth")]
-    public async Task<IActionResult> Refresh()
+    public async Task<IActionResult> Refresh(
+        [FromServices] RefreshTokenService refreshService)
     {
-        var refreshToken = Request.Cookies["refresh_token"];
-        if (string.IsNullOrEmpty(refreshToken))
-            return Unauthorized(new { detail = "No refresh token." });
+        var result = await refreshService.RotateRefreshTokenAsync(Request.Cookies["refresh_token"]);
+        if (!result.Success)
+            return Unauthorized(new { detail = result.Detail });
 
-        var hash = Convert.ToBase64String(
-            System.Security.Cryptography.SHA256.HashData(
-                System.Text.Encoding.UTF8.GetBytes(refreshToken)));
-
-        // Wrap the entire read-check-rotate in a single transaction with a
-        // row-level lock (FOR UPDATE SKIP LOCKED) to prevent concurrent
-        // requests from both reading the same token as valid.
-        await using var tx = await db.Database.BeginTransactionAsync();
-
-        var stored = await db.RefreshTokens
-            .FromSqlRaw(
-                "SELECT * FROM refresh_tokens WHERE token_hash = {0} AND revoked = false AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1 FOR UPDATE SKIP LOCKED",
-                hash)
-            .SingleOrDefaultAsync();
-
-        if (stored is null)
-        {
-            await tx.RollbackAsync();
-            return Unauthorized(new { detail = "Invalid or expired refresh token." });
-        }
-
-        // Load the user to create a fresh access token
-        var user = await db.Users.FindAsync(stored.UserId);
-        if (user is null)
-        {
-            await tx.RollbackAsync();
-            return Unauthorized(new { detail = "User no longer exists." });
-        }
-
-        // Rotate: revoke old refresh token, issue a new one
-        stored.Revoked = true;
-        var (newRaw, newHash) = JwtService.CreateRefreshToken();
-        var refreshExpiry = DateTime.UtcNow.AddDays(
-            ParseIntConfig(config["Jwt:RefreshExpiresInDays"], 30));
-
-        db.RefreshTokens.Add(new RefreshToken
-        {
-            UserId = user.Id,
-            TokenHash = newHash,
-            ExpiresAt = refreshExpiry,
-        });
-        await db.SaveChangesAsync();
-        await tx.CommitAsync();
-
-        var newToken = jwt.CreateToken(user.Id, user.Username, user.Name, user.Email,
-            communeId: user.CommuneId, role: user.Role, dairaId: user.DairaId, wilayaId: user.WilayaId);
-
-        var cookieMaxAge = refreshExpiry - DateTime.UtcNow;
-
-        Response.Cookies.Append("access_token", newToken, MakeCookieOptions(TimeSpan.FromHours(24)));
-        Response.Cookies.Append("refresh_token", newRaw, MakeCookieOptions(cookieMaxAge));
+        var cookieMaxAge = result.RefreshExpiry!.Value - DateTime.UtcNow;
+        Response.Cookies.Append("access_token", result.NewAccessToken!, MakeCookieOptions(TimeSpan.FromHours(24)));
+        Response.Cookies.Append("refresh_token", result.NewRawToken!, MakeCookieOptions(cookieMaxAge));
 
         return Ok(new { success = true, token_type = "bearer" });
     }
@@ -247,7 +174,7 @@ public class AuthController(
     // fix #1: [Authorize] + User.FindFirst(...) replaces manual GetPrincipalFromCookie(),
     // routing unauthenticated requests through the standard JWT bearer pipeline → 401.
 
-    [HttpGet("/api/current_user")]
+    [HttpGet("current_user")]
     [Authorize]
     public async Task<IActionResult> CurrentUser()
     {
@@ -324,8 +251,8 @@ public class AuthController(
 
     // ── Account lockout helpers ───────────────────────────────
 
-    private const int MaxFailedAttempts = 5;
-    private const int LockoutMinutes = 30;
+    private int MaxFailedAttempts => ParseIntConfig(config["AccountLockout:MaxFailedAttempts"], 5);
+    private int LockoutMinutes => ParseIntConfig(config["AccountLockout:LockoutMinutes"], 30);
 
     private static int ParseIntConfig(string? value, int defaultValue)
     {
@@ -343,8 +270,8 @@ public class AuthController(
 
     // ── Private helpers ───────────────────────────────────────
 
-    private record LocationChain(Commune? Commune, Daira? Daira, Wilaya? Wilaya);
-    private record CommuneWithDaira(Commune? Commune, Daira? Daira);
+    private sealed record LocationChain(Commune? Commune, Daira? Daira, Wilaya? Wilaya);
+    private sealed record CommuneWithDaira(Commune? Commune, Daira? Daira);
 
     /// <summary>
     /// fix #7: Loads commune → daira → wilaya in one SQL JOIN.
@@ -382,23 +309,5 @@ public class AuthController(
         return row is null
             ? new CommuneWithDaira(null, null)
             : new CommuneWithDaira(row.Commune, row.Daira);
-    }
-
-    /// <summary>
-    /// Creates a consistent CookieOptions with secure defaults for auth cookies.
-    /// </summary>
-    private CookieOptions MakeCookieOptions(TimeSpan maxAge)
-    {
-        var isHttps = Request.IsHttps;
-
-        return new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = isHttps,
-            SameSite = SameSiteMode.Lax,
-            MaxAge = maxAge,
-            Path = "/",
-            IsEssential = true,
-        };
     }
 }

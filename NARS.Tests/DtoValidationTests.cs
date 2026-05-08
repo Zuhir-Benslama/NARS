@@ -1,28 +1,28 @@
-using Xunit;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using NarsApi.DTOs;
+using NarsApi.Infrastructure;
+using Xunit;
 
 namespace NarsApi.Tests;
 
 public class DtoValidationTests
 {
-    // Note: SignUpRequest uses primary constructor parameters with validation
-    // attributes. On records, [Required] on a positional parameter applies to
-    // the auto-generated property, so Validator.TryValidateObject catches it.
-    // However, passing null! bypasses the C# null-state but the attribute still
-    // fires. We test via a subclass to ensure property-level validation.
-
     [Fact]
-    public void SignUpRequest_AllValid_PassesValidation()
+    public void AuthorizedAdminSignupRequest_AllValid_PassesValidation()
     {
-        var request = new SignUpRequest(
+        var request = new AuthorizedAdminSignupRequest(
+            AdminUsername: "admin1",
+            AdminPassword: "Str0ng!Pass",
             Name: "Test User",
             Email: "test@example.com",
             Phone: "0555123456",
             Username: "testuser",
             Password: "Str0ng!Pass",
-            CommuneId: 1
+            Role: UserRoles.CommuneUser,
+            CommuneId: 1,
+            DairaId: null,
+            WilayaId: null
         );
 
         var context = new ValidationContext(request);
@@ -47,10 +47,6 @@ public class DtoValidationTests
         Assert.True(isValid);
     }
 
-    /// <summary>
-    /// Documents that [Required] on records allows empty strings.
-    /// ASP.NET Core ModelState rejects empty strings at the controller level.
-    /// </summary>
     [Fact]
     public void SignInRequest_EmptyUsername_DocumentBehavior()
     {
@@ -59,13 +55,12 @@ public class DtoValidationTests
             Password: "Str0ng!Pass"
         );
 
-        // [Required] only rejects null, not empty strings
         var context = new ValidationContext(request);
         var results = new List<ValidationResult>();
         var isValid = Validator.TryValidateObject(request, context, results, true);
 
-        Assert.True(isValid); // Validator passes
-        Assert.Empty(request.Username); // But the string is empty
+        Assert.True(isValid);
+        Assert.Empty(request.Username);
     }
 
     [Fact]
@@ -85,21 +80,26 @@ public class DtoValidationTests
     }
 
     [Fact]
-    public void SignUpRequest_CanBeSerialized()
+    public void AuthorizedAdminSignupRequest_CanBeSerialized()
     {
-        var request = new SignUpRequest(
+        var request = new AuthorizedAdminSignupRequest(
+            AdminUsername: "admin1",
+            AdminPassword: "Str0ng!Pass",
             Name: "Test User",
             Email: "test@example.com",
             Phone: "0555123456",
             Username: "testuser",
             Password: "Str0ng!Pass",
-            CommuneId: 1
+            Role: UserRoles.CommuneUser,
+            CommuneId: 1,
+            DairaId: null,
+            WilayaId: null
         );
 
         var json = JsonSerializer.Serialize(request);
-        var deserialized = JsonSerializer.Deserialize<SignUpRequest>(json);
+        var deserialized = JsonSerializer.Deserialize<AuthorizedAdminSignupRequest>(json);
 
-        Assert.Equal("Test User", deserialized!.Name);
+        Assert.Equal("admin1", deserialized!.AdminUsername);
         Assert.Equal("test@example.com", deserialized.Email);
         Assert.Equal(1, deserialized.CommuneId);
     }
@@ -119,23 +119,14 @@ public class DtoValidationTests
         Assert.Equal("Str0ng!Pass", deserialized.Password);
     }
 
-    /// <summary>
-    /// Validates that the Controller ModelState would reject empty strings
-    /// for [Required] properties — this is what the API actually uses.
-    /// </summary>
     [Fact]
     public void SignInRequest_WithEmptyUsername_ModelStateWouldReject()
     {
-        // [Required] on records allows empty strings — ASP.NET Core's
-        // model binding rejects them at the controller level via ModelState.
-        // This test documents that behavior.
         var request = new SignInRequest(
             Username: "",
             Password: "Str0ng!Pass"
         );
 
-        // The DTO accepts empty strings (Required only rejects null),
-        // but the controller's [Required] model validation will catch this.
         Assert.Empty(request.Username);
     }
 }

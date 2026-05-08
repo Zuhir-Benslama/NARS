@@ -27,7 +27,7 @@ public static class FeatureTypes
     public const string CityCenter = "city_center";
     public const string NamingPanel = "naming_panel";
 
-    public static readonly IReadOnlySet<string> All = new HashSet<string>
+    public static readonly IReadOnlySet<string> AllTypes = new HashSet<string>
     {
         Area, Road, District, HouseEntrance, PublicBuilding, PublicSpace, CityCenter, NamingPanel
     };
@@ -75,7 +75,7 @@ public static class FeatureTypes
     {
         public const string HousingEstate = "housing_estate";
         public const string UrbanPole = "urban_pole";
-        public const string District = "district";
+        public const string DistrictLayer = "district";
         public const string TradActivitiesZone = "trad_activities_zone";
         public const string IndustryZone = "industry_zone";
 

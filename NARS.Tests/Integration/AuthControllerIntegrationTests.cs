@@ -3,20 +3,18 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Moq;
 using NarsApi.Controllers;
 using NarsApi.Data;
 using NarsApi.DTOs;
+using NarsApi.Infrastructure;
 using NarsApi.Models;
 using NarsApi.Services;
 using Xunit;
 
 namespace NarsApi.Tests.Integration;
 
-/// <summary>
-/// Integration tests for AuthController against a real PostgreSQL database.
-/// Tests the full stack: controller → EF Core → PostGIS.
-/// </summary>
 [Collection("PostgreSQL Integration")]
 public class AuthControllerIntegrationTests : IAsyncLifetime
 {
@@ -28,15 +26,11 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
     {
         _fixture = fixture;
         _db = fixture.CreateDbContext();
-
-        var config = CreateConfigMock();
-        var jwt = new JwtService("integration-test-secret-key-that-is-32chars!!", null, null, config.Object, Mock.Of<Microsoft.Extensions.Logging.ILogger<JwtService>>());
-        _controller = new AuthController(_db, jwt, config.Object);
+        _controller = CreateController(_db);
     }
 
     public async Task InitializeAsync()
     {
-        // Seed reference data required for tests
         await SeedReferenceDataAsync();
     }
 
@@ -46,21 +40,31 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task SignUp_ValidRequest_CreatesUser()
+    public async Task AuthorizedAdminSignup_ValidRequest_CreatesUser()
     {
-        var result = await _controller.SignUp(new SignUpRequest(
+        await CreateAdminAsync(
+            username: "daira_admin_1",
+            role: UserRoles.DairaAdmin,
+            password: "Str0ng!Pass",
+            dairaId: 1);
+
+        var result = await _controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
+            AdminUsername: "daira_admin_1",
+            AdminPassword: "Str0ng!Pass",
             Name: "Integration Test User",
             Email: "integration@test.com",
             Phone: "0555999888",
             Username: "integration_user",
             Password: "Str0ng!Pass",
-            CommuneId: 1
+            Role: UserRoles.CommuneUser,
+            CommuneId: 1,
+            DairaId: null,
+            WilayaId: null
         ));
 
         var statusResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, statusResult.StatusCode);
 
-        // Verify user was created in the database
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == "integration_user");
         Assert.NotNull(user);
         Assert.Equal("integration@test.com", user.Email);
@@ -68,24 +72,40 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task SignUp_DuplicateUsername_Returns409()
+    public async Task AuthorizedAdminSignup_DuplicateUsername_Returns409()
     {
-        await _controller.SignUp(new SignUpRequest(
+        await CreateAdminAsync(
+            username: "daira_admin_1",
+            role: UserRoles.DairaAdmin,
+            password: "Str0ng!Pass",
+            dairaId: 1);
+
+        await _controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
+            AdminUsername: "daira_admin_1",
+            AdminPassword: "Str0ng!Pass",
             Name: "User One",
             Email: "one@test.com",
             Phone: "0555111222",
             Username: "duplicate_user",
             Password: "Str0ng!Pass",
-            CommuneId: 1
+            Role: UserRoles.CommuneUser,
+            CommuneId: 1,
+            DairaId: null,
+            WilayaId: null
         ));
 
-        var result = await _controller.SignUp(new SignUpRequest(
+        var result = await _controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
+            AdminUsername: "daira_admin_1",
+            AdminPassword: "Str0ng!Pass",
             Name: "User Two",
             Email: "two@test.com",
             Phone: "0555333444",
-            Username: "duplicate_user",  // Same username
+            Username: "duplicate_user",
             Password: "Str0ng!Pass",
-            CommuneId: 1
+            Role: UserRoles.CommuneUser,
+            CommuneId: 1,
+            DairaId: null,
+            WilayaId: null
         ));
 
         Assert.IsType<ConflictObjectResult>(result);
@@ -94,15 +114,10 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task SignIn_CorrectCredentials_ReturnsTokens()
     {
-        // Register a user first
-        await _controller.SignUp(new SignUpRequest(
-            Name: "Sign In User",
-            Email: "signin@test.com",
-            Phone: "0555123456",
-            Username: "signin_user",
-            Password: "Str0ng!Pass",
-            CommuneId: 1
-        ));
+        await CreateCommuneUserAsync(
+            username: "signin_user",
+            password: "Str0ng!Pass",
+            communeId: 1);
 
         var controller = CreateSignInController();
         var result = await controller.SignIn(new SignInRequest(
@@ -111,21 +126,16 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
         ));
 
         var okResult = Assert.IsType<OkObjectResult>(result);
-        // The response is an anonymous type — just verify it's OK
         Assert.NotNull(okResult.Value);
     }
 
     [Fact]
     public async Task SignIn_WrongPassword_Returns401()
     {
-        await _controller.SignUp(new SignUpRequest(
-            Name: "Wrong Pass User",
-            Email: "wrong@test.com",
-            Phone: "0555777888",
-            Username: "wrong_pass",
-            Password: "Str0ng!Pass",
-            CommuneId: 1
-        ));
+        await CreateCommuneUserAsync(
+            username: "wrong_pass",
+            password: "Str0ng!Pass",
+            communeId: 1);
 
         var controller = CreateSignInController();
         var result = await controller.SignIn(new SignInRequest(
@@ -139,15 +149,10 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task Logout_RevokesRefreshTokens()
     {
-        // Sign in to get tokens
-        await _controller.SignUp(new SignUpRequest(
-            Name: "Logout User",
-            Email: "logout@test.com",
-            Phone: "0555999000",
-            Username: "logout_user",
-            Password: "Str0ng!Pass",
-            CommuneId: 1
-        ));
+        var user = await CreateCommuneUserAsync(
+            username: "logout_user",
+            password: "Str0ng!Pass",
+            communeId: 1);
 
         var signInController = CreateSignInController();
         await signInController.SignIn(new SignInRequest(
@@ -155,57 +160,60 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             Password: "Str0ng!Pass"
         ));
 
-        // Verify refresh token exists
-        var userId = (await _db.Users.FirstAsync(u => u.Username == "logout_user")).Id;
-        var tokenCount = await _db.RefreshTokens.CountAsync(rt => rt.UserId == userId && !rt.Revoked);
+        var tokenCount = await _db.RefreshTokens.CountAsync(rt => rt.UserId == user.Id && !rt.Revoked);
         Assert.True(tokenCount > 0);
 
-        // Now logout
-        var claims = new List<Claim> { new Claim("user_id", userId.ToString()) };
+        var claims = new List<Claim> { new("user_id", user.Id.ToString()) };
         var httpContext = CreateHttpContext(claims);
         _controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
         var result = await _controller.Logout();
-
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(200, okResult.StatusCode);
 
-        // Verify tokens were revoked
-        var revokedCount = await _db.RefreshTokens.CountAsync(rt => rt.UserId == userId && rt.Revoked);
+        var revokedCount = await _db.RefreshTokens.CountAsync(rt => rt.UserId == user.Id && rt.Revoked);
         Assert.True(revokedCount > 0);
     }
 
     [Fact]
     public async Task CurrentUser_WithValidToken_ReturnsUserData()
     {
-        await _controller.SignUp(new SignUpRequest(
-            Name: "Current User",
-            Email: "current@test.com",
-            Phone: "0555111333",
-            Username: "current_user",
-            Password: "Str0ng!Pass",
-            CommuneId: 1
-        ));
+        var user = await CreateCommuneUserAsync(
+            username: "current_user",
+            password: "Str0ng!Pass",
+            communeId: 1);
 
-        var user = await _db.Users.FirstAsync(u => u.Username == "current_user");
         var claims = new List<Claim>
         {
-            new Claim("user_id", user.Id.ToString()),
-            new Claim("commune_id", "1"),
+            new("user_id", user.Id.ToString()),
+            new("commune_id", "1"),
         };
         var httpContext = CreateHttpContext(claims);
         _controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
         var result = await _controller.CurrentUser();
-
         var okResult = Assert.IsType<OkObjectResult>(result);
-        // Verify response contains user data (anonymous type, can't cast directly)
         Assert.NotNull(okResult.Value);
+    }
+
+    private static AuthController CreateController(AppDbContext db)
+    {
+        var config = CreateConfigMock();
+        var jwt = new JwtService(
+            "integration-test-secret-key-that-is-32chars!!",
+            null,
+            null,
+            config.Object,
+            Mock.Of<ILogger<JwtService>>());
+        return new AuthController(
+            db,
+            jwt,
+            config.Object,
+            Mock.Of<ILogger<AuthController>>());
     }
 
     private async Task SeedReferenceDataAsync()
     {
-        // Only seed if tables are empty
         if (await _db.Communes.AnyAsync()) return;
 
         await _db.Wilayas.AddAsync(new Wilaya
@@ -238,7 +246,6 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             CommuneLongitude = 2.96,
         });
 
-        // Seed a simple commune boundary polygon (a small square near Draria)
         var factory = NetTopologySuite.NtsGeometryServices.Instance.CreateGeometryFactory(4326);
         var boundary = factory.CreatePolygon(new[]
         {
@@ -258,6 +265,50 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
         await _db.SaveChangesAsync();
     }
 
+    private async Task<User> CreateAdminAsync(
+        string username,
+        string role,
+        string password,
+        int? dairaId = null,
+        int? wilayaId = null)
+    {
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Name = $"Admin {username}",
+            Email = $"{username}@test.com",
+            Phone = "0555000000",
+            Username = username,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+            Role = role,
+            DairaId = dairaId,
+            WilayaId = wilayaId,
+        };
+
+        await _db.Users.AddAsync(user);
+        await _db.SaveChangesAsync();
+        return user;
+    }
+
+    private async Task<User> CreateCommuneUserAsync(string username, string password, int communeId)
+    {
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Name = $"User {username}",
+            Email = $"{username}@test.com",
+            Phone = "0555000000",
+            Username = username,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+            Role = UserRoles.CommuneUser,
+            CommuneId = communeId,
+        };
+
+        await _db.Users.AddAsync(user);
+        await _db.SaveChangesAsync();
+        return user;
+    }
+
     private static Mock<IConfiguration> CreateConfigMock()
     {
         var config = new Mock<IConfiguration>();
@@ -270,16 +321,16 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
     private static DefaultHttpContext CreateHttpContext(List<Claim> claims)
     {
         var identity = new ClaimsIdentity(claims, "TestAuth");
-        var httpContext = new DefaultHttpContext();
-        httpContext.User = new ClaimsPrincipal(identity);
+        var httpContext = new DefaultHttpContext
+        {
+            User = new ClaimsPrincipal(identity)
+        };
         return httpContext;
     }
 
     private AuthController CreateSignInController()
     {
-        var config = CreateConfigMock();
-        var jwt = new JwtService("integration-test-secret-key-that-is-32chars!!", null, null, config.Object, Mock.Of<Microsoft.Extensions.Logging.ILogger<JwtService>>());
-        var ctrl = new AuthController(_db, jwt, config.Object);
+        var ctrl = CreateController(_db);
         ctrl.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext(),

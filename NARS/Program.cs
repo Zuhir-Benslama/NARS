@@ -15,19 +15,27 @@ using NarsApi.Services;
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
-var loggerConfig = builder.Logging; // captured for startup logging
 
 // ═══════════════════════════════════════════════════════════════
 // 0. Secrets — environment variables override appsettings.json.
 //    NEVER commit real secrets to appsettings.json.
 // ═══════════════════════════════════════════════════════════════
 var connStr = builder.Configuration.GetConnectionString("DefaultConnection");
-var envDbPassword = builder.Configuration["NARS_DB_PASSWORD"];
-var hasPlaceholder = connStr?.Contains("Password=${NARS_DB_PASSWORD}") == true;
+
+// Read the DB password directly from the OS environment variable.
+// builder.Configuration["NARS_DB_PASSWORD"] also works but only if the var
+// is exported before the process starts. Environment.GetEnvironmentVariable
+// is unambiguous and works regardless of shell export state.
+var envDbPassword = Environment.GetEnvironmentVariable("NARS_DB_PASSWORD")
+    ?? builder.Configuration["NARS_DB_PASSWORD"];
+
+var hasPlaceholder = connStr?.Contains("${NARS_DB_PASSWORD}") == true;
 
 if (hasPlaceholder && string.IsNullOrEmpty(envDbPassword))
 {
-    throw new InvalidOperationException("Database password is not configured. Set NARS_DB_PASSWORD env var.");
+    throw new InvalidOperationException(
+        "Database password is not configured. " +
+        "Set the NARS_DB_PASSWORD environment variable before starting the server.");
 }
 
 if (!string.IsNullOrEmpty(envDbPassword))
@@ -63,8 +71,11 @@ if (string.IsNullOrEmpty(jwtIssuer) || string.IsNullOrEmpty(jwtAudience))
 {
     // Warn at startup that issuer/audience validation is disabled.
     // Acceptable for single-tenant development, but should be configured for production.
-    Console.WriteLine("[WARNING] JWT Issuer/Audience validation is disabled. Set Jwt:Issuer and Jwt:Audience for defense-in-depth.");
+    // Logged after the logger is initialized (see ApplicationStarted below).
 }
+
+// Logged after build when logger is available
+var logJwtWarning = string.IsNullOrEmpty(jwtIssuer) || string.IsNullOrEmpty(jwtAudience);
 
 builder.Services.AddNarsJwtAuthentication(
     jwtSecret,
@@ -77,6 +88,7 @@ builder.Services.AddNarsJwtAuthentication(
 builder.Services.AddSingleton<IBackgroundTaskQueue, BackgroundTaskQueue>();
 builder.Services.AddHostedService<BackgroundQueueProcessor>();
 builder.Services.AddScoped<IScatteredAreaService, ScatteredAreaService>();
+builder.Services.AddScoped<RefreshTokenService>();
 
 // HTTP client for tile proxy
 builder.Services.AddHttpClient("tile-proxy", client =>
@@ -161,6 +173,9 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
 var app = builder.Build();
 var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
 
+if (logJwtWarning)
+    startupLogger.LogWarning("JWT Issuer/Audience validation is disabled. Set Jwt:Issuer and Jwt:Audience for defense-in-depth.");
+
 // ── Database initialisation ───────────────────────────────────
 using (var scope = app.Services.CreateScope())
 {
@@ -209,14 +224,14 @@ app.UseDefaultFiles();
 // deprecated "application/javascript". When combined with X-Content-Type-Options: nosniff,
 // any missing or incorrect Content-Type causes browsers to block the resource entirely.
 var contentTypeProvider = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
-contentTypeProvider.Mappings[".js"]    = "text/javascript";    // RFC 9239 (supersedes application/javascript)
-contentTypeProvider.Mappings[".mjs"]   = "text/javascript";
-contentTypeProvider.Mappings[".css"]   = "text/css";
+contentTypeProvider.Mappings[".js"] = "text/javascript";    // RFC 9239 (supersedes application/javascript)
+contentTypeProvider.Mappings[".mjs"] = "text/javascript";
+contentTypeProvider.Mappings[".css"] = "text/css";
 contentTypeProvider.Mappings[".woff2"] = "font/woff2";
-contentTypeProvider.Mappings[".woff"]  = "font/woff";
-contentTypeProvider.Mappings[".ico"]   = "image/x-icon";
-contentTypeProvider.Mappings[".svg"]   = "image/svg+xml";
-contentTypeProvider.Mappings[".map"]   = "application/json";   // source maps
+contentTypeProvider.Mappings[".woff"] = "font/woff";
+contentTypeProvider.Mappings[".ico"] = "image/x-icon";
+contentTypeProvider.Mappings[".svg"] = "image/svg+xml";
+contentTypeProvider.Mappings[".map"] = "application/json";   // source maps
 
 app.UseStaticFiles(new StaticFileOptions
 {
@@ -329,4 +344,4 @@ app.Lifetime.ApplicationStarted.Register(() =>
     startupLogger.LogInformation("Startup complete — {Addresses}", addresses);
 });
 
-app.Run();
+await app.RunAsync();

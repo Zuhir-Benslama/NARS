@@ -1,8 +1,12 @@
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import { fileURLToPath } from 'node:url'
+import path from 'node:path'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig(({ command, mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
+  const env = loadEnv(mode, __dirname, '')
   const devBackend = env.VITE_DEV_BACKEND || 'http://localhost:5000'
 
   const plugins = [
@@ -32,15 +36,8 @@ export default defineConfig(({ command, mode }) => {
     outDir: 'dist',
     emptyOutDir: true,
     sourcemap: true,
-    rollupOptions: {
-      input: {
-        main: './index.html',
-        login: './login.html',
-      },
-    },
     // Maplibre GL JS is ~1MB - separated into its own chunk
     chunkSizeWarningLimit: 1500,
-    // Add cache-busting to all assets
     rollupOptions: {
       output: {
         entryFileNames: 'assets/[name]-[hash].js',

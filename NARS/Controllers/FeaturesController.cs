@@ -15,6 +15,7 @@ namespace NarsApi.Controllers;
 /// Feature-type metadata and layer queries live in FeatureCatalogController.
 /// </summary>
 [ApiController]
+[Route("/api")]
 [Tags("Features")]
 public class FeaturesController(
     AppDbContext db,
@@ -27,13 +28,13 @@ public class FeaturesController(
 
     // ── POST /api/save ────────────────────────────────────────────────────────
 
-    [HttpPost("/api/save")]
+    [HttpPost("save")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> SaveFeature([FromBody] FeatureSaveRequest body)
     {
-        if (!FeatureTypes.All.Contains(body.Type))
+        if (!FeatureTypes.AllTypes.Contains(body.Type))
             return BadRequest(new { detail = $"Unknown feature type '{body.Type}'." });
         if (!FeatureTypes.IsValidLayer(body.Type, body.Layer))
             return BadRequest(new { detail = $"Layer '{body.Layer}' is not valid for type '{body.Type}'." });
@@ -50,9 +51,9 @@ public class FeaturesController(
         var dataJson = rawJson;
 
         Guid? roadId = null;
-        if (body.Type == FeatureTypes.HouseEntrance && body.Layer == FeatureTypes.HouseEntranceLayers.Main)
-            if (body.Data.TryGetProperty("roadDbId", out var ridEl) && ridEl.ValueKind == JsonValueKind.String && Guid.TryParse(ridEl.GetString(), out var rid))
-                roadId = rid;
+        if (body.Type == FeatureTypes.HouseEntrance && body.Layer == FeatureTypes.HouseEntranceLayers.Main
+            && body.Data.TryGetProperty("roadDbId", out var ridEl) && ridEl.ValueKind == JsonValueKind.String && Guid.TryParse(ridEl.GetString(), out var rid))
+            roadId = rid;
 
         // Validate that the referenced road exists and belongs to the current user.
         if (roadId.HasValue && !await db.Roads.AnyAsync(r => r.Id == roadId.Value && r.UserId == CurrentUserId))
@@ -89,11 +90,11 @@ public class FeaturesController(
 
     // ── GET /api/load ─────────────────────────────────────────────────────────
     // Supports pagination via ?skip=0&take=100 query parameters.
-    // Maximum page size is 500 to prevent oversized responses.
+    // Default page size is 1000, maximum is 2000 to prevent oversized responses.
     // Uses UNION ALL across all feature tables so Skip/Take applies to the
     // combined result — not per-table (which would return up to 8x the page).
 
-    [HttpGet("/api/load")]
+    [HttpGet("load")]
     public async Task<IActionResult> LoadFeatures([FromQuery] int skip = 0, [FromQuery] int take = 1000)
     {
         // Cap page size to prevent memory exhaustion and oversized responses.
@@ -113,7 +114,7 @@ public class FeaturesController(
 
     // ── POST /api/clear ───────────────────────────────────────────────────────
 
-    [HttpPost("/api/clear")]
+    [HttpPost("clear")]
     [EnableRateLimiting("clear")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -155,7 +156,7 @@ public class FeaturesController(
 
     // ── GET /api/stats ────────────────────────────────────────────────────────
 
-    [HttpGet("/api/stats")]
+    [HttpGet("stats")]
     public async Task<IActionResult> GetStats()
     {
         var uid = CurrentUserId;
@@ -215,7 +216,7 @@ public class FeaturesController(
 
     // ── GET /api/scattered-status ─────────────────────────────────────────────
 
-    [HttpGet("/api/scattered-status")]
+    [HttpGet("scattered-status")]
     public IActionResult GetScatteredStatus()
     {
         var error = scatteredService.LastError;
@@ -229,11 +230,16 @@ public class FeaturesController(
 
     // ── PUT /api/update/{id} ──────────────────────────────────────────────────
 
-    [HttpPut("/api/update/{featureId:guid}")]
+    [HttpPut("update/{featureId:guid}")]
     public async Task<IActionResult> UpdateFeature(Guid featureId, [FromBody] FeatureUpdateRequest body)
     {
         var reg = await db.FeatureRegistry.FindAsync(featureId);
         if (reg is null) return NotFound(new { detail = "Feature not found" });
+
+        // Verify ownership — prevent users from updating other users' features
+        var owned = await FeatureTypeRegistry.GetDbSet(db, reg.FeatureType)!
+            .AnyAsync(f => f.Id == featureId && f.UserId == CurrentUserId);
+        if (!owned) return NotFound(new { detail = "Feature not found" });
 
         // Guard against oversized JSON payloads (max ~500 KB per feature)
         if (body.Data is JsonElement dataElement)
@@ -268,7 +274,7 @@ public class FeaturesController(
 
     // ── DELETE /api/delete/{id} ───────────────────────────────────────────────
 
-    [HttpDelete("/api/delete/{featureId:guid}")]
+    [HttpDelete("delete/{featureId:guid}")]
     public async Task<IActionResult> DeleteFeature(Guid featureId)
     {
         var reg = await db.FeatureRegistry.FindAsync(featureId);

@@ -1,81 +1,81 @@
 /* ── Dark (default) ─────────────────────────────────────────────────────────── */
 :root {
-    --glass-bg: rgba(15, 25, 50, 0.88);
-    --glass-bg-hover: rgba(255, 255, 255, 0.1);
-    --glass-border: rgba(255, 255, 255, 0.25);
-    --glass-blur: blur(20px);
-    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --glass-bg: rgba(15, 25, 50, 0.88);
+  --glass-bg-hover: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.25);
+  --glass-blur: blur(20px);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 
-    --text-primary: #ffffff;
-    --text-secondary: rgba(255, 255, 255, 0.7);
-    --text-muted: rgba(255, 255, 255, 0.4);
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.7);
+  --text-muted: rgba(255, 255, 255, 0.4);
 
-    --input-bg: rgba(255, 255, 255, 0.1);
-    --input-border: rgba(255, 255, 255, 0.3);
-    --input-border-focus: rgba(255, 255, 255, 0.55);
-    --input-text: #ffffff;
-    --input-placeholder: rgba(255, 255, 255, 0.35);
-    --input-scheme: dark;
+  --input-bg: rgba(255, 255, 255, 0.1);
+  --input-border: rgba(255, 255, 255, 0.3);
+  --input-border-focus: rgba(255, 255, 255, 0.55);
+  --input-text: #ffffff;
+  --input-placeholder: rgba(255, 255, 255, 0.35);
+  --input-scheme: dark;
 
-    --btn-glass-bg: rgba(255, 255, 255, 0.15);
-    --btn-glass-border: rgba(255, 255, 255, 0.25);
-    --btn-glass-hover: rgba(255, 255, 255, 0.22);
-    --btn-cancel-bg: rgba(255, 255, 255, 0.08);
-    --btn-cancel-text: rgba(255, 255, 255, 0.75);
-    --btn-cancel-border: rgba(255, 255, 255, 0.2);
-    --btn-cancel-hover: rgba(255, 255, 255, 0.14);
+  --btn-glass-bg: rgba(255, 255, 255, 0.15);
+  --btn-glass-border: rgba(255, 255, 255, 0.25);
+  --btn-glass-hover: rgba(255, 255, 255, 0.22);
+  --btn-cancel-bg: rgba(255, 255, 255, 0.08);
+  --btn-cancel-text: rgba(255, 255, 255, 0.75);
+  --btn-cancel-border: rgba(255, 255, 255, 0.2);
+  --btn-cancel-hover: rgba(255, 255, 255, 0.14);
 
-    --dropdown-bg: rgba(10, 25, 55, 0.95);
-    --dropdown-bg-blur: blur(16px);
-    --dropdown-border: rgba(255, 255, 255, 0.2);
-    --dropdown-item: rgba(255, 255, 255, 0.85);
-    --dropdown-hover: rgba(255, 255, 255, 0.12);
+  --dropdown-bg: rgba(10, 25, 55, 0.95);
+  --dropdown-bg-blur: blur(16px);
+  --dropdown-border: rgba(255, 255, 255, 0.2);
+  --dropdown-item: rgba(255, 255, 255, 0.85);
+  --dropdown-hover: rgba(255, 255, 255, 0.12);
 
-    --overlay-bg: rgba(0, 0, 0, 0.65);
-    --modal-bg: rgba(15, 25, 50, 0.88);
-    --modal-border: rgba(255, 255, 255, 0.25);
-    --modal-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-    --modal-text: #ffffff;
-    --modal-label: rgba(255, 255, 255, 0.85);
+  --overlay-bg: rgba(0, 0, 0, 0.65);
+  --modal-bg: rgba(15, 25, 50, 0.88);
+  --modal-border: rgba(255, 255, 255, 0.25);
+  --modal-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --modal-text: #ffffff;
+  --modal-label: rgba(255, 255, 255, 0.85);
 }
 
 /* ── Light ──────────────────────────────────────────────────────────────────── */
-[data-theme='light'] {
-    --glass-bg: rgba(255, 255, 255, 0.72);
-    --glass-bg-hover: rgba(255, 255, 255, 0.82);
-    --glass-border: rgba(255, 255, 255, 0.25);
-    --glass-blur: blur(20px);
-    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+[data-theme="light"] {
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-bg-hover: rgba(255, 255, 255, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.25);
+  --glass-blur: blur(20px);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 
-    --text-primary: #1a1a2e;
-    --text-secondary: rgba(0, 0, 0, 0.6);
-    --text-muted: rgba(0, 0, 0, 0.38);
+  --text-primary: #1a1a2e;
+  --text-secondary: rgba(0, 0, 0, 0.6);
+  --text-muted: rgba(0, 0, 0, 0.38);
 
-    --input-bg: rgba(0, 0, 0, 0.06);
-    --input-border: rgba(0, 0, 0, 0.2);
-    --input-border-focus: rgba(0, 0, 0, 0.45);
-    --input-text: #1a1a2e;
-    --input-placeholder: rgba(0, 0, 0, 0.3);
-    --input-scheme: light;
+  --input-bg: rgba(0, 0, 0, 0.06);
+  --input-border: rgba(0, 0, 0, 0.2);
+  --input-border-focus: rgba(0, 0, 0, 0.45);
+  --input-text: #1a1a2e;
+  --input-placeholder: rgba(0, 0, 0, 0.3);
+  --input-scheme: light;
 
-    --btn-glass-bg: rgba(255, 255, 255, 0.15);
-    --btn-glass-border: rgba(255, 255, 255, 0.25);
-    --btn-glass-hover: rgba(255, 255, 255, 0.22);
-    --btn-cancel-bg: rgba(0, 0, 0, 0.07);
-    --btn-cancel-text: rgba(0, 0, 0, 0.65);
-    --btn-cancel-border: rgba(0, 0, 0, 0.15);
-    --btn-cancel-hover: rgba(0, 0, 0, 0.12);
+  --btn-glass-bg: rgba(255, 255, 255, 0.15);
+  --btn-glass-border: rgba(255, 255, 255, 0.25);
+  --btn-glass-hover: rgba(255, 255, 255, 0.22);
+  --btn-cancel-bg: rgba(0, 0, 0, 0.07);
+  --btn-cancel-text: rgba(0, 0, 0, 0.65);
+  --btn-cancel-border: rgba(0, 0, 0, 0.15);
+  --btn-cancel-hover: rgba(0, 0, 0, 0.12);
 
-    --dropdown-bg: rgba(240, 244, 255, 0.92);
-    --dropdown-bg-blur: blur(16px);
-    --dropdown-border: rgba(255, 255, 255, 0.2);
-    --dropdown-item: #1a1a2e;
-    --dropdown-hover: rgba(0, 0, 0, 0.06);
+  --dropdown-bg: rgba(240, 244, 255, 0.92);
+  --dropdown-bg-blur: blur(16px);
+  --dropdown-border: rgba(255, 255, 255, 0.2);
+  --dropdown-item: #1a1a2e;
+  --dropdown-hover: rgba(0, 0, 0, 0.06);
 
-    --overlay-bg: rgba(0, 0, 0, 0.55);
-    --modal-bg: rgba(255, 255, 255, 0.75);
-    --modal-border: rgba(255, 255, 255, 0.6);
-    --modal-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-    --modal-text: #1a1a2e;
-    --modal-label: rgba(0, 0, 0, 0.75);
+  --overlay-bg: rgba(0, 0, 0, 0.55);
+  --modal-bg: rgba(255, 255, 255, 0.75);
+  --modal-border: rgba(255, 255, 255, 0.6);
+  --modal-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  --modal-text: #1a1a2e;
+  --modal-label: rgba(0, 0, 0, 0.75);
 }
