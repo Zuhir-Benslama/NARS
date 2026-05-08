@@ -13,10 +13,11 @@ spec:
       labels:
         app: nars-api
     spec:
+      imagePullSecrets:
+        - name: regcred
       containers:
         - name: nars-api
-          # Replace with your pushed image
-          image: your-registry/nars-api:latest
+          image: zuhirbenslama/nars-api:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

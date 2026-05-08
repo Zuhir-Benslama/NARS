@@ -1,8 +1,5 @@
-# Optional custom Postgres image for k8s/postgres.yaml.
-# Build with:
-# docker build -f Docker/Dockerfile.postgres -t your-registry/nars-postgres:15 .
+FROM postgis/postgis:17-3.5
 
-FROM postgres:15
+COPY docs/nars_db.sql /docker-entrypoint-initdb.d/01-nars-schema.sql
 
-# Keep defaults; runtime env vars from Kubernetes Secret/Deployment are used.
 EXPOSE 5432

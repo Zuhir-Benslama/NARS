@@ -4,8 +4,13 @@ metadata:
   name: nars-api
   namespace: nars
 spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - nars.dz
+      secretName: nars-tls
   rules:
-    - host: nars.local
+    - host: nars.dz
       http:
         paths:
           - path: /
