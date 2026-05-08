@@ -19,6 +19,12 @@ public static class AuthenticationExtensions
         string? issuer = null,
         string? audience = null)
     {
+        // Prevent JwtSecurityTokenHandler from renaming custom claims.
+        // By default it maps e.g. "role" → long URI claim type, which breaks
+        // User.FindFirstValue("role") in NarsControllerBase.CurrentUserRole.
+        Microsoft.IdentityModel.JsonWebTokens.JsonWebTokenHandler.DefaultMapInboundClaims = false;
+        System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {

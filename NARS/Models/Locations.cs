@@ -18,9 +18,9 @@ public class User
     /// </summary>
     [Column("commune_id")] public int? CommuneId { get; set; }
     /// <summary>Geographic scope for daira_admin accounts.</summary>
-    [Column("daira_id")]   public int? DairaId   { get; set; }
+    [Column("daira_id")] public int? DairaId { get; set; }
     /// <summary>Geographic scope for wilaya_admin accounts.</summary>
-    [Column("wilaya_id")]  public int? WilayaId  { get; set; }
+    [Column("wilaya_id")] public int? WilayaId { get; set; }
     /// <summary>Role: commune_user | daira_admin | wilaya_admin | national_admin</summary>
     [Column("role"), MaxLength(20), Required] public string Role { get; set; } = NarsApi.Infrastructure.UserRoles.CommuneUser;
     [Column("created_at")] public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

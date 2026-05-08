@@ -3,6 +3,7 @@ package com.nars.maplibre.data.repository
 import com.nars.maplibre.data.model.NarsFeature
 import com.nars.maplibre.data.store.FeatureStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -19,9 +20,7 @@ class LocalFeatureRepository(
     }
     
     override fun getFeaturesByPhase(phaseKey: String): Flow<List<NarsFeature>> {
-        // Return the featuresByPhase flow - caller should filter by phaseKey
-        @Suppress("UNCHECKED_CAST")
-        return featureStore.featuresByPhase as Flow<List<NarsFeature>>
+        return featureStore.featuresByPhase.map { it[phaseKey] ?: emptyList() }
     }
     
     override suspend fun getFeatureById(featureId: String): NarsFeature? = withContext(Dispatchers.Default) {

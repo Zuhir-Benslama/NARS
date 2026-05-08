@@ -1,5 +1,4 @@
 using Xunit;
-using DotNet.Testcontainers.Builders;
 using Testcontainers.PostgreSql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -14,12 +13,10 @@ namespace NarsApi.Tests.Integration;
 /// </summary>
 public sealed class NarsDatabaseFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
-        .WithImage("postgis/postgis:17-3.5-alpine")
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgis/postgis:17-3.5-alpine")
         .WithDatabase("nars_test")
         .WithUsername("nars")
         .WithPassword("nars_password")
-        .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(5432))
         .Build();
 
     private bool _initialized;

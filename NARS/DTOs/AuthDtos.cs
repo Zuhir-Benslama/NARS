@@ -33,18 +33,32 @@ public record PagedResponse<T>(
 // ─── AUTH DTOs ───────────────────────────────────────────────────────────────
 
 /// <summary>
-/// Request body for user registration (commune_user only).
-/// Admin accounts are created via POST /api/admin/users.
+/// Request body for creating any account from the public login page.
+/// The authorizing admin's credentials are included so no browser session
+/// is required.
+///
+/// Required geographic field per target role:
+///   commune_user   → commune_id  (must belong to admin's daira)
+///   daira_admin    → daira_id    (must belong to admin's wilaya)
+///   wilaya_admin   → wilaya_id   (any; national_admin only)
+///   national_admin → not creatable via API
 /// </summary>
-public record SignUpRequest(
+public record AuthorizedAdminSignupRequest(
+    // ── Authorizing admin ────────────────────────────────────────────────────
+    [Required] string AdminUsername,
+    [Required] string AdminPassword,
+    // ── New account details ──────────────────────────────────────────────────
     [Required] string Name,
     [Required, EmailAddress] string Email,
     [Required] string Phone,
     [Required] string Username,
     [Required] string Password,
-    [Required] int CommuneId
+    [Required] string Role,
+    // ── Geographic anchor (one required depending on role) ───────────────────
+    int? CommuneId,
+    int? DairaId,
+    int? WilayaId
 );
-
 /// <summary>
 /// Request body for user login.
 /// </summary>

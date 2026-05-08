@@ -54,7 +54,7 @@ public class BackgroundTaskQueue : IBackgroundTaskQueue
 public class BackgroundQueueProcessor(
     IBackgroundTaskQueue queue,
     IServiceProvider services,
-    ILogger<BackgroundQueueProcessor> logger) : IHostedService
+    ILogger<BackgroundQueueProcessor> logger) : IHostedService, IAsyncDisposable
 {
     private Task? _executingTask;
     private readonly CancellationTokenSource _shutdown = new();
@@ -69,9 +69,16 @@ public class BackgroundQueueProcessor(
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        _shutdown.Cancel();
+        await _shutdown.CancelAsync();
         if (_executingTask != null)
             await Task.WhenAny(_executingTask, Task.Delay(Timeout.Infinite, cancellationToken));
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _shutdown.Dispose();
+        if (_executingTask is not null)
+            await _executingTask;
     }
 
     private async Task ProcessQueueAsync(CancellationToken ct)
@@ -81,8 +88,6 @@ public class BackgroundQueueProcessor(
             try
             {
                 var workItem = await queue.DequeueAsync(ct);
-                if (workItem is null) continue;
-
                 await workItem(services, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)

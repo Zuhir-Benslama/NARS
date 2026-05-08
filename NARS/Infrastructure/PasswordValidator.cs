@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Linq;
 
 namespace NarsApi.Infrastructure;
@@ -15,9 +16,9 @@ public static class PasswordValidator
     {
         if (password.Length < 8)
             return "Password must be at least 8 characters.";
-        if (!password.Any(char.IsUpper))
+        if (!password.Any(c => char.IsUpper(c)))
             return "Password must contain at least one uppercase letter.";
-        if (!password.Any(char.IsDigit))
+        if (!password.Any(c => char.IsDigit(c)))
             return "Password must contain at least one digit.";
         if (!password.Any(c => !char.IsLetterOrDigit(c)))
             return "Password must contain at least one special character.";

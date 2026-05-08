@@ -135,6 +135,15 @@ class SecurePreferences(context: Context) {
     }
 
     /**
+     * Clear municipality name
+     */
+    fun clearMunicipalityName() {
+        encryptedPrefs.edit()
+            .remove(KEY_MUNICIPALITY)
+            .apply()
+    }
+
+    /**
      * Clear all secure data
      */
     fun clearAll() {

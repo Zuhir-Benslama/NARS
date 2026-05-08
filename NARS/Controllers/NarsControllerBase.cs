@@ -69,4 +69,20 @@ public abstract class NarsControllerBase : ControllerBase
     /// </summary>
     protected static void AddParam(IDbCommand cmd, string name, object value)
         => SqlFragments.AddParam(cmd, name, value);
+
+    /// <summary>
+    /// Creates a consistent CookieOptions with secure defaults for auth cookies.
+    /// </summary>
+    protected CookieOptions MakeCookieOptions(TimeSpan maxAge)
+    {
+        return new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = Request.IsHttps,
+            SameSite = SameSiteMode.Lax,
+            MaxAge = maxAge,
+            Path = "/",
+            IsEssential = true,
+        };
+    }
 }

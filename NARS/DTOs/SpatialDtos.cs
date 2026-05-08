@@ -4,9 +4,9 @@ using System.Text.Json.Serialization;
 namespace NarsApi.DTOs;
 
 public record RoadSideRequest(
-    [Required][property: JsonPropertyName("roadId")] Guid RoadId,
-    [Required][property: JsonPropertyName("lat")] double Lat,
-    [Required][property: JsonPropertyName("lng")] double Lng
+    [Required][property: JsonPropertyName("roadId")][property: JsonRequired] Guid RoadId,
+    [Required][property: JsonPropertyName("lat")][property: JsonRequired] double Lat,
+    [Required][property: JsonPropertyName("lng")][property: JsonRequired] double Lng
 );
 
 public record RoadSideResponse(
