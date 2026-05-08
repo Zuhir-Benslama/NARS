@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
    NARS — National Addressing Reference System
-   login.css — styles for the login / sign-up page
+   login.css — styles for the login page
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 * {
@@ -29,34 +29,6 @@ body {
     width: 100%;
     max-width: 450px;
     overflow: hidden;
-}
-
-.tabs {
-    display: flex;
-    background: rgba(0, 0, 0, 0.01);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.tab {
-    flex: 1;
-    padding: 20px;
-    text-align: center;
-    cursor: pointer;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.6);
-    transition: all 0.3s;
-    border-bottom: 3px solid transparent;
-}
-
-.tab:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.9);
-}
-
-.tab.active {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.1);
-    border-bottom: 3px solid rgba(255, 255, 255, 0.8);
 }
 
 .form-container {
@@ -156,17 +128,6 @@ select option {
     display: none;
 }
 
-.success-message {
-    background: rgba(50, 180, 100, 0.3);
-    border: 1px solid rgba(100, 220, 140, 0.4);
-    color: #aaffcc;
-    padding: 12px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    font-size: 14px;
-    display: none;
-}
-
 .logo {
     text-align: center;
     margin-bottom: 30px;
@@ -182,76 +143,6 @@ select option {
 .logo p {
     color: rgba(255, 255, 255, 0.7);
     font-size: 14px;
-}
-
-/* ── Searchable select ──────────────────────────────────────────────────────── */
-
-.search-select-wrapper {
-    position: relative;
-}
-
-.search-select {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    border-radius: 8px;
-    font-size: 14px;
-    background: transparent !important;
-    background-color: transparent !important;
-    -webkit-appearance: none;
-    appearance: none;
-    color-scheme: dark;
-    color: #fff;
-    -webkit-text-fill-color: #fff;
-    transition: all 0.2s;
-    letter-spacing: 0.2px;
-}
-
-.search-select::placeholder {
-    color: rgba(255, 255, 255, 0.3);
-}
-
-.search-select:focus {
-    outline: none;
-    border-color: rgba(255, 255, 255, 0.45);
-    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04);
-}
-
-.dropdown-list {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    max-height: 200px;
-    overflow-y: auto;
-    background: rgba(10, 30, 55, 0.4);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-top: none;
-    border-radius: 0 0 8px 8px;
-    z-index: 1000;
-    display: none;
-}
-
-.dropdown-item {
-    padding: 10px 12px;
-    cursor: pointer;
-    transition: background 0.2s;
-    color: rgba(255, 255, 255, 0.85);
-}
-
-.dropdown-item:hover {
-    background: rgba(255, 255, 255, 0.12);
-}
-
-.dropdown-item.selected {
-    background: rgba(255, 255, 255, 0.2);
-    color: white;
-}
-
-#signupForm {
-    display: none;
 }
 
 /* ── Language + Theme control bar ──────────────────────────────────────────── */
@@ -311,26 +202,6 @@ select option {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
-[data-theme="dark"] .tabs {
-    background: rgba(0, 0, 0, 0.2);
-    border-bottom-color: rgba(255, 255, 255, 0.06);
-}
-
-[data-theme="dark"] .tab {
-    color: rgba(255, 255, 255, 0.45);
-}
-
-[data-theme="dark"] .tab:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.8);
-}
-
-[data-theme="dark"] .tab.active {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.08);
-    border-bottom-color: rgba(255, 255, 255, 0.6);
-}
-
 [data-theme="dark"] label {
     color: rgba(255, 255, 255, 0.7);
 }
@@ -338,8 +209,7 @@ select option {
 [data-theme="dark"] .logo h1 { color: #fff; }
 [data-theme="dark"] .logo p  { color: rgba(255, 255, 255, 0.55); }
 
-[data-theme="dark"] input,
-[data-theme="dark"] .search-select {
+[data-theme="dark"] input {
     background: rgba(255, 255, 255, 0.06);
     border-color: rgba(255, 255, 255, 0.15);
     color: #fff;
@@ -347,13 +217,11 @@ select option {
     -webkit-text-fill-color: #fff;
 }
 
-[data-theme="dark"] input::placeholder,
-[data-theme="dark"] .search-select::placeholder {
+[data-theme="dark"] input::placeholder {
     color: rgba(255, 255, 255, 0.25);
 }
 
-[data-theme="dark"] input:focus,
-[data-theme="dark"] .search-select:focus {
+[data-theme="dark"] input:focus {
     border-color: rgba(255, 255, 255, 0.35);
     box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04) !important;
 }
@@ -366,19 +234,6 @@ select option {
 
 [data-theme="dark"] .btn:hover {
     background: rgba(255, 255, 255, 0.16);
-}
-
-[data-theme="dark"] .dropdown-list {
-    background: rgba(10, 20, 45, 0.92);
-    border-color: rgba(255, 255, 255, 0.12);
-}
-
-[data-theme="dark"] .dropdown-item {
-    color: rgba(255, 255, 255, 0.8);
-}
-
-[data-theme="dark"] .dropdown-item:hover {
-    background: rgba(255, 255, 255, 0.08);
 }
 
 [data-theme="dark"] .login-controls { z-index: 101; }
