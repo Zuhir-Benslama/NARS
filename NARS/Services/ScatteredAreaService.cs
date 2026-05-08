@@ -38,7 +38,14 @@ public interface IScatteredAreaService
 public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFactory, ILogger<ScatteredAreaService> logger)
     : IScatteredAreaService
 {
-    public (DateTimeOffset Timestamp, string Message)? LastError { get; private set; }
+    private readonly object _errorLock = new();
+    private (DateTimeOffset Timestamp, string Message)? _lastError;
+
+    public (DateTimeOffset Timestamp, string Message)? LastError
+    {
+        get { lock (_errorLock) return _lastError; }
+        private set { lock (_errorLock) _lastError = value; }
+    }
 
     public async Task RefreshAsync(Guid userId, int communeId)
     {

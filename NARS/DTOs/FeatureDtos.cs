@@ -8,7 +8,7 @@ namespace NarsApi.DTOs;
 /// Request body for deleting all user features. Requires explicit confirmation.
 /// </summary>
 public record ClearFeaturesRequest(
-    [property: JsonPropertyName("confirm")] bool Confirm
+    [property: JsonPropertyName("confirm")][property: JsonRequired] bool Confirm
 );
 
 /// <summary>
@@ -19,7 +19,7 @@ public record FeatureSaveRequest(
     [property: JsonPropertyName("type")][param: Required] string Type,
     [property: JsonPropertyName("layer")][param: Required] string Layer,
     [property: JsonPropertyName("label")][param: Required] string Label,
-    [property: JsonPropertyName("data")][param: Required] JsonElement Data
+    [property: JsonPropertyName("data")][param: Required][property: JsonRequired] JsonElement Data
 );
 
 /// <summary>

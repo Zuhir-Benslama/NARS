@@ -58,14 +58,14 @@ public static class FeatureTypeRegistry
     private static readonly IReadOnlyDictionary<string, FeatureTypeDescriptor> _registry =
         new Dictionary<string, FeatureTypeDescriptor>
         {
-            [FeatureTypes.Area]          = new() { Type = FeatureTypes.Area,          TableName = "areas",            EntityType = typeof(Area),          DbSetAccessor = db => db.Areas },
-            [FeatureTypes.District]      = new() { Type = FeatureTypes.District,      TableName = "districts",        EntityType = typeof(District),      DbSetAccessor = db => db.Districts },
-            [FeatureTypes.CityCenter]    = new() { Type = FeatureTypes.CityCenter,    TableName = "city_centers",     EntityType = typeof(CityCenter),    DbSetAccessor = db => db.CityCenters },
-            [FeatureTypes.Road]          = new() { Type = FeatureTypes.Road,          TableName = "roads",            EntityType = typeof(Road),          DbSetAccessor = db => db.Roads },
-            [FeatureTypes.HouseEntrance] = new() { Type = FeatureTypes.HouseEntrance, TableName = "house_entrances",  EntityType = typeof(HouseEntrance), DbSetAccessor = db => db.HouseEntrances },
-            [FeatureTypes.PublicBuilding]= new() { Type = FeatureTypes.PublicBuilding,TableName = "public_buildings", EntityType = typeof(PublicBuilding),DbSetAccessor = db => db.PublicBuildings },
-            [FeatureTypes.PublicSpace]   = new() { Type = FeatureTypes.PublicSpace,   TableName = "public_spaces",    EntityType = typeof(PublicSpace),   DbSetAccessor = db => db.PublicSpaces },
-            [FeatureTypes.NamingPanel]   = new() { Type = FeatureTypes.NamingPanel,   TableName = "naming_panels",    EntityType = typeof(NamingPanel),   DbSetAccessor = db => db.NamingPanels },
+            [FeatureTypes.Area] = new() { Type = FeatureTypes.Area, TableName = "areas", EntityType = typeof(Area), DbSetAccessor = db => db.Areas },
+            [FeatureTypes.District] = new() { Type = FeatureTypes.District, TableName = "districts", EntityType = typeof(District), DbSetAccessor = db => db.Districts },
+            [FeatureTypes.CityCenter] = new() { Type = FeatureTypes.CityCenter, TableName = "city_centers", EntityType = typeof(CityCenter), DbSetAccessor = db => db.CityCenters },
+            [FeatureTypes.Road] = new() { Type = FeatureTypes.Road, TableName = "roads", EntityType = typeof(Road), DbSetAccessor = db => db.Roads },
+            [FeatureTypes.HouseEntrance] = new() { Type = FeatureTypes.HouseEntrance, TableName = "house_entrances", EntityType = typeof(HouseEntrance), DbSetAccessor = db => db.HouseEntrances },
+            [FeatureTypes.PublicBuilding] = new() { Type = FeatureTypes.PublicBuilding, TableName = "public_buildings", EntityType = typeof(PublicBuilding), DbSetAccessor = db => db.PublicBuildings },
+            [FeatureTypes.PublicSpace] = new() { Type = FeatureTypes.PublicSpace, TableName = "public_spaces", EntityType = typeof(PublicSpace), DbSetAccessor = db => db.PublicSpaces },
+            [FeatureTypes.NamingPanel] = new() { Type = FeatureTypes.NamingPanel, TableName = "naming_panels", EntityType = typeof(NamingPanel), DbSetAccessor = db => db.NamingPanels },
         };
 
     /// <summary>

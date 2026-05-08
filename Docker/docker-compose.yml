@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+  # PostgreSQL + PostGIS for spatial data
+  db:
+    image: postgis/postgis:17-3.5
+    environment:
+      POSTGRES_USER: nars
+      POSTGRES_PASSWORD: changeme_in_production
+      POSTGRES_DB: nars
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nars -d nars"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  api:
+    build:
+      context: ..
+      dockerfile: Docker/Dockerfile.nars-api
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=Host=db;Database=nars;Username=nars;Password=changeme_in_production
+      - Jwt__Secret=changeme_in_production_must_be_at_least_32_characters_long
+      - Jwt__Issuer=nars-api
+      - Jwt__Audience=nars-client
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Frontend (standalone mode — use build:deploy to serve via API instead)
+  frontend:
+    build:
+      context: ..
+      dockerfile: Docker/Dockerfile.nars-vite
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:

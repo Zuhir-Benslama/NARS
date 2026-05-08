@@ -1,39 +1,39 @@
 // ─── MAP ROTATION ─────────────────────────────────────────────────────────────
 // Adds rotation controls to the Maplibre GL JS map.
 
-import { ctx } from './state'
-import { t } from '../i18n'
+import { ctx } from "./core/state"
+import { t } from "../i18n"
 
 let currentBearing = 0
 const STEP = 5
 
 export function setBearing(deg: number): void {
-    currentBearing = ((deg % 360) + 360) % 360
-    ctx.map.easeTo({ bearing: currentBearing, duration: 300 })
+  currentBearing = ((deg % 360) + 360) % 360
+  ctx.map.easeTo({ bearing: currentBearing, duration: 300 })
 }
 
 export function initRotationControls(): void {
-    const container = ctx.map.getContainer()
+  const container = ctx.map.getContainer()
 
-    const wrap = document.createElement('div')
-    wrap.className = 'nars-rotation-control leaflet-bar'
-    wrap.style.cssText = 'position:absolute;bottom:10px;right:10px;display:flex;gap:4px;z-index:1000;'
+  const wrap = document.createElement("div")
+  wrap.className = "nars-rotation-control leaflet-bar"
+  wrap.style.cssText = "position:absolute;bottom:10px;right:10px;display:flex;gap:4px;z-index:1000;"
 
-    const ccw = document.createElement('button')
-    ccw.textContent = '↺'
-    ccw.title = t('rotate_ccw')
-    ccw.className = 'nars-map-btn'
-    ccw.style.cssText = 'width:30px;height:30px;cursor:pointer;'
-    ccw.onclick = () => setBearing(currentBearing - STEP)
+  const ccw = document.createElement("button")
+  ccw.textContent = "↺"
+  ccw.title = t("rotate_ccw")
+  ccw.className = "nars-map-btn"
+  ccw.style.cssText = "width:30px;height:30px;cursor:pointer;"
+  ccw.onclick = () => setBearing(currentBearing - STEP)
 
-    const cw = document.createElement('button')
-    cw.textContent = '↻'
-    cw.title = t('rotate_cw')
-    cw.className = 'nars-map-btn'
-    cw.style.cssText = 'width:30px;height:30px;cursor:pointer;'
-    cw.onclick = () => setBearing(currentBearing + STEP)
+  const cw = document.createElement("button")
+  cw.textContent = "↻"
+  cw.title = t("rotate_cw")
+  cw.className = "nars-map-btn"
+  cw.style.cssText = "width:30px;height:30px;cursor:pointer;"
+  cw.onclick = () => setBearing(currentBearing + STEP)
 
-    wrap.appendChild(ccw)
-    wrap.appendChild(cw)
-    container.appendChild(wrap)
+  wrap.appendChild(ccw)
+  wrap.appendChild(cw)
+  container.appendChild(wrap)
 }

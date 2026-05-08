@@ -93,8 +93,7 @@ class AppPreferences(context: Context) {
             if (value != null) {
                 securePrefs.saveMunicipalityName(value)
             } else {
-                // Not removing to allow null storage
-                prefs.edit { putString(KEY_MUNICIPALITY, value) }
+                securePrefs.clearMunicipalityName()
             }
         }
 

@@ -1,0 +1,119 @@
+# NARStreet Detekt Configuration
+build:
+  maxIssues: 0
+
+# Enable all rule sets
+ruleSets:
+  - ruleSet: "戒 Complexity"
+    active: true
+  - ruleSet: "戒 Coroutines"
+    active: true
+  - ruleSet: "戒 EmptyCode"
+    active: true
+  - ruleSet: "戒 Exceptions"
+    active: true
+  - ruleSet: "戒 Migration"
+    active: true
+  - ruleSet: "戒 Naming"
+    active: true
+  - ruleSet: "戒 Performance"
+    active: true
+  - ruleSet: "戒 PotentialBugs"
+    active: true
+  - ruleSet: "戒 Style"
+    active: true
+
+# Complexity rules
+complexity:
+  ComplexMethod:
+    threshold: 15
+  LongMethod:
+    threshold: 50
+  LargeClass:
+    threshold: 600
+  TooManyFunctions:
+    threshold: 20
+    excludeFunctionsInClasses:
+      - "*Screen" # Composable screens often have many small functions
+    excludeTraits:
+      - "Composable"
+  CyclomaticComplexMethod:
+    threshold: 15
+  ReturnCount:
+    max: 3
+  ThrowCount:
+    max: 3
+
+# Naming rules - lenient for Compose
+naming:
+  FunctionNaming:
+    active: true
+    excludeFunctionRegex: "^\\$[a-zA-Z]+.*"
+    ignoreAnnotated:
+      - "Composable"
+      - "androidx.compose.runtime.Composable"
+    functionPattern: "[a-zA-Z][a-zA-Z0-9]*"
+  MatchingDeclarationName:
+    active: true
+    ignoreAnnotated:
+      - "Composable"
+  PropertyNaming:
+    active: true
+    excludeAnnotationRegex: ".*"
+
+# Style rules
+style:
+  MagicNumber:
+    ignoreNumbers:
+      - "-1"
+      - "0"
+      - "1"
+      - "2"
+      - "3"
+      - "4"
+      - "100"
+      - "360"
+      - "1000"
+      - "3600"
+      - "6371000.0" # Earth radius in meters (WGS84)
+      - "6378137.0" # Earth semi-major axis
+    ignoreAnnotationRegex: ".*Color.*"
+    ignorePropertyDeclaration: true
+    ignoreTaggedStatements:
+      - "expected"
+  MaxLineLength:
+    maxLineLength: 120
+    excludePatternRegex: '".*log.*"'
+  NewLineAtEndOfFile:
+    active: true
+
+# Empty code rules
+empty-blocks:
+  EmptyCatchBlock:
+    ignoreExceptedCases: true
+  EmptyClass:
+    ignoreAnnotated:
+      - "Composable"
+
+# Exception rules
+exceptions:
+  TooGenericResult:
+    excludeResultNames:
+      - "Ok"
+      - "Err"
+  SwallowedException:
+    allowedExceptionClassRegex: ".*"
+
+# Potential bugs
+potential-bugs:
+  UnsafeCast:
+    active: true
+  UnusedParameter:
+    active: false
+  UnusedPrivateFunction:
+    active: true
+
+# Performance
+performance:
+  SpreadOperator:
+    active: true

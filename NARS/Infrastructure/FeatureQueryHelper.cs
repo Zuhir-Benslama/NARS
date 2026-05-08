@@ -129,10 +129,10 @@ public static class FeatureQueryHelper
                     string s => Guid.Parse(s),
                     _ => throw new InvalidOperationException($"Unexpected ID type: {idValue?.GetType().Name}")
                 };
-                var label = reader.IsDBNull(1) ? null : reader.GetString(1);
-                var dataJson = reader.IsDBNull(2) ? "{}" : reader.GetString(2);
+                var label = await reader.IsDBNullAsync(1) ? null : reader.GetString(1);
+                var dataJson = await reader.IsDBNullAsync(2) ? "{}" : reader.GetString(2);
                 var createdAt = reader.GetDateTime(3);
-                var layerVal = reader.IsDBNull(4) ? null : reader.GetString(4);
+                var layerVal = await reader.IsDBNullAsync(4) ? null : reader.GetString(4);
                 var type = reader.GetString(5);
                 totalCount = (int)reader.GetInt64(6);
 

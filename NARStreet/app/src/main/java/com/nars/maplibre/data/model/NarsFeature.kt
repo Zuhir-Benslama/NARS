@@ -176,10 +176,21 @@ enum class DrawType {
  * Labels are i18n keys - implement proper string resource lookup in production.
  */
 object Phases {
+    // Phase key constants - Full set (some may not be used in NARStreet Field Mode)
+    const val AREAS_KEY = "areas"
+    const val DISTRICTS_KEY = "districts"
+    const val CITY_CENTER_KEY = "cityCenter"
+    const val ROADS_KEY = "roads"
+    const val HOUSE_ENTRANCES_KEY = "houseEntrances"
+    const val PUBLIC_BUILDINGS_KEY = "publicBuildings"
+    const val PUBLIC_SPACES_KEY = "publicSpaces"
+    const val NAMING_PANELS_KEY = "namingPanels"
+
+    // Active phases for NARStreet Field Mode
     val ALL = listOf(
         PhaseDefinition(
             index = 0,
-            key = "roads",
+            key = ROADS_KEY,
             label = "phase_roads_label",
             drawType = DrawType.POLYLINE,
             color = "#3498db",
@@ -187,7 +198,7 @@ object Phases {
         ),
         PhaseDefinition(
             index = 1,
-            key = "houseEntrances",
+            key = HOUSE_ENTRANCES_KEY,
             label = "phase_houseEntrances_label",
             drawType = DrawType.MARKER,
             color = "#27ae60",
@@ -195,7 +206,7 @@ object Phases {
         ),
         PhaseDefinition(
             index = 2,
-            key = "namingPanels",
+            key = NAMING_PANELS_KEY,
             label = "phase_namingPanels_label",
             drawType = DrawType.MARKER,
             color = "#9b59b6",

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Data;
+using System.Data.Common;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
@@ -12,16 +13,23 @@ namespace NarsApi.Controllers;
 // fix #2 & #9: Extends NarsControllerBase ([Authorize] + CurrentUserId/CurrentCommuneId)
 // instead of duplicating the manual RequireAuth() helper.
 [ApiController]
+[Route("/api")]
 [Tags("Validation")]
-public class ValidationController(AppDbContext db) : NarsControllerBase
+public class ValidationController(
+    AppDbContext db,
+    IConfiguration config) : NarsControllerBase
 {
-    // fix #13: named constant replaces the magic number tolerance buffer.
-    private const double DistrictBoundaryToleranceMeters = 10.0;
+    private double DistrictBoundaryToleranceMeters =>
+        double.TryParse(config["Validation:DistrictBoundaryToleranceMeters"], out var v) ? v : 10.0;
 
-    // Maximum number of coordinates allowed in a single validation request.
-    // Prevents DoS via extremely large coordinate payloads (memory exhaustion
-    // on both server and database during WKT construction and PostGIS queries).
-    private const int MaxCoordinateCount = 10_000;
+    private double MaxRoadTurnAngleDegrees =>
+        double.TryParse(config["Validation:RoadTurnAngleDegrees"], out var v) ? v : 90.0;
+
+    private double RoadConnectivityDistanceMeters =>
+        double.TryParse(config["Validation:RoadConnectivityMeters"], out var v) ? v : 20.0;
+
+    private int MaxCoordinateCount =>
+        int.TryParse(config["Validation:MaxCoordinateCount"], out var v) ? v : 10_000;
 
     // fix #4: PolygonFromDataSql and LineStringFromDataSql are now imported from
     // SqlFragments (both include ST_MakeValid) instead of being declared locally.
@@ -29,7 +37,7 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
 
     // ── GET /api/validate/area/main-urban-exists ──────────────────────────────
 
-    [HttpGet("/api/validate/area/main-urban-exists")]
+    [HttpGet("validate/area/main-urban-exists")]
     public async Task<IActionResult> MainUrbanExists()
     {
         var exists = await db.Areas.AnyAsync(f =>
@@ -41,23 +49,15 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
 
     // ── POST /api/validate/road ───────────────────────────────────────────────
 
-    [HttpPost("/api/validate/road")]
+    [HttpPost("validate/road")]
     public async Task<IActionResult> ValidateRoad([FromBody] ValidateRoadRequest body)
     {
         if (body.Coordinates.Count < 2)
             return BadRequest(new ValidateRoadResponse(false, "A road must have at least 2 points."));
 
         // Bounds checking: prevent DoS via excessive coordinate counts.
-        if (body.Coordinates.Count > MaxCoordinateCount)
-            return BadRequest(new ValidateRoadResponse(false, $"Too many coordinates (max {MaxCoordinateCount:N0})."));
-
-        // Validate for NaN/Infinity values that would produce invalid WKT.
-        foreach (var c in body.Coordinates)
-        {
-            if (double.IsNaN(c.Lat) || double.IsInfinity(c.Lat) ||
-                double.IsNaN(c.Lng) || double.IsInfinity(c.Lng))
-                return BadRequest(new ValidateRoadResponse(false, "Invalid coordinate values (NaN or Infinity)."));
-        }
+        if (!CheckCoordinateBounds(body.Coordinates, out var boundsError))
+            return BadRequest(new ValidateRoadResponse(false, boundsError!));
 
         // Rule 1: angle check (pure C#)
         for (int i = 0; i < body.Coordinates.Count - 2; i++)
@@ -77,9 +77,9 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
             double dot = (v1x * v2x + v1y * v2y) / (len1 * len2);
             double angle = Math.Acos(Math.Clamp(dot, -1.0, 1.0)) * (180.0 / Math.PI);
 
-            if (angle > 90.0)
+            if (angle > MaxRoadTurnAngleDegrees)
                 return Ok(new ValidateRoadResponse(false,
-                    $"Road turn at point {i + 2} is {angle:F1}°, which exceeds the 90° maximum."));
+                    $"Road turn at point {i + 2} is {angle:F1}°, which exceeds the {MaxRoadTurnAngleDegrees}° maximum."));
         }
 
         // Rule 2: connectivity check (PostGIS) — first road is exempt
@@ -103,7 +103,7 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
                       AND ST_DWithin(
                             ({SqlFragments.LineStringFromData})::geography,
                             ST_SetSRID(ST_GeomFromText(@wkt), 4326)::geography,
-                            20
+                            {RoadConnectivityDistanceMeters}
                           )
                 )";
             AddParam(cmd, "@uid", CurrentUserId);
@@ -126,27 +126,16 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
 
     // ── POST /api/validate/district ───────────────────────────────────────────
 
-    [HttpPost("/api/validate/district")]
+    [HttpPost("validate/district")]
     public async Task<IActionResult> ValidateDistrict([FromBody] ValidateDistrictRequest body)
     {
         if (body.Coordinates.Count < 3)
             return BadRequest(new ValidateDistrictResponse(false, "A district must have at least 3 points."));
-
-        // Bounds checking: prevent DoS via excessive coordinate counts.
-        if (body.Coordinates.Count > MaxCoordinateCount)
-            return BadRequest(new ValidateDistrictResponse(false, $"Too many coordinates (max {MaxCoordinateCount:N0})."));
-
-        // Validate for NaN/Infinity values that would produce invalid WKT.
-        foreach (var c in body.Coordinates)
-        {
-            if (double.IsNaN(c.Lat) || double.IsInfinity(c.Lat) ||
-                double.IsNaN(c.Lng) || double.IsInfinity(c.Lng))
-                return BadRequest(new ValidateDistrictResponse(false, "Invalid coordinate values (NaN or Infinity)."));
-        }
+        if (!CheckCoordinateBounds(body.Coordinates, out var inputError))
+            return BadRequest(new ValidateDistrictResponse(false, inputError!));
 
         var existingCount = await db.Districts.CountAsync(f => f.UserId == CurrentUserId);
 
-        // First district ever is always exempt from adjacency.
         if (existingCount == 0)
             return Ok(new ValidateDistrictResponse(true, null));
 
@@ -156,116 +145,19 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
         await db.Database.OpenConnectionAsync();
         try
         {
-            // Check overlap — hard block (always required)
-            // ST_Intersects catches all intersection cases including containment
-            // (ST_Overlaps returns false when one polygon is fully inside another).
-            using (var cmd = conn.CreateCommand())
-            {
-                cmd.CommandText = $@"
-                    SELECT EXISTS (
-                        SELECT 1
-                        FROM districts f
-                        WHERE f.user_id = @uid
-                          AND ST_Intersects(
-                                ({SqlFragments.PolygonFromData}),
-                                ST_SetSRID(ST_GeomFromText(@wkt), 4326)
-                              )
-                    )";
-                AddParam(cmd, "@uid", CurrentUserId);
-                AddParam(cmd, "@wkt", wkt);
+            if (await CheckOverlapAsync(conn, wkt))
+                return Ok(new ValidateDistrictResponse(false,
+                    "This district overlaps an existing district. Districts must share edges but not overlap."));
 
-                var overlaps = Convert.ToBoolean(await cmd.ExecuteScalarAsync());
-                if (overlaps)
+            var skipAdjacency = body.DistrictTypeKey == FeatureTypes.DistrictLayers.TradActivitiesZone ||
+                                body.DistrictTypeKey == FeatureTypes.DistrictLayers.IndustryZone;
+
+            if (!skipAdjacency)
+            {
+                var siblings = await CountSiblingsInSameAreaAsync(conn, wkt);
+                if (siblings > 0 && !await CheckAdjacencyAsync(conn, wkt))
                     return Ok(new ValidateDistrictResponse(false,
-                        "This district overlaps an existing district. Districts must share edges but not overlap."));
-            }
-
-            // Check adjacency — must touch at least one existing district
-            // Skip this check for zones that can exist in scattered areas (trad_activities_zone, industry_zone)
-            var districtTypeKey = body.DistrictTypeKey;
-            var skipAdjacencyCheck = districtTypeKey == FeatureTypes.DistrictLayers.TradActivitiesZone ||
-                                     districtTypeKey == FeatureTypes.DistrictLayers.IndustryZone;
-
-            if (!skipAdjacencyCheck)
-            {
-                // Count existing districts that lie within the same urban area as
-                // the new district.  Each urban area (main or secondary) is a
-                // separate, disconnected polygon, so the "must be adjacent" rule
-                // only makes sense relative to siblings inside the same area.
-                // If this is the first district inside its urban area, the
-                // adjacency check is skipped — exactly as the global first-district
-                // exemption works.
-                long siblingsInSameArea;
-                using (var cmd = conn.CreateCommand())
-                {
-                    cmd.CommandText = $@"
-                        SELECT COUNT(*)
-                        FROM districts d
-                        WHERE d.user_id = @uid
-                          AND EXISTS (
-                              SELECT 1
-                              FROM areas a
-                              WHERE a.user_id = @uid
-                                AND a.layer   IN ('central_urban', 'secondary_urban')
-                                AND ST_Intersects(
-                                    ({SqlFragments.PolygonFromDataWithAlias("a")}),
-                                    ST_SetSRID(ST_GeomFromText(@wkt), 4326)
-                                )
-                                AND ST_Intersects(
-                                    ({SqlFragments.PolygonFromDataWithAlias("a")}),
-                                    ({SqlFragments.PolygonFromDataWithAlias("d")})
-                                )
-                          )";
-                    AddParam(cmd, "@uid", CurrentUserId);
-                    AddParam(cmd, "@wkt", wkt);
-
-                    siblingsInSameArea = Convert.ToInt64(await cmd.ExecuteScalarAsync());
-                }
-
-                // First district in this urban area — no neighbours to touch yet.
-                if (siblingsInSameArea > 0)
-                {
-                    using (var cmd = conn.CreateCommand())
-                    {
-                        cmd.CommandText = $@"
-                            SELECT EXISTS (
-                                SELECT 1
-                                FROM districts f
-                                WHERE f.user_id = @uid
-                                  AND (
-                                    ST_Touches(
-                                        ST_SetSRID(ST_GeomFromText(@wkt), 4326),
-                                        ({SqlFragments.PolygonFromData})
-                                    )
-                                    OR ST_Intersects(
-                                        ST_Boundary(ST_SetSRID(ST_GeomFromText(@wkt), 4326)),
-                                        ST_Boundary({SqlFragments.PolygonFromData})
-                                    )
-                                  )
-                                  AND EXISTS (
-                                      SELECT 1
-                                      FROM areas a
-                                      WHERE a.user_id = @uid
-                                        AND a.layer   IN ('central_urban', 'secondary_urban')
-                                        AND ST_Intersects(
-                                            ({SqlFragments.PolygonFromDataWithAlias("a")}),
-                                            ST_SetSRID(ST_GeomFromText(@wkt), 4326)
-                                        )
-                                        AND ST_Intersects(
-                                            ({SqlFragments.PolygonFromDataWithAlias("a")}),
-                                            ({SqlFragments.PolygonFromDataWithAlias("f")})
-                                        )
-                                  )
-                            )";
-                        AddParam(cmd, "@uid", CurrentUserId);
-                        AddParam(cmd, "@wkt", wkt);
-
-                        var touches = Convert.ToBoolean(await cmd.ExecuteScalarAsync());
-                        if (!touches)
-                            return Ok(new ValidateDistrictResponse(false,
-                                "This district does not connect to any existing district in this urban area. Districts must share a boundary (no gaps)."));
-                    }
-                }
+                        "This district does not connect to any existing district in this urban area. Districts must share a boundary (no gaps)."));
             }
         }
         finally
@@ -278,7 +170,7 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
 
     // ── GET /api/validate/districts/coverage ─────────────────────────────────
 
-    [HttpGet("/api/validate/districts/coverage")]
+    [HttpGet("validate/districts/coverage")]
     public async Task<IActionResult> DistrictsCoverage()
     {
         var urbanCount = await db.Areas.CountAsync(f =>
@@ -324,7 +216,7 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
             AddParam(cmd, "@uid", CurrentUserId);
 
             var result = await cmd.ExecuteScalarAsync();
-            covered = result is not null && Convert.ToBoolean(result);
+            covered = result is bool b && b;
         }
         finally
         {
@@ -338,18 +230,94 @@ public class ValidationController(AppDbContext db) : NarsControllerBase
                 : "Districts do not yet fully cover all urban areas. Please fill any remaining gaps before proceeding."));
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ── Input validation ───────────────────────────────────────
+
+    private bool CheckCoordinateBounds(List<CoordDto> coords, out string? error)
+    {
+        if (coords.Count > MaxCoordinateCount) { error = $"Too many coordinates (max {MaxCoordinateCount:N0})."; return false; }
+        if (coords.Any(c => double.IsNaN(c.Lat) || double.IsInfinity(c.Lat) ||
+                            double.IsNaN(c.Lng) || double.IsInfinity(c.Lng)))
+        {
+            error = "Invalid coordinate values (NaN or Infinity).";
+            return false;
+        }
+        error = null;
+        return true;
+    }
+
+    // ── Query helpers ─────────────────────────────────────────
+
+    private async Task<bool> CheckOverlapAsync(DbConnection conn, string wkt)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = $@"
+            SELECT EXISTS (
+                SELECT 1 FROM districts f
+                WHERE f.user_id = @uid
+                  AND ST_Intersects(
+                        ({SqlFragments.PolygonFromData}),
+                        ST_SetSRID(ST_GeomFromText(@wkt), 4326)
+                      )
+            )";
+        AddParam(cmd, "@uid", CurrentUserId);
+        AddParam(cmd, "@wkt", wkt);
+        var result = await cmd.ExecuteScalarAsync();
+        return result is bool b && b;
+    }
+
+    private async Task<long> CountSiblingsInSameAreaAsync(DbConnection conn, string wkt)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = $@"
+            SELECT COUNT(*) FROM districts d
+            WHERE d.user_id = @uid
+              AND EXISTS (
+                  SELECT 1 FROM areas a
+                  WHERE a.user_id = @uid
+                    AND a.layer IN ('central_urban', 'secondary_urban')
+                    AND ST_Intersects(({SqlFragments.PolygonFromDataWithAlias("a")}), ST_SetSRID(ST_GeomFromText(@wkt), 4326))
+                    AND ST_Intersects(({SqlFragments.PolygonFromDataWithAlias("a")}), ({SqlFragments.PolygonFromDataWithAlias("d")}))
+              )";
+        AddParam(cmd, "@uid", CurrentUserId);
+        AddParam(cmd, "@wkt", wkt);
+        return Convert.ToInt64(await cmd.ExecuteScalarAsync());
+    }
+
+    private async Task<bool> CheckAdjacencyAsync(DbConnection conn, string wkt)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = $@"
+            SELECT EXISTS (
+                SELECT 1 FROM districts f
+                WHERE f.user_id = @uid
+                  AND (ST_Touches(ST_SetSRID(ST_GeomFromText(@wkt), 4326), ({SqlFragments.PolygonFromData}))
+                       OR ST_Intersects(ST_Boundary(ST_SetSRID(ST_GeomFromText(@wkt), 4326)), ST_Boundary({SqlFragments.PolygonFromData})))
+                  AND EXISTS (
+                      SELECT 1 FROM areas a
+                      WHERE a.user_id = @uid
+                        AND a.layer IN ('central_urban', 'secondary_urban')
+                        AND ST_Intersects(({SqlFragments.PolygonFromDataWithAlias("a")}), ST_SetSRID(ST_GeomFromText(@wkt), 4326))
+                        AND ST_Intersects(({SqlFragments.PolygonFromDataWithAlias("a")}), ({SqlFragments.PolygonFromDataWithAlias("f")}))
+                  )
+            )";
+        AddParam(cmd, "@uid", CurrentUserId);
+        AddParam(cmd, "@wkt", wkt);
+        var result = await cmd.ExecuteScalarAsync();
+        return result is bool b && b;
+    }
+
+    // ── WKT builders ───────────────────────────────────────────
 
     // Use InvariantCulture so doubles always format with '.' decimal separator,
     // regardless of server locale (e.g. fr-DZ would use ',' otherwise).
-    private static string F(double v) => v.ToString(CultureInfo.InvariantCulture);
+    private static string FormatDouble(double v) => v.ToString(CultureInfo.InvariantCulture);
 
     private static string BuildLineStringWkt(List<CoordDto> coords) =>
-        $"LINESTRING({string.Join(",", coords.Select(c => $"{F(c.Lng)} {F(c.Lat)}"))})";
+        $"LINESTRING({string.Join(",", coords.Select(c => $"{FormatDouble(c.Lng)} {FormatDouble(c.Lat)}"))})";
 
     private static string BuildPolygonWkt(List<CoordDto> coords)
     {
-        var pts = coords.Select(c => $"{F(c.Lng)} {F(c.Lat)}").ToList();
+        var pts = coords.Select(c => $"{FormatDouble(c.Lng)} {FormatDouble(c.Lat)}").ToList();
         if (pts[0] != pts[^1]) pts.Add(pts[0]);
         return $"POLYGON(({string.Join(",", pts)}))";
     }

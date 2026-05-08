@@ -16,7 +16,6 @@ public class JwtService(string secret, string? issuer, string? audience, IConfig
 {
     private readonly string _secret = secret ?? throw new ArgumentNullException(nameof(secret));
     private readonly int _expiresMinutes = ParseIntConfig(config["Jwt:ExpiresInMinutes"], 1440);
-    private readonly int _refreshExpiresDays = ParseIntConfig(config["Jwt:RefreshExpiresInDays"], 30);
     private readonly string? _issuer = issuer;
     private readonly string? _audience = audience;
 
@@ -48,8 +47,8 @@ public class JwtService(string secret, string? issuer, string? audience, IConfig
         // This keeps tokens minimal and avoids confusion when a claim is present
         // but meaningless for the role.
         if (communeId.HasValue) claims.Add(new Claim("commune_id", communeId.Value.ToString()));
-        if (dairaId.HasValue)   claims.Add(new Claim("daira_id",   dairaId.Value.ToString()));
-        if (wilayaId.HasValue)  claims.Add(new Claim("wilaya_id",  wilayaId.Value.ToString()));
+        if (dairaId.HasValue) claims.Add(new Claim("daira_id", dairaId.Value.ToString()));
+        if (wilayaId.HasValue) claims.Add(new Claim("wilaya_id", wilayaId.Value.ToString()));
 
         var token = new JwtSecurityToken(
             issuer: _issuer,

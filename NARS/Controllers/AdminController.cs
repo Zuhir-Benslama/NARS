@@ -1,4 +1,5 @@
 using System.Data;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
@@ -11,16 +12,24 @@ namespace NarsApi.Controllers;
 /// <summary>
 /// Monitoring and admin-user management endpoints.
 ///
-/// Hierarchy:
-///   national_admin  →  GET /api/admin/overview          (all wilayas, shallow)
-///                      GET /api/admin/wilaya/{id}        (one wilaya, full depth)
-///   wilaya_admin    →  GET /api/admin/overview          (own wilaya, full depth)
-///                      GET /api/admin/daira/{id}         (one daira, full depth — within scope)
-///   daira_admin     →  GET /api/admin/overview          (own daira, full depth)
+/// Creation hierarchy (each role may only create the role one level below):
+///   daira_admin    → commune_user  (commune must belong to admin's daira)
+///   wilaya_admin   → daira_admin   (daira must belong to admin's wilaya)
+///   national_admin → wilaya_admin  (any wilaya)
+///   national_admin → created directly in the database only (no API endpoint)
 ///
-///   POST /api/admin/users — create a lower-level admin account.
+/// Monitoring hierarchy:
+///   daira_admin    → GET /api/admin/overview   (own daira, full depth)
+///   wilaya_admin   → GET /api/admin/overview   (own wilaya, full depth)
+///                    GET /api/admin/daira/{id}  (one daira within scope)
+///   national_admin → GET /api/admin/overview   (all wilayas, shallow)
+///                    GET /api/admin/wilaya/{id} (one wilaya, full depth)
+///
+///   POST /api/admin/users — create an account one level below the caller's role.
 /// </summary>
 [ApiController]
+[Route("/api")]
+[Authorize(Roles = "daira_admin,wilaya_admin,national_admin")]
 [Tags("Admin")]
 public class AdminController(
     AppDbContext db,
@@ -28,15 +37,23 @@ public class AdminController(
 {
     // ── GET /api/admin/overview ───────────────────────────────────────────────
 
-    [HttpGet("/api/admin/overview")]
+    [HttpGet("admin/overview")]
     public async Task<IActionResult> Overview()
     {
-        return CurrentUserRole switch
+        // Read role and geographic IDs directly from the database.
+        // JWT claim names can vary depending on when the token was issued
+        // (before or after the claim mapping fix), so DB is the source of truth.
+        var user = await db.Users.FindAsync(CurrentUserId);
+        if (user is null) return Unauthorized(new { detail = "User not found." });
+
+        return user.Role switch
         {
-            UserRoles.DairaAdmin    => await DairaOverview(CurrentDairaId
-                ?? throw new InvalidOperationException("daira_id claim missing for daira_admin.")),
-            UserRoles.WilayaAdmin   => await WilayaOverview(CurrentWilayaId
-                ?? throw new InvalidOperationException("wilaya_id claim missing for wilaya_admin.")),
+            UserRoles.DairaAdmin when user.DairaId is null =>
+                Forbid("daira_id missing on account. Contact your administrator."),
+            UserRoles.WilayaAdmin when user.WilayaId is null =>
+                Forbid("wilaya_id missing on account. Contact your administrator."),
+            UserRoles.DairaAdmin => await DairaOverview(user.DairaId!.Value),
+            UserRoles.WilayaAdmin => await WilayaOverview(user.WilayaId!.Value),
             UserRoles.NationalAdmin => await NationalOverview(),
             _ => Forbid(),
         };
@@ -45,11 +62,12 @@ public class AdminController(
     // ── GET /api/admin/wilaya/{wilayaId} ─────────────────────────────────────
     // National admin only — drill into a specific wilaya.
 
-    [HttpGet("/api/admin/wilaya/{wilayaId:int}")]
+    [HttpGet("admin/wilaya/{wilayaId:int}")]
     public async Task<IActionResult> GetWilaya(int wilayaId)
     {
-        if (CurrentUserRole != UserRoles.NationalAdmin)
-            return Forbid();
+        var user = await db.Users.FindAsync(CurrentUserId);
+        if (user is null) return Unauthorized(new { detail = "User not found." });
+        if (user.Role != UserRoles.NationalAdmin) return Forbid();
 
         var result = await BuildWilayaReportAsync(wilayaId);
         return result is null ? NotFound(new { detail = "Wilaya not found." }) : Ok(result);
@@ -58,21 +76,23 @@ public class AdminController(
     // ── GET /api/admin/daira/{dairaId} ───────────────────────────────────────
     // Wilaya admin (own dairas) or national admin.
 
-    [HttpGet("/api/admin/daira/{dairaId:int}")]
+    [HttpGet("admin/daira/{dairaId:int}")]
     public async Task<IActionResult> GetDaira(int dairaId)
     {
-        switch (CurrentUserRole)
+        var user = await db.Users.FindAsync(CurrentUserId);
+        if (user is null) return Unauthorized(new { detail = "User not found." });
+
+        switch (user.Role)
         {
             case UserRoles.WilayaAdmin:
-            {
-                // Enforce scope — daira must belong to admin's wilaya.
-                var daira = await db.Dairas.FindAsync(dairaId);
-                if (daira is null || daira.WilayaId != CurrentWilayaId)
-                    return Forbid();
-                break;
-            }
+                {
+                    var daira = await db.Dairas.FindAsync(dairaId);
+                    if (daira is null || daira.WilayaId != user.WilayaId)
+                        return Forbid();
+                    break;
+                }
             case UserRoles.NationalAdmin:
-                break; // no scope restriction
+                break;
             default:
                 return Forbid();
         }
@@ -82,34 +102,52 @@ public class AdminController(
     }
 
     // ── POST /api/admin/users ────────────────────────────────────────────────
-    // Create a new admin account. Role hierarchy:
-    //   national_admin  → can create wilaya_admin, daira_admin
-    //   wilaya_admin    → can create daira_admin within their wilaya
-    //   daira_admin     → cannot create admins
+    // Create an account one level below the caller's role.
+    // daira_admin  → commune_user  (commune must be in their daira)
+    // wilaya_admin → daira_admin   (daira must be in their wilaya)
+    // national_admin → wilaya_admin (any wilaya)
+    // national_admin is NOT creatable via API.
 
-    [HttpPost("/api/admin/users")]
+    [HttpPost("admin/users")]
     public async Task<IActionResult> CreateAdmin([FromBody] CreateAdminRequest body)
     {
-        // Role permission check
-        if (!CanCreateRole(CurrentUserRole, body.Role))
+        var creator = await db.Users.FindAsync(CurrentUserId);
+        if (creator is null) return Unauthorized();
+        var callerRole = creator.Role;
+
+        if (!CanCreateRole(callerRole, body.Role))
             return Forbid();
 
-        // Scope check: wilaya_admin can only create daira_admins in their wilaya
-        if (CurrentUserRole == UserRoles.WilayaAdmin && body.Role == UserRoles.DairaAdmin)
+        switch (callerRole, body.Role)
         {
-            if (!body.DairaId.HasValue)
-                return BadRequest(new { detail = "daira_id is required for daira_admin." });
-            var daira = await db.Dairas.FindAsync(body.DairaId.Value);
-            if (daira is null || daira.WilayaId != CurrentWilayaId)
-                return Forbid();
+            case (UserRoles.DairaAdmin, UserRoles.CommuneUser):
+                {
+                    if (!body.CommuneId.HasValue)
+                        return BadRequest(new { detail = "commune_id is required." });
+                    var commune = await db.Communes.FindAsync(body.CommuneId.Value);
+                    if (commune is null || commune.DairaId != creator.DairaId)
+                        return Forbid();
+                    break;
+                }
+            case (UserRoles.WilayaAdmin, UserRoles.DairaAdmin):
+                {
+                    if (!body.DairaId.HasValue)
+                        return BadRequest(new { detail = "daira_id is required." });
+                    var daira = await db.Dairas.FindAsync(body.DairaId.Value);
+                    if (daira is null || daira.WilayaId != creator.WilayaId)
+                        return Forbid();
+                    break;
+                }
+            case (UserRoles.NationalAdmin, UserRoles.WilayaAdmin):
+                if (!body.WilayaId.HasValue)
+                    return BadRequest(new { detail = "wilaya_id is required." });
+                break;
         }
 
-        // Validate geographic fields per role
         var geoError = ValidateGeographicFields(body);
         if (geoError is not null)
             return BadRequest(new { detail = geoError });
 
-        // Uniqueness check
         var existing = await db.Users.FirstOrDefaultAsync(u =>
             u.Username == body.Username || u.Email == body.Email);
         if (existing is not null)
@@ -122,27 +160,27 @@ public class AdminController(
         if (pwdErr is not null)
             return BadRequest(new { detail = pwdErr });
 
-        var user = new User
+        var newUser = new User
         {
-            Name          = body.Name,
-            Email         = body.Email,
-            Phone         = body.Phone,
-            Username      = body.Username,
-            PasswordHash  = BCrypt.Net.BCrypt.HashPassword(body.Password),
-            Role          = body.Role,
-            CommuneId     = null,
-            DairaId       = body.DairaId,
-            WilayaId      = body.WilayaId,
+            Name = body.Name,
+            Email = body.Email,
+            Phone = body.Phone,
+            Username = body.Username,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(body.Password),
+            Role = body.Role,
+            CommuneId = body.Role == UserRoles.CommuneUser ? body.CommuneId : null,
+            DairaId = body.Role == UserRoles.DairaAdmin ? body.DairaId : null,
+            WilayaId = body.Role == UserRoles.WilayaAdmin ? body.WilayaId : null,
             FailedLoginAttempts = 0,
         };
 
-        db.Users.Add(user);
+        db.Users.Add(newUser);
         await db.SaveChangesAsync();
 
-        logger.LogInformation("[Admin] {Creator} ({CreatorRole}) created admin {Username} ({Role})",
-            CurrentUsername, CurrentUserRole, user.Username, user.Role);
+        logger.LogInformation("[Admin] {Creator} ({CreatorRole}) created {Role} account {Username}",
+            CurrentUsername, CurrentUserRole, newUser.Role, newUser.Username);
 
-        return StatusCode(201, new { success = true, user_id = user.Id.ToString(), message = "Admin account created." });
+        return StatusCode(201, new { success = true, user_id = newUser.Id.ToString(), message = "Account created." });
     }
 
     // ─── Private: overview builders ──────────────────────────────────────────
@@ -192,13 +230,13 @@ public class AdminController(
         {
             var admin = wilayaAdmins.FirstOrDefault(a => a.WilayaId == w.WilayaId);
             return new WilayaSummary(
-                WilayaId:        w.WilayaId,
-                WilayaNameFr:    w.WilayaFr ?? "",
-                WilayaNameAr:    w.WilayaAr ?? "",
-                WilayaAdmin:     admin is null ? null
+                WilayaId: w.WilayaId,
+                WilayaNameFr: w.WilayaFr ?? "",
+                WilayaNameAr: w.WilayaAr ?? "",
+                WilayaAdmin: admin is null ? null
                                    : new AdminInfo(admin.Id.ToString(), admin.Username, admin.Name, admin.Email, admin.Role),
-                DairaCount:      dairaCounts.GetValueOrDefault(w.WilayaId),
-                CommuneCount:    communeByWilaya.GetValueOrDefault(w.WilayaId),
+                DairaCount: dairaCounts.GetValueOrDefault(w.WilayaId),
+                CommuneCount: communeByWilaya.GetValueOrDefault(w.WilayaId),
                 CommuneUserCount: usersByWilaya.GetValueOrDefault(w.WilayaId)
             );
         }).ToList();
@@ -228,11 +266,11 @@ public class AdminController(
             dairaReports.Add(await BuildDairaReportAsync(daira) ?? throw new InvalidOperationException());
 
         return new WilayaReport(
-            WilayaId:     wilaya.WilayaId,
+            WilayaId: wilaya.WilayaId,
             WilayaNameFr: wilaya.WilayaFr ?? "",
             WilayaNameAr: wilaya.WilayaAr ?? "",
-            WilayaAdmin:  wilayaAdmin,
-            Dairas:       dairaReports
+            WilayaAdmin: wilayaAdmin,
+            Dairas: dairaReports
         );
     }
 
@@ -276,19 +314,19 @@ public class AdminController(
                 .ToList();
 
             return new CommuneReport(
-                CommuneId:      c.CommuneId,
-                CommuneNameFr:  c.CommuneFr,
-                CommuneNameAr:  c.CommuneAr,
-                Users:          communeUsers
+                CommuneId: c.CommuneId,
+                CommuneNameFr: c.CommuneFr,
+                CommuneNameAr: c.CommuneAr,
+                Users: communeUsers
             );
         }).ToList();
 
         return new DairaReport(
-            DairaId:     daira.DairaId,
+            DairaId: daira.DairaId,
             DairaNameFr: daira.DairaFr,
             DairaNameAr: daira.DairaAr,
-            DairaAdmin:  dairaAdmin,
-            Communes:    communeReports
+            DairaAdmin: dairaAdmin,
+            Communes: communeReports
         );
     }
 
@@ -300,8 +338,8 @@ public class AdminController(
     {
         if (userIds.Length == 0) return new Dictionary<Guid, UserFeatureStats>();
 
+        await db.Database.OpenConnectionAsync();
         var conn = db.Database.GetDbConnection();
-        await conn.OpenAsync();
         try
         {
             await using var cmd = conn.CreateCommand();
@@ -346,51 +384,41 @@ public class AdminController(
             {
                 var id = reader.GetGuid(0);
                 result[id] = new UserFeatureStats(
-                    UserId:         id.ToString(),
-                    Username:       reader.GetString(1),
-                    Name:           reader.GetString(2),
-                    Email:          reader.GetString(3),
-                    Areas:          reader.GetInt64(4),
-                    Districts:      reader.GetInt64(5),
-                    CityCenters:    reader.GetInt64(6),
-                    Roads:          reader.GetInt64(7),
+                    UserId: id.ToString(),
+                    Username: reader.GetString(1),
+                    Name: reader.GetString(2),
+                    Email: reader.GetString(3),
+                    Areas: reader.GetInt64(4),
+                    Districts: reader.GetInt64(5),
+                    CityCenters: reader.GetInt64(6),
+                    Roads: reader.GetInt64(7),
                     HouseEntrances: reader.GetInt64(8),
-                    PublicBuildings:reader.GetInt64(9),
-                    PublicSpaces:   reader.GetInt64(10),
-                    NamingPanels:   reader.GetInt64(11),
-                    Total:          reader.GetInt64(12)
+                    PublicBuildings: reader.GetInt64(9),
+                    PublicSpaces: reader.GetInt64(10),
+                    NamingPanels: reader.GetInt64(11),
+                    Total: reader.GetInt64(12)
                 );
             }
             return result;
         }
         finally
         {
-            await conn.CloseAsync();
+            await db.Database.CloseConnectionAsync();
         }
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Returns true if <paramref name="creatorRole"/> is allowed to create an
-    /// account with <paramref name="targetRole"/>.
-    /// </summary>
     private static bool CanCreateRole(string creatorRole, string targetRole) =>
-        (creatorRole, targetRole) switch
-        {
-            (UserRoles.NationalAdmin, UserRoles.WilayaAdmin)   => true,
-            (UserRoles.NationalAdmin, UserRoles.DairaAdmin)    => true,
-            (UserRoles.WilayaAdmin,   UserRoles.DairaAdmin)    => true,
-            _ => false,
-        };
+        AuthController.CanCreateRole(creatorRole, targetRole);
 
     private static string? ValidateGeographicFields(CreateAdminRequest body) =>
         body.Role switch
         {
-            UserRoles.WilayaAdmin   when !body.WilayaId.HasValue => "wilaya_id is required for wilaya_admin.",
-            UserRoles.DairaAdmin    when !body.DairaId.HasValue  => "daira_id is required for daira_admin.",
-            UserRoles.NationalAdmin when body.WilayaId.HasValue || body.DairaId.HasValue
-                => "national_admin accounts must not have a geographic restriction.",
+            UserRoles.CommuneUser when !body.CommuneId.HasValue => "commune_id is required for commune_user.",
+            UserRoles.DairaAdmin when !body.DairaId.HasValue => "daira_id is required for daira_admin.",
+            UserRoles.WilayaAdmin when !body.WilayaId.HasValue => "wilaya_id is required for wilaya_admin.",
+            UserRoles.NationalAdmin => "national_admin accounts must be created directly in the database.",
             _ => null,
         };
 }

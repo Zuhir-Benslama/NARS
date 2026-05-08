@@ -11,9 +11,9 @@ const DEBUG = import.meta.env?.DEV ?? false
  * Use this instead of console.log for application debugging.
  */
 export function debugLog(...args: any[]): void {
-    if (DEBUG) {
-        console.log(...args)
-    }
+  if (DEBUG) {
+    console.log(...args)
+  }
 }
 
 /**
@@ -21,9 +21,9 @@ export function debugLog(...args: any[]): void {
  * Use this instead of console.error for application errors that should be hidden in production.
  */
 export function debugError(...args: any[]): void {
-    if (DEBUG) {
-        console.error(...args)
-    }
+  if (DEBUG) {
+    console.error(...args)
+  }
 }
 
 /**
@@ -31,9 +31,9 @@ export function debugError(...args: any[]): void {
  * Use this instead of console.warn for application warnings.
  */
 export function debugWarn(...args: any[]): void {
-    if (DEBUG) {
-        console.warn(...args)
-    }
+  if (DEBUG) {
+    console.warn(...args)
+  }
 }
 
 /**
@@ -41,9 +41,9 @@ export function debugWarn(...args: any[]): void {
  * Use this instead of console.info for application info messages.
  */
 export function debugInfo(...args: any[]): void {
-    if (DEBUG) {
-        console.info(...args)
-    }
+  if (DEBUG) {
+    console.info(...args)
+  }
 }
 
 /**
@@ -51,5 +51,5 @@ export function debugInfo(...args: any[]): void {
  * Useful for conditional debug behavior.
  */
 export function isDebugEnabled(): boolean {
-    return DEBUG
+  return DEBUG
 }

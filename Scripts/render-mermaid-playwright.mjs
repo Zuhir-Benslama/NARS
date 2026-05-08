@@ -1,0 +1,102 @@
+import { firefox } from 'playwright';
+import { readFileSync, writeFileSync } from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const inputDir = process.argv[2] || join(__dirname, 'docs', 'uml');
+const outputDir = process.argv[3] || inputDir;
+
+const files = process.argv.length > 4
+  ? process.argv.slice(4)
+  : [
+      'nars-class-diagram.md',
+      'nars-sequence-diagram.md',
+      'nars-vite-component-diagram.md',
+      'nars-vite-sequence-diagram.md',
+    ];
+
+const browser = await firefox.launch({ headless: true });
+
+for (const file of files) {
+  const filePath = join(inputDir, file);
+  console.log(`Processing ${file}...`);
+
+  const content = readFileSync(filePath, 'utf-8');
+  const codeBlocks = content.match(/```mermaid\n([\s\S]*?)```/g) || [];
+
+  if (codeBlocks.length === 0) {
+    console.log(`  No mermaid blocks found in ${file}`);
+    continue;
+  }
+
+  const page = await browser.newPage();
+
+  for (let i = 0; i < codeBlocks.length; i++) {
+    const code = codeBlocks[i].replace(/```mermaid\n/, '').replace(/```$/, '').trim();
+    const baseName = file.replace('.md', '');
+    const outputName = codeBlocks.length > 1
+      ? `${baseName}-${i + 1}.png`
+      : `${baseName}.png`;
+    const outputPath = join(outputDir, outputName);
+
+    console.log(`  Rendering diagram ${i + 1}/${codeBlocks.length}...`);
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>body { margin: 0; padding: 20px; background: white; }</style>
+</head>
+<body>
+  <div id="diagram"></div>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: false, theme: 'default', fontFamily: 'monospace' });
+    const code = JSON.parse(${JSON.stringify(JSON.stringify(code))});
+    try {
+      const { svg } = await mermaid.render('d' + Date.now(), code);
+      document.getElementById('diagram').innerHTML = svg;
+      window.__ready = true;
+    } catch (e) {
+      window.__error = e.message;
+      window.__ready = true;
+    }
+  </script>
+</body>
+</html>`;
+
+    await page.setContent(html, { waitUntil: 'commit' });
+
+    try {
+      await page.waitForFunction(() => window.__ready || window.__error, { timeout: 30000 });
+
+      const error = await page.evaluate(() => window.__error);
+      if (error) {
+        console.error(`  Error: ${error}`);
+        continue;
+      }
+
+      await page.waitForTimeout(500);
+
+      const svgElement = await page.locator('#diagram svg');
+      const bbox = await svgElement.evaluate(el => {
+        const b = el.getBBox();
+        return { width: Math.ceil(b.width + 40), height: Math.ceil(b.height + 40) };
+      });
+
+      await page.setViewportSize({ width: Math.max(bbox.width, 800), height: Math.max(bbox.height, 600) });
+      await page.waitForTimeout(300);
+
+      await svgElement.screenshot({ path: outputPath, type: 'png' });
+      console.log(`  -> ${outputName} (${bbox.width}x${bbox.height})`);
+    } catch (err) {
+      console.error(`  Error rendering: ${err.message}`);
+    }
+  }
+
+  await page.close();
+}
+
+await browser.close();
+console.log('Done.');

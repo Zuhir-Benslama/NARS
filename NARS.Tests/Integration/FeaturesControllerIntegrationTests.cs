@@ -211,6 +211,7 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
         var saveOk = Assert.IsType<ObjectResult>(saveResult);
         var savedObj = saveOk.Value!;
         var idProp = savedObj.GetType().GetProperty("id");
+        Assert.NotNull(idProp);
         var featureId = Guid.Parse((string)idProp.GetValue(savedObj)!);
 
         // Update the label

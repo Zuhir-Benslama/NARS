@@ -1,22 +1,22 @@
 /* ── Reset & base ──────────────────────────────────────────────────────────── */
 
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    overflow: hidden;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  overflow: hidden;
 }
 
 /* Hide Vue app until mounted — prevents FOUC */
 [v-cloak] {
-    display: none;
+  display: none;
 }
 
 #map {
-    height: 100vh;
-    width: 100%;
+  height: 100vh;
+  width: 100%;
 }
