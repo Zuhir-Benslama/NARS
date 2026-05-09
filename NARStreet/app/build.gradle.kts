@@ -38,7 +38,10 @@ android {
         buildConfigField("Boolean", "MTLS_ENABLED", localProperties.getProperty("MTLS_ENABLED", "false").toBoolean().toString())
         buildConfigField("String", "CA_CERT_ASSET", "\"${localProperties.getProperty("CA_CERT_ASSET", "nars-ca.crt")}\"")
         buildConfigField("String", "CLIENT_P12_ASSET", "\"${localProperties.getProperty("CLIENT_P12_ASSET", "nars-client.p12")}\"")
-        buildConfigField("String", "CLIENT_P12_PASSWORD", "\"${localProperties.getProperty("CLIENT_P12_PASSWORD", "")}\"")
+        // SECURITY: P12 password is NOT compiled into the APK.
+        // Provide it at runtime via SecurePreferences or a runtime prompt.
+        // buildConfigField("String", "CLIENT_P12_PASSWORD", "\"${localProperties.getProperty("CLIENT_P12_PASSWORD", "")}\"")
+        buildConfigField("String", "CERTIFICATE_PINS", "\"${localProperties.getProperty("CERTIFICATE_PINS", "")}\"")
     }
 
     buildTypes {
@@ -109,7 +112,6 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
     implementation(libs.compose.material.icons.extended)
-    implementation(libs.compose.material.ripple)
 
     // Navigation
     implementation(libs.androidx.navigation.compose)
@@ -123,9 +125,22 @@ dependencies {
     // Coil for image loading
     implementation(libs.coil.compose)
 
+    // Koin DI
+    implementation(libs.koin.core)
+    implementation(libs.koin.android)
+    implementation(libs.koin.androidx.compose)
+
+    // Ktor HTTP Client
+    implementation(libs.ktor.client.okhttp)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.ktor.client.logging)
+
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.mockk)
+    testImplementation(libs.ktor.client.mock)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.compose.bom))

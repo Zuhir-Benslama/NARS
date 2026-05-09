@@ -25,8 +25,6 @@ import androidx.compose.material.icons.filled.BrightnessHigh
 import androidx.compose.material.icons.filled.BrightnessLow
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.GridOn
-import androidx.compose.material.icons.automirrored.filled.Label
-import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -49,25 +47,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nars.maplibre.NarsViewModel
+import com.nars.maplibre.SettingsViewModel
 import com.nars.maplibre.ui.theme.DangerColor
 import com.nars.maplibre.ui.theme.GlassBackground
 import com.nars.maplibre.ui.theme.TextPrimary
 import com.nars.maplibre.ui.theme.TextSecondary
 import com.nars.maplibre.ui.theme.ThemeMode
+import org.koin.androidx.compose.koinViewModel
 
-/**
- * Settings screen
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    viewModel: NarsViewModel,
     onNavigateBack: () -> Unit,
     onLogout: () -> Unit
 ) {
+    val viewModel: SettingsViewModel = koinViewModel()
     var snapDistance by remember { mutableFloatStateOf(20f) }
     var showGrid by remember { mutableStateOf(false) }
     var showLabels by remember { mutableStateOf(true) }
@@ -100,7 +97,6 @@ fun SettingsScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Theme settings
                 SettingsSection(
                     title = "Appearance",
                     icon = Icons.Default.Palette
@@ -122,12 +118,10 @@ fun SettingsScreen(
                     }
                 }
 
-                // Map settings
                 SettingsSection(
                     title = "Map",
                     icon = Icons.Default.GridOn
                 ) {
-                    // Snap distance
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -171,7 +165,6 @@ fun SettingsScreen(
                         )
                     }
 
-                    // Show grid
                     SettingsItem(
                         icon = Icons.Default.GridOn,
                         title = "Show Grid",
@@ -180,7 +173,6 @@ fun SettingsScreen(
                         onClick = { showGrid = !showGrid }
                     )
 
-                    // Show labels
                     SettingsItem(
                         icon = Icons.AutoMirrored.Filled.Label,
                         title = "Show Labels",
@@ -190,7 +182,6 @@ fun SettingsScreen(
                     )
                 }
 
-                // About section
                 SettingsSection(
                     title = "About",
                     icon = Icons.Default.Palette
@@ -224,7 +215,6 @@ fun SettingsScreen(
                         }
                     }
 
-                    // Logout button
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Box(
@@ -249,7 +239,7 @@ fun SettingsScreen(
                             Text(
                                 text = "Logout",
                                 fontSize = 15.sp,
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = DangerColor
                             )
                         }
@@ -260,9 +250,6 @@ fun SettingsScreen(
     }
 }
 
-/**
- * Settings section
- */
 @Composable
 private fun SettingsSection(
     title: String,
@@ -306,9 +293,6 @@ private fun SettingsSection(
     }
 }
 
-/**
- * Settings item
- */
 @Composable
 private fun SettingsItem(
     icon: ImageVector,
@@ -351,7 +335,6 @@ private fun SettingsItem(
             }
         }
 
-        // Selection indicator
         if (selected) {
             Icon(
                 imageVector = Icons.Default.Info,

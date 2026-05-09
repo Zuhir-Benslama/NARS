@@ -10,7 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import com.nars.maplibre.NarsViewModel
+import com.nars.maplibre.MapViewModel
 import com.nars.maplibre.data.model.BaseLayerType
 import com.nars.maplibre.data.model.NarsFeature
 import org.maplibre.android.camera.CameraPosition
@@ -30,7 +30,7 @@ import org.maplibre.android.style.sources.GeoJsonSource
  */
 @Composable
 fun NarsMap(
-    viewModel: NarsViewModel,
+    viewModel: MapViewModel,
     onMapReady: (MapView, MapLibreMap) -> Unit,
     onMapClick: ((LatLng) -> Unit)? = null,
     onMapLongClick: ((LatLng) -> Unit)? = null,

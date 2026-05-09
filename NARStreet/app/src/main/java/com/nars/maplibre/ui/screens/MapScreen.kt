@@ -43,8 +43,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nars.maplibre.NarsApplication
-import com.nars.maplibre.NarsViewModel
+import com.nars.maplibre.MapViewModel
+import com.nars.maplibre.data.api.ApiService
+import com.nars.maplibre.data.api.SessionManager
 import com.nars.maplibre.data.model.NarsFeature
 import com.nars.maplibre.data.model.Phases
 import com.nars.maplibre.ui.components.CompactInfoPanel
@@ -55,19 +56,24 @@ import com.nars.maplibre.ui.components.TileControl
 import com.nars.maplibre.ui.components.VerticalPhaseNav
 import com.nars.maplibre.ui.theme.GlassBackground
 import kotlinx.coroutines.launch
+import org.koin.androidx.compose.koinViewModel
+import org.koin.java.KoinJavaComponent.get
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
-    viewModel: NarsViewModel,
     onNavigateToSettings: () -> Unit,
     onLogout: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    val application = NarsApplication.instance
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val viewModel: MapViewModel = koinViewModel()
+    val apiService: ApiService = get(ApiService::class.java)
+    val sessionManager: SessionManager = get(SessionManager::class.java)
 
     val currentPhase by viewModel.currentPhase.collectAsState()
     val allFeatures by viewModel.allFeatures.collectAsState()
@@ -83,7 +89,7 @@ fun MapScreen(
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
 
     val handlers = remember {
-        MapScreenHandlers(viewModel, application, scope) { msg ->
+        MapScreenHandlers(viewModel, apiService, sessionManager, context, scope) { msg ->
             scope.launch { snackbarHostState.showSnackbar(msg) }
         }
     }
@@ -154,7 +160,7 @@ fun MapScreen(
             )
 
             ProfileMenu(
-                user = application.appPreferences.user,
+                user = sessionManager.getUser(),
                 onSettingsClick = onNavigateToSettings,
                 onLogoutClick = { handlers.logout(onLogout) },
                 modifier = Modifier.align(Alignment.TopEnd).padding(end = 12.dp, top = 12.dp)

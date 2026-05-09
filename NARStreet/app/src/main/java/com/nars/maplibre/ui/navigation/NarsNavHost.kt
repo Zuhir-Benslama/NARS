@@ -4,26 +4,19 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.nars.maplibre.NarsViewModel
 import com.nars.maplibre.ui.screens.LoginScreen
 import com.nars.maplibre.ui.screens.MapScreen
 import com.nars.maplibre.ui.screens.SettingsScreen
+import org.koin.java.KoinJavaComponent.get
 
-/**
- * Navigation routes
- */
 object Routes {
     const val LOGIN = "login"
     const val MAP = "map"
     const val SETTINGS = "settings"
 }
 
-/**
- * Navigation host for NARS
- * Handles authentication flow
- */
 @Composable
-fun NarsNavHost(viewModel: NarsViewModel) {
+fun NarsNavHost() {
     val navController = rememberNavController()
 
     NavHost(
@@ -42,7 +35,6 @@ fun NarsNavHost(viewModel: NarsViewModel) {
 
         composable(Routes.MAP) {
             MapScreen(
-                viewModel = viewModel,
                 onNavigateToSettings = {
                     navController.navigate(Routes.SETTINGS)
                 },
@@ -56,7 +48,6 @@ fun NarsNavHost(viewModel: NarsViewModel) {
 
         composable(Routes.SETTINGS) {
             SettingsScreen(
-                viewModel = viewModel,
                 onNavigateBack = {
                     navController.popBackStack()
                 },

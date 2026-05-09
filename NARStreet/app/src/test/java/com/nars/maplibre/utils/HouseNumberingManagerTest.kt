@@ -8,6 +8,7 @@ import com.nars.maplibre.data.model.Phases
 import com.nars.maplibre.data.model.PointGeometry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -25,12 +26,12 @@ class HouseNumberingManagerTest {
                 phase = Phases.ROADS_KEY,
                 color = "#3498db"
             ),
-            dbId = 1L
+            dbId = "1"
         )
     }
 
     // Helper to create an entrance (Point)
-    private fun createEntrance(id: String, lng: Double, lat: Double, roadDbId: Long? = 1L): NarsFeature {
+    private fun createEntrance(id: String, lng: Double, lat: Double, roadDbId: String? = "1"): NarsFeature {
         return NarsFeature(
             id = id,
             type = NarsFeatureType.HOUSE_ENTRANCE,
@@ -78,7 +79,7 @@ class HouseNumberingManagerTest {
     @Test
     fun `setHouseNumbers skips entrances not assigned to road`() {
         val road = createRoad("road1", listOf(3.0, 36.0, 3.01, 36.0))
-        val entrance = createEntrance("e1", 3.005, 36.0001, roadDbId = 999L) // Different road
+        val entrance = createEntrance("e1", 3.005, 36.0001, roadDbId = "999") // Different road
 
         val result = manager.setHouseNumbers(listOf(entrance), road)
 

@@ -7,7 +7,6 @@ import com.nars.maplibre.data.model.PointGeometry
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlin.math.sqrt
 
 /**
  * Road directions computation matching web version (road-directions.ts)
@@ -157,13 +156,13 @@ class RoadDirectionsCalculator {
             for ((otherKey, otherNode) in graph) {
                 if (otherKey == startKey || otherKey == endKey) continue
 
-                val dist = distance(startLat, startLng, otherNode.lat, otherNode.lng)
+                val dist = GeometryUtils.haversineDistance(startLat, startLng, otherNode.lat, otherNode.lng)
                 if (dist < CONNECT_METERS) {
                     // Connect the nodes in graph
                     startNode.connectedSegmentIds.addAll(otherNode.connectedSegmentIds)
                 }
 
-                val dist2 = distance(endLat, endLng, otherNode.lat, otherNode.lng)
+                val dist2 = GeometryUtils.haversineDistance(endLat, endLng, otherNode.lat, otherNode.lng)
                 if (dist2 < CONNECT_METERS) {
                     endNode.connectedSegmentIds.addAll(otherNode.connectedSegmentIds)
                 }
@@ -197,7 +196,7 @@ class RoadDirectionsCalculator {
 
         // Start with city center node or nearby nodes
         val startNodes = graph.filter { (_, node) ->
-            distance(centerLat, centerLng, node.lat, node.lng) < cityCenterRadius * 2
+            GeometryUtils.haversineDistance(centerLat, centerLng, node.lat, node.lng) < cityCenterRadius * 2
         }.keys.toList()
 
         if (startNodes.isEmpty()) {
@@ -206,7 +205,7 @@ class RoadDirectionsCalculator {
                 val parts = key.split(",")
                 val lat = parts[0].toDoubleOrNull() ?: 0.0
                 val lng = parts[1].toDoubleOrNull() ?: 0.0
-                distance(centerLat, centerLng, lat, lng)
+                GeometryUtils.haversineDistance(centerLat, centerLng, lat, lng)
             }.take(1)
             queue.addAll(sorted)
         } else {
@@ -239,7 +238,7 @@ class RoadDirectionsCalculator {
                 if (otherKey in visited) continue
 
                 val otherNode = graph[otherKey] ?: continue
-                if (distance(node.lat, node.lng, otherNode.lat, otherNode.lng) < CONNECT_METERS) {
+                if (GeometryUtils.haversineDistance(node.lat, node.lng, otherNode.lat, otherNode.lng) < CONNECT_METERS) {
                     queue.add(otherKey)
                 }
             }
@@ -275,8 +274,8 @@ class RoadDirectionsCalculator {
         val endLng = coords[coords.size - 2]
         val endLat = coords[coords.size - 1]
 
-        val startDist = distance(centerLat, centerLng, startLat, startLng)
-        val endDist = distance(centerLat, centerLng, endLat, endLng)
+        val startDist = GeometryUtils.haversineDistance(centerLat, centerLng, startLat, startLng)
+        val endDist = GeometryUtils.haversineDistance(centerLat, centerLng, endLat, endLng)
 
         // Flow from closer to farther (away from center)
         return startDist < endDist
@@ -343,20 +342,6 @@ class RoadDirectionsCalculator {
     }
 
     /**
-     * Calculate distance between two points in meters (Haversine formula)
-     */
-    private fun distance(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
-        val r = 6371000.0 // Earth radius in meters
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLng = Math.toRadians(lng2 - lng1)
-        val a = sin(dLat / 2) * sin(dLat / 2) +
-                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
-                sin(dLng / 2) * sin(dLng / 2)
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        return r * c
-    }
-
-    /**
      * Reverse a road's coordinates
      */
     fun reverseRoadCoordinates(coordinates: List<Double>): List<Double> {
@@ -364,16 +349,16 @@ class RoadDirectionsCalculator {
     }
 
     /**
-     * Get bearing from start to end point
+     * Get bearing from start to end point using standard formula:
+     * θ = atan2(sin(Δλ)⋅cos(φ2), cos(φ1)⋅sin(φ2) − sin(φ1)⋅cos(φ2)⋅cos(Δλ))
      */
     fun getBearing(startLng: Double, startLat: Double, endLng: Double, endLat: Double): Double {
         val dLng = Math.toRadians(endLng - startLng)
-        val y = sin(dLng)
-        val x = cos(Math.toRadians(startLat)) * tan(Math.toRadians(endLat)) -
-                sin(Math.toRadians(startLat)) * cos(dLng)
+        val lat1Rad = Math.toRadians(startLat)
+        val lat2Rad = Math.toRadians(endLat)
+        val y = sin(dLng) * cos(lat2Rad)
+        val x = cos(lat1Rad) * sin(lat2Rad) - sin(lat1Rad) * cos(lat2Rad) * cos(dLng)
         val bearing = Math.toDegrees(atan2(y, x))
         return (bearing + 360) % 360
     }
-
-    private fun tan(angle: Double): Double = sin(angle) / cos(angle)
 }
