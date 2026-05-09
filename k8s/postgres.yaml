@@ -25,8 +25,8 @@ spec:
       labels:
         app: postgres
     spec:
-      imagePullSecrets:
-        - name: regcred
+      securityContext:
+        fsGroup: 999
       containers:
         - name: postgres
           image: zuhirbenslama/nars-postgres:latest
@@ -42,9 +42,49 @@ spec:
                 secretKeyRef:
                   name: nars-secrets
                   key: postgres_password
+          startupProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - postgres
+                - -d
+                - nars_db
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - postgres
+                - -d
+                - nars_db
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - postgres
+                - -d
+                - nars_db
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 1
+              memory: 1Gi
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
+          securityContext:
+            allowPrivilegeEscalation: false
       volumes:
         - name: postgres-data
           persistentVolumeClaim:

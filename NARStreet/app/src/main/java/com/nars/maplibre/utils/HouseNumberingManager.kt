@@ -1,6 +1,6 @@
 package com.nars.maplibre.utils
 
-import android.util.Log
+import com.nars.maplibre.utils.NarsLogger
 import com.nars.maplibre.data.model.NarsFeature
 import com.nars.maplibre.data.model.LineStringGeometry
 import com.nars.maplibre.data.model.PointGeometry
@@ -37,13 +37,13 @@ class HouseNumberingManager {
     ): List<NarsFeature> {
         val roadGeom = road.geometry as? LineStringGeometry
         if (roadGeom == null) {
-            Log.w(TAG, "Road has no geometry")
+            NarsLogger.w(TAG, "Road has no geometry")
             return entrances
         }
 
         val roadCoords = roadGeom.coordinates.chunked(2)
         if (roadCoords.size < 2) {
-            Log.w(TAG, "Road has insufficient coordinates")
+            NarsLogger.w(TAG, "Road has insufficient coordinates")
             return entrances
         }
 
@@ -54,11 +54,11 @@ class HouseNumberingManager {
         }
 
         if (mainEntrances.isEmpty()) {
-            Log.d(TAG, "No main entrances found for road ${road.id}")
+            NarsLogger.d(TAG, "No main entrances found for road ${road.id}")
             return entrances
         }
 
-        Log.d(TAG, "Numbering ${mainEntrances.size} entrances for road ${road.id}")
+        NarsLogger.d(TAG, "Numbering ${mainEntrances.size} entrances for road ${road.id}")
 
         // Project each entrance onto road and calculate arc distance
         val projectedEntrances = mainEntrances.mapNotNull { entrance ->
@@ -134,7 +134,7 @@ class HouseNumberingManager {
             updated ?: entrance
         }
 
-        Log.d(TAG, "Assigned numbers: oddNext=$oddNext, evenNext=$evenNext")
+        NarsLogger.d(TAG, "Assigned numbers: oddNext=$oddNext, evenNext=$evenNext")
         return result
     }
 

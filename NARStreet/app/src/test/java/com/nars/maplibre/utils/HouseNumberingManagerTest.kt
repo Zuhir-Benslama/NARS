@@ -83,7 +83,7 @@ class HouseNumberingManagerTest {
         val result = manager.setHouseNumbers(listOf(entrance), road)
 
         // Should not assign number
-        assertTrue(result[0].properties.entranceNumber == null || (result[0].properties.entranceNumber ?: 0) <= 0)
+        assertNull(result[0].properties.entranceNumber)
     }
 
     @Test

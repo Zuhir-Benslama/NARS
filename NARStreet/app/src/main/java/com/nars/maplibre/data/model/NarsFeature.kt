@@ -50,7 +50,7 @@ enum class BuildingType(val value: String, val displayName: String) {
 @Serializable
 data class NarsFeature(
     val id: String,
-    val dbId: Long? = null,
+    val dbId: String? = null,
     val type: NarsFeatureType,
     val geometry: Geometry,
     val properties: FeatureProperties,
@@ -120,11 +120,11 @@ data class FeatureProperties(
     val buildingTypeKey: String? = null,
     // House entrance specific fields
     val entranceTypeKey: String? = null,
-    val roadDbId: Long? = null,
+    val roadDbId: String? = null,
     val roadLabel: String? = null,
     val side: String? = null, // "left" or "right"
     val entranceNumber: Int? = null,
-    val mainEntranceDbId: Long? = null,
+    val mainEntranceDbId: String? = null,
     val mainEntranceLabel: String? = null,
     // --- Roads Phase Fields (Field Mode) ---
     val roadTraffic: String? = null, // "high" | "medium" | "low"

@@ -1,6 +1,6 @@
 package com.nars.maplibre
 
-import android.util.Log
+import com.nars.maplibre.utils.NarsLogger
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nars.maplibre.data.model.BaseLayerType
@@ -103,7 +103,7 @@ class NarsViewModel(
             val error = phaseNavigator.canAdvance(phase.index)
             if (error != null) {
                 showError(error)
-                Log.d("NarsViewModel", "Phase validation failed: $error")
+                NarsLogger.d("NarsViewModel", "Phase validation failed: $error")
                 return null
             }
 
@@ -113,7 +113,7 @@ class NarsViewModel(
             }
         }
 
-        Log.d("NarsViewModel", "Setting current phase to: ${phase.label} (${phase.key})")
+        NarsLogger.d("NarsViewModel", "Setting current phase to: ${phase.label} (${phase.key})")
         featureStore.setCurrentPhase(phase)
         appPreferences.currentPhase = phase.key
 
@@ -195,9 +195,9 @@ class NarsViewModel(
                 }
 
                 showSuccess(result.message)
-                Log.d("NarsViewModel", "Road directions: ${result.message}")
+                NarsLogger.d("NarsViewModel", "Road directions: ${result.message}")
             } catch (e: Exception) {
-                Log.e("NarsViewModel", "Failed to compute road directions", e)
+                NarsLogger.e("NarsViewModel", "Failed to compute road directions", e)
                 showError("Failed to compute road directions")
             }
         }
@@ -220,17 +220,17 @@ class NarsViewModel(
                     try {
                         val saveResult = application.apiClient.saveFeature(panel)
                         saveResult.onSuccess { savedId ->
-                            Log.d("NarsViewModel", "Saved naming panel: $savedId")
+                            NarsLogger.d("NarsViewModel", "Saved naming panel: $savedId")
                         }
                     } catch (e: Exception) {
-                        Log.w("NarsViewModel", "Failed to save naming panel: ${e.message}")
+                        NarsLogger.w("NarsViewModel", "Failed to save naming panel: ${e.message}")
                     }
                 }
 
                 showSuccess("Generated ${panels.size} naming panels")
-                Log.d("NarsViewModel", "Generated ${panels.size} naming panels")
+                NarsLogger.d("NarsViewModel", "Generated ${panels.size} naming panels")
             } catch (e: Exception) {
-                Log.e("NarsViewModel", "Failed to generate naming panels", e)
+                NarsLogger.e("NarsViewModel", "Failed to generate naming panels", e)
                 showError("Failed to generate naming panels")
             }
         }
@@ -265,9 +265,9 @@ class NarsViewModel(
 
                 val numberedCount = updated.count { it.properties.entranceNumber != null && it.properties.entranceNumber > 0 }
                 showSuccess("Assigned numbers to $numberedCount entrances")
-                Log.d("NarsViewModel", "Numbered $numberedCount entrances")
+                NarsLogger.d("NarsViewModel", "Numbered $numberedCount entrances")
             } catch (e: Exception) {
-                Log.e("NarsViewModel", "Failed to set house numbers", e)
+                NarsLogger.e("NarsViewModel", "Failed to set house numbers", e)
                 showError("Failed to set house numbers")
             }
         }

@@ -78,7 +78,7 @@ public static class AuthenticationExtensions
         services.AddAuthorization();
 
         // Register JwtService with the same secret and options used for authentication
-        services.AddScoped<JwtService>(sp =>
+        services.AddScoped<IJwtService, JwtService>(sp =>
         {
             var config = sp.GetRequiredService<IConfiguration>();
             var logger = sp.GetRequiredService<ILogger<JwtService>>();

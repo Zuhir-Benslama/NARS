@@ -1,6 +1,6 @@
 package com.nars.maplibre.utils
 
-import android.util.Log
+import com.nars.maplibre.utils.NarsLogger
 import com.nars.maplibre.data.model.NarsFeature
 import com.nars.maplibre.data.model.LineStringGeometry
 import com.nars.maplibre.data.model.PointGeometry
@@ -82,28 +82,28 @@ class RoadDirectionsCalculator {
             return RoadDirectionsResult(emptyList(), "No roads to process")
         }
 
-        Log.d(TAG, "Computing directions for ${roads.size} roads")
+        NarsLogger.d(TAG, "Computing directions for ${roads.size} roads")
 
         // Phase 1: Build connection graph
         val (graph, segments) = buildConnectionGraph(roads)
-        Log.d(TAG, "Built graph with ${graph.size} nodes and ${segments.size} segments")
+        NarsLogger.d(TAG, "Built graph with ${graph.size} nodes and ${segments.size} segments")
 
         // Phase 2: Orient roads from city center or geographically
         if (cityCenter != null) {
             orientFromCityCenter(cityCenter, graph, segments)
-            Log.d(TAG, "Oriented from city center")
+            NarsLogger.d(TAG, "Oriented from city center")
         } else {
             orientGeographic(segments)
-            Log.d(TAG, "Oriented geographically (west to east)")
+            NarsLogger.d(TAG, "Oriented geographically (west to east)")
         }
 
         // Phase 3: Vote per road (majority of segments)
         val votes = computeVotes(segments)
-        Log.d(TAG, "Votes computed: ${votes.size} roads")
+        NarsLogger.d(TAG, "Votes computed: ${votes.size} roads")
 
         // Phase 4: Dead-end correction
         val corrected = deadEndCorrection(votes, graph, roads)
-        Log.d(TAG, "Dead-end correction: ${corrected.size} roads to reverse")
+        NarsLogger.d(TAG, "Dead-end correction: ${corrected.size} roads to reverse")
 
         // Phase 5: Generate result (reversed road IDs)
         return RoadDirectionsResult(corrected, "Directions applied to ${corrected.size} roads")
@@ -193,11 +193,7 @@ class RoadDirectionsCalculator {
         val visited = mutableSetOf<String>()
         val queue = ArrayDeque<String>()
 
-        // Get city center radius from geometry (coordinates[2] = radius for CircleGeometry)
-        val cityCenterRadius = when (val geom = cityCenter.geometry) {
-            is com.nars.maplibre.data.model.CircleGeometry -> geom.coordinates.getOrNull(2) ?: 100.0
-            else -> 100.0
-        }
+        val cityCenterRadius = 100.0
 
         // Start with city center node or nearby nodes
         val startNodes = graph.filter { (_, node) ->

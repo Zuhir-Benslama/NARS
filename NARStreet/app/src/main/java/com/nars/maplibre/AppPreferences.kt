@@ -25,12 +25,14 @@ class AppPreferences(context: Context) {
 
     // Current theme mode
     var themeMode: ThemeMode
-        get() = ThemeMode.valueOf(prefs.getString(KEY_THEME, ThemeMode.AUTO.name)!!)
+        get() = runCatching { ThemeMode.valueOf(prefs.getString(KEY_THEME, ThemeMode.AUTO.name) ?: ThemeMode.AUTO.name) }
+            .getOrDefault(ThemeMode.AUTO)
         set(value) = prefs.edit { putString(KEY_THEME, value.name) }
 
     // Current base layer
     var baseLayer: BaseLayerType
-        get() = BaseLayerType.valueOf(prefs.getString(KEY_BASE_LAYER, BaseLayerType.SATELLITE.name)!!)
+        get() = runCatching { BaseLayerType.valueOf(prefs.getString(KEY_BASE_LAYER, BaseLayerType.SATELLITE.name) ?: BaseLayerType.SATELLITE.name) }
+            .getOrDefault(BaseLayerType.SATELLITE)
         set(value) = prefs.edit { putString(KEY_BASE_LAYER, value.name) }
 
     // Snap distance in meters

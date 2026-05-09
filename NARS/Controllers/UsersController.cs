@@ -61,11 +61,10 @@ public class UsersController(AppDbContext db) : NarsControllerBase
             return Conflict(new { detail = "Username or email already exists." });
         }
 
-        return Ok(new
-        {
-            success = true,
-            message = "Profile updated successfully.",
-            user = new { user.Username, user.Email },
-        });
+        return Ok(new UpdateCredentialsResponse(
+            Success: true,
+            Message: "Profile updated successfully.",
+            User: new UserCredentialsInfo(Username: user.Username, Email: user.Email)
+        ));
     }
 }

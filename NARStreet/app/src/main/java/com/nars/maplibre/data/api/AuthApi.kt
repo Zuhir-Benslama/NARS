@@ -18,6 +18,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.net.HttpURLConnection
 import java.net.URL
+import javax.net.ssl.HttpsURLConnection
 
 /**
  * Handles authentication-related API calls
@@ -26,7 +27,8 @@ class AuthApi(
     private val baseUrl: String,
     private val json: Json,
     private var authToken: String?,
-    private var cookie: String?
+    private var cookie: String?,
+    private val tlsSocketFactory: javax.net.ssl.SSLSocketFactory? = null
 ) {
     companion object {
         private const val TAG = "AuthApi"
@@ -36,6 +38,14 @@ class AuthApi(
         private const val DEFAULT_TIMEOUT_MS = 10000
         private const val HTTP_REDIRECT_FOUND = 302
         private const val HTTP_REDIRECT_SEE_OTHER = 303
+    }
+
+    private fun openConnection(url: URL): HttpURLConnection {
+        val connection = url.openConnection()
+        if (tlsSocketFactory != null && connection is HttpsURLConnection) {
+            connection.sslSocketFactory = tlsSocketFactory
+        }
+        return connection as HttpURLConnection
     }
 
     fun setAuthToken(token: String?) {
@@ -60,7 +70,7 @@ class AuthApi(
 
         try {
             val url = URL("$baseUrl/api/signin")
-            val connection = url.openConnection() as HttpURLConnection
+            val connection = openConnection(url)
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
             connection.setRequestProperty("Accept", "application/json")
@@ -99,7 +109,7 @@ class AuthApi(
                     }
 
                     val userObj = jsonElement.jsonObject["user"]?.jsonObject ?: JsonObject(emptyMap())
-                    val userId = userObj["id"]?.jsonPrimitive?.intOrNull ?: 0
+                    val userId = userObj["id"]?.jsonPrimitive?.contentOrNull ?: ""
                     val apiUsername = userObj["username"]?.jsonPrimitive?.content ?: username
                     val apiName = userObj["name"]?.jsonPrimitive?.content ?: username
                     val email = userObj["email"]?.jsonPrimitive?.contentOrNull
@@ -129,7 +139,7 @@ class AuthApi(
                 } catch (e: Exception) {
                     NarsLogger.w(TAG, "Login response parse error: ${e.message}")
                     Result.success(LoginResponse(
-                        user = User(id = 0, username = username, name = username),
+                        user = User(username = username, name = username),
                         token = null,
                         municipalityName = null
                     ))
@@ -137,7 +147,7 @@ class AuthApi(
             } else if (responseCode == HTTP_REDIRECT_FOUND || responseCode == HTTP_REDIRECT_SEE_OTHER) {
                 NarsLogger.logAuthEvent(TAG, "Login redirect - session-based auth", username)
                 return@withContext Result.success(LoginResponse(
-                    user = User(id = 0, username = username, name = username),
+                    user = User(username = username, name = username),
                     token = null,
                     municipalityName = null
                 ))
@@ -169,7 +179,7 @@ class AuthApi(
     suspend fun getCurrentUser(cookie: String?): Result<User> = withContext(Dispatchers.IO) {
         try {
             val url = URL("$baseUrl/api/current_user")
-            val connection = url.openConnection() as HttpURLConnection
+            val connection = openConnection(url)
             connection.requestMethod = "GET"
             connection.setRequestProperty("Content-Type", "application/json")
             connection.setRequestProperty("Accept", "application/json")
@@ -182,7 +192,26 @@ class AuthApi(
             val responseCode = connection.responseCode
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 val responseBody = connection.inputStream.bufferedReader().use { it.readText() }
-                val user = json.decodeFromString(User.serializer(), responseBody)
+                val jsonElement = json.parseToJsonElement(responseBody)
+                val userId = jsonElement.jsonObject["id"]?.jsonPrimitive?.contentOrNull ?: ""
+                val apiUsername = jsonElement.jsonObject["username"]?.jsonPrimitive?.content ?: ""
+                val apiName = jsonElement.jsonObject["name"]?.jsonPrimitive?.content ?: ""
+                val email = jsonElement.jsonObject["email"]?.jsonPrimitive?.contentOrNull
+
+                val communeObj = jsonElement.jsonObject["commune"]?.jsonObject ?: JsonObject(emptyMap())
+                val communeLat = communeObj["latitude"]?.jsonPrimitive?.doubleOrNull
+                val communeLng = communeObj["longitude"]?.jsonPrimitive?.doubleOrNull
+                val communeName = communeObj["name_fr"]?.jsonPrimitive?.contentOrNull
+
+                val user = User(
+                    id = userId,
+                    username = apiUsername,
+                    name = apiName,
+                    email = email,
+                    communeLatitude = communeLat,
+                    communeLongitude = communeLng,
+                    communeName = communeName
+                )
                 Result.success(user)
             } else {
                 Result.failure(Exception("Auth check failed: HTTP $responseCode"))
@@ -198,7 +227,7 @@ class AuthApi(
     suspend fun logout(cookie: String?): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val url = URL("$baseUrl/api/logout")
-            val connection = url.openConnection() as HttpURLConnection
+            val connection = openConnection(url)
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
 
@@ -216,6 +245,39 @@ class AuthApi(
             }
         } catch (e: Exception) {
             Result.failure(Exception("Logout error: ${e.message}"))
+        }
+    }
+
+    /**
+     * Refresh JWT token using refresh_token cookie
+     */
+    suspend fun refreshToken(): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL("$baseUrl/api/refresh")
+            val connection = openConnection(url)
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Accept", "application/json")
+            cookie?.let { connection.setRequestProperty("Cookie", it) }
+            connection.connectTimeout = DEFAULT_TIMEOUT_MS
+            connection.readTimeout = DEFAULT_TIMEOUT_MS
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                val cookies = connection.headerFields["Set-Cookie"]
+                cookies?.firstOrNull()?.let { cookieValue ->
+                    val tokenMatch = Regex("access_token=([^;]+)").find(cookieValue)
+                    tokenMatch?.let { match ->
+                        authToken = match.groupValues[1]
+                        cookie = cookieValue
+                    }
+                }
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Token refresh failed: HTTP $responseCode"))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception("Token refresh error: ${e.message}"))
         }
     }
 

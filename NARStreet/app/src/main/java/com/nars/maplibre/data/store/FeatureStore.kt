@@ -6,6 +6,7 @@ import com.nars.maplibre.data.model.Phases
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.Collections
 
 /**
  * Feature store managing all NARS features
@@ -41,8 +42,8 @@ class FeatureStore {
     private val _referenceEntranceDbId = MutableStateFlow<String?>(null)
     val referenceEntranceDbId: StateFlow<String?> = _referenceEntranceDbId.asStateFlow()
 
-    // Undo stack
-    private val _undoStack = mutableListOf<UndoAction>()
+    // Undo stack (thread-safe)
+    private val _undoStack = Collections.synchronizedList(mutableListOf<UndoAction>())
     val canUndo: Boolean get() = _undoStack.isNotEmpty()
 
     init {
@@ -107,11 +108,19 @@ class FeatureStore {
     }
     
     /**
-     * Update a feature
+     * Update a feature atomically
      */
     fun updateFeature(featureId: String, updatedFeature: NarsFeature) {
-        removeFeature(featureId)
-        addFeature(updatedFeature)
+        val currentMap = _featuresByPhase.value.toMutableMap()
+        val updatedMap = mutableMapOf<String, List<NarsFeature>>()
+        currentMap.forEach { (phase, features) ->
+            updatedMap[phase] = features.map { if (it.id == featureId) updatedFeature else it }
+        }
+        _featuresByPhase.value = updatedMap
+        _allFeatures.value = _allFeatures.value.map { if (it.id == featureId) updatedFeature else it }
+        if (_selectedFeature.value?.id == featureId) {
+            _selectedFeature.value = updatedFeature
+        }
     }
     
     /**

@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   # PostgreSQL + PostGIS for spatial data
   db:
@@ -17,6 +15,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   # Backend API
   api:
@@ -34,6 +33,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    restart: unless-stopped
 
   # Frontend (standalone mode — use build:deploy to serve via API instead)
   frontend:
@@ -44,6 +44,7 @@ services:
       - "3000:80"
     depends_on:
       - api
+    restart: unless-stopped
 
 volumes:
   postgres_data:

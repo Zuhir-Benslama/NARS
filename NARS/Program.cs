@@ -88,7 +88,7 @@ builder.Services.AddNarsJwtAuthentication(
 builder.Services.AddSingleton<IBackgroundTaskQueue, BackgroundTaskQueue>();
 builder.Services.AddHostedService<BackgroundQueueProcessor>();
 builder.Services.AddScoped<IScatteredAreaService, ScatteredAreaService>();
-builder.Services.AddScoped<RefreshTokenService>();
+builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 
 // HTTP client for tile proxy
 builder.Services.AddHttpClient("tile-proxy", client =>

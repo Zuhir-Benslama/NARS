@@ -1,6 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: nars
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/part-of: nars
+      app.kubernetes.io/managed-by: kustomize
 resources:
   - namespace.yaml
   - configmap.yaml
@@ -8,4 +13,14 @@ resources:
   - postgres.yaml
   - app-deployment.yaml
   - app-service.yaml
-  - ingress.yaml
+  - frontend-deployment.yaml
+  - frontend-service.yaml
+  - ingress-api.yaml
+  - ingress-frontend.yaml
+images:
+  - name: zuhirbenslama/nars-api
+    newTag: latest
+  - name: zuhirbenslama/nars-postgres
+    newTag: latest
+  - name: zuhirbenslama/nars-vite
+    newTag: latest

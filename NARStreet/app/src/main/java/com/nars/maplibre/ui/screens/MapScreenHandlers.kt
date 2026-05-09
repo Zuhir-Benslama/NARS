@@ -1,6 +1,6 @@
 package com.nars.maplibre.ui.screens
 
-import android.util.Log
+import com.nars.maplibre.utils.NarsLogger
 import com.nars.maplibre.NarsApplication
 import com.nars.maplibre.NarsViewModel
 import com.nars.maplibre.data.model.NarsFeature
@@ -21,6 +21,8 @@ class MapScreenHandlers(
         private const val TAG = "MapScreenHandlers"
         private const val ANIM_DURATION_MS = 1500
         private const val MAP_ZOOM = 14.0
+        private const val LONG_CLICK_DISTANCE_THRESHOLD = 50.0
+        private const val NEAR_FEATURE_DISTANCE_THRESHOLD = 20.0
     }
 
     var narsGeoman: NarsGeoman? = null
@@ -46,8 +48,8 @@ class MapScreenHandlers(
 
             application.appPreferences.user?.let { user ->
                 if (user.hasCommuneLocation()) {
-                    val lat = user.communeLatitude!!
-                    val lng = user.communeLongitude!!
+                    val lat = user.communeLatitude ?: return@let
+                    val lng = user.communeLongitude ?: return@let
                     map.animateCamera(
                         org.maplibre.android.camera.CameraUpdateFactory.newLatLngZoom(
                             org.maplibre.android.geometry.LatLng(lat, lng), MAP_ZOOM
@@ -58,7 +60,7 @@ class MapScreenHandlers(
         }
 
     fun handleFeatureCreated(feature: NarsFeature) {
-        Log.d(TAG, "Feature created: ${feature.id}, phase=${feature.properties.phase}")
+        NarsLogger.d(TAG, "Feature created: ${feature.id}, phase=${feature.properties.phase}")
         narsGeoman?.addFeature(feature)
     }
 
@@ -90,12 +92,12 @@ class MapScreenHandlers(
                         val fp = org.maplibre.android.geometry.LatLng(
                             geometry.coordinates[1], geometry.coordinates[0]
                         )
-                        latLng.distanceTo(fp) < 50.0
+                        latLng.distanceTo(fp) < LONG_CLICK_DISTANCE_THRESHOLD
                     }
                     is com.nars.maplibre.data.model.LineStringGeometry -> {
                         geometry.coordinates.chunked(2).any { coord ->
                             val lp = org.maplibre.android.geometry.LatLng(coord[1], coord[0])
-                            latLng.distanceTo(lp) < 50.0
+                            latLng.distanceTo(lp) < LONG_CLICK_DISTANCE_THRESHOLD
                         }
                     }
                     else -> false
@@ -137,8 +139,8 @@ class MapScreenHandlers(
             try {
                 val result = application.apiClient.saveFeature(feature)
                 result.onSuccess { savedId ->
-                    val updatedFeature = if (savedId != 0L && savedId.toString() != feature.id) {
-                        feature.copy(dbId = savedId, id = savedId.toString())
+                    val updatedFeature = if (savedId != feature.id) {
+                        feature.copy(dbId = savedId, id = savedId)
                     } else feature.copy(dbId = savedId)
                     viewModel.addFeature(updatedFeature)
                     narsGeoman?.updateFeatureId(feature.id, updatedFeature.id)
@@ -181,7 +183,7 @@ class MapScreenHandlers(
 
     fun loadFeaturesOnMapReady() {
         scope.launch {
-            Log.d(TAG, "Loading features from backend...")
+            NarsLogger.d(TAG, "Loading features from backend...")
             viewModel.setLoading(true)
             try {
                 val result = application.apiClient.loadFeatures()
@@ -197,7 +199,7 @@ class MapScreenHandlers(
     }
 
     private fun isPointNearFeature(latLng: org.maplibre.android.geometry.LatLng, feature: NarsFeature): Boolean {
-        val threshold = 20.0
+        val threshold = NEAR_FEATURE_DISTANCE_THRESHOLD
         return when (val geometry = feature.geometry) {
             is com.nars.maplibre.data.model.PointGeometry -> {
                 val fp = org.maplibre.android.geometry.LatLng(geometry.coordinates[1], geometry.coordinates[0])

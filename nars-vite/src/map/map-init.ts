@@ -51,8 +51,7 @@ export async function initMap(): Promise<void> {
   })
 
   if (import.meta.env.DEV) {
-    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-    ;(window as any).__narsMap = ctx.map
+    ;(window as unknown as Record<string, unknown>).__narsMap = ctx.map
   }
 
   ctx.satelliteStyle = satelliteStyle
