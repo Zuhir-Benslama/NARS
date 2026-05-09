@@ -1,68 +1,72 @@
 package com.nars.maplibre
 
 import android.app.Application
-import android.content.Context
-import com.nars.maplibre.data.api.ApiClient
-import com.nars.maplibre.data.store.FeatureStore
+import com.nars.maplibre.data.api.ApiService
+import com.nars.maplibre.di.appModule
 import com.nars.maplibre.utils.NarsLogger
-import com.nars.maplibre.utils.TlsUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import org.koin.android.ext.koin.androidContext
+import org.koin.core.context.startKoin
+import org.koin.java.KoinJavaComponent.get
 import org.maplibre.android.MapLibre
 import org.maplibre.android.WellKnownTileServer
 
 class NarsApplication : Application() {
 
-    val featureStore: FeatureStore by lazy { FeatureStore() }
-
-    val appPreferences: AppPreferences by lazy { AppPreferences(this) }
-
-    val apiClient: ApiClient by lazy {
-        ApiClient(tlsSocketFactory = TlsUtils.getSocketFactory(this))
-    }
-
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
         super.onCreate()
-        instance = this
-
+        startKoin {
+            androidContext(this@NarsApplication)
+            modules(appModule)
+        }
         MapLibre.getInstance(this, null, WellKnownTileServer.MapTiler)
 
-        appPreferences.authToken?.let { jwtToken ->
-            apiClient.setAuthToken(jwtToken)
-            apiClient.setCookie(jwtToken)
-            applicationScope.launch {
-                val refreshResult = apiClient.refreshToken()
-                if (refreshResult.isSuccess) {
-                    val newToken = apiClient.getAuthToken()
-                    if (newToken != null && newToken != jwtToken) {
-                        appPreferences.authToken = newToken
-                        appPreferences.sessionCookie = apiClient.getCookie()
+        applicationScope.launch {
+            try {
+                val prefs: AppPreferences = get(AppPreferences::class.java)
+                val apiService: ApiService = get(ApiService::class.java)
+
+                prefs.authToken?.let { jwtToken ->
+                    apiService.setAuthToken(jwtToken)
+                    apiService.setCookie(jwtToken)
+                    val refreshResult = apiService.refreshToken()
+                    if (refreshResult.isSuccess) {
+                        val newToken = apiService.getAuthToken()
+                        if (newToken != null && newToken != jwtToken) {
+                            prefs.authToken = newToken
+                            prefs.sessionCookie = apiService.getCookie()
+                        }
+                        NarsLogger.d("NarsApplication", "Token refreshed on startup")
                     }
-                    NarsLogger.d("NarsApplication", "Token refreshed on startup")
                 }
+            } catch (e: Exception) {
+                NarsLogger.w("NarsApplication", "Token refresh skipped: ${e.message}")
             }
         }
     }
 
-    fun isLoggedIn(): Boolean = appPreferences.isLoggedIn
-
-    suspend fun logout() {
-        apiClient.logout()
-        appPreferences.authToken = null
-        appPreferences.sessionCookie = null
-        appPreferences.user = null
-        appPreferences.municipalityName = null
+    fun isLoggedIn(): Boolean {
+        return try {
+            get<AppPreferences>(AppPreferences::class.java).isLoggedIn
+        } catch (e: Exception) {
+            false
+        }
     }
 
-    companion object {
-        lateinit var instance: NarsApplication
-            private set
-
-        val context: Context
-            get() = instance.applicationContext
+    suspend fun logout() {
+        try {
+            val prefs: AppPreferences = get(AppPreferences::class.java)
+            val apiService: ApiService = get(ApiService::class.java)
+            try { apiService.logout() } catch (_: Exception) {}
+            prefs.authToken = null
+            prefs.sessionCookie = null
+            prefs.user = null
+            prefs.municipalityName = null
+        } catch (_: Exception) {}
     }
 }

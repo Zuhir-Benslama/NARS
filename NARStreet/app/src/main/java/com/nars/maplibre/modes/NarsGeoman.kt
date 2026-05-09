@@ -66,7 +66,9 @@ class NarsGeoman(
         )
         geoman = Geoman(mapView, map, options)
 
-        featureRenderer = FeatureRenderer(map)
+        featureRenderer = FeatureRenderer(map).also { renderer ->
+            renderer.labelAndMarkerManager = LabelAndMarkerManager(map)
+        }
         eventHandler = GeomanEventHandler(scope, geoman, onFeatureCreated, onFeatureUpdated, onFeatureDeleted)
         eventHandler.setupEventListeners()
 
@@ -180,7 +182,7 @@ class NarsGeoman(
         clearAllFeatures()
         addFeatures(allFeatures)
         if (currentPhase?.key == Phases.ROADS_KEY) {
-            featureRenderer.addRoadEndpointMarkers(allFeatures)
+            featureRenderer.labelAndMarkerManager.addRoadEndpointMarkers(allFeatures)
         }
     }
 
@@ -221,7 +223,7 @@ class NarsGeoman(
             catch (e: Exception) { NarsLogger.w("NarsGeoman", "Failed to remove source $name: ${e.message}") }
         }
 
-        featureRenderer.removeVertexMarkers(featureId)
+        featureRenderer.labelAndMarkerManager.removeVertexMarkers(featureId)
         featureRenderer.removeFromTracking(featureId)
         NarsLogger.d("NarsGeoman", "Removed feature $featureId")
     }

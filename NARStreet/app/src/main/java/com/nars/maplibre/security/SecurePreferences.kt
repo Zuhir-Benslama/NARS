@@ -156,6 +156,31 @@ class SecurePreferences(context: Context) {
     }
 
     /**
+     * Save P12 client certificate password
+     */
+    fun saveP12Password(password: String) {
+        encryptedPrefs.edit()
+            .putString(KEY_P12_PASSWORD, password)
+            .apply()
+    }
+
+    /**
+     * Get P12 client certificate password
+     */
+    fun getP12Password(): String? {
+        return encryptedPrefs.getString(KEY_P12_PASSWORD, null)
+    }
+
+    /**
+     * Clear P12 password
+     */
+    fun clearP12Password() {
+        encryptedPrefs.edit()
+            .remove(KEY_P12_PASSWORD)
+            .apply()
+    }
+
+    /**
      * Check if user is logged in
      */
     fun isLoggedIn(): Boolean {
@@ -169,5 +194,6 @@ class SecurePreferences(context: Context) {
         private const val KEY_COOKIE = "session_cookie"
         private const val KEY_USER = "user"
         private const val KEY_MUNICIPALITY = "municipality"
+        private const val KEY_P12_PASSWORD = "p12_password"
     }
 }
