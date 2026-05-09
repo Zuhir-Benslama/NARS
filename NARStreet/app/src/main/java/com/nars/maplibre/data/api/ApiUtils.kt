@@ -11,7 +11,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
-
 private const val TAG = "ApiUtils"
 
 fun getPhaseColor(phaseKey: String): String = when (phaseKey) {

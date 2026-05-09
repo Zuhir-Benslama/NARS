@@ -1,19 +1,20 @@
 package com.nars.maplibre.ui.screens
 
 import com.nars.maplibre.utils.NarsLogger
-import com.nars.maplibre.NarsApplication
-import com.nars.maplibre.NarsViewModel
+import android.content.Context
+import com.nars.maplibre.MapViewModel
+import com.nars.maplibre.data.api.ApiService
+import com.nars.maplibre.data.api.SessionManager
 import com.nars.maplibre.data.model.NarsFeature
 import com.nars.maplibre.modes.NarsGeoman
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
-/**
- * Handles MapScreen events — delegates to ViewModel, NarsGeoman, and API.
- */
 class MapScreenHandlers(
-    private val viewModel: NarsViewModel,
-    private val application: NarsApplication,
+    private val viewModel: MapViewModel,
+    private val apiService: ApiService,
+    private val sessionManager: SessionManager,
+    private val context: Context,
     private val scope: CoroutineScope,
     private val snackbar: (String) -> Unit
 ) {
@@ -31,7 +32,7 @@ class MapScreenHandlers(
         { mv, map ->
             val geoman = NarsGeoman(
                 mapView = mv, map = map,
-                context = application.applicationContext,
+                context = context,
                 onFeatureCreated = { feature -> handleFeatureCreated(feature) },
                 onFeatureUpdated = { feature ->
                     viewModel.updateFeature(feature)
@@ -46,7 +47,7 @@ class MapScreenHandlers(
 
             viewModel.currentPhase.value?.let { geoman.setCurrentPhase(it) }
 
-            application.appPreferences.user?.let { user ->
+            sessionManager.getUser()?.let { user ->
                 if (user.hasCommuneLocation()) {
                     val lat = user.communeLatitude ?: return@let
                     val lng = user.communeLongitude ?: return@let
@@ -137,7 +138,7 @@ class MapScreenHandlers(
     fun saveFeature(feature: NarsFeature) {
         scope.launch {
             try {
-                val result = application.apiClient.saveFeature(feature)
+                val result = apiService.saveFeature(feature)
                 result.onSuccess { savedId ->
                     val updatedFeature = if (savedId != feature.id) {
                         feature.copy(dbId = savedId, id = savedId)
@@ -155,7 +156,7 @@ class MapScreenHandlers(
     fun updateFeature(feature: NarsFeature) {
         scope.launch {
             try {
-                val result = application.apiClient.updateFeature(feature.id, feature)
+                val result = apiService.updateFeature(feature.id, feature)
                 result.onSuccess { snackbar("Feature updated successfully") }
                 result.onFailure { snackbar("Failed to update feature: ${it.message}") }
             } catch (e: Exception) { snackbar("Error updating feature: ${e.message}") }
@@ -167,7 +168,7 @@ class MapScreenHandlers(
         narsGeoman?.removeFeature(featureId)
         scope.launch {
             try {
-                val result = application.apiClient.deleteFeature(featureId)
+                val result = apiService.deleteFeature(featureId)
                 result.onSuccess { snackbar("Feature deleted from backend") }
                 result.onFailure { snackbar("Failed to delete from backend: ${it.message}") }
             } catch (e: Exception) { snackbar("Error deleting feature: ${e.message}") }
@@ -176,7 +177,7 @@ class MapScreenHandlers(
 
     fun logout(onLogout: () -> Unit) {
         scope.launch {
-            application.logout()
+            sessionManager.logout()
             onLogout()
         }
     }
@@ -186,7 +187,7 @@ class MapScreenHandlers(
             NarsLogger.d(TAG, "Loading features from backend...")
             viewModel.setLoading(true)
             try {
-                val result = application.apiClient.loadFeatures()
+                val result = apiService.loadFeatures()
                 result.onSuccess { features ->
                     viewModel.featureStore.addFeatures(features)
                     narsGeoman?.updateDisplayedFeatures(features)

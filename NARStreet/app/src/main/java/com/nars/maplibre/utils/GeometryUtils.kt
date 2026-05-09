@@ -1,24 +1,36 @@
 package com.nars.maplibre.utils
 
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 import org.maplibre.android.geometry.LatLng
 
 /**
  * Geometry utility functions
  */
 object GeometryUtils {
-    
+
+    private const val EARTH_RADIUS_METERS = 6371000.0
+
     /**
-     * Calculate distance between two points in meters using Haversine formula
+     * Calculate Haversine distance between two points in meters using raw coordinates
+     */
+    fun haversineDistance(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLng = Math.toRadians(lng2 - lng1)
+        val a = sin(dLat / 2) * sin(dLat / 2) +
+                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
+                sin(dLng / 2) * sin(dLng / 2)
+        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+        return EARTH_RADIUS_METERS * c
+    }
+
+    /**
+     * Calculate distance between two LatLng points in meters using Haversine formula
      */
     fun calculateDistance(from: LatLng, to: LatLng): Double {
-        val earthRadius = 6371000.0 // meters
-        val dLat = Math.toRadians(to.latitude - from.latitude)
-        val dLon = Math.toRadians(to.longitude - from.longitude)
-        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(Math.toRadians(from.latitude)) * Math.cos(Math.toRadians(to.latitude)) *
-                Math.sin(dLon / 2) * Math.sin(dLon / 2)
-        val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-        return earthRadius * c
+        return haversineDistance(from.latitude, from.longitude, to.latitude, to.longitude)
     }
     
     /**

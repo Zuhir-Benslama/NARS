@@ -42,13 +42,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nars.maplibre.NarsApplication
+import com.nars.maplibre.data.api.SessionManager
 import kotlinx.coroutines.launch
+import org.koin.java.KoinJavaComponent.get
 
-/**
- * Login Screen
- * Glass-morphism styled login form
- */
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
@@ -60,11 +57,10 @@ fun LoginScreen(
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    val application = NarsApplication.instance
+    val sessionManager: SessionManager = get(SessionManager::class.java)
 
-    // Auto-login if already authenticated
     LaunchedEffect(Unit) {
-        if (application.isLoggedIn()) {
+        if (sessionManager.isLoggedIn()) {
             onLoginSuccess()
         }
     }
@@ -82,7 +78,6 @@ fun LoginScreen(
             ),
         contentAlignment = Alignment.Center
     ) {
-        // Login card
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.85f)
@@ -93,7 +88,6 @@ fun LoginScreen(
                 .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // App icon / logo
             Box(
                 modifier = Modifier
                     .size(72.dp)
@@ -118,7 +112,6 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Title
             Text(
                 text = "NARS Urban Addressing",
                 fontSize = 20.sp,
@@ -136,7 +129,6 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Username field
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
@@ -167,7 +159,6 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Password field
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
@@ -201,20 +192,8 @@ fun LoginScreen(
                                 isLoading = true
                                 errorMessage = null
                                 try {
-                                    val result = application.apiClient.login(username, password)
-                                    result.onSuccess { response ->
-                                        application.appPreferences.user = response.user.copy(
-                                            username = username,
-                                            name = response.user.name.ifBlank { username }
-                                        )
-                                        application.appPreferences.municipalityName = response.municipalityName
-                                        // Store JWT token from cookie as auth token
-                                        application.apiClient.getCookie()?.let { jwtToken ->
-                                            application.appPreferences.authToken = jwtToken
-                                            application.apiClient.setAuthToken(jwtToken)
-                                        }
-                                        onLoginSuccess()
-                                    }
+                                    val result = sessionManager.login(username, password)
+                                    result.onSuccess { onLoginSuccess() }
                                     result.onFailure { error ->
                                         errorMessage = "Login failed: ${error.message}"
                                     }
@@ -230,7 +209,6 @@ fun LoginScreen(
                 singleLine = true
             )
 
-            // Error message
             errorMessage?.let { error ->
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
@@ -243,7 +221,6 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Login button
             Button(
                 onClick = {
                     if (!isLoading && username.isNotBlank() && password.isNotBlank()) {
@@ -251,20 +228,8 @@ fun LoginScreen(
                             isLoading = true
                             errorMessage = null
                             try {
-                                val result = application.apiClient.login(username, password)
-                                result.onSuccess { response ->
-                                    application.appPreferences.user = response.user.copy(
-                                        username = username,
-                                        name = response.user.name.ifBlank { username }
-                                    )
-                                    application.appPreferences.municipalityName = response.municipalityName
-                                    // Store JWT token from cookie as auth token
-                                    application.apiClient.getCookie()?.let { jwtToken ->
-                                        application.appPreferences.authToken = jwtToken
-                                        application.apiClient.setAuthToken(jwtToken)
-                                    }
-                                    onLoginSuccess()
-                                }
+                                val result = sessionManager.login(username, password)
+                                result.onSuccess { onLoginSuccess() }
                                 result.onFailure { error ->
                                     errorMessage = "Login failed: ${error.message}"
                                 }
