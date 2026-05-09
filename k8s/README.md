@@ -1,56 +1,175 @@
 # Kubernetes manifests for NARS
 
-This folder is separate from the app source code and can be applied as-is after you update secrets/image.
+This folder contains the Kubernetes manifests and a Makefile at the project root
+that automates cluster creation, deployment, and teardown.
 
-## 1) Prerequisites
+## Quick Start
 
-- A Kubernetes cluster (e.g., [kind](https://kind.sigs.k8s.io/))
-- NGINX Ingress Controller installed:
+```bash
+# Full bootstrap (creates kind cluster, installs ingress, deploys everything)
+make cluster-up
+
+# Port-forward ingress controller to localhost
+make cluster-port-forward
+
+# Add to /etc/hosts
+echo '127.0.0.1 nars.dz' | sudo tee -a /etc/hosts
+
+# Visit
+#   http://nars.dz:8080/       — Frontend
+#   http://nars.dz:8080/health — API health
+```
+
+## Essential Commands
+
+### Cluster Lifecycle
+
+| Command | Description |
+|---------|-------------|
+| `make cluster-up` | Full bootstrap — create cluster, deploy everything |
+| `make cluster-down` | Delete cluster (postgres data preserved) |
+| `make cluster-rebuild` | Delete and recreate the cluster |
+| `make cluster-clean` | Delete cluster **and wipe all postgres data** (irreversible) |
+| `make cluster-status` | Show all cluster resources |
+
+### Stop / Resume (keep cluster, free resources)
+
+| Command | Description |
+|---------|-------------|
+| `make cluster-stop` | Scale all deployments to 0 (pods removed, data intact) |
+| `make cluster-start` | Scale deployments back to original replica count |
+| `make cluster-restart` | Stop → Start |
+
+### Port-Forwarding
+
+| Command | Description |
+|---------|-------------|
+| `make cluster-port-forward` | Forward ingress controller to `localhost:8080` (background) |
+
+### Database
+
+| Command | Description |
+|---------|-------------|
+| `make db-backup` | Dump database to `data/nars/postgres/backups/` |
+| `make db-restore FILE=...` | Restore from a backup file |
+| `make db-shell` | Open interactive `psql` inside the postgres pod |
+
+### Docker Images
+
+| Command | Description |
+|---------|-------------|
+| `make images-build` | Build all Docker images |
+| `make images-push` | Push images to Docker Hub |
+| `make images-load` | Load local images into the kind cluster |
+
+### Logs
+
+| Command | Description |
+|---------|-------------|
+| `make cluster-logs` | Tail logs from all pods |
+| `make cluster-status` | Show resources and endpoints |
+
+## Prerequisites
+
+- [kind](https://kind.sigs.k8s.io/)
+- [kubectl](https://kubernetes.io/docs/tasks/tools/)
+- [mkcert](https://github.com/FiloSottile/mkcert) (for local TLS certificates)
+- [docker](https://docs.docker.com/get-docker/)
+
+Verify with:
+
+```bash
+make prerequisites
+```
+
+## Configuration
+
+Copy `.env.example` to `.env` and customize:
+
+```bash
+cp .env.example .env
+```
+
+Key variables (all optional):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CLUSTER_NAME` | `nars` | Kind cluster name |
+| `DOMAIN` | `nars.dz` | TLS certificate domain |
+| `POSTGRES_DATA_DIR` | `data/nars/postgres` | Host path for postgres data (hostPath mount) |
+| `DOCKER_TOKEN` | — | Docker Hub token for `regcred` (optional — uses local images otherwise) |
+
+## Manual Steps (without Makefile)
+
+If you prefer to run the raw commands instead of using the Makefile:
+
+### 1. Create kind cluster
+
+```bash
+kind create cluster --name nars --config k8s/kind-config.yaml
+```
+
+### 2. Install NGINX Ingress Controller
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
 ```
 
-- [mkcert](https://github.com/FiloSottile/mkcert) for local HTTPS certificates
+Wait for it to be ready:
 
-## 2) Update placeholders
+```bash
+kubectl wait --namespace ingress-nginx --for=condition=ready pod \
+  --selector=app.kubernetes.io/component=controller --timeout=180s
+```
 
-- `app-deployment.yaml`: set `image` to your registry/image
-- `secret.yaml`: set strong values for:
-  - `postgres_password`
-  - `ConnectionStrings__DefaultConnection`
-  - `Jwt__SecretKey`
-  - Docker registry credentials (`regcred`)
-
-## 3) Generate TLS certificate
+### 3. Generate TLS certificate
 
 ```bash
 mkcert -install
 mkcert -cert-file /tmp/nars-tls.crt -key-file /tmp/nars-tls.key nars.dz
-kubectl create secret tls nars-tls -n nars --cert=/tmp/nars-tls.crt --key=/tmp/nars-tls.key --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret tls nars-tls -n nars \
+  --cert=/tmp/nars-tls.crt --key=/tmp/nars-tls.key \
+  --dry-run=client -o yaml | kubectl apply -f -
 ```
 
-## 4) Apply
+### 4. Create secrets
+
+```bash
+kubectl create secret generic nars-ca -n nars \
+  --from-file=ca.crt=k8s/certs/ca.crt
+
+kubectl create secret generic nars-secrets -n nars \
+  --from-literal=postgres_password="<your-password>" \
+  --from-literal=ConnectionStrings__DefaultConnection="Host=postgres;Port=5432;Database=nars_db;Username=postgres;Password=<your-password>" \
+  --from-literal=Jwt__SecretKey="<your-jwt-secret>" \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+### 5. Apply manifests
 
 ```bash
 kubectl apply -k k8s/
 ```
 
-## 5) Access
-
-Port-forward the ingress controller:
+### 6. Access
 
 ```bash
 kubectl port-forward -n ingress-nginx service/ingress-nginx-controller 8080:80 8443:443
 ```
 
-Then add to `/etc/hosts`:
+Add to `/etc/hosts`:
 
 ```
 127.0.0.1 nars.dz
 ```
 
-Access at:
-
 - **HTTP**: `http://nars.dz:8080/`
 - **HTTPS**: `https://nars.dz:8443/`
+
+## Data Persistence
+
+Postgres data is stored on your host machine at `$(POSTGRES_DATA_DIR)`
+(default: `data/nars/postgres/`). This survives `make cluster-down` and
+`kind delete cluster`.
+
+Backups are written to `$(POSTGRES_DATA_DIR)/backups/`.
