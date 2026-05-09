@@ -9,7 +9,8 @@ labels:
 resources:
   - namespace.yaml
   - configmap.yaml
-  - secret.yaml
+  # secret.yaml is managed by `make secrets-apply` — see Makefile
+  - postgres-pv.yaml
   - postgres.yaml
   - app-deployment.yaml
   - app-service.yaml

@@ -20,6 +20,9 @@ nars-vite/yarn-debug.log*
 nars-vite/yarn-error.log*
 nars-vite/.vscode/
 
+# === Data ===
+data/
+
 # === General / IDE ===
 
 maplibre-geoman-0.7.1/
