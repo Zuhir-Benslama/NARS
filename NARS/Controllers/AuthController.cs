@@ -16,7 +16,7 @@ namespace NarsApi.Controllers;
 [Tags("Auth")]
 public partial class AuthController(
     AppDbContext db,
-    JwtService jwt,
+    IJwtService jwt,
     // config: read by SignIn + Refresh for Jwt:RefreshExpiresInDays.
     // Accessed in the main AuthController.cs file; in scope for all partials.
     IConfiguration config,
@@ -34,18 +34,17 @@ public partial class AuthController(
     [HttpPost("signup")]
     [AllowAnonymous]
     public IActionResult SignUp() =>
-        StatusCode(410, new
-        {
-            detail = "Self-registration is disabled. " +
-                     "Contact your daira admin to create a commune user account, " +
-                     "or use POST /api/admin/authorized-signup for admin accounts."
-        });
+        StatusCode(410, new DetailResponse(
+            "Self-registration is disabled. " +
+            "Contact your daira admin to create a commune user account, " +
+            "or use POST /api/admin/authorized-signup for admin accounts."
+        ));
 
     // ── POST /api/signin ──────────────────────────────────────
 
     [HttpPost("signin")]
     [AllowAnonymous]
-    [EnableRateLimiting("auth")]
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
     public async Task<IActionResult> SignIn([FromBody] SignInRequest body)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Username == body.Username);
@@ -105,28 +104,25 @@ public partial class AuthController(
         // fix #11: wilaya is not part of the SignIn response — not loaded here.
         var loc = await LoadCommuneWithDairaAsync(user.CommuneId ?? 0);
 
-        return Ok(new
-        {
-            success = true,
-            token = token,
-            token_type = "bearer",
-            user = new
-            {
-                id = user.Id.ToString(),
-                username = user.Username,
-                name = user.Name,
-                email = user.Email,
-                role = user.Role,
-                commune = new
-                {
-                    id = user.CommuneId,
-                    name_fr = loc.Commune?.CommuneFr,
-                    name_ar = loc.Commune?.CommuneAr,
-                    latitude = loc.Commune?.CommuneLatitude,
-                    longitude = loc.Commune?.CommuneLongitude,
-                },
-            },
-        });
+        return Ok(new SignInResponse(
+            Success: true,
+            Token: token,
+            TokenType: "bearer",
+            User: new UserInfo(
+                Id: user.Id.ToString(),
+                Username: user.Username,
+                Name: user.Name,
+                Email: user.Email,
+                Role: user.Role,
+                Commune: new CommuneInfo(
+                    Id: user.CommuneId,
+                    NameFr: loc.Commune?.CommuneFr,
+                    NameAr: loc.Commune?.CommuneAr,
+                    Latitude: loc.Commune?.CommuneLatitude,
+                    Longitude: loc.Commune?.CommuneLongitude
+                )
+            )
+        ));
     }
 
     // ── POST /api/logout ──────────────────────────────────────
@@ -148,16 +144,16 @@ public partial class AuthController(
 
         Response.Cookies.Delete("access_token");
         Response.Cookies.Delete("refresh_token");
-        return Ok(new { success = true, message = "Logged out successfully" });
+        return Ok(new ActionResponse(Success: true, Message: "Logged out successfully"));
     }
 
     // ── POST /api/refresh — issue a new access token using a valid refresh token
     // Rate-limited to prevent refresh token brute-force attacks.
     [HttpPost("refresh")]
     [AllowAnonymous]
-    [EnableRateLimiting("auth")]
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
     public async Task<IActionResult> Refresh(
-        [FromServices] RefreshTokenService refreshService)
+        [FromServices] IRefreshTokenService refreshService)
     {
         var result = await refreshService.RotateRefreshTokenAsync(Request.Cookies["refresh_token"]);
         if (!result.Success)
@@ -167,7 +163,7 @@ public partial class AuthController(
         Response.Cookies.Append("access_token", result.NewAccessToken!, MakeCookieOptions(TimeSpan.FromHours(24)));
         Response.Cookies.Append("refresh_token", result.NewRawToken!, MakeCookieOptions(cookieMaxAge));
 
-        return Ok(new { success = true, token_type = "bearer" });
+        return Ok(new RefreshResponse(Success: true, TokenType: "bearer"));
     }
 
     // ── GET /api/current_user ─────────────────────────────────
@@ -215,38 +211,22 @@ public partial class AuthController(
             loc = new LocationChain(null, null, null);
         }
 
-        return Ok(new
-        {
-            id = user.Id.ToString(),
-            username = user.Username,
-            name = user.Name,
-            email = user.Email,
-            role = user.Role,
-            wilaya = new
-            {
-                id = loc.Wilaya?.WilayaId,
-                name_fr = loc.Wilaya?.WilayaFr,
-                name_ar = loc.Wilaya?.WilayaAr,
-                latitude = loc.Wilaya?.WilayaLatitude,
-                longitude = loc.Wilaya?.WilayaLongitude,
-            },
-            daira = new
-            {
-                id = loc.Daira?.DairaId,
-                name_fr = loc.Daira?.DairaFr,
-                name_ar = loc.Daira?.DairaAr,
-                latitude = loc.Daira?.DairaLatitude,
-                longitude = loc.Daira?.DairaLongitude,
-            },
-            commune = new
-            {
-                id = communeId > 0 ? communeId : null as int?,
-                name_fr = loc.Commune?.CommuneFr,
-                name_ar = loc.Commune?.CommuneAr,
-                latitude = loc.Commune?.CommuneLatitude,
-                longitude = loc.Commune?.CommuneLongitude,
-            },
-        });
+        return Ok(new UserInfoWithLocation(
+            Id: user.Id.ToString(),
+            Username: user.Username,
+            Name: user.Name,
+            Email: user.Email,
+            Role: user.Role,
+            Wilaya: loc.Wilaya is not null
+                ? new CommuneInfo(loc.Wilaya.WilayaId, loc.Wilaya.WilayaFr, loc.Wilaya.WilayaAr, loc.Wilaya.WilayaLatitude, loc.Wilaya.WilayaLongitude)
+                : null,
+            Daira: loc.Daira is not null
+                ? new CommuneInfo(loc.Daira.DairaId, loc.Daira.DairaFr, loc.Daira.DairaAr, loc.Daira.DairaLatitude, loc.Daira.DairaLongitude)
+                : null,
+            Commune: communeId > 0
+                ? new CommuneInfo(communeId, loc.Commune?.CommuneFr, loc.Commune?.CommuneAr, loc.Commune?.CommuneLatitude, loc.Commune?.CommuneLongitude)
+                : null
+        ));
     }
 
     // ── Account lockout helpers ───────────────────────────────

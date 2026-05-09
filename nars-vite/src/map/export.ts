@@ -21,17 +21,26 @@ export async function exportMapToPdf(
   // Dynamic imports — these will fail if the packages are not installed,
   // providing a clear error message instead of a cryptic "module not found".
   // Using string literal imports bypasses TS type resolution for optional deps.
-  /* eslint-disable @typescript-eslint/no-explicit-any */
-  let html2canvas: any
-  let jsPDF: any
-  /* eslint-enable @typescript-eslint/no-explicit-any */
+  let html2canvas: (el: HTMLElement, opts?: Record<string, unknown>) => Promise<HTMLCanvasElement>
+  let jsPDF: new (...args: unknown[]) => {
+    save: (name: string) => void
+    addImage: (...args: unknown[]) => void
+    setFillColor: (...args: unknown[]) => void
+    rect: (...args: unknown[]) => void
+    setTextColor: (...args: unknown[]) => void
+    setFontSize: (...args: unknown[]) => void
+    setFont: (...args: unknown[]) => void
+    text: (...args: unknown[]) => void
+  }
   try {
     const mods = await Promise.all([
-      import(/* @vite-ignore */ "html2canvas" as string),
-      import(/* @vite-ignore */ "jspdf" as string),
+      import(/* @vite-ignore */ "html2canvas" as string) as Promise<{
+        default: typeof html2canvas
+      }>,
+      import(/* @vite-ignore */ "jspdf" as string) as Promise<{ default: typeof jsPDF }>,
     ])
-    html2canvas = mods[0]?.default
-    jsPDF = mods[1]?.default
+    html2canvas = mods[0].default
+    jsPDF = mods[1].default
     if (!html2canvas || !jsPDF) {
       throw new Error("Missing exports")
     }

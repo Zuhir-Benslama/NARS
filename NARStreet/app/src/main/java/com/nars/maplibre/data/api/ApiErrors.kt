@@ -117,7 +117,7 @@ suspend fun <T> withRetry(
         }
     }
     
-    throw lastException!!
+    throw requireNotNull(lastException) { "withRetry: lastException should never be null after exhausting retries" }
 }
 
 /**

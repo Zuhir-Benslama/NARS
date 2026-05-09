@@ -92,8 +92,7 @@ export function getFeatureStyle(
 // ─── CITY CENTER CHECK ───────────────────────────────────────────
 
 async function checkExistingCityCenter(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  geomanFeatureData: any,
+  geomanFeatureData: Record<string, unknown>,
 ): Promise<boolean> {
   if (getDrawingPhase()?.key !== "cityCenter") return true
   const layerStore = useLayerStore()
@@ -102,7 +101,8 @@ async function checkExistingCityCenter(
 
   showToast("A city center already exists. Delete it first to create a new one.", "error")
   try {
-    geomanFeatureData?.delete?.()
+    const deleteFn = (geomanFeatureData as unknown as { delete?: () => void })?.delete
+    deleteFn?.()
   } catch (err) {
     debugError("[DRAW-SAVE] delete:", err)
   }
@@ -117,8 +117,7 @@ async function saveAndUpdateStore(
   modalResult: ModalResult,
   narsDrawType: string,
   featureId: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  geomanFeatureData: any,
+  geomanFeatureData: Record<string, unknown>,
 ): Promise<void> {
   setSavingFeature(true)
   try {
@@ -174,7 +173,8 @@ async function saveAndUpdateStore(
 
     setTimeout(() => {
       try {
-        geomanFeatureData?.delete?.()
+        const deleteFn = (geomanFeatureData as unknown as { delete?: () => void })?.delete
+        deleteFn?.()
       } catch (err) {
         debugError("[DRAW-SAVE] deferred delete:", err)
       }
@@ -193,8 +193,7 @@ async function saveAndUpdateStore(
 export async function completeDrawingWithGeometry(
   geometry: GeoJSON.Geometry,
   narsDrawType: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  geomanFeatureData: any,
+  geomanFeatureData: Record<string, unknown>,
 ): Promise<void> {
   const drawingPhase = getDrawingPhase()
   if (!drawingPhase) return
@@ -215,7 +214,8 @@ export async function completeDrawingWithGeometry(
   const modalResult = await openModalForFeature(drawingPhase, featureId, geometry)
   if (!modalResult) {
     try {
-      geomanFeatureData?.delete?.()
+      const deleteFn = (geomanFeatureData as unknown as { delete?: () => void })?.delete
+      deleteFn?.()
     } catch (err) {
       debugError("[DRAW-SAVE] modal delete:", err)
     }
@@ -243,12 +243,12 @@ export async function completeDrawingWithGeometry(
 function validateGeometry(
   geometry: GeoJSON.Geometry,
   phase: (typeof PHASES)[number],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  geomanFeatureData: any,
+  geomanFeatureData: Record<string, unknown>,
 ): boolean {
   const cleanup = () => {
     try {
-      geomanFeatureData?.delete?.()
+      const deleteFn = (geomanFeatureData as unknown as { delete?: () => void })?.delete
+      deleteFn?.()
     } catch (err) {
       debugError("[VALIDATE] cleanup:", err)
     }

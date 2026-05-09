@@ -3,3 +3,6 @@ FROM postgis/postgis:17-3.5
 COPY docs/nars_db.sql /docker-entrypoint-initdb.d/01-nars-schema.sql
 
 EXPOSE 5432
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 \
+  CMD pg_isready -U postgres -d nars_db || exit 1

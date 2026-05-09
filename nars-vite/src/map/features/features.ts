@@ -59,10 +59,9 @@ export function buildFeatureData(
       coordinates: coords,
     }
     // Circle radius from geometry (extracted from Geoman's polygon approximation)
-    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-    if ((geometry as any).radius != null) {
-      /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-      result.radius = (geometry as any).radius
+    const geomWithRadius = geometry as GeoJSON.Point & { radius?: number }
+    if (geomWithRadius.radius != null) {
+      result.radius = geomWithRadius.radius
     }
   } else if (geometry.type === "LineString") {
     const coords = geometry.coordinates.map((c: number[]) => ({
@@ -80,8 +79,7 @@ export function buildFeatureData(
   } else if (geometry.type === "MultiPolygon") {
     // MultiPolygon: flatten by taking first (largest) ring from first polygon.
     // This can happen when Geoman produces self-intersecting or multi-ring shapes.
-    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-    const coords = (geometry as any).coordinates[0][0].map((c: [number, number]) => ({
+    const coords = (geometry as GeoJSON.MultiPolygon).coordinates[0][0].map((c) => ({
       lat: c[1],
       lng: c[0],
     }))

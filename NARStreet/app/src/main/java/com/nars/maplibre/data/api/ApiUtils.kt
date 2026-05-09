@@ -117,7 +117,7 @@ fun parseFeatureProperties(data: JsonObject, phaseKey: String, color: String, la
         districtTypeKey = data["districtTypeKey"]?.jsonPrimitive?.content,
         roadTypeKey = data["roadTypeKey"]?.jsonPrimitive?.content,
         entranceTypeKey = data["entranceTypeKey"]?.jsonPrimitive?.content,
-        roadDbId = data["roadDbId"]?.jsonPrimitive?.content?.toLongOrNull(),
+        roadDbId = data["roadDbId"]?.jsonPrimitive?.content,
         side = data["side"]?.jsonPrimitive?.content,
         entranceNumber = data["entranceNumber"]?.jsonPrimitive?.intOrNull,
         sectorKey = data["sectorKey"]?.jsonPrimitive?.content,
@@ -173,11 +173,11 @@ fun buildDataJson(feature: NarsFeature): String {
     props.sectorKey?.takeIf { it.isNotBlank() }?.let { fields.add("\"sectorKey\":\"$it\"") }
     props.buildingTypeKey?.takeIf { it.isNotBlank() }?.let { fields.add("\"buildingTypeKey\":\"$it\"") }
 
-    props.roadDbId?.let { fields.add("\"roadDbId\":$it") }
+    props.roadDbId?.let { fields.add("\"roadDbId\":\"$it\"") }
     props.roadLabel?.takeIf { it.isNotBlank() }?.let { fields.add("\"roadLabel\":\"${escapeJson(it)}\"") }
     props.side?.takeIf { it.isNotBlank() }?.let { fields.add("\"side\":\"$it\"") }
     props.entranceNumber?.let { fields.add("\"entranceNumber\":$it") }
-    props.mainEntranceDbId?.let { fields.add("\"mainEntranceDbId\":$it") }
+    props.mainEntranceDbId?.let { fields.add("\"mainEntranceDbId\":\"$it\"") }
     props.mainEntranceLabel?.takeIf { it.isNotBlank() }?.let { fields.add("\"mainEntranceLabel\":\"${escapeJson(it)}\"") }
     props.bisNumber?.let { fields.add("\"bisNumber\":$it") }
 

@@ -15,8 +15,8 @@ public record RefreshTokenResult(
 
 public class RefreshTokenService(
     AppDbContext db,
-    JwtService jwt,
-    IConfiguration config)
+    IJwtService jwt,
+    IConfiguration config) : IRefreshTokenService
 {
     public async Task<RefreshTokenResult> RotateRefreshTokenAsync(string? rawRefreshToken)
     {

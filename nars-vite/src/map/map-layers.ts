@@ -25,14 +25,10 @@ export function initSources(): void {
     }
   }
 
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-  ctx.boundariesSource = map.getSource("boundaries") as any
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-  ctx.scatteredSource = map.getSource("scattered") as any
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-  ctx.featuresSource = map.getSource("features") as any
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-  ctx.endpointsSource = map.getSource("endpoints") as any
+  ctx.boundariesSource = map.getSource("boundaries") as maplibregl.GeoJSONSource
+  ctx.scatteredSource = map.getSource("scattered") as maplibregl.GeoJSONSource
+  ctx.featuresSource = map.getSource("features") as maplibregl.GeoJSONSource
+  ctx.endpointsSource = map.getSource("endpoints") as maplibregl.GeoJSONSource
 
   debugLog("[initSources] ctx.featuresSource set:", !!ctx.featuresSource)
 
@@ -300,8 +296,7 @@ export function addDrawingPreviewLayer(map: maplibregl.Map): void {
 }
 
 export function updateDrawingPreview(geometry: [number, number][] | null): void {
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-  const source = ctx.map.getSource("drawing-preview") as any
+  const source = ctx.map.getSource("drawing-preview") as maplibregl.GeoJSONSource
   if (!source) return
   const features: GeoJSON.Feature[] =
     geometry && geometry.length > 0

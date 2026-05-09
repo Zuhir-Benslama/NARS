@@ -293,8 +293,7 @@ export function snapPointForEdit(
 export function installSnapInterceptors(): void {
   const map = ctx.map
 
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-  const snapLngLat = (e: any): void => {
+  const snapLngLat = (e: Record<string, unknown>): void => {
     if (!snapActive || !snapLatLng) return
     const { lng, lat } = snapLatLng
     try {

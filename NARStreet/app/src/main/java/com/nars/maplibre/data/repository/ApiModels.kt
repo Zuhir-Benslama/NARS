@@ -30,7 +30,7 @@ data class FeatureRequest(
 @Serializable
 data class FeatureResponse(
     val id: String,
-    val dbId: Long,
+    val dbId: String = "",
     val type: String,
     val geometry: GeometryResponse,
     val properties: PropertiesResponse,

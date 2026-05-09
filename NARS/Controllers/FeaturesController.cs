@@ -85,7 +85,7 @@ public class FeaturesController(
         if (body.Type == FeatureTypes.Area)
             await QueueScatteredRefresh();
 
-        return StatusCode(201, new { success = true, id = newId.ToString(), message = "Feature saved successfully" });
+        return StatusCode(201, new SaveFeatureResponse(Success: true, Id: newId.ToString(), Message: "Feature saved successfully"));
     }
 
     // ── GET /api/load ─────────────────────────────────────────────────────────
@@ -103,19 +103,18 @@ public class FeaturesController(
         var (features, totalCount) = await FeatureQueryHelper.LoadAllFeaturesAsync(
             db.Database.GetDbConnection(), CurrentUserId, skip, take);
 
-        return Ok(new
-        {
-            features,
-            count = totalCount,
-            skip,
-            take,
-        });
+        return Ok(new LoadFeaturesResponse(
+            Features: features,
+            Count: totalCount,
+            Skip: skip,
+            Take: take
+        ));
     }
 
     // ── POST /api/clear ───────────────────────────────────────────────────────
 
     [HttpPost("clear")]
-    [EnableRateLimiting("clear")]
+    [EnableRateLimiting(RateLimitPolicies.Clear)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ClearFeatures([FromBody] ClearFeaturesRequest body)
@@ -151,7 +150,7 @@ public class FeaturesController(
 
         await tx.CommitAsync();
 
-        return Ok(new { success = true, message = $"Deleted {total} features" });
+        return Ok(new ActionResponse(Success: true, Message: $"Deleted {total} features"));
     }
 
     // ── GET /api/stats ────────────────────────────────────────────────────────
@@ -194,18 +193,17 @@ public class FeaturesController(
             long GetCount(string key) => counts.TryGetValue(key, out var v) ? v : 0;
             var total = counts.Values.Sum();
 
-            return Ok(new
-            {
-                area = GetCount("area"),
-                district = GetCount("district"),
-                city_center = GetCount("city_center"),
-                road = GetCount("road"),
-                house_entrance = GetCount("house_entrance"),
-                public_building = GetCount("public_building"),
-                public_space = GetCount("public_space"),
-                naming_panel = GetCount("naming_panel"),
-                total,
-            });
+            return Ok(new FeatureStatsResponse(
+                Area: GetCount("area"),
+                District: GetCount("district"),
+                CityCenter: GetCount("city_center"),
+                Road: GetCount("road"),
+                HouseEntrance: GetCount("house_entrance"),
+                PublicBuilding: GetCount("public_building"),
+                PublicSpace: GetCount("public_space"),
+                NamingPanel: GetCount("naming_panel"),
+                Total: total
+            ));
         }
         finally
         {
@@ -220,12 +218,11 @@ public class FeaturesController(
     public IActionResult GetScatteredStatus()
     {
         var error = scatteredService.LastError;
-        return Ok(new
-        {
-            lastErrorTime = error?.Timestamp.ToString("o"),
-            lastErrorMessage = error?.Message,
-            hasError = error.HasValue,
-        });
+        return Ok(new ScatteredStatusResponse(
+            LastErrorTime: error?.Timestamp.ToString("o"),
+            LastErrorMessage: error?.Message,
+            HasError: error.HasValue
+        ));
     }
 
     // ── PUT /api/update/{id} ──────────────────────────────────────────────────
@@ -256,7 +253,7 @@ public class FeaturesController(
         {
             int rows = await UpdateHouseEntrance(featureId, body, updatedAt);
             if (rows == 0) return NotFound(new { detail = "Feature not found" });
-            return Ok(new { success = true, id = featureId.ToString(), updated_at = updatedAt });
+            return Ok(new UpdateFeatureResponse(Success: true, Id: featureId.ToString(), UpdatedAt: updatedAt));
         }
 
         var dbSet = FeatureTypeRegistry.GetDbSet(db, reg.FeatureType);
@@ -269,7 +266,7 @@ public class FeaturesController(
         if (reg.FeatureType == FeatureTypes.Area)
             await QueueScatteredRefresh();
 
-        return Ok(new { success = true, id = featureId.ToString(), updated_at = updatedAt });
+        return Ok(new UpdateFeatureResponse(Success: true, Id: featureId.ToString(), UpdatedAt: updatedAt));
     }
 
     // ── DELETE /api/delete/{id} ───────────────────────────────────────────────
@@ -303,7 +300,7 @@ public class FeaturesController(
         if (reg.FeatureType == FeatureTypes.Area)
             await QueueScatteredRefresh();
 
-        return Ok(new { success = true, message = "Feature deleted successfully" });
+        return Ok(new ActionResponse(Success: true, Message: "Feature deleted successfully"));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

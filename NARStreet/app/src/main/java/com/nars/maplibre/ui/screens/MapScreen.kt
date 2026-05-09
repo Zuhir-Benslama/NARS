@@ -1,6 +1,6 @@
 package com.nars.maplibre.ui.screens
 
-import android.util.Log
+import com.nars.maplibre.utils.NarsLogger
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -105,7 +105,7 @@ fun MapScreen(
 
     LaunchedEffect(currentPhase) {
         currentPhase?.let { phase ->
-            Log.d("MapScreen", "Phase changed: ${phase.label}")
+            NarsLogger.d("MapScreen", "Phase changed: ${phase.label}")
             handlers.narsGeoman?.setCurrentPhase(phase)
             handlers.narsGeoman?.updateDisplayedFeatures(allFeatures)
             viewModel.setLoading(false)
@@ -114,7 +114,7 @@ fun MapScreen(
 
     fun handleFeatureSave(feature: NarsFeature) {
         val existing = editingFeature
-        if (existing != null && (existing.dbId ?: 0L) != 0L) {
+        if (existing != null && existing.dbId != null) {
             viewModel.updateFeature(feature)
             handlers.narsGeoman?.commitEdits()
             handlers.narsGeoman?.updateFeatureOnMap(feature)
@@ -252,12 +252,16 @@ fun MapScreen(
                 }
             }
 
-            if (showFeatureModal && currentPhase != null && editingFeature != null) {
-                FeatureValidationModal(
-                    feature = editingFeature!!, phase = currentPhase!!,
-                    onSave = { handleFeatureSave(it) },
-                    onDismiss = { showFeatureModal = false; editingFeature = null }
-                )
+            if (showFeatureModal && editingFeature != null && currentPhase != null) {
+                editingFeature?.let { feature ->
+                    currentPhase?.let { phase ->
+                        FeatureValidationModal(
+                            feature = feature, phase = phase,
+                            onSave = { handleFeatureSave(it) },
+                            onDismiss = { showFeatureModal = false; editingFeature = null }
+                        )
+                    }
+                }
             }
         }
     }

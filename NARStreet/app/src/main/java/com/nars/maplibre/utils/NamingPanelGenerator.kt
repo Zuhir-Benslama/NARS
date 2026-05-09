@@ -1,6 +1,6 @@
 package com.nars.maplibre.utils
 
-import android.util.Log
+import com.nars.maplibre.utils.NarsLogger
 import com.nars.maplibre.data.model.NarsFeature
 import com.nars.maplibre.data.model.NarsFeatureType
 import com.nars.maplibre.data.model.PointGeometry
@@ -41,7 +41,7 @@ class NamingPanelGenerator {
     fun generatePanelsFromRoads(
         roads: List<NarsFeature>
     ): List<NarsFeature> {
-        Log.d(TAG, "Generating panels for ${roads.size} roads (field mode)")
+        NarsLogger.d(TAG, "Generating panels for ${roads.size} roads (field mode)")
 
         val panels = mutableListOf<NarsFeature>()
         val seenPositions = mutableListOf<Pair<Double, Double>>()
@@ -67,7 +67,7 @@ class NamingPanelGenerator {
             }
         }
 
-        Log.d(TAG, "Generated ${panels.size} naming panels (field mode)")
+        NarsLogger.d(TAG, "Generated ${panels.size} naming panels (field mode)")
         return panels
     }
 
@@ -81,7 +81,7 @@ class NamingPanelGenerator {
         publicBuildings: List<NarsFeature>,
         publicSpaces: List<NarsFeature>
     ): List<NarsFeature> {
-        Log.d(TAG, "Generating panels for ${districts.size} districts, ${roads.size} roads, ${publicBuildings.size} buildings, ${publicSpaces.size} spaces")
+        NarsLogger.d(TAG, "Generating panels for ${districts.size} districts, ${roads.size} roads, ${publicBuildings.size} buildings, ${publicSpaces.size} spaces")
 
         val panels = mutableListOf<NarsFeature>()
         val seenPositions = mutableListOf<Pair<Double, Double>>() // For deduplication
@@ -159,7 +159,7 @@ class NamingPanelGenerator {
             seenPositions.add(lat to lng)
         }
 
-        Log.d(TAG, "Generated ${panels.size} naming panels")
+        NarsLogger.d(TAG, "Generated ${panels.size} naming panels")
         return panels
     }
 

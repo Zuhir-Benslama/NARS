@@ -6,7 +6,7 @@ import com.nars.maplibre.data.model.NarsFeature
 import com.nars.maplibre.data.model.NarsFeatureType
 import com.nars.maplibre.data.model.Phases
 import com.nars.maplibre.data.model.PointGeometry
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -38,7 +38,7 @@ class FeatureStoreTest {
     }
 
     @Test
-    fun `addFeature adds to correct phase`() = runBlocking {
+    fun `addFeature adds to correct phase`() = runTest {
         val feature = createFeature("f1", Phases.ROADS_KEY)
 
         featureStore.addFeature(feature)
@@ -49,7 +49,7 @@ class FeatureStoreTest {
     }
 
     @Test
-    fun `addFeature updates allFeatures`() = runBlocking {
+    fun `addFeature updates allFeatures`() = runTest {
         val feature = createFeature("f1", Phases.ROADS_KEY)
 
         featureStore.addFeature(feature)
@@ -60,7 +60,7 @@ class FeatureStoreTest {
     }
 
     @Test
-    fun `addFeature updates fast lookup map`() = runBlocking {
+    fun `addFeature updates fast lookup map`() = runTest {
         val feature = createFeature("f1", Phases.ROADS_KEY)
 
         featureStore.addFeature(feature)
@@ -71,13 +71,13 @@ class FeatureStoreTest {
     }
 
     @Test
-    fun `getFeatureById returns null for non-existent feature`() = runBlocking {
+    fun `getFeatureById returns null for non-existent feature`() = runTest {
         val result = featureStore.getFeatureById("nonexistent")
         assertNull(result)
     }
 
     @Test
-    fun `updateFeature removes old and adds new`() = runBlocking {
+    fun `updateFeature removes old and adds new`() = runTest {
         val feature1 = createFeature("f1", Phases.ROADS_KEY, lng = 3.0)
         val feature2 = createFeature("f1", Phases.ROADS_KEY, lng = 3.1) // Same ID, updated
 
@@ -90,7 +90,7 @@ class FeatureStoreTest {
     }
 
     @Test
-    fun `removeFeature removes from store`() = runBlocking {
+    fun `removeFeature removes from store`() = runTest {
         val feature = createFeature("f1", Phases.ROADS_KEY)
         featureStore.addFeature(feature)
 
@@ -102,7 +102,7 @@ class FeatureStoreTest {
     }
 
     @Test
-    fun `removeFeature clears selection if selected`() = runBlocking {
+    fun `removeFeature clears selection if selected`() = runTest {
         val feature = createFeature("f1", Phases.ROADS_KEY)
         featureStore.addFeature(feature)
         featureStore.selectFeature(feature)
@@ -113,7 +113,7 @@ class FeatureStoreTest {
     }
 
     @Test
-    fun `addFeatures batch adds multiple features`() = runBlocking {
+    fun `addFeatures batch adds multiple features`() = runTest {
         val features = listOf(
             createFeature("f1", Phases.ROADS_KEY),
             createFeature("f2", Phases.ROADS_KEY),
@@ -128,7 +128,7 @@ class FeatureStoreTest {
     }
 
     @Test
-    fun `clearPhase removes features for specific phase`() = runBlocking {
+    fun `clearPhase removes features for specific phase`() = runTest {
         val features = listOf(
             createFeature("f1", Phases.ROADS_KEY),
             createFeature("f2", Phases.ROADS_KEY),
@@ -144,7 +144,7 @@ class FeatureStoreTest {
     }
 
     @Test
-    fun `syncCounts returns correct counts`() = runBlocking {
+    fun `syncCounts returns correct counts`() = runTest {
         val features = listOf(
             createFeature("f1", Phases.ROADS_KEY),
             createFeature("f2", Phases.ROADS_KEY),
@@ -161,7 +161,7 @@ class FeatureStoreTest {
     }
 
     @Test
-    fun `undo stack respects max size`() = runBlocking {
+    fun `undo stack respects max size`() = runTest {
         // Add more than 50 undo actions
         for (i in 1..55) {
             val feature = createFeature("f$i", Phases.ROADS_KEY)
@@ -177,7 +177,7 @@ class FeatureStoreTest {
     }
 
     @Test
-    fun `getAllRoads returns roads only`() = runBlocking {
+    fun `getAllRoads returns roads only`() = runTest {
         val features = listOf(
             createFeature("f1", Phases.ROADS_KEY),
             createFeature("f2", Phases.HOUSE_ENTRANCES_KEY)
