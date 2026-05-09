@@ -100,8 +100,14 @@ export async function editFeatureInfo(dbId: string): Promise<void> {
           geomType: "LineString",
           lineColor: "#e74c3c",
           lineWidth: 6,
-          /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-        } as any,
+        } as {
+          dbId?: string
+          phaseKey: string
+          label: string
+          geomType?: string
+          lineColor: string
+          lineWidth: number
+        } satisfies Record<string, unknown>,
       })
     } else {
       featuresStore.update(entry.id, {

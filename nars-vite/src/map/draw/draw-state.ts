@@ -8,12 +8,15 @@ import { PHASES } from "../../phases"
 
 // ─── GEOMAN MARKER BRIDGE ─────────────────────────────────────────────────────
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-let _geomanMarkerPointer: any = null
-let _originalGeomanMarkerSetLngLat: ((...args: any[]) => void) | null = null
+let _geomanMarkerPointer: Record<string, unknown> | null = null
+let _originalGeomanMarkerSetLngLat: ((...args: unknown[]) => void) | null = null
 let _snappingEnabled = true
 
-export function registerGeomanMarker(mp: any, _marker: any, orig: (...args: any[]) => void): void {
+export function registerGeomanMarker(
+  mp: Record<string, unknown>,
+  _marker: unknown,
+  orig: (...args: unknown[]) => void,
+): void {
   _geomanMarkerPointer = mp
   _originalGeomanMarkerSetLngLat = orig
 }
@@ -21,8 +24,9 @@ export function registerGeomanMarker(mp: any, _marker: any, orig: (...args: any[
 export function unpatchGeomanMarker(): void {
   _snappingEnabled = false
   if (_geomanMarkerPointer?.marker && _originalGeomanMarkerSetLngLat) {
-    _geomanMarkerPointer.marker.setLngLat = _originalGeomanMarkerSetLngLat
-    ;(_geomanMarkerPointer.marker as any)._narsSnapPatchedInstance = false
+    const marker = _geomanMarkerPointer.marker as Record<string, unknown>
+    marker.setLngLat = _originalGeomanMarkerSetLngLat
+    marker._narsSnapPatchedInstance = false
   }
 }
 
@@ -33,7 +37,6 @@ export function isSnappingEnabled(): boolean {
 export function setSnappingEnabled(v: boolean): void {
   _snappingEnabled = v
 }
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 // ─── RE-PATCH BRIDGE ──────────────────────────────────────────────────────────
 

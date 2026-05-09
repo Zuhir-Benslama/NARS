@@ -1,7 +1,6 @@
 package com.nars.maplibre.modes
 
 import android.graphics.Color
-import com.geoman.maplibre.geoman.GeomanConstants
 import com.nars.maplibre.data.model.CircleGeometry
 import com.nars.maplibre.data.model.LineStringGeometry
 import com.nars.maplibre.data.model.NarsFeature
@@ -186,7 +185,7 @@ class FeatureRenderer(
             org.maplibre.android.style.layers.PropertyFactory.textColor(Color.BLACK),
             org.maplibre.android.style.layers.PropertyFactory.textSize(LABEL_TEXT_SIZE),
             org.maplibre.android.style.layers.PropertyFactory.textFont(
-                arrayOf("Noto Sans Regular", "Noto Sans Bold")
+                arrayOf("Noto Sans Regular")
             ),
             org.maplibre.android.style.layers.PropertyFactory.textAllowOverlap(true),
             org.maplibre.android.style.layers.PropertyFactory.textIgnorePlacement(true),
@@ -306,7 +305,10 @@ class FeatureRenderer(
         try {
             val source = GeoJsonSource(sourceName, geoJson)
             map.style?.addSource(source)
-        } catch (e: Exception) { return }
+        } catch (e: Exception) {
+            NarsLogger.w(TAG, "Failed to add endpoint marker source: ${e.message}")
+            return
+        }
 
         val color = if (isStart) Color.parseColor("#2ecc71") else Color.parseColor("#e74c3c")
 
@@ -318,7 +320,7 @@ class FeatureRenderer(
             org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth(3f)
         )
 
-        try { map.style?.addLayer(circleLayer) } catch (e: Exception) {}
+        try { map.style?.addLayer(circleLayer) } catch (e: Exception) { NarsLogger.w(TAG, "Failed to add circle layer: ${e.message}") }
     }
 
     private fun addLabelAt(layerName: String, labelText: String?, lon: Double, lat: Double) {
@@ -328,20 +330,20 @@ class FeatureRenderer(
 
         val geoJson = """{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [$lon, $lat]}, "properties": {"text": "$labelText"}}]}""".trimIndent()
 
-        try { map.style?.addSource(GeoJsonSource(sourceName, geoJson)) } catch (e: Exception) {}
+        try { map.style?.addSource(GeoJsonSource(sourceName, geoJson)) } catch (e: Exception) { NarsLogger.w(TAG, "Failed to add label source: ${e.message}") }
 
         val symbolLayer = SymbolLayer(layerName, sourceName)
         symbolLayer.setProperties(
             org.maplibre.android.style.layers.PropertyFactory.textField(Expression.get("text")),
             org.maplibre.android.style.layers.PropertyFactory.textColor(Color.BLACK),
             org.maplibre.android.style.layers.PropertyFactory.textSize(14f),
-            org.maplibre.android.style.layers.PropertyFactory.textFont(arrayOf("Noto Sans Regular", "Noto Sans Bold")),
+            org.maplibre.android.style.layers.PropertyFactory.textFont(arrayOf("Noto Sans Regular")),
             org.maplibre.android.style.layers.PropertyFactory.textAllowOverlap(true),
             org.maplibre.android.style.layers.PropertyFactory.textHaloColor(Color.WHITE),
             org.maplibre.android.style.layers.PropertyFactory.textHaloWidth(3f)
         )
 
-        try { map.style?.addLayer(symbolLayer) } catch (e: Exception) {}
+        try { map.style?.addLayer(symbolLayer) } catch (e: Exception) { NarsLogger.w(TAG, "Failed to add label layer: ${e.message}") }
     }
 
     fun addVertexMarkers(feature: NarsFeature) {
@@ -371,22 +373,29 @@ class FeatureRenderer(
                     org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth(2f)
                 )
                 map.style?.addLayer(circleLayer)
+                vertexMarkerIds.add(vertexLayerName)
             } catch (e: Exception) {
                 NarsLogger.w(TAG, "Error adding vertex marker: ${e.message}")
             }
         }
     }
 
+    private val vertexMarkerIds = mutableSetOf<String>()
+
     fun removeVertexMarkers(featureId: String) {
-        for (i in 0 until 100) {
-            val vertexLayerName = "nars_vertex_layer_${featureId}_$i"
-            val vertexSourceName = "nars_vertex_${featureId}_$i"
+        val prefix = "nars_vertex_layer_${featureId}_"
+        val markersToRemove = vertexMarkerIds.filter { it.startsWith(prefix) }
+        for (markerId in markersToRemove) {
+            val sourceName = markerId.replace("nars_vertex_layer_", "nars_vertex_")
             try {
-                map.style?.getLayer(vertexLayerName)?.let {
+                map.style?.getLayer(markerId)?.let {
                     map.style?.removeLayer(it)
-                    map.style?.removeSource(vertexSourceName)
+                    map.style?.removeSource(sourceName)
                 }
-            } catch (e: Exception) { break }
+                vertexMarkerIds.remove(markerId)
+            } catch (e: Exception) {
+                NarsLogger.w(TAG, "Failed to remove vertex marker $markerId: ${e.message}")
+            }
         }
     }
 }

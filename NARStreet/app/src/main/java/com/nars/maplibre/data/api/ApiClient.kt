@@ -5,20 +5,19 @@ import com.nars.maplibre.data.model.LoginResponse
 import com.nars.maplibre.data.model.NarsFeature
 import com.nars.maplibre.data.model.User
 import kotlinx.serialization.json.Json
+import javax.net.ssl.SSLSocketFactory
 
-/**
- * API Client for NARS backend — delegates to AuthApi and FeatureApi.
- */
 class ApiClient(
-    private val baseUrl: String = BuildConfig.API_BASE_URL
+    private val baseUrl: String = BuildConfig.API_BASE_URL,
+    private val tlsSocketFactory: SSLSocketFactory? = null
 ) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     private var authToken: String? = null
     private var cookie: String? = null
 
-    val authApi = AuthApi(baseUrl, json, authToken, cookie)
-    val featureApi = FeatureApi(baseUrl, json)
+    val authApi = AuthApi(baseUrl, json, authToken, cookie, tlsSocketFactory)
+    val featureApi = FeatureApi(baseUrl, json, tlsSocketFactory)
 
     fun setAuthToken(token: String?) {
         authToken = token
@@ -44,7 +43,7 @@ class ApiClient(
 
     suspend fun loadFeatures(): Result<List<NarsFeature>> = featureApi.loadFeatures(cookie)
 
-    suspend fun saveFeature(feature: NarsFeature): Result<Long> = featureApi.saveFeature(feature, cookie)
+    suspend fun saveFeature(feature: NarsFeature): Result<String> = featureApi.saveFeature(feature, cookie)
 
     suspend fun deleteFeature(featureId: String): Result<Unit> = featureApi.deleteFeature(featureId, cookie)
 
@@ -54,6 +53,8 @@ class ApiClient(
     suspend fun getCurrentUser(): Result<User> = authApi.getCurrentUser(cookie)
 
     suspend fun logout(): Result<Unit> = authApi.logout(cookie)
+
+    suspend fun refreshToken(): Result<Unit> = authApi.refreshToken()
 
     suspend fun isAuthenticated(): Boolean = authApi.isAuthenticated(cookie)
 }

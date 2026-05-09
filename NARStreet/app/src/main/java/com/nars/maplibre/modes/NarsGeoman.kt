@@ -3,9 +3,9 @@
 package com.nars.maplibre.modes
 
 import android.content.Context
-import android.util.Log
+import com.nars.maplibre.utils.NarsLogger
 import com.geoman.maplibre.geoman.Geoman
-import com.geoman.maplibre.geoman.GeomanConstants
+import com.geoman.maplibre.geoman.core.GeomanCoreConstants
 import com.geoman.maplibre.geoman.core.options.GmOptionsData
 import com.geoman.maplibre.geoman.core.options.SettingsOptions
 import com.geoman.maplibre.geoman.types.DrawModeName
@@ -13,9 +13,12 @@ import com.geoman.maplibre.geoman.types.EditModeName
 import com.nars.maplibre.data.model.DrawType
 import com.nars.maplibre.data.model.NarsFeature
 import com.nars.maplibre.data.model.PhaseDefinition
+import com.nars.maplibre.data.model.Phases
+import com.nars.maplibre.utils.Config
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +38,7 @@ class NarsGeoman(
     private val onFeatureDeleted: (String) -> Unit
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var destroyed = false
     val geoman: Geoman
 
     private val eventHandler: GeomanEventHandler
@@ -57,7 +61,7 @@ class NarsGeoman(
                 useControlsUi = true,
                 showControlsOnMap = false,
                 enableSnap = true,
-                snapDistance = 20f
+                snapDistance = Config.SNAP_THRESHOLD_PX.toFloat()
             )
         )
         geoman = Geoman(mapView, map, options)
@@ -66,7 +70,7 @@ class NarsGeoman(
         eventHandler = GeomanEventHandler(scope, geoman, onFeatureCreated, onFeatureUpdated, onFeatureDeleted)
         eventHandler.setupEventListeners()
 
-        Log.d("NarsGeoman", "Initialized — delegating to FeatureRenderer, GeomanEventHandler, GeometryConverter, SnappingEngine")
+        NarsLogger.d("NarsGeoman", "Initialized — delegating to FeatureRenderer, GeomanEventHandler, GeometryConverter, SnappingEngine")
     }
 
     fun setCurrentPhase(phase: PhaseDefinition) {
@@ -76,7 +80,7 @@ class NarsGeoman(
 
     fun startDrawing() {
         val phase = currentPhase ?: return
-        Log.d("NarsGeoman", "startDrawing for phase: ${phase.label}, drawType: ${phase.drawType}")
+        NarsLogger.d("NarsGeoman", "startDrawing for phase: ${phase.label}, drawType: ${phase.drawType}")
 
         geoman.disableAllModes()
         _isEditing.value = false
@@ -97,7 +101,7 @@ class NarsGeoman(
     }
 
     fun startEditing(feature: NarsFeature) {
-        Log.d("NarsGeoman", "startEditing: ${feature.id}, type=${feature.type}")
+        NarsLogger.d("NarsGeoman", "startEditing: ${feature.id}, type=${feature.type}")
         geoman.disableAllModes()
         _isDrawing.value = false
 
@@ -121,8 +125,8 @@ class NarsGeoman(
         val originalFeature = eventHandler.getEditingFeature() ?: return
 
         val sourceNames = listOf(
-            GeomanConstants.SOURCE_MARKERS, GeomanConstants.SOURCE_LINES,
-            GeomanConstants.SOURCE_POLYGONS, GeomanConstants.SOURCE_CIRCLES
+            GeomanCoreConstants.SOURCE_MARKERS, GeomanCoreConstants.SOURCE_LINES,
+            GeomanCoreConstants.SOURCE_POLYGONS, GeomanCoreConstants.SOURCE_CIRCLES
         )
 
         var updatedGeometry: com.nars.maplibre.data.model.Geometry? = null
@@ -137,7 +141,7 @@ class NarsGeoman(
         val updated = if (updatedGeometry != null) {
             originalFeature.copy(geometry = updatedGeometry)
         } else {
-            Log.w("NarsGeoman", "Could not find updated geometry for ${originalFeature.id}")
+            NarsLogger.w("NarsGeoman", "Could not find updated geometry for ${originalFeature.id}")
             originalFeature
         }
         onFeatureUpdated(updated)
@@ -147,8 +151,8 @@ class NarsGeoman(
     fun cancelEdits() {
         val featureId = eventHandler.getEditingFeatureId() ?: return
         val sourceNames = listOf(
-            GeomanConstants.SOURCE_MARKERS, GeomanConstants.SOURCE_LINES,
-            GeomanConstants.SOURCE_POLYGONS, GeomanConstants.SOURCE_CIRCLES
+            GeomanCoreConstants.SOURCE_MARKERS, GeomanCoreConstants.SOURCE_LINES,
+            GeomanCoreConstants.SOURCE_POLYGONS, GeomanCoreConstants.SOURCE_CIRCLES
         )
         for (sourceName in sourceNames) {
             val featureData = geoman.features.getFeature(sourceName, featureId)
@@ -175,7 +179,7 @@ class NarsGeoman(
     fun updateDisplayedFeatures(allFeatures: List<NarsFeature>) {
         clearAllFeatures()
         addFeatures(allFeatures)
-        if (currentPhase?.key == "roads") {
+        if (currentPhase?.key == Phases.ROADS_KEY) {
             featureRenderer.addRoadEndpointMarkers(allFeatures)
         }
     }
@@ -186,15 +190,15 @@ class NarsGeoman(
     }
 
     fun updateFeatureId(oldId: String, newId: String) {
-        Log.d("NarsGeoman", "Updating feature ID: $oldId -> $newId")
+        NarsLogger.d("NarsGeoman", "Updating feature ID: $oldId -> $newId")
     }
 
     fun removeFeature(featureId: String) {
-        val sourceNames = listOf(
-            GeomanConstants.SOURCE_MARKERS, GeomanConstants.SOURCE_LINES,
-            GeomanConstants.SOURCE_POLYGONS, GeomanConstants.SOURCE_CIRCLES
+        val geomanSourceNames = listOf(
+            GeomanCoreConstants.SOURCE_MARKERS, GeomanCoreConstants.SOURCE_LINES,
+            GeomanCoreConstants.SOURCE_POLYGONS, GeomanCoreConstants.SOURCE_CIRCLES
         )
-        for (sourceName in sourceNames) {
+        for (sourceName in geomanSourceNames) {
             val featureData = geoman.features.getFeature(sourceName, featureId)
             if (featureData != null) {
                 geoman.features.removeFeature(sourceName, featureId)
@@ -203,16 +207,23 @@ class NarsGeoman(
         }
 
         val layerName = "nars_layer_$featureId"
-        try { map.style?.getLayer(layerName)?.let { map.style?.removeLayer(it) } } catch (e: Exception) {}
-        try { map.style?.getLayer("${layerName}_outline")?.let { map.style?.removeLayer(it) } } catch (e: Exception) {}
-        try { map.style?.getLayer("${layerName}_stroke")?.let { map.style?.removeLayer(it) } } catch (e: Exception) {}
-        try { map.style?.getLayer("${layerName}_label")?.let { map.style?.removeLayer(it) } } catch (e: Exception) {}
-        try { map.style?.removeSource("nars_${featureId}_edges") } catch (e: Exception) {}
-        try { map.style?.removeSource("nars_$featureId") } catch (e: Exception) {}
+        val layerNames = listOf(
+            layerName, "${layerName}_outline",
+            "${layerName}_stroke", "${layerName}_label"
+        )
+        for (name in layerNames) {
+            try { map.style?.getLayer(name)?.let { map.style?.removeLayer(it) } }
+            catch (e: Exception) { NarsLogger.w("NarsGeoman", "Failed to remove layer $name: ${e.message}") }
+        }
+        val mapSourceNames = listOf("nars_${featureId}_edges", "nars_$featureId")
+        for (name in mapSourceNames) {
+            try { map.style?.removeSource(name) }
+            catch (e: Exception) { NarsLogger.w("NarsGeoman", "Failed to remove source $name: ${e.message}") }
+        }
 
         featureRenderer.removeVertexMarkers(featureId)
         featureRenderer.removeFromTracking(featureId)
-        Log.d("NarsGeoman", "Removed feature $featureId")
+        NarsLogger.d("NarsGeoman", "Removed feature $featureId")
     }
 
     fun clearAllFeatures() {
@@ -251,8 +262,11 @@ class NarsGeoman(
     }
 
     fun destroy() {
+        if (destroyed) return
+        destroyed = true
         stopDrawing()
         stopEditing()
         geoman.destroy()
+        scope.cancel()
     }
 }

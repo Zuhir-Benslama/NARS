@@ -75,3 +75,51 @@ public record UpdateUserRequest(
     [property: JsonPropertyName("email")] string? Email,
     [property: JsonPropertyName("password")] string? Password
 );
+
+// ─── RESPONSE DTOs ────────────────────────────────────────────────────────────
+
+public record CommuneInfo(
+    [property: JsonPropertyName("id")] int? Id,
+    [property: JsonPropertyName("name_fr")] string? NameFr,
+    [property: JsonPropertyName("name_ar")] string? NameAr,
+    [property: JsonPropertyName("latitude")] double? Latitude,
+    [property: JsonPropertyName("longitude")] double? Longitude
+);
+
+public record UserInfo(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("username")] string Username,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("role")] string Role,
+    [property: JsonPropertyName("commune")] CommuneInfo? Commune = null
+);
+
+public record UserInfoWithLocation(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("username")] string Username,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("role")] string Role,
+    [property: JsonPropertyName("wilaya")] CommuneInfo? Wilaya = null,
+    [property: JsonPropertyName("daira")] CommuneInfo? Daira = null,
+    [property: JsonPropertyName("commune")] CommuneInfo? Commune = null
+);
+
+public record SignInResponse(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("token")] string Token,
+    [property: JsonPropertyName("token_type")] string TokenType,
+    [property: JsonPropertyName("user")] UserInfo User
+);
+
+public record RefreshResponse(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("token_type")] string TokenType
+);
+
+public record CreateAdminResponse(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("user_id")] string UserId,
+    [property: JsonPropertyName("message")] string Message
+);

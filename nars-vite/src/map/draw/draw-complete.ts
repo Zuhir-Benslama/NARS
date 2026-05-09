@@ -23,85 +23,98 @@ export { normalizeGeometry, completeDrawingWithGeometry, getFeatureStyle } from 
 
 // ─── REMOVE LAST VERTEX ───────────────────────────────────────────────────────
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 export async function removeLastVertex(): Promise<void> {
-  const gm = ctx.geoman as any
+  const gm = ctx.geoman as unknown as Record<string, unknown> | null
   if (!gm) return
 
-  const polygonInst = gm.actionInstances?.["draw__polygon"]
-  const lineInst = gm.actionInstances?.["draw__line"]
-  const drawInstance = polygonInst ?? lineInst
-  const lineDrawer = drawInstance?.lineDrawer
+  const polygonInst = (gm.actionInstances as Record<string, unknown> | undefined)?.["draw__polygon"]
+  const lineInst = (gm.actionInstances as Record<string, unknown> | undefined)?.["draw__line"]
+  const drawInstance = (polygonInst ?? lineInst) as Record<string, unknown> | undefined
+  const lineDrawer = drawInstance?.lineDrawer as Record<string, unknown> | undefined
   if (!lineDrawer?.featureData) return
 
-  const coords: [number, number][] = lineDrawer.shapeLngLats
+  const coords: [number, number][] = lineDrawer.shapeLngLats as [number, number][]
   if (coords.length <= 1) {
-    void gm.disableDraw()
+    void (gm.disableDraw as Function)()
     return
   }
   coords.pop()
 
   const isPolygon = !!polygonInst
-  const markers: Map<string, any> | undefined = lineDrawer.featureData.markers
-  if (markers) {
-    const entries = Array.from(markers.entries())
+  const markers = lineDrawer.featureData as Record<string, unknown> | undefined
+  const markersMap = markers?.markers as Map<string, Record<string, unknown>> | undefined
+  if (markersMap) {
+    const entries = Array.from(markersMap.entries())
     if (entries.length > 0) {
       const [key, markerData] = entries[entries.length - 1]
-      markerData?.instance?.remove?.()
-      markers.delete(key)
+      const instance = markerData?.instance as Record<string, unknown> | undefined
+      const removeFn = instance?.remove as unknown as (() => void) | undefined
+      removeFn?.()
+      markersMap.delete(key)
     }
   }
 
-  const controlMarker = lineDrawer.gm?.markerPointer?.marker
+  const controlMarker = (lineDrawer?.gm as Record<string, unknown> | undefined)?.markerPointer as
+    | Record<string, unknown>
+    | undefined
+  const markerControl = controlMarker?.marker as maplibregl.Marker | undefined
 
   if (isPolygon) {
     const ring: [number, number][] = [...coords]
-    if (controlMarker) {
-      const ll = controlMarker.getLngLat()
+    if (markerControl) {
+      const ll = markerControl.getLngLat()
       ring.push([ll.lng, ll.lat])
     }
     if (ring.length > 0) {
       ring.push([ring[0][0], ring[0][1]])
     }
 
-    await lineDrawer.featureData.updateGeometry({
+    const fd = lineDrawer.featureData as Record<string, unknown>
+    await (fd.updateGeometry as Function)({
       type: "Polygon",
       coordinates: [ring],
     })
 
-    if (lineDrawer.featureData.convertToPolygon) {
-      await lineDrawer.featureData.convertToPolygon()
+    if (fd.convertToPolygon) {
+      await (fd.convertToPolygon as Function)()
     }
 
-    if (controlMarker && lineDrawer.fireUpdateEvent) {
-      await lineDrawer.fireUpdateEvent(lineDrawer.featureData, {
-        type: "dom",
-        instance: controlMarker,
-        position: {
-          coordinate: [controlMarker.getLngLat().lng, controlMarker.getLngLat().lat],
-          path: ["geometry", "coordinates", coords.length],
-        },
-      })
+    if (markerControl) {
+      const fireEvent = fd.fireUpdateEvent as Function | undefined
+      if (fireEvent) {
+        await fireEvent(fd, {
+          type: "dom",
+          instance: markerControl,
+          position: {
+            coordinate: [markerControl.getLngLat().lng, markerControl.getLngLat().lat],
+            path: ["geometry", "coordinates", coords.length],
+          },
+        })
+      }
     }
   } else {
-    await lineDrawer.featureData.updateGeometry(
-      lineDrawer.getFeatureGeoJson({ withControlMarker: true }).geometry,
-    )
-    if (controlMarker && lineDrawer.fireUpdateEvent) {
-      await lineDrawer.fireUpdateEvent(lineDrawer.featureData, {
-        type: "dom",
-        instance: controlMarker,
-        position: {
-          coordinate: [controlMarker.getLngLat().lng, controlMarker.getLngLat().lat],
-          path: ["geometry", "coordinates", coords.length],
-        },
-      })
+    const fd = lineDrawer.featureData as Record<string, unknown>
+    const getGeoJson = lineDrawer.getFeatureGeoJson as Function
+    await (fd.updateGeometry as Function)(getGeoJson({ withControlMarker: true }).geometry)
+    if (markerControl) {
+      const fireEvent = fd.fireUpdateEvent as Function | undefined
+      if (fireEvent) {
+        await fireEvent(fd, {
+          type: "dom",
+          instance: markerControl,
+          position: {
+            coordinate: [markerControl.getLngLat().lng, markerControl.getLngLat().lat],
+            path: ["geometry", "coordinates", coords.length],
+          },
+        })
+      }
     }
   }
 
-  lineDrawer.snappingHelper?.setCustomSnappingCoordinates?.(lineDrawer.snappingKey, coords)
+  const snapHelper = lineDrawer.snappingHelper as Record<string, unknown> | undefined
+  const setCustomSnap = snapHelper?.setCustomSnappingCoordinates as Function | undefined
+  setCustomSnap?.(lineDrawer.snappingKey, coords)
   if (typeof lineDrawer.setSnapping === "function") {
-    lineDrawer.setSnapping()
+    ;(lineDrawer.setSnapping as Function)()
   }
 }
-/* eslint-enable @typescript-eslint/no-explicit-any */

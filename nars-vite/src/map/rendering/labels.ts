@@ -2,6 +2,7 @@
 
 import { PHASES } from "../../phases"
 import { store } from "../../store"
+import maplibregl from "maplibre-gl"
 import { ctx } from "../core/state"
 import { debugLog } from "../../utils/debug"
 
@@ -65,8 +66,7 @@ export function refreshLayerVisibility(): void {
   for (const [layerId, geomType] of Object.entries(layerGeometryTypes)) {
     if (map.getLayer(layerId)) {
       const combinedFilter = ["all", ["==", ["geometry-type"], geomType], phaseScopedFilter]
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      map.setFilter(layerId, combinedFilter as any)
+      map.setFilter(layerId, combinedFilter as maplibregl.FilterSpecification)
     }
   }
 

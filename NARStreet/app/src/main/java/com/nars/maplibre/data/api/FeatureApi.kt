@@ -12,6 +12,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
@@ -20,18 +21,28 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import java.net.HttpURLConnection
 import java.net.URL
+import javax.net.ssl.HttpsURLConnection
 
 /**
  * Handles feature-related API calls (load, save, update, delete)
  */
 class FeatureApi(
     private val baseUrl: String,
-    private val json: Json
+    private val json: Json,
+    private val tlsSocketFactory: javax.net.ssl.SSLSocketFactory? = null
 ) {
     companion object {
         private const val TAG = "FeatureApi"
         private const val SAVE_TIMEOUT_MS = 15000
         private const val DEFAULT_TIMEOUT_MS = 10000
+    }
+
+    private fun openConnection(url: URL): HttpURLConnection {
+        val connection = url.openConnection()
+        if (tlsSocketFactory != null && connection is HttpsURLConnection) {
+            connection.sslSocketFactory = tlsSocketFactory
+        }
+        return connection as HttpURLConnection
     }
 
     /**
@@ -42,7 +53,7 @@ class FeatureApi(
 
         try {
             val url = URL("$baseUrl/api/load")
-            val connection = url.openConnection() as HttpURLConnection
+            val connection = openConnection(url)
             connection.requestMethod = "GET"
             connection.setRequestProperty("Content-Type", "application/json")
             connection.setRequestProperty("Accept", "application/json")
@@ -90,11 +101,11 @@ class FeatureApi(
     /**
      * Save a feature
      */
-    suspend fun saveFeature(feature: NarsFeature, cookie: String?): Result<Long> = withContext(Dispatchers.IO) {
+    suspend fun saveFeature(feature: NarsFeature, cookie: String?): Result<String> = withContext(Dispatchers.IO) {
         try {
             val cleanBaseUrl = baseUrl.trimEnd('/')
             val url = URL("$cleanBaseUrl/api/save")
-            val connection = url.openConnection() as HttpURLConnection
+            val connection = openConnection(url)
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
             connection.setRequestProperty("Accept", "application/json")
@@ -117,7 +128,10 @@ class FeatureApi(
             val responseCode = connection.responseCode
             if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED) {
                 val responseBody = connection.inputStream.bufferedReader().use { it.readText() }
-                val id = json.parseToJsonElement(responseBody).jsonObject["id"]?.jsonPrimitive?.longOrNull ?: 0L
+                val responseJson = json.parseToJsonElement(responseBody).jsonObject
+                val id = responseJson["id"]?.jsonPrimitive?.contentOrNull
+                    ?: responseJson["id"]?.jsonPrimitive?.longOrNull?.toString()
+                    ?: feature.id
                 Result.success(id)
             } else {
                 val errorBody = try {
@@ -138,7 +152,7 @@ class FeatureApi(
     suspend fun updateFeature(featureId: String, feature: NarsFeature, cookie: String?): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val url = URL("$baseUrl/api/update/$featureId")
-            val connection = url.openConnection() as HttpURLConnection
+            val connection = openConnection(url)
             connection.requestMethod = "PUT"
             connection.setRequestProperty("Content-Type", "application/json")
             connection.setRequestProperty("Accept", "application/json")
@@ -174,7 +188,7 @@ class FeatureApi(
     suspend fun deleteFeature(featureId: String, cookie: String?): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val url = URL("$baseUrl/api/delete/$featureId")
-            val connection = url.openConnection() as HttpURLConnection
+            val connection = openConnection(url)
             connection.requestMethod = "DELETE"
             connection.setRequestProperty("Accept", "application/json")
 

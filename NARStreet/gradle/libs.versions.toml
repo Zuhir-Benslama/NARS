@@ -33,6 +33,7 @@ material = "1.12.0"
 
 # Testing
 junit = "4.13.2"
+kotlinx-coroutines-test = "1.9.0"
 
 [libraries]
 # Kotlin
@@ -73,8 +74,9 @@ material = { group = "com.google.android.material", name = "material", version.r
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidx-test-ext" }
-androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "androidx-espresso" }
+androidx-espresso-core = { group = "androidx.espresso", name = "espresso-core", version.ref = "androidx-espresso" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

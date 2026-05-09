@@ -49,3 +49,62 @@ public record FeatureTypeDefinition(
     [property: JsonPropertyName("icon")] string Icon,
     [property: JsonPropertyName("layers")] IReadOnlyList<LayerOption> Layers
 );
+
+// ─── RESPONSE DTOs ────────────────────────────────────────────────────────────
+
+public record SaveFeatureResponse(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("message")] string Message
+);
+
+public record LoadFeaturesResponse(
+    [property: JsonPropertyName("features")] object Features,
+    [property: JsonPropertyName("count")] int Count,
+    [property: JsonPropertyName("skip")] int Skip,
+    [property: JsonPropertyName("take")] int Take
+);
+
+public record FeatureStatsResponse(
+    [property: JsonPropertyName("area")] long Area,
+    [property: JsonPropertyName("district")] long District,
+    [property: JsonPropertyName("city_center")] long CityCenter,
+    [property: JsonPropertyName("road")] long Road,
+    [property: JsonPropertyName("house_entrance")] long HouseEntrance,
+    [property: JsonPropertyName("public_building")] long PublicBuilding,
+    [property: JsonPropertyName("public_space")] long PublicSpace,
+    [property: JsonPropertyName("naming_panel")] long NamingPanel,
+    [property: JsonPropertyName("total")] long Total
+);
+
+public record ScatteredStatusResponse(
+    [property: JsonPropertyName("lastErrorTime")] string? LastErrorTime,
+    [property: JsonPropertyName("lastErrorMessage")] string? LastErrorMessage,
+    [property: JsonPropertyName("hasError")] bool HasError
+);
+
+public record UpdateFeatureResponse(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("updated_at")] DateTime UpdatedAt
+);
+
+public record ActionResponse(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("message")] string? Message = null
+);
+
+public record UpdateCredentialsResponse(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("message")] string Message,
+    [property: JsonPropertyName("user")] UserCredentialsInfo? User = null
+);
+
+public record UserCredentialsInfo(
+    [property: JsonPropertyName("username")] string? Username,
+    [property: JsonPropertyName("email")] string? Email
+);
+
+public record DetailResponse(
+    [property: JsonPropertyName("detail")] string Detail
+);

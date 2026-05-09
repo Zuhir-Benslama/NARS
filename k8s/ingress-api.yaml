@@ -9,11 +9,18 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
     nginx.ingress.kubernetes.io/use-regex: "true"
+    # mTLS — require client certificate for all HTTPS API calls
+    # HTTP traffic is unaffected (client certs only work over TLS)
+    nginx.ingress.kubernetes.io/auth-tls-verify-client: "on"
+    nginx.ingress.kubernetes.io/auth-tls-secret: "nars/nars-ca"
+    nginx.ingress.kubernetes.io/auth-tls-verify-depth: "1"
+    nginx.ingress.kubernetes.io/auth-tls-pass-certificate-to-upstream: "true"
 spec:
   ingressClassName: nginx
   tls:
     - hosts:
         - nars.dz
+        - localhost
       secretName: nars-tls
   rules:
     - host: nars.dz
@@ -33,13 +40,6 @@ spec:
                 name: nars-api
                 port:
                   number: 80
-          - path: /(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: nars-frontend
-                port:
-                  number: 80
     - host: localhost
       http:
         paths:
@@ -55,12 +55,5 @@ spec:
             backend:
               service:
                 name: nars-api
-                port:
-                  number: 80
-          - path: /(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: nars-frontend
                 port:
                   number: 80

@@ -12,6 +12,7 @@ import com.nars.maplibre.data.model.LineStringGeometry
 import com.nars.maplibre.data.model.NarsFeature
 import com.nars.maplibre.data.model.PointGeometry
 import com.nars.maplibre.data.model.PolygonGeometry
+import com.geoman.maplibre.geoman.core.GeomanCoreConstants
 import com.nars.maplibre.utils.NarsLogger
 
 /**
@@ -72,10 +73,10 @@ class GeometryConverter {
     fun convertToGeomanFeatureData(narsFeature: NarsFeature): FeatureData {
         val geoJsonFeature = convertToGeoJson(narsFeature)
         val sourceName = when (narsFeature.geometry) {
-            is PointGeometry -> com.geoman.maplibre.geoman.GeomanConstants.SOURCE_MARKERS
-            is LineStringGeometry -> com.geoman.maplibre.geoman.GeomanConstants.SOURCE_LINES
-            is PolygonGeometry -> com.geoman.maplibre.geoman.GeomanConstants.SOURCE_POLYGONS
-            is CircleGeometry -> com.geoman.maplibre.geoman.GeomanConstants.SOURCE_CIRCLES
+            is PointGeometry -> GeomanCoreConstants.SOURCE_MARKERS
+            is LineStringGeometry -> GeomanCoreConstants.SOURCE_LINES
+            is PolygonGeometry -> GeomanCoreConstants.SOURCE_POLYGONS
+            is CircleGeometry -> GeomanCoreConstants.SOURCE_CIRCLES
         }
         return FeatureData(
             id = narsFeature.id,
@@ -90,10 +91,10 @@ class GeometryConverter {
      */
     fun getSourceNameForGeometry(geometry: com.nars.maplibre.data.model.Geometry): String {
         return when (geometry) {
-            is PointGeometry -> com.geoman.maplibre.geoman.GeomanConstants.SOURCE_MARKERS
-            is LineStringGeometry -> com.geoman.maplibre.geoman.GeomanConstants.SOURCE_LINES
-            is PolygonGeometry -> com.geoman.maplibre.geoman.GeomanConstants.SOURCE_POLYGONS
-            is CircleGeometry -> com.geoman.maplibre.geoman.GeomanConstants.SOURCE_CIRCLES
+            is PointGeometry -> GeomanCoreConstants.SOURCE_MARKERS
+            is LineStringGeometry -> GeomanCoreConstants.SOURCE_LINES
+            is PolygonGeometry -> GeomanCoreConstants.SOURCE_POLYGONS
+            is CircleGeometry -> GeomanCoreConstants.SOURCE_CIRCLES
         }
     }
 

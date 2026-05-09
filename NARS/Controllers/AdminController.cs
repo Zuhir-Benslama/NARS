@@ -180,7 +180,7 @@ public class AdminController(
         logger.LogInformation("[Admin] {Creator} ({CreatorRole}) created {Role} account {Username}",
             CurrentUsername, CurrentUserRole, newUser.Role, newUser.Username);
 
-        return StatusCode(201, new { success = true, user_id = newUser.Id.ToString(), message = "Account created." });
+        return StatusCode(201, new CreateAdminResponse(Success: true, UserId: newUser.Id.ToString(), Message: "Account created."));
     }
 
     // ─── Private: overview builders ──────────────────────────────────────────
