@@ -61,6 +61,11 @@
     <string name="menu_compute_directions">Compute Directions</string>
     <string name="menu_update_attributes">Update Attributes</string>
 
+    <!-- Phase hints -->
+    <string name="phase_roads_hint">Update road attributes (traffic, lanes, etc.)</string>
+    <string name="phase_house_entrances_hint">Verify entrances and numbering panels</string>
+    <string name="phase_naming_panels_hint">Verify naming panel locations</string>
+
     <!-- Phase Navigation Alerts -->
     <string name="alert_at_least_one_road">At least one road required before proceeding</string>
     <string name="alert_at_least_one_entrance">At least one entrance required before proceeding</string>

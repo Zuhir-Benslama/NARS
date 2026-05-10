@@ -44,6 +44,23 @@ let snapCursor: HTMLDivElement | null = null
 let snapActive = false
 let snapLatLng: { lat: number; lng: number } | null = null
 let snapFrozen = false
+let snapRafId: number | null = null
+let snapPendingEvent: MouseEvent | null = null
+
+// ─── STATE RESET (for testing & HMR) ──────────────────────────────────────────
+
+export function resetSnapState(): void {
+  crosshairActive = false
+  snapMarker = null
+  snapCursor = null
+  snapActive = false
+  snapLatLng = null
+  snapFrozen = false
+  editModeActive = false
+  editDragActive = false
+  snapRafId = null
+  snapPendingEvent = null
+}
 export function isSnapFrozen(): boolean {
   return snapFrozen
 }
@@ -63,9 +80,6 @@ export function setEditDragActive(v: boolean): void {
 export function setSnapExclude(id: string | null): void {
   setSnapSourceExclude(id)
 }
-
-let snapRafId: number | null = null
-let snapPendingEvent: MouseEvent | null = null
 
 export function getActiveSnapPhases(): string[] {
   if (editModeActive) {

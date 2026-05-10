@@ -62,7 +62,7 @@ public class FeaturesController(
         Guid newId = Guid.CreateVersion7();
 
         // Use the registry to create the entity — no more 8-case switch statement
-        var entity = FeatureTypeRegistry.CreateEntity(body.Type, newId, CurrentUserId, body.Layer, body.Label, dataJson);
+        var entity = FeatureTypeRegistry.CreateEntity(body.Type, newId, RequiredCurrentUserId, body.Layer, body.Label, dataJson);
         if (entity is null)
             return BadRequest(new { detail = $"Unknown feature type '{body.Type}'." });
 
@@ -101,7 +101,7 @@ public class FeaturesController(
         take = Math.Clamp(take, 1, 2000);
 
         var (features, totalCount) = await FeatureQueryHelper.LoadAllFeaturesAsync(
-            db.Database.GetDbConnection(), CurrentUserId, skip, take);
+            db.Database.GetDbConnection(), RequiredCurrentUserId, skip, take);
 
         return Ok(new LoadFeaturesResponse(
             Features: features,
@@ -160,7 +160,8 @@ public class FeaturesController(
     {
         var uid = CurrentUserId;
 
-        // Single UNION ALL query instead of 8 sequential round-trips.
+        // Single UNION ALL query built from FeatureTypeRegistry instead of
+        // hardcoded per-type SELECTs — adding a new type auto-extends this query.
         var conn = db.Database.GetDbConnection();
         var wasOpen = conn.State == System.Data.ConnectionState.Open;
         if (!wasOpen) await conn.OpenAsync();
@@ -168,22 +169,20 @@ public class FeaturesController(
         try
         {
             await using var cmd = conn.CreateCommand();
-            cmd.CommandText = """
-                SELECT 'area' AS type, COUNT(*) FROM areas WHERE user_id = @uid UNION ALL
-                SELECT 'district', COUNT(*) FROM districts WHERE user_id = @uid UNION ALL
-                SELECT 'city_center', COUNT(*) FROM city_centers WHERE user_id = @uid UNION ALL
-                SELECT 'road', COUNT(*) FROM roads WHERE user_id = @uid UNION ALL
-                SELECT 'house_entrance', COUNT(*) FROM house_entrances WHERE user_id = @uid UNION ALL
-                SELECT 'public_building', COUNT(*) FROM public_buildings WHERE user_id = @uid UNION ALL
-                SELECT 'public_space', COUNT(*) FROM public_spaces WHERE user_id = @uid UNION ALL
-                SELECT 'naming_panel', COUNT(*) FROM naming_panels WHERE user_id = @uid
-                """;
+            var sql = new System.Text.StringBuilder();
+            var descriptors = FeatureTypeRegistry.GetAllDescriptors();
+            for (int i = 0; i < descriptors.Count; i++)
+            {
+                if (i > 0) sql.Append(" UNION ALL ");
+                sql.Append($"SELECT '{descriptors[i].Type}' AS type, COUNT(*) FROM {descriptors[i].TableName} WHERE user_id = @uid");
+            }
+            cmd.CommandText = sql.ToString();
             var uidParam = cmd.CreateParameter();
             uidParam.ParameterName = "@uid";
             uidParam.Value = uid;
             cmd.Parameters.Add(uidParam);
 
-            var counts = new Dictionary<string, long>(8);
+            var counts = new Dictionary<string, long>(descriptors.Count);
             await using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
@@ -194,14 +193,14 @@ public class FeaturesController(
             var total = counts.Values.Sum();
 
             return Ok(new FeatureStatsResponse(
-                Area: GetCount("area"),
-                District: GetCount("district"),
-                CityCenter: GetCount("city_center"),
-                Road: GetCount("road"),
-                HouseEntrance: GetCount("house_entrance"),
-                PublicBuilding: GetCount("public_building"),
-                PublicSpace: GetCount("public_space"),
-                NamingPanel: GetCount("naming_panel"),
+                Area: GetCount(FeatureTypes.Area),
+                District: GetCount(FeatureTypes.District),
+                CityCenter: GetCount(FeatureTypes.CityCenter),
+                Road: GetCount(FeatureTypes.Road),
+                HouseEntrance: GetCount(FeatureTypes.HouseEntrance),
+                PublicBuilding: GetCount(FeatureTypes.PublicBuilding),
+                PublicSpace: GetCount(FeatureTypes.PublicSpace),
+                NamingPanel: GetCount(FeatureTypes.NamingPanel),
                 Total: total
             ));
         }
@@ -351,7 +350,7 @@ public class FeaturesController(
             try
             {
                 var svc = sp.GetRequiredService<IScatteredAreaService>();
-                await svc.RefreshAsync(CurrentUserId, RequiredCommuneId);
+                await svc.RefreshAsync(RequiredCurrentUserId, RequiredCommuneId);
             }
             catch (Exception ex)
             {

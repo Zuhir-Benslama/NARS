@@ -263,7 +263,11 @@ public class AdminController(
 
         var dairaReports = new List<DairaReport>();
         foreach (var daira in dairas)
-            dairaReports.Add(await BuildDairaReportAsync(daira) ?? throw new InvalidOperationException());
+        {
+            var report = await BuildDairaReportAsync(daira);
+            if (report is not null)
+                dairaReports.Add(report);
+        }
 
         return new WilayaReport(
             WilayaId: wilaya.WilayaId,
@@ -343,31 +347,33 @@ public class AdminController(
         try
         {
             await using var cmd = conn.CreateCommand();
-            cmd.CommandText = """
+            // Build the inner UNION ALL from FeatureTypeRegistry so new types
+            // are automatically included — no more hardcoded table list.
+            var unionBuilder = new System.Text.StringBuilder();
+            var descriptors = FeatureTypeRegistry.GetAllDescriptors();
+            for (int i = 0; i < descriptors.Count; i++)
+            {
+                if (i > 0) unionBuilder.Append(" UNION ALL ");
+                unionBuilder.Append($"SELECT id, user_id, '{descriptors[i].Type}' AS ft FROM {descriptors[i].TableName}");
+            }
+
+            var caseBuilder = new System.Text.StringBuilder();
+            for (int i = 0; i < descriptors.Count; i++)
+            {
+                caseBuilder.AppendLine(
+                    $"                    COALESCE(SUM(CASE WHEN f.ft = '{descriptors[i].Type}' THEN 1 ELSE 0 END), 0),");
+            }
+
+            cmd.CommandText = $"""
                 SELECT
                     u.id,
                     u.username,
                     u.name,
                     u.email,
-                    COALESCE(SUM(CASE WHEN f.ft = 'area'            THEN 1 ELSE 0 END), 0),
-                    COALESCE(SUM(CASE WHEN f.ft = 'district'        THEN 1 ELSE 0 END), 0),
-                    COALESCE(SUM(CASE WHEN f.ft = 'city_center'     THEN 1 ELSE 0 END), 0),
-                    COALESCE(SUM(CASE WHEN f.ft = 'road'            THEN 1 ELSE 0 END), 0),
-                    COALESCE(SUM(CASE WHEN f.ft = 'house_entrance'  THEN 1 ELSE 0 END), 0),
-                    COALESCE(SUM(CASE WHEN f.ft = 'public_building' THEN 1 ELSE 0 END), 0),
-                    COALESCE(SUM(CASE WHEN f.ft = 'public_space'    THEN 1 ELSE 0 END), 0),
-                    COALESCE(SUM(CASE WHEN f.ft = 'naming_panel'    THEN 1 ELSE 0 END), 0),
-                    COUNT(f.id)
+                    {caseBuilder}                    COUNT(f.id)
                 FROM users u
                 LEFT JOIN (
-                    SELECT id, user_id, 'area'            AS ft FROM areas
-                    UNION ALL SELECT id, user_id, 'district'        FROM districts
-                    UNION ALL SELECT id, user_id, 'city_center'     FROM city_centers
-                    UNION ALL SELECT id, user_id, 'road'            FROM roads
-                    UNION ALL SELECT id, user_id, 'house_entrance'  FROM house_entrances
-                    UNION ALL SELECT id, user_id, 'public_building' FROM public_buildings
-                    UNION ALL SELECT id, user_id, 'public_space'    FROM public_spaces
-                    UNION ALL SELECT id, user_id, 'naming_panel'    FROM naming_panels
+                    {unionBuilder}
                 ) f ON f.user_id = u.id
                 WHERE u.id = ANY(@ids)
                 GROUP BY u.id, u.username, u.name, u.email
@@ -377,6 +383,13 @@ public class AdminController(
             param.ParameterName = "@ids";
             param.Value = userIds;
             cmd.Parameters.Add(param);
+
+            // Build column index map: first 4 columns are id/username/name/email,
+            // then one CASE SUM per descriptor (+ 1 for the final COUNT column).
+            var typeColIndex = new Dictionary<string, int>(descriptors.Count);
+            for (int i = 0; i < descriptors.Count; i++)
+                typeColIndex[descriptors[i].Type] = 4 + i;
+            var totalCol = 4 + descriptors.Count;
 
             var result = new Dictionary<Guid, UserFeatureStats>();
             await using var reader = await cmd.ExecuteReaderAsync();
@@ -388,15 +401,15 @@ public class AdminController(
                     Username: reader.GetString(1),
                     Name: reader.GetString(2),
                     Email: reader.GetString(3),
-                    Areas: reader.GetInt64(4),
-                    Districts: reader.GetInt64(5),
-                    CityCenters: reader.GetInt64(6),
-                    Roads: reader.GetInt64(7),
-                    HouseEntrances: reader.GetInt64(8),
-                    PublicBuildings: reader.GetInt64(9),
-                    PublicSpaces: reader.GetInt64(10),
-                    NamingPanels: reader.GetInt64(11),
-                    Total: reader.GetInt64(12)
+                    Areas: reader.GetInt64(typeColIndex[FeatureTypes.Area]),
+                    Districts: reader.GetInt64(typeColIndex[FeatureTypes.District]),
+                    CityCenters: reader.GetInt64(typeColIndex[FeatureTypes.CityCenter]),
+                    Roads: reader.GetInt64(typeColIndex[FeatureTypes.Road]),
+                    HouseEntrances: reader.GetInt64(typeColIndex[FeatureTypes.HouseEntrance]),
+                    PublicBuildings: reader.GetInt64(typeColIndex[FeatureTypes.PublicBuilding]),
+                    PublicSpaces: reader.GetInt64(typeColIndex[FeatureTypes.PublicSpace]),
+                    NamingPanels: reader.GetInt64(typeColIndex[FeatureTypes.NamingPanel]),
+                    Total: reader.GetInt64(totalCol)
                 );
             }
             return result;

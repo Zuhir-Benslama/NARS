@@ -73,3 +73,14 @@ export function isSavingFeature(): boolean {
 export function setSavingFeature(v: boolean): void {
   savingFeature = v
 }
+
+// ─── STATE RESET (for testing & HMR) ──────────────────────────────────────────
+
+export function resetDrawState(): void {
+  _geomanMarkerPointer = null
+  _originalGeomanMarkerSetLngLat = null
+  _snappingEnabled = true
+  _repatchMarkerPointer = null
+  _drawingPhase = null
+  savingFeature = false
+}

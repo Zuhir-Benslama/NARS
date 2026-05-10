@@ -93,7 +93,7 @@ public class FeatureCatalogController(AppDbContext db) : NarsControllerBase
         take = Math.Clamp(take, 1, 500);
 
         var (features, totalCount) = await FeatureQueryHelper.LoadByLayerAsync(
-            db.Database.GetDbConnection(), CurrentUserId, layerType, skip, take);
+            db.Database.GetDbConnection(), RequiredCurrentUserId, layerType, skip, take);
 
         return Ok(new
         {

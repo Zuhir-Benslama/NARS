@@ -53,7 +53,7 @@ export async function exportMapToPdf(
 
   onProgress(15, t("export_step_render"))
 
-  let canvas: HTMLCanvasElement
+  let canvas: HTMLCanvasElement | null = null
   try {
     canvas = await html2canvas(mapEl, {
       useCORS: true,
@@ -66,8 +66,7 @@ export async function exportMapToPdf(
     })
     onProgress(82, t("export_step_compose"))
   } catch (err) {
-    // Clean up canvas reference on failure
-    canvas = undefined as unknown as HTMLCanvasElement
+    canvas = null
     throw err
   }
 

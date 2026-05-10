@@ -11,6 +11,11 @@ sealed class UndoAction {
         val phaseKey: String
     ) : UndoAction()
 
+    data class Create(
+        val feature: NarsFeature,
+        val phaseKey: String
+    ) : UndoAction()
+
     data class Update(
         val oldFeature: NarsFeature,
         val newFeature: NarsFeature,

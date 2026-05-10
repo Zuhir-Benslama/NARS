@@ -1,0 +1,266 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CyclomaticComplexMethod:ApiClient.kt:ApiClient$private fun buildDataJson: String</ID>
+    <ID>CyclomaticComplexMethod:ApiClient.kt:ApiClient$private fun mapPhaseToLayer: String</ID>
+    <ID>CyclomaticComplexMethod:ApiClient.kt:ApiClient$suspend fun login: Result&lt;LoginResponse&gt;</ID>
+    <ID>CyclomaticComplexMethod:FeatureModal.kt:@Composable fun FeatureValidationModal</ID>
+    <ID>CyclomaticComplexMethod:HouseNumberingManager.kt:HouseNumberingManager$fun setHouseNumbers: List&lt;NarsFeature&gt;</ID>
+    <ID>CyclomaticComplexMethod:MapScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun MapScreen</ID>
+    <ID>CyclomaticComplexMethod:NamingPanelGenerator.kt:NamingPanelGenerator$fun generatePanels: List&lt;NarsFeature&gt;</ID>
+    <ID>CyclomaticComplexMethod:NarsGeoman.kt:NarsGeoman$fun removeFeature</ID>
+    <ID>CyclomaticComplexMethod:NarsGeoman.kt:NarsGeoman$fun snapPoint: LatLng</ID>
+    <ID>CyclomaticComplexMethod:RoadDirectionsCalculator.kt:RoadDirectionsCalculator$private fun deadEndCorrection: List&lt;String&gt;</ID>
+    <ID>CyclomaticComplexMethod:RoadDirectionsCalculator.kt:RoadDirectionsCalculator$private fun orientFromCityCenter</ID>
+    <ID>CyclomaticComplexMethod:VerticalPhaseNav.kt:@Composable private fun PhaseBadge</ID>
+    <ID>EmptyCatchBlock:NarsGeoman.kt:NarsGeoman${}</ID>
+    <ID>ForbiddenComment:LocalFeatureRepository.kt:LocalFeatureRepository$// TODO: Implement GeoJSON export</ID>
+    <ID>ForbiddenComment:LocalFeatureRepository.kt:LocalFeatureRepository$// TODO: Implement GeoJSON parsing</ID>
+    <ID>ForbiddenComment:NarsFeature.kt:Phases$// TODO: Implement i18n lookup</ID>
+    <ID>FunctionNaming:BaseLayerSwitcher.kt:@Composable fun CompactBaseLayerSelector</ID>
+    <ID>FunctionNaming:BaseLayerSwitcher.kt:@Composable fun TileControl</ID>
+    <ID>FunctionNaming:BaseLayerSwitcher.kt:@Composable private fun CompactLayerButton</ID>
+    <ID>FunctionNaming:DrawingControls.kt:@Composable fun DrawingControls</ID>
+    <ID>FunctionNaming:DrawingControls.kt:@Composable fun FloatingDrawingControls</ID>
+    <ID>FunctionNaming:DrawingControls.kt:@Composable private fun ToolIconButton</ID>
+    <ID>FunctionNaming:FeatureModal.kt:@Composable fun FeatureValidationModal</ID>
+    <ID>FunctionNaming:FeatureModal.kt:@Composable private fun HouseEntranceValidationFields</ID>
+    <ID>FunctionNaming:FeatureModal.kt:@Composable private fun NamingPanelValidationFields</ID>
+    <ID>FunctionNaming:FeatureModal.kt:@Composable private fun RoadsValidationFields</ID>
+    <ID>FunctionNaming:FeatureModal.kt:@Composable private fun ValidationNumberField</ID>
+    <ID>FunctionNaming:FeatureModal.kt:@Composable private fun ValidationRadioGroup</ID>
+    <ID>FunctionNaming:FeatureModal.kt:@Composable private fun ValidationSwitch</ID>
+    <ID>FunctionNaming:InfoPanel.kt:@Composable fun CompactInfoPanel</ID>
+    <ID>FunctionNaming:InfoPanel.kt:@Composable fun InfoPanel</ID>
+    <ID>FunctionNaming:InfoPanel.kt:@Composable private fun PhaseCountRow</ID>
+    <ID>FunctionNaming:InfoPanel.kt:@Composable private fun TotalBadge</ID>
+    <ID>FunctionNaming:LoginScreen.kt:@Composable fun LoginScreen</ID>
+    <ID>FunctionNaming:MapScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun MapScreen</ID>
+    <ID>FunctionNaming:NarsMap.kt:@Composable fun NarsMap</ID>
+    <ID>FunctionNaming:NarsNavHost.kt:@Composable fun NarsNavHost</ID>
+    <ID>FunctionNaming:PhaseBar.kt:@Composable fun CompactPhaseSelector</ID>
+    <ID>FunctionNaming:PhaseBar.kt:@Composable fun PhaseBar</ID>
+    <ID>FunctionNaming:PhaseBar.kt:@Composable private fun CompactPhaseItem</ID>
+    <ID>FunctionNaming:PhaseBar.kt:@Composable private fun PhaseConnector</ID>
+    <ID>FunctionNaming:PhaseBar.kt:@Composable private fun PhaseStep</ID>
+    <ID>FunctionNaming:ProfileMenu.kt:@Composable fun CompactProfileMenu</ID>
+    <ID>FunctionNaming:ProfileMenu.kt:@Composable fun ProfileMenu</ID>
+    <ID>FunctionNaming:SettingsScreen.kt:@Composable private fun SettingsItem</ID>
+    <ID>FunctionNaming:SettingsScreen.kt:@Composable private fun SettingsSection</ID>
+    <ID>FunctionNaming:SettingsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsScreen</ID>
+    <ID>FunctionNaming:Theme.kt:@Composable fun NARSTheme</ID>
+    <ID>FunctionNaming:VerticalPhaseNav.kt:@Composable fun VerticalPhaseNav</ID>
+    <ID>FunctionNaming:VerticalPhaseNav.kt:@Composable private fun PhaseBadge</ID>
+    <ID>FunctionNaming:VerticalPhaseNav.kt:@Composable private fun PhaseConnector</ID>
+    <ID>LargeClass:ApiClient.kt:ApiClient</ID>
+    <ID>LargeClass:NarsGeoman.kt:NarsGeoman</ID>
+    <ID>LongMethod:ApiClient.kt:ApiClient$suspend fun login: Result&lt;LoginResponse&gt;</ID>
+    <ID>LongMethod:BaseLayerSwitcher.kt:@Composable fun TileControl</ID>
+    <ID>LongMethod:FeatureModal.kt:@Composable fun FeatureValidationModal</ID>
+    <ID>LongMethod:HouseNumberingManager.kt:HouseNumberingManager$fun setHouseNumbers: List&lt;NarsFeature&gt;</ID>
+    <ID>LongMethod:LoginScreen.kt:@Composable fun LoginScreen</ID>
+    <ID>LongMethod:MapScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun MapScreen</ID>
+    <ID>LongMethod:NarsGeoman.kt:NarsGeoman$fun addFeature</ID>
+    <ID>LongMethod:NarsGeoman.kt:NarsGeoman$fun removeFeature</ID>
+    <ID>LongMethod:NarsMap.kt:private fun getStyleJson: String</ID>
+    <ID>LongMethod:ProfileMenu.kt:@Composable fun CompactProfileMenu</ID>
+    <ID>LongMethod:ProfileMenu.kt:@Composable fun ProfileMenu</ID>
+    <ID>LongMethod:SettingsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsScreen</ID>
+    <ID>LongMethod:VerticalPhaseNav.kt:@Composable private fun PhaseBadge</ID>
+    <ID>LoopWithTooManyJumpStatements:NamingPanelGenerator.kt:NamingPanelGenerator$for</ID>
+    <ID>LoopWithTooManyJumpStatements:NarsGeoman.kt:NarsGeoman$for</ID>
+    <ID>LoopWithTooManyJumpStatements:RoadDirectionsCalculator.kt:RoadDirectionsCalculator$for</ID>
+    <ID>LoopWithTooManyJumpStatements:RoadDirectionsCalculator.kt:RoadDirectionsCalculator$while</ID>
+    <ID>MagicNumber:ApiClient.kt:ApiClient$100</ID>
+    <ID>MagicNumber:ApiClient.kt:ApiClient$10000</ID>
+    <ID>MagicNumber:ApiClient.kt:ApiClient$15000</ID>
+    <ID>MagicNumber:ApiClient.kt:ApiClient$20</ID>
+    <ID>MagicNumber:ApiClient.kt:ApiClient$200</ID>
+    <ID>MagicNumber:ApiClient.kt:ApiClient$2000</ID>
+    <ID>MagicNumber:ApiClient.kt:ApiClient$30</ID>
+    <ID>MagicNumber:ApiClient.kt:ApiClient$302</ID>
+    <ID>MagicNumber:ApiClient.kt:ApiClient$303</ID>
+    <ID>MagicNumber:ApiClient.kt:ApiClient$500</ID>
+    <ID>MagicNumber:BaseLayerSwitcher.kt:0xFF1a1a1a</ID>
+    <ID>MagicNumber:BaseLayerSwitcher.kt:0xFF1f1f1f</ID>
+    <ID>MagicNumber:BaseLayerSwitcher.kt:0xFFf0f0f0</ID>
+    <ID>MagicNumber:BaseLayerSwitcher.kt:0xFFffffff</ID>
+    <ID>MagicNumber:ContextMenuManager.kt:ContextMenuManager$3</ID>
+    <ID>MagicNumber:DrawingControls.kt:0xFF1e3a5f</ID>
+    <ID>MagicNumber:DrawingControls.kt:0xFFe0e0e0</ID>
+    <ID>MagicNumber:FeatureModal.kt:6</ID>
+    <ID>MagicNumber:FeatureStore.kt:FeatureStore$50</ID>
+    <ID>MagicNumber:GeometryUtils.kt:GeometryUtils$6371000.0</ID>
+    <ID>MagicNumber:HouseNumberingManager.kt:HouseNumberingManager$6371000.0</ID>
+    <ID>MagicNumber:InfoPanel.kt:3</ID>
+    <ID>MagicNumber:InfoPanel.kt:4</ID>
+    <ID>MagicNumber:LoginScreen.kt:0.85f</ID>
+    <ID>MagicNumber:LoginScreen.kt:0xFF0f1932</ID>
+    <ID>MagicNumber:LoginScreen.kt:0xFF1a2642</ID>
+    <ID>MagicNumber:LoginScreen.kt:0xFF667eea</ID>
+    <ID>MagicNumber:LoginScreen.kt:0xFF764ba2</ID>
+    <ID>MagicNumber:LoginScreen.kt:0xFFef4444</ID>
+    <ID>MagicNumber:MapScreen.kt:10.0</ID>
+    <ID>MagicNumber:MapScreen.kt:14.0</ID>
+    <ID>MagicNumber:MapScreen.kt:1500</ID>
+    <ID>MagicNumber:MapScreen.kt:20.0</ID>
+    <ID>MagicNumber:MapScreen.kt:50.0</ID>
+    <ID>MagicNumber:NamingPanelGenerator.kt:NamingPanelGenerator$100</ID>
+    <ID>MagicNumber:NamingPanelGenerator.kt:NamingPanelGenerator$3</ID>
+    <ID>MagicNumber:NamingPanelGenerator.kt:NamingPanelGenerator$4</ID>
+    <ID>MagicNumber:NamingPanelGenerator.kt:NamingPanelGenerator$6371000.0</ID>
+    <ID>MagicNumber:NarsGeoman.kt:NarsGeoman$0.20</ID>
+    <ID>MagicNumber:NarsGeoman.kt:NarsGeoman$0.25</ID>
+    <ID>MagicNumber:NarsGeoman.kt:NarsGeoman$0.3</ID>
+    <ID>MagicNumber:NarsGeoman.kt:NarsGeoman$0.5</ID>
+    <ID>MagicNumber:NarsGeoman.kt:NarsGeoman$0.5f</ID>
+    <ID>MagicNumber:NarsGeoman.kt:NarsGeoman$100</ID>
+    <ID>MagicNumber:NarsGeoman.kt:NarsGeoman$14f</ID>
+    <ID>MagicNumber:NarsGeoman.kt:NarsGeoman$3</ID>
+    <ID>MagicNumber:NarsGeoman.kt:NarsGeoman$32</ID>
+    <ID>MagicNumber:NarsGeoman.kt:NarsGeoman$360.0</ID>
+    <ID>MagicNumber:NarsGeoman.kt:NarsGeoman$3f</ID>
+    <ID>MagicNumber:NarsGeoman.kt:NarsGeoman$50.0</ID>
+    <ID>MagicNumber:NarsGeoman.kt:NarsGeoman$6</ID>
+    <ID>MagicNumber:NarsGeoman.kt:NarsGeoman$6371000.0</ID>
+    <ID>MagicNumber:NarsGeoman.kt:NarsGeoman$6378137.0</ID>
+    <ID>MagicNumber:NarsGeoman.kt:NarsGeoman$6f</ID>
+    <ID>MagicNumber:NarsGeoman.kt:NarsGeoman$8</ID>
+    <ID>MagicNumber:NarsLogger.kt:NarsLogger$4</ID>
+    <ID>MagicNumber:NarsMap.kt:2.5</ID>
+    <ID>MagicNumber:NarsMap.kt:28.0</ID>
+    <ID>MagicNumber:NarsMap.kt:5.0</ID>
+    <ID>MagicNumber:NarsViewModel.kt:NarsViewModel$3000</ID>
+    <ID>MagicNumber:NarsViewModel.kt:NarsViewModel$5000</ID>
+    <ID>MagicNumber:RoadDirectionsCalculator.kt:RoadDirectionsCalculator$100.0</ID>
+    <ID>MagicNumber:RoadDirectionsCalculator.kt:RoadDirectionsCalculator$360</ID>
+    <ID>MagicNumber:RoadDirectionsCalculator.kt:RoadDirectionsCalculator$4</ID>
+    <ID>MagicNumber:RoadDirectionsCalculator.kt:RoadDirectionsCalculator$6371000.0</ID>
+    <ID>MagicNumber:SettingsScreen.kt:20f</ID>
+    <ID>MagicNumber:Theme.kt:0x1AFFFFFF</ID>
+    <ID>MagicNumber:Theme.kt:0x1FFFFFFF</ID>
+    <ID>MagicNumber:Theme.kt:0x330f1932</ID>
+    <ID>MagicNumber:Theme.kt:0x33FFFFFF</ID>
+    <ID>MagicNumber:Theme.kt:0x40FFFFFF</ID>
+    <ID>MagicNumber:Theme.kt:0x4DFFFFFF</ID>
+    <ID>MagicNumber:Theme.kt:0x66FFFFFF</ID>
+    <ID>MagicNumber:Theme.kt:0x8CFFFFFF</ID>
+    <ID>MagicNumber:Theme.kt:0xB3FFFFFF</ID>
+    <ID>MagicNumber:Theme.kt:0xD9FFFFFF</ID>
+    <ID>MagicNumber:Theme.kt:0xF20A1937</ID>
+    <ID>MagicNumber:Theme.kt:0xFF0f1932</ID>
+    <ID>MagicNumber:Theme.kt:0xFF1565C0</ID>
+    <ID>MagicNumber:Theme.kt:0xFF1976D2</ID>
+    <ID>MagicNumber:Theme.kt:0xFF212121</ID>
+    <ID>MagicNumber:Theme.kt:0xFF27ae60</ID>
+    <ID>MagicNumber:Theme.kt:0xFF3498db</ID>
+    <ID>MagicNumber:Theme.kt:0xFF3E2723</ID>
+    <ID>MagicNumber:Theme.kt:0xFF4A148C</ID>
+    <ID>MagicNumber:Theme.kt:0xFF667eea</ID>
+    <ID>MagicNumber:Theme.kt:0xFF757575</ID>
+    <ID>MagicNumber:Theme.kt:0xFF764ba2</ID>
+    <ID>MagicNumber:Theme.kt:0xFF7B1FA2</ID>
+    <ID>MagicNumber:Theme.kt:0xFF8e44ad</ID>
+    <ID>MagicNumber:Theme.kt:0xFF90CAF9</ID>
+    <ID>MagicNumber:Theme.kt:0xFFBBDEFB</ID>
+    <ID>MagicNumber:Theme.kt:0xFFBDBDBD</ID>
+    <ID>MagicNumber:Theme.kt:0xFFCE93D8</ID>
+    <ID>MagicNumber:Theme.kt:0xFFE1BEE7</ID>
+    <ID>MagicNumber:Theme.kt:0xFFE64A19</ID>
+    <ID>MagicNumber:Theme.kt:0xFFEEEEEE</ID>
+    <ID>MagicNumber:Theme.kt:0xFFF44336</ID>
+    <ID>MagicNumber:Theme.kt:0xFFFAFAFA</ID>
+    <ID>MagicNumber:Theme.kt:0xFFFF5722</ID>
+    <ID>MagicNumber:Theme.kt:0xFFFFAB91</ID>
+    <ID>MagicNumber:Theme.kt:0xFFFFCCBC</ID>
+    <ID>MagicNumber:Theme.kt:0xFFFFFFFF</ID>
+    <ID>MagicNumber:Theme.kt:0xFFe74c3c</ID>
+    <ID>MagicNumber:VerticalPhaseNav.kt:0xFF0f1932</ID>
+    <ID>MagicNumber:VerticalPhaseNav.kt:0xFF27ae60</ID>
+    <ID>MagicNumber:VerticalPhaseNav.kt:0xFF667eea</ID>
+    <ID>MagicNumber:VerticalPhaseNav.kt:0xFFffffff</ID>
+    <ID>MatchingDeclarationName:NarsNavHost.kt:Routes</ID>
+    <ID>MatchingDeclarationName:Theme.kt:ThemeMode</ID>
+    <ID>MaxLineLength:ApiClient.kt:ApiClient$Log.d(TAG, " [$idx] Feature: id=${f.id}, phase=${f.properties.phase}, type=${f.type}, name=${f.properties.name}")</ID>
+    <ID>MaxLineLength:ApiClient.kt:ApiClient$private</ID>
+    <ID>MaxLineLength:ApiClient.kt:ApiClient$props.mainEntranceLabel?.takeIf { it.isNotBlank() }?.let { fields.add("\"mainEntranceLabel\":\"${escapeJson(it)}\"") }</ID>
+    <ID>MaxLineLength:ApiClient.kt:ApiClient$return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")</ID>
+    <ID>MaxLineLength:BaseLayer.kt:BaseLayers$const val CARTODB_ATTRIBUTION = """ &amp;copy; &lt;a href="https://www.openstreetmap.org/copyright"&gt;OpenStreetMap&lt;/a&gt; contributors &amp;copy; &lt;a href="https://carto.com/attributions"&gt;CARTO&lt;/a&gt; """</ID>
+    <ID>MaxLineLength:BaseLayer.kt:BaseLayers$const val OSM_ATTRIBUTION = """ &amp;copy; &lt;a href="https://www.openstreetmap.org/copyright"&gt;OpenStreetMap&lt;/a&gt; contributors """</ID>
+    <ID>MaxLineLength:FeatureModal.kt:if (geom.coordinates.size &gt;= 2) "Lat: ${geom.coordinates[1].format(6)}, Lng: ${geom.coordinates[0].format(6)}" else null</ID>
+    <ID>MaxLineLength:FeatureStore.kt:FeatureStore$secondaryEntrances = features["houseEntrances"]?.count { it.properties.entranceTypeKey == "secondary_entrance" } ?: 0</ID>
+    <ID>MaxLineLength:FeatureTypes.kt:PublicBuildingType(key = "specialized_vocational_institute", label = "National Specialized Vocational Training Institute")</ID>
+    <ID>MaxLineLength:FeatureTypes.kt:PublicBuildingType(key = "vocational_apprenticeship_center", label = "Vocational Training and Apprenticeship Center")</ID>
+    <ID>MaxLineLength:InfoPanel.kt:fontWeight = if (isHighlighted) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal</ID>
+    <ID>MaxLineLength:MapScreen.kt:Log.d("MapScreen", " - ${f.id}: ${f.properties.phase}, type=${f.type}, geom=${f.geometry::class.simpleName}")</ID>
+    <ID>MaxLineLength:MapScreen.kt:Log.d("MapScreen", "Load result: success=${result.isSuccess}, features count = ${result.getOrNull()?.size}")</ID>
+    <ID>MaxLineLength:MapScreen.kt:Log.d("MapScreen", "Saving new feature to backend: ${feature.id}, phase=${feature.properties.phase}")</ID>
+    <ID>MaxLineLength:MapScreen.kt:android.util.Log.d("MapScreen", "Long clicked feature: ${clickedFeature.id}, phase=${clickedFeature.properties.phase}")</ID>
+    <ID>MaxLineLength:MapScreen.kt:android.util.Log.d("MapScreen", "No feature clicked on long press, currentPhase=$currentPhaseKey, featuresWithPhase=${allFeatures.count { it.properties.phase == currentPhaseKey }}")</ID>
+    <ID>MaxLineLength:MapScreen.kt:android.util.Log.d("MapScreen", "handleMapLongClick: phase=${currentPhase?.key}, hasFeatures=${allFeatures.size}")</ID>
+    <ID>MaxLineLength:NamingPanelGenerator.kt:NamingPanelGenerator$Log.d(TAG, "Generating panels for ${districts.size} districts, ${roads.size} roads, ${publicBuildings.size} buildings, ${publicSpaces.size} spaces")</ID>
+    <ID>MaxLineLength:NarsGeoman.kt:NarsGeoman$Log.d("NarsGeoman", "Adding feature: id=${feature.id}, type=${feature.type}, phase=${feature.properties.phase}, geometry=${feature.geometry::class.simpleName}")</ID>
+    <ID>MaxLineLength:NarsGeoman.kt:NarsGeoman$Log.d("NarsGeoman", "GmDrawEvent.Create received: shape=${event.shape}, feature=${event.feature}, feature javaClass=${event.feature?.javaClass?.name}")</ID>
+    <ID>MaxLineLength:NarsGeoman.kt:NarsGeoman$Log.d("NarsGeoman", "Snapped point: ${point.latitude},${point.longitude} -&gt; ${closestPoint.latitude},${closestPoint.longitude} (${minDistance.toInt()}m)")</ID>
+    <ID>MaxLineLength:NarsGeoman.kt:NarsGeoman$Log.d("NarsGeoman", "extractGeometryFromEvent: event.feature javaClass=${featureObj?.javaClass?.name}, toString=${featureObj?.toString()}")</ID>
+    <ID>MaxLineLength:NarsGeoman.kt:NarsGeoman$is com.nars.maplibre.data.model.LineStringGeometry -&gt; com.geoman.maplibre.geoman.GeomanConstants.SOURCE_LINES</ID>
+    <ID>MaxLineLength:NarsGeoman.kt:NarsGeoman$is com.nars.maplibre.data.model.PolygonGeometry -&gt; com.geoman.maplibre.geoman.GeomanConstants.SOURCE_POLYGONS</ID>
+    <ID>MaxLineLength:NarsGeoman.kt:NarsGeoman$private</ID>
+    <ID>MaxLineLength:NarsGeoman.kt:NarsGeoman$return """{"type": "Feature", "geometry": {"type": "LineString", "coordinates": [$coordsString]}, "properties": {}}"""</ID>
+    <ID>MaxLineLength:NarsGeoman.kt:NarsGeoman$val color = if (isStart) android.graphics.Color.parseColor("#2ecc71") else android.graphics.Color.parseColor("#e74c3c")</ID>
+    <ID>MaxLineLength:NarsViewModel.kt:NarsViewModel$val numberedCount = updated.count { it.properties.entranceNumber != null &amp;&amp; it.properties.entranceNumber &gt; 0 }</ID>
+    <ID>MaxLineLength:RoadDirectionsCalculator.kt:RoadDirectionsCalculator$private</ID>
+    <ID>NewLineAtEndOfFile:ContextMenuManager.kt:com.nars.maplibre.ui.components.ContextMenuManager.kt</ID>
+    <ID>NewLineAtEndOfFile:FeatureModal.kt:com.nars.maplibre.ui.components.FeatureModal.kt</ID>
+    <ID>NewLineAtEndOfFile:GeometryUtilsTest.kt:com.nars.maplibre.utils.GeometryUtilsTest.kt</ID>
+    <ID>NewLineAtEndOfFile:HouseNumberingManager.kt:com.nars.maplibre.utils.HouseNumberingManager.kt</ID>
+    <ID>NewLineAtEndOfFile:NamingPanelGenerator.kt:com.nars.maplibre.utils.NamingPanelGenerator.kt</ID>
+    <ID>NewLineAtEndOfFile:PhaseNavigator.kt:com.nars.maplibre.utils.PhaseNavigator.kt</ID>
+    <ID>NewLineAtEndOfFile:RoadDirectionsCalculator.kt:com.nars.maplibre.utils.RoadDirectionsCalculator.kt</ID>
+    <ID>NewLineAtEndOfFile:UndoAction.kt:com.nars.maplibre.data.store.UndoAction.kt</ID>
+    <ID>ReturnCount:HouseNumberingManager.kt:HouseNumberingManager$fun setHouseNumbers: List&lt;NarsFeature&gt;</ID>
+    <ID>ReturnCount:NarsGeoman.kt:NarsGeoman$private fun extractCircleGeometry: CircleGeometry</ID>
+    <ID>ReturnCount:PhaseNavigator.kt:PhaseNavigator$fun canAdvance: String?</ID>
+    <ID>ReturnCount:PhaseNavigator.kt:PhaseNavigator$fun goBack: PhaseDefinition?</ID>
+    <ID>ReturnCount:PhaseNavigator.kt:PhaseNavigator$fun goNext: PhaseDefinition?</ID>
+    <ID>ReturnCount:RoadDirectionsCalculator.kt:RoadDirectionsCalculator$private fun orientFromCityCenter</ID>
+    <ID>ReturnCount:Validation.kt:internal fun validateHouseEntranceFieldWorkflow: HouseEntranceValidation</ID>
+    <ID>ReturnCount:Validation.kt:internal fun validateNamingPanelFieldWorkflow: NamingPanelValidation</ID>
+    <ID>SwallowedException:ApiClient.kt:ApiClient$e: Exception</ID>
+    <ID>SwallowedException:NarsGeoman.kt:NarsGeoman$e: Exception</ID>
+    <ID>SwallowedException:SecurePreferences.kt:SecurePreferences$e: Exception</ID>
+    <ID>ThrowsCount:ApiErrors.kt:suspend fun &lt;T&gt; withRetry: T</ID>
+    <ID>TooGenericExceptionCaught:ApiClient.kt:ApiClient$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ApiErrors.kt:e: Exception</ID>
+    <ID>TooGenericExceptionCaught:LocalFeatureRepository.kt:LocalFeatureRepository$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:LoginScreen.kt:e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MapScreen.kt:e: Exception</ID>
+    <ID>TooGenericExceptionCaught:NarsGeoman.kt:NarsGeoman$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:NarsViewModel.kt:NarsViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:SecurePreferences.kt:SecurePreferences$e: Exception</ID>
+    <ID>TooManyFunctions:ApiClient.kt:ApiClient</ID>
+    <ID>TooManyFunctions:FeatureStore.kt:FeatureStore</ID>
+    <ID>TooManyFunctions:NarsGeoman.kt:NarsGeoman</ID>
+    <ID>TooManyFunctions:NarsViewModel.kt:NarsViewModel : ViewModel</ID>
+    <ID>TooManyFunctions:RoadDirectionsCalculator.kt:RoadDirectionsCalculator</ID>
+    <ID>TooManyFunctions:SecurePreferences.kt:SecurePreferences</ID>
+    <ID>UnusedParameter:ContextMenuManager.kt:ContextMenuManager$feature: NarsFeature</ID>
+    <ID>UnusedParameter:ContextMenuManager.kt:ContextMenuManager$x: Float</ID>
+    <ID>UnusedParameter:ContextMenuManager.kt:ContextMenuManager$y: Float</ID>
+    <ID>UnusedParameter:DrawingControls.kt:canUndo: Boolean = false</ID>
+    <ID>UnusedParameter:DrawingControls.kt:currentPhase: com.nars.maplibre.data.model.PhaseDefinition?</ID>
+    <ID>UnusedParameter:DrawingControls.kt:isDrawing: Boolean</ID>
+    <ID>UnusedParameter:DrawingControls.kt:isEditing: Boolean</ID>
+    <ID>UnusedParameter:DrawingControls.kt:modifier: Modifier = Modifier</ID>
+    <ID>UnusedParameter:DrawingControls.kt:onComputeRoadDirections: (() -&gt; Unit)? = null</ID>
+    <ID>UnusedParameter:DrawingControls.kt:onDrawToggle: () -&gt; Unit</ID>
+    <ID>UnusedParameter:DrawingControls.kt:onEditToggle: () -&gt; Unit</ID>
+    <ID>UnusedParameter:DrawingControls.kt:onGenerateNamingPanels: (() -&gt; Unit)? = null</ID>
+    <ID>UnusedParameter:DrawingControls.kt:onSetHouseNumbers: (() -&gt; Unit)? = null</ID>
+    <ID>UnusedParameter:DrawingControls.kt:onSettingsClick: () -&gt; Unit</ID>
+    <ID>UnusedParameter:DrawingControls.kt:onUndoClick: (() -&gt; Unit)? = null</ID>
+    <ID>UnusedParameter:NarsFeature.kt:Phases$context: android.content.Context</ID>
+    <ID>WildcardImport:GeometryUtilsTest.kt:import org.junit.Assert.*</ID>
+  </CurrentIssues>
+</SmellBaseline>

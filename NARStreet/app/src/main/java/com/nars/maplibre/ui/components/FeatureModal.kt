@@ -44,6 +44,8 @@ import com.nars.maplibre.data.model.FeatureProperties
 import com.nars.maplibre.data.model.NarsFeature
 import com.nars.maplibre.data.model.PhaseDefinition
 import com.nars.maplibre.ui.theme.GlassBackground
+import com.nars.maplibre.utils.ValidationResult
+import com.nars.maplibre.utils.validateFeatureProperties
 
 @Composable
 fun FeatureValidationModal(
@@ -53,6 +55,7 @@ fun FeatureValidationModal(
     onDismiss: () -> Unit
 ) {
     var props by remember { mutableStateOf(feature.properties) }
+    var validationErrors by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -133,10 +136,26 @@ fun FeatureValidationModal(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
+                validationErrors.entries.forEach { (field, msg) ->
+                    Text(
+                        text = "$field: $msg",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 Button(
                     onClick = {
-                        onSave(feature.copy(properties = props))
-                        onDismiss()
+                        val result = validateFeatureProperties(props, phase)
+                        if (result.valid) {
+                            onSave(feature.copy(properties = props))
+                            onDismiss()
+                        } else {
+                            validationErrors = result.errors
+                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)

@@ -43,8 +43,8 @@ class ApiService(
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
     private val baseUrl: String = BuildConfig.API_BASE_URL.trimEnd('/')
 
-    private var authToken: String? = null
-    private var cookie: String? = null
+    @Volatile private var authToken: String? = null
+    @Volatile private var cookie: String? = null
 
     fun setAuthToken(token: String?) {
         authToken = token
@@ -130,6 +130,13 @@ class ApiService(
         }
         val body = response.bodyAsText()
         val jsonElement = json.parseToJsonElement(body)
+
+        if (!response.status.isSuccess()) {
+            val errorMessage = jsonElement.jsonObject["message"]?.jsonPrimitive?.contentOrNull
+                ?: "Request failed: HTTP ${response.status.value}"
+            throw Exception(errorMessage)
+        }
+
         val userId = jsonElement.jsonObject["id"]?.jsonPrimitive?.contentOrNull ?: ""
         val apiUsername = jsonElement.jsonObject["username"]?.jsonPrimitive?.content ?: ""
         val apiName = jsonElement.jsonObject["name"]?.jsonPrimitive?.content ?: ""

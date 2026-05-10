@@ -3,16 +3,22 @@ kind: Deployment
 metadata:
   name: nars-api
   namespace: nars
+  labels:
+    app.kubernetes.io/name: nars-api
+    app.kubernetes.io/component: api
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: nars-api
+      app.kubernetes.io/name: nars-api
+      app.kubernetes.io/component: api
   template:
     metadata:
       labels:
-        app: nars-api
+        app.kubernetes.io/name: nars-api
+        app.kubernetes.io/component: api
     spec:
+      serviceAccountName: nars-api
       imagePullSecrets:
         - name: regcred
       terminationGracePeriodSeconds: 30

@@ -47,6 +47,15 @@ export function setActiveEditEntry(entry: LayerEntry | null): void {
   activeEditEntry = entry
 }
 
+// ─── STATE RESET (for testing & HMR) ──────────────────────────────────────────
+
+export function resetEditState(): void {
+  isEditMode = false
+  activeGeomanFeatureId = null
+  activeEditEntry = null
+  activeEditCoordsSnapshot = null
+}
+
 // ─── DISABLE EDIT MODE ───────────────────────────────────────────────────
 
 export function disableEditMode(): void {
