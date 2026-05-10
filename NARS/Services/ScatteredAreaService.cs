@@ -59,6 +59,7 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
             await db.Database.OpenConnectionAsync();
             try
             {
+                var areaTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.Area)?.TableName ?? "areas";
                 using var cmd = conn.CreateCommand();
                 cmd.CommandText = $@"
                     WITH
@@ -69,7 +70,7 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
                     ),
                     urban AS (
                         SELECT ST_Union({SqlFragments.PolygonFromData}) AS geom
-                        FROM areas f
+                        FROM {areaTable} f
                         WHERE f.user_id = @uid
                           AND f.layer  IN ('central_urban', 'secondary_urban')
                     )

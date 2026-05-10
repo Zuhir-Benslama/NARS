@@ -9,6 +9,9 @@ spec:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
   storageClassName: manual
+  # ⚠ hostPath is for local dev (kind/minikube) only.
+  # For production, replace with a CSI-backed persistent volume
+  # (e.g. EBS, GCE PD, Azure Disk, Longhorn, Rook/Ceph).
   hostPath:
     path: /mnt/nars/postgres
     type: DirectoryOrCreate

@@ -3,16 +3,22 @@ kind: Deployment
 metadata:
   name: nars-frontend
   namespace: nars
+  labels:
+    app.kubernetes.io/name: nars-frontend
+    app.kubernetes.io/component: frontend
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: nars-frontend
+      app.kubernetes.io/name: nars-frontend
+      app.kubernetes.io/component: frontend
   template:
     metadata:
       labels:
-        app: nars-frontend
+        app.kubernetes.io/name: nars-frontend
+        app.kubernetes.io/component: frontend
     spec:
+      serviceAccountName: nars-frontend
       terminationGracePeriodSeconds: 10
       securityContext:
         runAsNonRoot: true

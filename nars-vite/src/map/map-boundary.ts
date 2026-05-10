@@ -7,6 +7,12 @@ import { escapeHtml } from "../utils/sanitize"
 
 let boundaryEventsRegistered = false
 
+// ─── STATE RESET (for testing & HMR) ──────────────────────────────────────────
+
+export function resetBoundaryEvents(): void {
+  boundaryEventsRegistered = false
+}
+
 export function addBoundaryClickEvents(map: maplibregl.Map): void {
   if (boundaryEventsRegistered) return
   boundaryEventsRegistered = true

@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
+using static NarsApi.Infrastructure.SqlFragments;
 
 namespace NarsApi.Services;
 
@@ -18,15 +19,6 @@ public class JwtService(string secret, string? issuer, string? audience, IConfig
     private readonly int _expiresMinutes = ParseIntConfig(config["Jwt:ExpiresInMinutes"], 1440);
     private readonly string? _issuer = issuer;
     private readonly string? _audience = audience;
-
-    /// <summary>
-    /// Safely parse an integer configuration value, falling back to a default.
-    /// </summary>
-    private static int ParseIntConfig(string? value, int defaultValue)
-    {
-        if (int.TryParse(value, out var result)) return result;
-        return defaultValue;
-    }
 
     public string CreateToken(Guid userId, string username, string name, string email, int? communeId,
         string role = "commune_user", int? dairaId = null, int? wilayaId = null)

@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
+using static NarsApi.Infrastructure.SqlFragments;
 using NarsApi.Models;
 using NarsApi.Services;
 
@@ -34,11 +35,9 @@ public partial class AuthController(
     [HttpPost("signup")]
     [AllowAnonymous]
     public IActionResult SignUp() =>
-        StatusCode(410, new DetailResponse(
-            "Self-registration is disabled. " +
+        StatusCode(410, new { detail = "Self-registration is disabled. " +
             "Contact your daira admin to create a commune user account, " +
-            "or use POST /api/admin/authorized-signup for admin accounts."
-        ));
+            "or use POST /api/admin/authorized-signup for admin accounts." });
 
     // ── POST /api/signin ──────────────────────────────────────
 
@@ -233,11 +232,6 @@ public partial class AuthController(
 
     private int MaxFailedAttempts => ParseIntConfig(config["AccountLockout:MaxFailedAttempts"], 5);
     private int LockoutMinutes => ParseIntConfig(config["AccountLockout:LockoutMinutes"], 30);
-
-    private static int ParseIntConfig(string? value, int defaultValue)
-    {
-        return int.TryParse(value, out var result) ? result : defaultValue;
-    }
 
     private async Task RecordFailedLogin(User user)
     {

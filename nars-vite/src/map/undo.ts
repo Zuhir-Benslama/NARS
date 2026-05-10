@@ -23,6 +23,12 @@ interface DeletedFeature {
 
 const undoStack: DeletedFeature[] = []
 
+// ─── STATE RESET (for testing & HMR) ──────────────────────────────────────────
+
+export function resetUndoStack(): void {
+  undoStack.length = 0
+}
+
 export function hasUndo(): boolean {
   return undoStack.length > 0
 }

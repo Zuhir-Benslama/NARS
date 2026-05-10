@@ -1,13 +1,13 @@
 # ─── Backend (ASP.NET Core API) ───────────────────────────────────────────────
 # Build from workspace root:
 #   docker build -f Docker/Dockerfile.nars-api -t nars-api:latest .
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-bookworm-slim AS base
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-bookworm-slim AS build
 WORKDIR /src
 COPY ["NARS/NarsApi.csproj", "NARS/"]
 RUN dotnet restore "NARS/NarsApi.csproj"

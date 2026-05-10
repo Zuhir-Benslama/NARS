@@ -8,6 +8,7 @@ using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
 
+
 namespace NarsApi.Controllers;
 
 // fix #2 & #9: Extends NarsControllerBase ([Authorize] + CurrentUserId/CurrentCommuneId)
@@ -30,6 +31,11 @@ public class ValidationController(
 
     private int MaxCoordinateCount =>
         int.TryParse(config["Validation:MaxCoordinateCount"], out var v) ? v : 10_000;
+
+    // ── Feature table names (from registry — single source of truth) ─────────
+    private static string RoadTable => FeatureTypeRegistry.GetDescriptor(FeatureTypes.Road)?.TableName ?? "roads";
+    private static string AreaTable => FeatureTypeRegistry.GetDescriptor(FeatureTypes.Area)?.TableName ?? "areas";
+    private static string DistrictTable => FeatureTypeRegistry.GetDescriptor(FeatureTypes.District)?.TableName ?? "districts";
 
     // fix #4: PolygonFromDataSql and LineStringFromDataSql are now imported from
     // SqlFragments (both include ST_MakeValid) instead of being declared locally.
@@ -98,7 +104,7 @@ public class ValidationController(
             cmd.CommandText = $@"
                 SELECT EXISTS (
                     SELECT 1
-                    FROM roads f
+                    FROM {RoadTable} f
                     WHERE f.user_id = @uid
                       AND ST_DWithin(
                             ({SqlFragments.LineStringFromData})::geography,
@@ -106,7 +112,7 @@ public class ValidationController(
                             {RoadConnectivityDistanceMeters}
                           )
                 )";
-            AddParam(cmd, "@uid", CurrentUserId);
+            AddParam(cmd, "@uid", RequiredCurrentUserId);
             AddParam(cmd, "@wkt", wkt);
 
             var result = await cmd.ExecuteScalarAsync();
@@ -198,13 +204,13 @@ public class ValidationController(
                 WITH
                 urban AS (
                     SELECT ST_Union({SqlFragments.PolygonFromData}) AS geom
-                    FROM areas f
+                    FROM {AreaTable} f
                     WHERE f.user_id = @uid
                       AND f.layer  IN ('central_urban', 'secondary_urban')
                 ),
                 districts AS (
                     SELECT ST_Union({SqlFragments.PolygonFromData}) AS geom
-                    FROM districts f
+                    FROM {DistrictTable} f
                     WHERE f.user_id = @uid
                 )
                 SELECT ST_Covers(
@@ -213,7 +219,7 @@ public class ValidationController(
                 )
                 FROM urban, districts
                 WHERE urban.geom IS NOT NULL AND districts.geom IS NOT NULL";
-            AddParam(cmd, "@uid", CurrentUserId);
+            AddParam(cmd, "@uid", RequiredCurrentUserId);
 
             var result = await cmd.ExecuteScalarAsync();
             covered = result is bool b && b;
@@ -250,16 +256,16 @@ public class ValidationController(
     private async Task<bool> CheckOverlapAsync(DbConnection conn, string wkt)
     {
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = $@"
+            cmd.CommandText = $@"
             SELECT EXISTS (
-                SELECT 1 FROM districts f
+                SELECT 1 FROM {DistrictTable} f
                 WHERE f.user_id = @uid
                   AND ST_Intersects(
                         ({SqlFragments.PolygonFromData}),
                         ST_SetSRID(ST_GeomFromText(@wkt), 4326)
                       )
             )";
-        AddParam(cmd, "@uid", CurrentUserId);
+        AddParam(cmd, "@uid", RequiredCurrentUserId);
         AddParam(cmd, "@wkt", wkt);
         var result = await cmd.ExecuteScalarAsync();
         return result is bool b && b;
@@ -268,17 +274,17 @@ public class ValidationController(
     private async Task<long> CountSiblingsInSameAreaAsync(DbConnection conn, string wkt)
     {
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = $@"
-            SELECT COUNT(*) FROM districts d
+            cmd.CommandText = $@"
+            SELECT COUNT(*) FROM {DistrictTable} d
             WHERE d.user_id = @uid
               AND EXISTS (
-                  SELECT 1 FROM areas a
+                  SELECT 1 FROM {AreaTable} a
                   WHERE a.user_id = @uid
                     AND a.layer IN ('central_urban', 'secondary_urban')
                     AND ST_Intersects(({SqlFragments.PolygonFromDataWithAlias("a")}), ST_SetSRID(ST_GeomFromText(@wkt), 4326))
                     AND ST_Intersects(({SqlFragments.PolygonFromDataWithAlias("a")}), ({SqlFragments.PolygonFromDataWithAlias("d")}))
               )";
-        AddParam(cmd, "@uid", CurrentUserId);
+        AddParam(cmd, "@uid", RequiredCurrentUserId);
         AddParam(cmd, "@wkt", wkt);
         return Convert.ToInt64(await cmd.ExecuteScalarAsync());
     }
@@ -286,21 +292,21 @@ public class ValidationController(
     private async Task<bool> CheckAdjacencyAsync(DbConnection conn, string wkt)
     {
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = $@"
+            cmd.CommandText = $@"
             SELECT EXISTS (
-                SELECT 1 FROM districts f
+                SELECT 1 FROM {DistrictTable} f
                 WHERE f.user_id = @uid
                   AND (ST_Touches(ST_SetSRID(ST_GeomFromText(@wkt), 4326), ({SqlFragments.PolygonFromData}))
                        OR ST_Intersects(ST_Boundary(ST_SetSRID(ST_GeomFromText(@wkt), 4326)), ST_Boundary({SqlFragments.PolygonFromData})))
                   AND EXISTS (
-                      SELECT 1 FROM areas a
+                      SELECT 1 FROM {AreaTable} a
                       WHERE a.user_id = @uid
                         AND a.layer IN ('central_urban', 'secondary_urban')
                         AND ST_Intersects(({SqlFragments.PolygonFromDataWithAlias("a")}), ST_SetSRID(ST_GeomFromText(@wkt), 4326))
                         AND ST_Intersects(({SqlFragments.PolygonFromDataWithAlias("a")}), ({SqlFragments.PolygonFromDataWithAlias("f")}))
                   )
             )";
-        AddParam(cmd, "@uid", CurrentUserId);
+        AddParam(cmd, "@uid", RequiredCurrentUserId);
         AddParam(cmd, "@wkt", wkt);
         var result = await cmd.ExecuteScalarAsync();
         return result is bool b && b;

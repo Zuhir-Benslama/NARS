@@ -67,6 +67,15 @@ export function _setCtx(ctx: MapContext): void {
   _ctx = ctx
 }
 
+/**
+ * Reset map state (for testing). Clears the ctx so the next getCtx() call
+ * will throw "accessed before initMap()" — same as initial state.
+ */
+export function resetMapState(): void {
+  _ctx = null
+  for (const key of Object.keys(_ctxTarget) as (keyof MapContext)[]) delete _ctxTarget[key]
+}
+
 // ─── FEATURES STORE ───────────────────────────────────────────────────────────
 // Single source of truth for all drawn features.
 // Keeps the 'nars-features' GeoJSON source in sync via one setData call.

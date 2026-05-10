@@ -17,16 +17,22 @@ kind: Deployment
 metadata:
   name: postgres
   namespace: nars
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: postgres
+      app.kubernetes.io/name: postgres
+      app.kubernetes.io/component: database
   template:
     metadata:
       labels:
-        app: postgres
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/component: database
     spec:
+      serviceAccountName: postgres
       securityContext:
         fsGroup: 999
       containers:
@@ -82,24 +88,40 @@ spec:
             limits:
               cpu: 1
               memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
-          securityContext:
-            allowPrivilegeEscalation: false
+            - name: postgres-run
+              mountPath: /var/run/postgresql
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: postgres-data
           persistentVolumeClaim:
             claimName: postgres-pvc
+        - name: postgres-run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: postgres
   namespace: nars
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
 spec:
   selector:
-    app: postgres
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
   ports:
     - port: 5432
       targetPort: 5432

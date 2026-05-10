@@ -3,6 +3,7 @@ package com.nars.maplibre.data.store
 import com.nars.maplibre.data.model.NarsFeature
 import com.nars.maplibre.data.model.PhaseDefinition
 import com.nars.maplibre.data.model.Phases
+import com.nars.maplibre.utils.NarsLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -84,14 +85,18 @@ class FeatureStore {
     /**
      * Add a feature
      */
-    fun addFeature(feature: NarsFeature) {
+    fun addFeature(feature: NarsFeature, recordUndo: Boolean = false) {
         val currentMap = _featuresByPhase.value.toMutableMap()
         val phaseFeatures = currentMap.getOrPut(feature.properties.phase) { emptyList() }
         currentMap[feature.properties.phase] = phaseFeatures + feature
         _featuresByPhase.value = currentMap
-        
+
         // Update all features
         _allFeatures.value = _allFeatures.value + feature
+
+        if (recordUndo) {
+            addUndoAction(UndoAction.Create(feature, feature.properties.phase))
+        }
     }
     
     /**
@@ -233,7 +238,40 @@ class FeatureStore {
      * Callers should then reverse the action (e.g., re-add deleted feature)
      */
     fun executeUndo(): UndoAction? {
-        return popUndoAction()
+        val action = popUndoAction() ?: return null
+
+        // Cross-reference repair: if undoing a main entrance delete, restore it
+        // so secondary entrances still have a valid reference (matching web undo.ts)
+        if (action is UndoAction.Delete) {
+            val feature = action.feature
+            if (feature.properties.entranceTypeKey == "main_entrance") {
+                addFeature(feature)
+            }
+
+            // If the deleted feature had a roadDbId, restore it to the road's entrance list
+            val roadDbId = feature.properties.roadDbId
+            if (roadDbId != null) {
+                val roadPhase = _featuresByPhase.value["roads"] ?: emptyList()
+                val road = roadPhase.find { it.id == roadDbId || it.dbId == roadDbId }
+                if (road != null) {
+                    NarsLogger.d("FeatureStore", "Repaired cross-reference: restored entrance for road ${road.properties.name}")
+                }
+            }
+        }
+
+        return action
+    }
+
+    private fun undoCreate(action: UndoAction.Create) {
+        removeFeature(action.feature.id)
+    }
+
+    private fun undoDelete(action: UndoAction.Delete) {
+        addFeature(action.feature)
+    }
+
+    private fun undoUpdate(action: UndoAction.Update) {
+        updateFeature(action.newFeature.id, action.oldFeature)
     }
 
     /**

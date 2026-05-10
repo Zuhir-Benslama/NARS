@@ -16,7 +16,7 @@ namespace NarsApi.Infrastructure;
 public sealed class FeatureTypeDescriptor
 {
     public string Type { get; init; } = string.Empty;
-    public Type EntityType { get; init; } = typeof(FeatureBase);
+    public required Type EntityType { get; init; }
 
     /// <summary>
     /// PostgreSQL table name for this feature type.
@@ -72,6 +72,13 @@ public static class FeatureTypeRegistry
     /// Returns all registered feature types.
     /// </summary>
     public static IReadOnlyList<string> GetAllTypes() => _registry.Keys.ToList();
+
+    /// <summary>
+    /// Returns all registered feature type descriptors.
+    /// Used to build dynamic UNION ALL SQL queries that stay in sync with the registry.
+    /// </summary>
+    public static IReadOnlyList<FeatureTypeDescriptor> GetAllDescriptors() =>
+        _registry.Values.ToList();
 
     /// <summary>
     /// Returns the table names for all registered feature types.

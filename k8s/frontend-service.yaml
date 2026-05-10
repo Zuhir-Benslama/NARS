@@ -5,10 +5,12 @@ metadata:
   namespace: nars
   labels:
     app.kubernetes.io/name: nars-frontend
+    app.kubernetes.io/component: frontend
 spec:
   type: ClusterIP
   selector:
-    app: nars-frontend
+    app.kubernetes.io/name: nars-frontend
+    app.kubernetes.io/component: frontend
   ports:
     - port: 80
       targetPort: 80

@@ -1,12 +1,8 @@
 package com.nars.maplibre.modes
 
 import android.graphics.Color
-import com.nars.maplibre.data.model.CircleGeometry
-import com.nars.maplibre.data.model.NarsFeature
-import com.nars.maplibre.data.model.Phases
-import com.nars.maplibre.data.model.PointGeometry
-import com.nars.maplibre.data.model.LineStringGeometry
-import com.nars.maplibre.data.model.PolygonGeometry
+import com.geoman.maplibre.geoman.types.geojson.Feature
+import com.nars.maplibre.data.api.escapeJson
 import com.nars.maplibre.utils.NarsLogger
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.style.layers.FillLayer
@@ -148,14 +144,15 @@ class FeatureRenderer(
     private fun buildGeoJsonString(feature: com.geoman.maplibre.geoman.types.geojson.Feature): String {
         val geometry = feature.geometry
         val props = feature.properties
-        return """{"type":"Feature","id":"${feature.id}","geometry":${GeometryConverter().geometryToJson(geometry)},"properties":${propertiesToJson(props)}}"""
+        val escapedId = escapeJson(feature.id ?: "")
+        return """{"type":"Feature","id":"$escapedId","geometry":${GeometryConverter().geometryToJson(geometry)},"properties":${propertiesToJson(props)}}"""
     }
 
     private fun propertiesToJson(properties: Map<String, Any?>): String {
         val props = properties.toMutableMap()
         if (props.containsKey("name") && !props.containsKey("label")) props["label"] = props["name"]
         return props.entries.joinToString(",", "{", "}") { (key, value) ->
-            """ "$key": "${value ?: ""}" """.trim()
+            """ "${escapeJson(key)}": "${escapeJson(value?.toString() ?: "")}" """.trim()
         }
     }
 

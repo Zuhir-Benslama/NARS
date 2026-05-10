@@ -1,5 +1,3 @@
-@file:Suppress("DEPRECATION")
-
 package com.nars.maplibre.modes
 
 import android.content.Context
@@ -29,6 +27,7 @@ import org.maplibre.android.maps.MapView
 /**
  * NARS wrapper for Geoman — thin orchestrator that delegates to dedicated modules.
  */
+@Suppress("DEPRECATION")
 class NarsGeoman(
     private val mapView: MapView,
     private val map: MapLibreMap,

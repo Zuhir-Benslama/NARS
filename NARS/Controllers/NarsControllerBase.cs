@@ -15,11 +15,22 @@ namespace NarsApi.Controllers;
 [Authorize]
 public abstract class NarsControllerBase : ControllerBase
 {
-    /// <summary>The authenticated user's database ID (UUID v7).</summary>
-    protected Guid CurrentUserId =>
+    /// <summary>
+    /// The authenticated user's database ID (UUID v7), or null if the claim is absent.
+    /// Returns null rather than throwing, matching the pattern of CommuneId/DairaId.
+    /// Use <see cref="RequiredCurrentUserId"/> if a non-null value is guaranteed.
+    /// </summary>
+    protected Guid? CurrentUserId =>
         Guid.TryParse(User.FindFirstValue("user_id"), out Guid id)
             ? id
-            : throw new InvalidOperationException("user_id claim missing or invalid in authenticated token.");
+            : null;
+
+    /// <summary>
+    /// The authenticated user's database ID, guaranteed non-null.
+    /// Throws if the claim is absent — use only in endpoints protected by [Authorize].
+    /// </summary>
+    protected Guid RequiredCurrentUserId =>
+        CurrentUserId ?? throw new InvalidOperationException("user_id claim missing — endpoint requires authentication.");
 
     /// <summary>The authenticated user's username.</summary>
     protected string CurrentUsername =>

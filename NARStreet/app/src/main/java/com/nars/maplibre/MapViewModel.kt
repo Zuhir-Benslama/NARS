@@ -135,8 +135,12 @@ class MapViewModel(
         }
         when (action) {
             is UndoAction.Delete -> {
-                featureStore.addFeature(action.feature)
+                // FeatureStore.executeUndo already re-added main entrances (cross-reference repair)
                 showSuccess("Restored: ${action.feature.properties.name}")
+            }
+            is UndoAction.Create -> {
+                featureStore.removeFeature(action.feature.id)
+                showSuccess("Removed: ${action.feature.properties.name}")
             }
             is UndoAction.Update -> {
                 featureStore.updateFeature(action.oldFeature.id, action.oldFeature)
@@ -146,15 +150,18 @@ class MapViewModel(
         return true
     }
 
-    fun addFeature(feature: NarsFeature) = featureStore.addFeature(feature)
+    fun addFeature(feature: NarsFeature) = featureStore.addFeature(feature, recordUndo = true)
 
     fun updateFeature(feature: NarsFeature) {
-        featureStore.addUndoAction(UndoAction.Update(
-            oldFeature = featureStore.getFeatureById(feature.id) ?: feature,
-            newFeature = feature,
-            phaseKey = feature.properties.phase
-        ))
+        val oldFeature = featureStore.getFeatureById(feature.id)
         featureStore.updateFeature(feature.id, feature)
+        oldFeature?.let {
+            featureStore.addUndoAction(UndoAction.Update(
+                oldFeature = it,
+                newFeature = feature,
+                phaseKey = feature.properties.phase
+            ))
+        }
     }
 
     fun deleteFeature(featureId: String) {

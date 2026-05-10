@@ -1,5 +1,5 @@
 import { apiFetch } from "../api"
-import { NarsError } from "./errors"
+import { NarsError, logError } from "./errors"
 import { VALIDATION_CONFIG } from "../config"
 import { debugError } from "../utils/debug"
 import type {
@@ -45,13 +45,16 @@ export async function validateRoad(coordinates: LatLng[]): Promise<ValidateRoadR
       body: JSON.stringify({ coordinates }),
     }).then((r) => r.json())) as Promise<ValidateRoadResponse>
   } catch (err) {
-    const message =
-      err instanceof NarsError
-        ? err.message
-        : err instanceof TypeError
-          ? "Cannot reach validation service."
-          : "Road validation encountered an unexpected error."
-    return { valid: false, error: message }
+    if (err instanceof NarsError) {
+      logError(err, { action: "validateRoad" })
+      return { valid: false, error: err.message }
+    }
+    if (err instanceof TypeError) {
+      debugError("[VALIDATION] validateRoad network error:", err)
+      return { valid: false, error: "Cannot reach validation service." }
+    }
+    debugError("[VALIDATION] validateRoad unexpected error:", err)
+    return { valid: false, error: "Road validation encountered an unexpected error." }
   }
 }
 
@@ -76,8 +79,12 @@ export async function validateDistrict(
       body: JSON.stringify({ coordinates: coords, districtTypeKey }),
     }).then((r) => r.json())) as Promise<ValidateDistrictResponse>
   } catch (err) {
-    const message = err instanceof NarsError ? err.message : "Cannot reach validation service."
-    return { valid: false, error: message }
+    if (err instanceof NarsError) {
+      logError(err, { action: "validateDistrict" })
+      return { valid: false, error: err.message }
+    }
+    debugError("[VALIDATION] validateDistrict network error:", err)
+    return { valid: false, error: "Cannot reach validation service." }
   }
 }
 
@@ -88,8 +95,12 @@ export async function checkDistrictCoverage(): Promise<DistrictCoverageResponse>
       r.json(),
     )) as Promise<DistrictCoverageResponse>
   } catch (err) {
-    const message = err instanceof NarsError ? err.message : "Cannot reach validation service."
-    return { covered: false, message }
+    if (err instanceof NarsError) {
+      logError(err, { action: "checkDistrictCoverage" })
+      return { covered: false, message: err.message }
+    }
+    debugError("[VALIDATION] checkDistrictCoverage network error:", err)
+    return { covered: false, message: "Cannot reach validation service." }
   }
 }
 

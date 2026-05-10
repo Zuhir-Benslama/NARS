@@ -37,11 +37,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,9 +62,9 @@ fun SettingsScreen(
     onLogout: () -> Unit
 ) {
     val viewModel: SettingsViewModel = koinViewModel()
-    var snapDistance by remember { mutableFloatStateOf(20f) }
-    var showGrid by remember { mutableStateOf(false) }
-    var showLabels by remember { mutableStateOf(true) }
+    val snapDistance by viewModel.snapDistance.collectAsState()
+    val showGrid by viewModel.showGrid.collectAsState()
+    val showLabels by viewModel.showLabels.collectAsState()
 
     Scaffold(
         topBar = {
@@ -159,7 +156,7 @@ fun SettingsScreen(
 
                         Slider(
                             value = snapDistance,
-                            onValueChange = { snapDistance = it },
+                            onValueChange = { viewModel.setSnapDistance(it) },
                             valueRange = 5f..50f,
                             steps = 9
                         )
@@ -170,7 +167,7 @@ fun SettingsScreen(
                         title = "Show Grid",
                         subtitle = "Display coordinate grid on map",
                         selected = showGrid,
-                        onClick = { showGrid = !showGrid }
+                        onClick = { viewModel.setShowGrid(!showGrid) }
                     )
 
                     SettingsItem(
@@ -178,7 +175,7 @@ fun SettingsScreen(
                         title = "Show Labels",
                         subtitle = "Display feature labels on map",
                         selected = showLabels,
-                        onClick = { showLabels = !showLabels }
+                        onClick = { viewModel.setShowLabels(!showLabels) }
                     )
                 }
 
@@ -337,7 +334,7 @@ private fun SettingsItem(
 
         if (selected) {
             Icon(
-                imageVector = Icons.Default.Info,
+                imageVector =                 Icons.AutoMirrored.Filled.Label,
                 contentDescription = "Selected",
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp)

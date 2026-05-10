@@ -11,12 +11,12 @@ namespace NarsApi.Infrastructure;
 internal static class SqlFragments
 {
     /// <summary>
-    /// Reconstructs a valid PostGIS POLYGON from a feature's stored JSONB data.
+    /// Template for reconstructing a valid PostGIS POLYGON from a feature's
+    /// stored JSONB data. Use {0} as the table alias placeholder.
     /// Coordinates are stored as [{lat, lng}] and converted to GeoJSON [lng, lat] order.
     /// ST_MakeValid ensures legacy or edge-case geometries are handled gracefully.
-    /// Alias the features table as "f" in the outer query.
     /// </summary>
-    internal const string PolygonFromData = @"
+    internal const string PolygonFromDataTemplate = @"
         ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(
             json_build_object(
                 'type', 'Polygon',
@@ -24,18 +24,18 @@ internal static class SqlFragments
                     SELECT json_agg(json_build_array(
                         (c->>'lng')::float, (c->>'lat')::float
                     ) ORDER BY ord)
-                    FROM jsonb_array_elements(f.data::jsonb->'coordinates')
+                    FROM jsonb_array_elements({0}.data::jsonb->'coordinates')
                     WITH ORDINALITY AS t(c, ord)
                 ))
             )::text
         ), 4326))";
 
     /// <summary>
-    /// Reconstructs a valid PostGIS LINESTRING from a feature's stored JSONB data.
-    /// Alias the features table as "f" in the outer query.
-    /// ST_MakeValid guards against degenerate linestrings (e.g. repeated identical points).
+    /// Template for reconstructing a valid PostGIS LINESTRING from a feature's
+    /// stored JSONB data. Use {0} as the table alias placeholder.
+    /// ST_MakeValid guards against degenerate linestrings.
     /// </summary>
-    internal const string LineStringFromData = @"
+    internal const string LineStringFromDataTemplate = @"
         ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(
             json_build_object(
                 'type', 'LineString',
@@ -43,7 +43,7 @@ internal static class SqlFragments
                     SELECT json_agg(json_build_array(
                         (c->>'lng')::float, (c->>'lat')::float
                     ) ORDER BY ord)
-                    FROM jsonb_array_elements(f.data::jsonb->'coordinates')
+                    FROM jsonb_array_elements({0}.data::jsonb->'coordinates')
                     WITH ORDINALITY AS t(c, ord)
                 )
             )::text
@@ -62,10 +62,37 @@ internal static class SqlFragments
     }
 
     /// <summary>
-    /// Returns PolygonFromData with the table alias replaced from "f." to the
-    /// specified alias. Uses word-boundary matching to avoid accidental replacements
-    /// inside string literals or column names.
+    /// Safely parse an integer configuration value, falling back to a default.
+    /// Shared by JwtService and AuthController to avoid duplication.
+    /// </summary>
+    internal static int ParseIntConfig(string? value, int defaultValue)
+    {
+        return int.TryParse(value, out var result) ? result : defaultValue;
+    }
+
+    /// <summary>
+    /// Returns the polygon SQL fragment with the given table alias substituted.
+    /// Uses format-string templating instead of string.Replace to guarantee
+    /// no accidental matches inside JSON string values or column names.
     /// </summary>
     internal static string PolygonFromDataWithAlias(string alias) =>
-        PolygonFromData.Replace("f.data", $"{alias}.data").Replace("f.user_id", $"{alias}.user_id");
+        string.Format(PolygonFromDataTemplate, alias);
+
+    /// <summary>
+    /// Returns the linestring SQL fragment with the given table alias substituted.
+    /// </summary>
+    internal static string LineStringFromDataWithAlias(string alias) =>
+        string.Format(LineStringFromDataTemplate, alias);
+
+    /// <summary>
+    /// Default alias ("f") variant for backward compatibility.
+    /// New code should call PolygonFromDataWithAlias explicitly.
+    /// </summary>
+    internal static string PolygonFromData => string.Format(PolygonFromDataTemplate, "f");
+
+    /// <summary>
+    /// Default alias ("f") variant for backward compatibility.
+    /// New code should call LineStringFromDataWithAlias explicitly.
+    /// </summary>
+    internal static string LineStringFromData => string.Format(LineStringFromDataTemplate, "f");
 }
