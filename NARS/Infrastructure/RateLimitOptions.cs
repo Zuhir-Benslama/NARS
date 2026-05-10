@@ -22,6 +22,10 @@ public class RateLimitOptions
     public int ApiPermitLimit { get; set; } = 60;
     public int ApiWindowMinutes { get; set; } = 1;
     public int ApiSegmentsPerWindow { get; set; } = 6;
+
+    // Client-side log submission limits
+    public int LogsPermitLimit { get; set; } = 30;
+    public int LogsWindowMinutes { get; set; } = 1;
 }
 
 /// <summary>
@@ -67,6 +71,12 @@ public static class RateLimitExtensions
                 limiter.SegmentsPerWindow = options.ApiSegmentsPerWindow;
                 limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
                 limiter.QueueLimit = 0;
+            });
+
+            rateOptions.AddFixedWindowLimiter("logs", limiter =>
+            {
+                limiter.PermitLimit = options.LogsPermitLimit;
+                limiter.Window = TimeSpan.FromMinutes(options.LogsWindowMinutes);
             });
         });
 

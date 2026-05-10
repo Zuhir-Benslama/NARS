@@ -11,15 +11,26 @@ DOCKER_DIR         ?= Docker
 DOCKER_ORG         ?= zuhirbenslama
 DOCKER_USERNAME    ?= zuhirbenslama
 DOCKER_TOKEN       ?=
-POSTGRES_PASSWORD  ?= $(shell openssl rand -base64 32)
-JWT_SECRET         ?= $(shell openssl rand -base64 32)
 BACKUP_DIR         ?= $(POSTGRES_DATA_DIR)/backups
 DB_NAME            ?= nars_db
 POSTGRES_DATA_DIR  ?= data/nars/postgres
 REGISTRY_IMAGES    := nars-api nars-postgres nars-vite
 SCALABLE_DEPLOYS   := postgres nars-api nars-frontend
 
+# ─── Secrets ──────────────────────────────────────────────────
+# Auto-generate .env with stable secrets if missing.
+# Make auto-remakes missing included files and re-execs, so
+# all targets see consistent POSTGRES_PASSWORD / JWT_SECRET.
+.env:
+	@echo "# Auto-generated — DO NOT COMMIT" > $@
+	@echo "POSTGRES_PASSWORD=$$(openssl rand -base64 32)" >> $@
+	@echo "JWT_SECRET=$$(openssl rand -base64 32)" >> $@
+	@echo "→ Created $@ with fresh secrets"
+
 -include .env
+
+POSTGRES_PASSWORD  ?= $(shell openssl rand -base64 32)
+JWT_SECRET         ?= $(shell openssl rand -base64 32)
 export
 
 .PHONY: help
@@ -229,7 +240,7 @@ cluster-create: ## Create the kind cluster with host-mounted postgres data (idem
 	else
 		echo "→ Creating postgres data directory at $(POSTGRES_DATA_DIR)..."
 		mkdir -p "$(POSTGRES_DATA_DIR)"
-		chmod 777 "$(POSTGRES_DATA_DIR)"
+		chmod 777 "$(POSTGRES_DATA_DIR)" 2>/dev/null || true
 		echo "→ Generating kind config..."
 		DATA_DIR="$(POSTGRES_DATA_DIR)"
 		if echo "$$DATA_DIR" | grep -qv '^/'; then
@@ -315,7 +326,7 @@ ca-secret: ca-generate ## Create mTLS CA secret from k8s/certs/ca.crt (idempoten
 	fi
 
 .PHONY: secrets-apply
-secrets-apply: ## Create nars-secrets and regcred with generated/variable values
+secrets-apply: .env ## Create nars-secrets and regcred with generated/variable values
 	@echo "→ Creating 'nars-secrets'..."
 	@kubectl create secret generic nars-secrets -n "$(NAMESPACE)" \
 		--from-literal=postgres_password="$(POSTGRES_PASSWORD)" \

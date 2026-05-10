@@ -18,6 +18,9 @@ public class AppDbContext : DbContext
     public DbSet<PublicSpace> PublicSpaces { get; set; }
     public DbSet<NamingPanel> NamingPanels { get; set; }
 
+    // ── Logs ──────────────────────────────────────────────────────────────────
+    public DbSet<ErrorLog> ErrorLogs { get; set; }
+
     // ── Reference tables ──────────────────────────────────────────────────────
     public DbSet<User> Users { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }

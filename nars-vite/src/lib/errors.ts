@@ -2,6 +2,7 @@
 // Centralized error handling with error codes, retry logic, and contextual logging.
 
 import { isDev } from "../config"
+import { captureError } from "./logger"
 
 // ─── ERROR CATEGORIES ─────────────────────────────────────────────────────────
 
@@ -260,9 +261,8 @@ export function logError(error: NarsError, additionalContext?: ErrorContext): vo
     console.error("Stack:", error.stack)
     console.groupEnd()
   } else {
-    // Production: send to remote logging service if configured
-    // Example: Sentry, LogRocket, etc.
-    // TODO: Integrate with your preferred logging service
+    // Production: send to backend logging endpoint
+    captureError(error, additionalContext)
     console.error(`[NarsError] ${error.code}: ${error.message}`)
   }
   /* eslint-enable no-console */

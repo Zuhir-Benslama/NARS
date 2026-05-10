@@ -61,12 +61,12 @@
 
 ## nars-vite (Web frontend)
 
-- [ ] Integrate logging service (`src/lib/errors.ts:265`)
+- [x] Integrate logging service (`src/lib/errors.ts:265`)
 
 ---
 
 ## Infrastructure
 
-- [ ] Push Docker images to registry (`make images-push`)
-- [ ] Deploy to k8s cluster (`make cluster-up`)
-- [ ] CI/CD pipeline
+- [x] Push Docker images to registry (`make images-push`)
+- [x] Deploy to k8s cluster (`make cluster-up`)
+- [x] CI/CD pipeline

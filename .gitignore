@@ -20,6 +20,11 @@ nars-vite/yarn-debug.log*
 nars-vite/yarn-error.log*
 nars-vite/.vscode/
 
+# === Secrets ===
+.env
+.env.*
+!.env.example
+
 # === Data ===
 data/
 
