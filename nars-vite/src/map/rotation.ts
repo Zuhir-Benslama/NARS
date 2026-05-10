@@ -7,6 +7,12 @@ import { t } from "../i18n"
 let currentBearing = 0
 const STEP = 5
 
+// ─── STATE RESET (for testing & HMR) ──────────────────────────────────────────
+
+export function resetRotation(): void {
+  currentBearing = 0
+}
+
 export function setBearing(deg: number): void {
   currentBearing = ((deg % 360) + 360) % 360
   ctx.map.easeTo({ bearing: currentBearing, duration: 300 })

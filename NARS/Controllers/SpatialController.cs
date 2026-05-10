@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
 using NarsApi.DTOs;
+using NarsApi.Infrastructure;
 using NarsApi.Models;
 using NarsApi.Services;
 
@@ -76,15 +77,16 @@ public class SpatialController(AppDbContext db, IScatteredAreaService scatteredS
             await conn.OpenAsync();
         try
         {
+            var heTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.HouseEntrance)?.TableName ?? "house_entrances";
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
+            cmd.CommandText = $@"
                 SELECT (data::jsonb->>'entranceNumber')::int
-                FROM house_entrances
+                FROM {heTable}
                 WHERE user_id = @uid
                   AND layer   = 'main_entrance'
                   AND road_id = @rid
                   AND data::jsonb->>'entranceNumber' IS NOT NULL";
-            AddParam(cmd, "@uid", CurrentUserId);
+            AddParam(cmd, "@uid", RequiredCurrentUserId);
             AddParam(cmd, "@rid", body.RoadId);
 
             using var reader = await cmd.ExecuteReaderAsync();
@@ -110,7 +112,7 @@ public class SpatialController(AppDbContext db, IScatteredAreaService scatteredS
     [HttpPost("areas/refresh-scattered")]
     public async Task<IActionResult> RefreshScattered()
     {
-        await scatteredService.RefreshAsync(CurrentUserId, RequiredCommuneId);
+        await scatteredService.RefreshAsync(RequiredCurrentUserId, RequiredCommuneId);
         return Ok(new ScatteredRefreshResponse(true, null, "Scattered area recomputed."));
     }
 }

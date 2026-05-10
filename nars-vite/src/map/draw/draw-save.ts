@@ -21,6 +21,30 @@ import { openModalForFeature } from "./draw-modal"
 import { getDrawingPhase, setSavingFeature, repatchMarker } from "./draw-state"
 import { areaStyle } from "../rendering/styles"
 
+// ─── DELAY HELPER ─────────────────────────────────────────────────────────────
+// Promise-based delay so async functions can await timing dependencies
+// instead of using fragile magic-number setTimeout callbacks.
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+// ─── GEOMAN CLEANUP HELPER ─────────────────────────────────────────────────────
+// Geoman's feature data type is poorly typed — accessing .delete() requires
+// an unchecked cast. Extracting it here avoids repeating the cast pattern.
+
+interface GeomanFeature {
+  delete?: () => void
+}
+
+function deleteGeomanFeature(feature: Record<string, unknown>): void {
+  try {
+    ;(feature as unknown as GeomanFeature).delete?.()
+  } catch (err) {
+    debugError("[GEOMAN] delete:", err)
+  }
+}
+
 // ─── GEOMETRY NORMALIZATION ───────────────────────────────────────────────────
 
 export function normalizeGeometry(
@@ -100,12 +124,7 @@ async function checkExistingCityCenter(
   if ((state.cityCenter?.length ?? 0) === 0) return true
 
   showToast("A city center already exists. Delete it first to create a new one.", "error")
-  try {
-    const deleteFn = (geomanFeatureData as unknown as { delete?: () => void })?.delete
-    deleteFn?.()
-  } catch (err) {
-    debugError("[DRAW-SAVE] delete:", err)
-  }
+  deleteGeomanFeature(geomanFeatureData)
   return false
 }
 
@@ -171,20 +190,15 @@ async function saveAndUpdateStore(
     if (drawingPhase.key === "roads") updateEndpointMarkers()
     showToast("Feature saved.", "success")
 
-    setTimeout(() => {
-      try {
-        const deleteFn = (geomanFeatureData as unknown as { delete?: () => void })?.delete
-        deleteFn?.()
-      } catch (err) {
-        debugError("[DRAW-SAVE] deferred delete:", err)
-      }
-    }, 100)
+    await delay(100)
+    deleteGeomanFeature(geomanFeatureData)
   } catch (err) {
     debugError("[COMPLETE] Save error:", err)
     showToast("Save failed: " + (err as Error).message, "error")
   } finally {
     setSavingFeature(false)
-    setTimeout(() => resetDrawMode(), 200)
+    await delay(200)
+    await resetDrawMode()
   }
 }
 
@@ -213,12 +227,7 @@ export async function completeDrawingWithGeometry(
 
   const modalResult = await openModalForFeature(drawingPhase, featureId, geometry)
   if (!modalResult) {
-    try {
-      const deleteFn = (geomanFeatureData as unknown as { delete?: () => void })?.delete
-      deleteFn?.()
-    } catch (err) {
-      debugError("[DRAW-SAVE] modal delete:", err)
-    }
+    deleteGeomanFeature(geomanFeatureData)
     buildDrawControl({
       key: drawingPhase.key,
       drawType: drawingPhase.drawType,
@@ -245,14 +254,7 @@ function validateGeometry(
   phase: (typeof PHASES)[number],
   geomanFeatureData: Record<string, unknown>,
 ): boolean {
-  const cleanup = () => {
-    try {
-      const deleteFn = (geomanFeatureData as unknown as { delete?: () => void })?.delete
-      deleteFn?.()
-    } catch (err) {
-      debugError("[VALIDATE] cleanup:", err)
-    }
-  }
+  const cleanup = () => deleteGeomanFeature(geomanFeatureData)
 
   if (geometry.type === "LineString" && geometry.coordinates.length < 2) {
     showToast("Road must have at least 2 points.", "error")

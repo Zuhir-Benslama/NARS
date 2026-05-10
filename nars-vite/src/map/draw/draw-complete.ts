@@ -4,6 +4,28 @@
 
 import { ctx } from "../core/state"
 
+// ─── GEOMAN INTERNAL TYPES ─────────────────────────────────────────────────────
+// Geoman's public API types are incomplete — these internal shapes document
+// the properties we access at runtime. Defined here to avoid `as unknown as`
+// casts throughout removeLastVertex.
+
+interface GeomanInternalActionInstance {
+  lineDrawer?: {
+    featureData?: Record<string, unknown>
+    shapeLngLats?: [number, number][]
+    getFeatureGeoJson?: Function
+    snappingHelper?: Record<string, unknown>
+    snappingKey?: unknown
+    setSnapping?: Function
+    gm?: Record<string, unknown>
+  }
+}
+
+interface GeomanInternal {
+  actionInstances?: Record<string, GeomanInternalActionInstance | undefined>
+  disableDraw?: Function
+}
+
 // ─── RE-EXPORTS ───────────────────────────────────────────────────────────────
 
 export {
@@ -23,26 +45,33 @@ export { normalizeGeometry, completeDrawingWithGeometry, getFeatureStyle } from 
 
 // ─── REMOVE LAST VERTEX ───────────────────────────────────────────────────────
 
-export async function removeLastVertex(): Promise<void> {
-  const gm = ctx.geoman as unknown as Record<string, unknown> | null
-  if (!gm) return
+function geomanActionInstance(name: string): GeomanInternalActionInstance | undefined {
+  return (ctx.geoman as unknown as GeomanInternal | null)?.actionInstances?.[name]
+}
 
-  const polygonInst = (gm.actionInstances as Record<string, unknown> | undefined)?.["draw__polygon"]
-  const lineInst = (gm.actionInstances as Record<string, unknown> | undefined)?.["draw__line"]
-  const drawInstance = (polygonInst ?? lineInst) as Record<string, unknown> | undefined
-  const lineDrawer = drawInstance?.lineDrawer as Record<string, unknown> | undefined
+export async function removeLastVertex(): Promise<void> {
+  const polygonInst = geomanActionInstance("draw__polygon")
+  const lineInst = geomanActionInstance("draw__line")
+  const drawInstance = polygonInst ?? lineInst
+  const lineDrawer = drawInstance?.lineDrawer
   if (!lineDrawer?.featureData) return
 
-  const coords: [number, number][] = lineDrawer.shapeLngLats as [number, number][]
+  const coords: [number, number][] = lineDrawer.shapeLngLats ?? []
   if (coords.length <= 1) {
-    void (gm.disableDraw as Function)()
+    const gm = ctx.geoman as unknown as GeomanInternal | null
+    try {
+      await (gm?.disableDraw as Function | undefined)?.()
+    } catch {
+      /* ignore */
+    }
     return
   }
   coords.pop()
 
   const isPolygon = !!polygonInst
-  const markers = lineDrawer.featureData as Record<string, unknown> | undefined
-  const markersMap = markers?.markers as Map<string, Record<string, unknown>> | undefined
+  const markersMap = lineDrawer.featureData?.markers as
+    | Map<string, Record<string, unknown>>
+    | undefined
   if (markersMap) {
     const entries = Array.from(markersMap.entries())
     if (entries.length > 0) {
@@ -54,10 +83,10 @@ export async function removeLastVertex(): Promise<void> {
     }
   }
 
-  const controlMarker = (lineDrawer?.gm as Record<string, unknown> | undefined)?.markerPointer as
+  const markerPointer = (lineDrawer?.gm as Record<string, unknown> | undefined)?.markerPointer as
     | Record<string, unknown>
     | undefined
-  const markerControl = controlMarker?.marker as maplibregl.Marker | undefined
+  const markerControl = markerPointer?.marker as maplibregl.Marker | undefined
 
   if (isPolygon) {
     const ring: [number, number][] = [...coords]

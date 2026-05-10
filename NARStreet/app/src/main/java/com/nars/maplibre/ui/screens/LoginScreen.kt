@@ -65,6 +65,26 @@ fun LoginScreen(
         }
     }
 
+    fun performLogin() {
+        if (!isLoading && username.isNotBlank() && password.isNotBlank()) {
+            scope.launch {
+                isLoading = true
+                errorMessage = null
+                try {
+                    val result = sessionManager.login(username, password)
+                    result.onSuccess { onLoginSuccess() }
+                    result.onFailure { error ->
+                        errorMessage = "Login failed: ${error.message}"
+                    }
+                } catch (e: Exception) {
+                    errorMessage = "Error: ${e.message}"
+                } finally {
+                    isLoading = false
+                }
+            }
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -186,25 +206,7 @@ fun LoginScreen(
                     imeAction = ImeAction.Done
                 ),
                 keyboardActions = KeyboardActions(
-                    onDone = {
-                        if (!isLoading && username.isNotBlank() && password.isNotBlank()) {
-                            scope.launch {
-                                isLoading = true
-                                errorMessage = null
-                                try {
-                                    val result = sessionManager.login(username, password)
-                                    result.onSuccess { onLoginSuccess() }
-                                    result.onFailure { error ->
-                                        errorMessage = "Login failed: ${error.message}"
-                                    }
-                                } catch (e: Exception) {
-                                    errorMessage = "Error: ${e.message}"
-                                } finally {
-                                    isLoading = false
-                                }
-                            }
-                        }
-                    }
+                    onDone = { performLogin() }
                 ),
                 singleLine = true
             )
@@ -222,25 +224,7 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
-                onClick = {
-                    if (!isLoading && username.isNotBlank() && password.isNotBlank()) {
-                        scope.launch {
-                            isLoading = true
-                            errorMessage = null
-                            try {
-                                val result = sessionManager.login(username, password)
-                                result.onSuccess { onLoginSuccess() }
-                                result.onFailure { error ->
-                                    errorMessage = "Login failed: ${error.message}"
-                                }
-                            } catch (e: Exception) {
-                                errorMessage = "Error: ${e.message}"
-                            } finally {
-                                isLoading = false
-                            }
-                        }
-                    }
-                },
+                onClick = { performLogin() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),

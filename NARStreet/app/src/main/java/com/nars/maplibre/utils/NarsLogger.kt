@@ -16,9 +16,9 @@ object NarsLogger {
 
     /**
      * Enable/disable logging
-     * In production, this should be false
+     * In production, automatically disabled
      */
-    var isEnabled: Boolean = true  // Simplified - no BuildConfig dependency
+    var isEnabled: Boolean = try { com.nars.maplibre.BuildConfig.DEBUG } catch (_: Exception) { true }
 
     /**
      * Verbose logging - most detailed, disabled in production

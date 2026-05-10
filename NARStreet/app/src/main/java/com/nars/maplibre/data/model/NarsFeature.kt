@@ -225,23 +225,20 @@ object Phases {
 
     /** Get display label for phase (with i18n support) */
     fun getDisplayLabel(phase: PhaseDefinition, context: android.content.Context): String {
-        // TODO: Implement i18n lookup
-        // For now, return the key - implement proper string resource lookup
-        return when (phase.label) {
-            "phase_roads_label" -> "Roads"
-            "phase_houseEntrances_label" -> "House Entrances"
-            "phase_namingPanels_label" -> "Naming Panels"
+        return when (phase.key) {
+            ROADS_KEY -> context.getString(com.nars.maplibre.R.string.phase_roads)
+            HOUSE_ENTRANCES_KEY -> context.getString(com.nars.maplibre.R.string.phase_house_entrances)
+            NAMING_PANELS_KEY -> context.getString(com.nars.maplibre.R.string.phase_naming_panels)
             else -> phase.label
         }
     }
 
     /** Get hint for phase (with i18n support) */
     fun getHint(phase: PhaseDefinition, context: android.content.Context): String {
-        // TODO: Implement i18n lookup
-        return when (phase.hint) {
-            "phase_roads_hint" -> "Update road attributes (traffic, lanes, etc.)"
-            "phase_houseEntrances_hint" -> "Verify entrances and numbering panels"
-            "phase_namingPanels_hint" -> "Verify naming panel locations"
+        return when (phase.key) {
+            ROADS_KEY -> context.getString(com.nars.maplibre.R.string.phase_roads_hint)
+            HOUSE_ENTRANCES_KEY -> context.getString(com.nars.maplibre.R.string.phase_house_entrances_hint)
+            NAMING_PANELS_KEY -> context.getString(com.nars.maplibre.R.string.phase_naming_panels_hint)
             else -> ""
         }
     }

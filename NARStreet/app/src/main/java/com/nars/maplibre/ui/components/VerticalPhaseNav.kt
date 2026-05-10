@@ -1,6 +1,7 @@
 package com.nars.maplibre.ui.components
 
 import android.widget.Toast
+import com.nars.maplibre.utils.NarsLogger
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -138,12 +139,12 @@ private fun PhaseBadge(
             .pointerInput(isLocked, phase.key) {
                 detectTapGestures(
                     onTap = {
-                        android.util.Log.d("PhaseBadge", "Tapped phase: ${phase.label}, isLocked=$isLocked")
+                        NarsLogger.d("PhaseBadge", "Tapped phase: ${phase.label}, isLocked=$isLocked")
                         if (!isLocked) {
-                            android.util.Log.d("PhaseBadge", "Calling onClick for ${phase.label}")
+                            NarsLogger.d("PhaseBadge", "Calling onClick for ${phase.label}")
                             onClick()
                         } else {
-                            android.util.Log.d("PhaseBadge", "Phase ${phase.label} is LOCKED - ignoring click")
+                            NarsLogger.d("PhaseBadge", "Phase ${phase.label} is LOCKED - ignoring click")
                             Toast.makeText(context, "Complete current phase first", Toast.LENGTH_SHORT).show()
                         }
                     }

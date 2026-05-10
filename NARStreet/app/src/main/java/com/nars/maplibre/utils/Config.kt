@@ -56,6 +56,19 @@ object Config {
     /** Minimum road length in meters */
     const val MIN_ROAD_LENGTH_METERS = 10
 
+    // ─── TILE SERVERS ─────────────────────────────────────────────────────────────
+
+    const val TILE_SATELLITE = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+    const val TILE_STREET = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+    const val TILE_LIGHT = "https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{ratio}.png"
+    const val TILE_DARK = "https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{ratio}.png"
+
+    const val GLYPHS = "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf"
+
+    const val ATTR_ESRI = "Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community"
+    const val ATTR_OSM = "© OpenStreetMap contributors"
+    const val ATTR_CARTO = "© OpenStreetMap contributors, © CARTO"
+
     // ─── UI CONFIGURATION ─────────────────────────────────────────────────────────
 
     /** Toast/notification duration in milliseconds */

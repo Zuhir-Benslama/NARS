@@ -274,8 +274,35 @@ tls-generate: ## Generate TLS certificate for $(DOMAIN) (idempotent)
 		echo "✓ TLS secret created"
 	fi
 
+.PHONY: ca-generate
+ca-generate: ## Generate a self-signed CA certificate for mTLS (idempotent)
+	@if [ -f "$(K8S_DIR)/certs/ca.crt" ]; then
+		echo "→ CA cert already exists at $(K8S_DIR)/certs/ca.crt"
+	else
+		echo "→ Generating self-signed CA certificate..."
+		mkdir -p "$(K8S_DIR)/certs"
+		openssl ecparam -genkey -name prime256v1 -noout -out "$(K8S_DIR)/certs/ca.key"
+		openssl req -x509 -new -nodes -key "$(K8S_DIR)/certs/ca.key" \
+			-sha256 -days 3650 \
+			-subj "/CN=nars-mtls-ca/O=NARS" \
+			-out "$(K8S_DIR)/certs/ca.crt"
+		chmod 600 "$(K8S_DIR)/certs/ca.key"
+		echo "✓ CA cert generated:"
+		echo "    cert: $(K8S_DIR)/certs/ca.crt"
+		echo "    key:  $(K8S_DIR)/certs/ca.key"
+		echo ""
+		echo "  Issue client certs with:"
+		echo "    openssl req -new -nodes -out client.csr \\"
+		echo "      -subj '/CN=client-name/O=NARS'"
+		echo "    openssl x509 -req -in client.csr \\"
+		echo "      -CA $(K8S_DIR)/certs/ca.crt \\"
+		echo "      -CAkey $(K8S_DIR)/certs/ca.key \\"
+		echo "      -CAcreateserial -out client.crt -days 365 -sha256"
+		echo "    rm client.csr"
+	fi
+
 .PHONY: ca-secret
-ca-secret: ## Create mTLS CA secret from k8s/certs/ca.crt (idempotent)
+ca-secret: ca-generate ## Create mTLS CA secret from k8s/certs/ca.crt (idempotent)
 	@if kubectl get secret nars-ca -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
 		echo "→ CA secret 'nars-ca' already exists"
 	else

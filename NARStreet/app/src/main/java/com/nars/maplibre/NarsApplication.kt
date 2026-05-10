@@ -62,11 +62,15 @@ class NarsApplication : Application() {
         try {
             val prefs: AppPreferences = get(AppPreferences::class.java)
             val apiService: ApiService = get(ApiService::class.java)
-            try { apiService.logout() } catch (_: Exception) {}
+            try { apiService.logout() } catch (e: Exception) {
+                NarsLogger.w("NarsApplication", "Logout API call failed: ${e.message}")
+            }
             prefs.authToken = null
             prefs.sessionCookie = null
             prefs.user = null
             prefs.municipalityName = null
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            NarsLogger.w("NarsApplication", "Logout failed: ${e.message}")
+        }
     }
 }

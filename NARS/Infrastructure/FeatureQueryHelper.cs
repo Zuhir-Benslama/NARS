@@ -1,4 +1,5 @@
 using System.Data.Common;
+using System.Text;
 using System.Text.Json;
 
 namespace NarsApi.Infrastructure;
@@ -7,21 +8,27 @@ namespace NarsApi.Infrastructure;
 /// Shared ADO.NET query helper for loading features across all tables.
 /// Eliminates ~100 lines of duplicated boilerplate between
 /// FeaturesController and FeatureCatalogController.
+/// UNION ALL branches are built from <see cref="FeatureTypeRegistry"/>
+/// so new feature types are automatically included.
 /// </summary>
 public static class FeatureQueryHelper
 {
-    // Verbatim string (no $ interpolation) — eliminates risk of accidental
-    // user-input injection if a future developer modifies this query.
-    private const string LoadFeaturesSql = """
+    private static string BuildUnionAllCte()
+    {
+        var sb = new StringBuilder();
+        var descriptors = FeatureTypeRegistry.GetAllDescriptors();
+        for (int i = 0; i < descriptors.Count; i++)
+        {
+            if (i > 0) sb.AppendLine().Append("UNION ALL ");
+            sb.Append($"SELECT id, user_id, label, data, created_at, layer, '{descriptors[i].Type}' AS feature_type FROM {descriptors[i].TableName}");
+        }
+        return sb.ToString();
+    }
+
+    private static string BuildLoadFeaturesSql() =>
+        $"""
         WITH all_features AS (
-            SELECT id, user_id, label, data, created_at, layer, 'area' AS feature_type FROM areas
-            UNION ALL SELECT id, user_id, label, data, created_at, layer, 'district' FROM districts
-            UNION ALL SELECT id, user_id, label, data, created_at, layer, 'city_center' FROM city_centers
-            UNION ALL SELECT id, user_id, label, data, created_at, layer, 'road' FROM roads
-            UNION ALL SELECT id, user_id, label, data, created_at, layer, 'house_entrance' FROM house_entrances
-            UNION ALL SELECT id, user_id, label, data, created_at, layer, 'public_building' FROM public_buildings
-            UNION ALL SELECT id, user_id, label, data, created_at, layer, 'public_space' FROM public_spaces
-            UNION ALL SELECT id, user_id, label, data, created_at, layer, 'naming_panel' FROM naming_panels
+            {BuildUnionAllCte()}
         ),
         filtered AS (
             SELECT id, label, data, created_at, layer, feature_type
@@ -35,18 +42,12 @@ public static class FeatureQueryHelper
         FROM filtered f, total t
         ORDER BY f.created_at
         OFFSET @skip LIMIT @take
-    """;
+        """;
 
-    private const string LoadByLayerSql = """
+    private static string BuildLoadByLayerSql() =>
+        $"""
         WITH all_features AS (
-            SELECT id, user_id, label, data, created_at, layer, 'area' AS feature_type FROM areas
-            UNION ALL SELECT id, user_id, label, data, created_at, layer, 'district' FROM districts
-            UNION ALL SELECT id, user_id, label, data, created_at, layer, 'city_center' FROM city_centers
-            UNION ALL SELECT id, user_id, label, data, created_at, layer, 'road' FROM roads
-            UNION ALL SELECT id, user_id, label, data, created_at, layer, 'house_entrance' FROM house_entrances
-            UNION ALL SELECT id, user_id, label, data, created_at, layer, 'public_building' FROM public_buildings
-            UNION ALL SELECT id, user_id, label, data, created_at, layer, 'public_space' FROM public_spaces
-            UNION ALL SELECT id, user_id, label, data, created_at, layer, 'naming_panel' FROM naming_panels
+            {BuildUnionAllCte()}
         ),
         filtered AS (
             SELECT id, label, data, created_at, layer, feature_type
@@ -60,7 +61,7 @@ public static class FeatureQueryHelper
         FROM filtered f, total t
         ORDER BY f.created_at
         OFFSET @skip LIMIT @take
-    """;
+        """;
 
     /// <summary>
     /// Loads features across all tables for a given user with pagination.
@@ -73,7 +74,7 @@ public static class FeatureQueryHelper
         int take,
         CancellationToken ct = default)
     {
-        return await ExecuteQueryAsync(conn, LoadFeaturesSql, userId, layer: null, skip, take, ct);
+        return await ExecuteQueryAsync(conn, BuildLoadFeaturesSql(), userId, layer: null, skip, take, ct);
     }
 
     /// <summary>
@@ -88,7 +89,7 @@ public static class FeatureQueryHelper
         int take,
         CancellationToken ct = default)
     {
-        return await ExecuteQueryAsync(conn, LoadByLayerSql, userId, layer, skip, take, ct);
+        return await ExecuteQueryAsync(conn, BuildLoadByLayerSql(), userId, layer, skip, take, ct);
     }
 
     private static async Task<(List<object> features, int totalCount)> ExecuteQueryAsync(

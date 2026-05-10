@@ -13,6 +13,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.nars.maplibre.MapViewModel
 import com.nars.maplibre.data.model.BaseLayerType
 import com.nars.maplibre.data.model.NarsFeature
+import com.nars.maplibre.utils.Config
+import com.nars.maplibre.utils.NarsLogger
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
@@ -116,10 +118,10 @@ private fun configureMap(
             // Check if we should handle this click (for drawing/editing mode detection)
             if (shouldHandleClick?.invoke() == false) {
                 // Skip click handling when in drawing/editing mode
-                android.util.Log.d("NarsMap", "Skipping feature selection click - in drawing/editing mode")
+                NarsLogger.d("NarsMap", "Skipping feature selection click - in drawing/editing mode")
                 return@addOnMapClickListener false // Let Geoman handle it
             }
-            android.util.Log.d("NarsMap", "Processing feature selection click")
+            NarsLogger.d("NarsMap", "Processing feature selection click")
             clickHandler(latLng)
             false // Return false to allow Geoman's listener to also process
         }
@@ -164,12 +166,12 @@ private fun getStyleJson(layer: BaseLayerType): String {
             "sources": {
                 "esri-satellite": {
                     "type": "raster",
-                    "tiles": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+                    "tiles": ["${Config.TILE_SATELLITE}"],
                     "tileSize": 256,
-                    "attribution": "Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community"
+                    "attribution": "${Config.ATTR_ESRI}"
                 }
             },
-            "glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+            "glyphs": "${Config.GLYPHS}",
             "layers": [{
                 "id": "satellite-layer",
                 "type": "raster",
@@ -179,19 +181,19 @@ private fun getStyleJson(layer: BaseLayerType): String {
             }]
         }
         """.trimIndent()
-        
+
         BaseLayerType.STREET -> """
         {
             "version": 8,
             "sources": {
                 "osm-tiles": {
                     "type": "raster",
-                    "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+                    "tiles": ["${Config.TILE_STREET}"],
                     "tileSize": 256,
-                    "attribution": "© OpenStreetMap contributors"
+                    "attribution": "${Config.ATTR_OSM}"
                 }
             },
-            "glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+            "glyphs": "${Config.GLYPHS}",
             "layers": [{
                 "id": "osm-layer",
                 "type": "raster",
@@ -201,19 +203,19 @@ private fun getStyleJson(layer: BaseLayerType): String {
             }]
         }
         """.trimIndent()
-        
+
         BaseLayerType.LIGHT -> """
         {
             "version": 8,
             "sources": {
                 "carto-light": {
                     "type": "raster",
-                    "tiles": ["https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"],
+                    "tiles": ["${Config.TILE_LIGHT}"],
                     "tileSize": 256,
-                    "attribution": "© OpenStreetMap contributors, © CARTO"
+                    "attribution": "${Config.ATTR_CARTO}"
                 }
             },
-            "glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+            "glyphs": "${Config.GLYPHS}",
             "layers": [{
                 "id": "carto-light-layer",
                 "type": "raster",
@@ -223,19 +225,19 @@ private fun getStyleJson(layer: BaseLayerType): String {
             }]
         }
         """.trimIndent()
-        
+
         BaseLayerType.DARK -> """
         {
             "version": 8,
             "sources": {
                 "carto-dark": {
                     "type": "raster",
-                    "tiles": ["https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"],
+                    "tiles": ["${Config.TILE_DARK}"],
                     "tileSize": 256,
-                    "attribution": "© OpenStreetMap contributors, © CARTO"
+                    "attribution": "${Config.ATTR_CARTO}"
                 }
             },
-            "glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+            "glyphs": "${Config.GLYPHS}",
             "layers": [{
                 "id": "carto-dark-layer",
                 "type": "raster",

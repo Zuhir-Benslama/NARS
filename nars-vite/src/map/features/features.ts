@@ -42,11 +42,8 @@ export function buildFeatureData(
     base.radius = modalResult.radius as number | undefined
   }
 
-  for (const k of Object.keys(base) as (keyof FeatureData)[]) {
-    if (base[k] === undefined) {
-      ;(base as unknown as Record<string, unknown>)[k] = undefined
-    }
-  }
+  // JSON.stringify strips undefined values automatically, so no need to
+  // explicitly clear them here.
 
   let result: FeatureData
 

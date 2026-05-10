@@ -9,7 +9,12 @@ labels:
 resources:
   - namespace.yaml
   - configmap.yaml
-  # secret.yaml is managed by `make secrets-apply` — see Makefile
+  # ── Secrets ───────────────────────────────────────────────────────────────
+  # secret.yaml is a REFERENCE TEMPLATE only. Real secrets are created at
+  # deploy time by `make secrets-apply` (generates random values via openssl).
+  #   make secrets-apply   ← creates nars-secrets + regcred
+  #   make tls-generate    ← creates nars-tls TLS certificate
+  #   make ca-secret       ← creates nars-ca for mTLS
   - postgres-pv.yaml
   - postgres.yaml
   - app-deployment.yaml
@@ -18,7 +23,15 @@ resources:
   - frontend-service.yaml
   - ingress-api.yaml
   - ingress-frontend.yaml
+  - service-account.yaml
+  - network-policy.yaml
+  - resource-quota.yaml
+  - hpa.yaml
+  - pdb.yaml
 images:
+  # ⚠ `latest` tags are for local dev. For CI/CD, override newTag with
+  # the commit SHA or build number:
+  #   kustomize edit set image zuhirbenslama/nars-api=ghcr.io/org/nars-api:abc1234
   - name: zuhirbenslama/nars-api
     newTag: latest
   - name: zuhirbenslama/nars-postgres

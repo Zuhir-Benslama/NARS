@@ -20,6 +20,17 @@ const DRAW_TYPE_MAP: Record<string, DrawModeName> = {
 let lastPhaseKey: string | null = null
 let modeSwitchToken = 0
 
+// ─── STATE RESET (for testing & HMR) ──────────────────────────────────────────
+
+export function resetDrawControl(): void {
+  lastPhaseKey = null
+  modeSwitchToken = 0
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 export function buildDrawControl(phase: PhaseConfig): void {
   const gm = ctx.geoman
   if (!gm) return
@@ -52,7 +63,7 @@ export function buildDrawControl(phase: PhaseConfig): void {
     }
 
     // Use a short delay to let Geoman settle before enabling new draw mode.
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    await delay(50)
 
     // Double-check we haven't been superseded.
     if (token !== modeSwitchToken || lastPhaseKey !== phase.key) return

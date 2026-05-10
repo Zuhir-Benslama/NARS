@@ -1,6 +1,7 @@
 package com.nars.maplibre.modes
 
 import android.graphics.Color
+import com.nars.maplibre.data.api.escapeJson
 import com.nars.maplibre.data.model.LineStringGeometry
 import com.nars.maplibre.data.model.NarsFeature
 import com.nars.maplibre.data.model.PointGeometry
@@ -95,7 +96,8 @@ class LabelAndMarkerManager(
     private fun addLabelAt(layerName: String, labelText: String?, lon: Double, lat: Double) {
         if (labelText.isNullOrBlank()) return
         val sourceName = "${layerName}_src"
-        val geoJson = """{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [$lon, $lat]}, "properties": {"text": "$labelText"}}]}"""
+        val escapedText = escapeJson(labelText)
+        val geoJson = """{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [$lon, $lat]}, "properties": {"text": "$escapedText"}}]}"""
 
         try { map.style?.addSource(GeoJsonSource(sourceName, geoJson)) } catch (e: Exception) {
             NarsLogger.w(TAG, "Failed to add label source: ${e.message}")
