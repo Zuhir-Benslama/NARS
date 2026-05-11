@@ -297,4 +297,10 @@ ALTER TABLE IF EXISTS public.users
 CREATE INDEX IF NOT EXISTS ix_users_wilaya_id
     ON public.users(wilaya_id);
 
+-- Record the initial EF Core migration as already applied
+-- (the schema above was generated from this migration).
+INSERT INTO public."__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20260510191030_AddErrorLogs', '10.0.7')
+ON CONFLICT DO NOTHING;
+
 END;

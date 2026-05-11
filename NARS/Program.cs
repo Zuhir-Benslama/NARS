@@ -186,6 +186,9 @@ using (var scope = app.Services.CreateScope())
 
     await dbCtx.Database.CanConnectAsync();
     startupLogger.LogInformation("Database connection verified");
+
+    await dbCtx.Database.MigrateAsync();
+    startupLogger.LogInformation("Database migrations applied");
 }
 
 // ── Global exception handler ──────────────────────────────────
