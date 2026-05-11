@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using NarsApi.Data;
 using Npgsql;
 
@@ -17,11 +18,13 @@ public static class DatabaseExtensions
         string connectionString)
     {
         services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(connectionString, o => o.UseNetTopologySuite()));
+            options.UseNpgsql(connectionString, o => o.UseNetTopologySuite())
+                .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
 
         // DbContextFactory for parallel queries outside request scope
         services.AddDbContextFactory<AppDbContext>(options =>
-            options.UseNpgsql(connectionString, o => o.UseNetTopologySuite()));
+            options.UseNpgsql(connectionString, o => o.UseNetTopologySuite())
+                .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
 
         return services;
     }
