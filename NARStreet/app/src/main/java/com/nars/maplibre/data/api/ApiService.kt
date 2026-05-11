@@ -100,6 +100,7 @@ class ApiService(
         val apiUsername = userObj["username"]?.jsonPrimitive?.content ?: username
         val apiName = userObj["name"]?.jsonPrimitive?.content ?: username
         val email = userObj["email"]?.jsonPrimitive?.contentOrNull
+        val role = userObj["role"]?.jsonPrimitive?.contentOrNull ?: "commune_user"
 
         val communeObj = userObj["commune"]?.jsonObject ?: JsonObject(emptyMap())
         val communeLat = communeObj["latitude"]?.jsonPrimitive?.doubleOrNull
@@ -111,6 +112,7 @@ class ApiService(
             username = apiUsername,
             name = apiName,
             email = email,
+            role = role,
             communeLatitude = communeLat,
             communeLongitude = communeLng,
             communeName = communeName
@@ -141,6 +143,7 @@ class ApiService(
         val apiUsername = jsonElement.jsonObject["username"]?.jsonPrimitive?.content ?: ""
         val apiName = jsonElement.jsonObject["name"]?.jsonPrimitive?.content ?: ""
         val email = jsonElement.jsonObject["email"]?.jsonPrimitive?.contentOrNull
+        val role = jsonElement.jsonObject["role"]?.jsonPrimitive?.contentOrNull ?: "commune_user"
 
         val communeObj = jsonElement.jsonObject["commune"]?.jsonObject ?: JsonObject(emptyMap())
         val communeLat = communeObj["latitude"]?.jsonPrimitive?.doubleOrNull
@@ -152,6 +155,7 @@ class ApiService(
             username = apiUsername,
             name = apiName,
             email = email,
+            role = role,
             communeLatitude = communeLat,
             communeLongitude = communeLng,
             communeName = communeName
@@ -221,5 +225,34 @@ class ApiService(
             authHeaders().forEach { (k, v) -> headers.append(k, v) }
         }
         Unit
+    }
+
+    // ── Field worker inspection endpoints ─────────────────────────────────────
+
+    suspend fun submitInspection(featureId: String, type: String, data: String, status: String): Result<Unit> = runCatching {
+        httpClient.post("$baseUrl/api/field/inspect") {
+            authHeaders().forEach { (k, v) -> headers.append(k, v) }
+            contentType(ContentType.Application.Json)
+            setBody("""{"feature_id":"$featureId","type":"$type","data":$data,"status":"$status"}""")
+        }
+        Unit
+    }
+
+    suspend fun createEntranceFromInspection(roadId: String, data: String, label: String = "Entrance (field worker)"): Result<String> = runCatching {
+        val response = httpClient.post("$baseUrl/api/field/entrance/create") {
+            authHeaders().forEach { (k, v) -> headers.append(k, v) }
+            contentType(ContentType.Application.Json)
+            setBody("""{"road_id":"$roadId","data":$data,"label":"$label"}""")
+        }
+        val body = response.bodyAsText()
+        val jsonElement = json.parseToJsonElement(body).jsonObject
+        jsonElement["id"]?.jsonPrimitive?.contentOrNull ?: throw Exception("No ID in response")
+    }
+
+    suspend fun loadFieldFeatures(type: String): Result<String> = runCatching {
+        val response = httpClient.get("$baseUrl/api/field/features?type=$type") {
+            authHeaders().forEach { (k, v) -> headers.append(k, v) }
+        }
+        response.bodyAsText()
     }
 }

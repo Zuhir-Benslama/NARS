@@ -31,11 +31,11 @@ A full-stack geographic data management application for urban addressing across 
 ```bash
 # Start PostgreSQL with PostGIS via Docker
 docker run -d --name nars-db \
-  -e POSTGRES_USER=nars \
+  -e POSTGRES_USER=postgres \
   -e POSTGRES_PASSWORD=changeme \
-  -e POSTGRES_DB=nars \
+  -e POSTGRES_DB=nars_db \
   -p 5432:5432 \
-  postgis/postgis:17-3.5
+  zuhirbenslama/nars-postgis:latest
 ```
 
 ### 2. Backend

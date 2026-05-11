@@ -35,12 +35,12 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-postgres-from-api
+  name: allow-postgis-from-api
   namespace: nars
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: postgres
+      app.kubernetes.io/name: postgis
       app.kubernetes.io/component: database
   policyTypes:
     - Ingress

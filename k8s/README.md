@@ -27,9 +27,9 @@ echo '127.0.0.1 nars.dz' | sudo tee -a /etc/hosts
 | Command | Description |
 |---------|-------------|
 | `make cluster-up` | Full bootstrap — create cluster, deploy everything |
-| `make cluster-down` | Delete cluster (postgres data preserved) |
+| `make cluster-down` | Delete cluster (postgis data preserved) |
 | `make cluster-rebuild` | Delete and recreate the cluster |
-| `make cluster-clean` | Delete cluster **and wipe all postgres data** (irreversible) |
+| `make cluster-clean` | Delete cluster **and wipe all postgis data** (irreversible) |
 | `make cluster-status` | Show all cluster resources |
 
 ### Stop / Resume (keep cluster, free resources)
@@ -50,9 +50,9 @@ echo '127.0.0.1 nars.dz' | sudo tee -a /etc/hosts
 
 | Command | Description |
 |---------|-------------|
-| `make db-backup` | Dump database to `data/nars/postgres/backups/` |
+| `make db-backup` | Dump database to `data/nars/postgis/backups/` |
 | `make db-restore FILE=...` | Restore from a backup file |
-| `make db-shell` | Open interactive `psql` inside the postgres pod |
+| `make db-shell` | Open interactive `psql` inside the postgis pod |
 
 ### Docker Images
 
@@ -96,7 +96,7 @@ Key variables (all optional):
 |----------|---------|-------------|
 | `CLUSTER_NAME` | `nars` | Kind cluster name |
 | `DOMAIN` | `nars.dz` | TLS certificate domain |
-| `POSTGRES_DATA_DIR` | `data/nars/postgres` | Host path for postgres data (hostPath mount) |
+| `POSTGRES_DATA_DIR` | `data/nars/postgis` | Host path for postgis data (hostPath mount) |
 | `DOCKER_TOKEN` | — | Docker Hub token for `regcred` (optional — uses local images otherwise) |
 
 ## Manual Steps (without Makefile)
@@ -140,7 +140,7 @@ kubectl create secret generic nars-ca -n nars \
 
 kubectl create secret generic nars-secrets -n nars \
   --from-literal=postgres_password="<your-password>" \
-  --from-literal=ConnectionStrings__DefaultConnection="Host=postgres;Port=5432;Database=nars_db;Username=postgres;Password=<your-password>" \
+  --from-literal=ConnectionStrings__DefaultConnection="Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=<your-password>" \
   --from-literal=Jwt__SecretKey="<your-jwt-secret>" \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
@@ -168,8 +168,8 @@ Add to `/etc/hosts`:
 
 ## Data Persistence
 
-Postgres data is stored on your host machine at `$(POSTGRES_DATA_DIR)`
-(default: `data/nars/postgres/`). This survives `make cluster-down` and
+PostGIS data is stored on your host machine at `$(POSTGRES_DATA_DIR)`
+(default: `data/nars/postgis/`). This survives `make cluster-down` and
 `kind delete cluster`.
 
 Backups are written to `$(POSTGRES_DATA_DIR)/backups/`.

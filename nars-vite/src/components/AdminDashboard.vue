@@ -112,6 +112,7 @@ const roleLabel = computed(
       wilaya_admin: t("admin.role.wilaya"),
       daira_admin: t("admin.role.daira"),
       commune_user: t("admin.role.commune"),
+      field_worker: "Field Worker",
     })[userRole.value] ?? userRole.value,
 )
 
@@ -122,6 +123,7 @@ const roleBadgeClass = computed(
       wilaya_admin: "badge-wilaya",
       daira_admin: "badge-daira",
       commune_user: "badge-commune",
+      field_worker: "badge-commune",
     })[userRole.value] ?? "",
 )
 

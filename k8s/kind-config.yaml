@@ -6,5 +6,5 @@ name: nars
 nodes:
   - role: control-plane
     extraMounts:
-      - hostPath: /absolute/path/to/data/nars/postgres
-        containerPath: /mnt/nars/postgres
+      - hostPath: /absolute/path/to/data/nars/postgis
+        containerPath: /mnt/nars/postgis

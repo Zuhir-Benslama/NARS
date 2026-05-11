@@ -14,16 +14,16 @@ docker push zuhirbenslama/nars-api:latest
 This matches `k8s/app-deployment.yaml`.  
 Images are also built and pushed automatically via CI on pushes to `main`/`develop`.
 
-## Postgres image (with schema auto-init)
+## PostGIS image
 Build:
 ```bash
-docker build -f Docker/Dockerfile.postgres -t zuhirbenslama/nars-postgres:latest .
+docker build -f Docker/Dockerfile.nars-postgis -t zuhirbenslama/nars-postgis:latest .
 ```
 Push:
 ```bash
-docker push zuhirbenslama/nars-postgres:latest
+docker push zuhirbenslama/nars-postgis:latest
 ```
-Used by `k8s/postgres.yaml`. On first startup the schema from `docs/nars_db.sql` is automatically loaded into the `nars_db` database.
+This matches `k8s/postgres.yaml`. On first startup the schema from `docs/nars_db.sql` is automatically loaded into the `nars_db` database. The database schema is also managed by EF Core migrations — the init script provides a baseline for fresh deployments.
 
 ## Kubernetes pull secret
 To pull images from your private Docker Hub repo, create a `regcred` secret in the `nars` namespace:

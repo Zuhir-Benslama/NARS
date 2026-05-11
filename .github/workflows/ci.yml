@@ -113,21 +113,21 @@ jobs:
           tags: ${{ steps.meta-vite.outputs.tags }}
           labels: ${{ steps.meta-vite.outputs.labels }}
 
-      - name: Generate nars-postgres metadata
-        id: meta-postgres
+      - name: Generate nars-postgis metadata
+        id: meta-postgis
         uses: docker/metadata-action@v5
         with:
-          images: zuhirbenslama/nars-postgres
+          images: zuhirbenslama/nars-postgis
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push postgres image
+      - name: Build and push postgis image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: Docker/Dockerfile.postgres
+          file: Docker/Dockerfile.nars-postgis
           push: true
-          tags: ${{ steps.meta-postgres.outputs.tags }}
-          labels: ${{ steps.meta-postgres.outputs.labels }}
+          tags: ${{ steps.meta-postgis.outputs.tags }}
+          labels: ${{ steps.meta-postgis.outputs.labels }}

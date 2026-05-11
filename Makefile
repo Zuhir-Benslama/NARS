@@ -13,9 +13,9 @@ DOCKER_USERNAME    ?= zuhirbenslama
 DOCKER_TOKEN       ?=
 BACKUP_DIR         ?= $(POSTGRES_DATA_DIR)/backups
 DB_NAME            ?= nars_db
-POSTGRES_DATA_DIR  ?= data/nars/postgres
-REGISTRY_IMAGES    := nars-api nars-postgres nars-vite
-SCALABLE_DEPLOYS   := postgres nars-api nars-frontend
+POSTGRES_DATA_DIR  ?= data/nars/postgis
+REGISTRY_IMAGES    := nars-api nars-postgis nars-vite
+SCALABLE_DEPLOYS   := postgis nars-api nars-frontend
 
 # ─── Secrets ──────────────────────────────────────────────────
 # Auto-generate .env with stable secrets if missing.
@@ -73,22 +73,22 @@ cluster-up: prerequisites ## Full bootstrap: create cluster, deploy everything
 	@echo "  Destroy data:  make cluster-clean"
 
 .PHONY: cluster-down
-cluster-down: ## Delete the kind cluster (preserves postgres data)
+cluster-down: ## Delete the kind cluster (preserves postgis data)
 	@echo "→ Deleting cluster '$(CLUSTER_NAME)'..."
 	@kind delete cluster --name "$(CLUSTER_NAME)" 2>/dev/null || true
 	@rm -f /tmp/$(CLUSTER_NAME)-tls.crt /tmp/$(CLUSTER_NAME)-tls.key
-	@echo "✓ Cluster deleted (postgres data preserved at $(POSTGRES_DATA_DIR))"
+	@echo "✓ Cluster deleted (postgis data preserved at $(POSTGRES_DATA_DIR))"
 
 .PHONY: cluster-rebuild
 cluster-rebuild: cluster-down cluster-up ## Delete and recreate the cluster
 
 .PHONY: cluster-clean
-cluster-clean: ## Delete cluster AND wipe postgres data (irreversible!)
-	@echo "⚠  WARNING: This will DESTROY all postgres data at $(POSTGRES_DATA_DIR)"
+cluster-clean: ## Delete cluster AND wipe postgis data (irreversible!)
+	@echo "⚠  WARNING: This will DESTROY all postgis data at $(POSTGRES_DATA_DIR)"
 	@read -p "  Type the cluster name '$(CLUSTER_NAME)' to confirm: " confirm; \
 		if [ "$$confirm" != "$(CLUSTER_NAME)" ]; then echo "  Cancelled."; exit 0; fi
 	$(MAKE) cluster-down
-	@echo "→ Wiping postgres data..."
+	@echo "→ Wiping postgis data..."
 	@if echo "$(POSTGRES_DATA_DIR)" | grep -q '^/'; then
 		sudo rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null || rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null || true
 	else
@@ -169,7 +169,7 @@ cluster-restart: cluster-stop cluster-start ## Stop all pods, then start them ag
 
 .PHONY: db-get-pod
 db-get-pod:
-	@kubectl get pod -n "$(NAMESPACE)" -l app=postgres \
+	@kubectl get pod -n "$(NAMESPACE)" -l app.kubernetes.io/name=postgis \
 		-o jsonpath='{.items[0].metadata.name}' 2>/dev/null \
 		|| echo ""
 
@@ -180,10 +180,10 @@ db-get-password:
 		| base64 -d 2>/dev/null || echo ""
 
 .PHONY: db-backup
-db-backup: ## Dump the Postgres database to a local file
-	@POD=$$(kubectl get pod -n "$(NAMESPACE)" -l app=postgres \
+db-backup: ## Dump the PostGIS database to a local file
+	@POD=$$(kubectl get pod -n "$(NAMESPACE)" 	-l app.kubernetes.io/name=postgis \
 		-o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
-	@if [ -z "$$POD" ]; then echo "✖ No postgres pod found in namespace '$(NAMESPACE)'"; exit 1; fi
+	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found in namespace '$(NAMESPACE)'"; exit 1; fi
 	@PASS=$$(kubectl get secret nars-secrets -n "$(NAMESPACE)" \
 		-o jsonpath='{.data.postgres_password}' | base64 -d)
 	@mkdir -p "$(BACKUP_DIR)"
@@ -197,12 +197,12 @@ db-backup: ## Dump the Postgres database to a local file
 	@ls -lh "$${FILE}.gz"
 
 .PHONY: db-restore
-db-restore: ## Restore a backup. Usage: make db-restore FILE=data/nars/postgres/backups/nars_db_20250101_120000.sql.gz
-	@POD=$$(kubectl get pod -n "$(NAMESPACE)" -l app=postgres \
+db-restore: ## Restore a backup. Usage: make db-restore FILE=data/nars/postgis/backups/nars_db_20250101_120000.sql.gz
+	@POD=$$(kubectl get pod -n "$(NAMESPACE)" 	-l app.kubernetes.io/name=postgis \
 		-o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
-	@if [ -z "$$POD" ]; then echo "✖ No postgres pod found in namespace '$(NAMESPACE)'"; exit 1; fi
+	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found in namespace '$(NAMESPACE)'"; exit 1; fi
 	@if [ -z "$(FILE)" ]; then
-		echo "✖ Usage: make db-restore FILE=data/nars/postgres/backups/nars_db_<timestamp>.sql.gz"
+		echo "✖ Usage: make db-restore FILE=data/nars/postgis/backups/nars_db_<timestamp>.sql.gz"
 		echo ""
 		echo "Available backups:"
 		ls -1 "$(BACKUP_DIR)"/*.sql.gz 2>/dev/null | sed 's/^/  /' || echo "  (none)"
@@ -225,20 +225,20 @@ db-restore: ## Restore a backup. Usage: make db-restore FILE=data/nars/postgres/
 	@echo "✓ Restore complete"
 
 .PHONY: db-shell
-db-shell: ## Open an interactive psql shell inside the postgres pod
-	@POD=$$(kubectl get pod -n "$(NAMESPACE)" -l app=postgres \
+db-shell: ## Open an interactive psql shell inside the postgis pod
+	@POD=$$(kubectl get pod -n "$(NAMESPACE)" 	-l app.kubernetes.io/name=postgis \
 		-o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
-	@if [ -z "$$POD" ]; then echo "✖ No postgres pod found"; exit 1; fi
+	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found"; exit 1; fi
 	@kubectl exec -it "$$POD" -n "$(NAMESPACE)" -- psql -U postgres -d "$(DB_NAME)"
 
 # ─── Individual Steps ───────────────────────────────────────
 
 .PHONY: cluster-create
-cluster-create: ## Create the kind cluster with host-mounted postgres data (idempotent)
+cluster-create: ## Create the kind cluster with host-mounted postgis data (idempotent)
 	@if kind get clusters 2>/dev/null | grep -q "^$(CLUSTER_NAME)$$"; then
 		echo "→ Cluster '$(CLUSTER_NAME)' already exists"
 	else
-		echo "→ Creating postgres data directory at $(POSTGRES_DATA_DIR)..."
+		echo "→ Creating postgis data directory at $(POSTGRES_DATA_DIR)..."
 		mkdir -p "$(POSTGRES_DATA_DIR)"
 		chmod 777 "$(POSTGRES_DATA_DIR)" 2>/dev/null || true
 		echo "→ Generating kind config..."
@@ -246,7 +246,7 @@ cluster-create: ## Create the kind cluster with host-mounted postgres data (idem
 		if echo "$$DATA_DIR" | grep -qv '^/'; then
 			DATA_DIR="$$(cd "$$DATA_DIR" && pwd)"
 		fi
-		printf 'kind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\nname: %s\nnodes:\n  - role: control-plane\n    extraMounts:\n      - hostPath: %s\n        containerPath: /mnt/nars/postgres\n' \
+		printf 'kind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\nname: %s\nnodes:\n  - role: control-plane\n    extraMounts:\n      - hostPath: %s\n        containerPath: /mnt/nars/postgis\n' \
 			"$(CLUSTER_NAME)" "$$DATA_DIR" > /tmp/kind-$(CLUSTER_NAME).yaml
 		echo "→ Creating kind cluster '$(CLUSTER_NAME)'..."
 		kind create cluster --name "$(CLUSTER_NAME)" --config /tmp/kind-$(CLUSTER_NAME).yaml
@@ -331,7 +331,7 @@ secrets-apply: .env ## Create nars-secrets and regcred with generated/variable v
 	@kubectl create secret generic nars-secrets -n "$(NAMESPACE)" \
 		--from-literal=postgres_password="$(POSTGRES_PASSWORD)" \
 		--from-literal=ConnectionStrings__DefaultConnection=\
-"Host=postgres;Port=5432;Database=nars_db;Username=postgres;Password=$(POSTGRES_PASSWORD)" \
+"Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=$(POSTGRES_PASSWORD)" \
 		--from-literal=Jwt__SecretKey="$(JWT_SECRET)" \
 		--dry-run=client -o yaml \
 	| kubectl apply -f -
@@ -357,7 +357,7 @@ kustomize-apply: ## Apply k8s manifests via kustomize
 	@echo "✓ Kustomization applied"
 
 	@echo "→ Waiting for deployments..."
-	@for deploy in postgres nars-api nars-frontend; do
+	@for deploy in postgis nars-api nars-frontend; do
 		if kubectl get deployment $$deploy -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
 			kubectl wait --namespace "$(NAMESPACE)" \
 				--for=condition=Available deployment/$$deploy --timeout=180s
@@ -371,7 +371,7 @@ kustomize-apply: ## Apply k8s manifests via kustomize
 images-build: ## Build all Docker images
 	@echo "→ Building images..."
 	$(MAKE) _build-nars-api
-	$(MAKE) _build-nars-postgres
+	$(MAKE) _build-nars-postgis
 	$(MAKE) _build-nars-vite
 	@echo "✓ All images built"
 
@@ -381,11 +381,11 @@ _build-nars-api:
 	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-api" \
 		-t "$(DOCKER_ORG)/nars-api:latest" .
 
-.PHONY: _build-nars-postgres
-_build-nars-postgres:
-	@echo "  → $(DOCKER_ORG)/nars-postgres:latest"
-	@docker build -f "$(DOCKER_DIR)/Dockerfile.postgres" \
-		-t "$(DOCKER_ORG)/nars-postgres:latest" .
+.PHONY: _build-nars-postgis
+_build-nars-postgis:
+	@echo "  → $(DOCKER_ORG)/nars-postgis:latest"
+	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-postgis" \
+		-t "$(DOCKER_ORG)/nars-postgis:latest" .
 
 .PHONY: _build-nars-vite
 _build-nars-vite:
