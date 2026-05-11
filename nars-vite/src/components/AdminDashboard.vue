@@ -171,6 +171,9 @@ onMounted(loadOverview)
   max-width: 1100px;
   margin: 0 auto;
   font-family: var(--font-sans, sans-serif);
+  height: 100dvh;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 .admin-header {
   display: flex;

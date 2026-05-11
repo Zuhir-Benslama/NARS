@@ -60,6 +60,7 @@ spec:
                 - nars_db
             initialDelaySeconds: 5
             periodSeconds: 5
+            timeoutSeconds: 5
             failureThreshold: 30
           readinessProbe:
             exec:
@@ -71,6 +72,7 @@ spec:
                 - nars_db
             initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 5
           livenessProbe:
             exec:
               command:
@@ -81,6 +83,7 @@ spec:
                 - nars_db
             initialDelaySeconds: 15
             periodSeconds: 20
+            timeoutSeconds: 5
           resources:
             requests:
               cpu: 200m

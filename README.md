@@ -11,82 +11,70 @@ A full-stack geographic data management application for urban addressing across 
 │   MapLibre GL JS    │      │  EF Core + PostGIS   │
 │   Pinia + vue-i18n  │      │  JWT Auth            │
 └─────────────────────┘      └──────────┬───────────┘
-                                        │
-                              ┌─────────▼──────────┐
-                              │   PostgreSQL +      │
-                              │   PostGIS           │
-                              └────────────────────┘
+                                         │
+                               ┌─────────▼──────────┐
+                               │   PostgreSQL +      │
+                               │   PostGIS           │
+                               └────────────────────┘
 ```
 
 ## Prerequisites
 
 - **.NET 10 SDK** — [Download](https://dotnet.microsoft.com/download)
 - **Node.js 22+** — [Download](https://nodejs.org/)
-- **PostgreSQL 17+ with PostGIS 3.5** — [Download](https://postgis.net/)
+- **Docker** — for building images
+- **kind** — `go install sigs.k8s.io/kind@latest`
+- **kubectl** — [Download](https://kubernetes.io/docs/tasks/tools/)
+- **kustomize** — `go install sigs.k8s.io/kustomize/kustomize/v5@latest`
 
 ## Quick Start
 
-### 1. Database
+### 1. Cluster
 
 ```bash
-# Start PostgreSQL with PostGIS via Docker
-docker run -d --name nars-db \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=changeme \
-  -e POSTGRES_DB=nars_db \
-  -p 5432:5432 \
-  zuhirbenslama/nars-postgis:latest
+make cluster-up   # Creates kind cluster, builds images, deploys all manifests
+make cluster-in   # Port-forward to localhost:8080
 ```
 
-### 2. Backend
+The app is available at `http://localhost:8080`.
+
+### 2. Bootstrap Admin
 
 ```bash
-cd NARS
-cp appsettings.Development.json.example appsettings.Development.json
-# Edit appsettings.Development.json with your DB connection string and JWT secret
-dotnet run
+make db-admin
 ```
 
-The API will be available at `https://localhost:5001`.
+Credentials: `zuhir` / `admin123`.
 
-### 3. Frontend
+### 3. Access the App
 
-```bash
-cd nars-vite
-npm install
-npm run dev
-```
+Open `http://localhost:8080` in your browser.
 
-The dev server will be available at `http://localhost:5173`.
+## Makefile Targets
 
-### Build & Deploy
+| Target | Description |
+|--------|-------------|
+| `cluster-up` | Create kind cluster, build images, deploy |
+| `cluster-down` | Delete kind cluster |
+| `cluster-reload` | Rebuild images, restart deployments |
+| `cluster-in` | Port-forward postgis (5433) + frontend (8080) |
+| `cluster-logs` | Tail logs from all pods |
+| `db-admin` | Create national admin user (zuhir) |
+| `images-build` | Build all Docker images |
+| `images-push` | Push all images to Docker Hub |
 
-```bash
-cd nars-vite
-npm run build:deploy  # Builds frontend and copies to NARS/wwwroot/
-```
+## Docker Images
 
-Then run the backend — it serves the built frontend as static files.
-
-## Docker
-
-```bash
-# Start full stack (API + Frontend + PostgreSQL)
-docker compose -f Docker/docker-compose.yml up -d
-
-# Build only the backend image
-docker build -f Docker/Dockerfile.nars-api -t nars-api .
-
-# Build only the frontend image
-docker build -f Docker/Dockerfile.nars-vite -t nars-vite .
-```
+- `zuhirbenslama/nars-postgis:latest` — PostGIS 17-3.5 with NARS init script
+- `zuhirbenslama/nars-api:latest` — ASP.NET Core 10 backend
+- `zuhirbenslama/nars-vite:latest` — Nginx-served Vue 3 SPA
 
 ## Project Structure
 
 ```
 Workspace/
 ├── NARS/                          # Backend — ASP.NET Core 10 API
-│   ├── Controllers/               # API endpoints (admin, auth, features, etc.)
+│   ├── Controllers/               # API endpoints (admin, auth, features, field)
 │   ├── Data/                      # EF Core DbContext
 │   ├── DTOs/                      # Data transfer objects
 │   ├── Infrastructure/            # Services, validators, helpers
@@ -99,16 +87,16 @@ Workspace/
 │
 ├── nars-vite/                     # Frontend — Vue 3 + TypeScript SPA
 │   ├── src/
-│   │   ├── api/                   # HTTP client (apiFetch, tests)
+│   │   ├── api/                   # HTTP client (apiFetch)
 │   │   ├── config/                # App constants
 │   │   ├── lib/                   # Shared utilities (errors, toast, validation)
 │   │   ├── i18n/                  # Internationalization (en, fr, ar)
-│   │   ├── store/                 # Legacy Pinia compatibility proxy
-│   │   ├── stores/                # Pinia state stores (app, layer, modal)
+│   │   ├── stores/                # Pinia state stores
 │   │   ├── types/                 # Domain type definitions
-│   │   ├── composables/           # Vue composables (theme, API fetch)
+│   │   ├── composables/           # Vue composables
 │   │   ├── components/            # Vue SFCs
 │   │   │   ├── admin/             # Admin dashboard widgets
+│   │   │   ├── inspection/        # Field worker inspection forms
 │   │   │   ├── modals/            # Feature type selectors
 │   │   │   └── settings/          # Settings sub-panels
 │   │   ├── map/                   # MapLibre GL JS + Geoman integration
@@ -121,14 +109,14 @@ Workspace/
 │   │   │   ├── rendering/         # Labels, styles, geometry math (3 files)
 │   │   │   ├── context-menu/      # Right-click menus (3 files)
 │   │   │   ├── phases/            # Phase navigation & storage (2 files)
-│   │   │   └── *.ts               # Orchestrator, boundary, numbering, etc.
+│   │   │   └── *.ts               # Orchestrator, click handlers, etc.
 │   │   ├── styles/                # CSS (theme, modal, phase bar, labels)
 │   │   └── utils/                 # Debug logging, HTML sanitization
 │   └── ...
 │
-├── Docker/                        # Docker configs (compose, Dockerfiles)
-├── k8s/                           # Kubernetes manifests
-├── Scripts/                       # DB setup, admin creation, rendering tools
+├── Docker/                        # Dockerfiles
+├── k8s/                           # Kubernetes manifests (kustomize)
+├── Scripts/                       # DB setup, admin creation
 ├── docs/                          # SQL schema, documentation, UML diagrams
 └── README.md                      # This file
 ```
@@ -176,7 +164,8 @@ npm install  # Runs "husky" via the prepare script
 
 ## Features
 
-- **Hierarchical Admin Roles**: National > Wilaya > Daira > Commune
+- **Hierarchical Admin Roles**: National > Wilaya > Daira > Commune > Field Worker
+- **Field Worker Inspections**: Inspect roads, house entrances, and naming panels
 - **Map Drawing & Editing**: Draw areas, districts, roads, buildings with MapLibre GL JS + Geoman
 - **Feature Validation**: Validate features against administrative boundaries
 - **Spatial Queries**: PostGIS-powered proximity and containment queries
