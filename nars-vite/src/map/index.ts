@@ -5,6 +5,7 @@ import { initRotationControls } from "./rotation"
 import { registerDrawEvents } from "./draw/draw-events"
 import { registerGeomanEvents } from "./core/geoman-events"
 import { initMap as initMapInstance } from "./map-init"
+import { registerFieldWorkerClick } from "./field-click"
 
 // ─── RE-EXPORTS ───────────────────────────────────────────────────────
 
@@ -26,4 +27,5 @@ export async function initMap(): Promise<void> {
   await applyInitialLang()
   registerDrawEvents()
   registerGeomanEvents()
+  registerFieldWorkerClick()
 }

@@ -30,7 +30,10 @@ export const useAppStore = defineStore("app", {
 
   getters: {
     isAuthenticated: (state) => state.user !== null,
-    isAdminUser: (state) => state.user !== null && state.user.role !== "commune_user",
+    isAdminUser: (state) =>
+      state.user !== null &&
+      state.user.role !== "commune_user" &&
+      state.user.role !== "field_worker",
   },
 
   actions: {

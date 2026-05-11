@@ -12,4 +12,5 @@ export {
   currentModalFeatureId,
 } from "./modalStore"
 export { useLayerStore, setSelectedFeature, selectedFeatureDbId } from "./layerStore"
+export { useFieldStore } from "./fieldStore"
 export type { LayerState } from "./layerStore"

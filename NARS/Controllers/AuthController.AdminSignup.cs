@@ -15,6 +15,7 @@ namespace NarsApi.Controllers;
 /// Handles account creation that originates from the public login page.
 ///
 /// Creation hierarchy (all enforced here and in AdminController):
+///   commune_user  → may create field_worker (inherits the creator's commune_id)
 ///   daira_admin   → may create commune_user (within their own daira only)
 ///   wilaya_admin  → may create daira_admin  (within their own wilaya only)
 ///   national_admin → may create wilaya_admin (any wilaya)
@@ -96,8 +97,8 @@ public partial class AuthController
             Username = body.Username,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(body.Password),
             Role = body.Role,
-            // commune_user gets a CommuneId; admins get their geographic anchor.
-            CommuneId = body.Role == UserRoles.CommuneUser ? body.CommuneId : null,
+            // commune_user and field_worker get a CommuneId; admins get their geographic anchor.
+            CommuneId = body.Role is UserRoles.CommuneUser or UserRoles.FieldWorker ? body.CommuneId : null,
             DairaId = body.Role == UserRoles.DairaAdmin ? body.DairaId : null,
             WilayaId = body.Role == UserRoles.WilayaAdmin ? body.WilayaId : null,
             FailedLoginAttempts = 0,
@@ -123,6 +124,9 @@ public partial class AuthController
     {
         switch (admin.Role, body.Role)
         {
+            // commune_user creates field_worker: inherits creator's commune_id, no extra scope needed
+            case (UserRoles.CommuneUser, UserRoles.FieldWorker):
+                return null;
             // daira_admin creates commune_user: commune must belong to admin's daira.
             case (UserRoles.DairaAdmin, UserRoles.CommuneUser):
                 {
@@ -162,6 +166,7 @@ public partial class AuthController
 
     /// <summary>
     /// Role creation hierarchy:
+    ///   commune_user  → field_worker
     ///   daira_admin   → commune_user
     ///   wilaya_admin  → daira_admin
     ///   national_admin → wilaya_admin
@@ -170,6 +175,7 @@ public partial class AuthController
     internal static bool CanCreateRole(string creatorRole, string targetRole) =>
         (creatorRole, targetRole) switch
         {
+            (UserRoles.CommuneUser, UserRoles.FieldWorker) => true,
             (UserRoles.DairaAdmin, UserRoles.CommuneUser) => true,
             (UserRoles.WilayaAdmin, UserRoles.DairaAdmin) => true,
             (UserRoles.NationalAdmin, UserRoles.WilayaAdmin) => true,
@@ -183,6 +189,7 @@ public partial class AuthController
             UserRoles.DairaAdmin when !body.DairaId.HasValue => "daira_id is required for daira_admin.",
             UserRoles.WilayaAdmin when !body.WilayaId.HasValue => "wilaya_id is required for wilaya_admin.",
             UserRoles.NationalAdmin => "national_admin accounts must be created directly in the database.",
+            UserRoles.FieldWorker => null, // field_worker inherits commune_id from creator
             _ => null,
         };
 }

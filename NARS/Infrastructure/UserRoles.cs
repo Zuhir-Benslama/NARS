@@ -10,6 +10,7 @@ public static class UserRoles
     public const string DairaAdmin = "daira_admin";
     public const string WilayaAdmin = "wilaya_admin";
     public const string NationalAdmin = "national_admin";
+    public const string FieldWorker = "field_worker";
 
     /// <summary>All admin roles — useful for policy declarations.</summary>
     public static readonly string[] AllAdminRoles =
@@ -18,4 +19,11 @@ public static class UserRoles
     /// <summary>Returns true if the role string represents any admin level.</summary>
     public static bool IsAdmin(string? role) =>
         role is DairaAdmin or WilayaAdmin or NationalAdmin;
+
+    /// <summary>
+    /// Roles that operate within a commune scope.
+    /// commune_user draws features; field_worker inspects them.
+    /// </summary>
+    public static bool IsCommuneScoped(string? role) =>
+        role is CommuneUser or FieldWorker;
 }

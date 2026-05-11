@@ -13,6 +13,7 @@ namespace NarsApi.Controllers;
 /// Monitoring and admin-user management endpoints.
 ///
 /// Creation hierarchy (each role may only create the role one level below):
+///   commune_user  → field_worker  (inherits the creator's commune_id)
 ///   daira_admin    → commune_user  (commune must belong to admin's daira)
 ///   wilaya_admin   → daira_admin   (daira must belong to admin's wilaya)
 ///   national_admin → wilaya_admin  (any wilaya)
@@ -26,10 +27,11 @@ namespace NarsApi.Controllers;
 ///                    GET /api/admin/wilaya/{id} (one wilaya, full depth)
 ///
 ///   POST /api/admin/users — create an account one level below the caller's role.
+///   Auth is split action-level: commune_user may call POST /api/admin/users
+///   but not monitoring endpoints.
 /// </summary>
 [ApiController]
 [Route("/api")]
-[Authorize(Roles = "daira_admin,wilaya_admin,national_admin")]
 [Tags("Admin")]
 public class AdminController(
     AppDbContext db,
@@ -38,6 +40,7 @@ public class AdminController(
     // ── GET /api/admin/overview ───────────────────────────────────────────────
 
     [HttpGet("admin/overview")]
+    [Authorize(Roles = "daira_admin,wilaya_admin,national_admin")]
     public async Task<IActionResult> Overview()
     {
         // Read role and geographic IDs directly from the database.
@@ -63,6 +66,7 @@ public class AdminController(
     // National admin only — drill into a specific wilaya.
 
     [HttpGet("admin/wilaya/{wilayaId:int}")]
+    [Authorize(Roles = "daira_admin,wilaya_admin,national_admin")]
     public async Task<IActionResult> GetWilaya(int wilayaId)
     {
         var user = await db.Users.FindAsync(CurrentUserId);
@@ -77,6 +81,7 @@ public class AdminController(
     // Wilaya admin (own dairas) or national admin.
 
     [HttpGet("admin/daira/{dairaId:int}")]
+    [Authorize(Roles = "daira_admin,wilaya_admin,national_admin")]
     public async Task<IActionResult> GetDaira(int dairaId)
     {
         var user = await db.Users.FindAsync(CurrentUserId);
@@ -120,6 +125,9 @@ public class AdminController(
 
         switch (callerRole, body.Role)
         {
+            case (UserRoles.CommuneUser, UserRoles.FieldWorker):
+                // field_worker inherits creator's commune_id, no extra validation needed
+                break;
             case (UserRoles.DairaAdmin, UserRoles.CommuneUser):
                 {
                     if (!body.CommuneId.HasValue)
@@ -160,6 +168,11 @@ public class AdminController(
         if (pwdErr is not null)
             return BadRequest(new { detail = pwdErr });
 
+        // field_worker inherits the creator's commune_id
+        var communeId = body.Role == UserRoles.FieldWorker
+            ? creator.CommuneId
+            : body.CommuneId;
+
         var newUser = new User
         {
             Name = body.Name,
@@ -168,7 +181,7 @@ public class AdminController(
             Username = body.Username,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(body.Password),
             Role = body.Role,
-            CommuneId = body.Role == UserRoles.CommuneUser ? body.CommuneId : null,
+            CommuneId = body.Role is UserRoles.CommuneUser or UserRoles.FieldWorker ? communeId : null,
             DairaId = body.Role == UserRoles.DairaAdmin ? body.DairaId : null,
             WilayaId = body.Role == UserRoles.WilayaAdmin ? body.WilayaId : null,
             FailedLoginAttempts = 0,
@@ -432,6 +445,7 @@ public class AdminController(
             UserRoles.DairaAdmin when !body.DairaId.HasValue => "daira_id is required for daira_admin.",
             UserRoles.WilayaAdmin when !body.WilayaId.HasValue => "wilaya_id is required for wilaya_admin.",
             UserRoles.NationalAdmin => "national_admin accounts must be created directly in the database.",
+            UserRoles.FieldWorker => null, // field_worker inherits commune_id from creator
             _ => null,
         };
 }

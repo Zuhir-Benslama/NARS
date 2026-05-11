@@ -18,6 +18,9 @@ public class AppDbContext : DbContext
     public DbSet<PublicSpace> PublicSpaces { get; set; }
     public DbSet<NamingPanel> NamingPanels { get; set; }
 
+    // ── Field worker inspections ──────────────────────────────────────────────
+    public DbSet<Inspection> Inspections { get; set; }
+
     // ── Logs ──────────────────────────────────────────────────────────────────
     public DbSet<ErrorLog> ErrorLogs { get; set; }
 
@@ -114,5 +117,17 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<RefreshToken>()
             .HasIndex(rt => rt.TokenHash)
             .HasDatabaseName("ix_refresh_tokens_token_hash");
+
+        // ── inspections: index on feature_id for history lookups ──────────────
+        modelBuilder.Entity<Inspection>()
+            .HasIndex(i => i.FeatureId)
+            .HasDatabaseName("ix_inspections_feature_id");
+        modelBuilder.Entity<Inspection>()
+            .HasIndex(i => i.UserId)
+            .HasDatabaseName("ix_inspections_user_id");
+        modelBuilder.Entity<Inspection>()
+            .HasIndex(i => new { i.FeatureId, i.CreatedAt })
+            .IsDescending(false, true)
+            .HasDatabaseName("ix_inspections_feature_created");
     }
 }
