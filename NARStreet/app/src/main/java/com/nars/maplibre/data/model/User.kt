@@ -12,6 +12,7 @@ data class User(
     val username: String,
     val name: String,
     val email: String? = null,
+    val role: String = "commune_user",
     val communeLatitude: Double? = null,
     val communeLongitude: Double? = null,
     val communeName: String? = null
@@ -29,6 +30,11 @@ data class User(
     fun hasCommuneLocation(): Boolean {
         return communeLatitude != null && communeLongitude != null
     }
+
+    /**
+     * Check if the user is a field worker
+     */
+    fun isFieldWorker(): Boolean = role == "field_worker"
 }
 
 /**

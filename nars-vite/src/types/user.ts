@@ -1,4 +1,9 @@
-export type UserRole = "commune_user" | "daira_admin" | "wilaya_admin" | "national_admin"
+export type UserRole =
+  | "commune_user"
+  | "field_worker"
+  | "daira_admin"
+  | "wilaya_admin"
+  | "national_admin"
 
 export interface CommuneInfo {
   id: number | null

@@ -188,6 +188,8 @@ interface RoleOption {
 }
 const availableTargetRoles = computed<RoleOption[]>(() => {
   switch (role.value) {
+    case "commune_user":
+      return [{ value: "field_worker", label: t("su_role_field_worker") }]
     case "daira_admin":
       return [{ value: "commune_user", label: t("su_role_commune") }]
     case "wilaya_admin":
@@ -209,6 +211,8 @@ watch(availableTargetRoles, (opts) => {
 // ── Hint text ─────────────────────────────────────────────────────────────────
 const hintText = computed(() => {
   switch (role.value) {
+    case "commune_user":
+      return t("su_hint_commune")
     case "daira_admin":
       return t("su_hint_daira")
     case "wilaya_admin":
@@ -228,7 +232,11 @@ const showDairaSelect = computed(
     (role.value === "national_admin" && targetRole.value === "daira_admin") ||
     role.value === "wilaya_admin",
 )
-const showCommuneSelect = computed(() => role.value === "daira_admin")
+const showCommuneSelect = computed(
+  () =>
+    role.value === "daira_admin" ||
+    (role.value === "commune_user" && targetRole.value !== "field_worker"),
+)
 const needWilayaFirst = computed(() => role.value === "national_admin")
 
 // ── Form state ────────────────────────────────────────────────────────────────

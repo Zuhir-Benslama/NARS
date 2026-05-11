@@ -1,13 +1,30 @@
 <template>
-  <!-- ProfileMenu (and its SettingsModal) always rendered — available to all roles -->
   <ProfileMenu />
 
-  <!-- Admin users get the monitoring dashboard -->
   <template v-if="isAdminUser">
     <AdminDashboard />
   </template>
 
-  <!-- Commune users get the full map UI -->
+  <template v-else-if="isFieldWorker">
+    <TileControl />
+    <FieldPanel />
+    <FeatureModal />
+
+    <div v-if="appStore.loadError" class="load-error-banner">
+      <span>⚠ Could not load saved features. Check your connection and refresh the page.</span>
+      <button class="load-error-dismiss" @click="appStore.loadError = false">✕</button>
+    </div>
+
+    <Teleport to="body">
+      <div v-if="appStore.isLoading" class="loading-overlay">
+        <div class="loading-spinner">
+          <div class="spinner" />
+          <p>Loading map data…</p>
+        </div>
+      </div>
+    </Teleport>
+  </template>
+
   <template v-else>
     <PhaseBar />
     <InfoPanel />
@@ -38,11 +55,13 @@ import ProfileMenu from "./components/ProfileMenu.vue"
 import TileControl from "./components/TileControl.vue"
 import FeatureModal from "./components/FeatureModal.vue"
 import AdminDashboard from "./components/AdminDashboard.vue"
+import FieldPanel from "./components/FieldPanel.vue"
 import { useAppStore } from "./stores/appStore"
 
 const appStore = useAppStore()
 
 const isAdminUser = computed(() => appStore.isAdminUser)
+const isFieldWorker = computed(() => appStore.user?.role === "field_worker")
 </script>
 
 <style scoped>
