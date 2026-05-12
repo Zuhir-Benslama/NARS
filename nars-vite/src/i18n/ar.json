@@ -151,7 +151,8 @@
       "national": "مشرف وطني",
       "wilaya": "مشرف ولاية",
       "daira": "مشرف دائرة",
-      "commune": "مستخدم بلدية"
+      "commune": "مستخدم بلدية",
+      "field_worker": "عامل ميداني"
     },
     "wilaya_admin": "مشرف الولاية",
     "daira_admin": "مشرف الدائرة",
@@ -169,7 +170,10 @@
     "pub_bldg": "مبنى عام",
     "pub_space": "فضاء عام",
     "panels": "لوحات",
-    "total": "المجموع"
+    "total": "المجموع",
+    "totals": "الإجماليات",
+    "create_user": "إنشاء مستخدم",
+    "cancel": "إلغاء"
   },
   "tab_users": "المستخدمون",
   "su_account_type": "نوع الحساب",

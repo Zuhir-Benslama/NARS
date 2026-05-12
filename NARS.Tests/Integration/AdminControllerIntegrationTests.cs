@@ -148,6 +148,180 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
         yield return [UserRoles.CommuneUser, UserRoles.NationalAdmin];
     }
 
+    // ── CommuneUser → FieldWorker ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task CreateAdmin_CommuneUserToFieldWorker_Returns201()
+    {
+        var creator = await CreateUserAsync(UserRoles.CommuneUser, communeId: 100);
+        SetAuthenticatedUser(creator);
+        var request = BuildRequest(UserRoles.FieldWorker, communeId: null);
+
+        var result = await _controller.CreateAdmin(request);
+
+        var created = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(201, created.StatusCode);
+
+        var createdUser = await _db.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
+        Assert.NotNull(createdUser);
+        Assert.Equal(UserRoles.FieldWorker, createdUser.Role);
+        Assert.Equal(100, createdUser.CommuneId);
+    }
+
+    // ── Overview ───────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Overview_NationalAdmin_ReturnsNationalOverview()
+    {
+        var creator = await CreateUserAsync(UserRoles.NationalAdmin);
+        SetAuthenticatedUser(creator);
+
+        var result = await _controller.Overview();
+
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        dynamic? data = okResult.Value;
+        Assert.NotNull(data);
+
+        // Use reflection to access the anonymous type
+        var wilayasProp = data.GetType().GetProperty("wilayas");
+        Assert.NotNull(wilayasProp);
+        var wilayas = wilayasProp.GetValue(data) as System.Collections.IList;
+        Assert.NotNull(wilayas);
+        Assert.Equal(2, wilayas.Count);
+    }
+
+    [Fact]
+    public async Task Overview_WilayaAdmin_ReturnsWilayaReport()
+    {
+        var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 2);
+        SetAuthenticatedUser(creator);
+
+        var result = await _controller.Overview();
+
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var report = Assert.IsType<WilayaReport>(okResult.Value);
+        Assert.Equal(2, report.WilayaId);
+        Assert.Single(report.Dairas);
+        Assert.Equal(11, report.Dairas[0].DairaId);
+    }
+
+    [Fact]
+    public async Task Overview_DairaAdmin_ReturnsDairaReport()
+    {
+        var creator = await CreateUserAsync(UserRoles.DairaAdmin, dairaId: 10);
+        SetAuthenticatedUser(creator);
+
+        var result = await _controller.Overview();
+
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var report = Assert.IsType<DairaReport>(okResult.Value);
+        Assert.Equal(10, report.DairaId);
+        Assert.Single(report.Communes);
+        Assert.Equal(100, report.Communes[0].CommuneId);
+    }
+
+    [Fact]
+    public async Task Overview_CommuneUser_ReturnsForbid()
+    {
+        var creator = await CreateUserAsync(UserRoles.CommuneUser, communeId: 100);
+        SetAuthenticatedUser(creator);
+
+        var result = await _controller.Overview();
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    [Fact]
+    public async Task Overview_FieldWorker_ReturnsForbid()
+    {
+        var creator = await CreateUserAsync(UserRoles.FieldWorker, communeId: 100);
+        SetAuthenticatedUser(creator);
+
+        var result = await _controller.Overview();
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    // ── Wilaya drill-down ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetWilaya_NationalAdmin_ReturnsWilayaReport()
+    {
+        var creator = await CreateUserAsync(UserRoles.NationalAdmin);
+        SetAuthenticatedUser(creator);
+
+        var result = await _controller.GetWilaya(2);
+
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var report = Assert.IsType<WilayaReport>(okResult.Value);
+        Assert.Equal(2, report.WilayaId);
+        Assert.Single(report.Dairas);
+        Assert.Equal(11, report.Dairas[0].DairaId);
+    }
+
+    [Fact]
+    public async Task GetWilaya_NationalAdmin_UnknownId_ReturnsNotFound()
+    {
+        var creator = await CreateUserAsync(UserRoles.NationalAdmin);
+        SetAuthenticatedUser(creator);
+
+        var result = await _controller.GetWilaya(999);
+
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    // ── Daira drill-down ───────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetDaira_WilayaAdmin_OwnDaira_ReturnsDairaReport()
+    {
+        var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 1);
+        SetAuthenticatedUser(creator);
+
+        var result = await _controller.GetDaira(10);
+
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var report = Assert.IsType<DairaReport>(okResult.Value);
+        Assert.Equal(10, report.DairaId);
+        Assert.Single(report.Communes);
+    }
+
+    [Fact]
+    public async Task GetDaira_WilayaAdmin_WrongWilaya_ReturnsForbid()
+    {
+        var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 1);
+        SetAuthenticatedUser(creator);
+
+        var result = await _controller.GetDaira(11);
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    [Fact]
+    public async Task GetDaira_NationalAdmin_ReturnsDairaReport()
+    {
+        var creator = await CreateUserAsync(UserRoles.NationalAdmin);
+        SetAuthenticatedUser(creator);
+
+        var result = await _controller.GetDaira(11);
+
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var report = Assert.IsType<DairaReport>(okResult.Value);
+        Assert.Equal(11, report.DairaId);
+        Assert.Single(report.Communes);
+    }
+
+    [Fact]
+    public async Task GetDaira_NationalAdmin_UnknownId_ReturnsNotFound()
+    {
+        var creator = await CreateUserAsync(UserRoles.NationalAdmin);
+        SetAuthenticatedUser(creator);
+
+        var result = await _controller.GetDaira(999);
+
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
     private static CreateAdminRequest BuildRequest(
         string role,
         int? communeId = null,

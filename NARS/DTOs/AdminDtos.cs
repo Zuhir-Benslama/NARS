@@ -32,6 +32,7 @@ public record UserFeatureStats(
     [property: JsonPropertyName("username")] string Username,
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("role")] string Role,
     [property: JsonPropertyName("areas")] long Areas,
     [property: JsonPropertyName("districts")] long Districts,
     [property: JsonPropertyName("city_centers")] long CityCenters,

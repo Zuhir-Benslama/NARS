@@ -6,11 +6,20 @@
         <span class="role-badge" :class="roleBadgeClass">{{ roleLabel }}</span>
         <h1>{{ t("admin.dashboard") }}</h1>
       </div>
-      <button class="admin-refresh-btn" :disabled="loading" @click="loadOverview">
-        <span v-if="loading" class="spinner" />
-        <span v-else>↻</span>
-        {{ t("admin.refresh") }}
-      </button>
+      <div class="admin-header-actions">
+        <button class="admin-action-btn" @click="showCreateUser = !showCreateUser">
+          {{ showCreateUser ? t("admin.cancel") : "+ " + t("admin.create_user") }}
+        </button>
+        <button class="admin-refresh-btn" :disabled="loading" @click="loadOverview">
+          <span v-if="loading" class="spinner" />
+          <span v-else>↻</span>
+          {{ t("admin.refresh") }}
+        </button>
+      </div>
+    </div>
+
+    <div v-if="showCreateUser" class="create-user-panel">
+      <SettingsUsers />
     </div>
 
     <div v-if="error" class="admin-error">{{ error }}</div>
@@ -20,40 +29,42 @@
       <div class="section-title">
         {{ t("admin.all_wilayas") }} ({{ nationalData.wilayas.length }})
       </div>
-      <div class="wilaya-grid">
-        <div
-          v-for="w in nationalData.wilayas"
-          :key="w.wilaya_id"
-          class="wilaya-card"
-          @click="drillWilaya(w.wilaya_id)"
-        >
-          <div class="wilaya-card-head">
-            <span class="wilaya-name">{{ w.wilaya_name_fr }}</span>
-            <span class="wilaya-name-ar">{{ w.wilaya_name_ar }}</span>
+      <div class="content-scroll">
+        <div class="wilaya-grid">
+          <div
+            v-for="w in nationalData.wilayas"
+            :key="w.wilaya_id"
+            class="wilaya-card"
+            @click="drillWilaya(w.wilaya_id)"
+          >
+            <div class="wilaya-card-head">
+              <span class="wilaya-name">{{ w.wilaya_name_fr }}</span>
+              <span class="wilaya-name-ar">{{ w.wilaya_name_ar }}</span>
+            </div>
+            <div class="wilaya-stats">
+              <StatPill :label="t('admin.dairas')" :value="w.daira_count" />
+              <StatPill :label="t('admin.communes')" :value="w.commune_count" />
+              <StatPill :label="t('admin.users')" :value="w.commune_user_count" color="blue" />
+            </div>
+            <div class="wilaya-admin-row">
+              <span class="admin-label">{{ t("admin.wilaya_admin") }}:</span>
+              <span v-if="w.wilaya_admin" class="admin-name">{{ w.wilaya_admin.name }}</span>
+              <span v-else class="admin-missing">{{ t("admin.none_assigned") }}</span>
+            </div>
+            <button class="drill-btn">{{ t("admin.view_detail") }} →</button>
           </div>
-          <div class="wilaya-stats">
-            <StatPill :label="t('admin.dairas')" :value="w.daira_count" />
-            <StatPill :label="t('admin.communes')" :value="w.commune_count" />
-            <StatPill :label="t('admin.users')" :value="w.commune_user_count" color="blue" />
-          </div>
-          <div class="wilaya-admin-row">
-            <span class="admin-label">{{ t("admin.wilaya_admin") }}:</span>
-            <span v-if="w.wilaya_admin" class="admin-name">{{ w.wilaya_admin.name }}</span>
-            <span v-else class="admin-missing">{{ t("admin.none_assigned") }}</span>
-          </div>
-          <button class="drill-btn">{{ t("admin.view_detail") }} →</button>
         </div>
-      </div>
 
-      <!-- Drilled wilaya detail -->
-      <template v-if="drilledWilaya">
-        <div class="section-title drill-title">
-          <button class="back-btn" @click="drilledWilaya = null">← {{ t("admin.back") }}</button>
-          {{ drilledWilaya.wilaya_name_fr }} —
-          {{ drilledWilaya.wilaya_name_ar }}
-        </div>
-        <DairaList :dairas="drilledWilaya.dairas" :role="userRole" />
-      </template>
+        <!-- Drilled wilaya detail -->
+        <template v-if="drilledWilaya">
+          <div class="section-title drill-title">
+            <button class="back-btn" @click="drilledWilaya = null">← {{ t("admin.back") }}</button>
+            {{ drilledWilaya.wilaya_name_fr }} —
+            {{ drilledWilaya.wilaya_name_ar }}
+          </div>
+          <DairaList :dairas="drilledWilaya.dairas" :role="userRole" />
+        </template>
+      </div>
     </template>
 
     <!-- WILAYA ADMIN: own wilaya full report -->
@@ -61,13 +72,17 @@
       <div class="section-title">
         {{ wilayaData.wilaya_name_fr }} — {{ wilayaData.wilaya_name_ar }}
       </div>
-      <DairaList :dairas="wilayaData.dairas" :role="userRole" />
+      <div class="content-scroll">
+        <DairaList :dairas="wilayaData.dairas" :role="userRole" />
+      </div>
     </template>
 
     <!-- DAIRA ADMIN: own daira full report -->
     <template v-else-if="isDaira && dairaData">
       <div class="section-title">{{ dairaData.daira_name_fr }} — {{ dairaData.daira_name_ar }}</div>
-      <CommuneList :communes="dairaData.communes" />
+      <div class="content-scroll">
+        <CommuneList :communes="dairaData.communes" />
+      </div>
     </template>
 
     <div v-if="!loading && !error && !hasData" class="admin-empty">
@@ -85,12 +100,14 @@ import type { NationalOverview, WilayaReport, DairaReport, UserRole } from "../t
 import StatPill from "./admin/StatPill.vue"
 import DairaList from "./admin/DairaList.vue"
 import CommuneList from "./admin/CommuneList.vue"
+import SettingsUsers from "./settings/SettingsUsers.vue"
 
 const { t } = useI18n()
 const appStore = useAppStore()
 
 const loading = ref(false)
 const error = ref<string | null>(null)
+const showCreateUser = ref(false)
 
 const nationalData = ref<NationalOverview | null>(null)
 const wilayaData = ref<WilayaReport | null>(null)
@@ -112,7 +129,7 @@ const roleLabel = computed(
       wilaya_admin: t("admin.role.wilaya"),
       daira_admin: t("admin.role.daira"),
       commune_user: t("admin.role.commune"),
-      field_worker: "Field Worker",
+      field_worker: t("admin.role.field_worker"),
     })[userRole.value] ?? userRole.value,
 )
 
@@ -172,8 +189,15 @@ onMounted(loadOverview)
   margin: 0 auto;
   font-family: var(--font-sans, sans-serif);
   height: 100dvh;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   box-sizing: border-box;
+}
+.content-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 .admin-header {
   display: flex;
@@ -190,7 +214,7 @@ onMounted(loadOverview)
   font-size: 1.4rem;
   font-weight: 600;
   margin: 0;
-  color: var(--color-text-primary, #111);
+  color: var(--text-primary);
 }
 .role-badge {
   font-size: 0.75rem;
@@ -214,14 +238,41 @@ onMounted(loadOverview)
   background: #64b5f6;
   color: #0d47a1;
 }
+.admin-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.admin-action-btn {
+  padding: 0.45rem 1rem;
+  border: 1px solid #1976d2;
+  border-radius: 6px;
+  background: #1976d2;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.admin-action-btn:hover {
+  background: #1565c0;
+}
+.create-user-panel {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
 .admin-refresh-btn {
   display: flex;
   align-items: center;
   gap: 0.4rem;
   padding: 0.45rem 1rem;
-  border: 1px solid #ccc;
+  border: 1px solid var(--glass-border);
   border-radius: 6px;
-  background: #fff;
+  background: var(--glass-bg);
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 0.875rem;
 }
@@ -230,7 +281,7 @@ onMounted(loadOverview)
   cursor: not-allowed;
 }
 .admin-refresh-btn:hover:not(:disabled) {
-  background: #f5f5f5;
+  background: var(--glass-bg-hover);
 }
 .spinner {
   width: 14px;
@@ -257,14 +308,14 @@ onMounted(loadOverview)
 }
 .admin-empty {
   text-align: center;
-  color: #888;
+  color: var(--text-muted);
   padding: 2rem;
   font-size: 0.95rem;
 }
 .section-title {
   font-size: 1.1rem;
   font-weight: 600;
-  color: var(--color-text-primary, #111);
+  color: var(--text-primary);
   margin: 1.25rem 0 0.75rem;
   border-bottom: 2px solid #1976d2;
   padding-bottom: 0.4rem;
@@ -278,14 +329,14 @@ onMounted(loadOverview)
 .back-btn {
   font-size: 0.8rem;
   padding: 0.2rem 0.6rem;
-  border: 1px solid #1976d2;
-  color: #1976d2;
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
   border-radius: 5px;
-  background: transparent;
+  background: var(--glass-bg);
   cursor: pointer;
 }
 .back-btn:hover {
-  background: #e3f2fd;
+  background: var(--glass-bg-hover);
 }
 .wilaya-grid {
   display: grid;
@@ -293,16 +344,16 @@ onMounted(loadOverview)
   gap: 1rem;
 }
 .wilaya-card {
-  background: #fff;
-  border: 1px solid #e0e0e0;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
   border-radius: 10px;
   padding: 1rem;
   cursor: pointer;
   transition: box-shadow 0.15s;
 }
 .wilaya-card:hover {
-  box-shadow: 0 3px 12px rgba(25, 118, 210, 0.15);
-  border-color: #90caf9;
+  box-shadow: var(--glass-shadow);
+  border-color: var(--glass-border);
 }
 .wilaya-card-head {
   display: flex;
@@ -313,11 +364,11 @@ onMounted(loadOverview)
 .wilaya-name {
   font-weight: 600;
   font-size: 1rem;
-  color: #111;
+  color: var(--text-primary);
 }
 .wilaya-name-ar {
   font-size: 0.85rem;
-  color: #555;
+  color: var(--text-secondary);
   direction: rtl;
 }
 .wilaya-stats {
@@ -328,7 +379,7 @@ onMounted(loadOverview)
 }
 .wilaya-admin-row {
   font-size: 0.8rem;
-  color: #555;
+  color: var(--text-secondary);
   margin-bottom: 0.6rem;
 }
 .admin-label {
@@ -336,7 +387,7 @@ onMounted(loadOverview)
   margin-right: 0.3rem;
 }
 .admin-name {
-  color: #1565c0;
+  color: var(--text-primary);
 }
 .admin-missing {
   color: #e53935;
@@ -346,13 +397,13 @@ onMounted(loadOverview)
   width: 100%;
   padding: 0.35rem;
   font-size: 0.8rem;
-  border: 1px solid #1976d2;
-  color: #1976d2;
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
   border-radius: 5px;
-  background: transparent;
+  background: var(--glass-bg);
   cursor: pointer;
 }
 .drill-btn:hover {
-  background: #e3f2fd;
+  background: var(--glass-bg-hover);
 }
 </style>

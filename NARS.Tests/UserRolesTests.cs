@@ -48,9 +48,34 @@ public class UserRolesTests
     }
 
     [Fact]
+    public void FieldWorker_Is_Not_Admin()
+    {
+        Assert.False(UserRoles.IsAdmin(UserRoles.FieldWorker));
+    }
+
+    [Fact]
+    public void FieldWorker_Is_CommuneScoped()
+    {
+        Assert.True(UserRoles.IsCommuneScoped(UserRoles.FieldWorker));
+    }
+
+    [Fact]
+    public void CommuneUser_Is_CommuneScoped()
+    {
+        Assert.True(UserRoles.IsCommuneScoped(UserRoles.CommuneUser));
+    }
+
+    [Fact]
+    public void DairaAdmin_Is_Not_CommuneScoped()
+    {
+        Assert.False(UserRoles.IsCommuneScoped(UserRoles.DairaAdmin));
+    }
+
+    [Fact]
     public void Role_Constants_Have_Expected_Values()
     {
         Assert.Equal("commune_user", UserRoles.CommuneUser);
+        Assert.Equal("field_worker", UserRoles.FieldWorker);
         Assert.Equal("daira_admin", UserRoles.DairaAdmin);
         Assert.Equal("wilaya_admin", UserRoles.WilayaAdmin);
         Assert.Equal("national_admin", UserRoles.NationalAdmin);

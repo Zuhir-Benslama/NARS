@@ -151,7 +151,8 @@
       "national": "Admin national",
       "wilaya": "Admin wilaya",
       "daira": "Admin daïra",
-      "commune": "Utilisateur commune"
+      "commune": "Utilisateur commune",
+      "field_worker": "Agent de terrain"
     },
     "wilaya_admin": "Admin wilaya",
     "daira_admin": "Admin daïra",
@@ -169,7 +170,10 @@
     "pub_bldg": "Bât. pub.",
     "pub_space": "Esp. pub.",
     "panels": "Panneaux",
-    "total": "Total"
+    "total": "Total",
+    "totals": "Totaux",
+    "create_user": "Créer un utilisateur",
+    "cancel": "Annuler"
   },
   "tab_users": "Utilisateurs",
   "su_account_type": "Type de compte",
