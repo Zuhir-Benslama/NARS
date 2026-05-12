@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgis-backup-pvc
+  namespace: nars
+  labels:
+    app.kubernetes.io/name: postgis-backup
+    app.kubernetes.io/component: backup
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgis-backup
+  namespace: nars
+  labels:
+    app.kubernetes.io/name: postgis-backup
+    app.kubernetes.io/component: backup
+spec:
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: pg-dump
+              image: postgis/postgis:17-3.5
+              command:
+                - /bin/sh
+                - -ec
+                - |
+                  TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+                  FILE="/backup/nars_db_${TIMESTAMP}.sql"
+                  echo "→ Backing up database 'nars_db'..."
+                  PGPASSWORD="${PGPASSWORD}" pg_dump \
+                    -h "${PGHOST}" -U "${PGUSER}" -d "${PGDATABASE}" \
+                    --no-owner > "$FILE"
+                  gzip -f "$FILE"
+                  echo "✓ Backup saved: ${FILE}.gz"
+                  ls -lh "${FILE}.gz"
+                  echo "→ Cleaning backups older than 30 days..."
+                  find /backup -name "nars_db_*.sql.gz" -mtime +30 -delete
+              env:
+                - name: PGHOST
+                  value: postgis
+                - name: PGPORT
+                  value: "5432"
+                - name: PGUSER
+                  value: postgres
+                - name: PGDATABASE
+                  value: nars_db
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: nars-secrets
+                      key: postgres_password
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /backup
+          volumes:
+            - name: backup-storage
+              persistentVolumeClaim:
+                claimName: postgis-backup-pvc

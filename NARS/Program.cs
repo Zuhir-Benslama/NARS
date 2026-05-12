@@ -7,6 +7,9 @@ using Microsoft.Extensions.Logging;
 using NarsApi.Data;
 using NarsApi.Infrastructure;
 using NarsApi.Services;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 // Npgsql 6+ maps DateTime to timestamptz by default. Our DB uses
 // 'timestamp without time zone', so we restore the legacy behaviour that
@@ -47,6 +50,29 @@ var jwtSecret = (builder.Configuration["NARS_JWT_SECRET"]
 
 if (jwtSecret.Length < 32)
     throw new InvalidOperationException("Jwt:SecretKey must be at least 32 characters for HMAC-SHA256 security.");
+
+// ═══════════════════════════════════════════════════════════════
+// 0.5 OpenTelemetry — traces, metrics, logs via OTLP
+// ═══════════════════════════════════════════════════════════════
+var otelEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")
+    ?? "http://otel-collector.observability:4317";
+
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r
+        .AddService("nars-api", serviceVersion: "2.0.0")
+        .AddEnvironmentVariableDetector())
+    .WithTracing(t => t
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddEntityFrameworkCoreInstrumentation()
+        .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)))
+    .WithMetrics(m => m
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddRuntimeInstrumentation()
+        .AddMeter("Microsoft.AspNetCore.Hosting")
+        .AddMeter("Microsoft.AspNetCore.Server.Kestrel")
+        .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)));
 
 // ═══════════════════════════════════════════════════════════════
 // 1. Database (EF Core + Npgsql / PostGIS)
