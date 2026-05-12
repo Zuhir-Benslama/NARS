@@ -28,16 +28,16 @@ const colorClass = computed(() =>
   min-width: 52px;
 }
 .pill-default {
-  background: #f5f5f5;
-  color: #333;
+  background: var(--glass-bg);
+  color: var(--text-primary);
 }
 .pill-blue {
-  background: #e3f2fd;
-  color: #0d47a1;
+  background: var(--glass-bg);
+  color: var(--text-primary);
 }
 .pill-green {
-  background: #e8f5e9;
-  color: #1b5e20;
+  background: var(--glass-bg);
+  color: var(--text-primary);
 }
 .stat-value {
   font-size: 1.1rem;

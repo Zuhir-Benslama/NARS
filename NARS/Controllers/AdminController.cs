@@ -232,7 +232,7 @@ public class AdminController(
             .ToDictionaryAsync(x => x.WilayaId, x => x.Count);
 
         var usersByWilaya = await db.Users
-            .Where(u => u.Role == UserRoles.CommuneUser && u.CommuneId.HasValue)
+            .Where(u => (u.Role == UserRoles.CommuneUser || u.Role == UserRoles.FieldWorker) && u.CommuneId.HasValue)
             .Join(db.Communes, u => u.CommuneId, c => c.CommuneId, (u, c) => new { c.DairaId, u.Id })
             .Join(db.Dairas, x => x.DairaId, d => d.DairaId, (x, d) => new { d.WilayaId, x.Id })
             .GroupBy(x => x.WilayaId)
@@ -309,12 +309,12 @@ public class AdminController(
             .OrderBy(c => c.CommuneId)
             .ToListAsync();
 
-        // Batch-load all commune users for this daira in one query
+        // Batch-load all commune-scoped users for this daira in one query
         var communeIds = communes.Select(c => c.CommuneId).ToArray();
         var users = await db.Users
-            .Where(u => u.Role == UserRoles.CommuneUser && u.CommuneId.HasValue
+            .Where(u => (u.Role == UserRoles.CommuneUser || u.Role == UserRoles.FieldWorker) && u.CommuneId.HasValue
                      && communeIds.Contains(u.CommuneId!.Value))
-            .Select(u => new { u.Id, u.Username, u.Name, u.Email, u.CommuneId })
+            .Select(u => new { u.Id, u.Username, u.Name, u.Email, u.CommuneId, u.Role })
             .ToListAsync();
 
         // Batch feature counts for all users in one UNION ALL query
@@ -326,7 +326,7 @@ public class AdminController(
             var communeUsers = users
                 .Where(u => u.CommuneId == c.CommuneId)
                 .Select(u => counts.TryGetValue(u.Id, out var s) ? s
-                    : new UserFeatureStats(u.Id.ToString(), u.Username, u.Name, u.Email,
+                    : new UserFeatureStats(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role,
                         0, 0, 0, 0, 0, 0, 0, 0, 0))
                 .ToList();
 
@@ -383,13 +383,14 @@ public class AdminController(
                     u.username,
                     u.name,
                     u.email,
+                    u.role,
                     {caseBuilder}                    COUNT(f.id)
                 FROM users u
                 LEFT JOIN (
                     {unionBuilder}
                 ) f ON f.user_id = u.id
                 WHERE u.id = ANY(@ids)
-                GROUP BY u.id, u.username, u.name, u.email
+                GROUP BY u.id, u.username, u.name, u.email, u.role
                 """;
 
             var param = cmd.CreateParameter();
@@ -397,12 +398,12 @@ public class AdminController(
             param.Value = userIds;
             cmd.Parameters.Add(param);
 
-            // Build column index map: first 4 columns are id/username/name/email,
+            // Build column index map: first 5 columns are id/username/name/email/role,
             // then one CASE SUM per descriptor (+ 1 for the final COUNT column).
             var typeColIndex = new Dictionary<string, int>(descriptors.Count);
             for (int i = 0; i < descriptors.Count; i++)
-                typeColIndex[descriptors[i].Type] = 4 + i;
-            var totalCol = 4 + descriptors.Count;
+                typeColIndex[descriptors[i].Type] = 5 + i;
+            var totalCol = 5 + descriptors.Count;
 
             var result = new Dictionary<Guid, UserFeatureStats>();
             await using var reader = await cmd.ExecuteReaderAsync();
@@ -414,6 +415,7 @@ public class AdminController(
                     Username: reader.GetString(1),
                     Name: reader.GetString(2),
                     Email: reader.GetString(3),
+                    Role: reader.GetString(4),
                     Areas: reader.GetInt64(typeColIndex[FeatureTypes.Area]),
                     Districts: reader.GetInt64(typeColIndex[FeatureTypes.District]),
                     CityCenters: reader.GetInt64(typeColIndex[FeatureTypes.CityCenter]),
