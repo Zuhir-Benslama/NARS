@@ -151,7 +151,8 @@
       "national": "National admin",
       "wilaya": "Wilaya admin",
       "daira": "Daira admin",
-      "commune": "Commune user"
+      "commune": "Commune user",
+      "field_worker": "Field Worker"
     },
     "wilaya_admin": "Wilaya admin",
     "daira_admin": "Daira admin",
@@ -169,7 +170,10 @@
     "pub_bldg": "Pub. bldg.",
     "pub_space": "Pub. space",
     "panels": "Panels",
-    "total": "Total"
+    "total": "Total",
+    "totals": "Totals",
+    "create_user": "Create user",
+    "cancel": "Cancel"
   },
   "tab_users": "Users",
   "su_account_type": "Account Type",

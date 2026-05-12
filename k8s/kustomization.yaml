@@ -29,8 +29,11 @@ resources:
   - hpa.yaml
   - pdb.yaml
   - backup-cronjob.yaml
-  - otel-metrics-service.yaml
-  - servicemonitor.yaml
+  # otel-metrics-service.yaml and servicemonitor.yaml are applied separately
+  # after the observability stack is installed (their CRDs are only available then):
+  #   make observability-servicemonitor
+  # is installed (its CRDs are only available then):
+  #   make observability-servicemonitor
 images:
   # ⚠ `latest` tags are for local dev. For CI/CD, override newTag with
   # the commit SHA or build number:

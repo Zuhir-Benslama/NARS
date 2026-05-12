@@ -412,6 +412,7 @@ observability-install: helm-check ## Install LGTM stack + OpenTelemetry Collecto
 	$(MAKE) observability-loki
 	$(MAKE) observability-tempo
 	$(MAKE) observability-otel-collector
+	$(MAKE) observability-servicemonitor
 	@echo ""
 	@echo "✓ Observability stack installed!"
 	@echo ""
@@ -516,6 +517,13 @@ observability-otel-collector: ## Install OpenTelemetry Collector
 		--values $(K8S_DIR)/helm-values/opentelemetry-collector.yaml \
 		--reuse-values --timeout 10m
 
+.PHONY: observability-servicemonitor
+observability-servicemonitor: ## Apply OTel metrics Service + ServiceMonitor (requires prometheus CRDs)
+	@echo "→ Applying OTel metrics Service and ServiceMonitor..."
+	@kubectl apply -f $(K8S_DIR)/otel-metrics-service.yaml
+	@kubectl apply -f $(K8S_DIR)/servicemonitor.yaml
+	@echo "✓ OTel metrics Service + ServiceMonitor applied"
+
 .PHONY: observability-port-forward
 observability-port-forward: ## Port-forward Grafana, Loki, Tempo (background)
 	@echo "→ Starting observability port-forwards (background)..."
@@ -591,3 +599,11 @@ images-load: ## Load locally built Docker images into the kind cluster
 		fi
 	done
 	@echo "✓ Images loaded"
+
+.PHONY: frontend-update
+frontend-update: ## Rebuild nars-vite, load into kind, and rollout restart
+	$(MAKE) _build-nars-vite
+	@kind load docker-image "$(DOCKER_ORG)/nars-vite:latest" --name "$(CLUSTER_NAME)"
+	@kubectl rollout restart deployment nars-frontend -n "$(NAMESPACE)"
+	@kubectl rollout status deployment nars-frontend -n "$(NAMESPACE)" --timeout=120s
+	@echo "✓ nars-vite rebuilt and deployed"

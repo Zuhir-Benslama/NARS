@@ -30,6 +30,7 @@
           <tr v-for="u in commune.users" :key="u.user_id" :class="{ 'row-complete': u.total > 0 }">
             <td class="user-cell">
               <span class="uname">{{ u.username }}</span>
+              <span v-if="isFieldWorker(u)" class="fw-badge">FW</span>
               <span class="uname-full">{{ u.name }}</span>
             </td>
             <td>{{ u.areas }}</td>
@@ -43,6 +44,20 @@
             <td class="total-col">{{ u.total }}</td>
           </tr>
         </tbody>
+        <tfoot v-if="commune.users.length > 1">
+          <tr class="totals-row">
+            <td class="totals-label">{{ t("admin.totals") }}</td>
+            <td>{{ sum(commune.users, "areas") }}</td>
+            <td>{{ sum(commune.users, "districts") }}</td>
+            <td>{{ sum(commune.users, "city_centers") }}</td>
+            <td>{{ sum(commune.users, "roads") }}</td>
+            <td>{{ sum(commune.users, "house_entrances") }}</td>
+            <td>{{ sum(commune.users, "public_buildings") }}</td>
+            <td>{{ sum(commune.users, "public_spaces") }}</td>
+            <td>{{ sum(commune.users, "naming_panels") }}</td>
+            <td class="total-col">{{ sum(commune.users, "total") }}</td>
+          </tr>
+        </tfoot>
       </table>
     </div>
   </div>
@@ -50,9 +65,20 @@
 
 <script setup lang="ts">
 import { useI18n } from "vue-i18n"
-import type { CommuneReport } from "../../types"
+import type { CommuneReport, UserFeatureStats } from "../../types"
 defineProps<{ communes: CommuneReport[] }>()
 const { t } = useI18n()
+
+function isFieldWorker(u: UserFeatureStats): boolean {
+  return u.role === "field_worker"
+}
+
+function sum(users: UserFeatureStats[], field: keyof UserFeatureStats): number {
+  return users.reduce(
+    (acc, u) => acc + (typeof u[field] === "number" ? (u[field] as number) : 0),
+    0,
+  )
+}
 </script>
 
 <style scoped>
@@ -150,5 +176,28 @@ const { t } = useI18n()
 .uname-full {
   font-size: 0.75rem;
   color: #666;
+}
+.fw-badge {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  background: #ff9800;
+  color: #fff;
+  border-radius: 3px;
+  padding: 0.05rem 0.35rem;
+  margin-left: 0.3rem;
+  vertical-align: middle;
+  line-height: 1.3;
+}
+.totals-row td {
+  font-weight: 700;
+  border-top: 2px solid #1976d2;
+  background: #e3f2fd;
+  color: #0d47a1;
+}
+.totals-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 </style>

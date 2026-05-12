@@ -55,6 +55,19 @@
 - [x] Configure OTel pipelines: traces → Tempo, metrics → Prometheus, logs → Loki
 - [x] Add ServiceMonitor for Prometheus scraping of OTel Collector
 
+## Dashboard Capabilities ✅ DONE
+
+- [x] Include field workers in admin overview stats (backend + frontend)
+- [x] Add totals summary row per commune in stats tables
+- [x] Add inline user creation button from dashboard
+
+## User Type Test Coverage ✅ DONE
+
+- [x] Add `UserRolesTests` — `field_worker` is not admin, `IsCommuneScoped` checks
+- [x] Add `AdminControllerIntegrationTests` — all create-role combos tested (incl. commune\_user → field\_worker)
+- [x] Add `AdminControllerIntegrationTests` — overview for every admin role + forbid for non-admins
+- [x] Add `AdminControllerIntegrationTests` — wilaya drill-down and daira drill-down with scope enforcement
+
 ## Future / Nice-to-have ✅ DONE
 
 - [x] Install metrics-server for HPA autoscaling
