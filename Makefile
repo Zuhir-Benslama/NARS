@@ -57,6 +57,10 @@ cluster-up: prerequisites ## Full bootstrap: create cluster, deploy everything
 	$(MAKE) cluster-create
 	$(MAKE) ingress-install
 	$(MAKE) ingress-wait
+	$(MAKE) metrics-install
+	$(MAKE) metrics-wait
+	$(MAKE) storage-provisioner-install
+	$(MAKE) storage-provisioner-wait
 	$(MAKE) tls-generate
 	$(MAKE) ca-secret
 	$(MAKE) secrets-apply
@@ -269,6 +273,38 @@ ingress-wait: ## Wait for ingress controller to be ready
 		--timeout=180s
 	@echo "✓ Ingress controller ready"
 
+.PHONY: metrics-install
+metrics-install: ## Install metrics-server for HPA autoscaling (idempotent)
+	@echo "→ Installing metrics-server..."
+	@kubectl apply -f \
+		https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+	@kubectl patch deployment metrics-server -n kube-system --type=json \
+		-p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]' 2>/dev/null || true
+	@echo "✓ metrics-server installed"
+
+.PHONY: metrics-wait
+metrics-wait: ## Wait for metrics-server to be ready
+	@echo "→ Waiting for metrics-server..."
+	@kubectl wait --namespace kube-system \
+		--for=condition=available deployment/metrics-server \
+		--timeout=180s
+	@echo "✓ metrics-server ready"
+
+.PHONY: storage-provisioner-install
+storage-provisioner-install: ## Install local-path StorageClass (dynamic provisioning, idempotent)
+	@echo "→ Installing local-path StorageClass..."
+	@kubectl apply -f \
+		https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.30/deploy/local-path-storage.yaml
+	@echo "✓ local-path StorageClass installed"
+
+.PHONY: storage-provisioner-wait
+storage-provisioner-wait: ## Wait for local-path-provisioner to be ready
+	@echo "→ Waiting for local-path-provisioner..."
+	@kubectl wait --namespace local-path-storage \
+		--for=condition=available deployment/local-path-provisioner \
+		--timeout=120s 2>/dev/null || echo "  ⚠ local-path-provisioner not found (may use different namespace)"
+	@echo "✓ local-path-provisioner ready"
+
 .PHONY: tls-generate
 tls-generate: ## Generate TLS certificate for $(DOMAIN) (idempotent)
 	@if kubectl get secret nars-tls -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
@@ -364,6 +400,148 @@ kustomize-apply: ## Apply k8s manifests via kustomize
 		fi
 	done
 	@echo "✓ All deployments ready"
+
+# ─── Observability (Grafana LGTM + OTel) ─────────────────────
+
+OBSERVABILITY_NAMESPACE ?= observability
+
+.PHONY: observability-install
+observability-install: helm-check ## Install LGTM stack + OpenTelemetry Collector
+	$(MAKE) observability-namespace
+	$(MAKE) observability-prometheus-stack
+	$(MAKE) observability-loki
+	$(MAKE) observability-tempo
+	$(MAKE) observability-otel-collector
+	@echo ""
+	@echo "✓ Observability stack installed!"
+	@echo ""
+	@echo "  Port-forward:  make observability-port-forward"
+	@echo "  Grafana:       http://localhost:3000 (admin/admin)"
+	@echo "  Loki:          http://localhost:3100"
+	@echo "  Tempo:         http://localhost:3200"
+
+.PHONY: helm-check
+helm-check:
+	@command -v helm >/dev/null 2>&1 || { echo "✖ helm is not installed"; exit 1; }
+
+.PHONY: observability-namespace
+observability-namespace:
+	@kubectl create namespace $(OBSERVABILITY_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+
+.PHONY: observability-prometheus-stack
+observability-prometheus-stack: ## Install Prometheus + Grafana + AlertManager
+	@echo "→ Installing kube-prometheus-stack..."
+	@helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
+		--namespace $(OBSERVABILITY_NAMESPACE) \
+		--set grafana.adminPassword=admin \
+		--set grafana.service.type=ClusterIP \
+		--set grafana.service.port=3000 \
+		--set grafana.additionalDataSources[0].name=Loki \
+		--set grafana.additionalDataSources[0].type=loki \
+		--set grafana.additionalDataSources[0].url=http://loki-gateway:80 \
+		--set grafana.additionalDataSources[0].access=proxy \
+		--set grafana.additionalDataSources[1].name=Tempo \
+		--set grafana.additionalDataSources[1].type=tempo \
+		--set grafana.additionalDataSources[1].url=http://tempo:3200 \
+		--set grafana.additionalDataSources[1].access=proxy \
+		--set grafana.additionalDataSources[1].jsonData.tracesToLogsV2.datasourceUid=loki \
+		--set grafana.additionalDataSources[1].jsonData.lokiSearch.datasourceUid=loki \
+		--set prometheus.prometheusSpec.resources.requests.cpu=100m \
+		--set prometheus.prometheusSpec.resources.requests.memory=256Mi \
+		--set prometheus.prometheusSpec.resources.limits.cpu=500m \
+		--set prometheus.prometheusSpec.resources.limits.memory=1Gi \
+		--set alertmanager.enabled=false \
+		--set defaultRules.create=false \
+		--set nodeExporter.enabled=false \
+		--set kubeStateMetrics.enabled=false \
+		--reuse-values --timeout 10m
+
+.PHONY: observability-loki
+observability-loki: ## Install Loki (logs)
+	@echo "→ Installing Loki..."
+	@helm upgrade --install loki grafana/loki \
+		--namespace $(OBSERVABILITY_NAMESPACE) \
+		--set deploymentMode=SingleBinary \
+		--set loki.commonConfig.replication_factor=1 \
+		--set loki.auth_enabled=false \
+		--set loki.storage.type=filesystem \
+		--set loki.storage.bucketNames.chunks=loki-chunks \
+		--set loki.storage.bucketNames.admin=loki-admin \
+		--set loki.useTestSchema=true \
+		--set loki.ruler.enabled=false \
+		--set singleBinary.replicas=1 \
+		--set singleBinary.persistence.volumeClaimsEnabled=false \
+		--set singleBinary.resources.requests.cpu=50m \
+		--set singleBinary.resources.requests.memory=128Mi \
+		--set singleBinary.resources.limits.cpu=200m \
+		--set singleBinary.resources.limits.memory=512Mi \
+		--set write.replicas=0 \
+		--set read.replicas=0 \
+		--set backend.replicas=0 \
+		--set chunksCache.enabled=false \
+		--set resultsCache.enabled=false \
+		--set test.enabled=false \
+		--set monitoring.lokiCanary.enabled=false \
+		--set monitoring.selfMonitoring.enabled=false \
+		--reuse-values --timeout 10m
+
+.PHONY: observability-tempo
+observability-tempo: ## Install Tempo (traces)
+	@echo "→ Installing Tempo..."
+	@helm upgrade --install tempo grafana/tempo \
+		--namespace $(OBSERVABILITY_NAMESPACE) \
+		--set tempo.replicas=1 \
+		--set tempo.resources.requests.cpu=50m \
+		--set tempo.resources.requests.memory=128Mi \
+		--set tempo.resources.limits.cpu=200m \
+		--set tempo.resources.limits.memory=512Mi \
+		--set tempo.storage.trace.backend=local \
+		--set tempo.storage.trace.local.path=/var/tempo/traces \
+		--set tempo.storage.trace.wal.path=/var/tempo/wal \
+		--set tempo.ingester.max_block_duration=5m \
+		--set tempo.readinessProbe.initialDelaySeconds=60 \
+		--set tempo.readinessProbe.failureThreshold=10 \
+		--set tempo.livenessProbe.initialDelaySeconds=60 \
+		--set tempo.livenessProbe.failureThreshold=10 \
+		--set tempoSearchEnabled=true \
+		--set memBallastSizeMbs=128 \
+		--set test.enabled=false \
+		--reuse-values --timeout 10m
+
+.PHONY: observability-otel-collector
+observability-otel-collector: ## Install OpenTelemetry Collector
+	@echo "→ Installing OpenTelemetry Collector..."
+	@helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
+		--namespace $(OBSERVABILITY_NAMESPACE) \
+		--values $(K8S_DIR)/helm-values/opentelemetry-collector.yaml \
+		--reuse-values --timeout 10m
+
+.PHONY: observability-port-forward
+observability-port-forward: ## Port-forward Grafana, Loki, Tempo (background)
+	@echo "→ Starting observability port-forwards (background)..."
+	@-pkill -f "kubectl port-forward.*observability.*grafana" 2>/dev/null || true
+	@-pkill -f "kubectl port-forward.*observability.*loki-gateway" 2>/dev/null || true
+	@-pkill -f "kubectl port-forward.*observability.*tempo" 2>/dev/null || true
+	@sleep 0.5
+	@nohup kubectl port-forward -n $(OBSERVABILITY_NAMESPACE) \
+		service/prometheus-stack-grafana 3000:80 \
+		> /tmp/port-forward-grafana.log 2>&1 &
+	@nohup kubectl port-forward -n $(OBSERVABILITY_NAMESPACE) \
+		service/loki-gateway 3100:80 \
+		> /tmp/port-forward-loki.log 2>&1 &
+	@nohup kubectl port-forward -n $(OBSERVABILITY_NAMESPACE) \
+		service/tempo 3200:3200 \
+		> /tmp/port-forward-tempo.log 2>&1 &
+	@echo "✓ Port-forwards running"
+	@echo "  Grafana: http://localhost:3000 (admin/admin)"
+	@echo "  Loki:    http://localhost:3100"
+	@echo "  Tempo:   http://localhost:3200"
+	@echo "  Logs:    tail -f /tmp/port-forward-{grafana,loki,tempo}.log"
+
+.PHONY: observability-stop
+observability-stop: ## Stop observability port-forwards
+	@-pkill -f "kubectl port-forward.*observability" 2>/dev/null || true
+	@echo "✓ Port-forwards stopped"
 
 # ─── Docker Images ───────────────────────────────────────────
 

@@ -43,10 +43,22 @@
 - [x] Deploy to k8s cluster (`make cluster-up`)
 - [x] CI/CD pipeline
 
-## Future / Nice-to-have
+## Observability (LGTM Stack) ✅ DONE
 
-- [ ] Install metrics-server for HPA autoscaling
-- [ ] Add `docs/seed_reference_data.sql` to init process for fresh deployments
-- [ ] Generate proper EF migration to capture pending model changes
-- [ ] Replace hostPath PV with CSI-backed persistent volume for production
-- [ ] Add database backup cronjob in k8s
+- [x] Install kube-prometheus-stack (Prometheus + Grafana + AlertManager)
+- [x] Install Loki (log aggregation)
+- [x] Install Tempo (distributed tracing)
+- [x] Install OpenTelemetry Collector
+- [x] Configure Grafana datasources (Loki, Tempo, Prometheus)
+- [x] Instrument NARS backend — traces (AspNetCore, HttpClient, EF Core) + metrics (Runtime, Hosting, Kestrel)
+- [x] Instrument nars-vite frontend — traces (page load, fetch) via OTel Web SDK
+- [x] Configure OTel pipelines: traces → Tempo, metrics → Prometheus, logs → Loki
+- [x] Add ServiceMonitor for Prometheus scraping of OTel Collector
+
+## Future / Nice-to-have ✅ DONE
+
+- [x] Install metrics-server for HPA autoscaling
+- [x] Add `docs/seed_reference_data.sql` to init process for fresh deployments
+- [x] Generate proper EF migration to capture pending model changes
+- [x] Replace hostPath PV with CSI-backed persistent volume for production
+- [x] Add database backup cronjob in k8s

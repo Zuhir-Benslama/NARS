@@ -13,6 +13,9 @@ import { apiUrl } from "./api"
 import { logError, createServerError } from "./lib/errors"
 import { showToast } from "./lib/toast"
 import { debugLog, debugError } from "./utils/debug"
+import { initTelemetry } from "./lib/telemetry"
+
+initTelemetry()
 
 // Apply the saved theme before anything renders — prevents flash of wrong theme.
 initTheme()

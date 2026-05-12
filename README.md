@@ -10,12 +10,26 @@ A full-stack geographic data management application for urban addressing across 
 │   Vue 3 + Vite      │◄────►│  ASP.NET Core 10     │
 │   MapLibre GL JS    │      │  EF Core + PostGIS   │
 │   Pinia + vue-i18n  │      │  JWT Auth            │
-└─────────────────────┘      └──────────┬───────────┘
-                                         │
-                               ┌─────────▼──────────┐
-                               │   PostgreSQL +      │
-                               │   PostGIS           │
-                               └────────────────────┘
+│   OTel (Web SDK) ───┼─────►│  OTel (.NET SDK) ────┼──┐
+└─────────────────────┘      └──────────────────────┘  │
+                                                       │
+                          ┌────────────────────────────┘
+                          ▼
+              ┌───────────────────────┐
+              │  OpenTelemetry        │
+              │  Collector            │
+              └───────┬───────┬───────┘
+                      │       │
+              ┌───────▼──┐ ┌──▼────────┐
+              │  Tempo    │ │  Loki     │
+              │  (traces) │ │  (logs)   │
+              └───────┬──┘ └──┬────────┘
+                      │       │
+              ┌───────▼───────▼───────┐
+              │  Grafana              │
+              │  + Prometheus         │
+              │  (metrics + UI)       │
+              └───────────────────────┘
 ```
 
 ## Prerequisites
@@ -38,7 +52,16 @@ make cluster-in   # Port-forward to localhost:8080
 
 The app is available at `http://localhost:8080`.
 
-### 2. Bootstrap Admin
+### 2. Observability Stack (optional)
+
+```bash
+make observability-install    # Deploys LGTM + OTel Collector
+make observability-port-forward  # Port-forward Grafana, Loki, Tempo
+```
+
+Grafana: `http://localhost:3000` (`admin`/`admin`).
+
+### 3. Bootstrap Admin
 
 ```bash
 make db-admin
@@ -46,7 +69,7 @@ make db-admin
 
 Credentials: `zuhir` / `admin123`.
 
-### 3. Access the App
+### 4. Access the App
 
 Open `http://localhost:8080` in your browser.
 
@@ -60,6 +83,9 @@ Open `http://localhost:8080` in your browser.
 | `cluster-in` | Port-forward postgis (5433) + frontend (8080) |
 | `cluster-logs` | Tail logs from all pods |
 | `db-admin` | Create national admin user (zuhir) |
+| `observability-install` | Deploy LGTM stack (Prometheus, Grafana, Loki, Tempo, OTel Collector) |
+| `observability-port-forward` | Port-forward Grafana (:3000), Loki (:3100), Tempo (:3200) |
+| `observability-stop` | Stop observability port-forwards |
 | `images-build` | Build all Docker images |
 | `images-push` | Push all images to Docker Hub |
 
@@ -171,6 +197,24 @@ npm install  # Runs "husky" via the prepare script
 - **Spatial Queries**: PostGIS-powered proximity and containment queries
 - **Multi-language**: English, French, Arabic (i18n)
 - **Export**: Print-ready PDF export of map views
+
+## Observability
+
+The application is instrumented with OpenTelemetry and connected to a full LGTM stack:
+
+| Component | Role | Access |
+|-----------|------|--------|
+| **OpenTelemetry Collector** | Receives traces, metrics, logs from apps | Internal — `otel-collector.observability:4317` |
+| **Tempo** | Distributed tracing store | `http://localhost:3200` |
+| **Loki** | Log aggregation | `http://localhost:3100` |
+| **Prometheus** | Metrics scrape & storage | Internal |
+| **Grafana** | Dashboards & visualization | `http://localhost:3000` (`admin`/`admin`) |
+
+- **Backend** (`NARS/Program.cs`): OTel .NET SDK traces ASP.NET Core, HttpClient, EF Core; metrics from runtime, hosting, Kestrel — all exported via OTLP.
+- **Frontend** (`nars-vite/src/lib/telemetry.ts`): OTel Web SDK captures page loads and fetch requests, exported via OTLP/HTTP.
+- **Android** MapLibre telemetry is opted out (`AndroidManifest.xml`).
+
+Run `make observability-install && make observability-port-forward` to enable.
 
 ## Security
 

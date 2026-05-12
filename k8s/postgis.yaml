@@ -6,11 +6,10 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: manual
+  storageClassName: local-path
   resources:
     requests:
       storage: 10Gi
-  volumeName: postgis-pv
 ---
 apiVersion: apps/v1
 kind: Deployment

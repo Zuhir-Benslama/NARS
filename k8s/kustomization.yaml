@@ -15,7 +15,7 @@ resources:
   #   make secrets-apply   ← creates nars-secrets + regcred
   #   make tls-generate    ← creates nars-tls TLS certificate
   #   make ca-secret       ← creates nars-ca for mTLS
-  - postgis-pv.yaml
+  # postgis-pv.yaml (static hostPath PV) replaced by dynamic provisioning via local-path StorageClass
   - postgis.yaml
   - app-deployment.yaml
   - app-service.yaml
@@ -28,6 +28,9 @@ resources:
   - resource-quota.yaml
   - hpa.yaml
   - pdb.yaml
+  - backup-cronjob.yaml
+  - otel-metrics-service.yaml
+  - servicemonitor.yaml
 images:
   # ⚠ `latest` tags are for local dev. For CI/CD, override newTag with
   # the commit SHA or build number:
