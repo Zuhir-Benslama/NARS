@@ -20,6 +20,16 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.addJsonObject
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.LineLayer
@@ -154,100 +164,57 @@ private fun updateBaseLayer(mapView: MapView, layer: BaseLayerType) {
     }
 }
 
+private data class LayerConfig(
+    val sourceId: String,
+    val layerId: String,
+    val tiles: String,
+    val attribution: String
+)
+
 /**
  * Get style JSON for layer type
- * Uses inline Mapbox Style Specification for raster tiles
+ * Uses Mapbox Style Specification built via kotlinx.serialization JSON API
  */
 private fun getStyleJson(layer: BaseLayerType): String {
-    return when (layer) {
-        BaseLayerType.SATELLITE -> """
-        {
-            "version": 8,
-            "sources": {
-                "esri-satellite": {
-                    "type": "raster",
-                    "tiles": ["${Config.TILE_SATELLITE}"],
-                    "tileSize": 256,
-                    "attribution": "${Config.ATTR_ESRI}"
-                }
-            },
-            "glyphs": "${Config.GLYPHS}",
-            "layers": [{
-                "id": "satellite-layer",
-                "type": "raster",
-                "source": "esri-satellite",
-                "minzoom": 0,
-                "maxzoom": 19
-            }]
-        }
-        """.trimIndent()
-
-        BaseLayerType.STREET -> """
-        {
-            "version": 8,
-            "sources": {
-                "osm-tiles": {
-                    "type": "raster",
-                    "tiles": ["${Config.TILE_STREET}"],
-                    "tileSize": 256,
-                    "attribution": "${Config.ATTR_OSM}"
-                }
-            },
-            "glyphs": "${Config.GLYPHS}",
-            "layers": [{
-                "id": "osm-layer",
-                "type": "raster",
-                "source": "osm-tiles",
-                "minzoom": 0,
-                "maxzoom": 19
-            }]
-        }
-        """.trimIndent()
-
-        BaseLayerType.LIGHT -> """
-        {
-            "version": 8,
-            "sources": {
-                "carto-light": {
-                    "type": "raster",
-                    "tiles": ["${Config.TILE_LIGHT}"],
-                    "tileSize": 256,
-                    "attribution": "${Config.ATTR_CARTO}"
-                }
-            },
-            "glyphs": "${Config.GLYPHS}",
-            "layers": [{
-                "id": "carto-light-layer",
-                "type": "raster",
-                "source": "carto-light",
-                "minzoom": 0,
-                "maxzoom": 19
-            }]
-        }
-        """.trimIndent()
-
-        BaseLayerType.DARK -> """
-        {
-            "version": 8,
-            "sources": {
-                "carto-dark": {
-                    "type": "raster",
-                    "tiles": ["${Config.TILE_DARK}"],
-                    "tileSize": 256,
-                    "attribution": "${Config.ATTR_CARTO}"
-                }
-            },
-            "glyphs": "${Config.GLYPHS}",
-            "layers": [{
-                "id": "carto-dark-layer",
-                "type": "raster",
-                "source": "carto-dark",
-                "minzoom": 0,
-                "maxzoom": 19
-            }]
-        }
-        """.trimIndent()
+    val cfg = when (layer) {
+        BaseLayerType.SATELLITE -> LayerConfig(
+            "esri-satellite", "satellite-layer",
+            Config.TILE_SATELLITE, Config.ATTR_ESRI
+        )
+        BaseLayerType.STREET -> LayerConfig(
+            "osm-tiles", "osm-layer",
+            Config.TILE_STREET, Config.ATTR_OSM
+        )
+        BaseLayerType.LIGHT -> LayerConfig(
+            "carto-light", "carto-light-layer",
+            Config.TILE_LIGHT, Config.ATTR_CARTO
+        )
+        BaseLayerType.DARK -> LayerConfig(
+            "carto-dark", "carto-dark-layer",
+            Config.TILE_DARK, Config.ATTR_CARTO
+        )
     }
+    return buildJsonObject {
+        put("version", 8)
+        putJsonObject("sources") {
+            putJsonObject(cfg.sourceId) {
+                put("type", "raster")
+                putJsonArray("tiles") { add(cfg.tiles) }
+                put("tileSize", 256)
+                put("attribution", cfg.attribution)
+            }
+        }
+        put("glyphs", Config.GLYPHS)
+        putJsonArray("layers") {
+            addJsonObject {
+                put("id", cfg.layerId)
+                put("type", "raster")
+                put("source", cfg.sourceId)
+                put("minzoom", 0)
+                put("maxzoom", 19)
+            }
+        }
+    }.toString()
 }
 
 /**

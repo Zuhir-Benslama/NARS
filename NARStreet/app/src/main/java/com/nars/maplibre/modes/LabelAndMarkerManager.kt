@@ -29,7 +29,9 @@ class LabelAndMarkerManager(
         val labelLayerName = "${layerName}_label"
         try {
             map.style?.getLayer(labelLayerName)?.let { map.style?.removeLayer(labelLayerName) }
-        } catch (e: Exception) { /* ignore */ }
+        } catch (e: Exception) {
+            NarsLogger.w(TAG, "Failed to remove existing label layer: ${e.message}")
+        }
 
         val labelLayer = SymbolLayer(labelLayerName, sourceName).apply {
             setProperties(

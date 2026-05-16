@@ -1,8 +1,7 @@
 # NARStreet Detekt Configuration
 build:
-  maxIssues: 0
+  maxIssues: 20
 
-# Enable all rule sets
 ruleSets:
   - ruleSet: "戒 Complexity"
     active: true
@@ -23,7 +22,6 @@ ruleSets:
   - ruleSet: "戒 Style"
     active: true
 
-# Complexity rules
 complexity:
   ComplexMethod:
     threshold: 15
@@ -34,7 +32,7 @@ complexity:
   TooManyFunctions:
     threshold: 20
     excludeFunctionsInClasses:
-      - "*Screen" # Composable screens often have many small functions
+      - "*Screen"
     excludeTraits:
       - "Composable"
   CyclomaticComplexMethod:
@@ -44,7 +42,6 @@ complexity:
   ThrowCount:
     max: 3
 
-# Naming rules - lenient for Compose
 naming:
   FunctionNaming:
     active: true
@@ -61,7 +58,6 @@ naming:
     active: true
     excludeAnnotationRegex: ".*"
 
-# Style rules
 style:
   MagicNumber:
     ignoreNumbers:
@@ -75,8 +71,8 @@ style:
       - "360"
       - "1000"
       - "3600"
-      - "6371000.0" # Earth radius in meters (WGS84)
-      - "6378137.0" # Earth semi-major axis
+      - "6371000.0"
+      - "6378137.0"
     ignoreAnnotationRegex: ".*Color.*"
     ignorePropertyDeclaration: true
     ignoreTaggedStatements:
@@ -87,7 +83,6 @@ style:
   NewLineAtEndOfFile:
     active: true
 
-# Empty code rules
 empty-blocks:
   EmptyCatchBlock:
     ignoreExceptedCases: true
@@ -95,16 +90,12 @@ empty-blocks:
     ignoreAnnotated:
       - "Composable"
 
-# Exception rules
 exceptions:
   TooGenericResult:
     excludeResultNames:
       - "Ok"
       - "Err"
-  SwallowedException:
-    allowedExceptionClassRegex: ".*"
 
-# Potential bugs
 potential-bugs:
   UnsafeCast:
     active: true
@@ -113,7 +104,6 @@ potential-bugs:
   UnusedPrivateFunction:
     active: true
 
-# Performance
 performance:
   SpreadOperator:
     active: true

@@ -1,191 +1,157 @@
 package com.nars.maplibre.data.store
 
-import com.nars.maplibre.data.model.EntranceType
 import com.nars.maplibre.data.model.FeatureProperties
+import com.nars.maplibre.data.model.LineStringGeometry
 import com.nars.maplibre.data.model.NarsFeature
 import com.nars.maplibre.data.model.NarsFeatureType
 import com.nars.maplibre.data.model.Phases
 import com.nars.maplibre.data.model.PointGeometry
-import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Test
 
 class FeatureStoreTest {
 
-    private lateinit var featureStore: FeatureStore
+    private fun createRoad(id: String): NarsFeature = NarsFeature(
+        id = id,
+        type = NarsFeatureType.ROAD,
+        geometry = LineStringGeometry(coordinates = listOf(3.0, 36.0, 3.01, 36.0)),
+        properties = FeatureProperties(phase = Phases.ROADS_KEY, color = "#3498db", name = "Road $id")
+    )
 
-    // Helper to create a test feature
-    private fun createFeature(id: String, phaseKey: String, lng: Double = 3.0, lat: Double = 36.0): NarsFeature {
-        return NarsFeature(
-            id = id,
-            type = NarsFeatureType.ROAD,
-            geometry = PointGeometry(coordinates = listOf(lng, lat)),
-            properties = FeatureProperties(
-                phase = phaseKey,
-                color = "#3498db"
-            )
-        )
-    }
+    private fun createEntrance(id: String): NarsFeature = NarsFeature(
+        id = id,
+        type = NarsFeatureType.HOUSE_ENTRANCE,
+        geometry = PointGeometry(coordinates = listOf(3.0, 36.0)),
+        properties = FeatureProperties(phase = Phases.HOUSE_ENTRANCES_KEY, color = "#27ae60")
+    )
 
-    @Before
-    fun setUp() {
-        featureStore = FeatureStore()
+    @Test
+    fun `addFeature stores feature and records undo`() {
+        val store = FeatureStore()
+        val feature = createRoad("r1")
+
+        store.addFeature(feature, recordUndo = true)
+
+        assertEquals(1, store.allFeatures.value.size)
+        assertEquals(feature, store.allFeatures.value[0])
+        assertTrue(store.canUndo)
     }
 
     @Test
-    fun `addFeature adds to correct phase`() = runTest {
-        val feature = createFeature("f1", Phases.ROADS_KEY)
+    fun `addFeatures stores multiple features by phase`() {
+        val store = FeatureStore()
+        val road = createRoad("r1")
+        val entrance = createEntrance("e1")
 
-        featureStore.addFeature(feature)
+        store.addFeatures(listOf(road, entrance))
 
-        val roads = featureStore.getFeaturesByPhase(Phases.ROADS_KEY)
-        assertEquals(1, roads.size)
-        assertEquals("f1", roads[0].id)
+        assertEquals(2, store.allFeatures.value.size)
+        assertEquals(1, store.getFeaturesByPhase(Phases.ROADS_KEY).size)
+        assertEquals(1, store.getFeaturesByPhase(Phases.HOUSE_ENTRANCES_KEY).size)
     }
 
     @Test
-    fun `addFeature updates allFeatures`() = runTest {
-        val feature = createFeature("f1", Phases.ROADS_KEY)
+    fun `addFeatures groups features by phase`() {
+        val store = FeatureStore()
+        val road1 = createRoad("r1")
+        val road2 = createRoad("r2")
 
-        featureStore.addFeature(feature)
+        store.addFeatures(listOf(road1, road2))
 
-        val allFeatures = featureStore.allFeatures.value
-        assertEquals(1, allFeatures.size)
-        assertEquals("f1", allFeatures[0].id)
+        assertEquals(2, store.getFeaturesByPhase(Phases.ROADS_KEY).size)
     }
 
     @Test
-    fun `addFeature updates fast lookup map`() = runTest {
-        val feature = createFeature("f1", Phases.ROADS_KEY)
+    fun `updateFeature modifies stored feature`() {
+        val store = FeatureStore()
+        val feature = createRoad("r1")
+        store.addFeature(feature)
 
-        featureStore.addFeature(feature)
+        val updated = feature.copy(properties = feature.properties.copy(name = "Updated Road"))
+        store.updateFeature("r1", updated)
 
-        val retrieved = featureStore.getFeatureById("f1")
-        assertNotNull(retrieved)
-        assertEquals("f1", retrieved?.id)
+        assertEquals("Updated Road", store.getFeatureById("r1")?.properties?.name)
     }
 
     @Test
-    fun `getFeatureById returns null for non-existent feature`() = runTest {
-        val result = featureStore.getFeatureById("nonexistent")
-        assertNull(result)
+    fun `removeFeature deletes feature and clears selection`() {
+        val store = FeatureStore()
+        val feature = createRoad("r1")
+        store.addFeature(feature)
+        store.selectFeature(feature)
+
+        store.removeFeature("r1")
+
+        assertNull(store.getFeatureById("r1"))
+        assertNull(store.selectedFeature.value)
+        assertEquals(0, store.getFeaturesByPhase(Phases.ROADS_KEY).size)
     }
 
     @Test
-    fun `updateFeature removes old and adds new`() = runTest {
-        val feature1 = createFeature("f1", Phases.ROADS_KEY, lng = 3.0)
-        val feature2 = createFeature("f1", Phases.ROADS_KEY, lng = 3.1) // Same ID, updated
-
-        featureStore.addFeature(feature1)
-        featureStore.updateFeature("f1", feature2)
-
-        val allFeatures = featureStore.allFeatures.value
-        assertEquals(1, allFeatures.size) // Still only 1 feature with ID "f1"
-        assertEquals(3.1, allFeatures[0].geometry.let { (it as PointGeometry).coordinates[0] }, 0.001)
+    fun `setCurrentPhase updates current phase`() {
+        val store = FeatureStore()
+        store.setCurrentPhase(Phases.ALL[1])
+        assertEquals(Phases.ALL[1], store.currentPhase.value)
     }
 
     @Test
-    fun `removeFeature removes from store`() = runTest {
-        val feature = createFeature("f1", Phases.ROADS_KEY)
-        featureStore.addFeature(feature)
+    fun `getFeatureCounts returns correct counts`() {
+        val store = FeatureStore()
+        store.addFeatures(listOf(createRoad("r1"), createRoad("r2"), createEntrance("e1")))
 
-        featureStore.removeFeature("f1")
-
-        val allFeatures = featureStore.allFeatures.value
-        assertEquals(0, allFeatures.size)
-        assertNull(featureStore.getFeatureById("f1"))
+        val counts = store.getFeatureCounts()
+        assertEquals(2, counts[Phases.ROADS_KEY])
+        assertEquals(1, counts[Phases.HOUSE_ENTRANCES_KEY])
     }
 
     @Test
-    fun `removeFeature clears selection if selected`() = runTest {
-        val feature = createFeature("f1", Phases.ROADS_KEY)
-        featureStore.addFeature(feature)
-        featureStore.selectFeature(feature)
+    fun `clearAll removes all features`() {
+        val store = FeatureStore()
+        store.addFeatures(listOf(createRoad("r1"), createEntrance("e1")))
+        store.selectFeature(createRoad("r1"))
 
-        featureStore.removeFeature("f1")
+        store.clearAll()
 
-        assertNull(featureStore.selectedFeature.value)
+        assertEquals(0, store.allFeatures.value.size)
+        assertNull(store.selectedFeature.value)
     }
 
     @Test
-    fun `addFeatures batch adds multiple features`() = runTest {
-        val features = listOf(
-            createFeature("f1", Phases.ROADS_KEY),
-            createFeature("f2", Phases.ROADS_KEY),
-            createFeature("f3", Phases.HOUSE_ENTRANCES_KEY)
-        )
+    fun `clearPhase removes only features of that phase`() {
+        val store = FeatureStore()
+        store.addFeatures(listOf(createRoad("r1"), createEntrance("e1")))
 
-        featureStore.addFeatures(features)
+        store.clearPhase(Phases.ROADS_KEY)
 
-        assertEquals(3, featureStore.allFeatures.value.size)
-        assertEquals(2, featureStore.getFeaturesByPhase(Phases.ROADS_KEY).size)
-        assertEquals(1, featureStore.getFeaturesByPhase(Phases.HOUSE_ENTRANCES_KEY).size)
+        assertEquals(0, store.getFeaturesByPhase(Phases.ROADS_KEY).size)
+        assertEquals(1, store.getFeaturesByPhase(Phases.HOUSE_ENTRANCES_KEY).size)
     }
 
     @Test
-    fun `clearPhase removes features for specific phase`() = runTest {
-        val features = listOf(
-            createFeature("f1", Phases.ROADS_KEY),
-            createFeature("f2", Phases.ROADS_KEY),
-            createFeature("f3", Phases.HOUSE_ENTRANCES_KEY)
-        )
-        featureStore.addFeatures(features)
-
-        featureStore.clearPhase(Phases.ROADS_KEY)
-
-        assertEquals(1, featureStore.allFeatures.value.size)
-        assertEquals(0, featureStore.getFeaturesByPhase(Phases.ROADS_KEY).size)
-        assertEquals(1, featureStore.getFeaturesByPhase(Phases.HOUSE_ENTRANCES_KEY).size)
-    }
-
-    @Test
-    fun `syncCounts returns correct counts`() = runTest {
-        val features = listOf(
-            createFeature("f1", Phases.ROADS_KEY),
-            createFeature("f2", Phases.ROADS_KEY),
-            createFeature("f3", Phases.HOUSE_ENTRANCES_KEY),
-            createFeature("f4", Phases.NAMING_PANELS_KEY)
-        )
-        featureStore.addFeatures(features)
-        featureStore.syncCounts()
-
-        val counts = featureStore.featureCounts.value
-        assertEquals(2, counts.roads)
-        assertEquals(0, counts.mainEntrances) // entranceTypeKey is null, so not counted as main
-        assertEquals(1, counts.namingPanels)
-    }
-
-    @Test
-    fun `undo stack respects max size`() = runTest {
-        // Add more than 50 undo actions
-        for (i in 1..55) {
-            val feature = createFeature("f$i", Phases.ROADS_KEY)
-            featureStore.addFeature(feature)
-            featureStore.addUndoAction(
-                UndoAction.Delete(feature = feature, phaseKey = Phases.ROADS_KEY)
-            )
+    fun `undo stack has max 50 items`() {
+        val store = FeatureStore()
+        for (i in 0 until 60) {
+            store.addUndoAction(UndoAction.Create(createRoad("r$i"), Phases.ROADS_KEY))
         }
 
-        // The undo stack should be at most 50
-        // Note: This test may need adjustment based on actual undo implementation
-        assertTrue(featureStore.canUndo)
+        assertTrue(store.canUndo)
+        // 50 max, so pop 51 times should return null on the last
+        for (i in 0 until 50) {
+            assertNotNull(store.popUndoAction())
+        }
+        assertNull(store.popUndoAction())
     }
 
     @Test
-    fun `getAllRoads returns roads only`() = runTest {
-        val features = listOf(
-            createFeature("f1", Phases.ROADS_KEY),
-            createFeature("f2", Phases.HOUSE_ENTRANCES_KEY)
-        )
-        featureStore.addFeatures(features)
+    fun `getAllRoads returns only road features`() {
+        val store = FeatureStore()
+        store.addFeatures(listOf(createRoad("r1"), createEntrance("e1"), createRoad("r2")))
 
-        val roads = featureStore.getAllRoads()
-        assertEquals(1, roads.size)
-        assertEquals("f1", roads[0].id)
+        val roads = store.getAllRoads()
+        assertEquals(2, roads.size)
     }
 }

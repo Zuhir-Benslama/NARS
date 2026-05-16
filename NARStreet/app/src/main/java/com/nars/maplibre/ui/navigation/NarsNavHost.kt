@@ -7,7 +7,6 @@ import androidx.navigation.compose.rememberNavController
 import com.nars.maplibre.ui.screens.LoginScreen
 import com.nars.maplibre.ui.screens.MapScreen
 import com.nars.maplibre.ui.screens.SettingsScreen
-import org.koin.java.KoinJavaComponent.get
 
 object Routes {
     const val LOGIN = "login"

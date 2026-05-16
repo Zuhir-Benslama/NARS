@@ -82,7 +82,7 @@ fun InfoPanel(
                 Phases.ALL.forEach { phase ->
                     val count = featureCounts[phase.key] ?: 0
                     val isCurrentPhase = currentPhaseKey == phase.key
-                    val phaseColor = Color(android.graphics.Color.parseColor(phase.color))
+                    val phaseColor = phase.parsedColor
 
                     PhaseCountRow(
                         phaseName = phase.label,
@@ -148,8 +148,8 @@ fun CompactInfoPanel(
             ) {
                 Phases.ALL.take(4).forEach { phase ->
                     val count = featureCounts[phase.key] ?: 0
-                    val phaseColor = Color(android.graphics.Color.parseColor(phase.color))
-                    
+                    val phaseColor = phase.parsedColor
+
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {

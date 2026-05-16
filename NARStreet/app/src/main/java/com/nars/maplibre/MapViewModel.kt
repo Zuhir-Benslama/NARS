@@ -9,9 +9,6 @@ import com.nars.maplibre.data.model.PhaseDefinition
 import com.nars.maplibre.data.model.Phases
 import com.nars.maplibre.data.store.FeatureStore
 import com.nars.maplibre.data.store.UndoAction
-import com.nars.maplibre.domain.ComputeRoadDirectionsUseCase
-import com.nars.maplibre.domain.GenerateNamingPanelsUseCase
-import com.nars.maplibre.domain.SetHouseNumbersUseCase
 import com.nars.maplibre.utils.NarsLogger
 import com.nars.maplibre.utils.PhaseNavigator
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,10 +22,7 @@ import kotlinx.coroutines.launch
 class MapViewModel(
     val featureStore: FeatureStore,
     private val appPreferences: AppPreferences,
-    private val apiService: ApiService,
-    private val computeRoadDirectionsUseCase: ComputeRoadDirectionsUseCase,
-    private val generateNamingPanelsUseCase: GenerateNamingPanelsUseCase,
-    private val setHouseNumbersUseCase: SetHouseNumbersUseCase
+    private val apiService: ApiService
 ) : ViewModel() {
 
     private val phaseNavigator = PhaseNavigator(featureStore)
@@ -52,7 +46,6 @@ class MapViewModel(
     val editModeEnabled: StateFlow<Boolean> = _editModeEnabled.asStateFlow()
 
     val referenceRoadDbId: StateFlow<String?> = featureStore.referenceRoadDbId
-    val referenceEntranceDbId: StateFlow<String?> = featureStore.referenceEntranceDbId
     val canUndo: Boolean get() = featureStore.canUndo
 
     init {
@@ -74,9 +67,6 @@ class MapViewModel(
                 showError(error)
                 NarsLogger.d("MapViewModel", "Phase validation failed: $error")
                 return null
-            }
-            if (featureStore.currentPhase.value?.key == "roads" && phase.key != "roads") {
-                computeRoadDirections()
             }
         }
         NarsLogger.d("MapViewModel", "Setting current phase to: ${phase.label} (${phase.key})")
@@ -101,31 +91,6 @@ class MapViewModel(
     fun canGoNextPhase(): Boolean = phaseNavigator.canGoForward()
 
     fun setReferenceRoad(dbId: String?) = featureStore.setReferenceRoad(dbId)
-    fun setReferenceEntrance(dbId: String?) = featureStore.setReferenceEntrance(dbId)
-
-    fun computeRoadDirections() {
-        viewModelScope.launch {
-            computeRoadDirectionsUseCase()
-                .onSuccess { msg -> showSuccess(msg); NarsLogger.d("MapViewModel", "Road directions: $msg") }
-                .onFailure { e -> NarsLogger.e("MapViewModel", "Failed to compute road directions", e); showError("Failed to compute road directions") }
-        }
-    }
-
-    fun generateNamingPanels() {
-        viewModelScope.launch {
-            generateNamingPanelsUseCase()
-                .onSuccess { count -> showSuccess("Generated $count naming panels"); NarsLogger.d("MapViewModel", "Generated $count naming panels") }
-                .onFailure { e -> NarsLogger.e("MapViewModel", "Failed to generate naming panels", e); showError("Failed to generate naming panels") }
-        }
-    }
-
-    fun setHouseNumbers() {
-        viewModelScope.launch {
-            setHouseNumbersUseCase()
-                .onSuccess { count -> showSuccess("Assigned numbers to $count entrances"); NarsLogger.d("MapViewModel", "Numbered $count entrances") }
-                .onFailure { e -> showError(e.message ?: "Failed to set house numbers"); NarsLogger.e("MapViewModel", "Failed to set house numbers", e) }
-        }
-    }
 
     fun undo(): Boolean {
         val action = featureStore.executeUndo()
@@ -135,7 +100,6 @@ class MapViewModel(
         }
         when (action) {
             is UndoAction.Delete -> {
-                // FeatureStore.executeUndo already re-added main entrances (cross-reference repair)
                 showSuccess("Restored: ${action.feature.properties.name}")
             }
             is UndoAction.Create -> {

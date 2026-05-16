@@ -55,3 +55,40 @@ data class LoginResponse(
     val token: String? = null,
     val municipalityName: String? = null
 )
+
+@Serializable
+data class LoginApiResponse(
+    val success: Boolean = true,
+    val user: LoginApiUser,
+    val token: String? = null,
+    val accessToken: String? = null,
+    val message: String? = null
+)
+
+@Serializable
+data class LoginApiUser(
+    val id: String = "",
+    val username: String,
+    val name: String,
+    val email: String? = null,
+    val role: String = "commune_user",
+    val commune: LoginApiCommune? = null
+)
+
+@Serializable
+data class LoginApiCommune(
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    @kotlinx.serialization.SerialName("name_fr") val nameFr: String? = null
+) {
+    fun toUserFields(user: LoginApiUser): User = User(
+        id = user.id,
+        username = user.username,
+        name = user.name,
+        email = user.email,
+        role = user.role,
+        communeLatitude = latitude,
+        communeLongitude = longitude,
+        communeName = nameFr
+    )
+}

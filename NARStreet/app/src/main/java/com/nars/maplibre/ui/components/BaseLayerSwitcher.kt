@@ -31,7 +31,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
+import com.nars.maplibre.R
 import com.nars.maplibre.data.model.BaseLayerType
 import com.nars.maplibre.ui.theme.DropdownBackground
 import com.nars.maplibre.ui.theme.DropdownHover
@@ -65,7 +67,7 @@ fun TileControl(
         ) {
             Icon(
                 imageVector = Icons.Default.Layers,
-                contentDescription = "Base Layers",
+                contentDescription = stringResource(R.string.map_base_layers),
                 tint = TextPrimary,
                 modifier = Modifier.size(20.dp)
             )
@@ -114,7 +116,7 @@ fun TileControl(
                         if (layer == currentLayer) {
                             Icon(
                                 imageVector = Icons.Default.Check,
-                                contentDescription = "Selected",
+                                contentDescription = stringResource(R.string.map_selected),
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(18.dp)
                             )
