@@ -46,6 +46,7 @@ class NarsGeoman(
     private val snappingEngine = SnappingEngine()
 
     private var currentPhase: PhaseDefinition? = null
+    private val _displayedFeatureIds = mutableSetOf<String>()
 
     // State flows
     private val _isDrawing = MutableStateFlow(false)
@@ -166,6 +167,7 @@ class NarsGeoman(
     }
 
     fun addFeature(feature: NarsFeature) {
+        _displayedFeatureIds.add(feature.id)
         featureRenderer.addFeature(feature)
         val geoJsonFeature = geometryConverter.convertToGeoJson(feature)
         geoman.addGeoJsonFeature(geoJsonFeature, geometryConverter.getSourceNameForGeometry(feature.geometry))
@@ -178,9 +180,20 @@ class NarsGeoman(
     }
 
     fun updateDisplayedFeatures(allFeatures: List<NarsFeature>) {
-        clearAllFeatures()
-        addFeatures(allFeatures)
-        if (currentPhase?.key == Phases.ROADS_KEY) {
+        val currentPhaseKey = currentPhase?.key
+        val filtered = if (currentPhaseKey != null) allFeatures.filter { it.properties.phase == currentPhaseKey } else allFeatures
+        val newIds = filtered.map { it.id }.toSet()
+
+        val toRemove = _displayedFeatureIds - newIds
+        toRemove.forEach { removeFeature(it) }
+
+        val toAdd = filtered.filter { it.id !in _displayedFeatureIds }
+        toAdd.forEach { addFeature(it) }
+
+        _displayedFeatureIds.clear()
+        _displayedFeatureIds.addAll(newIds)
+
+        if (currentPhaseKey == Phases.ROADS_KEY) {
             featureRenderer.labelAndMarkerManager.addRoadEndpointMarkers(allFeatures)
         }
     }
@@ -195,6 +208,7 @@ class NarsGeoman(
     }
 
     fun removeFeature(featureId: String) {
+        _displayedFeatureIds.remove(featureId)
         val geomanSourceNames = listOf(
             GeomanCoreConstants.SOURCE_MARKERS, GeomanCoreConstants.SOURCE_LINES,
             GeomanCoreConstants.SOURCE_POLYGONS, GeomanCoreConstants.SOURCE_CIRCLES
@@ -228,6 +242,7 @@ class NarsGeoman(
     }
 
     fun clearAllFeatures() {
+        _displayedFeatureIds.clear()
         geoman.clearAllFeatures()
         featureRenderer.clearTracking()
     }

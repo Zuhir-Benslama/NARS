@@ -41,9 +41,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nars.maplibre.MapViewModel
+import com.nars.maplibre.R
 import com.nars.maplibre.data.api.ApiService
 import com.nars.maplibre.data.api.SessionManager
 import com.nars.maplibre.data.model.NarsFeature
@@ -58,8 +60,6 @@ import com.nars.maplibre.ui.theme.GlassBackground
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.java.KoinJavaComponent.get
-import org.maplibre.android.maps.MapLibreMap
-import org.maplibre.android.maps.MapView
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,8 +85,6 @@ fun MapScreen(
 
     var showFeatureModal by remember { mutableStateOf(false) }
     var editingFeature by remember { mutableStateOf<NarsFeature?>(null) }
-    var mapView by remember { mutableStateOf<MapView?>(null) }
-    var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
 
     val handlers = remember {
         MapScreenHandlers(viewModel, apiService, sessionManager, context, scope) { msg ->
@@ -147,7 +145,6 @@ fun MapScreen(
             NarsMap(
                 viewModel = viewModel,
                 onMapReady = { mv, map ->
-                    mapView = mv; mapLibreMap = map
                     handlers.initializeNarsGeoman(mv, map)
                 },
                 onMapClick = { latLng -> handlers.handleMapClick(latLng, drawingEnabled, editModeEnabled) },
@@ -166,6 +163,8 @@ fun MapScreen(
                 modifier = Modifier.align(Alignment.TopEnd).padding(end = 12.dp, top = 12.dp)
             )
 
+            val phaseChangedText = stringResource(R.string.map_phase_changed)
+            val cannotAdvanceText = stringResource(R.string.map_cannot_advance)
             Column(
                 modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -176,8 +175,8 @@ fun MapScreen(
                     phaseCounts = featureCounts,
                     onPhaseSelected = { phase ->
                         viewModel.setCurrentPhase(phase)?.let {
-                            scope.launch { snackbarHostState.showSnackbar("Phase: ${phase.label}") }
-                        } ?: scope.launch { snackbarHostState.showSnackbar("Cannot advance: requirements not met") }
+                            scope.launch { snackbarHostState.showSnackbar("$phaseChangedText: ${phase.label}") }
+                        } ?: scope.launch { snackbarHostState.showSnackbar(cannotAdvanceText) }
                     },
                     modifier = Modifier.width(40.dp)
                 )
@@ -231,7 +230,7 @@ fun MapScreen(
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                     modifier = Modifier.weight(1f)
                                 ) { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(4.dp)); Text("Save Geometry") }
+                                    Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.map_save_geometry)) }
                                 Button(
                                     onClick = {
                                         handlers.narsGeoman?.cancelEdits()
@@ -239,19 +238,19 @@ fun MapScreen(
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                                     modifier = Modifier.weight(1f)
-                                ) { Text("Cancel") }
+                                ) { Text(stringResource(R.string.map_cancel)) }
                             } else {
                                 Button(
                                     onClick = { editingFeature = feature; showFeatureModal = true },
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                     modifier = Modifier.weight(1f)
-                                ) { Text("Properties") }
+                                ) { Text(stringResource(R.string.map_properties)) }
                                 Button(
                                     onClick = { handlers.toggleEditing(editModeEnabled) },
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                                     modifier = Modifier.weight(1f)
                                 ) { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(4.dp)); Text("Edit Geometry") }
+                                    Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.map_edit_geometry)) }
                             }
                         }
                     }

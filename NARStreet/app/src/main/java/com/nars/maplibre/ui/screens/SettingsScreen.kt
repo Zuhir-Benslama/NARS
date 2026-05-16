@@ -23,8 +23,6 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.BrightnessHigh
 import androidx.compose.material.icons.filled.BrightnessLow
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -34,7 +32,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -46,7 +43,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
+import com.nars.maplibre.R
 import com.nars.maplibre.SettingsViewModel
 import com.nars.maplibre.ui.theme.DangerColor
 import com.nars.maplibre.ui.theme.GlassBackground
@@ -62,19 +61,16 @@ fun SettingsScreen(
     onLogout: () -> Unit
 ) {
     val viewModel: SettingsViewModel = koinViewModel()
-    val snapDistance by viewModel.snapDistance.collectAsState()
-    val showGrid by viewModel.showGrid.collectAsState()
-    val showLabels by viewModel.showLabels.collectAsState()
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Settings") },
+                title = { Text(stringResource(R.string.action_settings)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = stringResource(R.string.nav_back)
                         )
                     }
                 }
@@ -95,7 +91,7 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 SettingsSection(
-                    title = "Appearance",
+                    title = stringResource(R.string.settings_appearance),
                     icon = Icons.Default.Palette
                 ) {
                     ThemeMode.entries.forEach { mode ->
@@ -105,8 +101,16 @@ fun SettingsScreen(
                                 ThemeMode.DARK -> Icons.Default.BrightnessLow
                                 ThemeMode.AUTO -> Icons.Default.BrightnessAuto
                             },
-                            title = mode.name.lowercase().replaceFirstChar { it.uppercase() },
-                            subtitle = "${mode.name} theme",
+                            title = when (mode) {
+                                ThemeMode.LIGHT -> stringResource(R.string.theme_light)
+                                ThemeMode.DARK -> stringResource(R.string.theme_dark)
+                                ThemeMode.AUTO -> stringResource(R.string.theme_auto)
+                            },
+                            subtitle = when (mode) {
+                                ThemeMode.LIGHT -> stringResource(R.string.settings_theme)
+                                ThemeMode.DARK -> stringResource(R.string.settings_theme)
+                                ThemeMode.AUTO -> stringResource(R.string.settings_theme)
+                            },
                             selected = viewModel.themeMode.value == mode,
                             onClick = {
                                 viewModel.setThemeMode(mode)
@@ -116,71 +120,7 @@ fun SettingsScreen(
                 }
 
                 SettingsSection(
-                    title = "Map",
-                    icon = Icons.Default.GridOn
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = "Snap Distance",
-                                    tint = TextPrimary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(
-                                        text = "Snap Distance",
-                                        fontSize = 14.sp,
-                                        color = TextPrimary
-                                    )
-                                    Text(
-                                        text = "${snapDistance.toInt()} meters",
-                                        fontSize = 12.sp,
-                                        color = TextSecondary
-                                    )
-                                }
-                            }
-                        }
-
-                        Slider(
-                            value = snapDistance,
-                            onValueChange = { viewModel.setSnapDistance(it) },
-                            valueRange = 5f..50f,
-                            steps = 9
-                        )
-                    }
-
-                    SettingsItem(
-                        icon = Icons.Default.GridOn,
-                        title = "Show Grid",
-                        subtitle = "Display coordinate grid on map",
-                        selected = showGrid,
-                        onClick = { viewModel.setShowGrid(!showGrid) }
-                    )
-
-                    SettingsItem(
-                        icon = Icons.AutoMirrored.Filled.Label,
-                        title = "Show Labels",
-                        subtitle = "Display feature labels on map",
-                        selected = showLabels,
-                        onClick = { viewModel.setShowLabels(!showLabels) }
-                    )
-                }
-
-                SettingsSection(
-                    title = "About",
+                    title = stringResource(R.string.settings_about),
                     icon = Icons.Default.Palette
                 ) {
                     Card(
@@ -193,19 +133,19 @@ fun SettingsScreen(
                             modifier = Modifier.padding(16.dp)
                         ) {
                             Text(
-                                text = "NARS Android",
+                                text = stringResource(R.string.settings_app_name),
                                 fontSize = 16.sp,
                                 color = TextPrimary
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "National Addressing Reference System",
+                                text = stringResource(R.string.settings_app_description),
                                 fontSize = 12.sp,
                                 color = TextSecondary
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Version 1.0.0",
+                                text = stringResource(R.string.settings_version),
                                 fontSize = 12.sp,
                                 color = TextSecondary.copy(alpha = 0.5f)
                             )
@@ -229,12 +169,12 @@ fun SettingsScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Logout,
-                                contentDescription = "Logout",
+                                contentDescription = stringResource(R.string.settings_logout),
                                 tint = DangerColor,
                                 modifier = Modifier.size(20.dp)
                             )
                             Text(
-                                text = "Logout",
+                                text = stringResource(R.string.settings_logout),
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = DangerColor
@@ -334,7 +274,7 @@ private fun SettingsItem(
 
         if (selected) {
             Icon(
-                imageVector =                 Icons.AutoMirrored.Filled.Label,
+                imageVector = Icons.AutoMirrored.Filled.Label,
                 contentDescription = "Selected",
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp)

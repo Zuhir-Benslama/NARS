@@ -39,7 +39,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
+import com.nars.maplibre.R
 import com.nars.maplibre.data.model.FeatureProperties
 import com.nars.maplibre.data.model.NarsFeature
 import com.nars.maplibre.data.model.PhaseDefinition
@@ -73,10 +75,10 @@ fun FeatureValidationModal(
                 ) {
                     Text(
                         text = when (phase.key) {
-                            "roads" -> "Road Attributes"
-                            "houseEntrances" -> "House Entrance Check"
-                            "namingPanels" -> "Naming Panel Check"
-                            else -> "Feature Details"
+                            "roads" -> stringResource(R.string.feature_road_attributes)
+                            "houseEntrances" -> stringResource(R.string.feature_entrance_check)
+                            "namingPanels" -> stringResource(R.string.feature_panel_check)
+                            else -> stringResource(R.string.feature_details)
                         },
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
@@ -90,7 +92,7 @@ fun FeatureValidationModal(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
+                            contentDescription = stringResource(R.string.map_close),
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -99,7 +101,7 @@ fun FeatureValidationModal(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Road name - bold and prominent
-                val roadName = feature.properties.name ?: "Unnamed Road"
+                val roadName = feature.properties.name ?: stringResource(R.string.feature_unnamed_road)
                 Text(
                     text = roadName,
                     fontSize = 22.sp,
@@ -111,10 +113,10 @@ fun FeatureValidationModal(
                 val coords = when (val geom = feature.geometry) {
                     is com.nars.maplibre.data.model.LineStringGeometry -> {
                         val c = geom.coordinates.chunked(2)
-                        if (c.isNotEmpty()) "Lat: ${c[0][1].format(6)}, Lng: ${c[0][0].format(6)}" else null
+                        if (c.isNotEmpty()) "Lat: ${c[0][1].formatDecimal(6)}, Lng: ${c[0][0].formatDecimal(6)}" else null
                     }
                     is com.nars.maplibre.data.model.PointGeometry -> {
-                        if (geom.coordinates.size >= 2) "Lat: ${geom.coordinates[1].format(6)}, Lng: ${geom.coordinates[0].format(6)}" else null
+                        if (geom.coordinates.size >= 2) "Lat: ${geom.coordinates[1].formatDecimal(6)}, Lng: ${geom.coordinates[0].formatDecimal(6)}" else null
                     }
                     else -> null
                 }
@@ -160,7 +162,7 @@ fun FeatureValidationModal(
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Text("Save")
+                    Text(stringResource(R.string.feature_save))
                 }
             }
         }
@@ -349,4 +351,4 @@ private fun ValidationSwitch(
     }
 }
 
-private fun Double.format(digits: Int) = "%.${digits}f".format(this)
+private fun Double.formatDecimal(digits: Int) = "%.${digits}f".format(this)

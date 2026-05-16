@@ -31,17 +31,8 @@ android {
         }
 
         // Build config fields from local.properties
-        val apiUrl = localProperties.getProperty("NARS_API_BASE_URL", "https://api.nars.example.com")
+        val apiUrl = localProperties.getProperty("NARS_API_BASE_URL", "")
         buildConfigField("String", "API_BASE_URL", "\"$apiUrl\"")
-        buildConfigField("Boolean", "ENABLE_ANALYTICS", localProperties.getProperty("ENABLE_ANALYTICS", "false").toBoolean().toString())
-        buildConfigField("Boolean", "ENABLE_CRASHLYTICS", localProperties.getProperty("ENABLE_CRASHLYTICS", "false").toBoolean().toString())
-        buildConfigField("Boolean", "MTLS_ENABLED", localProperties.getProperty("MTLS_ENABLED", "false").toBoolean().toString())
-        buildConfigField("String", "CA_CERT_ASSET", "\"${localProperties.getProperty("CA_CERT_ASSET", "nars-ca.crt")}\"")
-        buildConfigField("String", "CLIENT_P12_ASSET", "\"${localProperties.getProperty("CLIENT_P12_ASSET", "nars-client.p12")}\"")
-        // SECURITY: P12 password is NOT compiled into the APK.
-        // Provide it at runtime via SecurePreferences or a runtime prompt.
-        // buildConfigField("String", "CLIENT_P12_PASSWORD", "\"${localProperties.getProperty("CLIENT_P12_PASSWORD", "")}\"")
-        buildConfigField("String", "CERTIFICATE_PINS", "\"${localProperties.getProperty("CERTIFICATE_PINS", "")}\"")
     }
 
     buildTypes {

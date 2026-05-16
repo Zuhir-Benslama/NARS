@@ -5,6 +5,10 @@ import com.geoman.maplibre.geoman.types.geojson.Feature
 import com.nars.maplibre.data.api.escapeJson
 import com.nars.maplibre.data.model.*
 import com.nars.maplibre.utils.NarsLogger
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.LineLayer
@@ -145,16 +149,22 @@ class FeatureRenderer(
     private fun buildGeoJsonString(feature: com.geoman.maplibre.geoman.types.geojson.Feature): String {
         val geometry = feature.geometry
         val props = feature.properties
-        val escapedId = escapeJson(feature.id ?: "")
-        return """{"type":"Feature","id":"$escapedId","geometry":${GeometryConverter().geometryToJson(geometry)},"properties":${propertiesToJson(props)}}"""
-    }
-
-    private fun propertiesToJson(properties: Map<String, Any?>): String {
-        val props = properties.toMutableMap()
-        if (props.containsKey("name") && !props.containsKey("label")) props["label"] = props["name"]
-        return props.entries.joinToString(",", "{", "}") { (key, value) ->
-            """ "${escapeJson(key)}": "${escapeJson(value?.toString() ?: "")}" """.trim()
-        }
+        return buildJsonObject {
+            put("type", "Feature")
+            put("id", feature.id ?: "")
+            put("geometry", kotlinx.serialization.json.Json.parseToJsonElement(
+                GeometryConverter().geometryToJson(geometry)
+            ))
+            putJsonObject("properties") {
+                val mutableProps = props.toMutableMap()
+                if (mutableProps.containsKey("name") && !mutableProps.containsKey("label")) {
+                    mutableProps["label"] = mutableProps["name"]
+                }
+                mutableProps.forEach { (key, value) ->
+                    put(key, value?.toString() ?: "")
+                }
+            }
+        }.toString()
     }
 
     fun isFeatureAdded(featureId: String): Boolean = addedFeatureIds.contains(featureId)

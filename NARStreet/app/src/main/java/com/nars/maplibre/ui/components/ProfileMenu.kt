@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -27,14 +28,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
+import com.nars.maplibre.R
 import com.nars.maplibre.data.model.User
 import com.nars.maplibre.ui.theme.DangerColor
 import com.nars.maplibre.ui.theme.DropdownBackground
-import com.nars.maplibre.ui.theme.DropdownBorder
-import com.nars.maplibre.ui.theme.DropdownHover
 import com.nars.maplibre.ui.theme.DropdownItem
 import com.nars.maplibre.ui.theme.GlassBorder
 import com.nars.maplibre.ui.theme.PrimaryGradientEnd
@@ -42,22 +43,18 @@ import com.nars.maplibre.ui.theme.PrimaryGradientStart
 import com.nars.maplibre.ui.theme.TextPrimary
 import com.nars.maplibre.ui.theme.TextSecondary
 
-/**
- * Profile menu component
- * Avatar-only button with dropdown menu on click
- */
 @Composable
 fun ProfileMenu(
     user: User?,
     onSettingsClick: () -> Unit,
     onLogoutClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compact: Boolean = false
 ) {
     var dropdownExpanded by remember { mutableStateOf(false) }
     val initials = user?.getInitials() ?: "U"
 
     Box(modifier = modifier) {
-        // Avatar button
         Box(
             modifier = Modifier
                 .size(40.dp)
@@ -73,12 +70,11 @@ fun ProfileMenu(
             Text(
                 text = initials,
                 fontSize = 16.sp,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                fontWeight = FontWeight.Bold,
                 color = Color.White
             )
         }
 
-        // Dropdown menu
         DropdownMenu(
             expanded = dropdownExpanded,
             onDismissRequest = { dropdownExpanded = false },
@@ -88,133 +84,61 @@ fun ProfileMenu(
                     shape = RoundedCornerShape(12.dp)
                 )
         ) {
-            DropdownMenuItem(
-                text = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = null,
-                            tint = DropdownItem,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = "Settings",
-                            fontSize = 13.sp,
-                            color = DropdownItem
-                        )
-                    }
-                },
-                onClick = {
-                    dropdownExpanded = false
-                    onSettingsClick()
-                }
-            )
-
-            // Divider
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(GlassBorder.copy(alpha = 0.3f))
-            )
-
-            DropdownMenuItem(
-                text = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Text(
-                            text = "🚪",
-                            fontSize = 14.sp
-                        )
-                        Text(
-                            text = "Logout",
-                            fontSize = 13.sp,
-                            color = DangerColor
-                        )
-                    }
-                },
-                onClick = {
-                    dropdownExpanded = false
-                    onLogoutClick()
-                }
-            )
-        }
-    }
-}
-
-/**
- * Compact profile menu (icon only with dropdown)
- */
-@Composable
-fun CompactProfileMenu(
-    user: User?,
-    onSettingsClick: () -> Unit,
-    onLogoutClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var dropdownExpanded by remember { mutableStateOf(false) }
-    val initials = user?.getInitials() ?: "U"
-
-    Box(modifier = modifier) {
-        // Profile button (icon only)
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(PrimaryGradientStart, PrimaryGradientEnd)
-                    )
-                )
-                .clickable { dropdownExpanded = true },
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = initials,
-                fontSize = 16.sp,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                color = Color.White
-            )
-        }
-
-        // Dropdown menu
-        DropdownMenu(
-            expanded = dropdownExpanded,
-            onDismissRequest = { dropdownExpanded = false },
-            modifier = Modifier
-                .background(
-                    color = DropdownBackground,
-                    shape = RoundedCornerShape(12.dp)
-                )
-        ) {
-            // User info header
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp)
-            ) {
-                Text(
-                    text = user?.username ?: "User",
-                    fontSize = 14.sp,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                    color = TextPrimary
-                )
-                val userName = user?.name ?: ""
-                if (userName.isNotBlank()) {
+            if (compact) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp)
+                ) {
                     Text(
-                        text = userName,
-                        fontSize = 12.sp,
-                        color = TextSecondary
+                        text = user?.username ?: stringResource(R.string.profile_user),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary
                     )
+                    val userName = user?.name ?: ""
+                    if (userName.isNotBlank()) {
+                        Text(
+                            text = userName,
+                            fontSize = 12.sp,
+                            color = TextSecondary
+                        )
+                    }
                 }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(GlassBorder.copy(alpha = 0.3f))
+                )
             }
 
-            // Divider
+            DropdownMenuItem(
+                text = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = null,
+                            tint = DropdownItem,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = stringResource(R.string.profile_settings),
+                            fontSize = 13.sp,
+                            color = DropdownItem
+                        )
+                    }
+                },
+                onClick = {
+                    dropdownExpanded = false
+                    onSettingsClick()
+                }
+            )
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -229,44 +153,13 @@ fun CompactProfileMenu(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = null,
-                            tint = DropdownItem,
+                            imageVector = Icons.AutoMirrored.Filled.Logout,
+                            contentDescription = stringResource(R.string.profile_logout),
+                            tint = DangerColor,
                             modifier = Modifier.size(18.dp)
                         )
                         Text(
-                            text = "Settings",
-                            fontSize = 13.sp,
-                            color = DropdownItem
-                        )
-                    }
-                },
-                onClick = {
-                    dropdownExpanded = false
-                    onSettingsClick()
-                }
-            )
-
-            // Divider
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(GlassBorder.copy(alpha = 0.3f))
-            )
-
-            DropdownMenuItem(
-                text = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Text(
-                            text = "🚪",
-                            fontSize = 14.sp
-                        )
-                        Text(
-                            text = "Logout",
+                            text = stringResource(R.string.profile_logout),
                             fontSize = 13.sp,
                             color = DangerColor
                         )

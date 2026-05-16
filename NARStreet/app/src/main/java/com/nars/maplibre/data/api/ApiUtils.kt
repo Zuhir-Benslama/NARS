@@ -5,58 +5,43 @@ import com.nars.maplibre.data.model.Phases
 import com.nars.maplibre.utils.NarsLogger
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.addJsonObject
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 private const val TAG = "ApiUtils"
 
 fun getPhaseColor(phaseKey: String): String = when (phaseKey) {
-    "areas" -> "#8e44ad"
-    "districts" -> "#f39c12"
-    "cityCenter" -> "#e74c3c"
     "roads" -> "#3498db"
     "houseEntrances" -> "#27ae60"
-    "publicBuildings" -> "#e67e22"
-    "publicSpaces" -> "#2ecc71"
     "namingPanels" -> "#9b59b6"
     else -> "#8e44ad"
 }
 
 fun mapBackendTypeToPhase(type: String): String = when (type) {
-    "area" -> Phases.AREAS_KEY
-    "district" -> Phases.DISTRICTS_KEY
-    "city_center" -> Phases.CITY_CENTER_KEY
     "road" -> Phases.ROADS_KEY
     "house_entrance" -> Phases.HOUSE_ENTRANCES_KEY
-    "public_building" -> Phases.PUBLIC_BUILDINGS_KEY
-    "public_space" -> Phases.PUBLIC_SPACES_KEY
     "naming_panel" -> Phases.NAMING_PANELS_KEY
-    else -> Phases.AREAS_KEY
+    else -> Phases.ROADS_KEY
 }
 
 fun mapPhaseToBackendType(phase: String): String = when (phase) {
-    Phases.AREAS_KEY -> "area"
-    Phases.DISTRICTS_KEY -> "district"
-    Phases.CITY_CENTER_KEY -> "city_center"
     Phases.ROADS_KEY -> "road"
     Phases.HOUSE_ENTRANCES_KEY -> "house_entrance"
-    Phases.PUBLIC_BUILDINGS_KEY -> "public_building"
-    Phases.PUBLIC_SPACES_KEY -> "public_space"
     Phases.NAMING_PANELS_KEY -> "naming_panel"
-    else -> "area"
+    else -> "road"
 }
 
 fun mapPhaseToLayer(phase: String, properties: com.nars.maplibre.data.model.FeatureProperties): String = when (phase) {
-    Phases.AREAS_KEY -> properties.areaTypeKey ?: "central_urban"
-    Phases.DISTRICTS_KEY -> properties.districtTypeKey ?: "district"
-    Phases.CITY_CENTER_KEY -> "city_center"
     Phases.ROADS_KEY -> properties.roadTypeKey ?: "street"
     Phases.HOUSE_ENTRANCES_KEY -> properties.entranceTypeKey ?: "main_entrance"
-    Phases.PUBLIC_BUILDINGS_KEY -> properties.buildingTypeKey ?: "public_building"
-    Phases.PUBLIC_SPACES_KEY -> properties.spaceTypeKey ?: "garden"
     Phases.NAMING_PANELS_KEY -> "naming_panel"
     else -> ""
 }
@@ -106,22 +91,15 @@ fun parseFeatureProperties(data: JsonObject, phaseKey: String, color: String, la
         name = nameValue,
         number = null,
         bisNumber = null,
-        entranceType = null,
-        buildingType = null,
         phase = phaseKey,
         color = color,
         decisionNumber = data["decisionNumber"]?.jsonPrimitive?.content,
         decisionDate = data["decisionDate"]?.jsonPrimitive?.content,
-        areaTypeKey = data["areaTypeKey"]?.jsonPrimitive?.content,
-        districtTypeKey = data["districtTypeKey"]?.jsonPrimitive?.content,
         roadTypeKey = data["roadTypeKey"]?.jsonPrimitive?.content,
         entranceTypeKey = data["entranceTypeKey"]?.jsonPrimitive?.content,
         roadDbId = data["roadDbId"]?.jsonPrimitive?.content,
         side = data["side"]?.jsonPrimitive?.content,
-        entranceNumber = data["entranceNumber"]?.jsonPrimitive?.intOrNull,
-        sectorKey = data["sectorKey"]?.jsonPrimitive?.content,
-        buildingTypeKey = data["buildingTypeKey"]?.jsonPrimitive?.content,
-        spaceTypeKey = data["spaceTypeKey"]?.jsonPrimitive?.content
+        entranceNumber = data["entranceNumber"]?.jsonPrimitive?.intOrNull
     )
 }
 
@@ -134,53 +112,52 @@ fun escapeJson(s: String): String = s
 
 fun buildDataJson(feature: NarsFeature): String {
     val props = feature.properties
-    val fields = mutableListOf<String>()
-
-    when (val geometry = feature.geometry) {
-        is com.nars.maplibre.data.model.PointGeometry -> {
-            fields.add("\"lat\":${geometry.coordinates[1]}")
-            fields.add("\"lng\":${geometry.coordinates[0]}")
+    return buildJsonObject {
+        when (val geometry = feature.geometry) {
+            is com.nars.maplibre.data.model.PointGeometry -> {
+                put("lat", geometry.coordinates[1])
+                put("lng", geometry.coordinates[0])
+            }
+            is com.nars.maplibre.data.model.CircleGeometry -> {
+                put("lat", geometry.coordinates[1])
+                put("lng", geometry.coordinates[0])
+                put("radius", geometry.coordinates[2])
+            }
+            is com.nars.maplibre.data.model.LineStringGeometry -> {
+                putJsonArray("coordinates") {
+                    for (coord in geometry.coordinates.chunked(2)) {
+                        addJsonObject {
+                            put("lat", coord[1])
+                            put("lng", coord[0])
+                        }
+                    }
+                }
+            }
+            is com.nars.maplibre.data.model.PolygonGeometry -> {
+                putJsonArray("coordinates") {
+                    for (coord in geometry.coordinates.chunked(2)) {
+                        addJsonObject {
+                            put("lat", coord[1])
+                            put("lng", coord[0])
+                        }
+                    }
+                }
+            }
         }
-        is com.nars.maplibre.data.model.CircleGeometry -> {
-            fields.add("\"lat\":${geometry.coordinates[1]}")
-            fields.add("\"lng\":${geometry.coordinates[0]}")
-            fields.add("\"radius\":${geometry.coordinates[2]}")
-        }
-        is com.nars.maplibre.data.model.LineStringGeometry -> {
-            val coords = geometry.coordinates.chunked(2).map { coord ->
-                """{"lat":${coord[1]},"lng":${coord[0]}}"""
-            }.joinToString(",")
-            fields.add("\"coordinates\":[$coords]")
-        }
-        is com.nars.maplibre.data.model.PolygonGeometry -> {
-            val coords = geometry.coordinates.chunked(2).map { coord ->
-                """{"lat":${coord[1]},"lng":${coord[0]}}"""
-            }.joinToString(",")
-            fields.add("\"coordinates\":[$coords]")
-        }
-    }
 
-    props.name?.takeIf { it.isNotBlank() }?.let { fields.add("\"label\":\"${escapeJson(it)}\"") }
-    props.decisionNumber?.takeIf { it.isNotBlank() }?.let { fields.add("\"decisionNumber\":\"${escapeJson(it)}\"") }
-    props.decisionDate?.takeIf { it.isNotBlank() }?.let { fields.add("\"decisionDate\":\"${escapeJson(it)}\"") }
-
-    props.areaTypeKey?.takeIf { it.isNotBlank() }?.let { fields.add("\"areaTypeKey\":\"$it\"") }
-    props.districtTypeKey?.takeIf { it.isNotBlank() }?.let { fields.add("\"districtTypeKey\":\"$it\"") }
-    props.roadTypeKey?.takeIf { it.isNotBlank() }?.let { fields.add("\"roadTypeKey\":\"$it\"") }
-    props.entranceTypeKey?.takeIf { it.isNotBlank() }?.let { fields.add("\"entranceTypeKey\":\"$it\"") }
-    props.spaceTypeKey?.takeIf { it.isNotBlank() }?.let { fields.add("\"spaceTypeKey\":\"$it\"") }
-    props.sectorKey?.takeIf { it.isNotBlank() }?.let { fields.add("\"sectorKey\":\"$it\"") }
-    props.buildingTypeKey?.takeIf { it.isNotBlank() }?.let { fields.add("\"buildingTypeKey\":\"$it\"") }
-
-    props.roadDbId?.let { fields.add("\"roadDbId\":\"$it\"") }
-    props.roadLabel?.takeIf { it.isNotBlank() }?.let { fields.add("\"roadLabel\":\"${escapeJson(it)}\"") }
-    props.side?.takeIf { it.isNotBlank() }?.let { fields.add("\"side\":\"$it\"") }
-    props.entranceNumber?.let { fields.add("\"entranceNumber\":$it") }
-    props.mainEntranceDbId?.let { fields.add("\"mainEntranceDbId\":\"$it\"") }
-    props.mainEntranceLabel?.takeIf { it.isNotBlank() }?.let { fields.add("\"mainEntranceLabel\":\"${escapeJson(it)}\"") }
-    props.bisNumber?.let { fields.add("\"bisNumber\":$it") }
-
-    return "{${fields.joinToString(",")}}"
+        props.name?.takeIf { it.isNotBlank() }?.let { put("label", it) }
+        props.decisionNumber?.takeIf { it.isNotBlank() }?.let { put("decisionNumber", it) }
+        props.decisionDate?.takeIf { it.isNotBlank() }?.let { put("decisionDate", it) }
+        props.roadTypeKey?.takeIf { it.isNotBlank() }?.let { put("roadTypeKey", it) }
+        props.entranceTypeKey?.takeIf { it.isNotBlank() }?.let { put("entranceTypeKey", it) }
+        props.roadDbId?.let { put("roadDbId", it) }
+        props.roadLabel?.takeIf { it.isNotBlank() }?.let { put("roadLabel", it) }
+        props.side?.takeIf { it.isNotBlank() }?.let { put("side", it) }
+        props.entranceNumber?.let { put("entranceNumber", it) }
+        props.mainEntranceDbId?.let { put("mainEntranceDbId", it) }
+        props.mainEntranceLabel?.takeIf { it.isNotBlank() }?.let { put("mainEntranceLabel", it) }
+        props.bisNumber?.let { put("bisNumber", it) }
+    }.toString()
 }
 
 fun buildSaveRequestBody(feature: NarsFeature): String {

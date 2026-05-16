@@ -75,3 +75,65 @@
 - [x] Generate proper EF migration to capture pending model changes
 - [x] Replace hostPath PV with CSI-backed persistent volume for production
 - [x] Add database backup cronjob in k8s
+
+---
+
+## NARStreet Cleanup — DONE
+
+### Files removed (out of scope)
+- [x] `domain/ComputeRoadDirectionsUseCase.kt` — road direction assignment (admin task)
+- [x] `domain/SetHouseNumbersUseCase.kt` — auto-numbering (admin task)
+- [x] `domain/GenerateNamingPanelsUseCase.kt` — panel generation (admin task)
+- [x] `utils/RoadDirectionsCalculator.kt` — road direction implementation
+- [x] `utils/HouseNumberingManager.kt` — auto-numbering implementation
+- [x] `utils/NamingPanelGenerator.kt` — panel generation implementation
+- [x] `data/model/FeatureTypes.kt` — types for unused phases
+- [x] `ui/components/DrawingControls.kt` — empty placeholder
+- [x] `utils/TlsUtils.kt` — mTLS infrastructure (out of scope)
+
+### Pruned code blocks
+- [x] `MapViewModel.kt` — removed 3 use case fields, methods, constructor params
+- [x] `di/AppModule.kt` — removed 3 use case registrations, reduced MapViewModel to 3 deps
+- [x] `FeatureStore.kt` — removed `referenceEntranceDbId`, `syncCounts()`, `getAllMainEntrances()`, simplified `FeatureCounts`
+- [x] `NarsFeature.kt` — removed unused NarsFeatureType values, EntranceType, BuildingType, unused properties
+- [x] `Config.kt` — removed `SNAP_PHASES`, `PHASE_COUNT`, analytics/crashlytics flags
+- [x] `ApiUtils.kt` — removed unused phase branches, feature property mappings
+- [x] `ApiService.kt` — removed `getCurrentUser()`, `refreshToken()`, `isAuthenticated()`
+- [x] `SecurePreferences.kt` — removed P12 password methods
+- [x] `SettingsViewModel.kt` — removed snap/grid/labels state
+- [x] `SettingsScreen.kt` — removed snap/grid/labels UI
+- [x] `NarsApplication.kt` — removed token refresh, `isLoggedIn()`, `logout()` methods
+- [x] `SessionManager.kt` — removed `refreshSession()` method
+- [x] `ContextMenuManager.kt` — removed compute directions menu item
+- [x] `GeometryUtils.kt` — removed `calculateCentroid`, `isPointInPolygon`, `simplifyLine`, `calculateBoundingBox`, `BoundingBox`
+- [x] `AppPreferences.kt` — removed snap/grid/labels keys
+- [x] `BaseLayer.kt` — recreated with only `BaseLayerType` enum (removed duplicate URL constants)
+
+### Fixed HIGH priority code quality issues
+- [x] `build.gradle.kts` — removed default URLs and mTLS build config fields
+- [x] `di/AppModule.kt` — `LogLevel.HEADERS` → `LogLevel.NONE`, removed duplicate timeouts
+- [x] `ui/screens/LoginScreen.kt` — replaced `KoinJavaComponent.get()` with `koinInject()`
+- [x] `modes/LabelAndMarkerManager.kt` — empty catch block now logs the exception
+- [x] Haversine distance — consolidated to single `GeometryUtils` implementation (duplicate files removed)
+
+---
+
+## NARStreet Code Quality — Remaining Items
+
+### HIGH
+- [x] **No tests exist** — 60 unit tests added (Validation, FeatureStore, ApiUtils, GeometryConverter, SessionManager, ApiService)
+- [x] **Manual JSON building everywhere** — Replaced with `kotlinx.serialization.json` builder API in `FeatureRenderer`, `NarsMap`, `ApiUtils`, `GeometryConverter`
+- [x] **Manual JSON parsing in ApiService.login()** — Now uses `json.decodeFromString<LoginApiResponse>()` with `@Serializable` models
+- [x] **Broad `catch (e: Exception)` / `runCatching`** — Replaced with explicit try/catch that logs, all API methods return `Result` types
+- [x] **Heavy Android views in Compose state** — Removed unused `MapView`/`MapLibreMap` state variables from `MapScreen.kt`
+
+### MEDIUM
+- [ ] **Hardcoded strings throughout UI** — no `@StringRes` usage in any screen
+- [x] **Hardcoded colors in LoginScreen** — Replaced all `Color(0xFF…)` with theme colors (`GlassBackground`, `PrimaryColor`, `DangerColor`, etc.)
+- [x] **Settings.gradle relative path** — Now checks `geoman.dir` from `local.properties`, gradle property, system property, env var, then falls back to sibling path
+- [x] **Inline JSON in NarsMap.getStyleJson** — Replaced raw string templates with `buildJsonObject { }` API
+- [ ] **Flickering on feature update** — NarsGeoman clears and re-adds all features
+- [x] **Duplicate phase logic in PhaseBar** — Extracted shared `computePhaseState()` function used by both `PhaseBar` and `CompactPhaseSelector`
+
+### LOW
+- [x] **PhaseBar color parsing** — Added `parsedColor` lazy property to `PhaseDefinition`, cached at class level

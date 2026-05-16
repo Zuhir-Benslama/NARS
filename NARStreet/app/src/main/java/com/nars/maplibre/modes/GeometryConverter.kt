@@ -14,6 +14,12 @@ import com.nars.maplibre.data.model.PointGeometry
 import com.nars.maplibre.data.model.PolygonGeometry
 import com.geoman.maplibre.geoman.core.GeomanCoreConstants
 import com.nars.maplibre.utils.NarsLogger
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 
 /**
  * Handles geometry conversions between NARS and GeoJSON formats
@@ -102,25 +108,45 @@ class GeometryConverter {
      * Convert GeoJSON geometry to JSON string
      */
     fun geometryToJson(geometry: com.geoman.maplibre.geoman.types.geojson.Geometry): String {
-        return when (geometry) {
-            is Point -> {
-                val coords = geometry.coordinates
-                """{"type": "Point", "coordinates": [${coords[0]}, ${coords[1]}]}"""
-            }
-            is LineString -> {
-                val coords = geometry.coordinates.joinToString(",") { coord ->
-                    "[${coord.joinToString(", ")}]"
+        return buildJsonObject {
+            when (geometry) {
+                is Point -> {
+                    put("type", "Point")
+                    putJsonArray("coordinates") {
+                        add(geometry.coordinates[0])
+                        add(geometry.coordinates[1])
+                    }
                 }
-                """{"type": "LineString", "coordinates": [$coords]}"""
-            }
-            is Polygon -> {
-                val rings = geometry.coordinates.joinToString(",") { ring ->
-                    ring.joinToString(",", "[", "]") { coord -> "[${coord.joinToString(", ")}]" }
+                is LineString -> {
+                    put("type", "LineString")
+                    putJsonArray("coordinates") {
+                        for (coord in geometry.coordinates) {
+                            add(buildJsonArray {
+                                coord.forEach { add(it) }
+                            })
+                        }
+                    }
                 }
-                """{"type": "Polygon", "coordinates": [$rings]}"""
+                is Polygon -> {
+                    put("type", "Polygon")
+                    putJsonArray("coordinates") {
+                        for (ring in geometry.coordinates) {
+                            add(buildJsonArray {
+                                for (coord in ring) {
+                                    add(buildJsonArray {
+                                        coord.forEach { add(it) }
+                                    })
+                                }
+                            })
+                        }
+                    }
+                }
+                else -> {
+                    put("type", "Point")
+                    putJsonArray("coordinates") { add(0.0); add(0.0) }
+                }
             }
-            else -> """{"type": "Point", "coordinates": [0, 0]}"""
-        }
+        }.toString()
     }
 
     /**
@@ -134,11 +160,20 @@ class GeometryConverter {
             points + points.firstOrNull()
         }
 
-        val coordsString = ring.filterNotNull().joinToString(",") { coord ->
-            "[${coord[0]}, ${coord[1]}]"
-        }
-
-        return """{"type": "Feature", "geometry": {"type": "LineString", "coordinates": [$coordsString]}, "properties": {}}"""
+        return buildJsonObject {
+            put("type", "Feature")
+            putJsonObject("geometry") {
+                put("type", "LineString")
+                putJsonArray("coordinates") {
+                    add(buildJsonArray {
+                        for (coord in ring.filterNotNull()) {
+                            add(buildJsonArray { add(coord[0]); add(coord[1]) })
+                        }
+                    })
+                }
+            }
+            putJsonObject("properties") { }
+        }.toString()
     }
 
     /**
@@ -153,9 +188,24 @@ class GeometryConverter {
             val angle = Math.toRadians(i * DEGREES_IN_CIRCLE / segments)
             val lng = centerLng + radiusDegrees * Math.cos(angle) / Math.cos(Math.toRadians(centerLat))
             val lat = centerLat + radiusDegrees * Math.sin(angle)
-            "[${lng}, ${lat}]"
-        }.joinToString(",")
+            lng to lat
+        }
 
-        return """{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[$ring]]}, "properties": {}}"""
+        return buildJsonObject {
+            put("type", "Feature")
+            putJsonObject("geometry") {
+                put("type", "Polygon")
+                putJsonArray("coordinates") {
+                    add(buildJsonArray {
+                        add(buildJsonArray {
+                            for ((lng, lat) in ring) {
+                                add(buildJsonArray { add(lng); add(lat) })
+                            }
+                        })
+                    })
+                }
+            }
+            putJsonObject("properties") { }
+        }.toString()
     }
 }
