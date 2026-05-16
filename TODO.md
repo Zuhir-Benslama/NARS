@@ -1,5 +1,13 @@
 # TODO
 
+## Path to 9/10 — Project Hardening (Priority Checklist)
+
+- [ ] **P0 — Make integration tests a required CI gate**: Run `NARS.Tests/Integration` in CI (PostgreSQL + PostGIS via Testcontainers), publish results, and block merge on failures.
+- [ ] **P0 — Remove bootstrap default credentials**: Replace documented static admin password with one-time generated credentials (`make db-admin`) and update docs so no reusable defaults are shown.
+- [ ] **P1 — Add deterministic cluster bootstrap + smoke test**: Keep `make cluster-up` fully idempotent with robust waits/retries and add a post-deploy smoke target that verifies `/health`, API auth, and frontend reachability.
+- [ ] **P1 — Enforce stricter quality gates**: Treat backend warnings as errors in CI and enforce frontend minimum test coverage threshold so quality regressions fail fast.
+- [ ] **P2 — Repo hygiene + supply-chain guardrails**: Remove accidental directories/artifacts, keep generated files untracked, and enable automated dependency/security checks (Dependabot + CodeQL + secret scanning).
+
 ## Infrastructure — Cluster & Data
 
 - [x] Migrate from Docker Compose to k3s/kind cluster

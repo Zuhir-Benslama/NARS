@@ -76,6 +76,10 @@ cluster-up: prerequisites ## Full bootstrap: create cluster, deploy everything
 	@echo "  Tear down:     make cluster-down (data preserved)"
 	@echo "  Destroy data:  make cluster-clean"
 
+.PHONY: namespace-ensure
+namespace-ensure: ## Ensure $(NAMESPACE) namespace exists (idempotent)
+	@kubectl create namespace "$(NAMESPACE)" --dry-run=client -o yaml | kubectl apply -f -
+
 .PHONY: cluster-down
 cluster-down: ## Delete the kind cluster (preserves postgis data)
 	@echo "→ Deleting cluster '$(CLUSTER_NAME)'..."
@@ -268,8 +272,7 @@ ingress-install: ## Install NGINX Ingress Controller (idempotent)
 ingress-wait: ## Wait for ingress controller to be ready
 	@echo "→ Waiting for ingress controller..."
 	@kubectl wait --namespace ingress-nginx \
-		--for=condition=ready pod \
-		--selector=app.kubernetes.io/component=controller \
+		--for=condition=available deployment/ingress-nginx-controller \
 		--timeout=180s
 	@echo "✓ Ingress controller ready"
 
@@ -278,8 +281,14 @@ metrics-install: ## Install metrics-server for HPA autoscaling (idempotent)
 	@echo "→ Installing metrics-server..."
 	@kubectl apply -f \
 		https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-	@kubectl patch deployment metrics-server -n kube-system --type=json \
-		-p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]' 2>/dev/null || true
+	@if kubectl get deployment metrics-server -n kube-system \
+		-o jsonpath='{.spec.template.spec.containers[0].args}' 2>/dev/null \
+		| grep -q -- '--kubelet-insecure-tls'; then
+		echo "→ metrics-server already has --kubelet-insecure-tls"
+	else
+		kubectl patch deployment metrics-server -n kube-system --type=json \
+			-p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
+	fi
 	@echo "✓ metrics-server installed"
 
 .PHONY: metrics-wait
@@ -306,7 +315,7 @@ storage-provisioner-wait: ## Wait for local-path-provisioner to be ready
 	@echo "✓ local-path-provisioner ready"
 
 .PHONY: tls-generate
-tls-generate: ## Generate TLS certificate for $(DOMAIN) (idempotent)
+tls-generate: namespace-ensure ## Generate TLS certificate for $(DOMAIN) (idempotent)
 	@if kubectl get secret nars-tls -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
 		echo "→ TLS secret 'nars-tls' already exists"
 	else
@@ -349,7 +358,7 @@ ca-generate: ## Generate a self-signed CA certificate for mTLS (idempotent)
 	fi
 
 .PHONY: ca-secret
-ca-secret: ca-generate ## Create mTLS CA secret from k8s/certs/ca.crt (idempotent)
+ca-secret: ca-generate namespace-ensure ## Create mTLS CA secret from k8s/certs/ca.crt (idempotent)
 	@if kubectl get secret nars-ca -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
 		echo "→ CA secret 'nars-ca' already exists"
 	else
@@ -362,7 +371,7 @@ ca-secret: ca-generate ## Create mTLS CA secret from k8s/certs/ca.crt (idempoten
 	fi
 
 .PHONY: secrets-apply
-secrets-apply: .env ## Create nars-secrets and regcred with generated/variable values
+secrets-apply: .env namespace-ensure ## Create nars-secrets and regcred with generated/variable values
 	@echo "→ Creating 'nars-secrets'..."
 	@kubectl create secret generic nars-secrets -n "$(NAMESPACE)" \
 		--from-literal=postgres_password="$(POSTGRES_PASSWORD)" \
@@ -392,21 +401,99 @@ kustomize-apply: ## Apply k8s manifests via kustomize
 	@kubectl apply -k "$(K8S_DIR)"
 	@echo "✓ Kustomization applied"
 
-	@echo "→ Waiting for deployments..."
-	@for deploy in postgis nars-api nars-frontend; do
+	@echo "→ Waiting for postgis..."
+	@if kubectl get deployment postgis -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
+		kubectl wait --namespace "$(NAMESPACE)" \
+			--for=condition=Available deployment/postgis --timeout=240s
+		$(MAKE) postgis-password-sync
+		$(MAKE) postgis-migration-baseline
+	fi
+
+	@echo "→ Waiting for app deployments..."
+	@for deploy in nars-api nars-frontend; do
 		if kubectl get deployment $$deploy -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
-			kubectl wait --namespace "$(NAMESPACE)" \
-				--for=condition=Available deployment/$$deploy --timeout=180s
+			if ! kubectl wait --namespace "$(NAMESPACE)" \
+				--for=condition=Available deployment/$$deploy --timeout=240s; then
+				echo "✖ Deployment '$$deploy' did not become Available in time."
+				echo "→ describe deployment/$$deploy"
+				kubectl describe deployment $$deploy -n "$(NAMESPACE)" || true
+				echo "→ pods for $$deploy"
+				kubectl get pods -n "$(NAMESPACE)" -l app.kubernetes.io/name=$$deploy -o wide || true
+				for pod in $$(kubectl get pods -n "$(NAMESPACE)" -l app.kubernetes.io/name=$$deploy -o name); do
+					echo "→ logs $$pod (current)"
+					kubectl logs -n "$(NAMESPACE)" $$pod --tail=120 || true
+					echo "→ logs $$pod (previous)"
+					kubectl logs -n "$(NAMESPACE)" $$pod --previous --tail=120 || true
+				done
+				exit 1
+			fi
 		fi
 	done
 	@echo "✓ All deployments ready"
+
+.PHONY: postgis-password-sync
+postgis-password-sync: ## Align postgres user password with POSTGRES_PASSWORD (for persisted volumes)
+	@echo "→ Syncing postgres password..."
+	@kubectl exec -n "$(NAMESPACE)" deployment/postgis -- \
+		psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+		-c "ALTER USER postgres WITH PASSWORD '$(POSTGRES_PASSWORD)';" >/dev/null
+	@echo "✓ Postgres password synced"
+
+.PHONY: postgis-migration-baseline
+postgis-migration-baseline: ## Backfill EF migration history for pre-existing schemas
+	@echo "→ Ensuring EF migration history baseline..."
+	@cat <<'SQL' | kubectl exec -i -n "$(NAMESPACE)" deployment/postgis -- \
+		psql -U postgres -d nars_db -v ON_ERROR_STOP=1 >/dev/null
+	CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+	    "MigrationId" character varying(150) NOT NULL,
+	    "ProductVersion" character varying(32) NOT NULL,
+	    CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY ("MigrationId")
+	);
+
+	DO $$$$
+	DECLARE
+	    has_areas boolean;
+	    has_inspections boolean;
+	BEGIN
+	    SELECT EXISTS (
+	        SELECT 1
+	        FROM information_schema.tables
+	        WHERE table_schema = 'public' AND table_name = 'areas'
+	    ) INTO has_areas;
+
+	    SELECT EXISTS (
+	        SELECT 1
+	        FROM information_schema.tables
+	        WHERE table_schema = 'public' AND table_name = 'inspections'
+	    ) INTO has_inspections;
+
+	    IF has_areas THEN
+	        INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+	        VALUES ('20260510191030_AddErrorLogs', '10.0.7')
+	        ON CONFLICT ("MigrationId") DO NOTHING;
+	    END IF;
+
+	    IF has_inspections THEN
+	        INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+	        VALUES ('20260511062948_AddInspections', '10.0.7')
+	        ON CONFLICT ("MigrationId") DO NOTHING;
+	    END IF;
+
+	    IF has_areas AND has_inspections THEN
+	        INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+	        VALUES ('20260515165724_SyncPendingModelChanges', '10.0.7')
+	        ON CONFLICT ("MigrationId") DO NOTHING;
+	    END IF;
+	END $$$$;
+	SQL
+	@echo "✓ EF migration history baseline ensured"
 
 # ─── Observability (Grafana LGTM + OTel) ─────────────────────
 
 OBSERVABILITY_NAMESPACE ?= observability
 
 .PHONY: observability-install
-observability-install: helm-check ## Install LGTM stack + OpenTelemetry Collector
+observability-install: helm-check helm-repos ## Install LGTM stack + OpenTelemetry Collector
 	$(MAKE) observability-namespace
 	$(MAKE) observability-prometheus-stack
 	$(MAKE) observability-loki
@@ -424,6 +511,15 @@ observability-install: helm-check ## Install LGTM stack + OpenTelemetry Collecto
 .PHONY: helm-check
 helm-check:
 	@command -v helm >/dev/null 2>&1 || { echo "✖ helm is not installed"; exit 1; }
+
+.PHONY: helm-repos
+helm-repos: ## Ensure required Helm chart repos are configured
+	@echo "→ Configuring Helm repositories..."
+	@helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update
+	@helm repo add grafana https://grafana.github.io/helm-charts --force-update
+	@helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts --force-update
+	@helm repo update
+	@echo "✓ Helm repositories ready"
 
 .PHONY: observability-namespace
 observability-namespace:

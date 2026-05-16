@@ -118,8 +118,8 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main
 Wait for it to be ready:
 
 ```bash
-kubectl wait --namespace ingress-nginx --for=condition=ready pod \
-  --selector=app.kubernetes.io/component=controller --timeout=180s
+kubectl wait --namespace ingress-nginx \
+  --for=condition=available deployment/ingress-nginx-controller --timeout=180s
 ```
 
 ### 3. Generate TLS certificate
