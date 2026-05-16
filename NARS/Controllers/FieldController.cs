@@ -26,9 +26,10 @@ public class FieldController(
     public async Task<IActionResult> GetFeatures(
         [FromQuery] string? type = null,
         [FromQuery] int skip = 0,
-        [FromQuery] int take = 500)
+        [FromQuery] int take = 500,
+        CancellationToken cancellationToken = default)
     {
-        var user = await db.Users.FindAsync(CurrentUserId);
+        var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
         if (user is null) return Unauthorized();
         if (user.Role != UserRoles.FieldWorker)
             return Forbid();
@@ -41,7 +42,7 @@ public class FieldController(
         var communeUserIds = await db.Users
             .Where(u => u.Role == UserRoles.CommuneUser && u.CommuneId == communeId)
             .Select(u => u.Id)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         if (communeUserIds.Count == 0)
             return Ok(new { features = Array.Empty<object>(), count = 0 });
@@ -69,9 +70,9 @@ public class FieldController(
     /// Field workers submit road/entrance/naming panel inspection data here.
     /// </summary>
     [HttpPost("field/inspect")]
-    public async Task<IActionResult> SubmitInspection([FromBody] FieldInspectRequest body)
+    public async Task<IActionResult> SubmitInspection([FromBody] FieldInspectRequest body, CancellationToken cancellationToken = default)
     {
-        var user = await db.Users.FindAsync(CurrentUserId);
+        var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
         if (user is null || user.Role != UserRoles.FieldWorker)
             return Forbid();
 
@@ -79,7 +80,7 @@ public class FieldController(
             return BadRequest(new { detail = "Invalid feature_id." });
 
         // Verify the feature exists and belongs to a user in the same commune
-        var registryEntry = await db.FeatureRegistry.FindAsync(featureId);
+        var registryEntry = await db.FeatureRegistry.FindAsync([featureId], cancellationToken);
         if (registryEntry is null)
             return BadRequest(new { detail = "Feature not found." });
 
@@ -117,7 +118,7 @@ public class FieldController(
         };
 
         db.Add(inspection);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation("[Field] Worker {WorkerId} inspected {Type} {FeatureId} — status: {Status}",
             CurrentUserId, body.Type, featureId, body.Status);
@@ -134,9 +135,9 @@ public class FieldController(
     /// Gets the inspection history for a specific feature.
     /// </summary>
     [HttpGet("field/inspections/{featureId:guid}")]
-    public async Task<IActionResult> GetInspections(Guid featureId)
+    public async Task<IActionResult> GetInspections(Guid featureId, CancellationToken cancellationToken = default)
     {
-        var user = await db.Users.FindAsync(CurrentUserId);
+        var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
         if (user is null || user.Role != UserRoles.FieldWorker)
             return Forbid();
 
@@ -151,7 +152,7 @@ public class FieldController(
                 Status: i.Status,
                 CreatedAt: i.CreatedAt
             ))
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         return Ok(new { inspections });
     }
@@ -161,9 +162,9 @@ public class FieldController(
     /// Used when a field worker finds a missing entrance and needs to add one.
     /// </summary>
     [HttpPost("field/entrance/create")]
-    public async Task<IActionResult> CreateEntranceFromInspection([FromBody] FieldEntranceCreateRequest body)
+    public async Task<IActionResult> CreateEntranceFromInspection([FromBody] FieldEntranceCreateRequest body, CancellationToken cancellationToken = default)
     {
-        var user = await db.Users.FindAsync(CurrentUserId);
+        var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
         if (user is null || user.Role != UserRoles.FieldWorker)
             return Forbid();
 
@@ -171,11 +172,11 @@ public class FieldController(
             return BadRequest(new { detail = "Invalid road_id." });
 
         // Verify the road exists and belongs to a user in the same commune
-        var road = await db.Roads.FindAsync(roadId);
+        var road = await db.Roads.FindAsync([roadId], cancellationToken);
         if (road is null)
             return BadRequest(new { detail = "Road not found." });
 
-        var roadOwner = await db.Users.FindAsync(road.UserId);
+        var roadOwner = await db.Users.FindAsync([road.UserId], cancellationToken);
         if (roadOwner is null || roadOwner.CommuneId != user.CommuneId)
             return Forbid();
 
@@ -200,18 +201,18 @@ public class FieldController(
             CreatedAt = DateTime.UtcNow,
         };
 
-        await using var tx = await db.Database.BeginTransactionAsync();
+        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
 
         db.HouseEntrances.Add(entrance);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
 
         db.FeatureRegistry.Add(new FeatureRegistry
         {
             Id = newId,
             FeatureType = FeatureTypes.HouseEntrance
         });
-        await db.SaveChangesAsync();
-        await tx.CommitAsync();
+        await db.SaveChangesAsync(cancellationToken);
+        await tx.CommitAsync(cancellationToken);
 
         logger.LogInformation(
             "[Field] Worker {WorkerId} created entrance {EntranceId} for road {RoadId} (owner: {OwnerId})",
@@ -259,9 +260,10 @@ public class FieldController(
             {
                 if (total == 0) total = reader.GetInt32(6);
                 var id = reader.GetGuid(0);
-                var rawData = reader.IsDBNull(4) ? "{}" : reader.GetString(4);
+                var rawData = await reader.IsDBNullAsync(4) ? "{}" : reader.GetString(4);
                 JsonElement? data = null;
-                try { data = JsonSerializer.Deserialize<JsonElement>(rawData); } catch { }
+                try { data = JsonSerializer.Deserialize<JsonElement>(rawData); }
+                catch (JsonException ex) { logger.LogWarning(ex, "Failed to parse feature data for {Id}", id); }
 
                 items.Add(new
                 {
@@ -271,7 +273,7 @@ public class FieldController(
                     label = reader.GetString(3),
                     data,
                     created_at = reader.GetDateTime(5),
-                    updated_at = reader.IsDBNull(6) ? null : (DateTime?)reader.GetDateTime(6)
+                    updated_at = await reader.IsDBNullAsync(6) ? null : (DateTime?)reader.GetDateTime(6)
                 });
             }
 
@@ -303,7 +305,7 @@ public class FieldController(
             if (result is null || result == DBNull.Value) return null;
 
             var userId = (Guid)result;
-            var owner = await db.Users.FindAsync(userId);
+            var owner = await db.Users.FindAsync([userId], CancellationToken.None);
             return owner is null ? null : (owner.Id, owner.CommuneId);
         }
         finally

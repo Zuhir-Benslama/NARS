@@ -3,7 +3,7 @@
 
 import { watch } from "vue"
 import { PHASES } from "../../phases"
-import { store } from "../../store"
+import { useAppStore } from "../../stores/appStore"
 import { debugWarn } from "../../utils/debug"
 
 // Re-export state and functions used by other modules
@@ -42,8 +42,9 @@ export function registerDrawEvents(): void {
 // ─── FIX #4: REACTIVE DRAW TYPE ───────────────────────────────────────
 
 function watchDrawType() {
+  const appStore = useAppStore()
   watch(
-    () => store.currentPhase,
+    () => appStore.currentPhase,
     (phaseIdx) => {
       const activeDrawModes = ctx.geoman?.getActiveDrawModes?.() || []
       if (activeDrawModes.length > 0) {
@@ -57,8 +58,8 @@ function watchDrawType() {
 
         if (phase.key === "cityCenter") {
           requestAnimationFrame(() => {
-            const userLat = store.user?.commune?.latitude
-            const userLng = store.user?.commune?.longitude
+            const userLat = appStore.user?.commune?.latitude
+            const userLng = appStore.user?.commune?.longitude
 
             if (userLat && userLng) {
               ctx.map.flyTo({
@@ -67,9 +68,9 @@ function watchDrawType() {
                 duration: 1500,
                 essential: true,
               })
-            } else if (store.cityCenterLatLng) {
+            } else if (appStore.cityCenterLatLng) {
               ctx.map.flyTo({
-                center: [store.cityCenterLatLng.lng, store.cityCenterLatLng.lat],
+                center: [appStore.cityCenterLatLng.lng, appStore.cityCenterLatLng.lat],
                 zoom: 17,
                 duration: 1500,
                 essential: true,

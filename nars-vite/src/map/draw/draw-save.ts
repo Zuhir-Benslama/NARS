@@ -3,7 +3,7 @@
 // and resetting the draw mode for the next feature.
 
 import { PHASES } from "../../phases"
-import { syncCounts } from "../../store"
+import { useAppStore } from "../../stores/appStore"
 import { useLayerStore } from "../../stores/layerStore"
 import type { LayerState } from "../../stores/layerStore"
 import type { LayerEntry } from "../../types"
@@ -185,7 +185,7 @@ async function saveAndUpdateStore(
       type: getFeatureType(narsDrawType),
     })
 
-    syncCounts()
+    useAppStore().syncCounts()
     refreshLayerVisibility()
     if (drawingPhase.key === "roads") updateEndpointMarkers()
     showToast("Feature saved.", "success")

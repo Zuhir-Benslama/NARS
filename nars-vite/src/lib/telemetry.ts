@@ -5,7 +5,7 @@ import { FetchInstrumentation } from "@opentelemetry/instrumentation-fetch"
 import { DocumentLoadInstrumentation } from "@opentelemetry/instrumentation-document-load"
 import { registerInstrumentations } from "@opentelemetry/instrumentation"
 
-const otelEndpoint = import.meta.env.VITE_OTEL_ENDPOINT || "http://localhost:4318/v1/traces"
+const otelEndpoint = import.meta.env.VITE_OTEL_ENDPOINT || "/v1/traces"
 
 export function initTelemetry() {
   const exporter = new OTLPTraceExporter({
@@ -23,8 +23,10 @@ export function initTelemetry() {
       new FetchInstrumentation({
         propagateTraceHeaderCorsUrls: [
           /http:\/\/localhost:5173\/api/,
+          /http:\/\/localhost:8080\/api/,
           /http:\/\/nars\.dz.*\/api/,
           /https:\/\/nars\.dz.*\/api/,
+          /https:\/\/api\.nars\.dz.*\/api/,
         ],
         clearTimingResources: true,
       }),

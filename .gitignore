@@ -24,6 +24,11 @@ nars-vite/.vscode/
 .env
 .env.*
 !.env.example
+privkey.pem
+k8s/certs/ca.key
+k8s/certs/ca.srl
+backup/
+*.lscache
 
 # === Data ===
 data/

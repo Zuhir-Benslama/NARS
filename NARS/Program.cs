@@ -93,13 +93,6 @@ if (builder.Environment.IsProduction() && (string.IsNullOrEmpty(jwtIssuer) || st
         "Set them in appsettings.Production.json or via environment variables.");
 }
 
-if (string.IsNullOrEmpty(jwtIssuer) || string.IsNullOrEmpty(jwtAudience))
-{
-    // Warn at startup that issuer/audience validation is disabled.
-    // Acceptable for single-tenant development, but should be configured for production.
-    // Logged after the logger is initialized (see ApplicationStarted below).
-}
-
 // Logged after build when logger is available
 var logJwtWarning = string.IsNullOrEmpty(jwtIssuer) || string.IsNullOrEmpty(jwtAudience);
 

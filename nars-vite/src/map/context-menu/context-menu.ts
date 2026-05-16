@@ -2,7 +2,7 @@
 // Shows context menus for features and map background.
 // Re-exports actions for backward compatibility.
 
-import { store } from "../../store"
+import { useAppStore } from "../../stores/appStore"
 import { PHASES } from "../../phases"
 import { t } from "../../i18n"
 import { isSnappingEnabled } from "../draw/draw-complete"
@@ -40,7 +40,7 @@ export function showContextMenu(x: number, y: number, dbId: string, phaseKey: st
   const el = getCtxEl()
   const layerStore = useLayerStore()
   const state = layerStore.$state as LayerState
-  const currentPhase = PHASES[store.currentPhase]
+  const currentPhase = PHASES[useAppStore().currentPhase]
   const currentPhaseKey = currentPhase?.key ?? ""
   const isRoad = phaseKey === "roads"
   const isRoadsPhase = currentPhaseKey === "roads"
@@ -92,7 +92,7 @@ export function showContextMenu(x: number, y: number, dbId: string, phaseKey: st
     })
   }
 
-  const isCurrentRef = isRoad && dbId === store.referenceRoadDbId
+  const isCurrentRef = isRoad && dbId === useAppStore().referenceRoadDbId
   if (isRoad && isHouseEntrancesPhase && !isCurrentRef) {
     items.push({
       label: t("ctx_road_ref"),

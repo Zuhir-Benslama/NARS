@@ -1,7 +1,7 @@
 // ─── LABELS & LAYER VISIBILITY ───────────────────────────────────────────────
 
 import { PHASES } from "../../phases"
-import { store } from "../../store"
+import { useAppStore } from "../../stores/appStore"
 import maplibregl from "maplibre-gl"
 import { ctx } from "../core/state"
 import { debugLog } from "../../utils/debug"
@@ -24,7 +24,8 @@ export function refreshAllEdgeLabels(): void {
 }
 
 export function refreshLayerVisibility(): void {
-  const currentPhaseKey = PHASES[store.currentPhase]?.key
+  const appStore = useAppStore()
+  const currentPhaseKey = PHASES[appStore.currentPhase]?.key
 
   const map = ctx.map
   if (!map) return
@@ -37,7 +38,7 @@ export function refreshLayerVisibility(): void {
 
   debugLog(
     "[LAYERS] currentPhase:",
-    store.currentPhase,
+    appStore.currentPhase,
     "key:",
     currentPhaseKey,
     "visible:",

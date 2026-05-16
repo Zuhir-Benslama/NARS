@@ -11,8 +11,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: nars-api
-  minReplicas: 1
-  maxReplicas: 3
+  minReplicas: 2
+  maxReplicas: 4
   metrics:
     - type: Resource
       resource:
@@ -40,8 +40,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: nars-frontend
-  minReplicas: 1
-  maxReplicas: 3
+  minReplicas: 2
+  maxReplicas: 4
   metrics:
     - type: Resource
       resource:

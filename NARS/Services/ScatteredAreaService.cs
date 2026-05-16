@@ -26,7 +26,7 @@ public interface IScatteredAreaService
     /// for fire-and-forget: callers should use <c>_ = service.RefreshAsync(…)</c>
     /// and not await it on the request path.
     /// </summary>
-    Task RefreshAsync(Guid userId, int communeId);
+    Task RefreshAsync(Guid userId, int communeId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// The timestamp and message of the most recent refresh failure, or null
@@ -47,16 +47,16 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
         private set { lock (_errorLock) _lastError = value; }
     }
 
-    public async Task RefreshAsync(Guid userId, int communeId)
+    public async Task RefreshAsync(Guid userId, int communeId, CancellationToken cancellationToken = default)
     {
         LastError = null; // Clear any previous error
         try
         {
-            await using var db = await dbFactory.CreateDbContextAsync();
+            await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
             var conn = db.Database.GetDbConnection();
 
             string? scatteredGeoJson = null;
-            await db.Database.OpenConnectionAsync();
+            await db.Database.OpenConnectionAsync(cancellationToken);
             try
             {
                 var areaTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.Area)?.TableName ?? "areas";
@@ -88,13 +88,13 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
 
                 // CommandBehavior.SequentialAccess streams the large GeoJSON column
                 // instead of buffering it in Npgsql's internal buffer.
-                using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess);
-                if (await reader.ReadAsync() && !await reader.IsDBNullAsync(0))
-                    scatteredGeoJson = await reader.GetTextReader(0).ReadToEndAsync();
+                using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken);
+                if (await reader.ReadAsync(cancellationToken) && !await reader.IsDBNullAsync(0, cancellationToken))
+                    scatteredGeoJson = await reader.GetTextReader(0).ReadToEndAsync(cancellationToken);
             }
             finally
             {
-                await db.Database.CloseConnectionAsync();
+                await db.Database.CloseConnectionAsync(); // no CancellationToken on CloseConnectionAsync
             }
 
             if (scatteredGeoJson is null) return;
@@ -102,7 +102,7 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
             await db.Areas
                 .Where(f => f.UserId == userId &&
                             f.Layer == FeatureTypes.AreaLayers.Scattered)
-                .ExecuteDeleteAsync();
+                .ExecuteDeleteAsync(cancellationToken);
 
             // Extract per-polygon coordinate rings for SqlFragments.PolygonFromData
             // compatibility (reads f.data::jsonb->'coordinates').
@@ -129,7 +129,7 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
                     coordinates = coordinates,
                 }),
             });
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(cancellationToken);
         }
         catch (Exception ex)
         {

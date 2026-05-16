@@ -1,7 +1,8 @@
 // ─── FEATURE DATA, SAVE & MODAL HELPERS ──────────────────────────────────────
 
 import { PHASES } from "../../phases"
-import { store } from "../../store"
+import { useAppStore } from "../../stores/appStore"
+import { useModalStore } from "../../stores/modalStore"
 import { useLayerStore } from "../../stores/layerStore"
 import type { LayerState } from "../../stores/layerStore"
 import { apiFetch } from "../../api"
@@ -172,29 +173,33 @@ export async function saveToDatabase(featureData: FeatureData): Promise<SaveResu
 // ─── MODAL EXTRA PREPARATION ──────────────────────────────────────────────────
 
 export async function prepareModalExtras(phase: (typeof PHASES)[number]): Promise<void> {
-  const m = store.modal
+  const modalStore = useModalStore()
+  const appStore = useAppStore()
   const layerStore = useLayerStore()
   const state = layerStore.$state as LayerState
 
   if (phase.key === "areas") {
-    m.mainUrbanExists = await checkMainUrbanExists()
-    if (!m.mainUrbanExists) {
+    modalStore.mainUrbanExists = await checkMainUrbanExists()
+    if (!modalStore.mainUrbanExists) {
       const name =
-        store.municipalityName || store.user?.commune.name_fr || store.user?.commune.name_ar || ""
-      m.label = name
+        appStore.municipalityName ||
+        appStore.user?.commune.name_fr ||
+        appStore.user?.commune.name_ar ||
+        ""
+      modalStore.label = name
     } else {
-      m.label = ""
+      modalStore.label = ""
     }
-    m.areaTypeKey = m.mainUrbanExists ? "secondary_urban" : "central_urban"
+    modalStore.areaTypeKey = modalStore.mainUrbanExists ? "secondary_urban" : "central_urban"
   }
 
   if (phase.key === "houseEntrances") {
-    m.roadOptions = (state.roads || []).map((r, i) => ({
+    modalStore.roadOptions = (state.roads || []).map((r, i) => ({
       idx: i,
       label: r.data.label || `Road ${i + 1}`,
       dbId: String(r.dbId),
     }))
-    m.mainEntranceOptions = (state.houseEntrances || [])
+    modalStore.mainEntranceOptions = (state.houseEntrances || [])
       .filter((e: LayerEntry) => e.data.entranceTypeKey === "main_entrance")
       .map((e, i) => ({
         idx: i,
@@ -207,12 +212,12 @@ export async function prepareModalExtras(phase: (typeof PHASES)[number]): Promis
 // ─── ROAD-SIDE & BIS HELPERS ──────────────────────────────────────────────────
 
 export async function fetchRoadSide(roadDbId: string): Promise<void> {
-  const m = store.modal
+  const modalStore = useModalStore()
   const layerStore = useLayerStore()
   const state = layerStore.$state as LayerState
-  m.entranceSideLoading = true
-  m.entranceSide = null
-  m.entranceNumber = null
+  modalStore.entranceSideLoading = true
+  modalStore.entranceSide = null
+  modalStore.entranceNumber = null
 
   // Try to get position from current drawing geometry first (dev-only global)
   const narsWindow = window as Window & {
@@ -239,12 +244,12 @@ export async function fetchRoadSide(roadDbId: string): Promise<void> {
   if (lat && lng) {
     const result = await getRoadSide(roadDbId, lat, lng)
     if (result) {
-      m.entranceSide = result.side
-      m.entranceNumber = result.suggestedNumber
+      modalStore.entranceSide = result.side
+      modalStore.entranceNumber = result.suggestedNumber
     }
   }
 
-  m.entranceSideLoading = false
+  modalStore.entranceSideLoading = false
 }
 
 export function computeBisNumber(mainEntranceDbId: string): void {
@@ -255,6 +260,7 @@ export function computeBisNumber(mainEntranceDbId: string): void {
       e.data.entranceTypeKey === "secondary_entrance" &&
       e.data.mainEntranceDbId === mainEntranceDbId,
   ).length
-  store.modal.bisNumber = count + 1
-  store.modal.label = "BIS" + String(count + 1).padStart(2, "0")
+  const modalStore = useModalStore()
+  modalStore.bisNumber = count + 1
+  modalStore.label = "BIS" + String(count + 1).padStart(2, "0")
 }

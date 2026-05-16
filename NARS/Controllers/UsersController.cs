@@ -19,15 +19,15 @@ public class UsersController(AppDbContext db) : NarsControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> UpdateCredentials([FromBody] UpdateUserRequest body)
+    public async Task<IActionResult> UpdateCredentials([FromBody] UpdateUserRequest body, CancellationToken cancellationToken = default)
     {
-        var user = await db.Users.FindAsync(CurrentUserId);
+        var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
         if (user is null) return NotFound(new { detail = "User not found." });
 
         // Validate username uniqueness if changed
         if (!string.IsNullOrWhiteSpace(body.Username) && body.Username != user.Username)
         {
-            if (await db.Users.AnyAsync(u => u.Username == body.Username))
+            if (await db.Users.AnyAsync(u => u.Username == body.Username, cancellationToken))
                 return Conflict(new { detail = "Username already exists." });
             user.Username = body.Username;
         }
@@ -35,7 +35,7 @@ public class UsersController(AppDbContext db) : NarsControllerBase
         // Validate email uniqueness if changed
         if (!string.IsNullOrWhiteSpace(body.Email) && body.Email != user.Email)
         {
-            if (await db.Users.AnyAsync(u => u.Email == body.Email))
+            if (await db.Users.AnyAsync(u => u.Email == body.Email, cancellationToken))
                 return Conflict(new { detail = "Email already exists." });
             user.Email = body.Email;
         }
@@ -53,7 +53,7 @@ public class UsersController(AppDbContext db) : NarsControllerBase
 
         try
         {
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateException)
         {

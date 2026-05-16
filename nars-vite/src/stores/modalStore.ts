@@ -145,3 +145,40 @@ function resolveModalPromise(result: ModalResult | null): void {
 export function setCurrentModalFeatureId(id: string | null): void {
   currentModalFeatureId = id
 }
+
+// ─── LEGACY HELPER FUNCTIONS ───────────────────────────────────────────────────
+// Moved from the legacy store proxy layer. These wrap modal store actions with
+// awaitModalResult() for backward compatibility.
+
+import { PHASES } from "../phases"
+import { t } from "../i18n"
+
+export function openModal(
+  phaseIndex: number,
+  featureId: string,
+  extras?: { radius?: number },
+): Promise<ModalResult | null> {
+  setCurrentModalFeatureId(featureId)
+  const modalStore = useModalStore()
+  modalStore.openCreate(phaseIndex, extras)
+  const phase = PHASES[phaseIndex]
+  if (phase?.key === "cityCenter") {
+    modalStore.label = t("phase_cityCenter_label")
+  }
+  return awaitModalResult()
+}
+
+export function openEditModal(
+  phaseIndex: number,
+  dbId: string,
+  existing: FeatureData,
+): Promise<ModalResult | null> {
+  const modalStore = useModalStore()
+  modalStore.openEdit(phaseIndex, dbId, existing)
+  return awaitModalResult()
+}
+
+export function resolveModal(result: ModalResult | null): void {
+  const modalStore = useModalStore()
+  modalStore.close(result)
+}

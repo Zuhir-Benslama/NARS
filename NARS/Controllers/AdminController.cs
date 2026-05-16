@@ -41,12 +41,12 @@ public class AdminController(
 
     [HttpGet("admin/overview")]
     [Authorize(Roles = "daira_admin,wilaya_admin,national_admin")]
-    public async Task<IActionResult> Overview()
+    public async Task<IActionResult> Overview(CancellationToken cancellationToken = default)
     {
         // Read role and geographic IDs directly from the database.
         // JWT claim names can vary depending on when the token was issued
         // (before or after the claim mapping fix), so DB is the source of truth.
-        var user = await db.Users.FindAsync(CurrentUserId);
+        var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
         if (user is null) return Unauthorized(new { detail = "User not found." });
 
         return user.Role switch
@@ -55,9 +55,9 @@ public class AdminController(
                 Forbid("daira_id missing on account. Contact your administrator."),
             UserRoles.WilayaAdmin when user.WilayaId is null =>
                 Forbid("wilaya_id missing on account. Contact your administrator."),
-            UserRoles.DairaAdmin => await DairaOverview(user.DairaId!.Value),
-            UserRoles.WilayaAdmin => await WilayaOverview(user.WilayaId!.Value),
-            UserRoles.NationalAdmin => await NationalOverview(),
+            UserRoles.DairaAdmin => await DairaOverview(user.DairaId!.Value, cancellationToken),
+            UserRoles.WilayaAdmin => await WilayaOverview(user.WilayaId!.Value, cancellationToken),
+            UserRoles.NationalAdmin => await NationalOverview(cancellationToken),
             _ => Forbid(),
         };
     }
@@ -67,13 +67,13 @@ public class AdminController(
 
     [HttpGet("admin/wilaya/{wilayaId:int}")]
     [Authorize(Roles = "daira_admin,wilaya_admin,national_admin")]
-    public async Task<IActionResult> GetWilaya(int wilayaId)
+    public async Task<IActionResult> GetWilaya(int wilayaId, CancellationToken cancellationToken = default)
     {
-        var user = await db.Users.FindAsync(CurrentUserId);
+        var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
         if (user is null) return Unauthorized(new { detail = "User not found." });
         if (user.Role != UserRoles.NationalAdmin) return Forbid();
 
-        var result = await BuildWilayaReportAsync(wilayaId);
+        var result = await BuildWilayaReportAsync(wilayaId, cancellationToken);
         return result is null ? NotFound(new { detail = "Wilaya not found." }) : Ok(result);
     }
 
@@ -82,16 +82,16 @@ public class AdminController(
 
     [HttpGet("admin/daira/{dairaId:int}")]
     [Authorize(Roles = "daira_admin,wilaya_admin,national_admin")]
-    public async Task<IActionResult> GetDaira(int dairaId)
+    public async Task<IActionResult> GetDaira(int dairaId, CancellationToken cancellationToken = default)
     {
-        var user = await db.Users.FindAsync(CurrentUserId);
+        var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
         if (user is null) return Unauthorized(new { detail = "User not found." });
 
         switch (user.Role)
         {
             case UserRoles.WilayaAdmin:
                 {
-                    var daira = await db.Dairas.FindAsync(dairaId);
+                    var daira = await db.Dairas.FindAsync(dairaId, cancellationToken);
                     if (daira is null || daira.WilayaId != user.WilayaId)
                         return Forbid();
                     break;
@@ -102,7 +102,7 @@ public class AdminController(
                 return Forbid();
         }
 
-        var result = await BuildDairaReportAsync(dairaId);
+        var result = await BuildDairaReportAsync(dairaId, cancellationToken);
         return result is null ? NotFound(new { detail = "Daira not found." }) : Ok(result);
     }
 
@@ -114,9 +114,9 @@ public class AdminController(
     // national_admin is NOT creatable via API.
 
     [HttpPost("admin/users")]
-    public async Task<IActionResult> CreateAdmin([FromBody] CreateAdminRequest body)
+    public async Task<IActionResult> CreateAdmin([FromBody] CreateAdminRequest body, CancellationToken cancellationToken = default)
     {
-        var creator = await db.Users.FindAsync(CurrentUserId);
+        var creator = await db.Users.FindAsync([CurrentUserId], cancellationToken);
         if (creator is null) return Unauthorized();
         var callerRole = creator.Role;
 
@@ -132,7 +132,7 @@ public class AdminController(
                 {
                     if (!body.CommuneId.HasValue)
                         return BadRequest(new { detail = "commune_id is required." });
-                    var commune = await db.Communes.FindAsync(body.CommuneId.Value);
+                    var commune = await db.Communes.FindAsync(body.CommuneId.Value, cancellationToken);
                     if (commune is null || commune.DairaId != creator.DairaId)
                         return Forbid();
                     break;
@@ -141,7 +141,7 @@ public class AdminController(
                 {
                     if (!body.DairaId.HasValue)
                         return BadRequest(new { detail = "daira_id is required." });
-                    var daira = await db.Dairas.FindAsync(body.DairaId.Value);
+                    var daira = await db.Dairas.FindAsync(body.DairaId.Value, cancellationToken);
                     if (daira is null || daira.WilayaId != creator.WilayaId)
                         return Forbid();
                     break;
@@ -157,7 +157,7 @@ public class AdminController(
             return BadRequest(new { detail = geoError });
 
         var existing = await db.Users.FirstOrDefaultAsync(u =>
-            u.Username == body.Username || u.Email == body.Email);
+            u.Username == body.Username || u.Email == body.Email, cancellationToken);
         if (existing is not null)
         {
             var field = existing.Username == body.Username ? "Username" : "Email";
@@ -188,7 +188,7 @@ public class AdminController(
         };
 
         db.Users.Add(newUser);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation("[Admin] {Creator} ({CreatorRole}) created {Role} account {Username}",
             CurrentUsername, CurrentUserRole, newUser.Role, newUser.Username);
@@ -198,38 +198,38 @@ public class AdminController(
 
     // ─── Private: overview builders ──────────────────────────────────────────
 
-    private async Task<IActionResult> DairaOverview(int dairaId)
+    private async Task<IActionResult> DairaOverview(int dairaId, CancellationToken cancellationToken)
     {
-        var report = await BuildDairaReportAsync(dairaId);
+        var report = await BuildDairaReportAsync(dairaId, cancellationToken);
         return report is null ? NotFound(new { detail = "Daira not found." }) : Ok(report);
     }
 
-    private async Task<IActionResult> WilayaOverview(int wilayaId)
+    private async Task<IActionResult> WilayaOverview(int wilayaId, CancellationToken cancellationToken)
     {
-        var report = await BuildWilayaReportAsync(wilayaId);
+        var report = await BuildWilayaReportAsync(wilayaId, cancellationToken);
         return report is null ? NotFound(new { detail = "Wilaya not found." }) : Ok(report);
     }
 
-    private async Task<IActionResult> NationalOverview()
+    private async Task<IActionResult> NationalOverview(CancellationToken cancellationToken)
     {
-        var wilayas = await db.Wilayas.OrderBy(w => w.WilayaId).ToListAsync();
+        var wilayas = await db.Wilayas.OrderBy(w => w.WilayaId).ToListAsync(cancellationToken);
 
         // Batch-load wilaya admins, daira counts, commune counts, user counts
         var wilayaAdmins = await db.Users
             .Where(u => u.Role == UserRoles.WilayaAdmin)
             .Select(u => new { u.Id, u.Username, u.Name, u.Email, u.Role, u.WilayaId })
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         var dairaCounts = await db.Dairas
             .GroupBy(d => d.WilayaId)
             .Select(g => new { WilayaId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.WilayaId, x => x.Count);
+            .ToDictionaryAsync(x => x.WilayaId, x => x.Count, cancellationToken);
 
         var communeByWilaya = await db.Communes
             .Join(db.Dairas, c => c.DairaId, d => d.DairaId, (c, d) => new { c.CommuneId, d.WilayaId })
             .GroupBy(x => x.WilayaId)
             .Select(g => new { WilayaId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.WilayaId, x => x.Count);
+            .ToDictionaryAsync(x => x.WilayaId, x => x.Count, cancellationToken);
 
         var usersByWilaya = await db.Users
             .Where(u => (u.Role == UserRoles.CommuneUser || u.Role == UserRoles.FieldWorker) && u.CommuneId.HasValue)
@@ -237,7 +237,7 @@ public class AdminController(
             .Join(db.Dairas, x => x.DairaId, d => d.DairaId, (x, d) => new { d.WilayaId, x.Id })
             .GroupBy(x => x.WilayaId)
             .Select(g => new { WilayaId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.WilayaId, x => x.Count);
+            .ToDictionaryAsync(x => x.WilayaId, x => x.Count, cancellationToken);
 
         var summaries = wilayas.Select(w =>
         {
@@ -259,25 +259,25 @@ public class AdminController(
 
     // ─── Private: report builders ─────────────────────────────────────────────
 
-    private async Task<WilayaReport?> BuildWilayaReportAsync(int wilayaId)
+    private async Task<WilayaReport?> BuildWilayaReportAsync(int wilayaId, CancellationToken cancellationToken)
     {
-        var wilaya = await db.Wilayas.FindAsync(wilayaId);
+        var wilaya = await db.Wilayas.FindAsync(wilayaId, cancellationToken);
         if (wilaya is null) return null;
 
         var wilayaAdmin = await db.Users
             .Where(u => u.Role == UserRoles.WilayaAdmin && u.WilayaId == wilayaId)
             .Select(u => new AdminInfo(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role))
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(cancellationToken);
 
         var dairas = await db.Dairas
             .Where(d => d.WilayaId == wilayaId)
             .OrderBy(d => d.DairaId)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         var dairaReports = new List<DairaReport>();
         foreach (var daira in dairas)
         {
-            var report = await BuildDairaReportAsync(daira);
+            var report = await BuildDairaReportAsync(daira, cancellationToken);
             if (report is not null)
                 dairaReports.Add(report);
         }
@@ -291,23 +291,23 @@ public class AdminController(
         );
     }
 
-    private async Task<DairaReport?> BuildDairaReportAsync(int dairaId)
+    private async Task<DairaReport?> BuildDairaReportAsync(int dairaId, CancellationToken cancellationToken)
     {
-        var daira = await db.Dairas.FindAsync(dairaId);
-        return daira is null ? null : await BuildDairaReportAsync(daira);
+        var daira = await db.Dairas.FindAsync(dairaId, cancellationToken);
+        return daira is null ? null : await BuildDairaReportAsync(daira, cancellationToken);
     }
 
-    private async Task<DairaReport?> BuildDairaReportAsync(Daira daira)
+    private async Task<DairaReport?> BuildDairaReportAsync(Daira daira, CancellationToken cancellationToken)
     {
         var dairaAdmin = await db.Users
             .Where(u => u.Role == UserRoles.DairaAdmin && u.DairaId == daira.DairaId)
             .Select(u => new AdminInfo(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role))
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(cancellationToken);
 
         var communes = await db.Communes
             .Where(c => c.DairaId == daira.DairaId)
             .OrderBy(c => c.CommuneId)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         // Batch-load all commune-scoped users for this daira in one query
         var communeIds = communes.Select(c => c.CommuneId).ToArray();
@@ -315,11 +315,11 @@ public class AdminController(
             .Where(u => (u.Role == UserRoles.CommuneUser || u.Role == UserRoles.FieldWorker) && u.CommuneId.HasValue
                      && communeIds.Contains(u.CommuneId!.Value))
             .Select(u => new { u.Id, u.Username, u.Name, u.Email, u.CommuneId, u.Role })
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         // Batch feature counts for all users in one UNION ALL query
         var userIds = users.Select(u => u.Id).ToArray();
-        var counts = await GetUserFeatureCountsAsync(userIds);
+        var counts = await GetUserFeatureCountsAsync(userIds, cancellationToken);
 
         var communeReports = communes.Select(c =>
         {
@@ -351,11 +351,11 @@ public class AdminController(
     /// Returns per-user feature counts for the given user IDs in one UNION ALL
     /// query — O(1) round-trips regardless of how many users are in scope.
     /// </summary>
-    private async Task<Dictionary<Guid, UserFeatureStats>> GetUserFeatureCountsAsync(Guid[] userIds)
+    private async Task<Dictionary<Guid, UserFeatureStats>> GetUserFeatureCountsAsync(Guid[] userIds, CancellationToken cancellationToken)
     {
         if (userIds.Length == 0) return new Dictionary<Guid, UserFeatureStats>();
 
-        await db.Database.OpenConnectionAsync();
+        await db.Database.OpenConnectionAsync(cancellationToken);
         var conn = db.Database.GetDbConnection();
         try
         {
@@ -406,8 +406,8 @@ public class AdminController(
             var totalCol = 5 + descriptors.Count;
 
             var result = new Dictionary<Guid, UserFeatureStats>();
-            await using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
             {
                 var id = reader.GetGuid(0);
                 result[id] = new UserFeatureStats(

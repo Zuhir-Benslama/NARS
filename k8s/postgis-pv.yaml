@@ -13,5 +13,5 @@ spec:
   # For production, replace with a CSI-backed persistent volume
   # (e.g. EBS, GCE PD, Azure Disk, Longhorn, Rook/Ceph).
   hostPath:
-    path: /mnt/nars/postgis
+    path: /mnt/nars/postgis/data
     type: DirectoryOrCreate

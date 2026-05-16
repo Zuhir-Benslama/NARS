@@ -3,7 +3,7 @@
 // house entrance markers, and implements the Set House Numbers algorithm.
 // Extracted from context-menu.ts for size.
 
-import { store } from "../store"
+import { useAppStore } from "../stores/appStore"
 import { useLayerStore } from "../stores/layerStore"
 import type { LayerState } from "../stores/layerStore"
 import { featuresStore } from "./core/state"
@@ -41,25 +41,28 @@ function highlightFeature(phaseKey: string, dbId: string, active: boolean): void
 }
 
 export function setReferenceRoad(dbId: string): void {
-  if (store.referenceRoadDbId != null) {
-    highlightFeature("roads", store.referenceRoadDbId, false)
+  const appStore = useAppStore()
+  if (appStore.referenceRoadDbId != null) {
+    highlightFeature("roads", appStore.referenceRoadDbId, false)
   }
-  store.referenceRoadDbId = dbId
+  appStore.referenceRoadDbId = dbId
   highlightFeature("roads", dbId, true)
 }
 
 export function clearReferenceRoad(): void {
-  if (store.referenceRoadDbId != null) {
-    highlightFeature("roads", store.referenceRoadDbId, false)
-    store.referenceRoadDbId = null
+  const appStore = useAppStore()
+  if (appStore.referenceRoadDbId != null) {
+    highlightFeature("roads", appStore.referenceRoadDbId, false)
+    appStore.referenceRoadDbId = null
   }
 }
 
 export function setReferenceEntrance(dbId: string): void {
-  if (store.referenceEntranceDbId != null) {
-    highlightFeature("houseEntrances", store.referenceEntranceDbId, false)
+  const appStore = useAppStore()
+  if (appStore.referenceEntranceDbId != null) {
+    highlightFeature("houseEntrances", appStore.referenceEntranceDbId, false)
   }
-  store.referenceEntranceDbId = dbId
+  appStore.referenceEntranceDbId = dbId
   highlightFeature("houseEntrances", dbId, true)
 }
 

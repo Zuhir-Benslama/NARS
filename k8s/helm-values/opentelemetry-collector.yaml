@@ -35,10 +35,12 @@ config:
           cors:
             allowed_origins:
               - http://localhost:5173
-              - http://nars.dz:8080
-              - http://nars.dz:80
               - http://localhost:8080
               - http://localhost:80
+              - http://nars.dz:8080
+              - http://nars.dz:80
+              - https://nars.dz:8443
+              - https://api.nars.dz:8443
 
   processors:
     batch:

@@ -4,7 +4,7 @@
 // and double-click vertex removal in edit mode.
 
 import { apiFetch } from "../../api"
-import { syncCounts } from "../../store"
+import { useAppStore } from "../../stores/appStore"
 import { useLayerStore } from "../../stores/layerStore"
 import type { LayerState } from "../../stores/layerStore"
 import { ctx, featuresStore } from "./state"
@@ -211,7 +211,7 @@ export function registerGeomanEvents(): void {
           const filtered = entries.filter((f) => f.dbId !== dbId)
           ;(state as unknown as Record<string, LayerEntry[]>)[phaseKey] = filtered
         }
-        syncCounts()
+        useAppStore().syncCounts()
         refreshLayerVisibility()
       }
 

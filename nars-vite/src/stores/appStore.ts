@@ -3,6 +3,7 @@
 
 import { defineStore } from "pinia"
 import type { AppStoreState, FeatureCounts, UserInfo } from "../types"
+import { useLayerStore } from "./layerStore"
 
 export const useAppStore = defineStore("app", {
   state: (): AppStoreState => ({
@@ -49,6 +50,20 @@ export const useAppStore = defineStore("app", {
     },
     updateCounts(counts: FeatureCounts) {
       this.counts = counts
+    },
+    syncCounts() {
+      const layerStore = useLayerStore()
+      this.counts = {
+        areas: layerStore.areaCount,
+        cityCenter: layerStore.cityCenterCount,
+        districts: layerStore.districtCount,
+        roads: layerStore.roadCount,
+        mainEntrances: layerStore.mainEntranceCount,
+        secondaryEntrances: layerStore.secondaryEntranceCount,
+        publicBuildings: layerStore.publicBuildingCount,
+        publicSpaces: layerStore.publicSpaceCount,
+        namingPanels: layerStore.namingPanelCount,
+      }
     },
     reset() {
       this.$reset()

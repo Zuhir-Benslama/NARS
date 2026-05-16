@@ -28,10 +28,10 @@
 
 <script setup lang="ts">
 import { computed } from "vue"
-import { store } from "../../store"
+import { useModalStore } from "../../stores/modalStore"
 import { PUBLIC_BUILDING_SECTORS } from "../../phases"
 
-const m = store.modal
+const m = useModalStore()
 
 const currentSectorBuildings = computed(() => {
   const sector = PUBLIC_BUILDING_SECTORS.find((s) => s.key === m.sectorKey)

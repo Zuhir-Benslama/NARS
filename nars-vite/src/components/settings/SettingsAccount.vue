@@ -26,7 +26,7 @@
 <script setup lang="ts">
 import { reactive, watch } from "vue"
 import { useI18n } from "vue-i18n"
-import { store } from "../../store"
+import { useAppStore } from "../../stores/appStore"
 import { apiFetch } from "../../api"
 import { showToast } from "../../lib/toast"
 
@@ -34,12 +34,14 @@ const { t } = useI18n()
 
 const props = defineProps<{ visible: boolean }>()
 
+const appStore = useAppStore()
+
 const form = reactive({ username: "", email: "", password: "" })
 
 function syncFromStore() {
-  if (store.user) {
-    form.username = store.user.username || ""
-    form.email = store.user.email || ""
+  if (appStore.user) {
+    form.username = appStore.user.username || ""
+    form.email = appStore.user.email || ""
     form.password = ""
   }
 }

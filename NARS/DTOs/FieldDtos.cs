@@ -7,13 +7,13 @@ namespace NarsApi.DTOs;
 public record FieldInspectRequest(
     [property: JsonPropertyName("feature_id")][param: Required] string FeatureId,
     [property: JsonPropertyName("type")][param: Required] string Type,
-    [property: JsonPropertyName("data")][param: Required] JsonElement Data,
+    [property: JsonPropertyName("data")][property: JsonRequired][param: Required] JsonElement Data,
     [property: JsonPropertyName("status")][param: Required] string Status
 );
 
 public record FieldEntranceCreateRequest(
     [property: JsonPropertyName("road_id")][param: Required] string RoadId,
-    [property: JsonPropertyName("data")][param: Required] JsonElement Data,
+    [property: JsonPropertyName("data")][property: JsonRequired][param: Required] JsonElement Data,
     [property: JsonPropertyName("label")] string? Label
 );
 

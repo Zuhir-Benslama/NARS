@@ -2,7 +2,9 @@
 // Core event handlers: gm:create, contextmenu, click, keyboard (ESC, Ctrl+Z).
 
 import { PHASES } from "../../phases"
-import { store, setSelectedFeature } from "../../store"
+import { useAppStore } from "../../stores/appStore"
+import { useModalStore } from "../../stores/modalStore"
+import { setSelectedFeature } from "../../stores"
 import { debugError } from "../../utils/debug"
 import type { GeomanCreateEvent, ActionInstances } from "../core/geoman-types"
 import type { MapMouseEvent as MapLibreMapMouseEvent } from "maplibre-gl"
@@ -22,7 +24,7 @@ import { undo } from "../undo"
 
 // ─── GEOMETRY HELPER ──────────────────────────────────────────────────────────
 
-function pointToSegmentDist(
+export function pointToSegmentDist(
   px: number,
   py: number,
   x1: number,
@@ -106,6 +108,7 @@ async function onFeatureCreated(e: GeomanCreateEvent): Promise<void> {
 // ─── CONTEXT MENU HANDLER ─────────────────────────────────────────────────────
 
 function onContextMenu(e: MouseEvent): void {
+  const appStore = useAppStore()
   const mapEl = ctx.map.getContainer()
   if (!mapEl.contains(e.target as Node)) return
 
@@ -127,7 +130,7 @@ function onContextMenu(e: MouseEvent): void {
     e.stopPropagation()
     const coords: [number, number][] = lineDrawer.shapeLngLats
     if (coords.length <= 1) {
-      const phase = PHASES[store.currentPhase]
+      const phase = PHASES[appStore.currentPhase]
       ctx
         .geoman!.disableDraw()
         .then(() => {
@@ -142,7 +145,7 @@ function onContextMenu(e: MouseEvent): void {
 
   e.preventDefault()
   e.stopImmediatePropagation()
-  const phase = PHASES[store.currentPhase]
+  const phase = PHASES[appStore.currentPhase]
   if (!phase) return
 
   const rect = ctx.map.getContainer().getBoundingClientRect()
@@ -209,10 +212,11 @@ function onContextMenu(e: MouseEvent): void {
 // ─── CLICK HANDLER ────────────────────────────────────────────────────────────
 
 function onClick(e: MapLibreMapMouseEvent & { point: { x: number; y: number } }): void {
+  const appStore = useAppStore()
   if (isEditMode) return
   if (ctx.geoman && ctx.geoman.getActiveDrawModes?.().length > 0) return
 
-  const phase = PHASES[store.currentPhase]
+  const phase = PHASES[appStore.currentPhase]
   const features = ctx.map.queryRenderedFeatures(e.point)
 
   let feature
@@ -233,7 +237,7 @@ function onClick(e: MapLibreMapMouseEvent & { point: { x: number; y: number } })
   } else {
     setSelectedFeature(null)
     updateSelectionHighlight(null)
-    const currentPhase = PHASES[store.currentPhase]
+    const currentPhase = PHASES[appStore.currentPhase]
     if (currentPhase && currentPhase.key !== "namingPanels") {
       buildDrawControl(currentPhase)
     }
@@ -243,14 +247,15 @@ function onClick(e: MapLibreMapMouseEvent & { point: { x: number; y: number } })
 // ─── KEYBOARD HANDLERS ────────────────────────────────────────────────────────
 
 function onKeyDown(e: KeyboardEvent): void {
+  const appStore = useAppStore()
   if (e.key === "Escape") {
-    if (store.modal.visible) return
+    if (useModalStore().visible) return
 
     const drawing = (ctx.geoman?.getActiveDrawModes?.().length ?? 0) > 0
     if (drawing) {
       e.preventDefault()
       e.stopImmediatePropagation()
-      const phase = PHASES[store.currentPhase]
+      const phase = PHASES[appStore.currentPhase]
       ctx
         .geoman!.disableDraw()
         .then(() => {

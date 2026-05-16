@@ -1,16 +1,18 @@
+# ─── API Ingress (secure) ──────────────────────────────────────────────
+# Serves api.nars.dz with TLS + mTLS client certificate authentication.
+# HTTP traffic is redirected to HTTPS; HTTPS requires a valid client cert
+# signed by the nars-ca (see make ca-generate / ca-secret).
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: nars-api
   namespace: nars
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
     nginx.ingress.kubernetes.io/use-regex: "true"
-    # mTLS — require client certificate for all HTTPS API calls
-    # HTTP traffic is unaffected (client certs only work over TLS)
     nginx.ingress.kubernetes.io/auth-tls-verify-client: "on"
     nginx.ingress.kubernetes.io/auth-tls-secret: "nars/nars-ca"
     nginx.ingress.kubernetes.io/auth-tls-verify-depth: "1"
@@ -19,11 +21,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - nars.dz
-        - localhost
+        - api.nars.dz
       secretName: nars-tls
   rules:
-    - host: nars.dz
+    - host: api.nars.dz
       http:
         paths:
           - path: /api(/|$)(.*)
@@ -40,6 +41,25 @@ spec:
                 name: nars-api
                 port:
                   number: 80
+---
+# ─── API Ingress (local dev) ──────────────────────────────────────────
+# Serves localhost without TLS/mTLS for local development access.
+# Port-forward ingress-nginx to localhost, then:
+#   curl http://localhost:8080/api/feature-types
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nars-api-local
+  namespace: nars
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
     - host: localhost
       http:
         paths:
