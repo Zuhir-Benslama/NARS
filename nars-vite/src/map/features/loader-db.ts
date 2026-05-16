@@ -4,7 +4,7 @@
 
 import { apiFetch } from "../../api"
 import { PHASES, API_LAYER_TO_PHASE } from "../../phases"
-import { store, syncCounts } from "../../store"
+import { useAppStore } from "../../stores/appStore"
 import { useLayerStore } from "../../stores/layerStore"
 import type { LayerState } from "../../stores/layerStore"
 import { featuresStore, type MaplibreFeature } from "../core/state"
@@ -85,8 +85,9 @@ function processFeature(
     }
 
     if (phase.key === "cityCenter" && data.lat != null && data.lng != null) {
-      store.cityCenterMode = "city_center"
-      store.cityCenterLatLng = { lat: data.lat, lng: data.lng }
+      const appStore = useAppStore()
+      appStore.cityCenterMode = "city_center"
+      appStore.cityCenterLatLng = { lat: data.lat, lng: data.lng }
     }
   } catch (err) {
     debugError("[LOAD] Error loading feature:", err)
@@ -95,8 +96,9 @@ function processFeature(
 }
 
 export async function loadFromDatabase(): Promise<void> {
+  const appStore = useAppStore()
   debugLog("[LOAD] Starting...")
-  store.isLoading = true
+  appStore.isLoading = true
   try {
     debugLog("[LOAD] Fetching /api/load...")
     const response = await apiFetch("/api/load")
@@ -131,7 +133,8 @@ export async function loadFromDatabase(): Promise<void> {
     debugLog("[LOAD] batchAdd", maplibreFeatures.length, "features into features source")
 
     const communeId =
-      (store.user as { commune?: { id?: number | string } } | null | undefined)?.commune?.id ?? null
+      (appStore.user as { commune?: { id?: number | string } } | null | undefined)?.commune?.id ??
+      null
     const persistedPhase = loadPhase(communeId)
 
     if (
@@ -139,19 +142,19 @@ export async function loadFromDatabase(): Promise<void> {
       persistedPhase >= 0 &&
       persistedPhase < PHASES.length
     ) {
-      store.currentPhase = persistedPhase
+      appStore.currentPhase = persistedPhase
     } else {
-      store.currentPhase = 0
+      appStore.currentPhase = 0
     }
 
-    syncCounts()
+    appStore.syncCounts()
     refreshLayerVisibility()
     updateEndpointMarkers()
     debugLog("[LOAD] Loading complete")
   } catch (err) {
     debugError("Load error:", err)
-    store.loadError = true
+    appStore.loadError = true
   } finally {
-    store.isLoading = false
+    appStore.isLoading = false
   }
 }

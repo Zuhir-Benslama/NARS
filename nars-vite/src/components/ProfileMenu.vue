@@ -33,20 +33,21 @@
 <script setup lang="ts">
 import { ref, computed } from "vue"
 import { useI18n } from "vue-i18n"
-import { store } from "../store"
+import { useAppStore } from "../stores/appStore"
 import { apiFetch } from "../api"
 import { getLoginPath } from "../config"
 import { showToast } from "../lib/toast"
 import SettingsModal from "./SettingsModal.vue"
 
 const { t } = useI18n()
+const appStore = useAppStore()
 
 const dropdownOpen = ref(false)
 const settingsVisible = ref(false)
 
-const username = computed(() => store.user?.username || t("loading"))
-const name = computed(() => store.user?.name || "")
-const initials = computed(() => (store.user?.username || "U").charAt(0).toUpperCase())
+const username = computed(() => appStore.user?.username || t("loading"))
+const name = computed(() => appStore.user?.name || "")
+const initials = computed(() => (appStore.user?.username || "U").charAt(0).toUpperCase())
 
 const toggleDropdown = () => {
   dropdownOpen.value = !dropdownOpen.value
@@ -62,7 +63,7 @@ function onSettings() {
 
 async function onLogout() {
   try {
-    localStorage.setItem("nars_resume_phase", String(store.currentPhase))
+    localStorage.setItem("nars_resume_phase", String(appStore.currentPhase))
     const res = await apiFetch("/api/logout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

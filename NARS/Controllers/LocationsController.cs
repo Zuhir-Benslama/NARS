@@ -6,11 +6,6 @@ using NarsApi.DTOs;
 
 namespace NarsApi.Controllers;
 
-// Shape types for wilaya/daira/commune list items
-public record WilayaItem(int Id, string NameFr, string NameAr, double? Latitude, double? Longitude);
-public record DairaItem(int Id, string NameFr, string NameAr, double? Latitude, double? Longitude, string FullName);
-public record CommuneItem(int Id, string NameFr, string NameAr, string? Code, double? Latitude, double? Longitude, string FullName);
-
 /// <summary>
 /// Administrative hierarchy endpoints (Wilayas, Dairas, Communes) with
 /// pagination support. Maximum page size is 500 to prevent oversized responses.
@@ -42,7 +37,8 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
     public async Task<IActionResult> GetWilayas(
         [FromQuery] string search = "",
         [FromQuery] int skip = 0,
-        [FromQuery] int take = 100)
+        [FromQuery] int take = 100,
+        CancellationToken cancellationToken = default)
     {
         // Cap page size to prevent oversized responses.
         take = Math.Clamp(take, 1, 500);
@@ -57,7 +53,7 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
         {
             var cached = await CacheOrFetchAsync(WilayaCacheKey, async () =>
             {
-                var all = await db.Wilayas.OrderBy(w => w.WilayaFr).ToListAsync();
+                var all = await db.Wilayas.OrderBy(w => w.WilayaFr).ToListAsync(cancellationToken);
                 return all.Select(w => new WilayaItem(
                     w.WilayaId, w.WilayaFr ?? "", w.WilayaAr ?? "", w.WilayaLatitude, w.WilayaLongitude
                 )).ToList();
@@ -72,8 +68,8 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
                           || EF.Functions.ILike(w.WilayaAr!, $"%{search}%"));
         }
 
-        var total = await q.CountAsync();
-        var result = await q.OrderBy(w => w.WilayaFr).Skip(skip).Take(take).ToListAsync();
+        var total = await q.CountAsync(cancellationToken);
+        var result = await q.OrderBy(w => w.WilayaFr).Skip(skip).Take(take).ToListAsync(cancellationToken);
 
         var items = result.Select(w => new WilayaItem(
             w.WilayaId, w.WilayaFr ?? "", w.WilayaAr ?? "", w.WilayaLatitude, w.WilayaLongitude
@@ -89,7 +85,8 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
         [FromQuery] int wilaya_id,
         [FromQuery] string search = "",
         [FromQuery] int skip = 0,
-        [FromQuery] int take = 100)
+        [FromQuery] int take = 100,
+        CancellationToken cancellationToken = default)
     {
         // Cap page size to prevent oversized responses.
         take = Math.Clamp(take, 1, 500);
@@ -105,7 +102,7 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
         {
             var cached = await CacheOrFetchAsync(dairaCacheKey, async () =>
             {
-                var all = await db.Dairas.Where(d => d.WilayaId == wilaya_id).OrderBy(d => d.DairaFr).ToListAsync();
+                var all = await db.Dairas.Where(d => d.WilayaId == wilaya_id).OrderBy(d => d.DairaFr).ToListAsync(cancellationToken);
                 return all.Select(d => new DairaItem(
                     d.DairaId, d.DairaFr, d.DairaAr, d.DairaLatitude, d.DairaLongitude, d.DairaName ?? ""
                 )).ToList();
@@ -120,8 +117,8 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
                           || EF.Functions.ILike(d.DairaAr, $"%{search}%"));
         }
 
-        var total = await q.CountAsync();
-        var result = await q.OrderBy(d => d.DairaFr).Skip(skip).Take(take).ToListAsync();
+        var total = await q.CountAsync(cancellationToken);
+        var result = await q.OrderBy(d => d.DairaFr).Skip(skip).Take(take).ToListAsync(cancellationToken);
 
         var items = result.Select(d => new DairaItem(
             d.DairaId, d.DairaFr, d.DairaAr, d.DairaLatitude, d.DairaLongitude, d.DairaName ?? ""
@@ -137,7 +134,8 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
         [FromQuery] int daira_id,
         [FromQuery] string search = "",
         [FromQuery] int skip = 0,
-        [FromQuery] int take = 100)
+        [FromQuery] int take = 100,
+        CancellationToken cancellationToken = default)
     {
         // Cap page size to prevent oversized responses.
         take = Math.Clamp(take, 1, 500);
@@ -153,7 +151,7 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
         {
             var cached = await CacheOrFetchAsync(communeCacheKey, async () =>
             {
-                var all = await db.Communes.Where(c => c.DairaId == daira_id).OrderBy(c => c.CommuneFr).ToListAsync();
+                var all = await db.Communes.Where(c => c.DairaId == daira_id).OrderBy(c => c.CommuneFr).ToListAsync(cancellationToken);
                 return all.Select(c => new CommuneItem(
                     c.CommuneId, c.CommuneFr, c.CommuneAr, c.CommuneCode?.ToString(), c.CommuneLatitude, c.CommuneLongitude, c.CommuneName ?? ""
                 )).ToList();
@@ -168,8 +166,8 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
                           || EF.Functions.ILike(c.CommuneAr, $"%{search}%"));
         }
 
-        var total = await q.CountAsync();
-        var result = await q.OrderBy(c => c.CommuneFr).Skip(skip).Take(take).ToListAsync();
+        var total = await q.CountAsync(cancellationToken);
+        var result = await q.OrderBy(c => c.CommuneFr).Skip(skip).Take(take).ToListAsync(cancellationToken);
 
         var items = result.Select(c => new CommuneItem(
             c.CommuneId, c.CommuneFr, c.CommuneAr, c.CommuneCode?.ToString(), c.CommuneLatitude, c.CommuneLongitude, c.CommuneName ?? ""
@@ -181,16 +179,16 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
     // ── GET /api/commune/{id}/boundary ────────────────────────
 
     [HttpGet("commune/{communeId:int}/boundary")]
-    public async Task<IActionResult> GetCommuneBoundary(int communeId)
+    public async Task<IActionResult> GetCommuneBoundary(int communeId, CancellationToken cancellationToken = default)
     {
-        var commune = await db.Communes.FirstOrDefaultAsync(c => c.CommuneId == communeId);
+        var commune = await db.Communes.FirstOrDefaultAsync(c => c.CommuneId == communeId, cancellationToken);
 
         // Use ADO.NET directly — SqlQueryRaw routes through EF Core's mapping pipeline
         // which mis-maps the ST_AsGeoJSON text result under UseSnakeCaseNamingConvention()
         var conn = db.Database.GetDbConnection();
 
         string? geoJson = null;
-        await conn.OpenAsync();
+        await conn.OpenAsync(cancellationToken);
         try
         {
             using var cmd = conn.CreateCommand();
@@ -200,7 +198,7 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
             param.Value = communeId;
             cmd.Parameters.Add(param);
 
-            var scalar = await cmd.ExecuteScalarAsync();
+            var scalar = await cmd.ExecuteScalarAsync(cancellationToken);
             geoJson = scalar as string;
         }
         finally
@@ -224,12 +222,12 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
     // Returns internal details (geometry type, point count, validity, envelope).
 
     [HttpGet("commune/{communeId:int}/boundary-debug")]
-    public async Task<IActionResult> DebugCommuneBoundary(int communeId, IHostEnvironment env)
+    public async Task<IActionResult> DebugCommuneBoundary(int communeId, IHostEnvironment env, CancellationToken cancellationToken = default)
     {
         if (!env.IsDevelopment())
             return NotFound();
 
-        var boundary = await db.CommuneBoundaries.FirstOrDefaultAsync(b => b.CommuneId == communeId);
+        var boundary = await db.CommuneBoundaries.FirstOrDefaultAsync(b => b.CommuneId == communeId, cancellationToken);
         if (boundary is null)
             return Ok(new { error = "Boundary not found" });
 

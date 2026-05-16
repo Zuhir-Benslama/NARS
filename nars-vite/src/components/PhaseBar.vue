@@ -22,20 +22,21 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
-import { store } from "../store"
+import { useAppStore } from "../stores/appStore"
 import { PHASES } from "../phases"
 import { goToPhase } from "../map"
 
 const { t } = useI18n()
+const appStore = useAppStore()
 
 const steps = computed(() =>
   PHASES.map((p, i) => ({
     ...p,
-    done: i < store.currentPhase,
-    active: i === store.currentPhase,
-    locked: i > store.currentPhase,
-    badge: i < store.currentPhase ? "✓" : String(i + 1),
-    connectorDone: i < store.currentPhase,
+    done: i < appStore.currentPhase,
+    active: i === appStore.currentPhase,
+    locked: i > appStore.currentPhase,
+    badge: i < appStore.currentPhase ? "✓" : String(i + 1),
+    connectorDone: i < appStore.currentPhase,
   })),
 )
 

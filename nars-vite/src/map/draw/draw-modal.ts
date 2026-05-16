@@ -3,7 +3,8 @@
 // Handles reference-driven house entrance logic and city center radius extraction.
 
 import { PHASES } from "../../phases"
-import { store, openModal } from "../../store"
+import { useAppStore } from "../../stores/appStore"
+import { openModal } from "../../stores"
 import { useLayerStore } from "../../stores/layerStore"
 import type { LayerState } from "../../stores/layerStore"
 import { showToast } from "../../lib/toast"
@@ -32,14 +33,15 @@ export async function openModalForFeature(
 }
 
 async function openHouseEntranceModal(geometry: GeoJSON.Geometry): Promise<ModalResult | null> {
+  const appStore = useAppStore()
   const layerStore = useLayerStore()
   const state = layerStore.$state as LayerState
 
-  if (store.referenceEntranceDbId != null) {
+  if (appStore.referenceEntranceDbId != null) {
     return openSecondaryEntranceModal(state)
   }
 
-  if (store.referenceRoadDbId != null) {
+  if (appStore.referenceRoadDbId != null) {
     return openMainEntranceModal(state, geometry)
   }
 
@@ -48,7 +50,10 @@ async function openHouseEntranceModal(geometry: GeoJSON.Geometry): Promise<Modal
 }
 
 function openSecondaryEntranceModal(state: LayerState): ModalResult | null {
-  const mainEntry = (state.houseEntrances || []).find((e) => e.dbId === store.referenceEntranceDbId)
+  const appStore = useAppStore()
+  const mainEntry = (state.houseEntrances || []).find(
+    (e) => e.dbId === appStore.referenceEntranceDbId,
+  )
   if (!mainEntry) {
     showToast(t("alert_ref_entrance_not_found"), "error")
     return null
@@ -57,7 +62,7 @@ function openSecondaryEntranceModal(state: LayerState): ModalResult | null {
   const bisCount = (state.houseEntrances || []).filter(
     (e) =>
       e.data.entranceTypeKey === "secondary_entrance" &&
-      e.data.mainEntranceDbId === store.referenceEntranceDbId,
+      e.data.mainEntranceDbId === appStore.referenceEntranceDbId,
   ).length
   const bisNumber = bisCount + 1
 
@@ -66,7 +71,7 @@ function openSecondaryEntranceModal(state: LayerState): ModalResult | null {
     decisionNumber: "",
     decisionDate: "",
     entranceTypeKey: "secondary_entrance",
-    mainEntranceDbId: store.referenceEntranceDbId ?? undefined,
+    mainEntranceDbId: appStore.referenceEntranceDbId ?? undefined,
     mainEntranceLabel: mainEntry.data.label,
     bisNumber,
   }
@@ -76,17 +81,18 @@ async function openMainEntranceModal(
   state: LayerState,
   geometry: GeoJSON.Geometry,
 ): Promise<ModalResult | null> {
-  const roadEntry = (state.roads || []).find((r) => r.dbId === store.referenceRoadDbId)
+  const appStore = useAppStore()
+  const roadEntry = (state.roads || []).find((r) => r.dbId === appStore.referenceRoadDbId)
   if (!roadEntry) {
     showToast(t("alert_ref_road_not_found"), "error")
     return null
   }
 
   let side: "left" | "right" = "left"
-  if (geometry.type === "Point" && store.referenceRoadDbId) {
+  if (geometry.type === "Point" && appStore.referenceRoadDbId) {
     const lat = geometry.coordinates[1]
     const lng = geometry.coordinates[0]
-    const sideResult = await getRoadSide(store.referenceRoadDbId, lat, lng)
+    const sideResult = await getRoadSide(appStore.referenceRoadDbId, lat, lng)
     side = sideResult?.side ?? "left"
   }
 
@@ -95,7 +101,7 @@ async function openMainEntranceModal(
     decisionNumber: "",
     decisionDate: "",
     entranceTypeKey: "main_entrance",
-    roadDbId: store.referenceRoadDbId ?? undefined,
+    roadDbId: appStore.referenceRoadDbId ?? undefined,
     roadLabel: roadEntry.data.label,
     side,
     entranceNumber: undefined,

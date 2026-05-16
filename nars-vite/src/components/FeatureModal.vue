@@ -152,17 +152,19 @@
 <script setup lang="ts">
 import { computed, watch } from "vue"
 import { useI18n } from "vue-i18n"
-import { store } from "../store"
 import { PHASES, DISTRICT_TYPES, ROAD_TYPES, PUBLIC_SPACE_TYPES } from "../phases"
-import { resolveModal } from "../store"
 import type { FeatureData } from "../types"
+import { useAppStore } from "../stores/appStore"
+import { useModalStore } from "../stores/modalStore"
 import { fetchRoadSide, computeBisNumber } from "../map"
 import AreaTypeSelector from "./modals/AreaTypeSelector.vue"
 import RoadAssignmentSelector from "./modals/RoadAssignmentSelector.vue"
 import BuildingTypeSelector from "./modals/BuildingTypeSelector.vue"
 
 const { t } = useI18n()
-const m = store.modal
+const appStore = useAppStore()
+const modalStore = useModalStore()
+const m = modalStore
 const phase = computed(() => (m.phaseIndex !== null ? (PHASES[m.phaseIndex] ?? null) : null))
 
 // ── Computed display helpers ──────────────────────────────────────────────────
@@ -218,9 +220,12 @@ watch(
     if (val === "central_urban") {
       // Use municipalityName or fall back to user.commune.name_fr
       const communeName =
-        store.municipalityName || store.user?.commune.name_fr || store.user?.commune.name_ar || ""
+        appStore.municipalityName ||
+        appStore.user?.commune.name_fr ||
+        appStore.user?.commune.name_ar ||
+        ""
       m.label = communeName
-    } else if (!m.isEdit && m.label === store.municipalityName) {
+    } else if (!m.isEdit && m.label === appStore.municipalityName) {
       m.label = ""
     }
   },
@@ -282,7 +287,7 @@ function validate() {
       errors.mainEntrance = "Required"
   }
 
-  store.modal.errors = errors
+  modalStore.errors = errors
   return Object.keys(errors).length === 0
 }
 
@@ -291,7 +296,7 @@ function onSave() {
   const key = phase.value?.key
   const result: Partial<FeatureData> = {
     label: isMainUrban.value
-      ? store.municipalityName || store.user?.commune.name_fr || ""
+      ? appStore.municipalityName || appStore.user?.commune.name_fr || ""
       : m.label.trim(),
     decisionNumber: m.decisionNumber.trim(),
     decisionDate: m.decisionDate.trim(),
@@ -326,11 +331,11 @@ function onSave() {
     result.radius = m.radius ?? undefined
   }
 
-  resolveModal(result as import("../types").ModalResult)
+  modalStore.close(result as import("../types").ModalResult)
 }
 
 function onCancel() {
-  resolveModal(null)
+  modalStore.close(null)
 }
 
 // Keyboard shortcuts

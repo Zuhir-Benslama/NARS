@@ -87,13 +87,13 @@ public class FeatureCatalogController(AppDbContext db) : NarsControllerBase
     // Uses UNION ALL across tables so pagination applies to the combined result.
 
     [HttpGet("load/layer/{layerType}")]
-    public async Task<IActionResult> LoadByLayer(string layerType, [FromQuery] int skip = 0, [FromQuery] int take = 100)
+    public async Task<IActionResult> LoadByLayer(string layerType, [FromQuery] int skip = 0, [FromQuery] int take = 100, CancellationToken cancellationToken = default)
     {
         // Cap page size to prevent oversized responses.
         take = Math.Clamp(take, 1, 500);
 
         var (features, totalCount) = await FeatureQueryHelper.LoadByLayerAsync(
-            db.Database.GetDbConnection(), RequiredCurrentUserId, layerType, skip, take);
+            db.Database.GetDbConnection(), RequiredCurrentUserId, layerType, skip, take, cancellationToken);
 
         return Ok(new
         {

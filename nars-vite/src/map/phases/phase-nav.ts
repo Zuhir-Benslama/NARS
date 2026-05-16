@@ -2,7 +2,7 @@
 
 import { t } from "../../i18n"
 import { PHASES } from "../../phases"
-import { store } from "../../store"
+import { useAppStore } from "../../stores/appStore"
 import { useLayerStore } from "../../stores/layerStore"
 import type { LayerState } from "../../stores/layerStore"
 import { showToast } from "../../lib/toast"
@@ -14,14 +14,15 @@ import { computeAndApplyRoadDirections } from "../roads/road-directions"
 import { savePhase } from "./phase-storage"
 
 export async function navigatePhase(direction: number): Promise<void> {
-  const target = store.currentPhase + direction
+  const appStore = useAppStore()
+  const target = appStore.currentPhase + direction
   if (target < 0 || target >= PHASES.length) return
 
   const layerStore = useLayerStore()
   const state = layerStore.$state as LayerState
 
   if (direction > 0) {
-    const from = PHASES[store.currentPhase]
+    const from = PHASES[appStore.currentPhase]
 
     if (from.key === "areas" && (state.areas?.length ?? 0) === 0) {
       showToast(t("alert_at_least_one_urban_area"), "error")
@@ -53,12 +54,13 @@ export async function navigatePhase(direction: number): Promise<void> {
 }
 
 export async function goToPhase(target: number): Promise<void> {
-  if (target === store.currentPhase) return
-  if (target > store.currentPhase) {
-    for (let i = store.currentPhase; i < target; i++) {
-      const before = store.currentPhase
+  const appStore = useAppStore()
+  if (target === appStore.currentPhase) return
+  if (target > appStore.currentPhase) {
+    for (let i = appStore.currentPhase; i < target; i++) {
+      const before = appStore.currentPhase
       await navigatePhase(1)
-      if (store.currentPhase === before) return
+      if (appStore.currentPhase === before) return
     }
   } else {
     setPhase(target)
@@ -66,9 +68,11 @@ export async function goToPhase(target: number): Promise<void> {
 }
 
 export function setPhase(index: number): void {
-  store.currentPhase = index
+  const appStore = useAppStore()
+  appStore.currentPhase = index
   const communeId =
-    (store.user as { commune?: { id?: number | string } } | null | undefined)?.commune?.id ?? null
+    (appStore.user as { commune?: { id?: number | string } } | null | undefined)?.commune?.id ??
+    null
   savePhase(index, communeId)
   const phase = PHASES[index]
   setDrawingPhase(phase ?? null)

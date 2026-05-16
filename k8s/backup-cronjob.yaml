@@ -32,6 +32,10 @@ spec:
       template:
         spec:
           restartPolicy: Never
+          securityContext:
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
           containers:
             - name: pg-dump
               image: postgis/postgis:17-3.5
@@ -50,6 +54,13 @@ spec:
                   ls -lh "${FILE}.gz"
                   echo "→ Cleaning backups older than 30 days..."
                   find /backup -name "nars_db_*.sql.gz" -mtime +30 -delete
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
               env:
                 - name: PGHOST
                   value: postgis

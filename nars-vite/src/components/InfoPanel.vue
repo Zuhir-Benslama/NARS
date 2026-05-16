@@ -41,15 +41,16 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
-import { store } from "../store"
+import { useAppStore } from "../stores/appStore"
 
 const { t } = useI18n()
+const appStore = useAppStore()
 
-const c = computed(() => store.counts)
+const c = computed(() => appStore.counts)
 
 const cityCenterStatus = computed(() => {
   if (c.value.cityCenter > 0) return t("info_status_placed")
-  if (store.cityCenterMode === "auto") return t("info_status_skipped")
+  if (appStore.cityCenterMode === "auto") return t("info_status_skipped")
   return "—"
 })
 </script>

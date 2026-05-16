@@ -2,7 +2,7 @@
 // Shared state for edit mode: active entry, coordinate snapshot, and
 // Geoman feature tracking. Also contains lookup helpers and fill suppression.
 
-import { setSelectedFeature } from "../../store"
+import { setSelectedFeature } from "../../stores"
 import { useLayerStore } from "../../stores/layerStore"
 import type { LayerState } from "../../stores/layerStore"
 import type { LayerEntry, LatLng } from "../../types"

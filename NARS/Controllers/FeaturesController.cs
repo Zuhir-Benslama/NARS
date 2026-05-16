@@ -32,7 +32,7 @@ public class FeaturesController(
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> SaveFeature([FromBody] FeatureSaveRequest body)
+    public async Task<IActionResult> SaveFeature([FromBody] FeatureSaveRequest body, CancellationToken cancellationToken = default)
     {
         if (!FeatureTypes.AllTypes.Contains(body.Type))
             return BadRequest(new { detail = $"Unknown feature type '{body.Type}'." });
@@ -56,7 +56,7 @@ public class FeaturesController(
             roadId = rid;
 
         // Validate that the referenced road exists and belongs to the current user.
-        if (roadId.HasValue && !await db.Roads.AnyAsync(r => r.Id == roadId.Value && r.UserId == CurrentUserId))
+        if (roadId.HasValue && !await db.Roads.AnyAsync(r => r.Id == roadId.Value && r.UserId == CurrentUserId, cancellationToken))
             return BadRequest(new { detail = "Referenced road not found." });
 
         Guid newId = Guid.CreateVersion7();
@@ -71,16 +71,16 @@ public class FeaturesController(
             entrance.RoadId = roadId;
 
         // Wrap the feature insert + registry insert in a single transaction
-        await using var tx = await db.Database.BeginTransactionAsync();
+        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
 
         var entry = FeatureTypeRegistry.AddToDbContext(db, entity);
         if (entry is null)
             return BadRequest(new { detail = $"Unknown feature type '{body.Type}'." });
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
 
         db.FeatureRegistry.Add(new FeatureRegistry { Id = newId, FeatureType = body.Type });
-        await db.SaveChangesAsync();
-        await tx.CommitAsync();
+        await db.SaveChangesAsync(cancellationToken);
+        await tx.CommitAsync(cancellationToken);
 
         if (body.Type == FeatureTypes.Area)
             await QueueScatteredRefresh();
@@ -95,7 +95,7 @@ public class FeaturesController(
     // combined result — not per-table (which would return up to 8x the page).
 
     [HttpGet("load")]
-    public async Task<IActionResult> LoadFeatures([FromQuery] int skip = 0, [FromQuery] int take = 1000)
+    public async Task<IActionResult> LoadFeatures([FromQuery] int skip = 0, [FromQuery] int take = 1000, CancellationToken cancellationToken = default)
     {
         // Cap page size to prevent memory exhaustion and oversized responses.
         take = Math.Clamp(take, 1, 2000);
@@ -117,7 +117,7 @@ public class FeaturesController(
     [EnableRateLimiting(RateLimitPolicies.Clear)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> ClearFeatures([FromBody] ClearFeaturesRequest body)
+    public async Task<IActionResult> ClearFeatures([FromBody] ClearFeaturesRequest body, CancellationToken cancellationToken = default)
     {
         if (!body.Confirm)
             return BadRequest(new { detail = "Set \"confirm\": true to delete all features." });
@@ -125,13 +125,13 @@ public class FeaturesController(
         var uid = CurrentUserId;
         int total = 0;
 
-        await using var tx = await db.Database.BeginTransactionAsync();
+        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
 
         // Use the registry to iterate over all feature types — no hardcoded list
         foreach (var type in FeatureTypeRegistry.GetAllTypes())
         {
             var dbSet = FeatureTypeRegistry.GetDbSet(db, type)!;
-            total += await dbSet.Where(f => f.UserId == uid).ExecuteDeleteAsync();
+            total += await dbSet.Where(f => f.UserId == uid).ExecuteDeleteAsync(cancellationToken);
         }
 
         // Build the orphan-cleanup UNION ALL from the registry so it automatically
@@ -145,10 +145,10 @@ public class FeaturesController(
             FeatureTypeRegistry.GetAllTableNames().Select(t => $"SELECT id FROM {t}"));
 
         await db.Database.ExecuteSqlRawAsync(
-            $"DELETE FROM feature_registry WHERE id NOT IN ({unionAll})");
+            $"DELETE FROM feature_registry WHERE id NOT IN ({unionAll})", cancellationToken);
 #pragma warning restore EF1002
 
-        await tx.CommitAsync();
+        await tx.CommitAsync(cancellationToken);
 
         return Ok(new ActionResponse(Success: true, Message: $"Deleted {total} features"));
     }
@@ -156,7 +156,7 @@ public class FeaturesController(
     // ── GET /api/stats ────────────────────────────────────────────────────────
 
     [HttpGet("stats")]
-    public async Task<IActionResult> GetStats()
+    public async Task<IActionResult> GetStats(CancellationToken cancellationToken = default)
     {
         var uid = CurrentUserId;
 
@@ -183,8 +183,8 @@ public class FeaturesController(
             cmd.Parameters.Add(uidParam);
 
             var counts = new Dictionary<string, long>(descriptors.Count);
-            await using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
             {
                 counts[reader.GetString(0)] = reader.GetInt64(1);
             }
@@ -227,14 +227,14 @@ public class FeaturesController(
     // ── PUT /api/update/{id} ──────────────────────────────────────────────────
 
     [HttpPut("update/{featureId:guid}")]
-    public async Task<IActionResult> UpdateFeature(Guid featureId, [FromBody] FeatureUpdateRequest body)
+    public async Task<IActionResult> UpdateFeature(Guid featureId, [FromBody] FeatureUpdateRequest body, CancellationToken cancellationToken = default)
     {
-        var reg = await db.FeatureRegistry.FindAsync(featureId);
+        var reg = await db.FeatureRegistry.FindAsync([featureId], cancellationToken);
         if (reg is null) return NotFound(new { detail = "Feature not found" });
 
         // Verify ownership — prevent users from updating other users' features
         var owned = await FeatureTypeRegistry.GetDbSet(db, reg.FeatureType)!
-            .AnyAsync(f => f.Id == featureId && f.UserId == CurrentUserId);
+            .AnyAsync(f => f.Id == featureId && f.UserId == CurrentUserId, cancellationToken);
         if (!owned) return NotFound(new { detail = "Feature not found" });
 
         // Guard against oversized JSON payloads (max ~500 KB per feature)
@@ -250,7 +250,7 @@ public class FeaturesController(
         // HouseEntrance needs special handling for RoadId extraction from data
         if (reg.FeatureType == FeatureTypes.HouseEntrance)
         {
-            int rows = await UpdateHouseEntrance(featureId, body, updatedAt);
+            int rows = await UpdateHouseEntrance(featureId, body, updatedAt, cancellationToken);
             if (rows == 0) return NotFound(new { detail = "Feature not found" });
             return Ok(new UpdateFeatureResponse(Success: true, Id: featureId.ToString(), UpdatedAt: updatedAt));
         }
@@ -259,7 +259,7 @@ public class FeaturesController(
         if (dbSet is null)
             return BadRequest(new { detail = $"Unknown feature type in registry: {reg.FeatureType}" });
 
-        int updated = await UpdateEntityGeneric(dbSet, featureId, body, updatedAt);
+        int updated = await UpdateEntityGeneric(dbSet, featureId, body, updatedAt, cancellationToken);
         if (updated == 0) return NotFound(new { detail = "Feature not found" });
 
         if (reg.FeatureType == FeatureTypes.Area)
@@ -271,12 +271,12 @@ public class FeaturesController(
     // ── DELETE /api/delete/{id} ───────────────────────────────────────────────
 
     [HttpDelete("delete/{featureId:guid}")]
-    public async Task<IActionResult> DeleteFeature(Guid featureId)
+    public async Task<IActionResult> DeleteFeature(Guid featureId, CancellationToken cancellationToken = default)
     {
-        var reg = await db.FeatureRegistry.FindAsync(featureId);
+        var reg = await db.FeatureRegistry.FindAsync([featureId], cancellationToken);
         if (reg is null) return NotFound(new { detail = "Feature not found" });
 
-        await using var tx = await db.Database.BeginTransactionAsync();
+        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
 
         var dbSet = FeatureTypeRegistry.GetDbSet(db, reg.FeatureType);
         if (dbSet is null)
@@ -285,16 +285,16 @@ public class FeaturesController(
             return BadRequest(new { detail = $"Unknown feature type in registry: {reg.FeatureType}" });
         }
 
-        int deleted = await dbSet.Where(f => f.Id == featureId && f.UserId == CurrentUserId).ExecuteDeleteAsync();
+        int deleted = await dbSet.Where(f => f.Id == featureId && f.UserId == CurrentUserId).ExecuteDeleteAsync(cancellationToken);
 
         if (deleted == 0)
         {
-            await tx.RollbackAsync();
+            await tx.RollbackAsync(cancellationToken);
             return NotFound(new { detail = "Feature not found" });
         }
 
-        await db.FeatureRegistry.Where(r => r.Id == featureId).ExecuteDeleteAsync();
-        await tx.CommitAsync();
+        await db.FeatureRegistry.Where(r => r.Id == featureId).ExecuteDeleteAsync(cancellationToken);
+        await tx.CommitAsync(cancellationToken);
 
         if (reg.FeatureType == FeatureTypes.Area)
             await QueueScatteredRefresh();
@@ -304,39 +304,81 @@ public class FeaturesController(
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private async Task<int> UpdateEntityGeneric(IQueryable<FeatureBase> query, Guid id, FeatureUpdateRequest body, DateTime updatedAt)
+    private async Task<int> UpdateEntityGeneric(IQueryable<FeatureBase> query, Guid id, FeatureUpdateRequest body, DateTime updatedAt, CancellationToken cancellationToken = default)
     {
-        var entity = await query.FirstOrDefaultAsync(f => f.Id == id && f.UserId == CurrentUserId);
-        if (entity is null) return 0;
-        if (body.Label is not null) entity.Label = body.Label;
-        if (body.Data is not null)
-        {
-            if (body.Data.Value.ValueKind == JsonValueKind.String)
-                entity.Data = body.Data.Value.GetString()!;
-            else
-                entity.Data = body.Data.Value.GetRawText();
-        }
-        entity.UpdatedAt = updatedAt;
-        return await db.SaveChangesAsync();
-    }
+        var rows = await query
+            .Where(f => f.Id == id && f.UserId == CurrentUserId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(f => f.UpdatedAt, updatedAt)
+            , cancellationToken);
 
-    private async Task<int> UpdateHouseEntrance(Guid id, FeatureUpdateRequest body, DateTime updatedAt)
-    {
-        var entity = await db.HouseEntrances.FirstOrDefaultAsync(f => f.Id == id && f.UserId == CurrentUserId);
-        if (entity is null) return 0;
-        if (body.Label is not null) entity.Label = body.Label;
+        if (rows == 0) return 0;
+
+        if (body.Label is not null)
+        {
+            await query
+                .Where(f => f.Id == id && f.UserId == CurrentUserId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(f => f.Label, body.Label)
+                , cancellationToken);
+        }
+
         if (body.Data is not null)
         {
-            var dataJson = body.Data.Value.ValueKind == JsonValueKind.String
+            var dataStr = body.Data.Value.ValueKind == JsonValueKind.String
                 ? body.Data.Value.GetString()!
                 : body.Data.Value.GetRawText();
-            entity.Data = dataJson;
+            await query
+                .Where(f => f.Id == id && f.UserId == CurrentUserId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(f => f.Data, dataStr)
+                , cancellationToken);
+        }
+
+        return rows;
+    }
+
+    private async Task<int> UpdateHouseEntrance(Guid id, FeatureUpdateRequest body, DateTime updatedAt, CancellationToken cancellationToken = default)
+    {
+        var rows = await db.HouseEntrances
+            .Where(f => f.Id == id && f.UserId == CurrentUserId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(f => f.UpdatedAt, updatedAt)
+            , cancellationToken);
+
+        if (rows == 0) return 0;
+
+        if (body.Label is not null)
+        {
+            await db.HouseEntrances
+                .Where(f => f.Id == id && f.UserId == CurrentUserId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(f => f.Label, body.Label)
+                , cancellationToken);
+        }
+
+        if (body.Data is not null)
+        {
+            var dataStr = body.Data.Value.ValueKind == JsonValueKind.String
+                ? body.Data.Value.GetString()!
+                : body.Data.Value.GetRawText();
+            await db.HouseEntrances
+                .Where(f => f.Id == id && f.UserId == CurrentUserId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(f => f.Data, dataStr)
+                , cancellationToken);
 
             if (body.Data.Value.TryGetProperty("roadDbId", out var ridEl) && ridEl.ValueKind == JsonValueKind.String && Guid.TryParse(ridEl.GetString(), out var rid))
-                entity.RoadId = rid;
+            {
+                await db.HouseEntrances
+                    .Where(f => f.Id == id && f.UserId == CurrentUserId)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(f => f.RoadId, rid)
+                    , cancellationToken);
+            }
         }
-        entity.UpdatedAt = updatedAt;
-        return await db.SaveChangesAsync();
+
+        return rows;
     }
 
     /// <summary>
