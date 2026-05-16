@@ -7,7 +7,7 @@ metadata:
     app.kubernetes.io/name: nars-frontend
     app.kubernetes.io/component: frontend
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app.kubernetes.io/name: nars-frontend
@@ -20,6 +20,18 @@ spec:
     spec:
       serviceAccountName: nars-frontend
       terminationGracePeriodSeconds: 10
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - nars-frontend
+                topologyKey: kubernetes.io/hostname
       securityContext:
         runAsNonRoot: true
         runAsUser: 101

@@ -10,6 +10,9 @@ export {
   awaitModalResult,
   setCurrentModalFeatureId,
   currentModalFeatureId,
+  openModal,
+  openEditModal,
+  resolveModal,
 } from "./modalStore"
 export { useLayerStore, setSelectedFeature, selectedFeatureDbId } from "./layerStore"
 export { useFieldStore } from "./fieldStore"

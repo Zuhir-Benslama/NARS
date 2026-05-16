@@ -18,7 +18,7 @@ public class RefreshTokenService(
     IJwtService jwt,
     IConfiguration config) : IRefreshTokenService
 {
-    public async Task<RefreshTokenResult> RotateRefreshTokenAsync(string? rawRefreshToken)
+    public async Task<RefreshTokenResult> RotateRefreshTokenAsync(string? rawRefreshToken, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(rawRefreshToken))
             return new RefreshTokenResult(false, "No refresh token.", null, null, null, null);
@@ -27,24 +27,24 @@ public class RefreshTokenService(
             System.Security.Cryptography.SHA256.HashData(
                 System.Text.Encoding.UTF8.GetBytes(rawRefreshToken)));
 
-        await using var tx = await db.Database.BeginTransactionAsync();
+        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
 
         var stored = await db.RefreshTokens
             .FromSqlRaw(
                 "SELECT * FROM refresh_tokens WHERE token_hash = {0} AND revoked = false AND expires_at > NOW() FOR UPDATE SKIP LOCKED",
                 hash)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (stored is null)
         {
-            await tx.RollbackAsync();
+            await tx.RollbackAsync(cancellationToken);
             return new RefreshTokenResult(false, "Invalid or expired refresh token.", null, null, null, null);
         }
 
-        var user = await db.Users.FindAsync(stored.UserId);
+        var user = await db.Users.FindAsync([stored.UserId], cancellationToken);
         if (user is null)
         {
-            await tx.RollbackAsync();
+            await tx.RollbackAsync(cancellationToken);
             return new RefreshTokenResult(false, "User no longer exists.", null, null, null, null);
         }
 
@@ -60,8 +60,8 @@ public class RefreshTokenService(
             ExpiresAt = refreshExpiry,
         });
 
-        await db.SaveChangesAsync();
-        await tx.CommitAsync();
+        await db.SaveChangesAsync(cancellationToken);
+        await tx.CommitAsync(cancellationToken);
 
         var newAccessToken = jwt.CreateToken(user.Id, user.Username, user.Name, user.Email,
             communeId: user.CommuneId, role: user.Role, dairaId: user.DairaId, wilayaId: user.WilayaId);

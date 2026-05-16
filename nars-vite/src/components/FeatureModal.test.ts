@@ -5,47 +5,50 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { mount } from "@vue/test-utils"
 import { nextTick } from "vue"
 
-// Mock store
-const createMockStore = () => ({
-  modal: {
-    visible: false,
-    phaseIndex: 0,
-    isEdit: false,
-    editDbId: null as string | null,
-    label: "",
-    decisionNumber: "",
-    decisionDate: "",
-    errors: {} as Record<string, string>,
-    areaTypeKey: "central_urban",
-    mainUrbanExists: false,
-    districtTypeKey: "district",
-    roadTypeKey: "street",
-    entranceTypeKey: "main_entrance",
-    roadOptions: [] as any[],
-    selectedRoadIdx: "" as number | "",
-    entranceSide: null as "left" | "right" | null,
-    entranceNumber: null as number | null,
-    entranceSideLoading: false,
-    mainEntranceOptions: [] as any[],
-    selectedMainIdx: "" as number | "",
-    bisNumber: null as number | null,
-    spaceTypeKey: "garden",
-    sectorKey: "banking_postal",
-    buildingTypeKey: "bank",
-  },
+// Mock stores
+const createMockModalStore = () => ({
+  visible: false,
+  phaseIndex: 0,
+  isEdit: false,
+  editDbId: null as string | null,
+  label: "",
+  decisionNumber: "",
+  decisionDate: "",
+  errors: {} as Record<string, string>,
+  areaTypeKey: "central_urban",
+  mainUrbanExists: false,
+  districtTypeKey: "district",
+  roadTypeKey: "street",
+  entranceTypeKey: "main_entrance",
+  roadOptions: [] as any[],
+  selectedRoadIdx: "" as number | "",
+  entranceSide: null as "left" | "right" | null,
+  entranceNumber: null as number | null,
+  entranceSideLoading: false,
+  mainEntranceOptions: [] as any[],
+  selectedMainIdx: "" as number | "",
+  bisNumber: null as number | null,
+  spaceTypeKey: "garden",
+  sectorKey: "banking_postal",
+  buildingTypeKey: "bank",
+  radius: null as number | null,
+  close: vi.fn(),
+})
+
+const createMockAppStore = () => ({
   municipalityName: "Test Municipality",
   user: { commune: { name_fr: "Test Municipality", name_ar: "", id: 1 } },
 })
 
-let mockStore = createMockStore()
+let mockModalStore = createMockModalStore()
+const mockAppStore = createMockAppStore()
 
-vi.mock("../store", () => ({
-  get store() {
-    return mockStore
-  },
-  resolveModal: vi.fn(),
-  openModal: vi.fn(),
-  openEditModal: vi.fn(),
+vi.mock("../stores/modalStore", () => ({
+  useModalStore: () => mockModalStore,
+}))
+
+vi.mock("../stores/appStore", () => ({
+  useAppStore: () => mockAppStore,
 }))
 
 // Mock i18n
@@ -159,18 +162,16 @@ vi.mock("../map", () => ({
 }))
 
 import FeatureModal from "../components/FeatureModal.vue"
-import { resolveModal } from "../store"
 
 describe("FeatureModal", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockStore = createMockStore()
-    mockStore.modal.errors = {}
+    mockModalStore = createMockModalStore()
   })
 
   it("renders when visible is true", () => {
-    mockStore.modal.visible = true
-    mockStore.modal.phaseIndex = 0
+    mockModalStore.visible = true
+    mockModalStore.phaseIndex = 0
 
     const wrapper = mount(FeatureModal)
 
@@ -178,7 +179,7 @@ describe("FeatureModal", () => {
   })
 
   it("does not render when visible is false", () => {
-    mockStore.modal.visible = false
+    mockModalStore.visible = false
 
     const wrapper = mount(FeatureModal, {
       global: {
@@ -192,9 +193,9 @@ describe("FeatureModal", () => {
   })
 
   it("shows header text based on phase", async () => {
-    mockStore.modal.visible = true
-    mockStore.modal.phaseIndex = 0
-    mockStore.modal.isEdit = false
+    mockModalStore.visible = true
+    mockModalStore.phaseIndex = 0
+    mockModalStore.isEdit = false
 
     const wrapper = mount(FeatureModal)
     await nextTick()
@@ -203,9 +204,9 @@ describe("FeatureModal", () => {
   })
 
   it("shows edit header in edit mode", async () => {
-    mockStore.modal.visible = true
-    mockStore.modal.phaseIndex = 0
-    mockStore.modal.isEdit = true
+    mockModalStore.visible = true
+    mockModalStore.phaseIndex = 0
+    mockModalStore.isEdit = true
 
     const wrapper = mount(FeatureModal)
     await nextTick()
@@ -214,11 +215,11 @@ describe("FeatureModal", () => {
   })
 
   it("validates required fields on save", async () => {
-    mockStore.modal.visible = true
-    mockStore.modal.phaseIndex = 0
-    mockStore.modal.label = ""
-    mockStore.modal.decisionNumber = ""
-    mockStore.modal.decisionDate = ""
+    mockModalStore.visible = true
+    mockModalStore.phaseIndex = 0
+    mockModalStore.label = ""
+    mockModalStore.decisionNumber = ""
+    mockModalStore.decisionDate = ""
 
     const wrapper = mount(FeatureModal, {
       global: {
@@ -234,14 +235,14 @@ describe("FeatureModal", () => {
 
     // Validation should have been called - check that modal is still visible (not closed)
     // The actual validation errors are set on the store which is reactive
-    expect(mockStore.modal.visible).toBe(true)
+    expect(mockModalStore.visible).toBe(true)
   })
 
   it("auto-fills municipality name for main urban area", async () => {
-    mockStore.modal.visible = true
-    mockStore.modal.phaseIndex = 0
-    mockStore.modal.areaTypeKey = "central_urban"
-    mockStore.modal.mainUrbanExists = false
+    mockModalStore.visible = true
+    mockModalStore.phaseIndex = 0
+    mockModalStore.areaTypeKey = "central_urban"
+    mockModalStore.mainUrbanExists = false
 
     const wrapper = mount(FeatureModal, {
       global: {
@@ -256,9 +257,9 @@ describe("FeatureModal", () => {
   })
 
   it("hides name field for house entrance edit mode", async () => {
-    mockStore.modal.visible = true
-    mockStore.modal.phaseIndex = 4 // houseEntrances
-    mockStore.modal.isEdit = true
+    mockModalStore.visible = true
+    mockModalStore.phaseIndex = 4 // houseEntrances
+    mockModalStore.isEdit = true
 
     const wrapper = mount(FeatureModal)
     await nextTick()
@@ -269,8 +270,8 @@ describe("FeatureModal", () => {
   })
 
   it("shows area type selector for areas phase", async () => {
-    mockStore.modal.visible = true
-    mockStore.modal.phaseIndex = 0 // areas
+    mockModalStore.visible = true
+    mockModalStore.phaseIndex = 0 // areas
 
     const wrapper = mount(FeatureModal)
     await nextTick()
@@ -279,8 +280,8 @@ describe("FeatureModal", () => {
   })
 
   it("shows road type selector for roads phase", async () => {
-    mockStore.modal.visible = true
-    mockStore.modal.phaseIndex = 3 // roads
+    mockModalStore.visible = true
+    mockModalStore.phaseIndex = 3 // roads
 
     const wrapper = mount(FeatureModal)
     await nextTick()
@@ -291,8 +292,8 @@ describe("FeatureModal", () => {
   })
 
   it("shows road assignment selector for houseEntrances phase", async () => {
-    mockStore.modal.visible = true
-    mockStore.modal.phaseIndex = 4 // houseEntrances
+    mockModalStore.visible = true
+    mockModalStore.phaseIndex = 4 // houseEntrances
 
     const wrapper = mount(FeatureModal)
     await nextTick()
@@ -304,8 +305,8 @@ describe("FeatureModal", () => {
   })
 
   it("shows sector and building selectors for publicBuildings phase", async () => {
-    mockStore.modal.visible = true
-    mockStore.modal.phaseIndex = 5 // publicBuildings
+    mockModalStore.visible = true
+    mockModalStore.phaseIndex = 5 // publicBuildings
 
     const wrapper = mount(FeatureModal)
     await nextTick()
@@ -314,13 +315,13 @@ describe("FeatureModal", () => {
     expect(selects.length).toBeGreaterThanOrEqual(2)
   })
 
-  it("calls resolveModal with form data on save", async () => {
-    mockStore.modal.visible = true
-    mockStore.modal.phaseIndex = 0
-    mockStore.modal.label = "Test Area"
-    mockStore.modal.decisionNumber = "2024/001"
-    mockStore.modal.decisionDate = "2024-01-15"
-    mockStore.modal.areaTypeKey = "central_urban"
+  it("calls mockModalStore.close with form data on save", async () => {
+    mockModalStore.visible = true
+    mockModalStore.phaseIndex = 0
+    mockModalStore.label = "Test Area"
+    mockModalStore.decisionNumber = "2024/001"
+    mockModalStore.decisionDate = "2024-01-15"
+    mockModalStore.areaTypeKey = "central_urban"
 
     const wrapper = mount(FeatureModal)
     await nextTick()
@@ -329,12 +330,12 @@ describe("FeatureModal", () => {
     await saveBtn.trigger("click")
     await nextTick()
 
-    expect(resolveModal).toHaveBeenCalled()
+    expect(mockModalStore.close).toHaveBeenCalled()
   })
 
-  it("calls resolveModal with null on cancel", async () => {
-    mockStore.modal.visible = true
-    mockStore.modal.phaseIndex = 0
+  it("calls mockModalStore.close with null on cancel", async () => {
+    mockModalStore.visible = true
+    mockModalStore.phaseIndex = 0
 
     const wrapper = mount(FeatureModal)
     await nextTick()
@@ -343,15 +344,15 @@ describe("FeatureModal", () => {
     await cancelBtn.trigger("click")
     await nextTick()
 
-    expect(resolveModal).toHaveBeenCalledWith(null)
+    expect(mockModalStore.close).toHaveBeenCalledWith(null)
   })
 
   it("handles Enter key to save", async () => {
-    mockStore.modal.visible = true
-    mockStore.modal.phaseIndex = 0
-    mockStore.modal.label = "Test"
-    mockStore.modal.decisionNumber = "001"
-    mockStore.modal.decisionDate = "2024-01-01"
+    mockModalStore.visible = true
+    mockModalStore.phaseIndex = 0
+    mockModalStore.label = "Test"
+    mockModalStore.decisionNumber = "001"
+    mockModalStore.decisionDate = "2024-01-01"
 
     const wrapper = mount(FeatureModal)
     await nextTick()
@@ -359,12 +360,12 @@ describe("FeatureModal", () => {
     await wrapper.trigger("keyup", { key: "Enter" })
     await nextTick()
 
-    expect(resolveModal).toHaveBeenCalled()
+    expect(mockModalStore.close).toHaveBeenCalled()
   })
 
   it("handles Escape key to cancel", async () => {
-    mockStore.modal.visible = true
-    mockStore.modal.phaseIndex = 0
+    mockModalStore.visible = true
+    mockModalStore.phaseIndex = 0
 
     const wrapper = mount(FeatureModal)
     await nextTick()
@@ -372,13 +373,13 @@ describe("FeatureModal", () => {
     await wrapper.trigger("keyup", { key: "Escape" })
     await nextTick()
 
-    expect(resolveModal).toHaveBeenCalledWith(null)
+    expect(mockModalStore.close).toHaveBeenCalledWith(null)
   })
 
   it("disables name input for zones with type name", async () => {
-    mockStore.modal.visible = true
-    mockStore.modal.phaseIndex = 1 // districts
-    mockStore.modal.districtTypeKey = "trad_activities_zone"
+    mockModalStore.visible = true
+    mockModalStore.phaseIndex = 1 // districts
+    mockModalStore.districtTypeKey = "trad_activities_zone"
 
     const wrapper = mount(FeatureModal)
     await nextTick()
@@ -388,8 +389,8 @@ describe("FeatureModal", () => {
   })
 
   it("disables name input for city center", async () => {
-    mockStore.modal.visible = true
-    mockStore.modal.phaseIndex = 2 // cityCenter
+    mockModalStore.visible = true
+    mockModalStore.phaseIndex = 2 // cityCenter
 
     const wrapper = mount(FeatureModal)
     await nextTick()

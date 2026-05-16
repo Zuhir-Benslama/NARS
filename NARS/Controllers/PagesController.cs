@@ -26,10 +26,10 @@ public class PagesController(
     // GET / — redirect to map if authenticated, otherwise to login
     [HttpGet("/")]
     [AllowAnonymous]
-    public async Task<IActionResult> Root()
+    public async Task<IActionResult> Root(CancellationToken cancellationToken = default)
     {
         logger.LogInformation("[Pages] Root request. Checking auth...");
-        if (await IsAuthenticatedAsync())
+        if (await IsAuthenticatedAsync(cancellationToken))
         {
             logger.LogInformation("[Pages] Root authenticated, redirecting to /map");
             return Redirect("/map");
@@ -65,10 +65,10 @@ public class PagesController(
     // the SPA can send authenticated state-mutating requests without CSRF errors.
     [HttpGet("/map")]
     [AllowAnonymous]
-    public async Task<IActionResult> MapPage()
+    public async Task<IActionResult> MapPage(CancellationToken cancellationToken = default)
     {
         logger.LogInformation("[Pages] Map page request. Checking auth...");
-        if (!await IsAuthenticatedAsync())
+        if (!await IsAuthenticatedAsync(cancellationToken))
         {
             logger.LogWarning("[Pages] Map page NOT authenticated. Redirecting to /login");
             return Redirect("/login");
@@ -107,7 +107,7 @@ public class PagesController(
         }) ?? string.Empty;
     }
 
-    private async Task<bool> IsAuthenticatedAsync()
+    private async Task<bool> IsAuthenticatedAsync(CancellationToken cancellationToken)
     {
         // Respect the principal populated by UseAuthentication() first.
         if (User.Identity?.IsAuthenticated == true)
@@ -149,10 +149,10 @@ public class PagesController(
         }
 
         // Access token missing or expired — try silent refresh via refresh_token
-        return await TryRefreshSessionAsync();
+        return await TryRefreshSessionAsync(cancellationToken);
     }
 
-    private async Task<bool> TryRefreshSessionAsync()
+    private async Task<bool> TryRefreshSessionAsync(CancellationToken cancellationToken)
     {
         var refreshToken = Request.Cookies["refresh_token"];
         if (string.IsNullOrEmpty(refreshToken))
@@ -166,7 +166,7 @@ public class PagesController(
         try
         {
             var refreshService = HttpContext.RequestServices.GetRequiredService<RefreshTokenService>();
-            var result = await refreshService.RotateRefreshTokenAsync(refreshToken);
+            var result = await refreshService.RotateRefreshTokenAsync(refreshToken, cancellationToken);
             if (!result.Success)
             {
                 logger.LogWarning("[Pages] Refresh failed: {Detail}", result.Detail);

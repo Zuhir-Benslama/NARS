@@ -15,7 +15,7 @@ resources:
   #   make secrets-apply   ← creates nars-secrets + regcred
   #   make tls-generate    ← creates nars-tls TLS certificate
   #   make ca-secret       ← creates nars-ca for mTLS
-  # postgis-pv.yaml (static hostPath PV) replaced by dynamic provisioning via local-path StorageClass
+  - postgis-pv.yaml
   - postgis.yaml
   - app-deployment.yaml
   - app-service.yaml
@@ -23,6 +23,7 @@ resources:
   - frontend-service.yaml
   - ingress-api.yaml
   - ingress-frontend.yaml
+  # nars-api-local and nars-frontend-local are created by the same files (multi-doc YAML)
   - service-account.yaml
   - network-policy.yaml
   - resource-quota.yaml
@@ -31,8 +32,6 @@ resources:
   - backup-cronjob.yaml
   # otel-metrics-service.yaml and servicemonitor.yaml are applied separately
   # after the observability stack is installed (their CRDs are only available then):
-  #   make observability-servicemonitor
-  # is installed (its CRDs are only available then):
   #   make observability-servicemonitor
 images:
   # ⚠ `latest` tags are for local dev. For CI/CD, override newTag with

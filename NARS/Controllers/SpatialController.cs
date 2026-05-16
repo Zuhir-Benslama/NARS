@@ -23,10 +23,10 @@ public class SpatialController(AppDbContext db, IScatteredAreaService scatteredS
     // ── POST /api/road-side ───────────────────────────────────────────────────
 
     [HttpPost("road-side")]
-    public async Task<IActionResult> GetRoadSide([FromBody] RoadSideRequest body)
+    public async Task<IActionResult> GetRoadSide([FromBody] RoadSideRequest body, CancellationToken cancellationToken = default)
     {
         var road = await db.Roads.FirstOrDefaultAsync(f =>
-            f.Id == body.RoadId && f.UserId == CurrentUserId);
+            f.Id == body.RoadId && f.UserId == CurrentUserId, cancellationToken);
 
         if (road is null)
             return NotFound(new { detail = "Road not found." });
@@ -74,7 +74,7 @@ public class SpatialController(AppDbContext db, IScatteredAreaService scatteredS
         var conn = db.Database.GetDbConnection();
 
         if (conn.State != ConnectionState.Open)
-            await conn.OpenAsync();
+            await conn.OpenAsync(cancellationToken);
         try
         {
             var heTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.HouseEntrance)?.TableName ?? "house_entrances";
@@ -89,9 +89,9 @@ public class SpatialController(AppDbContext db, IScatteredAreaService scatteredS
             AddParam(cmd, "@uid", RequiredCurrentUserId);
             AddParam(cmd, "@rid", body.RoadId);
 
-            using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
-                if (!await reader.IsDBNullAsync(0))
+            using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+                if (!await reader.IsDBNullAsync(0, cancellationToken))
                     usedNumbers.Add(reader.GetInt32(0));
         }
         finally
@@ -110,9 +110,9 @@ public class SpatialController(AppDbContext db, IScatteredAreaService scatteredS
     // ── POST /api/areas/refresh-scattered ────────────────────────────────────
 
     [HttpPost("areas/refresh-scattered")]
-    public async Task<IActionResult> RefreshScattered()
+    public async Task<IActionResult> RefreshScattered(CancellationToken cancellationToken = default)
     {
-        await scatteredService.RefreshAsync(RequiredCurrentUserId, RequiredCommuneId);
+        await scatteredService.RefreshAsync(RequiredCurrentUserId, RequiredCommuneId, cancellationToken);
         return Ok(new ScatteredRefreshResponse(true, null, "Scattered area recomputed."));
     }
 }

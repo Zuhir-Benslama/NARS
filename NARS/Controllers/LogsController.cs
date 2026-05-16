@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using NarsApi.Data;
+using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
 
@@ -20,7 +21,7 @@ public class LogsController(AppDbContext db) : ControllerBase
     [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> SubmitLogs([FromBody] LogBatch body)
+    public async Task<IActionResult> SubmitLogs([FromBody] LogBatch body, CancellationToken cancellationToken = default)
     {
         if (body.Logs is null || body.Logs.Count == 0)
             return BadRequest(new { detail = "No log entries provided." });
@@ -45,7 +46,7 @@ public class LogsController(AppDbContext db) : ControllerBase
 
             entries.Add(new ErrorLog
             {
-                Id = Guid.NewGuid(),
+                Id = Guid.CreateVersion7(),
                 UserId = userId,
                 Level = (entry.Level ?? "error").ToLowerInvariant(),
                 Code = entry.Code ?? "",
@@ -63,7 +64,7 @@ public class LogsController(AppDbContext db) : ControllerBase
             return NoContent();
 
         db.ErrorLogs.AddRange(entries);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
 
         return NoContent();
     }
@@ -73,19 +74,4 @@ public class LogsController(AppDbContext db) : ControllerBase
         var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
         return claim is not null && Guid.TryParse(claim.Value, out var id) ? id : Guid.Empty;
     }
-}
-
-public class LogBatch
-{
-    public List<LogEntry> Logs { get; set; } = [];
-}
-
-public class LogEntry
-{
-    public string? Level { get; set; }
-    public string? Code { get; set; }
-    public string Message { get; set; } = "";
-    public string? Context { get; set; }
-    public string? Url { get; set; }
-    public string? Method { get; set; }
 }

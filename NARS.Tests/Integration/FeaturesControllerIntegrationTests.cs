@@ -134,8 +134,8 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
         var result = await _controller.LoadFeatures();
 
         var okResult = Assert.IsType<OkObjectResult>(result);
-        var features = Assert.IsAssignableFrom<List<object>>(okResult.Value);
-        Assert.True(features.Count >= 2);
+        var loadResponse = Assert.IsType<LoadFeaturesResponse>(okResult.Value);
+        Assert.True(loadResponse.Count >= 2);
     }
 
     [Fact]
@@ -150,10 +150,8 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
         // The response is an anonymous type — extract the ID via reflection
         var saveOk = Assert.IsType<ObjectResult>(saveResult);
         Assert.Equal(201, saveOk.StatusCode);
-        var savedObj = saveOk.Value!;
-        var idProp = savedObj.GetType().GetProperty("id");
-        Assert.NotNull(idProp);
-        var featureId = Guid.Parse((string)idProp.GetValue(savedObj)!);
+        var saveResponse = Assert.IsType<SaveFeatureResponse>(saveOk.Value);
+        var featureId = Guid.Parse(saveResponse.Id);
 
         // Delete it
         var deleteResult = await _controller.DeleteFeature(featureId);
@@ -209,10 +207,8 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(data)).RootElement));
 
         var saveOk = Assert.IsType<ObjectResult>(saveResult);
-        var savedObj = saveOk.Value!;
-        var idProp = savedObj.GetType().GetProperty("id");
-        Assert.NotNull(idProp);
-        var featureId = Guid.Parse((string)idProp.GetValue(savedObj)!);
+        var saveResponse = Assert.IsType<SaveFeatureResponse>(saveOk.Value);
+        var featureId = Guid.Parse(saveResponse.Id);
 
         // Update the label
         var updateData = new { coordinates = new[] { new { lat = 36.80, lng = 3.00 } } };
@@ -228,7 +224,7 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
         var area = await _db.Areas.AsNoTracking().FirstOrDefaultAsync(a => a.Id == featureId);
         Assert.NotNull(area);
         Assert.Equal("Updated Label", area.Label);
-        Assert.Contains("36.80", area.Data);
+        Assert.Contains("36.8", area.Data);
     }
 
     [Fact]
@@ -248,7 +244,8 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(data)).RootElement));
 
         var saveOk = Assert.IsType<ObjectResult>(saveResult);
-        var featureId = Guid.Parse((string)saveOk.Value!.GetType().GetProperty("id")!.GetValue(saveOk.Value)!);
+        var saveResponse = Assert.IsType<SaveFeatureResponse>(saveOk.Value);
+        var featureId = Guid.Parse(saveResponse.Id);
 
         var updateResult = await _controller.UpdateFeature(featureId, new FeatureUpdateRequest(Label: "Road After", Data: null));
         var updateOk = Assert.IsType<OkObjectResult>(updateResult);

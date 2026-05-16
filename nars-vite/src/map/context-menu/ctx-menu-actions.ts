@@ -2,13 +2,13 @@
 // enableEditGeometry, editFeatureInfo, removeFeature, and helpers.
 
 import { apiFetch } from "../../api"
-import { store, selectedFeatureDbId, setSelectedFeature } from "../../store"
+import { useAppStore } from "../../stores/appStore"
+import { selectedFeatureDbId, setSelectedFeature, openEditModal } from "../../stores"
 import { PHASES } from "../../phases"
 import { featuresStore, ctx } from "../core/state"
 import { showToast, showConfirm } from "../../lib/toast"
 import { recordDelete } from "../undo"
 import { enableEditMode } from "../draw/draw-events"
-import { openEditModal } from "../../store"
 import { useLayerStore } from "../../stores/layerStore"
 import type { LayerState } from "../../stores/layerStore"
 import type { LayerEntry } from "../../types"
@@ -163,8 +163,9 @@ export async function removeFeature(dbId: string): Promise<void> {
     }
 
     if (phaseKey === "cityCenter") {
-      store.cityCenterMode = null
-      store.cityCenterLatLng = null
+      const appStore = useAppStore()
+      appStore.cityCenterMode = null
+      appStore.cityCenterLatLng = null
     }
 
     if (phaseKey === "roads") {

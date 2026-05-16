@@ -15,10 +15,10 @@
 
 <script setup lang="ts">
 import { computed } from "vue"
-import { store } from "../../store"
+import { useModalStore } from "../../stores/modalStore"
 import { AREA_TYPES } from "../../phases"
 
-const m = store.modal
+const m = useModalStore()
 
 const areaTypeOptions = computed(() =>
   AREA_TYPES.filter((a) => !(a.key === "central_urban" && m.mainUrbanExists)),

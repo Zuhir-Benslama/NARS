@@ -10,7 +10,7 @@
 // - installSnapInterceptors patches map events for drawing-mode snap
 
 import { ctx } from "../core/state"
-import { store } from "../../store"
+import { useAppStore } from "../../stores/appStore"
 import { useLayerStore } from "../../stores/layerStore"
 import type { LayerState } from "../../stores/layerStore"
 import { SNAP_CONFIG } from "../../config"
@@ -91,12 +91,12 @@ export function getActiveSnapPhases(): string[] {
     })
   }
 
-  const currentPhaseKey = PHASES[store.currentPhase]?.key ?? ""
+  const currentPhaseKey = PHASES[useAppStore().currentPhase]?.key ?? ""
   const allowedTargets =
     SNAP_CONFIG.snapTargets[currentPhaseKey as keyof typeof SNAP_CONFIG.snapTargets] ?? []
 
   const completedPhaseKeys = new Set<string>()
-  for (let i = 0; i <= store.currentPhase; i++) {
+  for (let i = 0; i <= useAppStore().currentPhase; i++) {
     completedPhaseKeys.add(PHASES[i].key)
   }
 

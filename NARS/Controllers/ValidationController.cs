@@ -44,11 +44,11 @@ public class ValidationController(
     // ── GET /api/validate/area/main-urban-exists ──────────────────────────────
 
     [HttpGet("validate/area/main-urban-exists")]
-    public async Task<IActionResult> MainUrbanExists()
+    public async Task<IActionResult> MainUrbanExists(CancellationToken cancellationToken = default)
     {
         var exists = await db.Areas.AnyAsync(f =>
             f.UserId == CurrentUserId &&
-            f.Layer == FeatureTypes.AreaLayers.CentralUrban);
+            f.Layer == FeatureTypes.AreaLayers.CentralUrban, cancellationToken);
 
         return Ok(new { exists });
     }
@@ -56,7 +56,7 @@ public class ValidationController(
     // ── POST /api/validate/road ───────────────────────────────────────────────
 
     [HttpPost("validate/road")]
-    public async Task<IActionResult> ValidateRoad([FromBody] ValidateRoadRequest body)
+    public async Task<IActionResult> ValidateRoad([FromBody] ValidateRoadRequest body, CancellationToken cancellationToken = default)
     {
         if (body.Coordinates.Count < 2)
             return BadRequest(new ValidateRoadResponse(false, "A road must have at least 2 points."));
@@ -89,7 +89,7 @@ public class ValidationController(
         }
 
         // Rule 2: connectivity check (PostGIS) — first road is exempt
-        var existingCount = await db.Roads.CountAsync(f => f.UserId == CurrentUserId);
+        var existingCount = await db.Roads.CountAsync(f => f.UserId == CurrentUserId, cancellationToken);
 
         if (existingCount == 0)
             return Ok(new ValidateRoadResponse(true, null));
@@ -97,7 +97,7 @@ public class ValidationController(
         var wkt = BuildLineStringWkt(body.Coordinates);
         var conn = db.Database.GetDbConnection();
 
-        await db.Database.OpenConnectionAsync();
+        await db.Database.OpenConnectionAsync(cancellationToken);
         try
         {
             using var cmd = conn.CreateCommand();
@@ -115,7 +115,7 @@ public class ValidationController(
             AddParam(cmd, "@uid", RequiredCurrentUserId);
             AddParam(cmd, "@wkt", wkt);
 
-            var result = await cmd.ExecuteScalarAsync();
+            var result = await cmd.ExecuteScalarAsync(cancellationToken);
             bool connected = Convert.ToBoolean(result);
 
             if (!connected)
@@ -133,14 +133,14 @@ public class ValidationController(
     // ── POST /api/validate/district ───────────────────────────────────────────
 
     [HttpPost("validate/district")]
-    public async Task<IActionResult> ValidateDistrict([FromBody] ValidateDistrictRequest body)
+    public async Task<IActionResult> ValidateDistrict([FromBody] ValidateDistrictRequest body, CancellationToken cancellationToken = default)
     {
         if (body.Coordinates.Count < 3)
             return BadRequest(new ValidateDistrictResponse(false, "A district must have at least 3 points."));
         if (!CheckCoordinateBounds(body.Coordinates, out var inputError))
             return BadRequest(new ValidateDistrictResponse(false, inputError!));
 
-        var existingCount = await db.Districts.CountAsync(f => f.UserId == CurrentUserId);
+        var existingCount = await db.Districts.CountAsync(f => f.UserId == CurrentUserId, cancellationToken);
 
         if (existingCount == 0)
             return Ok(new ValidateDistrictResponse(true, null));
@@ -148,10 +148,10 @@ public class ValidationController(
         var wkt = BuildPolygonWkt(body.Coordinates);
         var conn = db.Database.GetDbConnection();
 
-        await db.Database.OpenConnectionAsync();
+        await db.Database.OpenConnectionAsync(cancellationToken);
         try
         {
-            if (await CheckOverlapAsync(conn, wkt))
+            if (await CheckOverlapAsync(conn, wkt, cancellationToken))
                 return Ok(new ValidateDistrictResponse(false,
                     "This district overlaps an existing district. Districts must share edges but not overlap."));
 
@@ -160,8 +160,8 @@ public class ValidationController(
 
             if (!skipAdjacency)
             {
-                var siblings = await CountSiblingsInSameAreaAsync(conn, wkt);
-                if (siblings > 0 && !await CheckAdjacencyAsync(conn, wkt))
+                var siblings = await CountSiblingsInSameAreaAsync(conn, wkt, cancellationToken);
+                if (siblings > 0 && !await CheckAdjacencyAsync(conn, wkt, cancellationToken))
                     return Ok(new ValidateDistrictResponse(false,
                         "This district does not connect to any existing district in this urban area. Districts must share a boundary (no gaps)."));
             }
@@ -177,17 +177,17 @@ public class ValidationController(
     // ── GET /api/validate/districts/coverage ─────────────────────────────────
 
     [HttpGet("validate/districts/coverage")]
-    public async Task<IActionResult> DistrictsCoverage()
+    public async Task<IActionResult> DistrictsCoverage(CancellationToken cancellationToken = default)
     {
         var urbanCount = await db.Areas.CountAsync(f =>
             f.UserId == CurrentUserId &&
             (f.Layer == FeatureTypes.AreaLayers.CentralUrban ||
-             f.Layer == FeatureTypes.AreaLayers.SecondaryUrban));
+             f.Layer == FeatureTypes.AreaLayers.SecondaryUrban), cancellationToken);
 
         if (urbanCount == 0)
             return Ok(new DistrictCoverageResponse(true, "No urban areas to cover."));
 
-        var districtCount = await db.Districts.CountAsync(f => f.UserId == CurrentUserId);
+        var districtCount = await db.Districts.CountAsync(f => f.UserId == CurrentUserId, cancellationToken);
 
         if (districtCount == 0)
             return Ok(new DistrictCoverageResponse(false,
@@ -195,7 +195,7 @@ public class ValidationController(
 
         var conn = db.Database.GetDbConnection();
         bool covered;
-        await db.Database.OpenConnectionAsync();
+        await db.Database.OpenConnectionAsync(cancellationToken);
         try
         {
             using var cmd = conn.CreateCommand();
@@ -221,7 +221,7 @@ public class ValidationController(
                 WHERE urban.geom IS NOT NULL AND districts.geom IS NOT NULL";
             AddParam(cmd, "@uid", RequiredCurrentUserId);
 
-            var result = await cmd.ExecuteScalarAsync();
+            var result = await cmd.ExecuteScalarAsync(cancellationToken);
             covered = result is bool b && b;
         }
         finally
@@ -253,7 +253,7 @@ public class ValidationController(
 
     // ── Query helpers ─────────────────────────────────────────
 
-    private async Task<bool> CheckOverlapAsync(DbConnection conn, string wkt)
+    private async Task<bool> CheckOverlapAsync(DbConnection conn, string wkt, CancellationToken cancellationToken)
     {
         using var cmd = conn.CreateCommand();
             cmd.CommandText = $@"
@@ -267,11 +267,11 @@ public class ValidationController(
             )";
         AddParam(cmd, "@uid", RequiredCurrentUserId);
         AddParam(cmd, "@wkt", wkt);
-        var result = await cmd.ExecuteScalarAsync();
+        var result = await cmd.ExecuteScalarAsync(cancellationToken);
         return result is bool b && b;
     }
 
-    private async Task<long> CountSiblingsInSameAreaAsync(DbConnection conn, string wkt)
+    private async Task<long> CountSiblingsInSameAreaAsync(DbConnection conn, string wkt, CancellationToken cancellationToken)
     {
         using var cmd = conn.CreateCommand();
             cmd.CommandText = $@"
@@ -286,10 +286,10 @@ public class ValidationController(
               )";
         AddParam(cmd, "@uid", RequiredCurrentUserId);
         AddParam(cmd, "@wkt", wkt);
-        return Convert.ToInt64(await cmd.ExecuteScalarAsync());
+        return Convert.ToInt64(await cmd.ExecuteScalarAsync(cancellationToken));
     }
 
-    private async Task<bool> CheckAdjacencyAsync(DbConnection conn, string wkt)
+    private async Task<bool> CheckAdjacencyAsync(DbConnection conn, string wkt, CancellationToken cancellationToken)
     {
         using var cmd = conn.CreateCommand();
             cmd.CommandText = $@"
@@ -308,7 +308,7 @@ public class ValidationController(
             )";
         AddParam(cmd, "@uid", RequiredCurrentUserId);
         AddParam(cmd, "@wkt", wkt);
-        var result = await cmd.ExecuteScalarAsync();
+        var result = await cmd.ExecuteScalarAsync(cancellationToken);
         return result is bool b && b;
     }
 

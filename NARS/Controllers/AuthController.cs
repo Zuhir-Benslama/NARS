@@ -44,9 +44,9 @@ public partial class AuthController(
     [HttpPost("signin")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicies.Auth)]
-    public async Task<IActionResult> SignIn([FromBody] SignInRequest body)
+    public async Task<IActionResult> SignIn([FromBody] SignInRequest body, CancellationToken cancellationToken = default)
     {
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Username == body.Username);
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Username == body.Username, cancellationToken);
         if (user is null)
             return Unauthorized(new { detail = "Invalid username or password" });
 
@@ -59,7 +59,7 @@ public partial class AuthController(
 
         if (!BCrypt.Net.BCrypt.Verify(body.Password, user.PasswordHash))
         {
-            await RecordFailedLogin(user);
+            await RecordFailedLogin(user, cancellationToken);
             return Unauthorized(new { detail = "Invalid username or password" });
         }
 
@@ -68,7 +68,7 @@ public partial class AuthController(
         {
             user.FailedLoginAttempts = 0;
             user.LockedUntil = null;
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(cancellationToken);
         }
 
         var token = jwt.CreateToken(user.Id, user.Username, user.Name, user.Email,
@@ -87,7 +87,7 @@ public partial class AuthController(
             TokenHash = refreshHash,
             ExpiresAt = refreshExpiry,
         });
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
 
         // fix #5: Secure = true only when the request itself is HTTPS.
         // Using Request.IsHttps instead of IsDevelopment() avoids the
@@ -101,7 +101,7 @@ public partial class AuthController(
 
         // fix #7: single joined query instead of 3 sequential round-trips.
         // fix #11: wilaya is not part of the SignIn response — not loaded here.
-        var loc = await LoadCommuneWithDairaAsync(user.CommuneId ?? 0);
+        var loc = await LoadCommuneWithDairaAsync(user.CommuneId ?? 0, cancellationToken);
 
         return Ok(new SignInResponse(
             Success: true,
@@ -128,7 +128,7 @@ public partial class AuthController(
 
     [HttpPost("logout")]
     [Authorize]
-    public async Task<IActionResult> Logout()
+    public async Task<IActionResult> Logout(CancellationToken cancellationToken = default)
     {
         // Extract user_id from the authenticated token claims
         var userIdStr = User.FindFirstValue("user_id");
@@ -138,7 +138,7 @@ public partial class AuthController(
             await db.RefreshTokens
                 .Where(rt => rt.UserId == userId && !rt.Revoked)
                 .ExecuteUpdateAsync(setters =>
-                    setters.SetProperty(rt => rt.Revoked, true));
+                    setters.SetProperty(rt => rt.Revoked, true), cancellationToken);
         }
 
         Response.Cookies.Delete("access_token");
@@ -152,9 +152,9 @@ public partial class AuthController(
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicies.Auth)]
     public async Task<IActionResult> Refresh(
-        [FromServices] IRefreshTokenService refreshService)
+        [FromServices] IRefreshTokenService refreshService, CancellationToken cancellationToken = default)
     {
-        var result = await refreshService.RotateRefreshTokenAsync(Request.Cookies["refresh_token"]);
+        var result = await refreshService.RotateRefreshTokenAsync(Request.Cookies["refresh_token"], cancellationToken);
         if (!result.Success)
             return Unauthorized(new { detail = result.Detail });
 
@@ -171,7 +171,7 @@ public partial class AuthController(
 
     [HttpGet("current_user")]
     [Authorize]
-    public async Task<IActionResult> CurrentUser()
+    public async Task<IActionResult> CurrentUser(CancellationToken cancellationToken = default)
     {
         var userIdStr = User.FindFirstValue("user_id");
         if (!Guid.TryParse(userIdStr, out Guid userId))
@@ -181,7 +181,7 @@ public partial class AuthController(
 
         // Query the database for fresh user data instead of relying on
         // potentially stale JWT claims (user profile may have changed).
-        var user = await db.Users.FindAsync(userId);
+        var user = await db.Users.FindAsync([userId], cancellationToken);
         if (user is null)
             return Unauthorized(new { detail = "User no longer exists." });
 
@@ -192,17 +192,17 @@ public partial class AuthController(
         LocationChain loc;
         if (communeId > 0)
         {
-            loc = await LoadLocationChainAsync(communeId);
+            loc = await LoadLocationChainAsync(communeId, cancellationToken);
         }
         else if (user.DairaId.HasValue)
         {
-            var daira = await db.Dairas.FindAsync(user.DairaId.Value);
-            var wilaya = daira is not null ? await db.Wilayas.FindAsync(daira.WilayaId) : null;
+            var daira = await db.Dairas.FindAsync([user.DairaId.Value], cancellationToken);
+            var wilaya = daira is not null ? await db.Wilayas.FindAsync([daira.WilayaId], cancellationToken) : null;
             loc = new LocationChain(null, daira, wilaya);
         }
         else if (user.WilayaId.HasValue)
         {
-            var wilaya = await db.Wilayas.FindAsync(user.WilayaId.Value);
+            var wilaya = await db.Wilayas.FindAsync([user.WilayaId.Value], cancellationToken);
             loc = new LocationChain(null, null, wilaya);
         }
         else
@@ -233,13 +233,13 @@ public partial class AuthController(
     private int MaxFailedAttempts => ParseIntConfig(config["AccountLockout:MaxFailedAttempts"], 5);
     private int LockoutMinutes => ParseIntConfig(config["AccountLockout:LockoutMinutes"], 30);
 
-    private async Task RecordFailedLogin(User user)
+    private async Task RecordFailedLogin(User user, CancellationToken cancellationToken = default)
     {
         user.FailedLoginAttempts = (user.FailedLoginAttempts ?? 0) + 1;
         if (user.FailedLoginAttempts >= MaxFailedAttempts)
             user.LockedUntil = DateTime.UtcNow.AddMinutes(LockoutMinutes);
 
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     // ── Private helpers ───────────────────────────────────────
@@ -250,7 +250,7 @@ public partial class AuthController(
     /// <summary>
     /// fix #7: Loads commune → daira → wilaya in one SQL JOIN.
     /// </summary>
-    private async Task<LocationChain> LoadLocationChainAsync(int communeId)
+    private async Task<LocationChain> LoadLocationChainAsync(int communeId, CancellationToken cancellationToken = default)
     {
         var row = await (
             from c in db.Communes
@@ -260,7 +260,7 @@ public partial class AuthController(
             join w in db.Wilayas on d.WilayaId equals w.WilayaId into wj
             from w in wj.DefaultIfEmpty()
             select new { Commune = c, Daira = (Daira?)d, Wilaya = (Wilaya?)w }
-        ).FirstOrDefaultAsync();
+        ).FirstOrDefaultAsync(cancellationToken);
 
         return row is null
             ? new LocationChain(null, null, null)
@@ -270,7 +270,7 @@ public partial class AuthController(
     /// <summary>
     /// fix #7 + fix #11: SignIn only needs commune + daira (wilaya absent from response).
     /// </summary>
-    private async Task<CommuneWithDaira> LoadCommuneWithDairaAsync(int communeId)
+    private async Task<CommuneWithDaira> LoadCommuneWithDairaAsync(int communeId, CancellationToken cancellationToken = default)
     {
         var row = await (
             from c in db.Communes
@@ -278,7 +278,7 @@ public partial class AuthController(
             join d in db.Dairas on c.DairaId equals d.DairaId into dj
             from d in dj.DefaultIfEmpty()
             select new { Commune = c, Daira = (Daira?)d }
-        ).FirstOrDefaultAsync();
+        ).FirstOrDefaultAsync(cancellationToken);
 
         return row is null
             ? new CommuneWithDaira(null, null)

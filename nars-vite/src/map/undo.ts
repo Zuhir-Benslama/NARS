@@ -4,7 +4,7 @@
 
 import { apiFetch } from "../api"
 import { showToast } from "../lib/toast"
-import { syncCounts } from "../store"
+import { useAppStore } from "../stores/appStore"
 import { useLayerStore } from "../stores/layerStore"
 import type { LayerState } from "../stores/layerStore"
 import { featuresStore } from "./core/state"
@@ -135,7 +135,7 @@ export async function undo(): Promise<void> {
       },
     })
 
-    syncCounts()
+    useAppStore().syncCounts()
     showToast(`Restored "${entry.data.label}".`, "success")
   } catch (err) {
     debugError("[UNDO] Restore failed:", err)

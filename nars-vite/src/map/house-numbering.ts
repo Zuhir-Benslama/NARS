@@ -6,7 +6,7 @@
 // them by arc-length, then assigns odd numbers to the left side and even to
 // the right — each counter continuing from the highest already-assigned number.
 
-import { store, syncCounts } from "../store"
+import { useAppStore } from "../stores/appStore"
 import { useLayerStore } from "../stores/layerStore"
 import type { LayerState } from "../stores/layerStore"
 import { featuresStore } from "./core/state"
@@ -15,14 +15,15 @@ import { t } from "../i18n"
 import { apiFetch } from "../api"
 
 export async function setHouseNumbers(options?: { syncCounts?: boolean }): Promise<void> {
-  if (store.referenceRoadDbId == null) {
+  const appStore = useAppStore()
+  if (appStore.referenceRoadDbId == null) {
     showToast(t("alert_no_ref_road"), "error")
     return
   }
 
   const layerStore = useLayerStore()
   const state = layerStore.$state as LayerState
-  const roadEntry = (state.roads || []).find((r) => r.dbId === store.referenceRoadDbId)
+  const roadEntry = (state.roads || []).find((r) => r.dbId === appStore.referenceRoadDbId)
   if (!roadEntry?.data.coordinates?.length) {
     showToast(t("alert_ref_road_no_coords"), "error")
     return
@@ -31,7 +32,7 @@ export async function setHouseNumbers(options?: { syncCounts?: boolean }): Promi
   const unassigned = (state.houseEntrances || []).filter(
     (e) =>
       e.data.entranceTypeKey === "main_entrance" &&
-      e.data.roadDbId === store.referenceRoadDbId &&
+      e.data.roadDbId === appStore.referenceRoadDbId &&
       e.data.label === "?",
   )
 
@@ -62,7 +63,7 @@ export async function setHouseNumbers(options?: { syncCounts?: boolean }): Promi
     .filter(
       (e) =>
         e.data.entranceTypeKey === "main_entrance" &&
-        e.data.roadDbId === store.referenceRoadDbId &&
+        e.data.roadDbId === appStore.referenceRoadDbId &&
         e.data.label !== "?" &&
         e.data.entranceNumber != null,
     )
@@ -101,7 +102,7 @@ export async function setHouseNumbers(options?: { syncCounts?: boolean }): Promi
   await Promise.all(updates)
 
   if (options?.syncCounts !== false) {
-    syncCounts()
+    appStore.syncCounts()
   }
 
   showToast(`Assigned numbers to ${unassigned.length} entrances.`, "success")

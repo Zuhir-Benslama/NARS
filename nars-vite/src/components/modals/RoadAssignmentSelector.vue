@@ -55,9 +55,9 @@
 
 <script setup lang="ts">
 import { computed } from "vue"
-import { store } from "../../store"
+import { useModalStore } from "../../stores/modalStore"
 
-const m = store.modal
+const m = useModalStore()
 
 const sideText = computed(() => {
   if (!m.entranceSide) return ""
