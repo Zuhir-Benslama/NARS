@@ -49,6 +49,11 @@ spec:
                 name: nars-config
             - secretRef:
                 name: nars-secrets
+          env:
+            # Containers don't need runtime config file watching; disabling it
+            # avoids inotify exhaustion on constrained local clusters.
+            - name: DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE
+              value: "false"
           startupProbe:
             httpGet:
               path: /health
