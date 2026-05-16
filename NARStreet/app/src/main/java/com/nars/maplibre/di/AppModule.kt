@@ -7,10 +7,6 @@ import com.nars.maplibre.SettingsViewModel
 import com.nars.maplibre.data.api.ApiService
 import com.nars.maplibre.data.api.SessionManager
 import com.nars.maplibre.data.store.FeatureStore
-import com.nars.maplibre.domain.ComputeRoadDirectionsUseCase
-import com.nars.maplibre.domain.GenerateNamingPanelsUseCase
-import com.nars.maplibre.domain.SetHouseNumbersUseCase
-import com.nars.maplibre.utils.TlsUtils
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
@@ -25,21 +21,13 @@ import kotlinx.serialization.json.Json
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
-import java.util.concurrent.TimeUnit
 
 val appModule = module {
     single {
-        val tlsConfig = TlsUtils.getTlsConfig(androidContext())
         HttpClient(OkHttp) {
             engine {
                 config {
-                    connectTimeout(10, TimeUnit.SECONDS)
-                    readTimeout(15, TimeUnit.SECONDS)
-                    writeTimeout(15, TimeUnit.SECONDS)
                     retryOnConnectionFailure(true)
-                    tlsConfig?.let { config ->
-                        sslSocketFactory(config.socketFactory, config.trustManager)
-                    }
                 }
             }
             install(ContentNegotiation) {
@@ -49,7 +37,7 @@ val appModule = module {
                 })
             }
             install(Logging) {
-                level = LogLevel.HEADERS
+                level = LogLevel.NONE
             }
             install(HttpTimeout) {
                 requestTimeoutMillis = 15000
@@ -72,10 +60,6 @@ val appModule = module {
 
     single { SessionManager(get(), get()) }
 
-    single { ComputeRoadDirectionsUseCase(get()) }
-    single { GenerateNamingPanelsUseCase(get(), get()) }
-    single { SetHouseNumbersUseCase(get()) }
-
-    viewModel { MapViewModel(get(), get(), get(), get(), get(), get()) }
+    viewModel { MapViewModel(get(), get(), get()) }
     viewModel { SettingsViewModel(get()) }
 }

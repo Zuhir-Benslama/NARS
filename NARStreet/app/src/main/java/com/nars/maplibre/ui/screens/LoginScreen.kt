@@ -41,10 +41,17 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
+import com.nars.maplibre.R
 import com.nars.maplibre.data.api.SessionManager
+import com.nars.maplibre.ui.theme.DangerColor
+import com.nars.maplibre.ui.theme.GlassBackground
+import com.nars.maplibre.ui.theme.PrimaryColor
+import com.nars.maplibre.ui.theme.PrimaryGradientEnd
+import com.nars.maplibre.ui.theme.PrimaryGradientStart
 import kotlinx.coroutines.launch
-import org.koin.java.KoinJavaComponent.get
+import org.koin.compose.koinInject
 
 @Composable
 fun LoginScreen(
@@ -57,7 +64,8 @@ fun LoginScreen(
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    val sessionManager: SessionManager = get(SessionManager::class.java)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val sessionManager: SessionManager = koinInject()
 
     LaunchedEffect(Unit) {
         if (sessionManager.isLoggedIn()) {
@@ -67,6 +75,8 @@ fun LoginScreen(
 
     fun performLogin() {
         if (!isLoading && username.isNotBlank() && password.isNotBlank()) {
+            val loginFailed = context.getString(R.string.login_failed)
+            val loginError = context.getString(R.string.login_error)
             scope.launch {
                 isLoading = true
                 errorMessage = null
@@ -74,10 +84,10 @@ fun LoginScreen(
                     val result = sessionManager.login(username, password)
                     result.onSuccess { onLoginSuccess() }
                     result.onFailure { error ->
-                        errorMessage = "Login failed: ${error.message}"
+                        errorMessage = "$loginFailed: ${error.message}"
                     }
                 } catch (e: Exception) {
-                    errorMessage = "Error: ${e.message}"
+                    errorMessage = "$loginError: ${e.message}"
                 } finally {
                     isLoading = false
                 }
@@ -91,8 +101,8 @@ fun LoginScreen(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFF0f1932),
-                        Color(0xFF1a2642)
+                        GlassBackground,
+                        GlassBackground.copy(alpha = 0.8f)
                     )
                 )
             ),
@@ -103,7 +113,7 @@ fun LoginScreen(
                 .fillMaxWidth(0.85f)
                 .clip(RoundedCornerShape(20.dp))
                 .background(
-                    Color(0xFF0f1932).copy(alpha = 0.88f)
+                    GlassBackground.copy(alpha = 0.88f)
                 )
                 .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -115,15 +125,15 @@ fun LoginScreen(
                     .background(
                         Brush.linearGradient(
                             colors = listOf(
-                                Color(0xFF667eea),
-                                Color(0xFF764ba2)
+                                PrimaryGradientStart,
+                                PrimaryGradientEnd
                             )
                         )
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "N",
+                    text = stringResource(R.string.app_name).first().uppercase(),
                     fontSize = 36.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -133,30 +143,30 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "NARS Urban Addressing",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White
-            )
+                    text = stringResource(R.string.login_title),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Sign in to continue",
-                fontSize = 14.sp,
-                color = Color.White.copy(alpha = 0.6f)
-            )
+                    text = stringResource(R.string.login_subtitle),
+                    fontSize = 14.sp,
+                    color = Color.White.copy(alpha = 0.6f)
+                )
 
             Spacer(modifier = Modifier.height(32.dp))
 
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
-                label = { Text("Username") },
+                label = { Text(stringResource(R.string.login_username)) },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Person,
-                        contentDescription = "Person",
+                        contentDescription = stringResource(R.string.login_icon_person),
                         tint = Color.White.copy(alpha = 0.6f)
                     )
                 },
@@ -182,11 +192,11 @@ fun LoginScreen(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Password") },
+                label = { Text(stringResource(R.string.login_password)) },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Lock,
-                        contentDescription = "Lock",
+                        contentDescription = stringResource(R.string.login_icon_lock),
                         tint = Color.White.copy(alpha = 0.6f)
                     )
                 },
@@ -216,7 +226,7 @@ fun LoginScreen(
                 Text(
                     text = error,
                     fontSize = 13.sp,
-                    color = Color(0xFFef4444),
+                    color = DangerColor,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -230,8 +240,8 @@ fun LoginScreen(
                     .height(50.dp),
                 enabled = !isLoading,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF667eea),
-                    disabledContainerColor = Color(0xFF667eea).copy(alpha = 0.5f)
+                    containerColor = PrimaryColor,
+                    disabledContainerColor = PrimaryColor.copy(alpha = 0.5f)
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -243,7 +253,7 @@ fun LoginScreen(
                     )
                 } else {
                     Text(
-                        text = "Sign In",
+                        text = stringResource(R.string.login_sign_in),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White

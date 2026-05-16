@@ -46,21 +46,6 @@ class SessionManager(
         apiService.setCookie(null)
     }
 
-    suspend fun refreshSession() {
-        appPreferences.authToken?.let { jwtToken ->
-            apiService.setAuthToken(jwtToken)
-            apiService.setCookie(jwtToken)
-            val refreshResult = apiService.refreshToken()
-            if (refreshResult.isSuccess) {
-                val newToken = apiService.getAuthToken()
-                if (newToken != null && newToken != jwtToken) {
-                    appPreferences.authToken = newToken
-                    appPreferences.sessionCookie = apiService.getCookie()
-                }
-            }
-        }
-    }
-
     fun getUser() = appPreferences.user
     fun getMunicipalityName() = appPreferences.municipalityName
 }

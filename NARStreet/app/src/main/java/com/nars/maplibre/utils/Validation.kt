@@ -3,16 +3,6 @@ package com.nars.maplibre.utils
 import com.nars.maplibre.data.model.FeatureProperties
 import com.nars.maplibre.data.model.PhaseDefinition
 
-/**
- * Validation utilities for NARStreet Field Mode
- * 
- * Provides validation rules for feature data based on phase requirements.
- * Only 3 phases: Roads, HouseEntrances, NamingPanels
- */
-
-/**
- * Validation result
- */
 data class ValidationResult(
     val valid: Boolean,
     val errors: Map<String, String> = emptyMap(),
@@ -35,9 +25,6 @@ data class ValidationResult(
     }
 }
 
-/**
- * House entrance validation result with step tracking
- */
 data class HouseEntranceValidation(
     val hasEntrance: Boolean,
     val hasNumberingPanel: Boolean? = null,
@@ -47,9 +34,6 @@ data class HouseEntranceValidation(
     val issues: List<String> = emptyList()
 )
 
-/**
- * Naming panel validation result with step tracking
- */
 data class NamingPanelValidation(
     val hasLocation: Boolean,
     val hasNamingPanel: Boolean? = null,
@@ -59,10 +43,6 @@ data class NamingPanelValidation(
     val issues: List<String> = emptyList()
 )
 
-/**
- * Validate feature properties based on phase
- * Simplified for NARStreet Field Mode
- */
 fun validateFeatureProperties(
     properties: FeatureProperties,
     phase: PhaseDefinition
@@ -82,25 +62,18 @@ fun validateFeatureProperties(
     }
 }
 
-/**
- * Validate road properties for field mode
- * All attributes are required for roads in field mode
- */
 private fun validateRoadFieldProperties(
     properties: FeatureProperties,
     errors: MutableMap<String, String>
 ) {
-    // Name/label required
     if (properties.name.isNullOrBlank()) {
         errors["label"] = "Road name is required"
     }
 
-    // Road type required
     if (properties.roadTypeKey.isNullOrBlank()) {
         errors["roadType"] = "Road type is required"
     }
 
-    // Field mode attributes - all required
     if (properties.roadTraffic.isNullOrBlank()) {
         errors["roadTraffic"] = "Road traffic level is required"
     }
@@ -130,52 +103,35 @@ private fun validateRoadFieldProperties(
     }
 }
 
-/**
- * Validate house entrance properties for field mode
- * Simplified - just need entrance to exist
- */
 private fun validateHouseEntranceFieldProperties(
     properties: FeatureProperties,
     errors: MutableMap<String, String>
 ) {
-    // Main entrance requires road assignment
     if (properties.entranceTypeKey == "main_entrance") {
         if (properties.roadDbId == null) {
             errors["road"] = "Main entrance must be assigned to a road"
         }
-        
+
         if (properties.side.isNullOrBlank()) {
             errors["side"] = "Side (left/right) is required"
         }
     }
 }
 
-/**
- * Validate naming panel properties for field mode
- * Simplified - just need naming panel location
- */
 private fun validateNamingPanelFieldProperties(
     properties: FeatureProperties,
     errors: MutableMap<String, String>
 ) {
-    // Name/label required (street name)
     if (properties.name.isNullOrBlank()) {
         errors["label"] = "Street name is required"
     }
 }
 
-/**
- * Validate house entrance based on field mode workflow
- * Returns validation result with notification flag
- */
 fun validateHouseEntranceFieldWorkflow(properties: FeatureProperties): HouseEntranceValidation {
     val issues = mutableListOf<String>()
-    var needsNotification = false
 
-    // Step 1: Check entrance presence
     if (properties.hasEntrance != true) {
         issues.add("Entrance not found")
-        needsNotification = true
         return HouseEntranceValidation(
             hasEntrance = false,
             needsNotification = true,
@@ -183,10 +139,8 @@ fun validateHouseEntranceFieldWorkflow(properties: FeatureProperties): HouseEntr
         )
     }
 
-    // Step 2: Check numbering panel presence
     if (properties.hasNumberingPanel != true) {
         issues.add("Numbering panel not found")
-        needsNotification = true
         return HouseEntranceValidation(
             hasEntrance = true,
             hasNumberingPanel = false,
@@ -195,10 +149,8 @@ fun validateHouseEntranceFieldWorkflow(properties: FeatureProperties): HouseEntr
         )
     }
 
-    // Step 3: Check numbering panel correct
     if (properties.numberingPanelCorrect != true) {
         issues.add("Number is incorrect")
-        needsNotification = true
         return HouseEntranceValidation(
             hasEntrance = true,
             hasNumberingPanel = true,
@@ -208,10 +160,8 @@ fun validateHouseEntranceFieldWorkflow(properties: FeatureProperties): HouseEntr
         )
     }
 
-    // Step 4: Check numbering panel position
     if (properties.numberingPanelPositionCorrect != true) {
         issues.add("Numbering panel position is incorrect")
-        needsNotification = true
         return HouseEntranceValidation(
             hasEntrance = true,
             hasNumberingPanel = true,
@@ -222,7 +172,6 @@ fun validateHouseEntranceFieldWorkflow(properties: FeatureProperties): HouseEntr
         )
     }
 
-    // All checks passed
     return HouseEntranceValidation(
         hasEntrance = true,
         hasNumberingPanel = true,
@@ -233,18 +182,11 @@ fun validateHouseEntranceFieldWorkflow(properties: FeatureProperties): HouseEntr
     )
 }
 
-/**
- * Validate naming panel based on field mode workflow
- * Returns validation result with notification flag
- */
 fun validateNamingPanelFieldWorkflow(properties: FeatureProperties): NamingPanelValidation {
     val issues = mutableListOf<String>()
-    var needsNotification = false
 
-    // Step 1: Check naming panel location exists
     if (properties.hasNamingPanelLocation != true) {
         issues.add("Naming panel location not found")
-        needsNotification = true
         return NamingPanelValidation(
             hasLocation = false,
             needsNotification = true,
@@ -252,10 +194,8 @@ fun validateNamingPanelFieldWorkflow(properties: FeatureProperties): NamingPanel
         )
     }
 
-    // Step 2: Check naming panel presence
     if (properties.hasNamingPanel != true) {
         issues.add("Naming panel not found")
-        needsNotification = true
         return NamingPanelValidation(
             hasLocation = true,
             hasNamingPanel = false,
@@ -264,10 +204,8 @@ fun validateNamingPanelFieldWorkflow(properties: FeatureProperties): NamingPanel
         )
     }
 
-    // Step 3: Check naming correct
     if (properties.namingCorrect != true) {
         issues.add("Street name is incorrect")
-        needsNotification = true
         return NamingPanelValidation(
             hasLocation = true,
             hasNamingPanel = true,
@@ -277,10 +215,8 @@ fun validateNamingPanelFieldWorkflow(properties: FeatureProperties): NamingPanel
         )
     }
 
-    // Step 4: Check naming panel position
     if (properties.namingPanelPositionCorrect != true) {
         issues.add("Naming panel position is incorrect")
-        needsNotification = true
         return NamingPanelValidation(
             hasLocation = true,
             hasNamingPanel = true,
@@ -291,7 +227,6 @@ fun validateNamingPanelFieldWorkflow(properties: FeatureProperties): NamingPanel
         )
     }
 
-    // All checks passed
     return NamingPanelValidation(
         hasLocation = true,
         hasNamingPanel = true,
@@ -302,9 +237,6 @@ fun validateNamingPanelFieldWorkflow(properties: FeatureProperties): NamingPanel
     )
 }
 
-/**
- * Validate road length (in meters)
- */
 fun validateRoadLength(lengthMeters: Double): ValidationResult {
     if (lengthMeters < Config.MIN_ROAD_LENGTH_METERS) {
         return ValidationResult.failure(

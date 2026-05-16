@@ -88,28 +88,9 @@ class SessionManagerTest {
     }
 
     @Test
-    fun `refreshSession refreshes token when token exists`() = runTest {
-        every { appPreferences.authToken } returns "old-token"
-        every { appPreferences.authToken = any() } just runs
-        every { appPreferences.sessionCookie = any() } just runs
-        every { apiService.setAuthToken(any()) } just runs
-        every { apiService.setCookie(any()) } just runs
-        coEvery { apiService.refreshToken() } returns Result.success(Unit)
-        coEvery { apiService.getAuthToken() } returns "new-token"
-        coEvery { apiService.getCookie() } returns "new-cookie"
-
-        sessionManager.refreshSession()
-
-        verify { appPreferences.authToken = "new-token" }
-        verify { appPreferences.sessionCookie = "new-cookie" }
-    }
-
-    @Test
-    fun `refreshSession skips when no token`() = runTest {
-        every { appPreferences.authToken } returns null
-
-        sessionManager.refreshSession()
-
-        verify(exactly = 0) { apiService.setAuthToken(any()) }
+    fun `getUser returns user from preferences`() {
+        val user = User(username = "testuser", name = "Test User")
+        every { appPreferences.user } returns user
+        assertEquals(user, sessionManager.getUser())
     }
 }

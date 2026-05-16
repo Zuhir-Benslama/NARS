@@ -1,6 +1,5 @@
 package com.nars.maplibre.ui.components
 
-import android.widget.Toast
 import com.nars.maplibre.utils.NarsLogger
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,7 +38,6 @@ fun VerticalPhaseNav(
     onPhaseSelected: (PhaseDefinition) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
 
     Column(
         modifier = modifier
@@ -79,7 +76,6 @@ fun VerticalPhaseNav(
                 contentAlignment = Alignment.Center
             ) {
                 PhaseBadge(
-                    context = context,
                     phase = phase,
                     isDone = isDone,
                     isActive = isActive,
@@ -102,7 +98,6 @@ fun VerticalPhaseNav(
  */
 @Composable
 private fun PhaseBadge(
-    context: android.content.Context,
     phase: PhaseDefinition,
     isDone: Boolean,
     isActive: Boolean,
@@ -145,7 +140,6 @@ private fun PhaseBadge(
                             onClick()
                         } else {
                             NarsLogger.d("PhaseBadge", "Phase ${phase.label} is LOCKED - ignoring click")
-                            Toast.makeText(context, "Complete current phase first", Toast.LENGTH_SHORT).show()
                         }
                     }
                 )

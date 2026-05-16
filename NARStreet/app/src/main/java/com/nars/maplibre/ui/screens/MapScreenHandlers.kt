@@ -3,6 +3,7 @@ package com.nars.maplibre.ui.screens
 import com.nars.maplibre.utils.NarsLogger
 import android.content.Context
 import com.nars.maplibre.MapViewModel
+import com.nars.maplibre.R
 import com.nars.maplibre.data.api.ApiService
 import com.nars.maplibre.data.api.SessionManager
 import com.nars.maplibre.data.model.NarsFeature
@@ -137,29 +138,25 @@ class MapScreenHandlers(
 
     fun saveFeature(feature: NarsFeature) {
         scope.launch {
-            try {
-                val result = apiService.saveFeature(feature)
-                result.onSuccess { savedId ->
-                    val updatedFeature = if (savedId != feature.id) {
-                        feature.copy(dbId = savedId, id = savedId)
-                    } else feature.copy(dbId = savedId)
-                    viewModel.addFeature(updatedFeature)
-                    narsGeoman?.updateFeatureId(feature.id, updatedFeature.id)
-                    narsGeoman?.updateFeatureOnMap(updatedFeature)
-                    snackbar("Feature saved successfully")
-                }
-                result.onFailure { snackbar("Failed to save feature: ${it.message}") }
-            } catch (e: Exception) { snackbar("Error saving feature: ${e.message}") }
+            val result = apiService.saveFeature(feature)
+            result.onSuccess { savedId ->
+                val updatedFeature = if (savedId != feature.id) {
+                    feature.copy(dbId = savedId, id = savedId)
+                } else feature.copy(dbId = savedId)
+                viewModel.addFeature(updatedFeature)
+                narsGeoman?.updateFeatureId(feature.id, updatedFeature.id)
+                narsGeoman?.updateFeatureOnMap(updatedFeature)
+                snackbar(context.getString(R.string.map_feature_saved))
+            }
+            result.onFailure { snackbar("${context.getString(R.string.map_save_failed)}: ${it.message}") }
         }
     }
 
     fun updateFeature(feature: NarsFeature) {
         scope.launch {
-            try {
-                val result = apiService.updateFeature(feature.id, feature)
-                result.onSuccess { snackbar("Feature updated successfully") }
-                result.onFailure { snackbar("Failed to update feature: ${it.message}") }
-            } catch (e: Exception) { snackbar("Error updating feature: ${e.message}") }
+            val result = apiService.updateFeature(feature.id, feature)
+            result.onSuccess { snackbar(context.getString(R.string.map_feature_updated)) }
+            result.onFailure { snackbar("${context.getString(R.string.map_update_failed)}: ${it.message}") }
         }
     }
 
@@ -167,11 +164,9 @@ class MapScreenHandlers(
         viewModel.deleteFeature(featureId)
         narsGeoman?.removeFeature(featureId)
         scope.launch {
-            try {
-                val result = apiService.deleteFeature(featureId)
-                result.onSuccess { snackbar("Feature deleted from backend") }
-                result.onFailure { snackbar("Failed to delete from backend: ${it.message}") }
-            } catch (e: Exception) { snackbar("Error deleting feature: ${e.message}") }
+            val result = apiService.deleteFeature(featureId)
+            result.onSuccess { snackbar(context.getString(R.string.map_feature_deleted)) }
+            result.onFailure { snackbar("${context.getString(R.string.map_delete_failed)}: ${it.message}") }
         }
     }
 
@@ -186,16 +181,15 @@ class MapScreenHandlers(
         scope.launch {
             NarsLogger.d(TAG, "Loading features from backend...")
             viewModel.setLoading(true)
-            try {
-                val result = apiService.loadFeatures()
-                result.onSuccess { features ->
-                    viewModel.featureStore.addFeatures(features)
-                    narsGeoman?.updateDisplayedFeatures(features)
-                    snackbar(if (features.isEmpty()) "No features found" else "Loaded ${features.size} features")
-                }
-                result.onFailure { snackbar("Failed to load features: ${it.message}") }
-            } catch (e: Exception) { snackbar("Error: ${e.message}") }
-            finally { viewModel.setLoading(false) }
+            val result = apiService.loadFeatures()
+            result.onSuccess { features ->
+                viewModel.featureStore.addFeatures(features)
+                narsGeoman?.updateDisplayedFeatures(features)
+                snackbar(if (features.isEmpty()) context.getString(R.string.map_no_features)
+                    else context.getString(R.string.map_features_loaded, features.size))
+            }
+            result.onFailure { snackbar("${context.getString(R.string.map_save_failed)}: ${it.message}") }
+            viewModel.setLoading(false)
         }
     }
 

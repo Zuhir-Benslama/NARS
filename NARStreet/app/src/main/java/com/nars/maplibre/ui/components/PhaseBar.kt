@@ -30,6 +30,29 @@ import com.nars.maplibre.ui.theme.TextPrimary
 import com.nars.maplibre.ui.theme.TextSecondary
 import com.nars.maplibre.ui.theme.TextMuted
 
+data class PhaseState(
+    val isDone: Boolean,
+    val isActive: Boolean,
+    val count: Int,
+    val phaseColor: Color,
+    val badge: String
+)
+
+fun computePhaseState(index: Int, phase: PhaseDefinition, currentPhase: PhaseDefinition?, phaseCounts: Map<String, Int>): PhaseState {
+    val isDone = currentPhase?.let { cp ->
+        Phases.ALL.indexOfFirst { it.key == cp.key } > index
+    } ?: false
+    val isActive = currentPhase?.key == phase.key
+    val count = phaseCounts[phase.key] ?: 0
+    return PhaseState(
+        isDone = isDone,
+        isActive = isActive,
+        count = count,
+        phaseColor = phase.parsedColor,
+        badge = if (isDone) "✓" else "${index + 1}"
+    )
+}
+
 /**
  * Phase bar component - matches nars-vite-maplibre design
  * Shows all phases with connectors, badges, and active/highlighted states
@@ -52,29 +75,22 @@ fun PhaseBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Phases.ALL.forEachIndexed { index, phase ->
-                val isDone = currentPhase?.let { cp -> 
-                    Phases.ALL.indexOfFirst { it.key == cp.key } > index 
-                } ?: false
-                val isActive = currentPhase?.key == phase.key
-                val count = phaseCounts[phase.key] ?: 0
-                val phaseColor = Color(android.graphics.Color.parseColor(phase.color))
-                val badge = if (isDone) "✓" else "${index + 1}"
+                val state = computePhaseState(index, phase, currentPhase, phaseCounts)
 
                 PhaseStep(
-                    badge = badge,
-                    phaseColor = phaseColor,
-                    isActive = isActive,
-                    isDone = isDone,
-                    count = count,
+                    badge = state.badge,
+                    phaseColor = state.phaseColor,
+                    isActive = state.isActive,
+                    isDone = state.isDone,
+                    count = state.count,
                     onClick = { onPhaseSelected(phase) }
                 )
 
                 // Connector between phases (except after last)
                 if (index < Phases.ALL.size - 1) {
-                    val isConnectorDone = isDone
                     Spacer(modifier = Modifier.width(4.dp))
                     PhaseConnector(
-                        isDone = isConnectorDone,
+                        isDone = state.isDone,
                         modifier = Modifier
                             .width(24.dp)
                             .height(3.dp)
@@ -185,20 +201,14 @@ fun CompactPhaseSelector(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Phases.ALL.forEachIndexed { index, phase ->
-            val isDone = currentPhase?.let { cp -> 
-                Phases.ALL.indexOfFirst { it.key == cp.key } > index 
-            } ?: false
-            val isActive = currentPhase?.key == phase.key
-            val count = phaseCounts[phase.key] ?: 0
-            val phaseColor = Color(android.graphics.Color.parseColor(phase.color))
-            val badge = if (isDone) "✓" else "${index + 1}"
+            val state = computePhaseState(index, phase, currentPhase, phaseCounts)
 
             CompactPhaseItem(
-                badge = badge,
-                count = count,
-                phaseColor = phaseColor,
-                isActive = isActive,
-                isDone = isDone,
+                badge = state.badge,
+                count = state.count,
+                phaseColor = state.phaseColor,
+                isActive = state.isActive,
+                isDone = state.isDone,
                 onClick = { onPhaseSelected(phase) }
             )
         }

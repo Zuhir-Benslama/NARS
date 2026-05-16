@@ -2,9 +2,9 @@ package com.nars.maplibre.modes
 
 import com.geoman.maplibre.geoman.types.events.GmDrawEvent
 import com.geoman.maplibre.geoman.types.events.GmEditEvent
-import com.geoman.maplibre.geoman.types.events.GmFeatureEvent
 import com.geoman.maplibre.geoman.types.events.GmMapEvent
 import com.nars.maplibre.data.model.CircleGeometry
+import com.nars.maplibre.data.model.Geometry
 import com.nars.maplibre.data.model.LineStringGeometry
 import com.nars.maplibre.data.model.NarsFeature
 import com.nars.maplibre.data.model.PhaseDefinition
@@ -16,14 +16,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import com.geoman.maplibre.geoman.core.features.FeatureData
 import com.geoman.maplibre.geoman.types.geojson.LngLat
-import com.geoman.maplibre.geoman.types.geojson.Point
 import com.geoman.maplibre.geoman.types.geojson.LineString
-import com.geoman.maplibre.geoman.types.geojson.Polygon
 import com.geoman.maplibre.geoman.types.geojson.MultiPolygon
+import com.geoman.maplibre.geoman.types.geojson.Point
+import com.geoman.maplibre.geoman.types.geojson.Polygon
 
-/**
- * Handles Geoman events (draw, edit, delete)
- */
 class GeomanEventHandler(
     private val scope: CoroutineScope,
     private val geoman: com.geoman.maplibre.geoman.Geoman,
@@ -51,9 +48,6 @@ class GeomanEventHandler(
     fun getEditingFeatureId(): String? = editingFeatureId
     fun getEditingFeature(): NarsFeature? = editingFeature
 
-    /**
-     * Set up Geoman event listeners
-     */
     fun setupEventListeners() {
         scope.launch {
             geoman.events.events.collect { event ->
@@ -77,23 +71,11 @@ class GeomanEventHandler(
                         NarsLogger.d(TAG, "Feature deleted")
                         handleFeatureDeleted(event)
                     }
-                    is GmFeatureEvent.Created -> {
-                        NarsLogger.d(TAG, "Feature event created")
-                    }
-                    is GmFeatureEvent.Updated -> {
-                        NarsLogger.d(TAG, "Feature event updated")
-                    }
-                    is GmFeatureEvent.Removed -> {
-                        NarsLogger.d(TAG, "Feature event removed")
-                    }
                 }
             }
         }
     }
 
-    /**
-     * Handle feature creation from Geoman
-     */
     private fun handleFeatureCreated(event: GmDrawEvent.Create) {
         val phase = currentPhase ?: run {
             NarsLogger.e(TAG, "No current phase set when creating feature!")
@@ -105,9 +87,6 @@ class GeomanEventHandler(
         onFeatureCreated(narsFeature)
     }
 
-    /**
-     * Create NarsFeature from Geoman event
-     */
     private fun createNarsFeatureFromEvent(event: GmDrawEvent.Create, phase: PhaseDefinition): NarsFeature {
         val featureData = event.feature as? FeatureData
         val geometry = if (featureData != null) {
@@ -115,10 +94,11 @@ class GeomanEventHandler(
                 featureData.properties["radius"] != null) {
                 extractCircleGeometry(featureData)
             } else {
-                extractGeometryFromEvent(event)
+                extractGeometryFromGeoJson(featureData.geometry)
             }
         } else {
-            extractGeometryFromEvent(event)
+            val fallback = (event.feature as? FeatureData)?.geometry
+            extractGeometryFromGeoJson(fallback)
         }
 
         return NarsFeature(
@@ -132,17 +112,11 @@ class GeomanEventHandler(
         )
     }
 
-    /**
-     * Handle edit end event
-     */
-    private fun handleEditEnd(@Suppress("UNUSED_PARAMETER") event: GmDrawEvent.EditEnd) {
+    private fun handleEditEnd(event: GmDrawEvent.EditEnd) {
         editingFeatureId = null
         editingFeature = null
     }
 
-    /**
-     * Handle geometry changed during edit
-     */
     private fun handleGeometryChanged(event: GmEditEvent.ChangeEnd) {
         val featureData = event.feature as? FeatureData ?: return
         val geometry = extractGeometryFromFeatureData(featureData)
@@ -152,10 +126,7 @@ class GeomanEventHandler(
         }
     }
 
-    /**
-     * Handle feature deletion
-     */
-    private fun handleFeatureDeleted(@Suppress("UNUSED_PARAMETER") event: GmEditEvent.Delete) {
+    private fun handleFeatureDeleted(event: GmEditEvent.Delete) {
         editingFeatureId?.let { featureId ->
             onFeatureDeleted(featureId)
         }
@@ -163,16 +134,9 @@ class GeomanEventHandler(
         editingFeature = null
     }
 
-    /**
-     * Extract geometry from Geoman event
-     */
-    private fun extractGeometryFromEvent(event: GmDrawEvent.Create): com.nars.maplibre.data.model.Geometry {
-        val featureObj = event.feature
-        val featureData = featureObj as? FeatureData
-
-        val geometry = featureData?.geometry
+    private fun extractGeometryFromGeoJson(geometry: com.geoman.maplibre.geoman.types.geojson.Geometry?): Geometry {
         if (geometry == null) {
-            NarsLogger.w(TAG, "No geometry in event feature")
+            NarsLogger.w(TAG, "No geometry in feature")
             return PointGeometry(coordinates = listOf(0.0, 0.0))
         }
 
@@ -210,9 +174,6 @@ class GeomanEventHandler(
         }
     }
 
-    /**
-     * Extract circle geometry from feature properties
-     */
     private fun extractCircleGeometry(featureData: FeatureData): CircleGeometry {
         val center = featureData.properties["center"] as? LngLat
         val radius = featureData.properties["radius"] as? Double
@@ -241,55 +202,16 @@ class GeomanEventHandler(
         }
     }
 
-    /**
-     * Extract geometry from Geoman FeatureData
-     */
-    fun extractGeometryFromFeatureData(featureData: FeatureData): com.nars.maplibre.data.model.Geometry {
-        val geometry = featureData.geometry
-
-        return when (geometry) {
-            is Point -> {
-                val coords = geometry.coordinates
-                PointGeometry(coordinates = listOf(coords[0], coords[1]))
-            }
-            is LineString -> {
-                val flattened = geometry.coordinates.flatMap { coord -> listOf(coord[0], coord[1]) }
-                LineStringGeometry(coordinates = flattened)
-            }
-            is Polygon -> {
-                if (geometry.coordinates.isNotEmpty()) {
-                    val exteriorRing = geometry.coordinates[0]
-                    val flattened = exteriorRing.flatMap { coord -> listOf(coord[0], coord[1]) }
-                    PolygonGeometry(coordinates = flattened)
-                } else {
-                    PolygonGeometry(coordinates = emptyList())
-                }
-            }
-            is MultiPolygon -> {
-                if (geometry.coordinates.isNotEmpty() && geometry.coordinates[0].isNotEmpty()) {
-                    val exteriorRing = geometry.coordinates[0][0]
-                    val flattened = exteriorRing.flatMap { coord -> listOf(coord[0], coord[1]) }
-                    PolygonGeometry(coordinates = flattened)
-                } else {
-                    PolygonGeometry(coordinates = emptyList())
-                }
-            }
-            else -> {
-                NarsLogger.w(TAG, "Unknown geometry type: ${geometry::class.simpleName}")
-                PointGeometry(coordinates = listOf(0.0, 0.0))
-            }
-        }
+    fun extractGeometryFromFeatureData(featureData: FeatureData): Geometry {
+        return extractGeometryFromGeoJson(featureData.geometry)
     }
 
-    /**
-     * Get feature type from phase
-     */
     private fun getFeatureTypeFromPhase(phase: PhaseDefinition): com.nars.maplibre.data.model.NarsFeatureType {
         return when (phase.key) {
             Phases.ROADS_KEY -> com.nars.maplibre.data.model.NarsFeatureType.ROAD
             Phases.HOUSE_ENTRANCES_KEY -> com.nars.maplibre.data.model.NarsFeatureType.HOUSE_ENTRANCE
             Phases.NAMING_PANELS_KEY -> com.nars.maplibre.data.model.NarsFeatureType.NAMING_PANEL
-            else -> com.nars.maplibre.data.model.NarsFeatureType.ROAD // Default fallback
+            else -> com.nars.maplibre.data.model.NarsFeatureType.ROAD
         }
     }
 }
