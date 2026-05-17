@@ -136,4 +136,4 @@ Open `http://localhost:8080` in your browser.
 
 ## License
 
-Proprietary — All rights reserved.
+GNU General Public License v3.0 — See [LICENSE](LICENSE) for details.
