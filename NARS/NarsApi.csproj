@@ -35,7 +35,7 @@
     <PackageReference Include="BCrypt.Net-Next" Version="4.1.0" />
 
     <!-- OpenAPI (built-in .NET 10 — replaces Swashbuckle) -->
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.7" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
 
     <!-- Health Checks -->
     <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
