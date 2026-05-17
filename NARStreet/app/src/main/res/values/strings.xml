@@ -168,6 +168,8 @@
     <string name="map_nothing_undo">Nothing to undo</string>
     <string name="map_restored">Restored</string>
     <string name="map_removed">Removed</string>
+    <string name="map_edit_hint">Drag vertices to edit. Tap Save when done.</string>
+    <string name="map_select_feature_hint">Please select a feature to edit first</string>
 
     <!-- Profile Menu -->
     <string name="profile_user">User</string>
