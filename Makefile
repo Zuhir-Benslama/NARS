@@ -25,12 +25,14 @@ SCALABLE_DEPLOYS   := postgis nars-api nars-frontend
 	@echo "# Auto-generated — DO NOT COMMIT" > $@
 	@echo "POSTGRES_PASSWORD=$$(openssl rand -base64 32)" >> $@
 	@echo "JWT_SECRET=$$(openssl rand -base64 32)" >> $@
+	@echo "GRAFANA_PASSWORD=$$(openssl rand -base64 12)" >> $@
 	@echo "→ Created $@ with fresh secrets"
 
 -include .env
 
 POSTGRES_PASSWORD  ?= $(shell openssl rand -base64 32)
 JWT_SECRET         ?= $(shell openssl rand -base64 32)
+GRAFANA_PASSWORD   ?= $(shell openssl rand -base64 12)
 export
 
 .PHONY: help
@@ -53,7 +55,7 @@ prerequisites: ## Check that all required tools are installed
 # ─── Cluster Lifecycle ──────────────────────────────────────
 
 .PHONY: cluster-up
-cluster-up: prerequisites ## Full bootstrap: create cluster, deploy everything
+cluster-up: prerequisites ## Full bootstrap: create cluster, build images, deploy everything
 	$(MAKE) cluster-create
 	$(MAKE) ingress-install
 	$(MAKE) ingress-wait
@@ -61,6 +63,7 @@ cluster-up: prerequisites ## Full bootstrap: create cluster, deploy everything
 	$(MAKE) metrics-wait
 	$(MAKE) storage-provisioner-install
 	$(MAKE) storage-provisioner-wait
+	$(MAKE) images-build
 	$(MAKE) tls-generate
 	$(MAKE) ca-secret
 	$(MAKE) secrets-apply
@@ -70,8 +73,8 @@ cluster-up: prerequisites ## Full bootstrap: create cluster, deploy everything
 	@echo "✓ Cluster '$(CLUSTER_NAME)' is ready!"
 	@echo ""
 	@echo "  Port-forward:  make cluster-port-forward"
+	@echo "  Smoke test:    make smoke-test"
 	@echo "  Visit:         http://$(DOMAIN):8080/"
-	@echo "  Health:        http://$(DOMAIN):8080/health"
 	@echo "  Stop pods:     make cluster-stop"
 	@echo "  Tear down:     make cluster-down (data preserved)"
 	@echo "  Destroy data:  make cluster-clean"
@@ -130,11 +133,67 @@ cluster-port-forward: ## Port-forward ingress controller to localhost (backgroun
 		8080:80 8443:443 \
 		> /tmp/port-forward-$(CLUSTER_NAME).log 2>&1 &
 	@echo "✓ Port-forward running (PID: $$!)"
-	@echo "  HTTP:  http://$(DOMAIN):8080/"
-	@echo "  HTTPS: https://$(DOMAIN):8443/"
-	@echo "  Logs:  tail -f /tmp/port-forward-$(CLUSTER_NAME).log"
+	@echo "  HTTP:       http://$(DOMAIN):8080/"
+	@echo "  HTTPS:      https://$(DOMAIN):8443/"
+	@echo "  Smoke test: make smoke-test"
+	@echo "  Logs:       tail -f /tmp/port-forward-$(CLUSTER_NAME).log"
 
-# ─── Stop / Start (scale to 0/1) ────────────────────────────
+# ─── Smoke Test ────────────────────────────────────────────
+
+SMOKE_BASE_URL ?= http://localhost:8080
+
+.PHONY: smoke-test
+smoke-test: ## Post-deploy smoke test: verify /health, frontend, and API auth
+	@echo "→ Running smoke tests against $(SMOKE_BASE_URL)..."
+	@echo ""
+	@failed=0; \
+	pass() { echo "  ✓ $$1"; }; \
+	fail() { echo "  ✖ $$1"; failed=$$((failed + 1)); }; \
+	\
+	echo "  1. Health endpoint..."; \
+	health=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/health" 2>/dev/null || echo "000"); \
+	if [ "$$health" = "200" ]; then \
+		body=$$(curl -s --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/health" 2>/dev/null); \
+		if echo "$$body" | grep -q '"status"[[:space:]]*:[[:space:]]*"Healthy"'; then \
+			pass "/health → 200 Healthy"; \
+		else \
+			fail "/health → 200 but body unexpected: $$body"; \
+		fi; \
+	else \
+		fail "/health → $$health (expected 200)"; \
+	fi; \
+	\
+	echo "  2. Frontend reachability..."; \
+	frontend=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/" 2>/dev/null || echo "000"); \
+	if [ "$$frontend" = "200" ]; then \
+		pass "/ → 200"; \
+	elif [ "$$frontend" = "302" ] || [ "$$frontend" = "301" ]; then \
+		pass "/ → $$frontend (redirect — SPA serving correctly)"; \
+	else \
+		fail "/ → $$frontend (expected 200 or redirect)"; \
+	fi; \
+	\
+	echo "  3. API auth endpoint..."; \
+	auth=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 \
+		-X POST "$(SMOKE_BASE_URL)/api/signin" \
+		-H "Content-Type: application/json" \
+		-d '{"username":"nonexistent","password":"bad"}' 2>/dev/null || echo "000"); \
+	if [ "$$auth" = "401" ]; then \
+		pass "POST /api/signin → 401 (auth endpoint alive, bad creds rejected)"; \
+	else \
+		fail "POST /api/signin → $$auth (expected 401)"; \
+	fi; \
+	\
+	echo ""; \
+	if [ "$$failed" -eq 0 ]; then \
+		echo "✓ All smoke tests passed!"; \
+	else \
+		echo "✖ $$failed smoke test(s) failed"; \
+		exit 1; \
+	fi
+
+.PHONY: cluster-stop
+cluster-stop: ## Scale all deployments to 0 (stop pods, keep cluster)
 
 .PHONY: cluster-stop
 cluster-stop: ## Scale all deployments to 0 (stop pods, keep cluster)
@@ -238,6 +297,24 @@ db-shell: ## Open an interactive psql shell inside the postgis pod
 		-o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
 	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found"; exit 1; fi
 	@kubectl exec -it "$$POD" -n "$(NAMESPACE)" -- psql -U postgres -d "$(DB_NAME)"
+
+.PHONY: db-admin
+db-admin: export NON_INTERACTIVE := 1
+db-admin: export ADMIN_NAME := National Admin
+db-admin: export ADMIN_EMAIL := admin@nars.dz
+db-admin: export ADMIN_PHONE := +213000000000
+db-admin: .env ## Create national admin with one-time generated credentials
+	@echo ""
+	@echo "→ Generating one-time national admin credentials..."
+	ADMIN_USERNAME="admin_$$(openssl rand -hex 4)"
+	ADMIN_PASSWORD="$$(openssl rand -base64 12)"
+	export ADMIN_USERNAME ADMIN_PASSWORD
+	echo "  Username: $${ADMIN_USERNAME}"
+	echo "  Password: $${ADMIN_PASSWORD}"
+	echo ""
+	bash Scripts/create_national_admin.sh
+	@echo ""
+	@echo "→ Done. Save the credentials above — they will not be shown again."
 
 # ─── Individual Steps ───────────────────────────────────────
 
@@ -504,7 +581,7 @@ observability-install: helm-check helm-repos ## Install LGTM stack + OpenTelemet
 	@echo "✓ Observability stack installed!"
 	@echo ""
 	@echo "  Port-forward:  make observability-port-forward"
-	@echo "  Grafana:       http://localhost:3000 (admin/admin)"
+	@echo "  Grafana:       http://localhost:3000 (credentials in local password manager)"
 	@echo "  Loki:          http://localhost:3100"
 	@echo "  Tempo:         http://localhost:3200"
 
@@ -530,7 +607,7 @@ observability-prometheus-stack: ## Install Prometheus + Grafana + AlertManager
 	@echo "→ Installing kube-prometheus-stack..."
 	@helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
 		--namespace $(OBSERVABILITY_NAMESPACE) \
-		--set grafana.adminPassword=admin \
+		--set grafana.adminPassword="$(GRAFANA_PASSWORD)" \
 		--set grafana.service.type=ClusterIP \
 		--set grafana.service.port=3000 \
 		--set grafana.additionalDataSources[0].name=Loki \
@@ -637,7 +714,7 @@ observability-port-forward: ## Port-forward Grafana, Loki, Tempo (background)
 		service/tempo 3200:3200 \
 		> /tmp/port-forward-tempo.log 2>&1 &
 	@echo "✓ Port-forwards running"
-	@echo "  Grafana: http://localhost:3000 (admin/admin)"
+	@echo "  Grafana: http://localhost:3000 (run \`make grafana-password\` to retrieve credentials)"
 	@echo "  Loki:    http://localhost:3100"
 	@echo "  Tempo:   http://localhost:3200"
 	@echo "  Logs:    tail -f /tmp/port-forward-{grafana,loki,tempo}.log"
@@ -646,6 +723,10 @@ observability-port-forward: ## Port-forward Grafana, Loki, Tempo (background)
 observability-stop: ## Stop observability port-forwards
 	@-pkill -f "kubectl port-forward.*observability" 2>/dev/null || true
 	@echo "✓ Port-forwards stopped"
+
+.PHONY: grafana-password
+grafana-password: ## Show the generated Grafana admin password
+	@echo "$(GRAFANA_PASSWORD)"
 
 # ─── Docker Images ───────────────────────────────────────────
 

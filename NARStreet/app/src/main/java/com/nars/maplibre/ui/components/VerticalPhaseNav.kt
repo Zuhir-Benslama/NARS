@@ -26,6 +26,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nars.maplibre.data.model.PhaseDefinition
 import com.nars.maplibre.data.model.Phases
+import com.nars.maplibre.ui.theme.GlassBackground
+import com.nars.maplibre.ui.theme.PrimaryColor
+import com.nars.maplibre.ui.theme.SuccessColor
 
 /**
  * Vertical Phase Navigation Sidebar
@@ -43,7 +46,7 @@ fun VerticalPhaseNav(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
             .background(
-                Color(0xFF0f1932).copy(alpha = 0.95f)
+                GlassBackground.copy(alpha = 0.95f)
             )
             .padding(vertical = 8.dp, horizontal = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -106,21 +109,21 @@ private fun PhaseBadge(
     onClick: () -> Unit
 ) {
     val backgroundColor = when {
-        isDone -> Color(0xFFffffff).copy(alpha = 0.15f)
-        isActive -> Color(0xFFffffff).copy(alpha = 0.28f)
-        else -> Color(0xFFffffff).copy(alpha = 0.05f)
+        isDone -> Color.White.copy(alpha = 0.15f)
+        isActive -> Color.White.copy(alpha = 0.28f)
+        else -> Color.White.copy(alpha = 0.05f)
     }
 
     val borderColor = when {
-        isDone -> Color(0xFFffffff).copy(alpha = 0.35f)
-        isActive -> Color(0xFFffffff).copy(alpha = 0.80f)
-        else -> Color(0xFFffffff).copy(alpha = 0.15f)
+        isDone -> Color.White.copy(alpha = 0.35f)
+        isActive -> Color.White.copy(alpha = 0.80f)
+        else -> Color.White.copy(alpha = 0.15f)
     }
 
     val badgeColor = when {
-        isDone -> Color(0xFFffffff)
-        isActive -> Color(0xFFffffff)
-        else -> Color(0xFFffffff).copy(alpha = 0.30f)
+        isDone -> Color.White
+        isActive -> Color.White
+        else -> Color.White.copy(alpha = 0.30f)
     }
 
     val badgeContent = if (isDone) "✓" else "${Phases.ALL.indexOf(phase) + 1}"
@@ -166,7 +169,7 @@ private fun PhaseBadge(
                 text = badgeContent,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF0f1932)
+                color = GlassBackground
             )
         }
 
@@ -177,7 +180,7 @@ private fun PhaseBadge(
                     .size(28.dp)
                     .clip(CircleShape)
                     .background(
-                        Color(0xFF667eea).copy(alpha = 0.18f)
+                        PrimaryColor.copy(alpha = 0.18f)
                     )
             )
         }
@@ -191,9 +194,9 @@ private fun PhaseBadge(
                 .clip(CircleShape)
                 .background(
                     when {
-                        isDone -> Color(0xFF27ae60)
-                        isActive -> Color(0xFF667eea)
-                        else -> Color(0xFFffffff).copy(alpha = 0.3f)
+                        isDone -> SuccessColor
+                        isActive -> PrimaryColor
+                        else -> Color.White.copy(alpha = 0.3f)
                     }
                 )
         )
@@ -213,8 +216,8 @@ private fun PhaseConnector(
             .height(12.dp)
             .background(
                 when {
-                    isDone -> Color(0xFFffffff).copy(alpha = 0.50f)
-                    else -> Color(0xFFffffff).copy(alpha = 0.12f)
+                    isDone -> Color.White.copy(alpha = 0.50f)
+                    else -> Color.White.copy(alpha = 0.12f)
                 }
             )
     )

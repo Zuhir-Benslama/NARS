@@ -198,13 +198,31 @@ class NarsGeoman(
         }
     }
 
-    fun updateFeatureOnMap(feature: NarsFeature) {
-        removeFeature(feature.id)
-        addFeature(feature)
+    fun updateFeatureId(oldId: String, newId: String) {
+        if (oldId == newId) return
+        _displayedFeatureIds.remove(oldId)
+        _displayedFeatureIds.add(newId)
+        featureRenderer.removeFromTracking(oldId)
     }
 
-    fun updateFeatureId(oldId: String, newId: String) {
-        NarsLogger.d("NarsGeoman", "Updating feature ID: $oldId -> $newId")
+    fun updateFeatureOnMap(feature: NarsFeature) {
+        val sourceName = "nars_${feature.id}"
+        val source = map.style?.getSource(sourceName)
+        if (source is org.maplibre.android.style.sources.GeoJsonSource) {
+            val geoJsonFeature = geometryConverter.convertToGeoJson(feature)
+            val geoJsonString = buildGeoJsonString(geoJsonFeature)
+            source.setGeoJson(geoJsonString)
+            NarsLogger.d("NarsGeoman", "Updated feature ${feature.id} in-place")
+        } else {
+            removeFeature(feature.id)
+            addFeature(feature)
+        }
+    }
+
+    private fun buildGeoJsonString(feature: com.geoman.maplibre.geoman.types.geojson.Feature): String {
+        val geometryJson = geometryConverter.geometryToJson(feature.geometry)
+        val id = feature.id ?: ""
+        return """{"type":"Feature","id":"$id","geometry":$geometryJson}"""
     }
 
     fun removeFeature(featureId: String) {
