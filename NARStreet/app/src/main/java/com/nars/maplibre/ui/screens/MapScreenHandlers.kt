@@ -37,11 +37,11 @@ class MapScreenHandlers(
                 onFeatureCreated = { feature -> handleFeatureCreated(feature) },
                 onFeatureUpdated = { feature ->
                     viewModel.updateFeature(feature)
-                    snackbar("Feature updated successfully")
+                    snackbar(context.getString(R.string.map_feature_updated))
                 },
                 onFeatureDeleted = { featureId ->
                     viewModel.deleteFeature(featureId)
-                    snackbar("Feature deleted successfully")
+                    snackbar(context.getString(R.string.map_feature_deleted))
                 }
             )
             narsGeoman = geoman
@@ -131,8 +131,8 @@ class MapScreenHandlers(
                 viewModel.toggleEditMode(true)
                 viewModel.toggleDrawing(false)
                 narsGeoman?.startEditing(feature)
-                snackbar("Drag vertices to edit. Tap Save when done.")
-            } ?: snackbar("Please select a feature to edit first")
+                snackbar(context.getString(R.string.map_edit_hint))
+            } ?: snackbar(context.getString(R.string.map_select_feature_hint))
         }
     }
 

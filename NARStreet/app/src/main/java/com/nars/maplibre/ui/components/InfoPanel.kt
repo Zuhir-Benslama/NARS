@@ -21,8 +21,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nars.maplibre.R
 import com.nars.maplibre.data.model.Phases
 import com.nars.maplibre.ui.theme.GlassBackground
 import com.nars.maplibre.ui.theme.GlassBorder
@@ -63,7 +65,7 @@ fun InfoPanel(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Feature Summary",
+                    text = stringResource(R.string.map_feature_summary),
                     fontSize = 13.sp,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
                     color = TextSecondary
@@ -120,7 +122,7 @@ fun CompactInfoPanel(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Features",
+                    text = stringResource(R.string.map_features),
                     fontSize = 12.sp,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
                     color = TextSecondary
@@ -192,7 +194,7 @@ private fun TotalBadge(total: Int) {
         )
         Spacer(modifier = Modifier.width(4.dp))
         Text(
-            text = "total",
+            text = stringResource(R.string.map_total),
             fontSize = 10.sp,
             color = Color.White.copy(alpha = 0.75f)
         )

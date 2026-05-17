@@ -183,7 +183,7 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
         Assert.NotNull(data);
 
         // Use reflection to access the anonymous type
-        var wilayasProp = data.GetType().GetProperty("wilayas");
+        var wilayasProp = data!.GetType().GetProperty("wilayas");
         Assert.NotNull(wilayasProp);
         var wilayas = wilayasProp.GetValue(data) as System.Collections.IList;
         Assert.NotNull(wilayas);

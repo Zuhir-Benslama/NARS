@@ -16,6 +16,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "audit": "npm audit --audit-level=high",
     "prepare": "husky"
   },
   "dependencies": {

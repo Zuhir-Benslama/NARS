@@ -15,8 +15,11 @@
 #   chmod +x create_national_admin.sh
 #   ./create_national_admin.sh
 #
-# Optional env overrides:
+# Optional env overrides (interactive if unset):
 #   NARS_DB_HOST  NARS_DB_PORT  NARS_DB_NAME  NARS_DB_USER  NARS_DB_PASSWORD
+#
+# Non-interactive mode (set all of these):
+#   ADMIN_USERNAME  ADMIN_PASSWORD  ADMIN_NAME  ADMIN_EMAIL  ADMIN_PHONE
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -95,41 +98,51 @@ if [[ -n "${EXISTING}" ]]; then
 fi
 
 # ── Collect account details ────────────────────────────────────────────────────
-echo -e "${BOLD}Enter details for the new national admin account:${RESET}"
-echo ""
+if [[ "${NON_INTERACTIVE:-0}" == "1" ]]; then
+    # Non-interactive mode — env vars provided by Makefile
+    ADMIN_NAME="${ADMIN_NAME:-National Admin}"
+    ADMIN_EMAIL="${ADMIN_EMAIL:-admin@nars.dz}"
+    ADMIN_PHONE="${ADMIN_PHONE:-+213000000000}"
+    echo -e "${CYAN}[INFO]${RESET}  Non-interactive mode — generating one-time credentials"
+else
+    echo -e "${BOLD}Enter details for the new national admin account:${RESET}"
+    echo ""
 
-read -r -p "  Full name:     " ADMIN_NAME
-[[ -n "${ADMIN_NAME}" ]] || die "Name cannot be empty."
+    read -r -p "  Full name:     " ADMIN_NAME
+    [[ -n "${ADMIN_NAME}" ]] || die "Name cannot be empty."
 
-read -r -p "  Email:         " ADMIN_EMAIL
-[[ "${ADMIN_EMAIL}" == *"@"* ]] || die "Invalid email address."
+    read -r -p "  Email:         " ADMIN_EMAIL
+    [[ "${ADMIN_EMAIL}" == *"@"* ]] || die "Invalid email address."
 
-read -r -p "  Phone:         " ADMIN_PHONE
-[[ -n "${ADMIN_PHONE}" ]] || die "Phone cannot be empty."
+    read -r -p "  Phone:         " ADMIN_PHONE
+    [[ -n "${ADMIN_PHONE}" ]] || die "Phone cannot be empty."
 
-read -r -p "  Username:      " ADMIN_USERNAME
-[[ -n "${ADMIN_USERNAME}" ]] || die "Username cannot be empty."
-[[ "${#ADMIN_USERNAME}" -ge 3 ]] || die "Username must be at least 3 characters."
+    read -r -p "  Username:      " ADMIN_USERNAME
+    [[ -n "${ADMIN_USERNAME}" ]] || die "Username cannot be empty."
+    [[ "${#ADMIN_USERNAME}" -ge 3 ]] || die "Username must be at least 3 characters."
 
-while true; do
-    read -r -s -p "  Password:      " ADMIN_PASSWORD; echo ""
-    [[ "${#ADMIN_PASSWORD}" -ge 8 ]] || { warn "Password must be at least 8 characters."; continue; }
-    read -r -s -p "  Confirm:       " ADMIN_CONFIRM; echo ""
-    [[ "${ADMIN_PASSWORD}" == "${ADMIN_CONFIRM}" ]] && break
-    warn "Passwords do not match. Try again."
-done
-echo ""
+    while true; do
+        read -r -s -p "  Password:      " ADMIN_PASSWORD; echo ""
+        [[ "${#ADMIN_PASSWORD}" -ge 8 ]] || { warn "Password must be at least 8 characters."; continue; }
+        read -r -s -p "  Confirm:       " ADMIN_CONFIRM; echo ""
+        [[ "${ADMIN_PASSWORD}" == "${ADMIN_CONFIRM}" ]] && break
+        warn "Passwords do not match. Try again."
+    done
+    echo ""
+fi
 
-# ── Confirmation ───────────────────────────────────────────────────────────────
-echo -e "${BOLD}Review:${RESET}"
-echo "  Role:     national_admin"
-echo "  Name:     ${ADMIN_NAME}"
-echo "  Email:    ${ADMIN_EMAIL}"
-echo "  Phone:    ${ADMIN_PHONE}"
-echo "  Username: ${ADMIN_USERNAME}"
-echo ""
-read -r -p "$(echo -e "${YELLOW}Proceed? [y/N]: ${RESET}")" CONFIRM
-[[ "${CONFIRM,,}" == "y" ]] || { info "Aborted — no changes made."; exit 0; }
+# ── Confirmation (skip in non-interactive mode) ──────────────────────────────
+if [[ "${NON_INTERACTIVE:-0}" != "1" ]]; then
+    echo -e "${BOLD}Review:${RESET}"
+    echo "  Role:     national_admin"
+    echo "  Name:     ${ADMIN_NAME}"
+    echo "  Email:    ${ADMIN_EMAIL}"
+    echo "  Phone:    ${ADMIN_PHONE}"
+    echo "  Username: ${ADMIN_USERNAME}"
+    echo ""
+    read -r -p "$(echo -e "${YELLOW}Proceed? [y/N]: ${RESET}")" CONFIRM
+    [[ "${CONFIRM,,}" == "y" ]] || { info "Aborted — no changes made."; exit 0; }
+fi
 
 # ── Insert via Python with parameterised query ─────────────────────────────────
 # All user-supplied values are passed as positional argv[] arguments and bound
@@ -215,6 +228,11 @@ echo ""
 echo -e "${BOLD}Account details:${RESET}"
 echo "  UUID:     ${NEW_UUID}"
 echo "  Username: ${ADMIN_USERNAME}"
+if [[ "${NON_INTERACTIVE:-0}" == "1" ]]; then
+    echo "  Password: ${ADMIN_PASSWORD}"
+    echo ""
+    echo -e "${YELLOW}⚠  Save these credentials now. They will not be shown again.${RESET}"
+fi
 echo "  Role:     national_admin"
 echo ""
 echo -e "${GREEN}You can now sign in at /login and create wilaya admins.${RESET}"
