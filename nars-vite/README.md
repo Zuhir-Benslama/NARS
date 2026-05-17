@@ -110,3 +110,7 @@ npm run build:deploy
 - Field worker inspection forms (road, entrance, naming panel)
 - Multi-language UI (English, French, Arabic)
 - RTL support for Arabic
+
+## License
+
+GNU General Public License v3.0 — See [LICENSE](../LICENSE) for details.

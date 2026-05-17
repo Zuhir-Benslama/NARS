@@ -126,4 +126,4 @@ For deployments behind mTLS, provide the CA certificate and client PKCS12:
 
 ## License
 
-See [LICENSE](../LICENSE) at project root.
+GNU General Public License v3.0 — See [LICENSE](../LICENSE) for details.

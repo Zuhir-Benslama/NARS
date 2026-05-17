@@ -100,3 +100,7 @@ dotnet test ../NARS.Tests
 - `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`
 - `NuGetAudit` enabled for dependency vulnerability scanning
 - Environment variable resolution for DB password and JWT secret
+
+## License
+
+GNU General Public License v3.0 — See [LICENSE](../LICENSE) for details.
