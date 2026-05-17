@@ -32,7 +32,7 @@
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.18.0" />
 
     <!-- BCrypt for password hashing -->
-    <PackageReference Include="BCrypt.Net-Next" Version="4.1.0" />
+    <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
 
     <!-- OpenAPI (built-in .NET 10 — replaces Swashbuckle) -->
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.7" />
