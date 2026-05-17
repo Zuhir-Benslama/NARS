@@ -63,7 +63,7 @@ jobs:
         run: dotnet test Workspace.sln --no-build --configuration Release --verbosity normal --filter "FullyQualifiedName~Integration" --logger "trx"
 
       - name: Publish test results
-        uses: dorny/test-reporter@v1
+        uses: dorny/test-reporter@v3
         if: always()
         with:
           name: Integration Test Results
