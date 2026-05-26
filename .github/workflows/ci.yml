@@ -129,7 +129,7 @@ jobs:
 
       - name: Generate Docker metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: zuhirbenslama/nars-api
           tags: |
@@ -148,7 +148,7 @@ jobs:
 
       - name: Generate nars-vite metadata
         id: meta-vite
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: zuhirbenslama/nars-vite
           tags: |
@@ -167,7 +167,7 @@ jobs:
 
       - name: Generate nars-postgis metadata
         id: meta-postgis
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: zuhirbenslama/nars-postgis
           tags: |
