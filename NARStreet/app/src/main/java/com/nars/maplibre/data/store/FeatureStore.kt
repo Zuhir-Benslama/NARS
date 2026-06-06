@@ -144,7 +144,7 @@ class FeatureStore {
 
     fun popUndoAction(): UndoAction? {
         if (_undoStack.isEmpty()) return null
-        return _undoStack.removeLast()
+        return _undoStack.removeAt(_undoStack.lastIndex)
     }
 
     fun executeUndo(): UndoAction? {

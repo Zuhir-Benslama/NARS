@@ -20,15 +20,10 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.doubleOrNull
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
@@ -43,7 +38,6 @@ class ApiService(
         private const val LOGIN_TIMEOUT_MS = 15000
     }
 
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
     private val baseUrl: String = BuildConfig.API_BASE_URL.trimEnd('/')
 
     @Volatile private var authToken: String? = null
@@ -84,7 +78,7 @@ class ApiService(
             }
 
             val body = response.bodyAsText()
-            val apiResponse = json.decodeFromString<LoginApiResponse>(body)
+            val apiResponse = apiJson.decodeFromString<LoginApiResponse>(body)
 
             if (!response.status.isSuccess()) {
                 return Result.failure(Exception(apiResponse.message ?: "Login failed: HTTP ${response.status.value}"))
@@ -134,7 +128,17 @@ class ApiService(
             }
             val body = response.bodyAsText()
             if (body.isBlank()) return Result.success(emptyList())
-            Result.success(parseFeaturesFromResponse(json, body))
+            val jsonElement = apiJson.parseToJsonElement(body)
+            val items = if (jsonElement is JsonObject) {
+                val apiResponse = apiJson.decodeFromJsonElement(ApiFeatureListResponse.serializer(), jsonElement)
+                apiResponse.features ?: emptyList()
+            } else {
+                apiJson.decodeFromJsonElement(
+                    kotlinx.serialization.builtins.ListSerializer(ApiFeatureResponse.serializer()),
+                    jsonElement
+                )
+            }
+            Result.success(items.mapNotNull { it.toNarsFeature() })
         } catch (e: Exception) {
             NarsLogger.e(TAG, "loadFeatures failed", e)
             Result.failure(e)
@@ -143,13 +147,13 @@ class ApiService(
 
     suspend fun saveFeature(feature: NarsFeature): Result<String> {
         return try {
-            val requestBody = buildSaveRequestBody(feature)
+            val requestBody = apiJson.encodeToString(feature.toSaveFeatureRequest())
             val response = httpClient.post("$baseUrl/api/save") {
                 authHeaders().forEach { (k, v) -> headers.append(k, v) }
                 setBody(requestBody)
             }
             val responseBody = response.bodyAsText()
-            val responseJson = json.parseToJsonElement(responseBody).jsonObject
+            val responseJson = apiJson.parseToJsonElement(responseBody).jsonObject
             val id = responseJson["id"]?.jsonPrimitive?.contentOrNull
                 ?: responseJson["id"]?.jsonPrimitive?.longOrNull?.toString()
                 ?: feature.id
@@ -162,7 +166,7 @@ class ApiService(
 
     suspend fun updateFeature(featureId: String, feature: NarsFeature): Result<Unit> {
         return try {
-            val requestBody = buildSaveRequestBody(feature)
+            val requestBody = apiJson.encodeToString(feature.toSaveFeatureRequest())
             httpClient.put("$baseUrl/api/update/$featureId") {
                 authHeaders().forEach { (k, v) -> headers.append(k, v) }
                 setBody(requestBody)
@@ -192,7 +196,7 @@ class ApiService(
                 put("feature_id", featureId)
                 put("type", type)
                 put("status", status)
-                put("data", json.parseToJsonElement(data))
+                put("data", apiJson.parseToJsonElement(data))
             }.toString()
             httpClient.post("$baseUrl/api/field/inspect") {
                 authHeaders().forEach { (k, v) -> headers.append(k, v) }
@@ -218,7 +222,7 @@ class ApiService(
                 setBody(requestBody)
             }
             val body = response.bodyAsText()
-            val jsonElement = json.parseToJsonElement(body).jsonObject
+            val jsonElement = apiJson.parseToJsonElement(body).jsonObject
             val id = jsonElement["id"]?.jsonPrimitive?.contentOrNull
                 ?: return Result.failure(Exception("No ID in response"))
             Result.success(id)

@@ -24,55 +24,66 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 
-/**
- * NARS wrapper for Geoman — thin orchestrator that delegates to dedicated modules.
- */
 @Suppress("DEPRECATION")
-class NarsGeoman(
-    private val mapView: MapView,
-    private val map: MapLibreMap,
-    private val context: Context,
+class NarsGeoman internal constructor(
+    val geoman: Geoman,
+    private val featureRenderer: FeatureRenderer,
+    private val eventHandler: GeomanEventHandler,
+    private val geometryConverter: GeometryConverter,
+    private val snappingEngine: SnappingEngine,
     private val onFeatureCreated: (NarsFeature) -> Unit,
     private val onFeatureUpdated: (NarsFeature) -> Unit,
-    private val onFeatureDeleted: (String) -> Unit
+    private val onFeatureDeleted: (String) -> Unit,
+    private val map: MapLibreMap? = null
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var destroyed = false
-    val geoman: Geoman
-
-    private val eventHandler: GeomanEventHandler
-    private val featureRenderer: FeatureRenderer
-    private val geometryConverter = GeometryConverter()
-    private val snappingEngine = SnappingEngine()
-
     private var currentPhase: PhaseDefinition? = null
     private val _displayedFeatureIds = mutableSetOf<String>()
 
-    // State flows
     private val _isDrawing = MutableStateFlow(false)
     val isDrawing: StateFlow<Boolean> = _isDrawing.asStateFlow()
 
     private val _isEditing = MutableStateFlow(false)
     val isEditing: StateFlow<Boolean> = _isEditing.asStateFlow()
 
-    init {
-        val options = GmOptionsData(
-            settings = SettingsOptions(
-                useControlsUi = true,
-                showControlsOnMap = false,
-                enableSnap = true,
-                snapDistance = Config.SNAP_THRESHOLD_PX.toFloat()
+    companion object {
+        operator fun invoke(
+            mapView: MapView,
+            map: MapLibreMap,
+            context: Context,
+            onFeatureCreated: (NarsFeature) -> Unit,
+            onFeatureUpdated: (NarsFeature) -> Unit,
+            onFeatureDeleted: (String) -> Unit
+        ): NarsGeoman {
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+            val options = GmOptionsData(
+                settings = SettingsOptions(
+                    useControlsUi = true,
+                    showControlsOnMap = false,
+                    enableSnap = true,
+                    snapDistance = Config.SNAP_THRESHOLD_PX.toFloat()
+                )
             )
-        )
-        geoman = Geoman(mapView, map, options)
-
-        featureRenderer = FeatureRenderer(map).also { renderer ->
-            renderer.labelAndMarkerManager = LabelAndMarkerManager(map)
+            val geoman = Geoman(mapView, map, options)
+            val featureRenderer = FeatureRenderer(map).also { renderer ->
+                renderer.labelAndMarkerManager = LabelAndMarkerManager(map)
+            }
+            val eventHandler = GeomanEventHandler(scope, geoman, onFeatureCreated, onFeatureUpdated, onFeatureDeleted)
+            eventHandler.setupEventListeners()
+            NarsLogger.d("NarsGeoman", "Initialized — delegating to FeatureRenderer, GeomanEventHandler, GeometryConverter, SnappingEngine")
+            return NarsGeoman(
+                geoman = geoman,
+                featureRenderer = featureRenderer,
+                eventHandler = eventHandler,
+                geometryConverter = GeometryConverter(),
+                snappingEngine = SnappingEngine(),
+                onFeatureCreated = onFeatureCreated,
+                onFeatureUpdated = onFeatureUpdated,
+                onFeatureDeleted = onFeatureDeleted,
+                map = map
+            )
         }
-        eventHandler = GeomanEventHandler(scope, geoman, onFeatureCreated, onFeatureUpdated, onFeatureDeleted)
-        eventHandler.setupEventListeners()
-
-        NarsLogger.d("NarsGeoman", "Initialized — delegating to FeatureRenderer, GeomanEventHandler, GeometryConverter, SnappingEngine")
     }
 
     fun setCurrentPhase(phase: PhaseDefinition) {
@@ -207,7 +218,7 @@ class NarsGeoman(
 
     fun updateFeatureOnMap(feature: NarsFeature) {
         val sourceName = "nars_${feature.id}"
-        val source = map.style?.getSource(sourceName)
+        val source = map?.style?.getSource(sourceName)
         if (source is org.maplibre.android.style.sources.GeoJsonSource) {
             val geoJsonFeature = geometryConverter.convertToGeoJson(feature)
             val geoJsonString = buildGeoJsonString(geoJsonFeature)
@@ -245,12 +256,12 @@ class NarsGeoman(
             "${layerName}_stroke", "${layerName}_label"
         )
         for (name in layerNames) {
-            try { map.style?.getLayer(name)?.let { map.style?.removeLayer(it) } }
+            try { map?.style?.getLayer(name)?.let { map?.style?.removeLayer(it) } }
             catch (e: Exception) { NarsLogger.w("NarsGeoman", "Failed to remove layer $name: ${e.message}") }
         }
         val mapSourceNames = listOf("nars_${featureId}_edges", "nars_$featureId")
         for (name in mapSourceNames) {
-            try { map.style?.removeSource(name) }
+            try { map?.style?.removeSource(name) }
             catch (e: Exception) { NarsLogger.w("NarsGeoman", "Failed to remove source $name: ${e.message}") }
         }
 

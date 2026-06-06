@@ -19,27 +19,6 @@ spec:
     - host: nars.dz
       http:
         paths:
-          - path: /api(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: nars-api
-                port:
-                  number: 80
-          - path: /health
-            pathType: Exact
-            backend:
-              service:
-                name: nars-api
-                port:
-                  number: 80
-          - path: /login
-            pathType: Exact
-            backend:
-              service:
-                name: nars-api
-                port:
-                  number: 80
           - path: /(.*)
             pathType: ImplementationSpecific
             backend:
@@ -64,6 +43,13 @@ spec:
     - host: localhost
       http:
         paths:
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: nars-api
+                port:
+                  number: 80
           - path: /(.*)
             pathType: ImplementationSpecific
             backend:
