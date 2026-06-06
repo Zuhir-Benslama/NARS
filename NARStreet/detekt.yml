@@ -1,65 +1,16 @@
-# NARStreet Detekt Configuration
-build:
-  maxIssues: 20
-
-ruleSets:
-  - ruleSet: "戒 Complexity"
-    active: true
-  - ruleSet: "戒 Coroutines"
-    active: true
-  - ruleSet: "戒 EmptyCode"
-    active: true
-  - ruleSet: "戒 Exceptions"
-    active: true
-  - ruleSet: "戒 Migration"
-    active: true
-  - ruleSet: "戒 Naming"
-    active: true
-  - ruleSet: "戒 Performance"
-    active: true
-  - ruleSet: "戒 PotentialBugs"
-    active: true
-  - ruleSet: "戒 Style"
-    active: true
-
-complexity:
-  ComplexMethod:
-    threshold: 15
-  LongMethod:
-    threshold: 50
-  LargeClass:
-    threshold: 600
-  TooManyFunctions:
-    threshold: 20
-    excludeFunctionsInClasses:
-      - "*Screen"
-    excludeTraits:
-      - "Composable"
-  CyclomaticComplexMethod:
-    threshold: 15
-  ReturnCount:
-    max: 3
-  ThrowCount:
-    max: 3
-
 naming:
   FunctionNaming:
     active: true
-    excludeFunctionRegex: "^\\$[a-zA-Z]+.*"
+    functionPattern: "[a-zA-Z][a-zA-Z0-9]*"
     ignoreAnnotated:
       - "Composable"
       - "androidx.compose.runtime.Composable"
-    functionPattern: "[a-zA-Z][a-zA-Z0-9]*"
   MatchingDeclarationName:
     active: true
-    ignoreAnnotated:
-      - "Composable"
-  PropertyNaming:
-    active: true
-    excludeAnnotationRegex: ".*"
 
 style:
   MagicNumber:
+    active: true
     ignoreNumbers:
       - "-1"
       - "0"
@@ -73,35 +24,49 @@ style:
       - "3600"
       - "6371000.0"
       - "6378137.0"
-    ignoreAnnotationRegex: ".*Color.*"
     ignorePropertyDeclaration: true
-    ignoreTaggedStatements:
-      - "expected"
+    ignoreConstantDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
   MaxLineLength:
+    active: true
     maxLineLength: 120
-    excludePatternRegex: '".*log.*"'
+    excludePackageStatements: true
+    excludeImportStatements: true
+    excludeCommentStatements: false
+    excludeRawStrings: true
   NewLineAtEndOfFile:
     active: true
+  ReturnCount:
+    active: true
+    max: 2
+    excludeReturnFromLambda: true
+    excludeGuardClauses: false
+  ThrowsCount:
+    active: true
+    max: 3
 
-empty-blocks:
-  EmptyCatchBlock:
-    ignoreExceptedCases: true
-  EmptyClass:
-    ignoreAnnotated:
-      - "Composable"
+complexity:
+  LongMethod:
+    active: true
+    allowedLines: 50
+  LargeClass:
+    active: true
+    allowedLines: 600
+  TooManyFunctions:
+    active: true
 
 exceptions:
-  TooGenericResult:
-    excludeResultNames:
-      - "Ok"
-      - "Err"
+  SwallowedException:
+    active: true
+    allowedExceptionNameRegex: "_|(ignore|expected).*"
+  TooGenericExceptionCaught:
+    active: true
+    allowedExceptionNameRegex: "_|(ignore|expected).*"
 
 potential-bugs:
   UnsafeCast:
     active: true
-  UnusedParameter:
-    active: false
-  UnusedPrivateFunction:
+  UnsafeCallOnNullableType:
     active: true
 
 performance:

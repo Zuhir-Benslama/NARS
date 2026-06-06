@@ -9,12 +9,6 @@ labels:
 resources:
   - namespace.yaml
   - configmap.yaml
-  # ── Secrets ───────────────────────────────────────────────────────────────
-  # secret.yaml is a REFERENCE TEMPLATE only. Real secrets are created at
-  # deploy time by `make secrets-apply` (generates random values via openssl).
-  #   make secrets-apply   ← creates nars-secrets + regcred
-  #   make tls-generate    ← creates nars-tls TLS certificate
-  #   make ca-secret       ← creates nars-ca for mTLS
   - postgis-pv.yaml
   - postgis.yaml
   - app-deployment.yaml

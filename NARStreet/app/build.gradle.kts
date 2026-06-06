@@ -5,6 +5,16 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.detekt)
+}
+
+detekt {
+    config.setFrom(rootProject.file("detekt.yml"))
+    baseline = file("detekt-baseline.xml")
+    buildUponDefaultConfig = true
+    allRules = false
+    autoCorrect = false
+    toolVersion = "2.0.0-alpha.3"
 }
 
 // Load local.properties if it exists
@@ -133,7 +143,6 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.ktor.client.mock)
     androidTestImplementation(libs.androidx.test.ext.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
     debugImplementation(libs.compose.ui.tooling)

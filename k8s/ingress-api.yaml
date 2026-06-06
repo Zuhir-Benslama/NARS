@@ -2,6 +2,8 @@
 # Serves api.nars.dz with TLS + mTLS client certificate authentication.
 # HTTP traffic is redirected to HTTPS; HTTPS requires a valid client cert
 # signed by the nars-ca (see make ca-generate / ca-secret).
+# NOTE: /health is deliberately NOT here — it has its own ingress below
+# so monitoring systems can reach it without a client cert.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -34,6 +36,27 @@ spec:
                 name: nars-api
                 port:
                   number: 80
+---
+# ─── Health Check Ingress (no mTLS) ────────────────────────────────────
+# Separate ingress for /health so external monitoring can reach it
+# without requiring a client certificate.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nars-api-health
+  namespace: nars
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.nars.dz
+      secretName: nars-tls
+  rules:
+    - host: api.nars.dz
+      http:
+        paths:
           - path: /health
             pathType: Exact
             backend:

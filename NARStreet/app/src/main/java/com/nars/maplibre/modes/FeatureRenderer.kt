@@ -25,6 +25,12 @@ class FeatureRenderer(
 ) {
     lateinit var labelAndMarkerManager: LabelAndMarkerManager
 
+    internal var geoJsonSourceFactory: (name: String, json: String) -> GeoJsonSource = { name, json -> GeoJsonSource(name, json) }
+    internal var lineLayerFactory: (name: String, source: String) -> LineLayer = { name, source -> LineLayer(name, source) }
+    internal var fillLayerFactory: (name: String, source: String) -> FillLayer = { name, source -> FillLayer(name, source) }
+    internal var symbolLayerFactory: (name: String, source: String) -> SymbolLayer = { name, source -> SymbolLayer(name, source) }
+    internal var geometryConverterProvider: () -> GeometryConverter = { GeometryConverter() }
+
     companion object {
         private const val TAG = "FeatureRenderer"
         private const val DEFAULT_MARKER_ICON_SIZE = 0.5f
@@ -48,14 +54,14 @@ class FeatureRenderer(
             return
         }
 
-        val geoJsonFeature = GeometryConverter().convertToGeoJson(feature)
+        val geoJsonFeature = geometryConverterProvider().convertToGeoJson(feature)
         val sourceName = "nars_${feature.id}"
         val layerName = "nars_layer_${feature.id}"
         val geoJsonString = buildGeoJsonString(geoJsonFeature)
 
         removeExistingSource(sourceName)
 
-        map.style?.addSource(GeoJsonSource(sourceName, geoJsonString))
+        map.style?.addSource(geoJsonSourceFactory(sourceName, geoJsonString))
 
         val style = getFeatureStyle(feature.properties.phase)
         when (feature.geometry) {
@@ -70,7 +76,7 @@ class FeatureRenderer(
     }
 
     private fun addPointLayer(layerName: String, sourceName: String) {
-        SymbolLayer(layerName, sourceName).apply {
+        symbolLayerFactory(layerName, sourceName).apply {
             setProperties(
                 org.maplibre.android.style.layers.PropertyFactory.iconImage("default-marker"),
                 org.maplibre.android.style.layers.PropertyFactory.iconSize(DEFAULT_MARKER_ICON_SIZE),
@@ -81,7 +87,7 @@ class FeatureRenderer(
     }
 
     private fun addLineLayer(layerName: String, sourceName: String, style: FeatureStyle) {
-        LineLayer(layerName, sourceName).apply {
+        lineLayerFactory(layerName, sourceName).apply {
             setProperties(
                 org.maplibre.android.style.layers.PropertyFactory.lineColor(parseColor(style.lineColor)),
                 org.maplibre.android.style.layers.PropertyFactory.lineWidth(style.lineWidth.toFloat())
@@ -93,9 +99,9 @@ class FeatureRenderer(
     private fun addPolygonLayer(layerName: String, sourceName: String, style: FeatureStyle, geom: PolygonGeometry) {
         val edgeSourceName = "${sourceName}_edges"
         removeExistingSource(edgeSourceName)
-        map.style?.addSource(GeoJsonSource(edgeSourceName, GeometryConverter().buildPolygonEdgesGeoJson(geom.coordinates)))
+        map.style?.addSource(geoJsonSourceFactory(edgeSourceName, geometryConverterProvider().buildPolygonEdgesGeoJson(geom.coordinates)))
 
-        LineLayer("${layerName}_outline", edgeSourceName).apply {
+        lineLayerFactory("${layerName}_outline", edgeSourceName).apply {
             setProperties(
                 org.maplibre.android.style.layers.PropertyFactory.lineColor(parseColor(style.lineColor)),
                 org.maplibre.android.style.layers.PropertyFactory.lineWidth(style.lineWidth.toFloat())
@@ -106,17 +112,17 @@ class FeatureRenderer(
 
     private fun addCircleLayer(layerName: String, sourceName: String, style: FeatureStyle, geom: CircleGeometry) {
         val radiusMeters = geom.coordinates[2].takeIf { it > 0 } ?: DEFAULT_CIRCLE_RADIUS_METERS
-        val circleGeoJson = GeometryConverter().buildCircleGeoJson(geom.coordinates[0], geom.coordinates[1], radiusMeters)
+        val circleGeoJson = geometryConverterProvider().buildCircleGeoJson(geom.coordinates[0], geom.coordinates[1], radiusMeters)
 
         removeExistingSource(sourceName)
-        map.style?.addSource(GeoJsonSource(sourceName, circleGeoJson))
+        map.style?.addSource(geoJsonSourceFactory(sourceName, circleGeoJson))
 
-        FillLayer(layerName, sourceName).apply {
+        fillLayerFactory(layerName, sourceName).apply {
             setProperties(org.maplibre.android.style.layers.PropertyFactory.fillOpacity(CIRCLE_FILL_OPACITY))
             map.style?.addLayer(this)
         }
 
-        LineLayer("${layerName}_stroke", sourceName).apply {
+        lineLayerFactory("${layerName}_stroke", sourceName).apply {
             setProperties(
                 org.maplibre.android.style.layers.PropertyFactory.lineColor(parseColor(style.lineColor)),
                 org.maplibre.android.style.layers.PropertyFactory.lineWidth(style.lineWidth.toFloat())
@@ -158,7 +164,7 @@ class FeatureRenderer(
             put("type", "Feature")
             put("id", feature.id ?: "")
             put("geometry", kotlinx.serialization.json.Json.parseToJsonElement(
-                GeometryConverter().geometryToJson(geometry)
+                geometryConverterProvider().geometryToJson(geometry)
             ))
             putJsonObject("properties") {
                 val mutableProps = props.toMutableMap()
