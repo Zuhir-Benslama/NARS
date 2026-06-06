@@ -4,8 +4,8 @@ import com.nars.maplibre.AppPreferences
 import com.nars.maplibre.data.model.NarsFeature
 import com.nars.maplibre.data.model.NarsFeatureType
 import com.nars.maplibre.data.model.FeatureProperties
+import com.nars.maplibre.data.model.Phases
 import com.nars.maplibre.data.model.PointGeometry
-import com.nars.maplibre.data.model.LoginRequest
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -123,5 +123,128 @@ class ApiServiceTest {
     fun `setCookie and getCookie round trip`() {
         apiService.setCookie("cookie123")
         assertEquals("cookie123", apiService.getCookie())
+    }
+
+    @Test
+    fun `loadFeatures parses feature array from response`() = runTest {
+        engine = MockEngine { _ ->
+            respond(
+                content = """[
+                    {"id": "1", "type": "road", "layer": "street", "data": {"lat": 36.0, "lng": 3.0}}
+                ]""",
+                status = HttpStatusCode.OK
+            )
+        }
+        val client = HttpClient(engine) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
+            }
+        }
+        apiService = ApiService(client, appPreferences)
+
+        val result = apiService.loadFeatures()
+
+        assertTrue(result.isSuccess)
+        val features = result.getOrNull()
+        assertEquals(1, features?.size)
+        assertEquals("1", features?.get(0)?.id)
+    }
+
+    @Test
+    fun `loadFeatures parses features object from response`() = runTest {
+        engine = MockEngine { _ ->
+            respond(
+                content = """{"features": [
+                    {"id": "2", "type": "house_entrance", "layer": "main_entrance", "data": {"lat": 36.0, "lng": 3.0}}
+                ]}""",
+                status = HttpStatusCode.OK
+            )
+        }
+        val client = HttpClient(engine) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
+            }
+        }
+        apiService = ApiService(client, appPreferences)
+
+        val result = apiService.loadFeatures()
+
+        assertTrue(result.isSuccess)
+        val features = result.getOrNull()
+        assertEquals(1, features?.size)
+        assertEquals("2", features?.get(0)?.id)
+    }
+
+    @Test
+    fun `saveFeature returns id from response`() = runTest {
+        val feature = NarsFeature(
+            id = "local-1",
+            type = NarsFeatureType.ROAD,
+            geometry = PointGeometry(coordinates = listOf(3.0, 36.0)),
+            properties = FeatureProperties(phase = Phases.ROADS_KEY, color = "#3498db")
+        )
+        engine = MockEngine { _ ->
+            respond(
+                content = """{"id": "server-42"}""",
+                status = HttpStatusCode.OK
+            )
+        }
+        val client = HttpClient(engine) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
+            }
+        }
+        apiService = ApiService(client, appPreferences)
+
+        val result = apiService.saveFeature(feature)
+
+        assertTrue(result.isSuccess)
+        assertEquals("server-42", result.getOrNull())
+    }
+
+    @Test
+    fun `updateFeature returns success`() = runTest {
+        val feature = NarsFeature(
+            id = "feature-1",
+            type = NarsFeatureType.ROAD,
+            geometry = PointGeometry(coordinates = listOf(3.0, 36.0)),
+            properties = FeatureProperties(phase = Phases.ROADS_KEY, color = "#3498db")
+        )
+        engine = MockEngine { _ ->
+            respond(
+                content = """{"id": "feature-1"}""",
+                status = HttpStatusCode.OK
+            )
+        }
+        val client = HttpClient(engine) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
+            }
+        }
+        apiService = ApiService(client, appPreferences)
+
+        val result = apiService.updateFeature("feature-1", feature)
+
+        assertTrue(result.isSuccess)
+    }
+
+    @Test
+    fun `deleteFeature returns success`() = runTest {
+        engine = MockEngine { _ ->
+            respond(
+                content = "",
+                status = HttpStatusCode.OK
+            )
+        }
+        val client = HttpClient(engine) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
+            }
+        }
+        apiService = ApiService(client, appPreferences)
+
+        val result = apiService.deleteFeature("feature-1")
+
+        assertTrue(result.isSuccess)
     }
 }

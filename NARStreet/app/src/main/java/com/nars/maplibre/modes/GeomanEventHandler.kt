@@ -57,38 +57,37 @@ class GeomanEventHandler(
                     }
                     is GmDrawEvent.Create -> {
                         NarsLogger.d(TAG, "GmDrawEvent.Create received: shape=${event.shape}")
-                        handleFeatureCreated(event)
+                        handleFeatureCreated(event.feature as? FeatureData)
                     }
                     is GmDrawEvent.EditEnd -> {
                         NarsLogger.d(TAG, "Edit ended: ${event.shape}")
-                        handleEditEnd(event)
+                        handleEditEnd()
                     }
                     is GmEditEvent.ChangeEnd -> {
                         NarsLogger.d(TAG, "Geometry changed")
-                        handleGeometryChanged(event)
+                        handleGeometryChanged(event.feature as? FeatureData)
                     }
                     is GmEditEvent.Delete -> {
                         NarsLogger.d(TAG, "Feature deleted")
-                        handleFeatureDeleted(event)
+                        handleDeleted()
                     }
                 }
             }
         }
     }
 
-    private fun handleFeatureCreated(event: GmDrawEvent.Create) {
+    internal fun handleFeatureCreated(featureData: FeatureData?) {
         val phase = currentPhase ?: run {
             NarsLogger.e(TAG, "No current phase set when creating feature!")
             return
         }
 
         NarsLogger.d(TAG, "Creating feature for phase: ${phase.label} (${phase.key})")
-        val narsFeature = createNarsFeatureFromEvent(event, phase)
+        val narsFeature = createNarsFeatureFromFeatureData(featureData, phase)
         onFeatureCreated(narsFeature)
     }
 
-    private fun createNarsFeatureFromEvent(event: GmDrawEvent.Create, phase: PhaseDefinition): NarsFeature {
-        val featureData = event.feature as? FeatureData
+    internal fun createNarsFeatureFromFeatureData(featureData: FeatureData?, phase: PhaseDefinition): NarsFeature {
         val geometry = if (featureData != null) {
             if (featureData.properties["shapeType"] == "circle" ||
                 featureData.properties["radius"] != null) {
@@ -97,8 +96,7 @@ class GeomanEventHandler(
                 extractGeometryFromGeoJson(featureData.geometry)
             }
         } else {
-            val fallback = (event.feature as? FeatureData)?.geometry
-            extractGeometryFromGeoJson(fallback)
+            extractGeometryFromGeoJson(null)
         }
 
         return NarsFeature(
@@ -112,21 +110,21 @@ class GeomanEventHandler(
         )
     }
 
-    private fun handleEditEnd(event: GmDrawEvent.EditEnd) {
+    internal fun handleEditEnd() {
         editingFeatureId = null
         editingFeature = null
     }
 
-    private fun handleGeometryChanged(event: GmEditEvent.ChangeEnd) {
-        val featureData = event.feature as? FeatureData ?: return
-        val geometry = extractGeometryFromFeatureData(featureData)
+    internal fun handleGeometryChanged(featureData: FeatureData?) {
+        val data = featureData ?: return
+        val geometry = extractGeometryFromFeatureData(data)
         editingFeature?.let { original ->
             val updated = original.copy(geometry = geometry)
             onFeatureUpdated(updated)
         }
     }
 
-    private fun handleFeatureDeleted(event: GmEditEvent.Delete) {
+    internal fun handleDeleted() {
         editingFeatureId?.let { featureId ->
             onFeatureDeleted(featureId)
         }
@@ -174,7 +172,7 @@ class GeomanEventHandler(
         }
     }
 
-    private fun extractCircleGeometry(featureData: FeatureData): CircleGeometry {
+    internal fun extractCircleGeometry(featureData: FeatureData): CircleGeometry {
         val center = featureData.properties["center"] as? LngLat
         val radius = featureData.properties["radius"] as? Double
 
@@ -206,7 +204,7 @@ class GeomanEventHandler(
         return extractGeometryFromGeoJson(featureData.geometry)
     }
 
-    private fun getFeatureTypeFromPhase(phase: PhaseDefinition): com.nars.maplibre.data.model.NarsFeatureType {
+    internal fun getFeatureTypeFromPhase(phase: PhaseDefinition): com.nars.maplibre.data.model.NarsFeatureType {
         return when (phase.key) {
             Phases.ROADS_KEY -> com.nars.maplibre.data.model.NarsFeatureType.ROAD
             Phases.HOUSE_ENTRANCES_KEY -> com.nars.maplibre.data.model.NarsFeatureType.HOUSE_ENTRANCE

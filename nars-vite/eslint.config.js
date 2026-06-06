@@ -67,6 +67,6 @@ export default [
     // Prettier must be last — disables all formatting rules that conflict
     prettier,
     {
-        ignores: ['dist/', 'node_modules/', 'src/test/', '**/*.test.ts', '**/*.spec.ts'],
+        ignores: ['dist/', 'node_modules/', 'coverage/', 'src/test/', '**/*.test.ts', '**/*.spec.ts'],
     },
 ]

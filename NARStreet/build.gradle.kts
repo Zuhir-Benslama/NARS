@@ -4,4 +4,15 @@ plugins {
     alias(libs.plugins.android.library) apply false
     alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.kotlin.serialization) apply false
+    alias(libs.plugins.detekt) apply false
+}
+
+subprojects {
+    configurations.all {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "androidx.espresso" && requested.name == "espresso-core") {
+                useTarget("androidx.test.espresso:espresso-core:${requested.version}")
+            }
+        }
+    }
 }

@@ -4,7 +4,7 @@ Android client for the NARS mapping system. Built with Jetpack Compose, MapLibre
 
 ## Features
 
-- 8-phase mapping pipeline (areas, districts, city center, roads, house entrances, public buildings, public spaces, naming panels)
+- 3-phase field mapping pipeline (roads, house entrances, naming panels)
 - Drawing, editing, and validation of geographic features
 - Offline-capable feature store with server sync
 - Phase-based workflow with validation gates

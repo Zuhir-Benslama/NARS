@@ -39,6 +39,7 @@ spec:
           containers:
             - name: pg-dump
               image: postgis/postgis:17-3.5
+              imagePullPolicy: IfNotPresent
               command:
                 - /bin/sh
                 - -ec
