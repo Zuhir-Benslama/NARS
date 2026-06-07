@@ -94,7 +94,6 @@ fun FeatureValidationModal(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Road name - bold and prominent
                 val roadName = feature.properties.name ?: stringResource(R.string.feature_unnamed_road)
                 Text(
                     text = roadName,
@@ -103,7 +102,6 @@ fun FeatureValidationModal(
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                // Show coordinates for reference
                 val coords = when (val geom = feature.geometry) {
                     is com.nars.maplibre.data.model.LineStringGeometry -> {
                         val c = geom.coordinates.chunked(2)
@@ -124,10 +122,19 @@ fun FeatureValidationModal(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                when (phase.key) {
-                    "roads" -> RoadsValidationFields(props = props, onPropsChanged = { props = it })
-                    "houseEntrances" -> HouseEntranceValidationFields(props = props, onPropsChanged = { props = it })
-                    "namingPanels" -> NamingPanelValidationFields(props = props, onPropsChanged = { props = it })
+                when (val typedProps = props) {
+                    is FeatureProperties.RoadProperties -> RoadsValidationFields(
+                        props = typedProps,
+                        onPropsChanged = { props = it }
+                    )
+                    is FeatureProperties.HouseEntranceProperties -> HouseEntranceValidationFields(
+                        props = typedProps,
+                        onPropsChanged = { props = it }
+                    )
+                    is FeatureProperties.NamingPanelProperties -> NamingPanelValidationFields(
+                        props = typedProps,
+                        onPropsChanged = { props = it }
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -145,7 +152,7 @@ fun FeatureValidationModal(
 
                 Button(
                     onClick = {
-                        val result = validateFeatureProperties(props, phase)
+                        val result = validateFeatureProperties(props)
                         if (result.valid) {
                             onSave(feature.copy(properties = props))
                             onDismiss()
@@ -162,4 +169,3 @@ fun FeatureValidationModal(
         }
     }
 }
-

@@ -152,10 +152,7 @@ class ApiService(
                 authHeaders().forEach { (k, v) -> headers.append(k, v) }
                 setBody(requestBody)
             }
-            val responseBody = response.bodyAsText()
-            val responseJson = apiJson.parseToJsonElement(responseBody).jsonObject
-            val id = responseJson["id"]?.jsonPrimitive?.contentOrNull
-                ?: responseJson["id"]?.jsonPrimitive?.longOrNull?.toString()
+            val id = apiJson.decodeFromString<SaveFeatureResponse>(response.bodyAsText()).id
                 ?: feature.id
             Result.success(id)
         } catch (e: Exception) {
@@ -221,9 +218,7 @@ class ApiService(
                 contentType(ContentType.Application.Json)
                 setBody(requestBody)
             }
-            val body = response.bodyAsText()
-            val jsonElement = apiJson.parseToJsonElement(body).jsonObject
-            val id = jsonElement["id"]?.jsonPrimitive?.contentOrNull
+            val id = apiJson.decodeFromString<CreateEntranceResponse>(response.bodyAsText()).id
                 ?: return Result.failure(Exception("No ID in response"))
             Result.success(id)
         } catch (e: Exception) {

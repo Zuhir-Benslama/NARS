@@ -23,9 +23,6 @@ class FeatureStore {
     private val _currentPhase = MutableStateFlow<PhaseDefinition?>(null)
     val currentPhase: StateFlow<PhaseDefinition?> = _currentPhase.asStateFlow()
 
-    private val _featureCounts = MutableStateFlow(FeatureCounts())
-    val featureCounts: StateFlow<FeatureCounts> = _featureCounts.asStateFlow()
-
     private val _referenceRoadDbId = MutableStateFlow<String?>(null)
     val referenceRoadDbId: StateFlow<String?> = _referenceRoadDbId.asStateFlow()
 
@@ -150,18 +147,30 @@ class FeatureStore {
     fun executeUndo(): UndoAction? {
         val action = popUndoAction() ?: return null
 
-        if (action is UndoAction.Delete) {
-            val feature = action.feature
-            if (feature.properties.entranceTypeKey == "main_entrance") {
-                addFeature(feature)
-            }
-            val roadDbId = feature.properties.roadDbId
-            if (roadDbId != null) {
-                val roadPhase = _featuresByPhase.value["roads"] ?: emptyList()
-                val road = roadPhase.find { it.id == roadDbId || it.dbId == roadDbId }
-                if (road != null) {
-                    NarsLogger.d("FeatureStore", "Repaired cross-reference: restored entrance for road ${road.properties.name}")
+        when (action) {
+            is UndoAction.Delete -> {
+                val feature = action.feature
+                if (getFeatureById(feature.id) == null) addFeature(feature)
+                val roadDbId = when (val props = feature.properties) {
+                    is com.nars.maplibre.data.model.FeatureProperties.HouseEntranceProperties -> props.roadDbId
+                    else -> null
                 }
+                if (roadDbId != null) {
+                    val roadPhase = _featuresByPhase.value["roads"] ?: emptyList()
+                    val road = roadPhase.find { it.id == roadDbId || it.dbId == roadDbId }
+                    if (road != null) {
+                        NarsLogger.d(
+                            "FeatureStore",
+                            "Cross-reference restored: entrance for road ${road.properties.name}"
+                        )
+                    }
+                }
+            }
+            is UndoAction.Create -> {
+                removeFeature(action.feature.id)
+            }
+            is UndoAction.Update -> {
+                updateFeature(action.newFeature.id, action.oldFeature)
             }
         }
 

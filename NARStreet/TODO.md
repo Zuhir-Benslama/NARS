@@ -1,25 +1,30 @@
 # NARStreet (Android) — TODO
 
 ## P1 — Static Analysis & Build
-- [ ] Run detekt — `detekt.yml` configured but never enforced in CI
-- [ ] Fix lint build — `espresso-core:3.6.1` unresolvable (blocks `./gradlew lint`)
-- [ ] Remove empty source dirs: `domain/`, `store/`, `components/`
+- [x] Run detekt — 23 issues fixed (MaxLineLength, TooGenericExceptionCaught, ReturnCount); now clean
+- [x] Fix lint build — `espresso-core:3.6.1` inlined in `maplibre-geoman-android/app/build.gradle.kts`
+- [x] Remove empty source dirs: `app/src/test/java/.../ui`, `mipmap-*`, `domain/`, `store/`, `components/`
 
 ## P1 — Test Coverage Gaps
-- [ ] Unit tests for `FeatureStore` — pure logic, easy to test (181 lines, zero tests)
-- [ ] Unit tests for `PhaseNavigator` — phase advancement validation (123 lines, zero tests)
-- [ ] Unit tests for `NarsGeoman` — most complex class (306 lines, zero tests)
-- [ ] Unit tests for `FeatureRenderer` — GeoJSON layer rendering (174 lines, zero tests)
-- [ ] Unit tests for `GeomanEventHandler` — drawing event handling (217 lines, zero tests)
+- [x] Unit tests for `FeatureStore` — 16 tests added (executeUndo for Create/Update/Delete, setReferenceRoad, getCurrentPhaseFeatures, setCurrentPhaseByKey, getFeatureCounts, getFeatureById, selectFeature, removeFeature)
+- [x] Unit tests for `PhaseNavigator` — 19 tests exist
+- [x] Unit tests for `NarsGeoman` — 27 tests exist
+- [x] Unit tests for `FeatureRenderer` — 13 tests exist
+- [x] Unit tests for `GeomanEventHandler` — 24 tests exist
 
 ## P2 — Code Quality Hotspots
-- [ ] Decompose `NarsGeoman` — god orchestrator at 306 lines (draw/edit/display/snap/teardown)
-- [ ] Convert `ApiService` JSON parsing — replace manual `jsonPrimitive.contentOrNull` with `@Serializable` response classes
-- [ ] Specialize `FeatureProperties` — 25 nullable fields is a code smell; consider sealed class per phase
-- [ ] Fix inconsistent undo — `FeatureStore.executeUndo()` only handles `Delete`; `Create`/`Update` handled in `MapViewModel`
-- [ ] Remove stale `colors.xml` values — Kotlin code never uses `R.color.*`; `Theme.kt` has all colors
+- [x] Decompose `NarsGeoman` — display methods extracted into `FeatureDisplayManager` (173 lines)
+- [x] Convert `ApiService` JSON parsing — `saveFeature()`/`createEntranceFromInspection()` use `@Serializable SaveFeatureResponse`/`CreateEntranceResponse`
+- [x] Specialize `FeatureProperties` — replaced flat data class with sealed class hierarchy (RoadProperties, HouseEntranceProperties, NamingPanelProperties), removed 11 dead fields
+- [x] Fix inconsistent undo — `FeatureStore.executeUndo()` now handles Create (remove), Update (restore old), Delete (re-add)
+- [x] Remove stale `colors.xml` values — only `primary` remains (referenced by launcher icons)
+- [x] Remove unused `androidx-espresso` dependency from version catalog
+- [x] Remove dead espresso resolution strategy from `build.gradle.kts`
 
 ## P3 — Nice-to-have
-- [ ] Instrumented (Compose UI) tests for map interactions
-- [ ] Add `AGENTS.md` with build/test/lint commands for AI-assisted development
-- [ ] Cover remaining ViewModel edge cases (sequential undo/redo, concurrent phase changes)
+- [x] Instrumented (Compose UI) tests for map interactions — LoginScreen covered (5 tests)
+- [x] Compose UI test infrastructure: `androidTest` directory, mockk dependency, Koin test setup
+- [x] Add `AGENTS.md` with build/test/lint commands for AI-assisted development
+- [x] Cover remaining ViewModel edge cases (sequential undo/redo, concurrent phase changes)
+- [x] Fix duplicate operations in ViewModel.undo() — Create/Update paths no longer re-execute the operation already done by FeatureStore.executeUndo()
+- [x] Enable HTTPS in nginx for meaningful HSTS — HSTS annotations added to frontend ingress (`max-age=31536000`, `includeSubdomains`); `upgrade-insecure-requests` added to CSP in nginx config

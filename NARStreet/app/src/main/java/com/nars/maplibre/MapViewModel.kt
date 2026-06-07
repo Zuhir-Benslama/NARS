@@ -103,11 +103,9 @@ class MapViewModel(
                 showSuccess("Restored: ${action.feature.properties.name}")
             }
             is UndoAction.Create -> {
-                featureStore.removeFeature(action.feature.id)
                 showSuccess("Removed: ${action.feature.properties.name}")
             }
             is UndoAction.Update -> {
-                featureStore.updateFeature(action.oldFeature.id, action.oldFeature)
                 showSuccess("Restored: ${action.oldFeature.properties.name}")
             }
         }

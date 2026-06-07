@@ -25,10 +25,14 @@ class FeatureRenderer(
 ) {
     lateinit var labelAndMarkerManager: LabelAndMarkerManager
 
-    internal var geoJsonSourceFactory: (name: String, json: String) -> GeoJsonSource = { name, json -> GeoJsonSource(name, json) }
-    internal var lineLayerFactory: (name: String, source: String) -> LineLayer = { name, source -> LineLayer(name, source) }
-    internal var fillLayerFactory: (name: String, source: String) -> FillLayer = { name, source -> FillLayer(name, source) }
-    internal var symbolLayerFactory: (name: String, source: String) -> SymbolLayer = { name, source -> SymbolLayer(name, source) }
+    internal var geoJsonSourceFactory: (name: String, json: String) -> GeoJsonSource =
+        { name, json -> GeoJsonSource(name, json) }
+    internal var lineLayerFactory: (name: String, source: String) -> LineLayer =
+        { name, source -> LineLayer(name, source) }
+    internal var fillLayerFactory: (name: String, source: String) -> FillLayer =
+        { name, source -> FillLayer(name, source) }
+    internal var symbolLayerFactory: (name: String, source: String) -> SymbolLayer =
+        { name, source -> SymbolLayer(name, source) }
     internal var geometryConverterProvider: () -> GeometryConverter = { GeometryConverter() }
 
     companion object {
@@ -99,7 +103,8 @@ class FeatureRenderer(
     private fun addPolygonLayer(layerName: String, sourceName: String, style: FeatureStyle, geom: PolygonGeometry) {
         val edgeSourceName = "${sourceName}_edges"
         removeExistingSource(edgeSourceName)
-        map.style?.addSource(geoJsonSourceFactory(edgeSourceName, geometryConverterProvider().buildPolygonEdgesGeoJson(geom.coordinates)))
+        val edgesJson = geometryConverterProvider().buildPolygonEdgesGeoJson(geom.coordinates)
+        map.style?.addSource(geoJsonSourceFactory(edgeSourceName, edgesJson))
 
         lineLayerFactory("${layerName}_outline", edgeSourceName).apply {
             setProperties(
@@ -112,7 +117,8 @@ class FeatureRenderer(
 
     private fun addCircleLayer(layerName: String, sourceName: String, style: FeatureStyle, geom: CircleGeometry) {
         val radiusMeters = geom.coordinates[2].takeIf { it > 0 } ?: DEFAULT_CIRCLE_RADIUS_METERS
-        val circleGeoJson = geometryConverterProvider().buildCircleGeoJson(geom.coordinates[0], geom.coordinates[1], radiusMeters)
+        val circleGeoJson = geometryConverterProvider()
+            .buildCircleGeoJson(geom.coordinates[0], geom.coordinates[1], radiusMeters)
 
         removeExistingSource(sourceName)
         map.style?.addSource(geoJsonSourceFactory(sourceName, circleGeoJson))
