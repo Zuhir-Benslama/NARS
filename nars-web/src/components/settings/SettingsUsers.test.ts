@@ -83,7 +83,11 @@ describe("SettingsUsers", () => {
   })
 
   describe("validation", () => {
-    async function expectValidationError(role: string, setup: (w: ReturnType<typeof mount>) => Promise<void>, expectedKey: string) {
+    async function expectValidationError(
+      role: string,
+      setup: (w: ReturnType<typeof mount>) => Promise<void>,
+      expectedKey: string,
+    ) {
       mockAppStore.mockReturnValue({ user: { role } })
       const wrapper = mount(SettingsUsers)
       if (setup) await setup(wrapper)
@@ -92,67 +96,91 @@ describe("SettingsUsers", () => {
     }
 
     it("requires name", async () => {
-      await expectValidationError("wilaya_admin", async (w) => {
-        const inputs = w.findAll("input")
-        await inputs[1].setValue("john@example.com")
-        await inputs[2].setValue("+213-555-123456")
-        await inputs[3].setValue("johndoe")
-        await inputs[4].setValue("password123")
-      }, "su_err_name")
+      await expectValidationError(
+        "wilaya_admin",
+        async (w) => {
+          const inputs = w.findAll("input")
+          await inputs[1].setValue("john@example.com")
+          await inputs[2].setValue("+213-555-123456")
+          await inputs[3].setValue("johndoe")
+          await inputs[4].setValue("password123")
+        },
+        "su_err_name",
+      )
     })
 
     it("requires valid email", async () => {
-      await expectValidationError("wilaya_admin", async (w) => {
-        const inputs = w.findAll("input")
-        await inputs[0].setValue("John Doe")
-        await inputs[2].setValue("+213-555-123456")
-        await inputs[3].setValue("johndoe")
-        await inputs[4].setValue("password123")
-      }, "su_err_email")
+      await expectValidationError(
+        "wilaya_admin",
+        async (w) => {
+          const inputs = w.findAll("input")
+          await inputs[0].setValue("John Doe")
+          await inputs[2].setValue("+213-555-123456")
+          await inputs[3].setValue("johndoe")
+          await inputs[4].setValue("password123")
+        },
+        "su_err_email",
+      )
     })
 
     it("requires password >= 8 chars", async () => {
-      await expectValidationError("wilaya_admin", async (w) => {
-        const inputs = w.findAll("input")
-        await inputs[0].setValue("John Doe")
-        await inputs[1].setValue("john@example.com")
-        await inputs[2].setValue("+213-555-123456")
-        await inputs[3].setValue("johndoe")
-        await inputs[4].setValue("short")
-      }, "su_err_password")
+      await expectValidationError(
+        "wilaya_admin",
+        async (w) => {
+          const inputs = w.findAll("input")
+          await inputs[0].setValue("John Doe")
+          await inputs[1].setValue("john@example.com")
+          await inputs[2].setValue("+213-555-123456")
+          await inputs[3].setValue("johndoe")
+          await inputs[4].setValue("short")
+        },
+        "su_err_password",
+      )
     })
 
     it("requires username >= 3 chars", async () => {
-      await expectValidationError("wilaya_admin", async (w) => {
-        const inputs = w.findAll("input")
-        await inputs[0].setValue("John Doe")
-        await inputs[1].setValue("john@example.com")
-        await inputs[2].setValue("+213-555-123456")
-        await inputs[3].setValue("ab")
-        await inputs[4].setValue("password123")
-      }, "su_err_username")
+      await expectValidationError(
+        "wilaya_admin",
+        async (w) => {
+          const inputs = w.findAll("input")
+          await inputs[0].setValue("John Doe")
+          await inputs[1].setValue("john@example.com")
+          await inputs[2].setValue("+213-555-123456")
+          await inputs[3].setValue("ab")
+          await inputs[4].setValue("password123")
+        },
+        "su_err_username",
+      )
     })
 
     it("requires wilaya for national_admin", async () => {
-      await expectValidationError("national_admin", async (w) => {
-        const inputs = w.findAll("input")
-        await inputs[0].setValue("John Doe")
-        await inputs[1].setValue("john@example.com")
-        await inputs[2].setValue("+213-555-123456")
-        await inputs[3].setValue("johndoe")
-        await inputs[4].setValue("password123")
-      }, "su_err_wilaya")
+      await expectValidationError(
+        "national_admin",
+        async (w) => {
+          const inputs = w.findAll("input")
+          await inputs[0].setValue("John Doe")
+          await inputs[1].setValue("john@example.com")
+          await inputs[2].setValue("+213-555-123456")
+          await inputs[3].setValue("johndoe")
+          await inputs[4].setValue("password123")
+        },
+        "su_err_wilaya",
+      )
     })
 
     it("requires daira for wilaya_admin", async () => {
-      await expectValidationError("wilaya_admin", async (w) => {
-        const inputs = w.findAll("input")
-        await inputs[0].setValue("John Doe")
-        await inputs[1].setValue("john@example.com")
-        await inputs[2].setValue("+213-555-123456")
-        await inputs[3].setValue("johndoe")
-        await inputs[4].setValue("password123")
-      }, "su_err_daira")
+      await expectValidationError(
+        "wilaya_admin",
+        async (w) => {
+          const inputs = w.findAll("input")
+          await inputs[0].setValue("John Doe")
+          await inputs[1].setValue("john@example.com")
+          await inputs[2].setValue("+213-555-123456")
+          await inputs[3].setValue("johndoe")
+          await inputs[4].setValue("password123")
+        },
+        "su_err_daira",
+      )
     })
   })
 
@@ -174,10 +202,13 @@ describe("SettingsUsers", () => {
       await wrapper.find(".modal-btn-save").trigger("click")
       await new Promise((resolve) => setTimeout(resolve, 0))
 
-      expect(mockApiFetch).toHaveBeenCalledWith("/api/admin/users", expect.objectContaining({
-        method: "POST",
-        body: expect.stringContaining("john@example.com"),
-      }))
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        "/api/admin/users",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("john@example.com"),
+        }),
+      )
     })
 
     it("shows success message on creation", async () => {

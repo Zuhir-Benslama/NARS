@@ -23,7 +23,9 @@ export async function signIn(
   return res.json()
 }
 
-export async function refreshToken(): Promise<Json<paths["/api/refresh"]["post"]["responses"][200]>> {
+export async function refreshToken(): Promise<
+  Json<paths["/api/refresh"]["post"]["responses"][200]>
+> {
   const res = await apiFetch("/api/refresh", { method: "POST" })
   return res.json()
 }
