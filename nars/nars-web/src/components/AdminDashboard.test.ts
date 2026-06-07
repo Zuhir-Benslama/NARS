@@ -64,7 +64,12 @@ function makeDairaReport() {
     daira_name_fr: "Sidi M'Hamed",
     daira_name_ar: "سيدي امحمد",
     communes: [
-      { commune_id: 1, commune_name_fr: "Alger Centre", commune_name_ar: "الجزائر الوسطى", user_count: 5 },
+      {
+        commune_id: 1,
+        commune_name_fr: "Alger Centre",
+        commune_name_ar: "الجزائر الوسطى",
+        user_count: 5,
+      },
     ],
   }
 }
@@ -254,9 +259,13 @@ describe("AdminDashboard", () => {
       if (role === "national_admin") {
         mockApiFetch.mockResolvedValue(createMockSuccessResponse({ wilayas: [] }))
       } else if (role === "wilaya_admin") {
-        mockApiFetch.mockResolvedValue(createMockSuccessResponse({ dairas: [], wilaya_name_fr: "", wilaya_name_ar: "" }))
+        mockApiFetch.mockResolvedValue(
+          createMockSuccessResponse({ dairas: [], wilaya_name_fr: "", wilaya_name_ar: "" }),
+        )
       } else if (role === "daira_admin") {
-        mockApiFetch.mockResolvedValue(createMockSuccessResponse({ communes: [], daira_name_fr: "", daira_name_ar: "" }))
+        mockApiFetch.mockResolvedValue(
+          createMockSuccessResponse({ communes: [], daira_name_fr: "", daira_name_ar: "" }),
+        )
       } else {
         mockApiFetch.mockResolvedValue(createMockSuccessResponse({}))
       }
@@ -282,9 +291,13 @@ describe("AdminDashboard", () => {
       if (role === "national_admin") {
         mockApiFetch.mockResolvedValue(createMockSuccessResponse({ wilayas: [] }))
       } else if (role === "wilaya_admin") {
-        mockApiFetch.mockResolvedValue(createMockSuccessResponse({ dairas: [], wilaya_name_fr: "", wilaya_name_ar: "" }))
+        mockApiFetch.mockResolvedValue(
+          createMockSuccessResponse({ dairas: [], wilaya_name_fr: "", wilaya_name_ar: "" }),
+        )
       } else if (role === "daira_admin") {
-        mockApiFetch.mockResolvedValue(createMockSuccessResponse({ communes: [], daira_name_fr: "", daira_name_ar: "" }))
+        mockApiFetch.mockResolvedValue(
+          createMockSuccessResponse({ communes: [], daira_name_fr: "", daira_name_ar: "" }),
+        )
       } else {
         mockApiFetch.mockResolvedValue(createMockSuccessResponse({}))
       }
