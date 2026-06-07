@@ -41,6 +41,9 @@ public class AdminController(
 
     [HttpGet("admin/overview")]
     [Authorize(Roles = "daira_admin,wilaya_admin,national_admin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Overview(CancellationToken cancellationToken = default)
     {
         // Read role and geographic IDs directly from the database.
@@ -67,6 +70,10 @@ public class AdminController(
 
     [HttpGet("admin/wilaya/{wilayaId:int}")]
     [Authorize(Roles = "daira_admin,wilaya_admin,national_admin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetWilaya(int wilayaId, CancellationToken cancellationToken = default)
     {
         var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
@@ -82,6 +89,10 @@ public class AdminController(
 
     [HttpGet("admin/daira/{dairaId:int}")]
     [Authorize(Roles = "daira_admin,wilaya_admin,national_admin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetDaira(int dairaId, CancellationToken cancellationToken = default)
     {
         var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
@@ -114,6 +125,11 @@ public class AdminController(
     // national_admin is NOT creatable via API.
 
     [HttpPost("admin/users")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateAdmin([FromBody] CreateAdminRequest body, CancellationToken cancellationToken = default)
     {
         var creator = await db.Users.FindAsync([CurrentUserId], cancellationToken);
@@ -274,13 +290,7 @@ public class AdminController(
             .OrderBy(d => d.DairaId)
             .ToListAsync(cancellationToken);
 
-        var dairaReports = new List<DairaReport>();
-        foreach (var daira in dairas)
-        {
-            var report = await BuildDairaReportAsync(daira, cancellationToken);
-            if (report is not null)
-                dairaReports.Add(report);
-        }
+        var dairaReports = await BuildDairaReportsBatchAsync(dairas, cancellationToken);
 
         return new WilayaReport(
             WilayaId: wilaya.WilayaId,
@@ -345,6 +355,82 @@ public class AdminController(
             DairaAdmin: dairaAdmin,
             Communes: communeReports
         );
+    }
+
+    /// <summary>
+    /// Builds DairaReports for all given dairas using batched queries.
+    /// Eliminates the N+1 that would occur from calling BuildDairaReportAsync
+    /// per daira — all data is loaded in 4 round-trips regardless of daira count.
+    /// </summary>
+    private async Task<List<DairaReport>> BuildDairaReportsBatchAsync(
+        List<Daira> dairas, CancellationToken cancellationToken)
+    {
+        if (dairas.Count == 0) return [];
+
+        var dairaIds = dairas.Select(d => d.DairaId).ToArray();
+
+        // 1. All daira admins for these dairas — one query
+        var dairaAdmins = await db.Users
+            .Where(u => u.Role == UserRoles.DairaAdmin && u.DairaId.HasValue
+                     && dairaIds.Contains(u.DairaId!.Value))
+            .Select(u => new { u.DairaId, Admin = new AdminInfo(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role) })
+            .ToDictionaryAsync(x => x.DairaId!.Value, x => x.Admin, cancellationToken);
+
+        // 2. All communes for these dairas — one query
+        var communes = await db.Communes
+            .Where(c => dairaIds.Contains(c.DairaId))
+            .OrderBy(c => c.CommuneId)
+            .ToListAsync(cancellationToken);
+
+        var communesByDaira = communes.GroupBy(c => c.DairaId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        // 3. All commune-scoped users for these communes — one query
+        var communeIds = communes.Select(c => c.CommuneId).ToArray();
+        var users = communeIds.Length > 0
+            ? await db.Users
+                .Where(u => (u.Role == UserRoles.CommuneUser || u.Role == UserRoles.FieldWorker)
+                         && u.CommuneId.HasValue && communeIds.Contains(u.CommuneId!.Value))
+                .Select(u => new { u.Id, u.Username, u.Name, u.Email, u.CommuneId, u.Role })
+                .ToListAsync(cancellationToken)
+            : [];
+
+        var usersByCommune = users.GroupBy(u => u.CommuneId!.Value)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        // 4. Feature counts for all users — one query
+        var userIds = users.Select(u => u.Id).ToArray();
+        var counts = await GetUserFeatureCountsAsync(userIds, cancellationToken);
+
+        // 5. Assemble reports in memory
+        return dairas.Select(d =>
+        {
+            var dairaCommuneIds = communesByDaira.GetValueOrDefault(d.DairaId) ?? [];
+            var communeReports = dairaCommuneIds.Select(c =>
+            {
+                var communeUsers = usersByCommune.GetValueOrDefault(c.CommuneId) ?? [];
+                var userStats = communeUsers
+                    .Select(u => counts.TryGetValue(u.Id, out var s) ? s
+                        : new UserFeatureStats(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role,
+                            0, 0, 0, 0, 0, 0, 0, 0, 0))
+                    .ToList();
+
+                return new CommuneReport(
+                    CommuneId: c.CommuneId,
+                    CommuneNameFr: c.CommuneFr,
+                    CommuneNameAr: c.CommuneAr,
+                    Users: userStats
+                );
+            }).ToList();
+
+            return new DairaReport(
+                DairaId: d.DairaId,
+                DairaNameFr: d.DairaFr,
+                DairaNameAr: d.DairaAr,
+                DairaAdmin: dairaAdmins.GetValueOrDefault(d.DairaId),
+                Communes: communeReports
+            );
+        }).ToList();
     }
 
     /// <summary>

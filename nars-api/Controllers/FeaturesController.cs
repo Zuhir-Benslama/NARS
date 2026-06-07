@@ -95,6 +95,7 @@ public class FeaturesController(
     // combined result — not per-table (which would return up to 8x the page).
 
     [HttpGet("load")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> LoadFeatures([FromQuery] int skip = 0, [FromQuery] int take = 1000, CancellationToken cancellationToken = default)
     {
         // Cap page size to prevent memory exhaustion and oversized responses.
@@ -134,19 +135,20 @@ public class FeaturesController(
             total += await dbSet.Where(f => f.UserId == uid).ExecuteDeleteAsync(cancellationToken);
         }
 
-        // Build the orphan-cleanup UNION ALL from the registry so it automatically
-        // stays in sync when new feature types are added — no hardcoded table list.
-        // Table names come from FeatureTypeRegistry constants (developer-owned, never
-        // user-supplied), so interpolation here is safe. ExecuteSqlAsync cannot be used
-        // because SQL does not allow table names as parameters.
-#pragma warning disable EF1002
-        var unionAll = string.Join(
-            " UNION ALL ",
-            FeatureTypeRegistry.GetAllTableNames().Select(t => $"SELECT id FROM {t}"));
+        // Collect all remaining feature IDs across all feature tables
+        // then delete orphaned registry entries (entries whose ID doesn't
+        // exist in any feature table).
+        var allIds = new HashSet<Guid>();
+        foreach (var type in FeatureTypeRegistry.GetAllTypes())
+        {
+            var dbSet = FeatureTypeRegistry.GetDbSet(db, type)!;
+            var ids = await dbSet.Select(f => f.Id).ToListAsync(cancellationToken);
+            foreach (var id in ids) allIds.Add(id);
+        }
 
-        await db.Database.ExecuteSqlRawAsync(
-            $"DELETE FROM feature_registry WHERE id NOT IN ({unionAll})", cancellationToken);
-#pragma warning restore EF1002
+        await db.FeatureRegistry
+            .Where(r => !allIds.Contains(r.Id))
+            .ExecuteDeleteAsync(cancellationToken);
 
         await tx.CommitAsync(cancellationToken);
 
@@ -156,6 +158,7 @@ public class FeaturesController(
     // ── GET /api/stats ────────────────────────────────────────────────────────
 
     [HttpGet("stats")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetStats(CancellationToken cancellationToken = default)
     {
         var uid = CurrentUserId;
@@ -214,6 +217,7 @@ public class FeaturesController(
     // ── GET /api/scattered-status ─────────────────────────────────────────────
 
     [HttpGet("scattered-status")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public IActionResult GetScatteredStatus()
     {
         var error = scatteredService.LastError;
@@ -227,6 +231,9 @@ public class FeaturesController(
     // ── PUT /api/update/{id} ──────────────────────────────────────────────────
 
     [HttpPut("update/{featureId:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateFeature(Guid featureId, [FromBody] FeatureUpdateRequest body, CancellationToken cancellationToken = default)
     {
         var reg = await db.FeatureRegistry.FindAsync([featureId], cancellationToken);
@@ -271,6 +278,9 @@ public class FeaturesController(
     // ── DELETE /api/delete/{id} ───────────────────────────────────────────────
 
     [HttpDelete("delete/{featureId:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteFeature(Guid featureId, CancellationToken cancellationToken = default)
     {
         var reg = await db.FeatureRegistry.FindAsync([featureId], cancellationToken);

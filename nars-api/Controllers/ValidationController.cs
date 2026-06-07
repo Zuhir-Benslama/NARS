@@ -44,6 +44,7 @@ public class ValidationController(
     // ── GET /api/validate/area/main-urban-exists ──────────────────────────────
 
     [HttpGet("validate/area/main-urban-exists")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> MainUrbanExists(CancellationToken cancellationToken = default)
     {
         var exists = await db.Areas.AnyAsync(f =>
@@ -56,6 +57,8 @@ public class ValidationController(
     // ── POST /api/validate/road ───────────────────────────────────────────────
 
     [HttpPost("validate/road")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ValidateRoad([FromBody] ValidateRoadRequest body, CancellationToken cancellationToken = default)
     {
         if (body.Coordinates.Count < 2)
@@ -133,6 +136,8 @@ public class ValidationController(
     // ── POST /api/validate/district ───────────────────────────────────────────
 
     [HttpPost("validate/district")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ValidateDistrict([FromBody] ValidateDistrictRequest body, CancellationToken cancellationToken = default)
     {
         if (body.Coordinates.Count < 3)
@@ -177,6 +182,7 @@ public class ValidationController(
     // ── GET /api/validate/districts/coverage ─────────────────────────────────
 
     [HttpGet("validate/districts/coverage")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> DistrictsCoverage(CancellationToken cancellationToken = default)
     {
         var urbanCount = await db.Areas.CountAsync(f =>

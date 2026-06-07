@@ -2,7 +2,7 @@
 // Snap priority (highest first): circle → vertex → midpoint → edge
 // Only searches phases that are ≤ current phase (completed phases), not future ones.
 //
-// Matching the reference (nars-vite/Leaflet) snapping.ts:
+// Matching the reference (nars-web/Leaflet) snapping.ts:
 // - Snap freeze on mousedown (prevents cursor jump during click)
 // - Vertex + edge snapping for polygons/roads
 // - Circle perimeter snapping for city centers

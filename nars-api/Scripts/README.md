@@ -11,7 +11,7 @@ After migrating features to the new Maplibre-Geoman system, follow these steps t
 ## Step 1: Create Database Backup
 
 ```bash
-cd /home/zuhir/Workspace/NARS/Scripts
+cd /home/zuhir/Workspace/nars-api/Scripts
 
 # Set database password
 export DB_PASSWORD="YOUR_DATABASE_PASSWORD"
@@ -85,7 +85,7 @@ Add to crontab for daily backups:
 crontab -e
 
 # Add daily backup at 2 AM
-0 2 * * * /home/zuhir/Workspace/NARS/Scripts/backup-db.sh
+0 2 * * * /home/zuhir/Workspace/nars-api/Scripts/backup-db.sh
 ```
 
 ## Troubleshooting

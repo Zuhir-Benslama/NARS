@@ -1,7 +1,6 @@
 import "maplibre-gl/dist/maplibre-gl.css"
 import "@geoman-io/maplibre-geoman-free/dist/maplibre-geoman.css"
 import { createApp } from "vue"
-import type { DirectiveBinding } from "vue"
 import { createPinia } from "pinia"
 import App from "./App.vue"
 import "./app.css"
@@ -14,6 +13,7 @@ import { logError, createServerError } from "./lib/errors"
 import { showToast } from "./lib/toast"
 import { debugLog, debugError } from "./utils/debug"
 import { initTelemetry } from "./lib/telemetry"
+import { vClickOutside } from "./directives/clickOutside"
 
 initTelemetry()
 
@@ -83,24 +83,7 @@ initTheme()
     debugError("[Vue Error]", error, "Info:", info)
   }
 
-  // ── Global directive: v-click-outside ──────────────────────────────────
-  const clickOutsideHandlers = new WeakMap<HTMLElement, (e: MouseEvent) => void>()
-  app.directive("click-outside", {
-    mounted(el: HTMLElement, binding: DirectiveBinding) {
-      const handler = (e: MouseEvent) => {
-        if (!el.contains(e.target as Node)) binding.value(e)
-      }
-      clickOutsideHandlers.set(el, handler)
-      document.addEventListener("click", handler)
-    },
-    unmounted(el: HTMLElement) {
-      const handler = clickOutsideHandlers.get(el)
-      if (handler) {
-        document.removeEventListener("click", handler)
-        clickOutsideHandlers.delete(el)
-      }
-    },
-  })
+  app.directive("click-outside", vClickOutside)
 
   app.mount("#app")
 
@@ -128,5 +111,21 @@ initTheme()
     )
     logError(narsError)
     showToast("Failed to load map. Please refresh the page.", "error")
+  }
+
+  // Expose stores for Playwright E2E tests
+  if (import.meta.env.DEV) {
+    const { useModalStore } = await import("./stores/modalStore")
+    const { useLayerStore } = await import("./stores/layerStore")
+    interface TestStores {
+      appStore: ReturnType<typeof useAppStore>
+      modalStore: ReturnType<typeof useModalStore>
+      layerStore: ReturnType<typeof useLayerStore>
+    }
+    ;(window as unknown as { __TEST__: TestStores }).__TEST__ = {
+      appStore: useAppStore(),
+      modalStore: useModalStore(),
+      layerStore: useLayerStore(),
+    }
   }
 })()

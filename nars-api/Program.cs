@@ -10,6 +10,7 @@ using NarsApi.Services;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Scalar.AspNetCore;
 
 // Npgsql 6+ maps DateTime to timestamptz by default. Our DB uses
 // 'timestamp without time zone', so we restore the legacy behaviour that
@@ -236,8 +237,11 @@ app.UseExceptionHandler(errApp =>
     });
 });
 
-if (app.Environment.IsDevelopment())
-    app.MapOpenApi();
+app.MapOpenApi();
+app.MapScalarApiReference(options =>
+{
+    options.WithTheme(ScalarTheme.Purple);
+});
 
 app.UseDefaultFiles();
 
@@ -313,7 +317,7 @@ app.Use(async (ctx, next) =>
             $"script-src 'self' 'nonce-{nonce}' blob:; " +
             "worker-src 'self' blob:; " +
             "style-src 'self' https://cdn.jsdelivr.net https://unpkg.com 'unsafe-inline' https://fonts.googleapis.com; " +
-            "img-src 'self' data: blob: https:; " +
+            "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.arcgisonline.com; " +
             "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; " +
             "connect-src 'self' http: https: data: ws://127.0.0.1:* http://127.0.0.1:* https://*.arcgisonline.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com; " +
             "frame-ancestors 'none'; " +

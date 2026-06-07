@@ -29,7 +29,7 @@ resources:
   #   make observability-servicemonitor
 images:
   # ⚠ `latest` tags are for local dev. For CI/CD, override newTag with
-  # the commit SHA or build number:
+  # the commit SHA or build number AND override imagePullPolicy to IfNotPresent:
   #   kustomize edit set image zuhirbenslama/nars-api=ghcr.io/org/nars-api:abc1234
   - name: zuhirbenslama/nars-api
     newTag: latest

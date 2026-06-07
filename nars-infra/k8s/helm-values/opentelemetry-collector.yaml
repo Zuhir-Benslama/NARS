@@ -1,4 +1,6 @@
 mode: deployment
+# Single replica is acceptable for dev. For production, increase to 2+ and add
+# a PodDisruptionBudget to avoid telemetry gaps during node maintenance.
 replicaCount: 1
 
 image:

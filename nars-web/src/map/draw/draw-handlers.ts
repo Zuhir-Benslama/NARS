@@ -4,7 +4,7 @@
 import { PHASES } from "../../phases"
 import { useAppStore } from "../../stores/appStore"
 import { useModalStore } from "../../stores/modalStore"
-import { setSelectedFeature } from "../../stores"
+import { useSelectionStore } from "../../stores/selectionStore"
 import { debugError } from "../../utils/debug"
 import type { GeomanCreateEvent, ActionInstances } from "../core/geoman-types"
 import type { MapMouseEvent as MapLibreMapMouseEvent } from "maplibre-gl"
@@ -228,14 +228,16 @@ function onClick(e: MapLibreMapMouseEvent & { point: { x: number; y: number } })
     feature = features.find((f) => f.source === "features")
   }
 
+  const selectionStore = useSelectionStore()
+
   if (feature) {
     const dbId = feature.properties?.dbId
     if (dbId) {
-      setSelectedFeature(dbId)
+      selectionStore.selectFeature(dbId)
       updateSelectionHighlight(dbId)
     }
   } else {
-    setSelectedFeature(null)
+    selectionStore.selectFeature(null)
     updateSelectionHighlight(null)
     const currentPhase = PHASES[appStore.currentPhase]
     if (currentPhase && currentPhase.key !== "namingPanels") {

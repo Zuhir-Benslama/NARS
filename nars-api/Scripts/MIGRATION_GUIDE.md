@@ -25,7 +25,7 @@ This guide walks you through migrating NARS features from Leaflet-Geoman format 
 ## 🚀 Quick Start
 
 ```bash
-cd /home/zuhir/Workspace/NARS/Scripts
+cd /home/zuhir/Workspace/nars-api/Scripts
 
 # Set database password
 export DB_PASSWORD="YOUR_DATABASE_PASSWORD"

@@ -2,7 +2,7 @@
 // Shared state for edit mode: active entry, coordinate snapshot, and
 // Geoman feature tracking. Also contains lookup helpers and fill suppression.
 
-import { setSelectedFeature } from "../../stores"
+import { useSelectionStore } from "../../stores/selectionStore"
 import { useLayerStore } from "../../stores/layerStore"
 import type { LayerState } from "../../stores/layerStore"
 import type { LayerEntry, LatLng } from "../../types"
@@ -68,7 +68,7 @@ export function disableEditMode(): void {
   activeEditEntry = null
   activeEditCoordsSnapshot = null
   setSnapExclude(null)
-  setSelectedFeature(null)
+  useSelectionStore().selectFeature(null)
   updateSelectionHighlight(null)
   enableCrosshair()
   reEnableSnapping()

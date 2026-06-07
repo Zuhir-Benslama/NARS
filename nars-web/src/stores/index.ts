@@ -14,6 +14,7 @@ export {
   openEditModal,
   resolveModal,
 } from "./modalStore"
-export { useLayerStore, setSelectedFeature, selectedFeatureDbId } from "./layerStore"
+export { useLayerStore } from "./layerStore"
+export { useSelectionStore } from "./selectionStore"
 export { useFieldStore } from "./fieldStore"
 export type { LayerState } from "./layerStore"
