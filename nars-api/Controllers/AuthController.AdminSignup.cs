@@ -32,6 +32,12 @@ public partial class AuthController
     [HttpPost("admin/authorized-signup")]
     [AllowAnonymous]
     [EnableRateLimiting("auth")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status423Locked)]
     public async Task<IActionResult> AuthorizedAdminSignup(
         [FromBody] AuthorizedAdminSignupRequest body)
     {

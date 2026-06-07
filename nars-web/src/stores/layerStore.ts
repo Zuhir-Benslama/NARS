@@ -1,7 +1,3 @@
-// ─── LAYER STORE ──────────────────────────────────────────────────────────────
-// Pinia store for map layer feature tracking.
-// Replaces the non-reactive module-level `featureLayers` export.
-
 import { defineStore } from "pinia"
 import type { LayerEntry } from "../types"
 
@@ -40,7 +36,6 @@ export const useLayerStore = defineStore("layers", {
         (e: LayerEntry) => e.data.entranceTypeKey === "secondary_entrance",
       ),
 
-    // Computed counts
     areaCount: (state) => state.areas.length,
     cityCenterCount: (state) => state.cityCenter.length,
     districtCount: (state) => state.districts.length,
@@ -94,12 +89,4 @@ export const useLayerStore = defineStore("layers", {
   },
 })
 
-// ─── SELECTION STATE ─────────────────────────────────────────────────────────
-// The currently selected feature by left-click (separate from Pinia since
-// it's transient and doesn't need store persistence).
-
-export let selectedFeatureDbId: string | null = null
-
-export function setSelectedFeature(dbId: string | null): void {
-  selectedFeatureDbId = dbId
-}
+// selectedFeatureDbId moved to selectionStore

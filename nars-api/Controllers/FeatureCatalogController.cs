@@ -87,6 +87,7 @@ public class FeatureCatalogController(AppDbContext db) : NarsControllerBase
     // Uses UNION ALL across tables so pagination applies to the combined result.
 
     [HttpGet("load/layer/{layerType}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> LoadByLayer(string layerType, [FromQuery] int skip = 0, [FromQuery] int take = 100, CancellationToken cancellationToken = default)
     {
         // Cap page size to prevent oversized responses.

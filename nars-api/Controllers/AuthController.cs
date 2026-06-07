@@ -34,6 +34,7 @@ public partial class AuthController(
     // Use POST /api/admin/authorized-signup from the login page instead.
     [HttpPost("signup")]
     [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status410Gone)]
     public IActionResult SignUp() =>
         StatusCode(410, new { detail = "Self-registration is disabled. " +
             "Contact your daira admin to create a commune user account, " +
@@ -44,6 +45,8 @@ public partial class AuthController(
     [HttpPost("signin")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicies.Auth)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> SignIn([FromBody] SignInRequest body, CancellationToken cancellationToken = default)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Username == body.Username, cancellationToken);
@@ -128,6 +131,7 @@ public partial class AuthController(
 
     [HttpPost("logout")]
     [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> Logout(CancellationToken cancellationToken = default)
     {
         // Extract user_id from the authenticated token claims
@@ -151,6 +155,8 @@ public partial class AuthController(
     [HttpPost("refresh")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicies.Auth)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Refresh(
         [FromServices] IRefreshTokenService refreshService, CancellationToken cancellationToken = default)
     {
@@ -171,6 +177,8 @@ public partial class AuthController(
 
     [HttpGet("current_user")]
     [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> CurrentUser(CancellationToken cancellationToken = default)
     {
         var userIdStr = User.FindFirstValue("user_id");

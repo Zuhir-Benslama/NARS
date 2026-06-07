@@ -15,7 +15,7 @@ ASP.NET Core 10 API with EF Core + PostGIS for the National Addressing Reference
 ## Project Structure
 
 ```
-NARS/
+nars-api/
 ├── Controllers/           # API endpoints
 │   ├── AuthController.cs
 │   ├── AdminController.cs
@@ -38,7 +38,7 @@ NARS/
 ├── Migrations/            # EF Core migrations
 ├── Services/              # Business logic
 ├── Scripts/               # DB seeding
-└── wwwroot/               # Built frontend (deployed from nars-vite)
+└── wwwroot/               # Built frontend (deployed from nars-web)
 ```
 
 ## API Endpoints
@@ -73,7 +73,7 @@ dotnet build --configuration Release
 dotnet run
 
 # Run tests
-dotnet test ../NARS.Tests
+dotnet test ../nars-tests
 
 # New migration
 dotnet ef migrations add <Name>
@@ -86,7 +86,7 @@ dotnet ef migrations add <Name>
 - 10 test files (2,249 lines), 4 integration + 6 unit
 
 ```bash
-dotnet test ../NARS.Tests
+dotnet test ../nars-tests
 ```
 
 ## Security

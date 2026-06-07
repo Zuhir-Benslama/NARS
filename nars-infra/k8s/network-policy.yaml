@@ -105,15 +105,20 @@ metadata:
   namespace: nars
 spec:
   podSelector:
-    matchLabels:
-      app.kubernetes.io/name: nars-frontend
-      app.kubernetes.io/component: frontend
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values:
+          - nars-frontend
+          - nars-api
   egress:
     - to:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: observability
       ports:
+        - port: 4317
+          protocol: TCP
         - port: 4318
           protocol: TCP
   policyTypes:

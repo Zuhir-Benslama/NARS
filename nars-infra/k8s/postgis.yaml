@@ -32,11 +32,15 @@ spec:
         app.kubernetes.io/component: database
     spec:
       serviceAccountName: postgis
+      terminationGracePeriodSeconds: 60
       securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
         fsGroup: 999
       containers:
         - name: postgis
           image: zuhirbenslama/nars-postgis:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 5432
           env:
@@ -57,6 +61,8 @@ spec:
                 - postgres
                 - -d
                 - nars_db
+                - -h
+                - localhost
             initialDelaySeconds: 5
             periodSeconds: 5
             timeoutSeconds: 5
@@ -69,6 +75,8 @@ spec:
                 - postgres
                 - -d
                 - nars_db
+                - -h
+                - localhost
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 5
@@ -80,6 +88,8 @@ spec:
                 - postgres
                 - -d
                 - nars_db
+                - -h
+                - localhost
             initialDelaySeconds: 15
             periodSeconds: 20
             timeoutSeconds: 5
@@ -90,8 +100,17 @@ spec:
             limits:
               cpu: 1
               memory: 1Gi
+          # PostGIS init requires CHOWN, DAC_OVERRIDE, SETUID/SETGID, FOWNER
+          # for shared memory, data dir permissions, and pg_ctl operations.
+          # allowPrivilegeEscalation remains true because postgres's init
+          # process fork/exec model depends on it during startup. After init
+          # the postgres user drops capabilities internally.
           securityContext:
             allowPrivilegeEscalation: true
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
             capabilities:
               add:
                 - CHOWN
@@ -129,6 +148,8 @@ spec:
   selector:
     app.kubernetes.io/name: postgis
     app.kubernetes.io/component: database
+  type: ClusterIP
   ports:
-    - port: 5432
+    - protocol: TCP
+      port: 5432
       targetPort: 5432

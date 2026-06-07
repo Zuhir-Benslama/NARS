@@ -75,7 +75,7 @@ export function updateEndpointMarkers(): void {
 }
 
 /** Compute the bearing angle (in degrees) from point A to point B,
- * matching the Leaflet segmentAngle() formula used in nars-vite. */
+ * matching the Leaflet segmentAngle() formula used in nars-web. */
 function computeSegmentAngle(a: Coord, b: Coord): number {
   const fp = ctx.map.project([a.lng, a.lat])
   const tp = ctx.map.project([b.lng, b.lat])

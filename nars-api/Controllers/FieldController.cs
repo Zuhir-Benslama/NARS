@@ -23,6 +23,10 @@ public class FieldController(
     /// within the same commune.
     /// </summary>
     [HttpGet("field/features")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetFeatures(
         [FromQuery] string? type = null,
         [FromQuery] int skip = 0,
@@ -70,6 +74,9 @@ public class FieldController(
     /// Field workers submit road/entrance/naming panel inspection data here.
     /// </summary>
     [HttpPost("field/inspect")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> SubmitInspection([FromBody] FieldInspectRequest body, CancellationToken cancellationToken = default)
     {
         var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
@@ -135,6 +142,8 @@ public class FieldController(
     /// Gets the inspection history for a specific feature.
     /// </summary>
     [HttpGet("field/inspections/{featureId:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetInspections(Guid featureId, CancellationToken cancellationToken = default)
     {
         var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
@@ -162,6 +171,9 @@ public class FieldController(
     /// Used when a field worker finds a missing entrance and needs to add one.
     /// </summary>
     [HttpPost("field/entrance/create")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> CreateEntranceFromInspection([FromBody] FieldEntranceCreateRequest body, CancellationToken cancellationToken = default)
     {
         var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);

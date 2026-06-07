@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
-    "build:deploy": "vue-tsc --noEmit && vite build && rm -rf ../NARS/wwwroot/assets && cp -r dist/* ../NARS/wwwroot/",
+    "build:deploy": "vue-tsc --noEmit && vite build && rm -rf ../../nars/nars-api/wwwroot/assets && cp -r dist/* ../../nars/nars-api/wwwroot/",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint . --ext .ts,.vue --report-unused-disable-directives --max-warnings 0",
@@ -16,8 +16,12 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test --config=e2e/playwright.config.ts",
     "audit": "npm audit --audit-level=high",
-    "prepare": "husky"
+    "prepare": "",
+    "codegen:fetch-spec": "curl -s http://localhost:5000/openapi/v1.json -o api-spec/openapi.json",
+    "codegen:types": "openapi-typescript api-spec/openapi.json -o src/api/schema.d.ts",
+    "codegen": "npm run codegen:fetch-spec && npm run codegen:types"
   },
   "dependencies": {
     "@geoman-io/maplibre-geoman-free": "^0.7.1",
@@ -39,6 +43,7 @@
     "vue-i18n": "^11.4.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/geojson": "^7946.0.16",
     "@types/node": "^25.9.1",
     "@typescript-eslint/eslint-plugin": "^8.59.4",
@@ -52,6 +57,7 @@
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "lint-staged": "^17.0.2",
+    "openapi-typescript": "^7.13.0",
     "prettier": "^3.8.3",
     "typescript": "^6.0.3",
     "vite": "^8.0.11",

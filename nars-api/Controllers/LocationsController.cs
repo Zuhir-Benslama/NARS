@@ -34,6 +34,8 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
     // ── GET /api/wilayas ──────────────────────────────────────
 
     [HttpGet("wilayas")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetWilayas(
         [FromQuery] string search = "",
         [FromQuery] int skip = 0,
@@ -81,6 +83,8 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
     // ── GET /api/dairas ───────────────────────────────────────
 
     [HttpGet("dairas")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetDairas(
         [FromQuery] int wilaya_id,
         [FromQuery] string search = "",
@@ -130,6 +134,8 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
     // ── GET /api/communes ─────────────────────────────────────
 
     [HttpGet("communes")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetCommunes(
         [FromQuery] int daira_id,
         [FromQuery] string search = "",
@@ -179,6 +185,8 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
     // ── GET /api/commune/{id}/boundary ────────────────────────
 
     [HttpGet("commune/{communeId:int}/boundary")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetCommuneBoundary(int communeId, CancellationToken cancellationToken = default)
     {
         var commune = await db.Communes.FirstOrDefaultAsync(c => c.CommuneId == communeId, cancellationToken);
@@ -222,6 +230,8 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
     // Returns internal details (geometry type, point count, validity, envelope).
 
     [HttpGet("commune/{communeId:int}/boundary-debug")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DebugCommuneBoundary(int communeId, IHostEnvironment env, CancellationToken cancellationToken = default)
     {
         if (!env.IsDevelopment())

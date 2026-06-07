@@ -1,4 +1,4 @@
-# nars-vite — Web Frontend
+# nars-web — Web Frontend
 
 Vue 3 + TypeScript SPA with MapLibre GL JS for the National Addressing Reference System.
 
@@ -90,7 +90,7 @@ npm run build:deploy
 | `test:run` | Vitest single run |
 | `test:coverage` | Vitest with V8 coverage |
 | `build` | Typecheck + production build |
-| `build:deploy` | Build + copy to `../NARS/wwwroot/` |
+| `build:deploy` | Build + copy to `../nars-api/wwwroot/` |
 | `audit` | `npm audit --audit-level=high` |
 
 ## Testing

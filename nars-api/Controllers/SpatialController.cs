@@ -23,6 +23,9 @@ public class SpatialController(AppDbContext db, IScatteredAreaService scatteredS
     // ── POST /api/road-side ───────────────────────────────────────────────────
 
     [HttpPost("road-side")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetRoadSide([FromBody] RoadSideRequest body, CancellationToken cancellationToken = default)
     {
         var road = await db.Roads.FirstOrDefaultAsync(f =>
@@ -110,6 +113,7 @@ public class SpatialController(AppDbContext db, IScatteredAreaService scatteredS
     // ── POST /api/areas/refresh-scattered ────────────────────────────────────
 
     [HttpPost("areas/refresh-scattered")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> RefreshScattered(CancellationToken cancellationToken = default)
     {
         await scatteredService.RefreshAsync(RequiredCurrentUserId, RequiredCommuneId, cancellationToken);

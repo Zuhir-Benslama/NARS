@@ -27,3 +27,18 @@ spec:
     matchLabels:
       app.kubernetes.io/name: nars-frontend
       app.kubernetes.io/component: frontend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: postgis
+  namespace: nars
+  labels:
+    app.kubernetes.io/name: postgis
+    app.kubernetes.io/component: database
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgis
+      app.kubernetes.io/component: database

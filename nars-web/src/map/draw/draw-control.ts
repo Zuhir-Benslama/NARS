@@ -1,6 +1,6 @@
 // ─── DRAW CONTROL ─────────────────────────────────────────────────────────────
 // Uses Geoman's native enableDraw() for the current phase's geometry type.
-// Mirrors the reference implementation in nars-vite/src/map/draw-control.ts
+// Mirrors the reference implementation in nars-web/src/map/draw-control.ts
 
 import { ctx } from "../core/state"
 import { debugLog, debugError } from "../../utils/debug"

@@ -106,7 +106,7 @@ If you prefer to run the raw commands instead of using the Makefile:
 ### 1. Create kind cluster
 
 ```bash
-kind create cluster --name nars --config k8s/kind-config.yaml
+kind create cluster --name nars --config nars-infra/k8s/kind-config.yaml
 ```
 
 ### 2. Install NGINX Ingress Controller
@@ -136,7 +136,7 @@ kubectl create secret tls nars-tls -n nars \
 
 ```bash
 kubectl create secret generic nars-ca -n nars \
-  --from-file=ca.crt=k8s/certs/ca.crt
+  --from-file=ca.crt=nars-infra/k8s/certs/ca.crt
 
 kubectl create secret generic nars-secrets -n nars \
   --from-literal=postgres_password="<your-password>" \
@@ -148,7 +148,7 @@ kubectl create secret generic nars-secrets -n nars \
 ### 5. Apply manifests
 
 ```bash
-kubectl apply -k k8s/
+kubectl apply -k nars-infra/k8s/
 ```
 
 ### 6. Access

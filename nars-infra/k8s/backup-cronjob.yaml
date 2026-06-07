@@ -33,13 +33,24 @@ spec:
         spec:
           restartPolicy: Never
           securityContext:
+            runAsNonRoot: true
             runAsUser: 999
             runAsGroup: 999
             fsGroup: 999
+          activeDeadlineSeconds: 600
           containers:
             - name: pg-dump
               image: postgis/postgis:17-3.5
               imagePullPolicy: IfNotPresent
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: false
+                runAsNonRoot: true
+                seccompProfile:
+                  type: RuntimeDefault
+                capabilities:
+                  drop:
+                    - ALL
               command:
                 - /bin/sh
                 - -ec

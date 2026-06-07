@@ -3,7 +3,8 @@
 
 import { apiFetch } from "../../api"
 import { useAppStore } from "../../stores/appStore"
-import { selectedFeatureDbId, setSelectedFeature, openEditModal } from "../../stores"
+import { useSelectionStore } from "../../stores/selectionStore"
+import { openEditModal } from "../../stores"
 import { PHASES } from "../../phases"
 import { featuresStore, ctx } from "../core/state"
 import { showToast, showConfirm } from "../../lib/toast"
@@ -32,13 +33,15 @@ export function findLayerEntryByDbId(dbId: string): LayerEntry | null {
 // ─── EDIT GEOMETRY ────────────────────────────────────────────────────────────
 
 export function enableEditGeometry(dbId: string): void {
-  if (selectedFeatureDbId !== null && dbId !== selectedFeatureDbId) {
+  const selectionStore = useSelectionStore()
+
+  if (selectionStore.selectedFeatureDbId !== null && dbId !== selectionStore.selectedFeatureDbId) {
     showToast("Click the feature to select it first, then right-click to edit.", "info")
     return
   }
 
-  if (selectedFeatureDbId === null) {
-    setSelectedFeature(dbId)
+  if (selectionStore.selectedFeatureDbId === null) {
+    selectionStore.selectFeature(dbId)
   }
 
   const entry = findLayerEntryByDbId(dbId)
