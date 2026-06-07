@@ -181,7 +181,7 @@ class ApiServiceTest {
             id = "local-1",
             type = NarsFeatureType.ROAD,
             geometry = PointGeometry(coordinates = listOf(3.0, 36.0)),
-            properties = FeatureProperties(phase = Phases.ROADS_KEY, color = "#3498db")
+            properties = FeatureProperties.RoadProperties()
         )
         engine = MockEngine { _ ->
             respond(
@@ -208,7 +208,7 @@ class ApiServiceTest {
             id = "feature-1",
             type = NarsFeatureType.ROAD,
             geometry = PointGeometry(coordinates = listOf(3.0, 36.0)),
-            properties = FeatureProperties(phase = Phases.ROADS_KEY, color = "#3498db")
+            properties = FeatureProperties.RoadProperties()
         )
         engine = MockEngine { _ ->
             respond(

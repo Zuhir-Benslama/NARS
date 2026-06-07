@@ -76,6 +76,9 @@ lint/tmp/
 # Android Profiling
 *.hprof
 
+# Stale backup directory
+gradle_backup/
+
 # Misc
 *.swp
 *.swo

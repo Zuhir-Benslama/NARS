@@ -7,12 +7,4 @@ plugins {
     alias(libs.plugins.detekt) apply false
 }
 
-subprojects {
-    configurations.all {
-        resolutionStrategy.eachDependency {
-            if (requested.group == "androidx.espresso" && requested.name == "espresso-core") {
-                useTarget("androidx.test.espresso:espresso-core:${requested.version}")
-            }
-        }
-    }
-}
+

@@ -103,10 +103,15 @@ class GeomanEventHandler(
             id = featureData?.id ?: java.util.UUID.randomUUID().toString(),
             type = getFeatureTypeFromPhase(phase),
             geometry = geometry,
-            properties = com.nars.maplibre.data.model.FeatureProperties(
-                phase = phase.key,
-                color = phase.color
-            )
+            properties = when (phase.key) {
+                com.nars.maplibre.data.model.Phases.ROADS_KEY ->
+                    com.nars.maplibre.data.model.FeatureProperties.RoadProperties()
+                com.nars.maplibre.data.model.Phases.HOUSE_ENTRANCES_KEY ->
+                    com.nars.maplibre.data.model.FeatureProperties.HouseEntranceProperties()
+                com.nars.maplibre.data.model.Phases.NAMING_PANELS_KEY ->
+                    com.nars.maplibre.data.model.FeatureProperties.NamingPanelProperties()
+                else -> com.nars.maplibre.data.model.FeatureProperties.RoadProperties()
+            }
         )
     }
 

@@ -23,8 +23,8 @@ import com.nars.maplibre.data.model.FeatureProperties
 
 @Composable
 fun RoadsValidationFields(
-    props: FeatureProperties,
-    onPropsChanged: (FeatureProperties) -> Unit
+    props: FeatureProperties.RoadProperties,
+    onPropsChanged: (FeatureProperties.RoadProperties) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         ValidationRadioGroup(
@@ -75,8 +75,8 @@ fun RoadsValidationFields(
 
 @Composable
 fun HouseEntranceValidationFields(
-    props: FeatureProperties,
-    onPropsChanged: (FeatureProperties) -> Unit
+    props: FeatureProperties.HouseEntranceProperties,
+    onPropsChanged: (FeatureProperties.HouseEntranceProperties) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         ValidationSwitch(
@@ -111,8 +111,8 @@ fun HouseEntranceValidationFields(
 
 @Composable
 fun NamingPanelValidationFields(
-    props: FeatureProperties,
-    onPropsChanged: (FeatureProperties) -> Unit
+    props: FeatureProperties.NamingPanelProperties,
+    onPropsChanged: (FeatureProperties.NamingPanelProperties) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         ValidationSwitch(

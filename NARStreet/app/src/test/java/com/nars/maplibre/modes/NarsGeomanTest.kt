@@ -36,6 +36,7 @@ class NarsGeomanTest {
 
     private lateinit var geoman: Geoman
     private lateinit var featureRenderer: FeatureRenderer
+    private lateinit var displayManager: FeatureDisplayManager
     private lateinit var eventHandler: GeomanEventHandler
     private lateinit var geometryConverter: GeometryConverter
     private lateinit var snappingEngine: SnappingEngine
@@ -53,6 +54,7 @@ class NarsGeomanTest {
     fun setUp() {
         geoman = mockk(relaxed = true)
         featureRenderer = mockk(relaxed = true)
+        displayManager = mockk(relaxed = true)
         eventHandler = mockk(relaxed = true)
         geometryConverter = mockk(relaxed = true)
         snappingEngine = mockk(relaxed = true)
@@ -61,7 +63,7 @@ class NarsGeomanTest {
 
         narsGeoman = NarsGeoman(
             geoman = geoman,
-            featureRenderer = featureRenderer,
+            displayManager = displayManager,
             eventHandler = eventHandler,
             geometryConverter = geometryConverter,
             snappingEngine = snappingEngine,
@@ -76,12 +78,15 @@ class NarsGeomanTest {
         narsGeoman.destroy()
     }
 
-    private fun createRoad(name: String? = null, geometry: com.nars.maplibre.data.model.Geometry = PointGeometry(coordinates = listOf(3.0, 36.0))): NarsFeature {
+    private fun createRoad(
+        name: String? = null,
+        geometry: com.nars.maplibre.data.model.Geometry = PointGeometry(coordinates = listOf(3.0, 36.0))
+    ): NarsFeature {
         return NarsFeature(
             id = "road-1",
             type = NarsFeatureType.ROAD,
             geometry = geometry,
-            properties = FeatureProperties(phase = Phases.ROADS_KEY, color = "#3498db", name = name)
+            properties = FeatureProperties.RoadProperties(name = name)
         )
     }
 
@@ -247,120 +252,62 @@ class NarsGeomanTest {
     // --- addFeature ---
 
     @Test
-    fun `addFeature delegates to renderer and geoman`() {
+    fun `addFeature delegates to displayManager`() {
         val feature = createRoad("Road")
-        val geoJson = mockk<Feature>(relaxed = true)
-        every { geometryConverter.convertToGeoJson(feature) } returns geoJson
-        every { geometryConverter.getSourceNameForGeometry(feature.geometry) } returns "nars_source"
-
         narsGeoman.addFeature(feature)
-
-        verify { featureRenderer.addFeature(feature) }
-        verify { geoman.addGeoJsonFeature(geoJson, "nars_source") }
+        verify { displayManager.addFeature(feature) }
     }
 
     // --- addFeatures ---
 
     @Test
-    fun `addFeatures with no current phase adds all features`() {
-        val f1 = createRoad("R1")
-        val f2 = NarsFeature(
-            id = "hp-1",
-            type = NarsFeatureType.HOUSE_ENTRANCE,
-            geometry = PointGeometry(coordinates = listOf(3.0, 36.1)),
-            properties = FeatureProperties(phase = Phases.HOUSE_ENTRANCES_KEY, color = "#27ae60")
-        )
-
-        narsGeoman.addFeatures(listOf(f1, f2))
-
-        verify { featureRenderer.addFeature(f1) }
-        verify { featureRenderer.addFeature(f2) }
-    }
-
-    @Test
-    fun `addFeatures with phase filters by phase key`() {
-        val f1 = createRoad("R1")
-        val f2 = NarsFeature(
-            id = "hp-1",
-            type = NarsFeatureType.HOUSE_ENTRANCE,
-            geometry = PointGeometry(coordinates = listOf(3.0, 36.1)),
-            properties = FeatureProperties(phase = Phases.HOUSE_ENTRANCES_KEY, color = "#27ae60")
-        )
-
-        narsGeoman.setCurrentPhase(pointPhase)
-        narsGeoman.addFeatures(listOf(f1, f2))
-
-        verify { featureRenderer.addFeature(f1) }
+    fun `addFeatures delegates to displayManager`() {
+        val features = listOf(createRoad("R1"))
+        narsGeoman.addFeatures(features)
+        verify { displayManager.addFeatures(features) }
     }
 
     // --- updateDisplayedFeatures ---
 
     @Test
-    fun `updateDisplayedFeatures adds new features and removes stale ones`() {
-        narsGeoman.setCurrentPhase(pointPhase)
-        val fresh = createRoad("Fresh").copy(id = "fresh-1")
-        val staleFeatureData = mockk<FeatureData>(relaxed = true)
-        every { geoman.features.getFeature(GeomanCoreConstants.SOURCE_MARKERS, "road-1") } returns staleFeatureData
-
-        narsGeoman.addFeature(createRoad("Stale"))
-        narsGeoman.updateDisplayedFeatures(listOf(fresh))
-
-        verify { geoman.features.removeFeature(any(), "road-1") }
-    }
-
-    @Test
-    fun `updateDisplayedFeatures adds road endpoint markers for roads phase`() {
+    fun `updateDisplayedFeatures delegates to displayManager`() {
         narsGeoman.setCurrentPhase(pointPhase)
         val features = listOf(createRoad("A"))
         narsGeoman.updateDisplayedFeatures(features)
-        verify { labelAndMarkerManager.addRoadEndpointMarkers(features) }
+        verify { displayManager.updateDisplayedFeatures(features) }
     }
 
     // --- updateFeatureId ---
 
     @Test
-    fun `updateFeatureId returns early when ids match`() {
-        narsGeoman.updateFeatureId("same", "same")
-        verify { featureRenderer wasNot Called }
-    }
-
-    @Test
-    fun `updateFeatureId updates tracking when ids differ`() {
+    fun `updateFeatureId delegates to displayManager`() {
         narsGeoman.updateFeatureId("old", "new")
-        verify { featureRenderer.removeFromTracking("old") }
+        verify { displayManager.updateFeatureId("old", "new") }
     }
 
     // --- updateFeatureOnMap ---
 
     @Test
-    fun `updateFeatureOnMap removes and adds feature when no GeoJsonSource`() {
+    fun `updateFeatureOnMap delegates to displayManager`() {
         val feature = createRoad("R")
-        narsGeoman.addFeature(feature)
         narsGeoman.updateFeatureOnMap(feature)
-        verify { featureRenderer.addFeature(feature) }
+        verify { displayManager.updateFeatureOnMap(feature) }
     }
 
     // --- removeFeature ---
 
     @Test
-    fun `removeFeature cleans up all systems`() {
-        val featureData = mockk<FeatureData>(relaxed = true)
-        every { geoman.features.getFeature(GeomanCoreConstants.SOURCE_MARKERS, "road-1") } returns featureData
-
+    fun `removeFeature delegates to displayManager`() {
         narsGeoman.removeFeature("road-1")
-
-        verify { geoman.features.removeFeature(GeomanCoreConstants.SOURCE_MARKERS, "road-1") }
-        verify { labelAndMarkerManager.removeVertexMarkers("road-1") }
-        verify { featureRenderer.removeFromTracking("road-1") }
+        verify { displayManager.removeFeature("road-1") }
     }
 
     // --- clearAllFeatures ---
 
     @Test
-    fun `clearAllFeatures clears rendering and tracking`() {
+    fun `clearAllFeatures delegates to displayManager`() {
         narsGeoman.clearAllFeatures()
-        verify { geoman.clearAllFeatures() }
-        verify { featureRenderer.clearTracking() }
+        verify { displayManager.clearAllFeatures() }
     }
 
     // --- snapPoint ---

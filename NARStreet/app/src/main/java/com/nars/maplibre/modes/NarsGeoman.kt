@@ -3,15 +3,14 @@ package com.nars.maplibre.modes
 import android.content.Context
 import com.nars.maplibre.utils.NarsLogger
 import com.geoman.maplibre.geoman.Geoman
-import com.geoman.maplibre.geoman.core.GeomanCoreConstants
 import com.geoman.maplibre.geoman.core.options.GmOptionsData
 import com.geoman.maplibre.geoman.core.options.SettingsOptions
+import com.geoman.maplibre.geoman.core.GeomanCoreConstants
 import com.geoman.maplibre.geoman.types.DrawModeName
 import com.geoman.maplibre.geoman.types.EditModeName
 import com.nars.maplibre.data.model.DrawType
 import com.nars.maplibre.data.model.NarsFeature
 import com.nars.maplibre.data.model.PhaseDefinition
-import com.nars.maplibre.data.model.Phases
 import com.nars.maplibre.utils.Config
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,7 +26,7 @@ import org.maplibre.android.maps.MapView
 @Suppress("DEPRECATION")
 class NarsGeoman internal constructor(
     val geoman: Geoman,
-    private val featureRenderer: FeatureRenderer,
+    private val displayManager: FeatureDisplayManager,
     private val eventHandler: GeomanEventHandler,
     private val geometryConverter: GeometryConverter,
     private val snappingEngine: SnappingEngine,
@@ -39,7 +38,6 @@ class NarsGeoman internal constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var destroyed = false
     private var currentPhase: PhaseDefinition? = null
-    private val _displayedFeatureIds = mutableSetOf<String>()
 
     private val _isDrawing = MutableStateFlow(false)
     val isDrawing: StateFlow<Boolean> = _isDrawing.asStateFlow()
@@ -69,14 +67,19 @@ class NarsGeoman internal constructor(
             val featureRenderer = FeatureRenderer(map).also { renderer ->
                 renderer.labelAndMarkerManager = LabelAndMarkerManager(map)
             }
+            val geometryConverter = GeometryConverter()
+            val displayManager = FeatureDisplayManager(geoman, featureRenderer, geometryConverter, map)
             val eventHandler = GeomanEventHandler(scope, geoman, onFeatureCreated, onFeatureUpdated, onFeatureDeleted)
             eventHandler.setupEventListeners()
-            NarsLogger.d("NarsGeoman", "Initialized — delegating to FeatureRenderer, GeomanEventHandler, GeometryConverter, SnappingEngine")
+            NarsLogger.d(
+                "NarsGeoman",
+                "Initialized — delegating display to FeatureDisplayManager"
+            )
             return NarsGeoman(
                 geoman = geoman,
-                featureRenderer = featureRenderer,
+                displayManager = displayManager,
                 eventHandler = eventHandler,
-                geometryConverter = GeometryConverter(),
+                geometryConverter = geometryConverter,
                 snappingEngine = SnappingEngine(),
                 onFeatureCreated = onFeatureCreated,
                 onFeatureUpdated = onFeatureUpdated,
@@ -88,6 +91,7 @@ class NarsGeoman internal constructor(
 
     fun setCurrentPhase(phase: PhaseDefinition) {
         currentPhase = phase
+        displayManager.currentPhase = phase
         eventHandler.setCurrentPhase(phase)
     }
 
@@ -177,104 +181,19 @@ class NarsGeoman internal constructor(
         stopEditing()
     }
 
-    fun addFeature(feature: NarsFeature) {
-        _displayedFeatureIds.add(feature.id)
-        featureRenderer.addFeature(feature)
-        val geoJsonFeature = geometryConverter.convertToGeoJson(feature)
-        geoman.addGeoJsonFeature(geoJsonFeature, geometryConverter.getSourceNameForGeometry(feature.geometry))
-    }
+    fun addFeature(feature: NarsFeature) = displayManager.addFeature(feature)
 
-    fun addFeatures(features: List<NarsFeature>) {
-        val currentPhaseKey = currentPhase?.key
-        val filtered = if (currentPhaseKey != null) features.filter { it.properties.phase == currentPhaseKey } else features
-        filtered.forEach { addFeature(it) }
-    }
+    fun addFeatures(features: List<NarsFeature>) = displayManager.addFeatures(features)
 
-    fun updateDisplayedFeatures(allFeatures: List<NarsFeature>) {
-        val currentPhaseKey = currentPhase?.key
-        val filtered = if (currentPhaseKey != null) allFeatures.filter { it.properties.phase == currentPhaseKey } else allFeatures
-        val newIds = filtered.map { it.id }.toSet()
+    fun updateDisplayedFeatures(allFeatures: List<NarsFeature>) = displayManager.updateDisplayedFeatures(allFeatures)
 
-        val toRemove = _displayedFeatureIds - newIds
-        toRemove.forEach { removeFeature(it) }
+    fun updateFeatureId(oldId: String, newId: String) = displayManager.updateFeatureId(oldId, newId)
 
-        val toAdd = filtered.filter { it.id !in _displayedFeatureIds }
-        toAdd.forEach { addFeature(it) }
+    fun updateFeatureOnMap(feature: NarsFeature) = displayManager.updateFeatureOnMap(feature)
 
-        _displayedFeatureIds.clear()
-        _displayedFeatureIds.addAll(newIds)
+    fun removeFeature(featureId: String) = displayManager.removeFeature(featureId)
 
-        if (currentPhaseKey == Phases.ROADS_KEY) {
-            featureRenderer.labelAndMarkerManager.addRoadEndpointMarkers(allFeatures)
-        }
-    }
-
-    fun updateFeatureId(oldId: String, newId: String) {
-        if (oldId == newId) return
-        _displayedFeatureIds.remove(oldId)
-        _displayedFeatureIds.add(newId)
-        featureRenderer.removeFromTracking(oldId)
-    }
-
-    fun updateFeatureOnMap(feature: NarsFeature) {
-        val sourceName = "nars_${feature.id}"
-        val source = map?.style?.getSource(sourceName)
-        if (source is org.maplibre.android.style.sources.GeoJsonSource) {
-            val geoJsonFeature = geometryConverter.convertToGeoJson(feature)
-            val geoJsonString = buildGeoJsonString(geoJsonFeature)
-            source.setGeoJson(geoJsonString)
-            NarsLogger.d("NarsGeoman", "Updated feature ${feature.id} in-place")
-        } else {
-            removeFeature(feature.id)
-            addFeature(feature)
-        }
-    }
-
-    private fun buildGeoJsonString(feature: com.geoman.maplibre.geoman.types.geojson.Feature): String {
-        val geometryJson = geometryConverter.geometryToJson(feature.geometry)
-        val id = feature.id ?: ""
-        return """{"type":"Feature","id":"$id","geometry":$geometryJson}"""
-    }
-
-    fun removeFeature(featureId: String) {
-        _displayedFeatureIds.remove(featureId)
-        val geomanSourceNames = listOf(
-            GeomanCoreConstants.SOURCE_MARKERS, GeomanCoreConstants.SOURCE_LINES,
-            GeomanCoreConstants.SOURCE_POLYGONS, GeomanCoreConstants.SOURCE_CIRCLES
-        )
-        for (sourceName in geomanSourceNames) {
-            val featureData = geoman.features.getFeature(sourceName, featureId)
-            if (featureData != null) {
-                geoman.features.removeFeature(sourceName, featureId)
-                break
-            }
-        }
-
-        val layerName = "nars_layer_$featureId"
-        val layerNames = listOf(
-            layerName, "${layerName}_outline",
-            "${layerName}_stroke", "${layerName}_label"
-        )
-        for (name in layerNames) {
-            try { map?.style?.getLayer(name)?.let { map?.style?.removeLayer(it) } }
-            catch (e: Exception) { NarsLogger.w("NarsGeoman", "Failed to remove layer $name: ${e.message}") }
-        }
-        val mapSourceNames = listOf("nars_${featureId}_edges", "nars_$featureId")
-        for (name in mapSourceNames) {
-            try { map?.style?.removeSource(name) }
-            catch (e: Exception) { NarsLogger.w("NarsGeoman", "Failed to remove source $name: ${e.message}") }
-        }
-
-        featureRenderer.labelAndMarkerManager.removeVertexMarkers(featureId)
-        featureRenderer.removeFromTracking(featureId)
-        NarsLogger.d("NarsGeoman", "Removed feature $featureId")
-    }
-
-    fun clearAllFeatures() {
-        _displayedFeatureIds.clear()
-        geoman.clearAllFeatures()
-        featureRenderer.clearTracking()
-    }
+    fun clearAllFeatures() = displayManager.clearAllFeatures()
 
     fun snapPoint(point: LatLng, features: List<NarsFeature>, snapThresholdMeters: Double = 20.0): LatLng {
         return snappingEngine.snapPoint(point, features, snapThresholdMeters)

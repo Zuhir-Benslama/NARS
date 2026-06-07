@@ -1,7 +1,6 @@
 package com.nars.maplibre.utils
 
 import com.nars.maplibre.data.model.FeatureProperties
-import com.nars.maplibre.data.model.PhaseDefinition
 
 data class ValidationResult(
     val valid: Boolean,
@@ -44,15 +43,14 @@ data class NamingPanelValidation(
 )
 
 fun validateFeatureProperties(
-    properties: FeatureProperties,
-    phase: PhaseDefinition
+    properties: FeatureProperties
 ): ValidationResult {
     val errors = mutableMapOf<String, String>()
 
-    when (phase.key) {
-        "roads" -> validateRoadFieldProperties(properties, errors)
-        "houseEntrances" -> validateHouseEntranceFieldProperties(properties, errors)
-        "namingPanels" -> validateNamingPanelFieldProperties(properties, errors)
+    when (properties) {
+        is FeatureProperties.RoadProperties -> validateRoadFieldProperties(properties, errors)
+        is FeatureProperties.HouseEntranceProperties -> validateHouseEntranceFieldProperties(properties, errors)
+        is FeatureProperties.NamingPanelProperties -> validateNamingPanelFieldProperties(properties, errors)
     }
 
     return if (errors.isEmpty()) {
@@ -63,7 +61,7 @@ fun validateFeatureProperties(
 }
 
 private fun validateRoadFieldProperties(
-    properties: FeatureProperties,
+    properties: FeatureProperties.RoadProperties,
     errors: MutableMap<String, String>
 ) {
     if (properties.name.isNullOrBlank()) {
@@ -104,7 +102,7 @@ private fun validateRoadFieldProperties(
 }
 
 private fun validateHouseEntranceFieldProperties(
-    properties: FeatureProperties,
+    properties: FeatureProperties.HouseEntranceProperties,
     errors: MutableMap<String, String>
 ) {
     if (properties.entranceTypeKey == "main_entrance") {
@@ -119,7 +117,7 @@ private fun validateHouseEntranceFieldProperties(
 }
 
 private fun validateNamingPanelFieldProperties(
-    properties: FeatureProperties,
+    properties: FeatureProperties.NamingPanelProperties,
     errors: MutableMap<String, String>
 ) {
     if (properties.name.isNullOrBlank()) {
@@ -127,7 +125,7 @@ private fun validateNamingPanelFieldProperties(
     }
 }
 
-fun validateHouseEntranceFieldWorkflow(properties: FeatureProperties): HouseEntranceValidation {
+fun validateHouseEntranceFieldWorkflow(properties: FeatureProperties.HouseEntranceProperties): HouseEntranceValidation {
     val issues = mutableListOf<String>()
 
     if (properties.hasEntrance != true) {
@@ -182,7 +180,7 @@ fun validateHouseEntranceFieldWorkflow(properties: FeatureProperties): HouseEntr
     )
 }
 
-fun validateNamingPanelFieldWorkflow(properties: FeatureProperties): NamingPanelValidation {
+fun validateNamingPanelFieldWorkflow(properties: FeatureProperties.NamingPanelProperties): NamingPanelValidation {
     val issues = mutableListOf<String>()
 
     if (properties.hasNamingPanelLocation != true) {

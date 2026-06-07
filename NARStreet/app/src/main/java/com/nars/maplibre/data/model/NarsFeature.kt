@@ -61,41 +61,54 @@ data class CircleGeometry(
 ) : Geometry()
 
 @Serializable
-data class FeatureProperties(
-    val name: String? = null,
-    val number: String? = null,
-    val bisNumber: Int? = null,
-    val phase: String,
-    val color: String,
-    val description: String? = null,
-    val decisionNumber: String? = null,
-    val decisionDate: String? = null,
-    val roadTypeKey: String? = null,
-    val entranceTypeKey: String? = null,
-    val roadDbId: String? = null,
-    val roadLabel: String? = null,
-    val side: String? = null,
-    val entranceNumber: Int? = null,
-    val mainEntranceDbId: String? = null,
-    val mainEntranceLabel: String? = null,
-    val roadTraffic: String? = null,
-    val tradActivity: String? = null,
-    val numLanes: Int? = null,
-    val hasMedian: Boolean? = null,
-    val hasVegetation: Boolean? = null,
-    val isDeadEnd: Boolean? = null,
-    val hasSidewalk: Boolean? = null,
-    val hasEntrance: Boolean? = null,
-    val hasNumberingPanel: Boolean? = null,
-    val numberingPanelCorrect: Boolean? = null,
-    val numberingPanelPositionCorrect: Boolean? = null,
-    val hasNamingPanelLocation: Boolean? = null,
-    val hasNamingPanel: Boolean? = null,
-    val namingCorrect: Boolean? = null,
-    val namingPanelPositionCorrect: Boolean? = null,
-    val markerType: String? = null,
-    val additionalData: Map<String, String> = emptyMap()
-)
+sealed class FeatureProperties {
+    abstract val name: String?
+    abstract val phase: String
+    abstract val color: String
+
+    @Serializable
+    @SerialName("roads")
+    data class RoadProperties(
+        override val name: String? = null,
+        override val phase: String = Phases.ROADS_KEY,
+        override val color: String = "#3498db",
+        val roadTypeKey: String? = null,
+        val roadTraffic: String? = null,
+        val tradActivity: String? = null,
+        val numLanes: Int? = null,
+        val hasMedian: Boolean? = null,
+        val hasVegetation: Boolean? = null,
+        val isDeadEnd: Boolean? = null,
+        val hasSidewalk: Boolean? = null
+    ) : FeatureProperties()
+
+    @Serializable
+    @SerialName("houseEntrances")
+    data class HouseEntranceProperties(
+        override val name: String? = null,
+        override val phase: String = Phases.HOUSE_ENTRANCES_KEY,
+        override val color: String = "#27ae60",
+        val entranceTypeKey: String? = null,
+        val roadDbId: String? = null,
+        val side: String? = null,
+        val hasEntrance: Boolean? = null,
+        val hasNumberingPanel: Boolean? = null,
+        val numberingPanelCorrect: Boolean? = null,
+        val numberingPanelPositionCorrect: Boolean? = null
+    ) : FeatureProperties()
+
+    @Serializable
+    @SerialName("namingPanels")
+    data class NamingPanelProperties(
+        override val name: String? = null,
+        override val phase: String = Phases.NAMING_PANELS_KEY,
+        override val color: String = "#9b59b6",
+        val hasNamingPanelLocation: Boolean? = null,
+        val hasNamingPanel: Boolean? = null,
+        val namingCorrect: Boolean? = null,
+        val namingPanelPositionCorrect: Boolean? = null
+    ) : FeatureProperties()
+}
 
 data class PhaseDefinition(
     val index: Int,
