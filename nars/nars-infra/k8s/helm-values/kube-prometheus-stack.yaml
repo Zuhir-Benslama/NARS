@@ -1,0 +1,45 @@
+grafana:
+  # Password must be set at install time via --set grafana.adminPassword=$GRAFANA_PASSWORD
+  # Do NOT hardcode a password here. The Makefile handles this automatically.
+  service:
+    type: ClusterIP
+    port: 3000
+  ingress:
+    enabled: false
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      url: http://loki:3100
+      access: proxy
+    - name: Tempo
+      type: tempo
+      url: http://tempo:3200
+      access: proxy
+    - name: Prometheus
+      type: prometheus
+      url: http://kube-prometheus-stack-prometheus:9090
+      access: proxy
+
+prometheus:
+  prometheusSpec:
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelector: {}
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+alertmanager:
+  enabled: false
+
+defaultRules:
+  create: false
+
+nodeExporter:
+  enabled: false
+
+kubeStateMetrics:
+  enabled: false

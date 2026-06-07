@@ -1,1 +1,1 @@
-cd nars-vite && npx lint-staged
+cd nars/nars-web && npx lint-staged

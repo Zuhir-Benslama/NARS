@@ -1,0 +1,62 @@
+# ─── Frontend Ingress ──────────────────────────────────────────────────
+# Serves nars.dz (SPA) with TLS but NO mTLS (browser-facing).
+# HTTP redirected to HTTPS automatically.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nars-frontend
+  namespace: nars
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/hsts: "true"
+    nginx.ingress.kubernetes.io/hsts-max-age: "31536000"
+    nginx.ingress.kubernetes.io/hsts-include-subdomains: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - nars.dz
+      secretName: nars-tls
+  rules:
+    - host: nars.dz
+      http:
+        paths:
+          - path: /(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: nars-frontend
+                port:
+                  number: 80
+---
+# ─── Frontend Ingress (local dev) ──────────────────────────────────────
+# Serves localhost without TLS for local development access.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nars-frontend-local
+  namespace: nars
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: localhost
+      http:
+        paths:
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: nars-api
+                port:
+                  number: 80
+          - path: /(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: nars-frontend
+                port:
+                  number: 80

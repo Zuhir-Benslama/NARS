@@ -4,15 +4,14 @@ Per-project TODO files:
 
 | Project | File |
 |---------|------|
-| NARS (.NET Backend) | [`NARS/TODO.md`](NARS/TODO.md) |
-| nars-vite (Vue 3 Frontend) | [`nars-vite/TODO.md`](nars-vite/TODO.md) |
-| NARStreet (Android) | → moved to [`Zuhir-Benslama/NARStreet`](https://github.com/Zuhir-Benslama/NARStreet) |
+| nars-api (.NET Backend) | [`nars-api/TODO.md`](nars-api/TODO.md) |
+| nars-web (Vue 3 Frontend) | [`nars-web/TODO.md`](nars-web/TODO.md) |
 
 ---
 
 ## Cross-Project (Infrastructure, CI, Deployments) ✅ DONE
 
-- [x] **P0 — Make integration tests a required CI gate**: Run `NARS.Tests/Integration` in CI (PostgreSQL + PostGIS via Testcontainers), publish results, and block merge on failures.
+- [x] **P0 — Make integration tests a required CI gate**: Run `nars-tests/` (PostgreSQL + PostGIS via Testcontainers), publish results, and block merge on failures.
 - [x] **P0 — Remove bootstrap default credentials**: Replace documented static admin password with one-time generated credentials (`make db-admin`) and update docs so no reusable defaults are shown.
 - [x] **P1 — Add deterministic cluster bootstrap + smoke test**: Keep `make cluster-up` fully idempotent with robust waits/retries and add a post-deploy smoke target that verifies `/health`, API auth, and frontend reachability.
 - [x] **P1 — Enforce stricter quality gates**: Treat backend warnings as errors in CI and enforce frontend minimum test coverage threshold so quality regressions fail fast.

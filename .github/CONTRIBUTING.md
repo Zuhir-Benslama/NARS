@@ -4,10 +4,9 @@
 
 NARS (National Addressing Reference System) is a full-stack geospatial application with:
 
-- **NARS/** — ASP.NET Core 10 backend API (C#, EF Core + PostGIS)
-- **nars-vite/** — Vue 3 + TypeScript frontend SPA (Maplibre GL JS + Geoman)
-- **NARS.Tests/** — xUnit unit tests + Testcontainers-based integration tests
-- ~~**NARStreet/**~~ → moved to [`Zuhir-Benslama/NARStreet`](https://github.com/Zuhir-Benslama/NARStreet)
+- **nars-api/** — ASP.NET Core 10 backend API (C#, EF Core + PostGIS)
+- **nars-web/** — Vue 3 + TypeScript frontend SPA (Maplibre GL JS + Geoman)
+- **nars-tests/** — xUnit unit tests + Testcontainers-based integration tests
 
 All code lives under `/home/zuhir/Workspace/`.
 
@@ -33,15 +32,15 @@ docker run -d --name nars-pg \
   postgis/postgis:17-3.5
 
 # 2. Initialize the database schema + reference data
-psql -h localhost -U postgres -d nars -f docs/nars_db.sql
-psql -h localhost -U postgres -d nars -f docs/seed_reference_data.sql
+psql -h localhost -U postgres -d nars -f nars-infra/docs/nars_db.sql
+psql -h localhost -U postgres -d nars -f nars-infra/docs/seed_reference_data.sql
 
 # 3. Run the backend (starts on http://localhost:5000)
-cd NARS
+cd nars-api
 dotnet run
 
 # 4. In another terminal, run the frontend (starts on http://localhost:5173)
-cd nars-vite
+cd nars-web
 npm install
 npm run dev
 ```
@@ -64,26 +63,26 @@ See the [Makefile](Makefile) for available targets (`cluster-down`, `cluster-reb
 ## Repository Structure
 
 ```
-.github/workflows/        — CI (backend, frontend, integration, security, Docker build)
-Docker/                   — Dockerfiles for nars-api, nars-vite, nars-postgis
-k8s/                      — Kubernetes manifests (kind-based local cluster)
-docs/                     — Database schema, UML diagrams, PDF documentation
-Scripts/                  — DB creation scripts, admin bootstrap, mermaid tooling
-NARS/                     — ASP.NET Core 10 backend
-nars-vite/                — Vue 3 + TypeScript frontend
-NARS.Tests/               — Backend unit + integration tests (xUnit)
-NARStreet/                — moved to Zuhir-Benslama/NARStreet
-Makefile                  — Cluster management entry point
+.github/workflows/          — CI (backend, frontend, integration, security, Docker build)
+nars-infra/                 — Infrastructure configs
+├── docker/                 — Dockerfiles for nars-api, nars-web, nars-postgis
+├── k8s/                    — Kubernetes manifests (kind-based local cluster)
+├── docs/                   — Database schema, UML diagrams, PDF documentation
+└── scripts/                — DB creation scripts, admin bootstrap, mermaid tooling
+nars-api/                   — ASP.NET Core 10 backend
+nars-web/                   — Vue 3 + TypeScript frontend
+nars-tests/                 — Backend unit + integration tests (xUnit)
+Makefile                    — Cluster management entry point
 ```
 
 ---
 
 ## Development Workflow
 
-### Backend (NARS/)
+### Backend (nars-api/)
 
 ```
-NARS/
+nars-api/
 ├── Controllers/           — API endpoints
 ├── Data/                  — EF Core DbContext
 ├── DTOs/                  — Request/response types
@@ -96,13 +95,13 @@ NARS/
 **Commands:**
 
 ```bash
-cd NARS
+cd nars-api
 dotnet restore
 dotnet build --configuration Release
 dotnet run                              # starts on http://localhost:5000
 dotnet watch run                        # hot reload
-dotnet test ../NARS.Tests               # run all tests (unit + integration)
-dotnet test ../NARS.Tests --filter "FullyQualifiedName!~Integration"  # unit only
+dotnet test ../nars-tests               # run all tests (unit + integration)
+dotnet test ../nars-tests --filter "FullyQualifiedName!~Integration"  # unit only
 dotnet ef migrations add <Name>         # add a new migration
 dotnet ef database update               # apply migrations
 ```
@@ -114,10 +113,10 @@ dotnet ef database update               # apply migrations
 - PascalCase for public members, `_camelCase` for private fields
 - `[ProducesResponseType]` on all controller actions
 
-### Frontend (nars-vite/)
+### Frontend (nars-web/)
 
 ```
-nars-vite/src/
+nars-web/src/
 ├── api/                    — HTTP client (apiFetch, CSRF, error handling)
 ├── components/             — Vue SFCs (FeatureModal, PhaseBar, InfoPanel, etc.)
 ├── composables/            — Vue composables (useApiFetch, useTheme)
@@ -134,13 +133,13 @@ nars-vite/src/
 └── main.ts                 — Entry point
 ```
 
-**Scripts** (run from `nars-vite/`):
+**Scripts** (run from `nars-web/`):
 
 | Command | Purpose |
 |---------|---------|
 | `npm run dev` | Vite dev server with HMR |
 | `npm run build` | Full production build |
-| `npm run build:deploy` | Build + copy to `../NARS/wwwroot/` |
+| `npm run build:deploy` | Build + copy to `../nars-api/wwwroot/` |
 | `npm run typecheck` | TypeScript type checking (`vue-tsc --noEmit`) |
 | `npm run lint` | ESLint (zero-warnings policy) |
 | `npm run lint:fix` | ESLint auto-fix |
@@ -162,19 +161,19 @@ nars-vite/src/
 
 ## Testing
 
-### Backend Tests (NARS.Tests/)
+### Backend Tests (nars-tests/)
 
 xUnit with Moq for unit tests and Testcontainers.PostgreSql for integration tests.
 
 ```bash
 # Unit tests only (fast, no database needed)
-dotnet test NARS.Tests --filter "FullyQualifiedName!~Integration"
+dotnet test nars-tests --filter "FullyQualifiedName!~Integration"
 
 # Integration tests (requires Docker for Testcontainers)
-dotnet test NARS.Tests --filter "FullyQualifiedName~Integration"
+dotnet test nars-tests --filter "FullyQualifiedName~Integration"
 
 # All tests
-dotnet test NARS.Tests
+dotnet test nars-tests
 ```
 
 Integration tests spin up a real PostGIS container via Testcontainers. Docker must be running.
@@ -262,16 +261,16 @@ test: add integration tests for district coverage check
 ### Backend (NuGet)
 
 ```bash
-cd NARS
+cd nars-api
 dotnet add package <PackageName> --version <Version>
 ```
 
-Update `NARS/NarsApi.csproj` and run `dotnet restore`.
+Update `nars-api/NarsApi.csproj` and run `dotnet restore`.
 
 ### Frontend (npm)
 
 ```bash
-cd nars-vite
+cd nars-web
 npm install <package>
 ```
 
@@ -301,9 +300,9 @@ Backend reads secrets from environment variables first, falling back to `appsett
 Build individual images:
 
 ```bash
-docker build -f Docker/Dockerfile.nars-api -t nars-api .
-docker build -f Docker/Dockerfile.nars-vite -t nars-vite .
-docker build -f Docker/Dockerfile.nars-postgis -t nars-postgis .
+docker build -f nars-infra/docker/Dockerfile.nars-api -t nars-api .
+docker build -f nars-infra/docker/Dockerfile.nars-vite -t nars-vite .
+docker build -f nars-infra/docker/Dockerfile.nars-postgis -t nars-postgis .
 ```
 
 Or use the Makefile for full cluster management.

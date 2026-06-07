@@ -1,0 +1,39 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: nars
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/part-of: nars
+      app.kubernetes.io/managed-by: kustomize
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - postgis-pv.yaml
+  - postgis.yaml
+  - app-deployment.yaml
+  - app-service.yaml
+  - frontend-deployment.yaml
+  - frontend-service.yaml
+  - ingress-api.yaml
+  - ingress-frontend.yaml
+  # nars-api-local and nars-frontend-local are created by the same files (multi-doc YAML)
+  - service-account.yaml
+  - network-policy.yaml
+  - resource-quota.yaml
+  - hpa.yaml
+  - pdb.yaml
+  - backup-cronjob.yaml
+  # otel-metrics-service.yaml and servicemonitor.yaml are applied separately
+  # after the observability stack is installed (their CRDs are only available then):
+  #   make observability-servicemonitor
+images:
+  # ⚠ `latest` tags are for local dev. For CI/CD, override newTag with
+  # the commit SHA or build number AND override imagePullPolicy to IfNotPresent:
+  #   kustomize edit set image zuhirbenslama/nars-api=ghcr.io/org/nars-api:abc1234
+  - name: zuhirbenslama/nars-api
+    newTag: latest
+  - name: zuhirbenslama/nars-postgis
+    newTag: latest
+  - name: zuhirbenslama/nars-vite
+    newTag: latest

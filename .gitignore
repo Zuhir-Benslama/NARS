@@ -10,15 +10,15 @@ appsettings.Development.json
 # If you use user secrets, they are usually stored outside the project, 
 # but keep an eye on any local secrets files.
 
-# === Vue 3 / Vite (nars-vite) ===
-nars-vite/node_modules/
-nars-vite/dist/
-nars-vite/.env.local
-nars-vite/.env.*.local
-nars-vite/npm-debug.log*
-nars-vite/yarn-debug.log*
-nars-vite/yarn-error.log*
-nars-vite/.vscode/
+# === Vue 3 / Vite (nars-web) ===
+nars/nars-web/node_modules/
+nars/nars-web/dist/
+nars/nars-web/.env.local
+nars/nars-web/.env.*.local
+nars/nars-web/npm-debug.log*
+nars/nars-web/yarn-debug.log*
+nars/nars-web/yarn-error.log*
+nars/nars-web/.vscode/
 
 # === Backup files ===
 *.bak
@@ -28,17 +28,19 @@ nars-vite/.vscode/
 .env.*
 !.env.example
 privkey.pem
-k8s/certs/ca.key
-k8s/certs/ca.srl
+nars/nars-infra/k8s/certs/ca.key
+nars/nars-infra/k8s/certs/ca.srl
 backup/
 *.lscache
 
 # === Data ===
 data/
 
+# === NARStreet (separate repo) ===
+narstreet/
+
 # === General / IDE ===
 
-maplibre-geoman-0.7.1/
 .idea/
 .vscode/
 *.swp
@@ -47,7 +49,7 @@ maplibre-geoman-0.7.1/
 .DS_Store
 .aider*
 
-# === Android / Kotlin (nars-android-maplibre, maplibre-geoman-android) ===
+# === Android ===
 *.apk
 *.aar
 *.aab

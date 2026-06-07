@@ -11,7 +11,7 @@ updates:
       - "backend"
 
   - package-ecosystem: "npm"
-    directory: "/nars-vite"
+    directory: "/nars/nars-web"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -21,7 +21,7 @@ updates:
       - "frontend"
 
   - package-ecosystem: "docker"
-    directory: "/Docker"
+    directory: "/nars/nars-infra/docker"
     schedule:
       interval: "weekly"
       day: "monday"

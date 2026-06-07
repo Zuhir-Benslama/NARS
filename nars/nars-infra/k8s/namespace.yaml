@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nars
+  labels:
+    # Pod Security Admission: baseline prevents privileged/host access
+    # but allows allowPrivilegeEscalation (required by PostGIS init).
+    # nars-api and nars-frontend could pass restricted but PostGIS cannot.
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
