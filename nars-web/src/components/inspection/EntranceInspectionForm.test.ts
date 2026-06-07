@@ -17,7 +17,9 @@ describe("EntranceInspectionForm", () => {
     mockApiFetch.mockResolvedValue(createMockSuccessResponse({}))
   })
 
-  function mountForm(feature: { id: string; label: string } | null = { id: "f1", label: "Main Entrance" }) {
+  function mountForm(
+    feature: { id: string; label: string } | null = { id: "f1", label: "Main Entrance" },
+  ) {
     return mount(EntranceInspectionForm, { props: { feature } as any })
   }
 
@@ -116,10 +118,13 @@ describe("EntranceInspectionForm", () => {
       await wrapper.find(".eif-btn-yes").trigger("click")
       await wrapper.find(".eif-btn-submit").trigger("click")
 
-      expect(mockApiFetch).toHaveBeenCalledWith("/api/field/inspect", expect.objectContaining({
-        method: "POST",
-        body: expect.stringContaining('"status":"good"'),
-      }))
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        "/api/field/inspect",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining('"status":"good"'),
+        }),
+      )
     })
 
     it("submits inspection with status 'issue'", async () => {
@@ -127,10 +132,13 @@ describe("EntranceInspectionForm", () => {
       await wrapper.find(".eif-btn-no").trigger("click")
       await wrapper.find(".eif-btn-submit").trigger("click")
 
-      expect(mockApiFetch).toHaveBeenCalledWith("/api/field/inspect", expect.objectContaining({
-        method: "POST",
-        body: expect.stringContaining('"status":"issue"'),
-      }))
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        "/api/field/inspect",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining('"status":"issue"'),
+        }),
+      )
     })
 
     it("shows loading state while submitting", async () => {
@@ -157,9 +165,12 @@ describe("EntranceInspectionForm", () => {
       await wrapper.find(".eif-btn-primary").trigger("click")
       await new Promise((resolve) => setTimeout(resolve, 0))
 
-      expect(mockApiFetch).toHaveBeenCalledWith("/api/field/entrance/create", expect.objectContaining({
-        method: "POST",
-      }))
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        "/api/field/entrance/create",
+        expect.objectContaining({
+          method: "POST",
+        }),
+      )
     })
   })
 })
