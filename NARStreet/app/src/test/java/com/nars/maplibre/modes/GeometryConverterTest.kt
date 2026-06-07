@@ -22,7 +22,7 @@ class GeometryConverterTest {
             id = "test-1",
             type = NarsFeatureType.ROAD,
             geometry = PointGeometry(coordinates = listOf(3.0, 36.0)),
-            properties = FeatureProperties(phase = Phases.ROADS_KEY, color = "#3498db")
+            properties = FeatureProperties.RoadProperties()
         )
 
         val geoJson = converter.convertToGeoJson(feature)
@@ -37,7 +37,7 @@ class GeometryConverterTest {
             id = "test-1",
             type = NarsFeatureType.ROAD,
             geometry = PointGeometry(coordinates = listOf(3.0, 36.0)),
-            properties = FeatureProperties(phase = Phases.ROADS_KEY, color = "#3498db", name = "Test Road")
+            properties = FeatureProperties.RoadProperties(name = "Test Road")
         )
 
         val geoJson = converter.convertToGeoJson(feature)

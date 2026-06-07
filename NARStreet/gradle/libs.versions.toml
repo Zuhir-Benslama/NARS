@@ -16,7 +16,7 @@ androidx-navigation = "2.8.5"
 androidx-datastore = "1.1.1"
 androidx-security = "1.1.0-alpha06"
 androidx-test-ext = "1.2.1"
-androidx-espresso = "3.6.1"
+
 
 # Compose
 compose-bom = "2025.01.01"
@@ -98,7 +98,6 @@ ktor-client-mock = { group = "io.ktor", name = "ktor-client-mock", version.ref =
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidx-test-ext" }
-androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "androidx-espresso" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 
 [plugins]

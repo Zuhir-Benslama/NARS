@@ -20,14 +20,14 @@ class PhaseNavigatorTest {
         id = id,
         type = NarsFeatureType.ROAD,
         geometry = LineStringGeometry(coordinates = listOf(3.0, 36.0, 3.01, 36.0)),
-        properties = FeatureProperties(phase = Phases.ROADS_KEY, color = "#3498db", name = "Road $id")
+        properties = FeatureProperties.RoadProperties(name = "Road $id")
     )
 
     private fun createEntrance(id: String): NarsFeature = NarsFeature(
         id = id,
         type = NarsFeatureType.HOUSE_ENTRANCE,
         geometry = PointGeometry(coordinates = listOf(3.0, 36.0)),
-        properties = FeatureProperties(phase = Phases.HOUSE_ENTRANCES_KEY, color = "#27ae60")
+        properties = FeatureProperties.HouseEntranceProperties()
     )
 
     // ── canAdvance ────────────────────────────────────────────────────────

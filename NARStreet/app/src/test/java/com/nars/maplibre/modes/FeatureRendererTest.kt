@@ -58,12 +58,14 @@ class FeatureRendererTest {
         renderer.geometryConverterProvider = { geometryConverter }
     }
 
-    private fun createRoad(geometry: com.nars.maplibre.data.model.Geometry = PointGeometry(coordinates = listOf(3.0, 36.0))): NarsFeature {
+    private fun createRoad(
+        geometry: com.nars.maplibre.data.model.Geometry = PointGeometry(coordinates = listOf(3.0, 36.0))
+    ): NarsFeature {
         return NarsFeature(
             id = "road-1",
             type = NarsFeatureType.ROAD,
             geometry = geometry,
-            properties = FeatureProperties(phase = Phases.ROADS_KEY, color = "#3498db", name = "Main Road")
+            properties = FeatureProperties.RoadProperties(name = "Main Road")
         )
     }
 
@@ -120,13 +122,15 @@ class FeatureRendererTest {
 
     @Test
     fun `addFeature passes null name for label`() {
-        renderer.addFeature(createRoad().copy(properties = FeatureProperties(phase = Phases.ROADS_KEY, color = "#3498db")))
+        val nullName = FeatureProperties.RoadProperties()
+        renderer.addFeature(createRoad().copy(properties = nullName))
         verify { renderer.labelAndMarkerManager.addLabelLayer(any(), any(), isNull()) }
     }
 
     @Test
     fun `addFeature passes blank name for label`() {
-        renderer.addFeature(createRoad().copy(properties = FeatureProperties(phase = Phases.ROADS_KEY, color = "#3498db", name = "")))
+        val blankName = FeatureProperties.RoadProperties(name = "")
+        renderer.addFeature(createRoad().copy(properties = blankName))
         verify { renderer.labelAndMarkerManager.addLabelLayer(any(), any(), "") }
     }
 
