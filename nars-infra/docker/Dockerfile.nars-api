@@ -13,6 +13,7 @@ ENV ASPNETCORE_URLS=http://+:8080
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0-noble AS build
 WORKDIR /src
+COPY ["nars/Directory.Build.props", "nars/"]
 COPY ["nars/nars-api/NarsApi.csproj", "nars/nars-api/"]
 RUN dotnet restore "nars/nars-api/NarsApi.csproj"
 COPY nars/nars-api/ nars/nars-api/
