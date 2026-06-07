@@ -3,7 +3,7 @@ from PIL import Image
 from pathlib import Path
 import sys
 
-input_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("docs/uml")
+input_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("nars-infra/docs/uml")
 
 for png in sorted(input_dir.glob("*.png")):
     pdf = png.with_suffix(".pdf")
