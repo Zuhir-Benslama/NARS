@@ -38,8 +38,8 @@ A full-stack geographic data management application for urban addressing across 
 |---------|-------------|--------|------|
 | `NARS/` | ASP.NET Core 10 backend API | [`NARS/README.md`](NARS/README.md) | [`NARS/TODO.md`](NARS/TODO.md) |
 | `nars-vite/` | Vue 3 + TypeScript web frontend | [`nars-vite/README.md`](nars-vite/README.md) | [`nars-vite/TODO.md`](nars-vite/TODO.md) |
-| `NARStreet/` | Android Jetpack Compose client | [`NARStreet/README.md`](NARStreet/README.md) | [`NARStreet/TODO.md`](NARStreet/TODO.md) |
 | `NARS.Tests/` | Backend unit & integration tests | — | — |
+| **New:** `NARStreet/` → moved to [`Zuhir-Benslama/NARStreet`](https://github.com/Zuhir-Benslama/NARStreet) |
 
 ## Quick Start
 

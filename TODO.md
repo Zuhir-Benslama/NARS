@@ -6,7 +6,7 @@ Per-project TODO files:
 |---------|------|
 | NARS (.NET Backend) | [`NARS/TODO.md`](NARS/TODO.md) |
 | nars-vite (Vue 3 Frontend) | [`nars-vite/TODO.md`](nars-vite/TODO.md) |
-| NARStreet (Android) | [`NARStreet/TODO.md`](NARStreet/TODO.md) |
+| NARStreet (Android) | → moved to [`Zuhir-Benslama/NARStreet`](https://github.com/Zuhir-Benslama/NARStreet) |
 
 ---
 
