@@ -1,17 +1,68 @@
-data/
-backup/
-**/bin/
-**/obj/
-**/node_modules/
-**/dist/
-**/build/
-**/coverage/
-**/playwright-report/
-**/test-results/
-*.lscache
-wwwroot/assets/
-certs/*.key
-certs/*.srl
-.DS_Store
-*.log
+# === ASP.NET (NARS) ===
+[Bb]in/
+[Oo]bj/
+out/
+appsettings.Development.json
+*.user
+*.suo
+*.sln.docstates
 .vs/
+# If you use user secrets, they are usually stored outside the project, 
+# but keep an eye on any local secrets files.
+
+# === Vue 3 / Vite (nars-web) ===
+nars/nars-web/node_modules/
+nars/nars-web/dist/
+nars/nars-web/.env.local
+nars/nars-web/.env.*.local
+nars/nars-web/npm-debug.log*
+nars/nars-web/yarn-debug.log*
+nars/nars-web/yarn-error.log*
+nars/nars-web/.vscode/
+
+# === Backup files ===
+*.bak
+
+# === Secrets ===
+.env
+.env.*
+!.env.example
+privkey.pem
+nars/nars-infra/k8s/certs/ca.key
+nars/nars-infra/k8s/certs/ca.srl
+backup/
+*.lscache
+
+# === Data ===
+data/
+
+# === NARStreet (separate repo) ===
+narstreet/
+
+# === General / IDE ===
+
+.idea/
+.vscode/
+*.swp
+*.log
+*.Rhistory
+.DS_Store
+.aider*
+
+# === Android ===
+*.apk
+*.aar
+*.aab
+local.properties
+.gradle/
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
