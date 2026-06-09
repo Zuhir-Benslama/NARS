@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
-    "build:deploy": "vue-tsc --noEmit && vite build && rm -rf ../../nars/nars-api/wwwroot/assets && cp -r dist/* ../../nars/nars-api/wwwroot/",
+    "build:deploy": "vue-tsc --noEmit && vite build && rm -rf ../../nars-api/wwwroot/assets && cp -r dist/* ../../nars-api/wwwroot/",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint . --ext .ts,.vue --report-unused-disable-directives --max-warnings 0",

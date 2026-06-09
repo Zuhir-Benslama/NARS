@@ -1,6 +1,6 @@
 # ─── Backend (ASP.NET Core API) ───────────────────────────────────────────────
-# Build from workspace root:
-#   docker build -f nars/nars-infra/docker/Dockerfile.nars-api -t nars-api:latest .
+# Build from repo root:
+#   docker build -f nars-infra/docker/Dockerfile.nars-api -t nars-api:latest .
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble AS base
 # curl is needed for Docker HEALTHCHECK. The ~5MB is a deliberate trade-off
 # for non-K8s deployments (docker-compose, local runs) that rely on HEALTHCHECK.
@@ -13,14 +13,14 @@ ENV ASPNETCORE_URLS=http://+:8080
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0-noble AS build
 WORKDIR /src
-COPY ["nars/Directory.Build.props", "nars/"]
-COPY ["nars/nars-api/NarsApi.csproj", "nars/nars-api/"]
-RUN dotnet restore "nars/nars-api/NarsApi.csproj"
-COPY nars/nars-api/ nars/nars-api/
-RUN dotnet build "nars/nars-api/NarsApi.csproj" --configuration Release -o /app/build
+COPY ["Directory.Build.props", "./"]
+COPY ["nars-api/NarsApi.csproj", "nars-api/"]
+RUN dotnet restore "nars-api/NarsApi.csproj"
+COPY nars-api/ nars-api/
+RUN dotnet build "nars-api/NarsApi.csproj" --configuration Release -o /app/build
 
 FROM build AS publish
-RUN dotnet publish "nars/nars-api/NarsApi.csproj" --configuration Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "nars-api/NarsApi.csproj" --configuration Release -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
