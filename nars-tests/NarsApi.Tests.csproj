@@ -25,7 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\nars\nars-api\NarsApi.csproj" />
+    <ProjectReference Include="..\nars-api\NarsApi.csproj" />
   </ItemGroup>
 
 </Project>
