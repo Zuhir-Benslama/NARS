@@ -80,7 +80,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: nars/nars-web
+        working-directory: nars-web
     steps:
       - uses: actions/checkout@v4
 
@@ -89,7 +89,7 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
-          cache-dependency-path: nars/nars-web/package-lock.json
+          cache-dependency-path: nars-web/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -147,7 +147,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: nars/nars-infra/docker/Dockerfile.nars-api
+          file: nars-infra/docker/Dockerfile.nars-api
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -166,7 +166,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: nars/nars-infra/docker/Dockerfile.nars-vite
+          file: nars-infra/docker/Dockerfile.nars-vite
           push: true
           tags: ${{ steps.meta-vite.outputs.tags }}
           labels: ${{ steps.meta-vite.outputs.labels }}
@@ -185,7 +185,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: nars/nars-infra/docker/Dockerfile.nars-postgis
+          file: nars-infra/docker/Dockerfile.nars-postgis
           push: true
           tags: ${{ steps.meta-postgis.outputs.tags }}
           labels: ${{ steps.meta-postgis.outputs.labels }}

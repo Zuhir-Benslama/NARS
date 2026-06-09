@@ -11,14 +11,14 @@ appsettings.Development.json
 # but keep an eye on any local secrets files.
 
 # === Vue 3 / Vite (nars-web) ===
-nars/nars-web/node_modules/
-nars/nars-web/dist/
-nars/nars-web/.env.local
-nars/nars-web/.env.*.local
-nars/nars-web/npm-debug.log*
-nars/nars-web/yarn-debug.log*
-nars/nars-web/yarn-error.log*
-nars/nars-web/.vscode/
+nars-web/node_modules/
+nars-web/dist/
+nars-web/.env.local
+nars-web/.env.*.local
+nars-web/npm-debug.log*
+nars-web/yarn-debug.log*
+nars-web/yarn-error.log*
+nars-web/.vscode/
 
 # === Backup files ===
 *.bak
@@ -28,8 +28,8 @@ nars/nars-web/.vscode/
 .env.*
 !.env.example
 privkey.pem
-nars/nars-infra/k8s/certs/ca.key
-nars/nars-infra/k8s/certs/ca.srl
+nars-infra/k8s/certs/ca.key
+nars-infra/k8s/certs/ca.srl
 backup/
 *.lscache
 

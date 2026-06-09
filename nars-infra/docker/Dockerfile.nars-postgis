@@ -1,7 +1,7 @@
 FROM postgis/postgis:17-3.5
 
-COPY nars/nars-infra/docs/nars_db.sql /docker-entrypoint-initdb.d/01-nars-schema.sql
-COPY nars/nars-infra/docs/seed_reference_data.sql /docker-entrypoint-initdb.d/02-seed-reference-data.sql
+COPY nars-infra/docs/nars_db.sql /docker-entrypoint-initdb.d/01-nars-schema.sql
+COPY nars-infra/docs/seed_reference_data.sql /docker-entrypoint-initdb.d/02-seed-reference-data.sql
 
 EXPOSE 5432
 
