@@ -1,0 +1,17 @@
+data/
+backup/
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/build/
+**/coverage/
+**/playwright-report/
+**/test-results/
+*.lscache
+wwwroot/assets/
+certs/*.key
+certs/*.srl
+.DS_Store
+*.log
+.vs/
