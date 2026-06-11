@@ -78,7 +78,10 @@ builder.Services.AddOpenTelemetry()
 // ═══════════════════════════════════════════════════════════════
 // 1. Database (EF Core + Npgsql / PostGIS)
 // ═══════════════════════════════════════════════════════════════
-builder.Services.AddNarsDatabase(connStr!);
+if (string.IsNullOrEmpty(connStr))
+    throw new InvalidOperationException("DefaultConnection is not configured.");
+
+builder.Services.AddNarsDatabase(connStr);
 
 // ═══════════════════════════════════════════════════════════════
 // 2. JWT Authentication (cookie-first)
@@ -165,7 +168,7 @@ builder.Services.AddNarsRateLimiting(builder.Configuration);
 // 8. Health checks — database connectivity for K8s probes
 // ═══════════════════════════════════════════════════════════════
 builder.Services.AddHealthChecks()
-    .AddNarsDatabaseHealthCheck(connStr!);
+    .AddNarsDatabaseHealthCheck(connStr);
 
 // ═══════════════════════════════════════════════════════════════
 // 9. Antiforgery (CSRF protection)
@@ -237,12 +240,6 @@ app.UseExceptionHandler(errApp =>
     });
 });
 
-app.MapOpenApi();
-app.MapScalarApiReference(options =>
-{
-    options.WithTheme(ScalarTheme.Purple);
-});
-
 app.UseDefaultFiles();
 
 // Explicitly register MIME types so Content-Type is always set.
@@ -281,15 +278,16 @@ app.UseStaticFiles(new StaticFileOptions
     }
 });
 
-// Middleware order: Routing → CORS → Compression → RateLimit → Auth → Antiforgery → Controllers
+// Middleware order: Routing → ForwardedHeaders → CORS → Compression → RateLimit → Auth → Antiforgery → Controllers
 app.UseRouting();
-app.UseCors();
-app.UseResponseCompression();
 
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
 });
+
+app.UseCors();
+app.UseResponseCompression();
 
 app.UseRateLimiter();
 app.UseAuthentication();
@@ -355,6 +353,12 @@ app.Use(async (ctx, next) =>
         }
     }
     await next();
+});
+
+app.MapOpenApi();
+app.MapScalarApiReference(options =>
+{
+    options.WithTheme(ScalarTheme.Purple);
 });
 
 app.MapControllers();

@@ -1,3 +1,4 @@
+---
 # ─── API Ingress (secure) ──────────────────────────────────────────────
 # Serves api.nars.dz with TLS + mTLS client certificate authentication.
 # HTTP traffic is redirected to HTTPS; HTTPS requires a valid client cert

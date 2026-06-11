@@ -61,6 +61,7 @@ public class ValidationController(
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ValidateRoad([FromBody] ValidateRoadRequest body, CancellationToken cancellationToken = default)
     {
+        if (body is null) return BadRequest(new ValidateRoadResponse(false, "Request body is required."));
         if (body.Coordinates.Count < 2)
             return BadRequest(new ValidateRoadResponse(false, "A road must have at least 2 points."));
 
@@ -140,6 +141,7 @@ public class ValidationController(
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ValidateDistrict([FromBody] ValidateDistrictRequest body, CancellationToken cancellationToken = default)
     {
+        if (body is null) return BadRequest(new ValidateDistrictResponse(false, "Request body is required."));
         if (body.Coordinates.Count < 3)
             return BadRequest(new ValidateDistrictResponse(false, "A district must have at least 3 points."));
         if (!CheckCoordinateBounds(body.Coordinates, out var inputError))

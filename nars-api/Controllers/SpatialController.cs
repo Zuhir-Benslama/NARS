@@ -28,6 +28,7 @@ public class SpatialController(AppDbContext db, IScatteredAreaService scatteredS
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetRoadSide([FromBody] RoadSideRequest body, CancellationToken cancellationToken = default)
     {
+        if (body is null) return BadRequest(new { detail = "Request body is required." });
         var road = await db.Roads.FirstOrDefaultAsync(f =>
             f.Id == body.RoadId && f.UserId == CurrentUserId, cancellationToken);
 
@@ -116,7 +117,10 @@ public class SpatialController(AppDbContext db, IScatteredAreaService scatteredS
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> RefreshScattered(CancellationToken cancellationToken = default)
     {
-        await scatteredService.RefreshAsync(RequiredCurrentUserId, RequiredCommuneId, cancellationToken);
+        var communeId = CurrentCommuneId;
+        if (communeId is null)
+            return BadRequest(new { detail = "This endpoint requires a commune-level account." });
+        await scatteredService.RefreshAsync(RequiredCurrentUserId, communeId.Value, cancellationToken);
         return Ok(new ScatteredRefreshResponse(true, null, "Scattered area recomputed."));
     }
 }

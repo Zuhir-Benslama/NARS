@@ -8,4 +8,6 @@ public interface IJwtService
         string role = "commune_user", int? dairaId = null, int? wilayaId = null);
 
     ClaimsPrincipal? ValidateToken(string token);
+
+    (string rawToken, string hash) CreateRefreshToken();
 }

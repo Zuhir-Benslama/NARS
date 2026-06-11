@@ -49,6 +49,7 @@ public partial class AuthController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> SignIn([FromBody] SignInRequest body, CancellationToken cancellationToken = default)
     {
+        if (body is null) return BadRequest(new { detail = "Request body is required." });
         var user = await db.Users.FirstOrDefaultAsync(u => u.Username == body.Username, cancellationToken);
         if (user is null)
             return Unauthorized(new { detail = "Invalid username or password" });
@@ -78,7 +79,7 @@ public partial class AuthController(
             communeId: user.CommuneId, role: user.Role, dairaId: user.DairaId, wilayaId: user.WilayaId);
 
         // Issue a refresh token for silent re-authentication before the access token expires.
-        var (refreshRaw, refreshHash) = JwtService.CreateRefreshToken();
+        var (refreshRaw, refreshHash) = jwt.CreateRefreshToken();
         var refreshExpiry = DateTime.UtcNow.AddDays(
             ParseIntConfig(config["Jwt:RefreshExpiresInDays"], 30));
 

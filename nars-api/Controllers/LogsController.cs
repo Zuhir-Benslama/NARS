@@ -23,6 +23,7 @@ public class LogsController(AppDbContext db) : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> SubmitLogs([FromBody] LogBatch body, CancellationToken cancellationToken = default)
     {
+        if (body is null) return BadRequest(new { detail = "Request body is required." });
         if (body.Logs is null || body.Logs.Count == 0)
             return BadRequest(new { detail = "No log entries provided." });
 

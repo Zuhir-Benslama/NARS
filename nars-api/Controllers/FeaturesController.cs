@@ -34,6 +34,7 @@ public class FeaturesController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> SaveFeature([FromBody] FeatureSaveRequest body, CancellationToken cancellationToken = default)
     {
+        if (body is null) return BadRequest(new { detail = "Request body is required." });
         if (!FeatureTypes.AllTypes.Contains(body.Type))
             return BadRequest(new { detail = $"Unknown feature type '{body.Type}'." });
         if (!FeatureTypes.IsValidLayer(body.Type, body.Layer))
@@ -76,7 +77,6 @@ public class FeaturesController(
         var entry = FeatureTypeRegistry.AddToDbContext(db, entity);
         if (entry is null)
             return BadRequest(new { detail = $"Unknown feature type '{body.Type}'." });
-        await db.SaveChangesAsync(cancellationToken);
 
         db.FeatureRegistry.Add(new FeatureRegistry { Id = newId, FeatureType = body.Type });
         await db.SaveChangesAsync(cancellationToken);
@@ -120,6 +120,7 @@ public class FeaturesController(
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ClearFeatures([FromBody] ClearFeaturesRequest body, CancellationToken cancellationToken = default)
     {
+        if (body is null) return BadRequest(new { detail = "Request body is required." });
         if (!body.Confirm)
             return BadRequest(new { detail = "Set \"confirm\": true to delete all features." });
 
@@ -236,6 +237,7 @@ public class FeaturesController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateFeature(Guid featureId, [FromBody] FeatureUpdateRequest body, CancellationToken cancellationToken = default)
     {
+        if (body is null) return BadRequest(new { detail = "Request body is required." });
         var reg = await db.FeatureRegistry.FindAsync([featureId], cancellationToken);
         if (reg is null) return NotFound(new { detail = "Feature not found" });
 
@@ -252,21 +254,12 @@ public class FeaturesController(
                 return BadRequest(new { detail = "Feature data is too large (max 512 KB)." });
         }
 
-        var updatedAt = DateTime.UtcNow;
-
-        // HouseEntrance needs special handling for RoadId extraction from data
-        if (reg.FeatureType == FeatureTypes.HouseEntrance)
-        {
-            int rows = await UpdateHouseEntrance(featureId, body, updatedAt, cancellationToken);
-            if (rows == 0) return NotFound(new { detail = "Feature not found" });
-            return Ok(new UpdateFeatureResponse(Success: true, Id: featureId.ToString(), UpdatedAt: updatedAt));
-        }
-
-        var dbSet = FeatureTypeRegistry.GetDbSet(db, reg.FeatureType);
-        if (dbSet is null)
+        var descriptor = FeatureTypeRegistry.GetDescriptor(reg.FeatureType);
+        if (descriptor is null)
             return BadRequest(new { detail = $"Unknown feature type in registry: {reg.FeatureType}" });
 
-        int updated = await UpdateEntityGeneric(dbSet, featureId, body, updatedAt, cancellationToken);
+        var updatedAt = DateTime.UtcNow;
+        int updated = await UpdateEntity(descriptor, featureId, body, updatedAt, cancellationToken);
         if (updated == 0) return NotFound(new { detail = "Feature not found" });
 
         if (reg.FeatureType == FeatureTypes.Area)
@@ -314,15 +307,22 @@ public class FeaturesController(
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private async Task<int> UpdateEntityGeneric(IQueryable<FeatureBase> query, Guid id, FeatureUpdateRequest body, DateTime updatedAt, CancellationToken cancellationToken = default)
+    private async Task<int> UpdateEntity(FeatureTypeDescriptor descriptor, Guid id, FeatureUpdateRequest body, DateTime updatedAt, CancellationToken cancellationToken = default)
     {
+        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        var query = descriptor.GetDbSet(db);
         var rows = await query
             .Where(f => f.Id == id && f.UserId == CurrentUserId)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(f => f.UpdatedAt, updatedAt)
             , cancellationToken);
 
-        if (rows == 0) return 0;
+        if (rows == 0)
+        {
+            await tx.RollbackAsync(cancellationToken);
+            return 0;
+        }
 
         if (body.Label is not null)
         {
@@ -345,49 +345,10 @@ public class FeaturesController(
                 , cancellationToken);
         }
 
-        return rows;
-    }
+        if (descriptor.PostUpdateAction is not null)
+            await descriptor.PostUpdateAction(db, id, RequiredCurrentUserId, body.Data, cancellationToken);
 
-    private async Task<int> UpdateHouseEntrance(Guid id, FeatureUpdateRequest body, DateTime updatedAt, CancellationToken cancellationToken = default)
-    {
-        var rows = await db.HouseEntrances
-            .Where(f => f.Id == id && f.UserId == CurrentUserId)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(f => f.UpdatedAt, updatedAt)
-            , cancellationToken);
-
-        if (rows == 0) return 0;
-
-        if (body.Label is not null)
-        {
-            await db.HouseEntrances
-                .Where(f => f.Id == id && f.UserId == CurrentUserId)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(f => f.Label, body.Label)
-                , cancellationToken);
-        }
-
-        if (body.Data is not null)
-        {
-            var dataStr = body.Data.Value.ValueKind == JsonValueKind.String
-                ? body.Data.Value.GetString()!
-                : body.Data.Value.GetRawText();
-            await db.HouseEntrances
-                .Where(f => f.Id == id && f.UserId == CurrentUserId)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(f => f.Data, dataStr)
-                , cancellationToken);
-
-            if (body.Data.Value.TryGetProperty("roadDbId", out var ridEl) && ridEl.ValueKind == JsonValueKind.String && Guid.TryParse(ridEl.GetString(), out var rid))
-            {
-                await db.HouseEntrances
-                    .Where(f => f.Id == id && f.UserId == CurrentUserId)
-                    .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(f => f.RoadId, rid)
-                    , cancellationToken);
-            }
-        }
-
+        await tx.CommitAsync(cancellationToken);
         return rows;
     }
 

@@ -57,7 +57,7 @@ public class JwtService(string secret, string? issuer, string? audience, IConfig
     /// Creates a refresh token — a cryptographically random string.
     /// The server stores the hash; the client stores the raw token in an HttpOnly cookie.
     /// </summary>
-    public static (string rawToken, string hash) CreateRefreshToken()
+    public (string rawToken, string hash) CreateRefreshToken()
     {
         var raw = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
         var hash = Convert.ToBase64String(
