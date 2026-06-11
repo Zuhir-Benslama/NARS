@@ -21,6 +21,7 @@ public class UsersController(AppDbContext db) : NarsControllerBase
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateCredentials([FromBody] UpdateUserRequest body, CancellationToken cancellationToken = default)
     {
+        if (body is null) return BadRequest(new { detail = "Request body is required." });
         var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
         if (user is null) return NotFound(new { detail = "User not found." });
 

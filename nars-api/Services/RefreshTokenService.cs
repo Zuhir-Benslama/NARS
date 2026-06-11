@@ -49,7 +49,7 @@ public class RefreshTokenService(
         }
 
         stored.Revoked = true;
-        var (newRaw, newHash) = JwtService.CreateRefreshToken();
+        var (newRaw, newHash) = jwt.CreateRefreshToken();
         var refreshDays = int.TryParse(config["Jwt:RefreshExpiresInDays"], out var d) ? d : 30;
         var refreshExpiry = DateTime.UtcNow.AddDays(refreshDays);
 

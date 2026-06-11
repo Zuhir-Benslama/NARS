@@ -108,7 +108,8 @@ public class JwtServiceTests
     [Fact]
     public void CreateRefreshToken_ReturnsRawAndHash()
     {
-        var (raw, hash) = JwtService.CreateRefreshToken();
+        var service = CreateService();
+        var (raw, hash) = service.CreateRefreshToken();
 
         Assert.NotNull(raw);
         Assert.NotEmpty(raw);
@@ -123,8 +124,9 @@ public class JwtServiceTests
     [Fact]
     public void CreateRefreshToken_UniqueTokens()
     {
-        var (raw1, hash1) = JwtService.CreateRefreshToken();
-        var (raw2, hash2) = JwtService.CreateRefreshToken();
+        var service = CreateService();
+        var (raw1, hash1) = service.CreateRefreshToken();
+        var (raw2, hash2) = service.CreateRefreshToken();
 
         Assert.NotEqual(raw1, raw2);
         Assert.NotEqual(hash1, hash2);

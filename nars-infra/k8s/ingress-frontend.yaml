@@ -1,3 +1,4 @@
+---
 # ─── Frontend Ingress ──────────────────────────────────────────────────
 # Serves nars.dz (SPA) with TLS but NO mTLS (browser-facing).
 # HTTP redirected to HTTPS automatically.

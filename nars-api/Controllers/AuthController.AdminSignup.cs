@@ -41,6 +41,7 @@ public partial class AuthController
     public async Task<IActionResult> AuthorizedAdminSignup(
         [FromBody] AuthorizedAdminSignupRequest body)
     {
+        if (body is null) return BadRequest(new { detail = "Request body is required." });
         // 1. Verify the authorizing admin's credentials.
         // IMPORTANT: always run BCrypt.Verify even when the user is not found.
         // Short-circuiting on "admin is null" leaks whether a username exists

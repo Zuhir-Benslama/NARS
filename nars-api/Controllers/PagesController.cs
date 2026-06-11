@@ -17,7 +17,7 @@ namespace NarsApi.Controllers;
 [ApiExplorerSettings(IgnoreApi = true)]
 #pragma warning disable S6931 // PagesController serves root-level paths (/, /login, /map), not API endpoints
 public class PagesController(
-    JwtService jwt,
+    IJwtService jwt,
     IAntiforgery antiforgery,
     IMemoryCache cache,
     IHostEnvironment env,

@@ -1,4 +1,4 @@
 <Solution>
   <Project Path="NarsApi.csproj" />
-  <Project Path="../../nars-tests/NarsApi.Tests.csproj" />
+  <Project Path="../nars-tests/NarsApi.Tests.csproj" />
 </Solution>

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using NarsApi.Data;
@@ -36,6 +37,14 @@ public sealed class FeatureTypeDescriptor
     public required Func<AppDbContext, FeatureBase, EntityEntry> AddToContext { get; init; }
 
     /// <summary>
+    /// Optional post-update action for type-specific column updates.
+    /// Called after the common fields (UpdatedAt, Label, Data) are updated.
+    /// Parameters: (AppDbContext, featureId, userId, data, CancellationToken).
+    /// data is body.Data from the update request (the nullable JsonElement).
+    /// </summary>
+    public Func<AppDbContext, Guid, Guid, System.Text.Json.JsonElement?, CancellationToken, Task>? PostUpdateAction { get; init; }
+
+    /// <summary>
     /// Creates a new entity instance with common fields populated.
     /// </summary>
     public FeatureBase CreateEntity(Guid id, Guid userId, string layer, string label, string data)
@@ -68,7 +77,7 @@ public static class FeatureTypeRegistry
             [FeatureTypes.District] = new() { Type = FeatureTypes.District, TableName = "districts", EntityType = typeof(District), DbSetAccessor = db => db.Districts, AddToContext = (db, e) => db.Entry(db.Districts.Add((District)e).Entity) },
             [FeatureTypes.CityCenter] = new() { Type = FeatureTypes.CityCenter, TableName = "city_centers", EntityType = typeof(CityCenter), DbSetAccessor = db => db.CityCenters, AddToContext = (db, e) => db.Entry(db.CityCenters.Add((CityCenter)e).Entity) },
             [FeatureTypes.Road] = new() { Type = FeatureTypes.Road, TableName = "roads", EntityType = typeof(Road), DbSetAccessor = db => db.Roads, AddToContext = (db, e) => db.Entry(db.Roads.Add((Road)e).Entity) },
-            [FeatureTypes.HouseEntrance] = new() { Type = FeatureTypes.HouseEntrance, TableName = "house_entrances", EntityType = typeof(HouseEntrance), DbSetAccessor = db => db.HouseEntrances, AddToContext = (db, e) => db.Entry(db.HouseEntrances.Add((HouseEntrance)e).Entity) },
+            [FeatureTypes.HouseEntrance] = new() { Type = FeatureTypes.HouseEntrance, TableName = "house_entrances", EntityType = typeof(HouseEntrance), DbSetAccessor = db => db.HouseEntrances, AddToContext = (db, e) => db.Entry(db.HouseEntrances.Add((HouseEntrance)e).Entity), PostUpdateAction = UpdateHouseEntranceRoadId },
             [FeatureTypes.PublicBuilding] = new() { Type = FeatureTypes.PublicBuilding, TableName = "public_buildings", EntityType = typeof(PublicBuilding), DbSetAccessor = db => db.PublicBuildings, AddToContext = (db, e) => db.Entry(db.PublicBuildings.Add((PublicBuilding)e).Entity) },
             [FeatureTypes.PublicSpace] = new() { Type = FeatureTypes.PublicSpace, TableName = "public_spaces", EntityType = typeof(PublicSpace), DbSetAccessor = db => db.PublicSpaces, AddToContext = (db, e) => db.Entry(db.PublicSpaces.Add((PublicSpace)e).Entity) },
             [FeatureTypes.NamingPanel] = new() { Type = FeatureTypes.NamingPanel, TableName = "naming_panels", EntityType = typeof(NamingPanel), DbSetAccessor = db => db.NamingPanels, AddToContext = (db, e) => db.Entry(db.NamingPanels.Add((NamingPanel)e).Entity) },
@@ -128,4 +137,19 @@ public static class FeatureTypeRegistry
 
     private static FeatureTypeDescriptor? GetDescriptor(FeatureBase entity) =>
         _registry.Values.FirstOrDefault(d => d.EntityType == entity.GetType());
+
+    private static async Task UpdateHouseEntranceRoadId(AppDbContext db, Guid featureId, Guid userId, JsonElement? data, CancellationToken ct)
+    {
+        if (data is not { ValueKind: JsonValueKind.Object } obj)
+            return;
+
+        if (obj.TryGetProperty("roadDbId", out var ridEl) && ridEl.ValueKind == JsonValueKind.String && Guid.TryParse(ridEl.GetString(), out var rid))
+        {
+            await db.HouseEntrances
+                .Where(f => f.Id == featureId && f.UserId == userId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(f => f.RoadId, rid)
+                , ct);
+        }
+    }
 }

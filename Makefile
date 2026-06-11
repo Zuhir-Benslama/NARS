@@ -312,7 +312,7 @@ db-admin: .env ## Create national admin with one-time generated credentials
 	echo "  Username: $${ADMIN_USERNAME}"
 	echo "  Password: $${ADMIN_PASSWORD}"
 	echo ""
-	bash Scripts/create_national_admin.sh
+	bash nars-infra/scripts/create_national_admin.sh
 	@echo ""
 	@echo "→ Done. Save the credentials above — they will not be shown again."
 
@@ -727,6 +727,42 @@ observability-stop: ## Stop observability port-forwards
 .PHONY: grafana-password
 grafana-password: ## Show the generated Grafana admin password
 	@echo "$(GRAFANA_PASSWORD)"
+
+# ─── Code Quality (nars-infra) ──────────────────────────────
+
+.PHONY: infra-lint
+infra-lint: ## Run all nars-infra linters (shell, docker, yaml)
+	$(MAKE) infra-lint-shell
+	$(MAKE) infra-lint-docker
+	$(MAKE) infra-lint-yaml
+
+.PHONY: infra-lint-shell
+infra-lint-shell: ## Shell-check nars-infra/scripts/*.sh
+	@if command -v shellcheck >/dev/null 2>&1; then
+		shellcheck nars-infra/scripts/*.sh
+	else
+		docker run --rm -v "$$(pwd):/mnt" koalaman/shellcheck:stable \
+			nars-infra/scripts/*.sh
+	endif
+
+.PHONY: infra-lint-docker
+infra-lint-docker: ## Lint Dockerfiles with hadolint
+	@if command -v hadolint >/dev/null 2>&1; then
+		hadolint nars-infra/docker/Dockerfile.*
+	else
+		docker run --rm -i hadolint/hadolint < nars-infra/docker/Dockerfile.nars-api
+		docker run --rm -i hadolint/hadolint < nars-infra/docker/Dockerfile.nars-postgis
+		docker run --rm -i hadolint/hadolint < nars-infra/docker/Dockerfile.nars-vite
+	endif
+
+.PHONY: infra-lint-yaml
+infra-lint-yaml: ## Lint k8s YAML with yamllint (uses .yamllint.yaml config)
+	@if command -v yamllint >/dev/null 2>&1; then
+		yamllint -c nars-infra/.yamllint.yaml nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml
+	else
+		docker run --rm -v "$$(pwd):/mnt" cytopia/yamllint \
+			-c nars-infra/.yamllint.yaml nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml
+	endif
 
 # ─── Docker Images ───────────────────────────────────────────
 

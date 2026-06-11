@@ -20,6 +20,12 @@
 #
 # Non-interactive mode (set all of these):
 #   ADMIN_USERNAME  ADMIN_PASSWORD  ADMIN_NAME  ADMIN_EMAIL  ADMIN_PHONE
+#
+# Security notes:
+#   - The DB password is never passed as a command-line argument.
+#     It flows via NARS_DB_PASSWORD_VAL env var read by Python heredocs.
+#   - All user-supplied values are bound as psycopg2 %s parameters, never
+#     interpolated into SQL strings.
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -40,13 +46,15 @@ command -v python3 >/dev/null 2>&1 || die "python3 not found."
 
 # Auto-install Python dependencies
 for pkg in psycopg2-binary bcrypt; do
-    module="${pkg%%-*}"  # psycopg2-binary → psycopg2
+    module="${pkg%%-*}"
     if ! python3 -c "import ${module}" 2>/dev/null; then
         warn "Python package '${pkg}' not found. Installing..."
-        pip3 install "${pkg}" --quiet --break-system-packages \
-            || pip3 install "${pkg}" --quiet \
-            || die "Failed to install ${pkg}. Run: pip3 install ${pkg}"
-        success "${pkg} installed."
+        if pip3 install "${pkg}" --quiet 2>/dev/null \
+           || pip3 install "${pkg}" --quiet --break-system-packages 2>/dev/null; then
+            success "${pkg} installed."
+        else
+            die "Failed to install ${pkg}. Run: pip3 install ${pkg}"
+        fi
     fi
 done
 
@@ -63,30 +71,46 @@ else
     DB_PASSWORD="${NARS_DB_PASSWORD}"
 fi
 
-# Test connection
+# Export for Python heredocs — avoids CLI-arg exposure in process listing
+export NARS_DB_PASSWORD_VAL="${DB_PASSWORD}"
+export NARS_DB_HOST="$DB_HOST"
+export NARS_DB_PORT="$DB_PORT"
+export NARS_DB_NAME="$DB_NAME"
+export NARS_DB_USER="$DB_USER"
+
+# ── Test connection ──────────────────────────────────────────────────────────────
 info "Testing database connection to ${DB_HOST}:${DB_PORT}/${DB_NAME}..."
-python3 -c "
-import psycopg2, sys
+python3 - "$DB_HOST" "$DB_PORT" "$DB_NAME" "$DB_USER" <<'PYEOF' || die "Cannot connect. Check credentials and that PostgreSQL is running."
+import os, sys, psycopg2
+
+host, port, dbname, user = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4]
+password = os.environ["NARS_DB_PASSWORD_VAL"]
+
 try:
-    c = psycopg2.connect(host='${DB_HOST}', port=${DB_PORT}, dbname='${DB_NAME}',
-                          user='${DB_USER}', password='${DB_PASSWORD}')
+    c = psycopg2.connect(host=host, port=port, dbname=dbname, user=user, password=password)
     c.close()
 except Exception as e:
-    print(f'Connection failed: {e}', file=sys.stderr); sys.exit(1)
-" || die "Cannot connect. Check credentials and that PostgreSQL is running."
+    print(f"Connection failed: {e}", file=sys.stderr)
+    sys.exit(1)
+PYEOF
 success "Database connection OK."
 echo ""
 
 # ── Check for existing national_admin ─────────────────────────────────────────
-EXISTING=$(python3 -c "
-import psycopg2
-c = psycopg2.connect(host='${DB_HOST}', port=${DB_PORT}, dbname='${DB_NAME}',
-                      user='${DB_USER}', password='${DB_PASSWORD}')
+EXISTING=$(python3 - "$DB_HOST" "$DB_PORT" "$DB_NAME" "$DB_USER" <<'PYEOF'
+import os, sys, psycopg2
+
+host, port, dbname, user = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4]
+password = os.environ["NARS_DB_PASSWORD_VAL"]
+
+c = psycopg2.connect(host=host, port=port, dbname=dbname, user=user, password=password)
 cur = c.cursor()
-cur.execute(\"SELECT username FROM users WHERE role = 'national_admin' LIMIT 5\")
-for row in cur.fetchall(): print(row[0])
+cur.execute("SELECT username FROM users WHERE role = 'national_admin' LIMIT 5")
+for row in cur.fetchall():
+    print(row[0])
 c.close()
-")
+PYEOF
+)
 
 if [[ -n "${EXISTING}" ]]; then
     warn "A national_admin account already exists:"
@@ -99,7 +123,6 @@ fi
 
 # ── Collect account details ────────────────────────────────────────────────────
 if [[ "${NON_INTERACTIVE:-0}" == "1" ]]; then
-    # Non-interactive mode — env vars provided by Makefile
     ADMIN_NAME="${ADMIN_NAME:-National Admin}"
     ADMIN_EMAIL="${ADMIN_EMAIL:-admin@nars.dz}"
     ADMIN_PHONE="${ADMIN_PHONE:-+213000000000}"
@@ -147,19 +170,23 @@ fi
 # ── Insert via Python with parameterised query ─────────────────────────────────
 # All user-supplied values are passed as positional argv[] arguments and bound
 # as psycopg2 %s parameters — they are never interpolated into the SQL string.
+# DB connection params are read from NARS_DB_* env vars (not argv).
 #
 # UUID: uuid.uuid4() generates a random UUID. The application normally uses
 # Guid.CreateVersion7() (time-ordered) for new rows, but the national_admin
 # is a bootstrap account — sequential ordering is not required here.
 info "Hashing password and inserting record..."
 
-python3 - "${ADMIN_NAME}" "${ADMIN_EMAIL}" "${ADMIN_PHONE}" \
-           "${ADMIN_USERNAME}" "${ADMIN_PASSWORD}" \
-           "${DB_HOST}" "${DB_PORT}" "${DB_NAME}" "${DB_USER}" "${DB_PASSWORD}" << 'PYEOF'
-import sys, uuid, bcrypt, psycopg2
+python3 - "$ADMIN_NAME" "$ADMIN_EMAIL" "$ADMIN_PHONE" \
+         "$ADMIN_USERNAME" "$ADMIN_PASSWORD" << 'PYEOF'
+import os, sys, uuid, bcrypt, psycopg2
 
 name, email, phone, username, password = sys.argv[1:6]
-host, port, dbname, user, pw           = sys.argv[6], int(sys.argv[7]), sys.argv[8], sys.argv[9], sys.argv[10]
+host    = os.environ["NARS_DB_HOST"]
+port    = int(os.environ["NARS_DB_PORT"])
+dbname  = os.environ["NARS_DB_NAME"]
+user    = os.environ["NARS_DB_USER"]
+pw      = os.environ["NARS_DB_PASSWORD_VAL"]
 
 new_id   = str(uuid.uuid4())
 pwd_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=11)).decode()
@@ -168,13 +195,11 @@ try:
     conn = psycopg2.connect(host=host, port=port, dbname=dbname, user=user, password=pw)
     cur  = conn.cursor()
 
-    # Uniqueness check — parameterised
     cur.execute("SELECT 1 FROM users WHERE username = %s OR email = %s LIMIT 1", (username, email))
     if cur.fetchone():
         print("DUPE", file=sys.stderr)
         conn.close(); sys.exit(2)
 
-    # Insert — all values as parameters, never interpolated into SQL
     cur.execute("""
         INSERT INTO users (
             id, name, email, phone, username, password_hash,
@@ -201,14 +226,16 @@ elif [[ ${PYEXIT} -ne 0 ]]; then
     die "Insert failed. See error above."
 fi
 
-# Re-run to capture UUID (previous run had heredoc; capture requires subshell)
-NEW_UUID=$(python3 - "${ADMIN_NAME}" "${ADMIN_EMAIL}" "${ADMIN_PHONE}" \
-                      "${ADMIN_USERNAME}" "${ADMIN_PASSWORD}" \
-                      "${DB_HOST}" "${DB_PORT}" "${DB_NAME}" "${DB_USER}" "${DB_PASSWORD}" << 'PYEOF'
-import sys, uuid, bcrypt, psycopg2
+# Capture UUID by re-querying
+NEW_UUID=$(python3 - "$ADMIN_USERNAME" << 'PYEOF'
+import os, sys, psycopg2
 
-name, email, phone, username, password = sys.argv[1:6]
-host, port, dbname, user, pw           = sys.argv[6], int(sys.argv[7]), sys.argv[8], sys.argv[9], sys.argv[10]
+username = sys.argv[1]
+host    = os.environ["NARS_DB_HOST"]
+port    = int(os.environ["NARS_DB_PORT"])
+dbname  = os.environ["NARS_DB_NAME"]
+user    = os.environ["NARS_DB_USER"]
+pw      = os.environ["NARS_DB_PASSWORD_VAL"]
 
 try:
     conn = psycopg2.connect(host=host, port=port, dbname=dbname, user=user, password=pw)

@@ -19,7 +19,7 @@ public record FeatureSaveRequest(
     [property: JsonPropertyName("type")][param: Required] string Type,
     [property: JsonPropertyName("layer")][param: Required] string Layer,
     [property: JsonPropertyName("label")][param: Required] string Label,
-    [property: JsonPropertyName("data")][param: Required][property: JsonRequired] JsonElement Data
+    [property: JsonPropertyName("data")][property: JsonRequired] JsonElement Data
 );
 
 /// <summary>

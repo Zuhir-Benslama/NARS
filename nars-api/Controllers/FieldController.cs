@@ -79,6 +79,7 @@ public class FieldController(
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> SubmitInspection([FromBody] FieldInspectRequest body, CancellationToken cancellationToken = default)
     {
+        if (body is null) return BadRequest(new { detail = "Request body is required." });
         var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
         if (user is null || user.Role != UserRoles.FieldWorker)
             return Forbid();
@@ -157,7 +158,7 @@ public class FieldController(
                 Id: i.Id.ToString(),
                 FeatureId: i.FeatureId.ToString(),
                 Type: i.Type,
-                Data: JsonSerializer.Deserialize<JsonElement>(i.Data),
+                Data: DeserializeJsonSafe(i.Data),
                 Status: i.Status,
                 CreatedAt: i.CreatedAt
             ))
@@ -176,6 +177,7 @@ public class FieldController(
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> CreateEntranceFromInspection([FromBody] FieldEntranceCreateRequest body, CancellationToken cancellationToken = default)
     {
+        if (body is null) return BadRequest(new { detail = "Request body is required." });
         var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
         if (user is null || user.Role != UserRoles.FieldWorker)
             return Forbid();
@@ -239,6 +241,12 @@ public class FieldController(
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private static JsonElement DeserializeJsonSafe(string json)
+    {
+        try { return JsonSerializer.Deserialize<JsonElement>(json); }
+        catch (JsonException) { return JsonDocument.Parse("{}").RootElement; }
+    }
 
     private async Task<(List<object> Items, int Total)> QueryFeaturesAsync(
         string tableName, Guid[] userIds, int skip, int take)

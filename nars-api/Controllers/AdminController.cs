@@ -132,6 +132,7 @@ public class AdminController(
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateAdmin([FromBody] CreateAdminRequest body, CancellationToken cancellationToken = default)
     {
+        if (body is null) return BadRequest(new { detail = "Request body is required." });
         var creator = await db.Users.FindAsync([CurrentUserId], cancellationToken);
         if (creator is null) return Unauthorized();
         var callerRole = creator.Role;
