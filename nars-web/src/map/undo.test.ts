@@ -82,7 +82,12 @@ describe("undo", () => {
     })
 
     it("returns label of the last deleted feature", () => {
-      recordDelete(makeEntry({ data: { type: "areas", label: "My Area", decisionNumber: "", decisionDate: "" } }), "areas")
+      recordDelete(
+        makeEntry({
+          data: { type: "areas", label: "My Area", decisionNumber: "", decisionDate: "" },
+        }),
+        "areas",
+      )
       expect(getUndoLabel()).toBe('Restore "My Area"')
     })
   })
@@ -133,10 +138,7 @@ describe("undo", () => {
 
       await undo()
 
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.stringContaining("Failed to restore"),
-        "error",
-      )
+      expect(mockToast).toHaveBeenCalledWith(expect.stringContaining("Failed to restore"), "error")
     })
 
     it("shows error when toApiSaveShape returns null", async () => {
@@ -148,10 +150,7 @@ describe("undo", () => {
 
       await undo()
 
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.stringContaining("Failed to restore"),
-        "error",
-      )
+      expect(mockToast).toHaveBeenCalledWith(expect.stringContaining("Failed to restore"), "error")
     })
 
     it("repairs cross-references for houseEntrances", async () => {
@@ -182,7 +181,10 @@ describe("undo", () => {
       recordDelete(entry, "houseEntrances")
 
       const mockFetch = vi.mocked(await import("../api")).apiFetch as ReturnType<typeof vi.fn>
-      mockFetch.mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue({ id: "new-main-id" }) })
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ id: "new-main-id" }),
+      })
 
       await undo()
 
@@ -194,7 +196,17 @@ describe("undo", () => {
   describe("entryDataToGeometry (via undo)", () => {
     it("handles marker features", async () => {
       recordDelete(
-        makeEntry({ type: "marker", data: { type: "markers", label: "Marker", lat: 5, lng: 10, decisionNumber: "", decisionDate: "" } }),
+        makeEntry({
+          type: "marker",
+          data: {
+            type: "markers",
+            label: "Marker",
+            lat: 5,
+            lng: 10,
+            decisionNumber: "",
+            decisionDate: "",
+          },
+        }),
         "areas",
       )
 

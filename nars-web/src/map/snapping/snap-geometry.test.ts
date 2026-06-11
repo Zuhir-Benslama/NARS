@@ -48,7 +48,7 @@ describe("snap-geometry", () => {
     it("computes pixel distance between cursor and projected point", () => {
       const dist = pixelDist(10, 10, 5, 5, project)
       expect(dist).not.toBeNull()
-      expect(dist).toBeCloseTo(Math.hypot(10 - 5, 10 - (-5)), 5)
+      expect(dist).toBeCloseTo(Math.hypot(10 - 5, 10 - -5), 5)
     })
 
     it("returns null on projection failure", () => {
@@ -117,15 +117,7 @@ describe("snap-geometry", () => {
       const projectIdentity = (ll: [number, number]) => ({ x: ll[0], y: ll[1] })
       const unprojectIdentity = (pt: [number, number]) =>
         ({ lng: pt[0], lat: pt[1] }) as unknown as maplibregl.LngLat
-      const result = closestOnCirclePerimeter(
-        10,
-        0,
-        10,
-        0,
-        100,
-        projectIdentity,
-        unprojectIdentity,
-      )
+      const result = closestOnCirclePerimeter(10, 0, 10, 0, 100, projectIdentity, unprojectIdentity)
       expect(result).toBeNull()
     })
 

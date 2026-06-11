@@ -54,7 +54,13 @@ describe("layerStore", () => {
   })
 
   it("updateFeature patches data by dbId", () => {
-    store.addFeature("areas", makeEntry({ dbId: "abc", data: { type: "areas", label: "Old", decisionNumber: "", decisionDate: "" } }))
+    store.addFeature(
+      "areas",
+      makeEntry({
+        dbId: "abc",
+        data: { type: "areas", label: "Old", decisionNumber: "", decisionDate: "" },
+      }),
+    )
     store.updateFeature("areas", "abc", { label: "New" })
     expect(store.areas[0].data.label).toBe("New")
   })
@@ -93,7 +99,13 @@ describe("layerStore", () => {
     const main = (dbId: string) =>
       makeEntry({
         dbId,
-        data: { type: "entrance", label: `Main ${dbId}`, entranceTypeKey: "main_entrance", decisionNumber: "", decisionDate: "" },
+        data: {
+          type: "entrance",
+          label: `Main ${dbId}`,
+          entranceTypeKey: "main_entrance",
+          decisionNumber: "",
+          decisionDate: "",
+        },
       })
     const secondary = (dbId: string) =>
       makeEntry({
@@ -123,7 +135,18 @@ describe("layerStore", () => {
       store.addFeature("areas", makeEntry())
       store.addFeature("areas", makeEntry())
       store.addFeature("roads", makeEntry())
-      store.addFeature("houseEntrances", makeEntry({ data: { type: "entrance", label: "M", entranceTypeKey: "main_entrance", decisionNumber: "", decisionDate: "" } }))
+      store.addFeature(
+        "houseEntrances",
+        makeEntry({
+          data: {
+            type: "entrance",
+            label: "M",
+            entranceTypeKey: "main_entrance",
+            decisionNumber: "",
+            decisionDate: "",
+          },
+        }),
+      )
 
       expect(store.areaCount).toBe(2)
       expect(store.roadCount).toBe(1)
