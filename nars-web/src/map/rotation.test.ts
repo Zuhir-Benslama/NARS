@@ -48,16 +48,12 @@ describe("rotation", () => {
 
     it("wraps bearing beyond 360", () => {
       setBearing(370)
-      expect(mockEaseTo).toHaveBeenCalledWith(
-        expect.objectContaining({ bearing: 10 }),
-      )
+      expect(mockEaseTo).toHaveBeenCalledWith(expect.objectContaining({ bearing: 10 }))
     })
 
     it("wraps negative bearing", () => {
       setBearing(-10)
-      expect(mockEaseTo).toHaveBeenCalledWith(
-        expect.objectContaining({ bearing: 350 }),
-      )
+      expect(mockEaseTo).toHaveBeenCalledWith(expect.objectContaining({ bearing: 350 }))
     })
   })
 
@@ -87,9 +83,7 @@ describe("rotation", () => {
       const ccw = container.querySelector("button")!
       ccw.click()
 
-      expect(mockEaseTo).toHaveBeenCalledWith(
-        expect.objectContaining({ bearing: 85 }),
-      )
+      expect(mockEaseTo).toHaveBeenCalledWith(expect.objectContaining({ bearing: 85 }))
     })
 
     it("cw button rotates clockwise", () => {
@@ -103,9 +97,7 @@ describe("rotation", () => {
       const cw = container.querySelectorAll("button")[1]
       cw.click()
 
-      expect(mockEaseTo).toHaveBeenCalledWith(
-        expect.objectContaining({ bearing: 95 }),
-      )
+      expect(mockEaseTo).toHaveBeenCalledWith(expect.objectContaining({ bearing: 95 }))
     })
   })
 })

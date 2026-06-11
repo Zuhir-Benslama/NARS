@@ -1,6 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-const { mockResetDrawState, mockResetEditState, mockResetUndoStack, mockResetSnapState, mockResetDrawControl, mockResetBoundaryEvents, mockResetRotation, mockResetMapState } = vi.hoisted(() => ({
+const {
+  mockResetDrawState,
+  mockResetEditState,
+  mockResetUndoStack,
+  mockResetSnapState,
+  mockResetDrawControl,
+  mockResetBoundaryEvents,
+  mockResetRotation,
+  mockResetMapState,
+} = vi.hoisted(() => ({
   mockResetDrawState: vi.fn(),
   mockResetEditState: vi.fn(),
   mockResetUndoStack: vi.fn(),

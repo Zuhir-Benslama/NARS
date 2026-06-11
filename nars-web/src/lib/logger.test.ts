@@ -29,7 +29,10 @@ describe("logger", () => {
   describe("captureError", () => {
     it("pushes a log entry with error details", async () => {
       const logger = await freshLogger()
-      const error = new NarsError(ErrorCode.VALIDATION, "Something failed", { url: "/test", method: "GET" })
+      const error = new NarsError(ErrorCode.VALIDATION, "Something failed", {
+        url: "/test",
+        method: "GET",
+      })
 
       logger.captureError(error)
       await logger.flushLogs()

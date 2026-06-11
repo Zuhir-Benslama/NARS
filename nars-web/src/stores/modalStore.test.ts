@@ -1,6 +1,13 @@
 import { describe, it, expect, beforeEach } from "vitest"
 import { createPinia, setActivePinia } from "pinia"
-import { useModalStore, awaitModalResult, openModal, openEditModal, resolveModal, currentModalFeatureId } from "./modalStore"
+import {
+  useModalStore,
+  awaitModalResult,
+  openModal,
+  openEditModal,
+  resolveModal,
+  currentModalFeatureId,
+} from "./modalStore"
 import type { ModalResult } from "../types/modal"
 
 const emptyResult: ModalResult = {
@@ -97,7 +104,11 @@ describe("modalStore", () => {
       const store = useModalStore()
       const promise = awaitModalResult()
       store.close({ label: "Done", decisionNumber: "", decisionDate: "" })
-      await expect(promise).resolves.toEqual({ label: "Done", decisionNumber: "", decisionDate: "" })
+      await expect(promise).resolves.toEqual({
+        label: "Done",
+        decisionNumber: "",
+        decisionDate: "",
+      })
     })
 
     it("awaitModalResult resolves to null when close is called without result", async () => {
