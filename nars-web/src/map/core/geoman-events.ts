@@ -51,7 +51,7 @@ export function registerGeomanEvents(): void {
 
   // ── Double-click to remove a vertex in edit mode ──────────────────────────
   map.on("dblclick", (e: MapLibreMapMouseEvent) => {
-    if (!isEditMode) return
+    if (!isEditMode()) return
     e.preventDefault()
 
     const gm = ctx.geoman

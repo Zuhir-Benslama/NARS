@@ -80,7 +80,7 @@ function watchDrawType() {
         }
       }
 
-      if (!isEditMode) {
+      if (!isEditMode()) {
         enableCrosshair()
         disableSnapping()
         enableSnapping()

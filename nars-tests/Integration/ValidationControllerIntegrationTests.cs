@@ -6,6 +6,7 @@ using NarsApi.Controllers;
 using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Models;
+using NarsApi.Services;
 using Xunit;
 
 namespace NarsApi.Tests.Integration;
@@ -32,7 +33,7 @@ public class ValidationControllerIntegrationTests : IAsyncLifetime
             ["Validation:RoadConnectivityMeters"] = "20",
             ["Validation:DistrictBoundaryToleranceMeters"] = "10",
         }).Build();
-        _controller = new ValidationController(_db, config);
+        _controller = new ValidationController(_db, config, Mock.Of<IValidationService>());
     }
 
     public async Task InitializeAsync()

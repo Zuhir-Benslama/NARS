@@ -105,6 +105,51 @@ async function onFeatureCreated(e: GeomanCreateEvent): Promise<void> {
   }
 }
 
+// ─── NEAREST FEATURE LOOKUP ────────────────────────────────────────────────────
+
+function findNearestFeatureAtPoint(
+  px: number,
+  py: number,
+): { dbId: string; phaseKey: string } | null {
+  const allFeatures = featuresStore.getAll()
+  let nearestDbId: string | null = null
+  let nearestPhaseKey: string | null = null
+  let nearestDist = 20
+
+  for (const f of allFeatures) {
+    const fPhaseKey = f.properties?.phaseKey
+    const fDbId = f.properties?.dbId
+    if (!fDbId || !fPhaseKey) continue
+
+    if (fPhaseKey === "roads" || fPhaseKey === "houseEntrances") {
+      if (f.geometry.type === "Point") {
+        const point = ctx.map.project([f.geometry.coordinates[0], f.geometry.coordinates[1]])
+        const dist = Math.sqrt((point.x - px) ** 2 + (point.y - py) ** 2)
+        if (dist < nearestDist) {
+          nearestDist = dist
+          nearestDbId = fDbId
+          nearestPhaseKey = fPhaseKey
+        }
+      }
+      if (f.geometry.type === "LineString") {
+        const coords = f.geometry.coordinates as [number, number][]
+        for (let i = 0; i < coords.length - 1; i++) {
+          const p1 = ctx.map.project([coords[i][0], coords[i][1]])
+          const p2 = ctx.map.project([coords[i + 1][0], coords[i + 1][1]])
+          const dist = pointToSegmentDist(px, py, p1.x, p1.y, p2.x, p2.y)
+          if (dist < nearestDist) {
+            nearestDist = dist
+            nearestDbId = fDbId
+            nearestPhaseKey = fPhaseKey
+          }
+        }
+      }
+    }
+  }
+
+  return nearestDbId && nearestPhaseKey ? { dbId: nearestDbId, phaseKey: nearestPhaseKey } : null
+}
+
 // ─── CONTEXT MENU HANDLER ─────────────────────────────────────────────────────
 
 function onContextMenu(e: MouseEvent): void {
@@ -112,7 +157,7 @@ function onContextMenu(e: MouseEvent): void {
   const mapEl = ctx.map.getContainer()
   if (!mapEl.contains(e.target as Node)) return
 
-  if (isEditMode) {
+  if (isEditMode()) {
     e.preventDefault()
     commitEditMode().catch((err) => debugError("[CONTEXT] commitEditMode:", err))
     return
@@ -165,44 +210,9 @@ function onContextMenu(e: MouseEvent): void {
   if (feature && feature.properties?.dbId && feature.properties?.phaseKey) {
     showContextMenu(e.clientX, e.clientY, feature.properties.dbId, feature.properties.phaseKey)
   } else {
-    const allFeatures = featuresStore.getAll()
-    let nearestDbId: string | null = null
-    let nearestPhaseKey: string | null = null
-    let nearestDist = 20
-
-    for (const f of allFeatures) {
-      const fPhaseKey = f.properties?.phaseKey
-      const fDbId = f.properties?.dbId
-      if (!fDbId || !fPhaseKey) continue
-
-      if (fPhaseKey === "roads" || fPhaseKey === "houseEntrances") {
-        if (f.geometry.type === "Point") {
-          const point = ctx.map.project([f.geometry.coordinates[0], f.geometry.coordinates[1]])
-          const dist = Math.sqrt((point.x - px) ** 2 + (point.y - py) ** 2)
-          if (dist < nearestDist) {
-            nearestDist = dist
-            nearestDbId = fDbId
-            nearestPhaseKey = fPhaseKey
-          }
-        }
-        if (f.geometry.type === "LineString") {
-          const coords = f.geometry.coordinates
-          for (let i = 0; i < coords.length - 1; i++) {
-            const p1 = ctx.map.project([coords[i][0], coords[i][1]])
-            const p2 = ctx.map.project([coords[i + 1][0], coords[i + 1][1]])
-            const dist = pointToSegmentDist(px, py, p1.x, p1.y, p2.x, p2.y)
-            if (dist < nearestDist) {
-              nearestDist = dist
-              nearestDbId = fDbId
-              nearestPhaseKey = fPhaseKey
-            }
-          }
-        }
-      }
-    }
-
-    if (nearestDbId && nearestPhaseKey) {
-      showContextMenu(e.clientX, e.clientY, nearestDbId, nearestPhaseKey)
+    const nearest = findNearestFeatureAtPoint(px, py)
+    if (nearest) {
+      showContextMenu(e.clientX, e.clientY, nearest.dbId, nearest.phaseKey)
     } else {
       showMapContextMenu(e.clientX, e.clientY, phase)
     }
@@ -213,7 +223,7 @@ function onContextMenu(e: MouseEvent): void {
 
 function onClick(e: MapLibreMapMouseEvent & { point: { x: number; y: number } }): void {
   const appStore = useAppStore()
-  if (isEditMode) return
+  if (isEditMode()) return
   if (ctx.geoman && ctx.geoman.getActiveDrawModes?.().length > 0) return
 
   const phase = PHASES[appStore.currentPhase]
@@ -266,7 +276,7 @@ function onKeyDown(e: KeyboardEvent): void {
         .catch((err) => debugError("[KEYDOWN] disableDraw:", err))
       return
     }
-    if (isEditMode) {
+  if (isEditMode()) {
       e.preventDefault()
       e.stopImmediatePropagation()
       cancelEditMode().catch((err) => debugError("[KEYDOWN] cancelEditMode:", err))

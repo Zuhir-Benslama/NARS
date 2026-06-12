@@ -9,6 +9,10 @@ COPY nars-web/ .
 RUN npm run typecheck && npm run build
 
 FROM nginx:1.27-alpine AS final
+
+LABEL org.opencontainers.image.title="NARS Vite Frontend" \
+      org.opencontainers.image.description="NARS Vue 3 + Vite frontend" \
+      org.opencontainers.image.source="https://github.com/zuhirbenslama/nars"
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nars-infra/docker/nginx.nars-vite.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80

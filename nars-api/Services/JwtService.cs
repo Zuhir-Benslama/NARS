@@ -13,7 +13,7 @@ namespace NarsApi.Services;
 /// The configuration (secret, issuer, audience) is injected via the constructor
 /// to ensure consistency with the Authentication middleware.
 /// </summary>
-public class JwtService(string secret, string? issuer, string? audience, IConfiguration config, ILogger<JwtService> logger) : IJwtService
+public class JwtService(string secret, string? issuer, string? audience, IConfiguration config, ILogger<JwtService> logger, IDateTimeProvider timeProvider) : IJwtService
 {
     private readonly string _secret = secret ?? throw new ArgumentNullException(nameof(secret));
     private readonly int _expiresMinutes = ParseIntConfig(config["Jwt:ExpiresInMinutes"], 1440);
@@ -46,7 +46,7 @@ public class JwtService(string secret, string? issuer, string? audience, IConfig
             issuer: _issuer,
             audience: _audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(_expiresMinutes),
+            expires: timeProvider.UtcNow.AddMinutes(_expiresMinutes),
             signingCredentials: creds
         );
 

@@ -1,6 +1,7 @@
 ---
 grafana:
-  # Password must be set at install time via --set grafana.adminPassword=$GRAFANA_PASSWORD
+  # Password must be set at install time via --set
+  # grafana.adminPassword=$GRAFANA_PASSWORD
   # Do NOT hardcode a password here. The Makefile handles this automatically.
   service:
     type: ClusterIP

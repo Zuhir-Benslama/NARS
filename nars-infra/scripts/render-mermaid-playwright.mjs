@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { firefox } from 'playwright';
 import { readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';

@@ -47,7 +47,7 @@ command -v python3 >/dev/null 2>&1 || die "python3 not found."
 # Auto-install Python dependencies
 for pkg in psycopg2-binary bcrypt; do
     module="${pkg%%-*}"
-    if ! python3 -c "import ${module}" 2>/dev/null; then
+    if ! python3 -c "import sys; __import__(sys.argv[1])" "${module}" 2>/dev/null; then
         warn "Python package '${pkg}' not found. Installing..."
         if pip3 install "${pkg}" --quiet 2>/dev/null \
            || pip3 install "${pkg}" --quiet --break-system-packages 2>/dev/null; then
@@ -177,11 +177,14 @@ fi
 # is a bootstrap account — sequential ordering is not required here.
 info "Hashing password and inserting record..."
 
+export NARS_ADMIN_PASSWORD_VAL="${ADMIN_PASSWORD}"
+
 python3 - "$ADMIN_NAME" "$ADMIN_EMAIL" "$ADMIN_PHONE" \
-         "$ADMIN_USERNAME" "$ADMIN_PASSWORD" << 'PYEOF'
+         "$ADMIN_USERNAME" << 'PYEOF'
 import os, sys, uuid, bcrypt, psycopg2
 
-name, email, phone, username, password = sys.argv[1:6]
+name, email, phone, username = sys.argv[1:5]
+password = os.environ["NARS_ADMIN_PASSWORD_VAL"]
 host    = os.environ["NARS_DB_HOST"]
 port    = int(os.environ["NARS_DB_PORT"])
 dbname  = os.environ["NARS_DB_NAME"]

@@ -1,9 +1,6 @@
-// ─── EDIT STATE ───────────────────────────────────────────────────────
-// Shared state for edit mode: active entry, coordinate snapshot, and
-// Geoman feature tracking. Also contains lookup helpers and fill suppression.
-
 import { useSelectionStore } from "../../stores/selectionStore"
 import { useLayerStore } from "../../stores/layerStore"
+import { useEditStore } from "../../stores/editStore"
 import type { LayerState } from "../../stores/layerStore"
 import type { LayerEntry, LatLng } from "../../types"
 import { ctx, updateSelectionHighlight } from "../core/state"
@@ -15,72 +12,60 @@ import {
   setEditModeActive,
 } from "../snapping/snapping"
 import { unpatchMarkerPointerSnap } from "./edit-snap"
-import { hideEditSaveButton } from "./edit-ui"
 
-export let isEditMode = false
-
-let activeGeomanFeatureId: string | null = null
-let activeEditEntry: LayerEntry | null = null
-let activeEditCoordsSnapshot: LatLng[] | null = null
-
-export function getActiveEditEntry(): LayerEntry | null {
-  return activeEditEntry
+export function isEditMode(): boolean {
+  return useEditStore().isEditMode
 }
 
 export function getActiveGeomanFeatureId(): string | null {
-  return activeGeomanFeatureId
+  return useEditStore().activeGeomanFeatureId
 }
 
-export function setActiveGeomanFeatureId(id: string | null): void {
-  activeGeomanFeatureId = id
+export function getActiveEditEntry(): LayerEntry | null {
+  return useEditStore().activeEditEntry
 }
 
 export function getActiveEditCoordsSnapshot(): LatLng[] | null {
-  return activeEditCoordsSnapshot
+  return useEditStore().activeEditCoordsSnapshot
+}
+
+export function setActiveGeomanFeatureId(id: string | null): void {
+  useEditStore().setActiveGeomanFeatureId(id)
 }
 
 export function setActiveEditCoordsSnapshot(snapshot: LatLng[] | null): void {
-  activeEditCoordsSnapshot = snapshot
+  useEditStore().setActiveEditCoordsSnapshot(snapshot)
 }
 
 export function setActiveEditEntry(entry: LayerEntry | null): void {
-  activeEditEntry = entry
+  useEditStore().setActiveEditEntry(entry)
 }
-
-// ─── STATE RESET (for testing & HMR) ──────────────────────────────────────────
 
 export function resetEditState(): void {
-  isEditMode = false
-  activeGeomanFeatureId = null
-  activeEditEntry = null
-  activeEditCoordsSnapshot = null
+  useEditStore().resetEdit()
 }
-
-// ─── DISABLE EDIT MODE ───────────────────────────────────────────────────
 
 export function disableEditMode(): void {
   if (!ctx.geoman) return
+  const store = useEditStore()
   unpatchMarkerPointerSnap()
   ctx.geoman.disableGlobalEditMode()
-  isEditMode = false
+  store.isEditMode = false
   setEditModeActive(false)
-  activeGeomanFeatureId = null
-  activeEditEntry = null
-  activeEditCoordsSnapshot = null
+  store.setActiveGeomanFeatureId(null)
+  store.setActiveEditEntry(null)
+  store.setActiveEditCoordsSnapshot(null)
   setSnapExclude(null)
   useSelectionStore().selectFeature(null)
   updateSelectionHighlight(null)
   enableCrosshair()
   reEnableSnapping()
-  hideEditSaveButton()
 }
 
 function reEnableSnapping(): void {
   disableSnapping()
   enableSnapping()
 }
-
-// ─── LOOKUP HELPERS ───────────────────────────────────────────────────
 
 export function findLayerEntryByFeatureId(featureId: string | undefined): LayerEntry | null {
   if (!featureId) return null
@@ -93,8 +78,6 @@ export function findLayerEntryByFeatureId(featureId: string | undefined): LayerE
   }
   return null
 }
-
-// ─── GEOMAN FILL SUPPRESSION ──────────────────────────────────────────
 
 export function suppressGeomanFill(): void {
   for (const layerId of ["gm_main-polygon__fill-layer-0", "gm_temporary-polygon__fill-layer-0"]) {

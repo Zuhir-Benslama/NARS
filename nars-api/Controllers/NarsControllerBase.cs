@@ -96,4 +96,19 @@ public abstract class NarsControllerBase : ControllerBase
             IsEssential = true,
         };
     }
+
+    /// <summary>
+    /// Validates that the required geographic fields are present for a given role.
+    /// Returns an error message if invalid, null if valid.
+    /// </summary>
+    internal static string? ValidateGeographicFields(string role, int? communeId, int? dairaId, int? wilayaId) =>
+        role switch
+        {
+            UserRoles.CommuneUser when !communeId.HasValue => "commune_id is required for commune_user.",
+            UserRoles.DairaAdmin when !dairaId.HasValue => "daira_id is required for daira_admin.",
+            UserRoles.WilayaAdmin when !wilayaId.HasValue => "wilaya_id is required for wilaya_admin.",
+            UserRoles.NationalAdmin => "national_admin accounts must be created directly in the database.",
+            UserRoles.FieldWorker => null,
+            _ => null,
+        };
 }

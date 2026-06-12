@@ -30,12 +30,13 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
         _db = fixture.CreateDbContext();
 
         var config = CreateConfigMock();
-        var jwt = new JwtService("integration-test-secret-key-that-is-32chars!!", null, null, config.Object, Mock.Of<Microsoft.Extensions.Logging.ILogger<JwtService>>());
+        var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == DateTime.UtcNow);
+        var jwt = new JwtService("integration-test-secret-key-that-is-32chars!!", null, null, config.Object, Mock.Of<Microsoft.Extensions.Logging.ILogger<JwtService>>(), timeProvider);
         var scatteredMock = new Mock<IScatteredAreaService>();
         scatteredMock.Setup(s => s.RefreshAsync(It.IsAny<Guid>(), It.IsAny<int>())).Returns(Task.CompletedTask);
         var bgQueueMock = Mock.Of<IBackgroundTaskQueue>();
 
-        _controller = new FeaturesController(_db, scatteredMock.Object, bgQueueMock, Mock.Of<Microsoft.Extensions.Logging.ILogger<FeaturesController>>());
+        _controller = new FeaturesController(_db, scatteredMock.Object, bgQueueMock, Mock.Of<Microsoft.Extensions.Logging.ILogger<FeaturesController>>(), config.Object, timeProvider, Mock.Of<IFeatureStatsService>());
     }
 
     public async Task InitializeAsync()

@@ -1,5 +1,7 @@
 <template>
   <ProfileMenu />
+  <EditSaveButton />
+  <ContextMenu />
 
   <template v-if="isAdminUser">
     <AdminDashboard />
@@ -56,6 +58,8 @@ import TileControl from "./components/TileControl.vue"
 import FeatureModal from "./components/FeatureModal.vue"
 import AdminDashboard from "./components/AdminDashboard.vue"
 import FieldPanel from "./components/FieldPanel.vue"
+import EditSaveButton from "./components/EditSaveButton.vue"
+import ContextMenu from "./components/ContextMenu.vue"
 import { useAppStore } from "./stores/appStore"
 
 const appStore = useAppStore()

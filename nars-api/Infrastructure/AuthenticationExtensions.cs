@@ -82,7 +82,8 @@ public static class AuthenticationExtensions
         {
             var config = sp.GetRequiredService<IConfiguration>();
             var logger = sp.GetRequiredService<ILogger<JwtService>>();
-            return new JwtService(jwtSecret, issuer, audience, config, logger);
+            var timeProvider = sp.GetRequiredService<IDateTimeProvider>();
+            return new JwtService(jwtSecret, issuer, audience, config, logger, timeProvider);
         });
 
         return services;

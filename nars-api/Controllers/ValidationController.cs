@@ -1,24 +1,21 @@
 using System.Globalization;
-using System.Data;
-using System.Data.Common;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
-
+using NarsApi.Services;
 
 namespace NarsApi.Controllers;
 
-// fix #2 & #9: Extends NarsControllerBase ([Authorize] + CurrentUserId/CurrentCommuneId)
-// instead of duplicating the manual RequireAuth() helper.
 [ApiController]
 [Route("/api")]
 [Tags("Validation")]
 public class ValidationController(
     AppDbContext db,
-    IConfiguration config) : NarsControllerBase
+    IConfiguration config,
+    IValidationService validationService) : NarsControllerBase
 {
     private double DistrictBoundaryToleranceMeters =>
         double.TryParse(config["Validation:DistrictBoundaryToleranceMeters"], out var v) ? v : 10.0;
@@ -32,17 +29,6 @@ public class ValidationController(
     private int MaxCoordinateCount =>
         int.TryParse(config["Validation:MaxCoordinateCount"], out var v) ? v : 10_000;
 
-    // ── Feature table names (from registry — single source of truth) ─────────
-    private static string RoadTable => FeatureTypeRegistry.GetDescriptor(FeatureTypes.Road)?.TableName ?? "roads";
-    private static string AreaTable => FeatureTypeRegistry.GetDescriptor(FeatureTypes.Area)?.TableName ?? "areas";
-    private static string DistrictTable => FeatureTypeRegistry.GetDescriptor(FeatureTypes.District)?.TableName ?? "districts";
-
-    // fix #4: PolygonFromDataSql and LineStringFromDataSql are now imported from
-    // SqlFragments (both include ST_MakeValid) instead of being declared locally.
-    // Use the shared constants directly in all queries below.
-
-    // ── GET /api/validate/area/main-urban-exists ──────────────────────────────
-
     [HttpGet("validate/area/main-urban-exists")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> MainUrbanExists(CancellationToken cancellationToken = default)
@@ -54,8 +40,6 @@ public class ValidationController(
         return Ok(new { exists });
     }
 
-    // ── POST /api/validate/road ───────────────────────────────────────────────
-
     [HttpPost("validate/road")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -65,11 +49,9 @@ public class ValidationController(
         if (body.Coordinates.Count < 2)
             return BadRequest(new ValidateRoadResponse(false, "A road must have at least 2 points."));
 
-        // Bounds checking: prevent DoS via excessive coordinate counts.
         if (!CheckCoordinateBounds(body.Coordinates, out var boundsError))
             return BadRequest(new ValidateRoadResponse(false, boundsError!));
 
-        // Rule 1: angle check (pure C#)
         for (int i = 0; i < body.Coordinates.Count - 2; i++)
         {
             var A = body.Coordinates[i];
@@ -92,49 +74,21 @@ public class ValidationController(
                     $"Road turn at point {i + 2} is {angle:F1}°, which exceeds the {MaxRoadTurnAngleDegrees}° maximum."));
         }
 
-        // Rule 2: connectivity check (PostGIS) — first road is exempt
         var existingCount = await db.Roads.CountAsync(f => f.UserId == CurrentUserId, cancellationToken);
 
         if (existingCount == 0)
             return Ok(new ValidateRoadResponse(true, null));
 
         var wkt = BuildLineStringWkt(body.Coordinates);
-        var conn = db.Database.GetDbConnection();
+        bool connected = await validationService.CheckRoadConnectivityAsync(
+            RequiredCurrentUserId, wkt, RoadConnectivityDistanceMeters, cancellationToken);
 
-        await db.Database.OpenConnectionAsync(cancellationToken);
-        try
-        {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = $@"
-                SELECT EXISTS (
-                    SELECT 1
-                    FROM {RoadTable} f
-                    WHERE f.user_id = @uid
-                      AND ST_DWithin(
-                            ({SqlFragments.LineStringFromData})::geography,
-                            ST_SetSRID(ST_GeomFromText(@wkt), 4326)::geography,
-                            {RoadConnectivityDistanceMeters}
-                          )
-                )";
-            AddParam(cmd, "@uid", RequiredCurrentUserId);
-            AddParam(cmd, "@wkt", wkt);
-
-            var result = await cmd.ExecuteScalarAsync(cancellationToken);
-            bool connected = Convert.ToBoolean(result);
-
-            if (!connected)
-                return Ok(new ValidateRoadResponse(false,
-                    "This road must connect to at least one existing road (within 20 m of an endpoint)."));
-        }
-        finally
-        {
-            await db.Database.CloseConnectionAsync();
-        }
+        if (!connected)
+            return Ok(new ValidateRoadResponse(false,
+                "This road must connect to at least one existing road (within 20 m of an endpoint)."));
 
         return Ok(new ValidateRoadResponse(true, null));
     }
-
-    // ── POST /api/validate/district ───────────────────────────────────────────
 
     [HttpPost("validate/district")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -153,35 +107,24 @@ public class ValidationController(
             return Ok(new ValidateDistrictResponse(true, null));
 
         var wkt = BuildPolygonWkt(body.Coordinates);
-        var conn = db.Database.GetDbConnection();
 
-        await db.Database.OpenConnectionAsync(cancellationToken);
-        try
+        if (await validationService.CheckDistrictOverlapAsync(RequiredCurrentUserId, wkt, cancellationToken))
+            return Ok(new ValidateDistrictResponse(false,
+                "This district overlaps an existing district. Districts must share edges but not overlap."));
+
+        var skipAdjacency = body.DistrictTypeKey == FeatureTypes.DistrictLayers.TradActivitiesZone ||
+                            body.DistrictTypeKey == FeatureTypes.DistrictLayers.IndustryZone;
+
+        if (!skipAdjacency)
         {
-            if (await CheckOverlapAsync(conn, wkt, cancellationToken))
+            var siblings = await validationService.CountSiblingsInSameAreaAsync(RequiredCurrentUserId, wkt, cancellationToken);
+            if (siblings > 0 && !await validationService.CheckDistrictAdjacencyAsync(RequiredCurrentUserId, wkt, cancellationToken))
                 return Ok(new ValidateDistrictResponse(false,
-                    "This district overlaps an existing district. Districts must share edges but not overlap."));
-
-            var skipAdjacency = body.DistrictTypeKey == FeatureTypes.DistrictLayers.TradActivitiesZone ||
-                                body.DistrictTypeKey == FeatureTypes.DistrictLayers.IndustryZone;
-
-            if (!skipAdjacency)
-            {
-                var siblings = await CountSiblingsInSameAreaAsync(conn, wkt, cancellationToken);
-                if (siblings > 0 && !await CheckAdjacencyAsync(conn, wkt, cancellationToken))
-                    return Ok(new ValidateDistrictResponse(false,
-                        "This district does not connect to any existing district in this urban area. Districts must share a boundary (no gaps)."));
-            }
-        }
-        finally
-        {
-            await db.Database.CloseConnectionAsync();
+                    "This district does not connect to any existing district in this urban area. Districts must share a boundary (no gaps)."));
         }
 
         return Ok(new ValidateDistrictResponse(true, null));
     }
-
-    // ── GET /api/validate/districts/coverage ─────────────────────────────────
 
     [HttpGet("validate/districts/coverage")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -201,41 +144,8 @@ public class ValidationController(
             return Ok(new DistrictCoverageResponse(false,
                 "No districts have been drawn yet. Districts must fully cover all urban areas."));
 
-        var conn = db.Database.GetDbConnection();
-        bool covered;
-        await db.Database.OpenConnectionAsync(cancellationToken);
-        try
-        {
-            using var cmd = conn.CreateCommand();
-            // fix #13: DistrictBoundaryToleranceMeters replaces the magic literal 10.
-            cmd.CommandText = $@"
-                WITH
-                urban AS (
-                    SELECT ST_Union({SqlFragments.PolygonFromData}) AS geom
-                    FROM {AreaTable} f
-                    WHERE f.user_id = @uid
-                      AND f.layer  IN ('central_urban', 'secondary_urban')
-                ),
-                districts AS (
-                    SELECT ST_Union({SqlFragments.PolygonFromData}) AS geom
-                    FROM {DistrictTable} f
-                    WHERE f.user_id = @uid
-                )
-                SELECT ST_Covers(
-                    ST_Buffer(districts.geom::geography, {DistrictBoundaryToleranceMeters})::geometry,
-                    urban.geom
-                )
-                FROM urban, districts
-                WHERE urban.geom IS NOT NULL AND districts.geom IS NOT NULL";
-            AddParam(cmd, "@uid", RequiredCurrentUserId);
-
-            var result = await cmd.ExecuteScalarAsync(cancellationToken);
-            covered = result is bool b && b;
-        }
-        finally
-        {
-            await db.Database.CloseConnectionAsync();
-        }
+        bool covered = await validationService.CheckDistrictCoverageAsync(
+            RequiredCurrentUserId, DistrictBoundaryToleranceMeters, cancellationToken);
 
         return Ok(new DistrictCoverageResponse(
             covered,
@@ -243,8 +153,6 @@ public class ValidationController(
                 ? "All urban areas are fully covered by districts."
                 : "Districts do not yet fully cover all urban areas. Please fill any remaining gaps before proceeding."));
     }
-
-    // ── Input validation ───────────────────────────────────────
 
     private bool CheckCoordinateBounds(List<CoordDto> coords, out string? error)
     {
@@ -259,71 +167,6 @@ public class ValidationController(
         return true;
     }
 
-    // ── Query helpers ─────────────────────────────────────────
-
-    private async Task<bool> CheckOverlapAsync(DbConnection conn, string wkt, CancellationToken cancellationToken)
-    {
-        using var cmd = conn.CreateCommand();
-            cmd.CommandText = $@"
-            SELECT EXISTS (
-                SELECT 1 FROM {DistrictTable} f
-                WHERE f.user_id = @uid
-                  AND ST_Intersects(
-                        ({SqlFragments.PolygonFromData}),
-                        ST_SetSRID(ST_GeomFromText(@wkt), 4326)
-                      )
-            )";
-        AddParam(cmd, "@uid", RequiredCurrentUserId);
-        AddParam(cmd, "@wkt", wkt);
-        var result = await cmd.ExecuteScalarAsync(cancellationToken);
-        return result is bool b && b;
-    }
-
-    private async Task<long> CountSiblingsInSameAreaAsync(DbConnection conn, string wkt, CancellationToken cancellationToken)
-    {
-        using var cmd = conn.CreateCommand();
-            cmd.CommandText = $@"
-            SELECT COUNT(*) FROM {DistrictTable} d
-            WHERE d.user_id = @uid
-              AND EXISTS (
-                  SELECT 1 FROM {AreaTable} a
-                  WHERE a.user_id = @uid
-                    AND a.layer IN ('central_urban', 'secondary_urban')
-                    AND ST_Intersects(({SqlFragments.PolygonFromDataWithAlias("a")}), ST_SetSRID(ST_GeomFromText(@wkt), 4326))
-                    AND ST_Intersects(({SqlFragments.PolygonFromDataWithAlias("a")}), ({SqlFragments.PolygonFromDataWithAlias("d")}))
-              )";
-        AddParam(cmd, "@uid", RequiredCurrentUserId);
-        AddParam(cmd, "@wkt", wkt);
-        return Convert.ToInt64(await cmd.ExecuteScalarAsync(cancellationToken));
-    }
-
-    private async Task<bool> CheckAdjacencyAsync(DbConnection conn, string wkt, CancellationToken cancellationToken)
-    {
-        using var cmd = conn.CreateCommand();
-            cmd.CommandText = $@"
-            SELECT EXISTS (
-                SELECT 1 FROM {DistrictTable} f
-                WHERE f.user_id = @uid
-                  AND (ST_Touches(ST_SetSRID(ST_GeomFromText(@wkt), 4326), ({SqlFragments.PolygonFromData}))
-                       OR ST_Intersects(ST_Boundary(ST_SetSRID(ST_GeomFromText(@wkt), 4326)), ST_Boundary({SqlFragments.PolygonFromData})))
-                  AND EXISTS (
-                      SELECT 1 FROM {AreaTable} a
-                      WHERE a.user_id = @uid
-                        AND a.layer IN ('central_urban', 'secondary_urban')
-                        AND ST_Intersects(({SqlFragments.PolygonFromDataWithAlias("a")}), ST_SetSRID(ST_GeomFromText(@wkt), 4326))
-                        AND ST_Intersects(({SqlFragments.PolygonFromDataWithAlias("a")}), ({SqlFragments.PolygonFromDataWithAlias("f")}))
-                  )
-            )";
-        AddParam(cmd, "@uid", RequiredCurrentUserId);
-        AddParam(cmd, "@wkt", wkt);
-        var result = await cmd.ExecuteScalarAsync(cancellationToken);
-        return result is bool b && b;
-    }
-
-    // ── WKT builders ───────────────────────────────────────────
-
-    // Use InvariantCulture so doubles always format with '.' decimal separator,
-    // regardless of server locale (e.g. fr-DZ would use ',' otherwise).
     private static string FormatDouble(double v) => v.ToString(CultureInfo.InvariantCulture);
 
     private static string BuildLineStringWkt(List<CoordDto> coords) =>

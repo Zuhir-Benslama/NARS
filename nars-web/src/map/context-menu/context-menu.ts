@@ -14,7 +14,7 @@ import { setHouseNumbers } from "../house-numbering"
 import { setReferenceRoad, clearReferenceRoad, setReferenceEntrance } from "../house-entrances"
 import { generateNamingPanels } from "../naming-panels"
 import { computeAndApplyRoadDirections, updateEndpointMarkers } from "../roads/road-directions"
-import { getCtxEl, setMenuItems, placeMenu, type CtxMenuItem } from "./ctx-menu-ui"
+import { useContextMenuStore, type CtxMenuItem } from "../../stores/contextMenuStore"
 import {
   enableEditGeometry,
   editFeatureInfo,
@@ -37,7 +37,6 @@ interface DrawContextEvent {
 }
 
 export function showContextMenu(x: number, y: number, dbId: string, phaseKey: string): void {
-  const el = getCtxEl()
   const layerStore = useLayerStore()
   const state = layerStore.$state as LayerState
   const currentPhase = PHASES[useAppStore().currentPhase]
@@ -58,8 +57,7 @@ export function showContextMenu(x: number, y: number, dbId: string, phaseKey: st
       false)
 
   if (isCityCenter && currentPhaseKey !== "cityCenter") {
-    setMenuItems(el, [{ label: t("ctx_cc_lock"), onClick: () => {} }])
-    placeMenu(el, x, y)
+    useContextMenuStore().show(x, y, [{ label: t("ctx_cc_lock"), onClick: () => {} }])
     return
   }
 
@@ -121,8 +119,7 @@ export function showContextMenu(x: number, y: number, dbId: string, phaseKey: st
     },
   })
 
-  setMenuItems(el, items)
-  placeMenu(el, x, y)
+  useContextMenuStore().show(x, y, items)
 }
 
 export function bindContextMenu(e: DrawContextEvent, dbId: string, phaseKey: string): void {
@@ -139,7 +136,6 @@ export async function showMapContextMenu(
   y: number,
   phase: (typeof PHASES)[number],
 ): Promise<void> {
-  const el = getCtxEl()
   const items: CtxMenuItem[] = []
 
   if (phase.key === "roads") {
@@ -170,6 +166,5 @@ export async function showMapContextMenu(
     },
   })
 
-  setMenuItems(el, items)
-  placeMenu(el, x, y)
+  useContextMenuStore().show(x, y, items)
 }

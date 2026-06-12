@@ -1,5 +1,11 @@
 FROM postgis/postgis:17-3.5
 
+LABEL org.opencontainers.image.title="NARS PostGIS" \
+      org.opencontainers.image.description="NARS PostgreSQL + PostGIS database" \
+      org.opencontainers.image.source="https://github.com/zuhirbenslama/nars"
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 COPY nars-infra/docs/nars_db.sql /docker-entrypoint-initdb.d/01-nars-schema.sql
 COPY nars-infra/docs/seed_reference_data.sql /docker-entrypoint-initdb.d/02-seed-reference-data.sql
 

@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using NarsApi.Data;
 using NarsApi.DTOs;
+using NarsApi.Infrastructure;
+using NarsApi.Services;
 
 namespace NarsApi.Controllers;
 
@@ -18,7 +20,11 @@ namespace NarsApi.Controllers;
 [ApiController]
 [Route("/api")]
 [Tags("Locations")]
-public class LocationsController(AppDbContext db, IMemoryCache cache, IConfiguration config) : ControllerBase
+public class LocationsController(
+    AppDbContext db,
+    IMemoryCache cache,
+    IConfiguration config,
+    IBoundaryService boundaryService) : ControllerBase
 {
     private const string WilayaCacheKey = "wilayas_all";
     private const string DairaCacheKeyPrefix = "dairas_wilaya_";
@@ -50,9 +56,9 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
         take = Math.Clamp(take, 1, 500);
 
         // Guard against excessively long search strings (defense-in-depth).
-        const int MaxSearchLength = 200;
-        if (search.Length > MaxSearchLength)
-            return BadRequest(new { detail = $"Search query is too long (max {MaxSearchLength} characters)." });
+        var maxSearchLength = int.TryParse(config["Locations:MaxSearchLength"], out var msl) ? msl : 200;
+        if (search.Length > maxSearchLength)
+            return BadRequest(new { detail = $"Search query is too long (max {maxSearchLength} characters)." });
 
         // Use cache for full list (no search, no pagination)
         if (string.IsNullOrEmpty(search) && skip == 0 && take >= 500)
@@ -100,9 +106,9 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
         take = Math.Clamp(take, 1, 500);
 
         // Guard against excessively long search strings (defense-in-depth).
-        const int MaxSearchLength = 200;
-        if (search.Length > MaxSearchLength)
-            return BadRequest(new { detail = $"Search query is too long (max {MaxSearchLength} characters)." });
+        var maxSearchLength = int.TryParse(config["Locations:MaxSearchLength"], out var msl) ? msl : 200;
+        if (search.Length > maxSearchLength)
+            return BadRequest(new { detail = $"Search query is too long (max {maxSearchLength} characters)." });
 
         // Use cache for full list (no search, no pagination)
         var dairaCacheKey = $"{DairaCacheKeyPrefix}{wilaya_id}";
@@ -151,9 +157,9 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
         take = Math.Clamp(take, 1, 500);
 
         // Guard against excessively long search strings (defense-in-depth).
-        const int MaxSearchLength = 200;
-        if (search.Length > MaxSearchLength)
-            return BadRequest(new { detail = $"Search query is too long (max {MaxSearchLength} characters)." });
+        var maxSearchLength = int.TryParse(config["Locations:MaxSearchLength"], out var msl) ? msl : 200;
+        if (search.Length > maxSearchLength)
+            return BadRequest(new { detail = $"Search query is too long (max {maxSearchLength} characters)." });
 
         // Use cache for full list (no search, no pagination)
         var communeCacheKey = $"{CommuneCacheKeyPrefix}{daira_id}";
@@ -195,28 +201,9 @@ public class LocationsController(AppDbContext db, IMemoryCache cache, IConfigura
     {
         var commune = await db.Communes.FirstOrDefaultAsync(c => c.CommuneId == communeId, cancellationToken);
 
-        // Use ADO.NET directly — SqlQueryRaw routes through EF Core's mapping pipeline
-        // which mis-maps the ST_AsGeoJSON text result under UseSnakeCaseNamingConvention()
-        var conn = db.Database.GetDbConnection();
-
-        string? geoJson = null;
-        await conn.OpenAsync(cancellationToken);
-        try
-        {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT ST_AsGeoJSON(geometry) FROM communes_boundaries WHERE commune_id = @id";
-            var param = cmd.CreateParameter();
-            param.ParameterName = "@id";
-            param.Value = communeId;
-            cmd.Parameters.Add(param);
-
-            var scalar = await cmd.ExecuteScalarAsync(cancellationToken);
-            geoJson = scalar as string;
-        }
-        finally
-        {
-            await conn.CloseAsync();
-        }
+        // Raw ADO.NET required — ST_AsGeoJSON returns a text result that
+        // EF Core's Npgsql mapper mis-handles under UseSnakeCaseNamingConvention().
+        var geoJson = await boundaryService.GetBoundaryGeoJsonAsync(communeId, cancellationToken);
 
         if (geoJson is null)
             return NotFound(new { detail = "Boundary not found for this commune" });

@@ -1,0 +1,5 @@
+# Generated PDFs
+docs/pdf/
+
+# Generated Mermaid SVG output
+docs/uml/*.svg

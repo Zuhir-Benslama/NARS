@@ -10,10 +10,6 @@ using NarsApi.Services;
 
 namespace NarsApi.Controllers;
 
-/// <summary>
-/// CRUD operations on saved map features: save, load, update, delete, clear, stats.
-/// Feature-type metadata and layer queries live in FeatureCatalogController.
-/// </summary>
 [ApiController]
 [Route("/api")]
 [Tags("Features")]
@@ -21,12 +17,12 @@ public class FeaturesController(
     AppDbContext db,
     IScatteredAreaService scatteredService,
     IBackgroundTaskQueue bgQueue,
-    ILogger<FeaturesController> logger) : NarsControllerBase
+    ILogger<FeaturesController> logger,
+    IConfiguration config,
+    IDateTimeProvider timeProvider,
+    IFeatureStatsService featureStatsService) : NarsControllerBase
 {
-    // Maximum allowed size for feature data JSON payloads (512 KB).
-    private const int MaxFeatureDataSize = 524_288;
-
-    // ── POST /api/save ────────────────────────────────────────────────────────
+    private int MaxFeatureDataSize => int.TryParse(config["FeatureDefaults:MaxFeatureDataSize"], out var v) ? v : 524_288;
 
     [HttpPost("save")]
     [ProducesResponseType(StatusCodes.Status201Created)]
@@ -40,11 +36,9 @@ public class FeaturesController(
         if (!FeatureTypes.IsValidLayer(body.Type, body.Layer))
             return BadRequest(new { detail = $"Layer '{body.Layer}' is not valid for type '{body.Type}'." });
 
-        // Prevent manual creation of scattered areas — these are auto-computed
         if (body.Type == FeatureTypes.Area && body.Layer == FeatureTypes.AreaLayers.Scattered)
             return BadRequest(new { detail = "Scattered areas are auto-computed and cannot be saved manually." });
 
-        // Guard against oversized JSON payloads (max ~500 KB per feature)
         var rawJson = body.Data.GetRawText();
         if (rawJson.Length > MaxFeatureDataSize)
             return BadRequest(new { detail = "Feature data is too large (max 512 KB)." });
@@ -56,22 +50,18 @@ public class FeaturesController(
             && body.Data.TryGetProperty("roadDbId", out var ridEl) && ridEl.ValueKind == JsonValueKind.String && Guid.TryParse(ridEl.GetString(), out var rid))
             roadId = rid;
 
-        // Validate that the referenced road exists and belongs to the current user.
         if (roadId.HasValue && !await db.Roads.AnyAsync(r => r.Id == roadId.Value && r.UserId == CurrentUserId, cancellationToken))
             return BadRequest(new { detail = "Referenced road not found." });
 
         Guid newId = Guid.CreateVersion7();
 
-        // Use the registry to create the entity — no more 8-case switch statement
         var entity = FeatureTypeRegistry.CreateEntity(body.Type, newId, RequiredCurrentUserId, body.Layer, body.Label, dataJson);
         if (entity is null)
             return BadRequest(new { detail = $"Unknown feature type '{body.Type}'." });
 
-        // HouseEntrance-specific: set RoadId on the concrete type
         if (entity is HouseEntrance entrance)
             entrance.RoadId = roadId;
 
-        // Wrap the feature insert + registry insert in a single transaction
         await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
 
         var entry = FeatureTypeRegistry.AddToDbContext(db, entity);
@@ -88,21 +78,14 @@ public class FeaturesController(
         return StatusCode(201, new SaveFeatureResponse(Success: true, Id: newId.ToString(), Message: "Feature saved successfully"));
     }
 
-    // ── GET /api/load ─────────────────────────────────────────────────────────
-    // Supports pagination via ?skip=0&take=100 query parameters.
-    // Default page size is 1000, maximum is 2000 to prevent oversized responses.
-    // Uses UNION ALL across all feature tables so Skip/Take applies to the
-    // combined result — not per-table (which would return up to 8x the page).
-
     [HttpGet("load")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> LoadFeatures([FromQuery] int skip = 0, [FromQuery] int take = 1000, CancellationToken cancellationToken = default)
     {
-        // Cap page size to prevent memory exhaustion and oversized responses.
         take = Math.Clamp(take, 1, 2000);
 
-        var (features, totalCount) = await FeatureQueryHelper.LoadAllFeaturesAsync(
-            db.Database.GetDbConnection(), RequiredCurrentUserId, skip, take);
+        var (features, totalCount) = await featureStatsService.LoadAllFeaturesAsync(
+            RequiredCurrentUserId, skip, take, cancellationToken);
 
         return Ok(new LoadFeaturesResponse(
             Features: features,
@@ -111,8 +94,6 @@ public class FeaturesController(
             Take: take
         ));
     }
-
-    // ── POST /api/clear ───────────────────────────────────────────────────────
 
     [HttpPost("clear")]
     [EnableRateLimiting(RateLimitPolicies.Clear)]
@@ -129,16 +110,12 @@ public class FeaturesController(
 
         await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
 
-        // Use the registry to iterate over all feature types — no hardcoded list
         foreach (var type in FeatureTypeRegistry.GetAllTypes())
         {
             var dbSet = FeatureTypeRegistry.GetDbSet(db, type)!;
             total += await dbSet.Where(f => f.UserId == uid).ExecuteDeleteAsync(cancellationToken);
         }
 
-        // Collect all remaining feature IDs across all feature tables
-        // then delete orphaned registry entries (entries whose ID doesn't
-        // exist in any feature table).
         var allIds = new HashSet<Guid>();
         foreach (var type in FeatureTypeRegistry.GetAllTypes())
         {
@@ -156,66 +133,27 @@ public class FeaturesController(
         return Ok(new ActionResponse(Success: true, Message: $"Deleted {total} features"));
     }
 
-    // ── GET /api/stats ────────────────────────────────────────────────────────
-
     [HttpGet("stats")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetStats(CancellationToken cancellationToken = default)
     {
-        var uid = CurrentUserId;
+        var counts = await featureStatsService.GetFeatureCountsAsync(RequiredCurrentUserId, cancellationToken);
 
-        // Single UNION ALL query built from FeatureTypeRegistry instead of
-        // hardcoded per-type SELECTs — adding a new type auto-extends this query.
-        var conn = db.Database.GetDbConnection();
-        var wasOpen = conn.State == System.Data.ConnectionState.Open;
-        if (!wasOpen) await conn.OpenAsync();
+        long GetCount(string key) => counts.TryGetValue(key, out var v) ? v : 0;
+        var total = counts.Values.Sum();
 
-        try
-        {
-            await using var cmd = conn.CreateCommand();
-            var sql = new System.Text.StringBuilder();
-            var descriptors = FeatureTypeRegistry.GetAllDescriptors();
-            for (int i = 0; i < descriptors.Count; i++)
-            {
-                if (i > 0) sql.Append(" UNION ALL ");
-                sql.Append($"SELECT '{descriptors[i].Type}' AS type, COUNT(*) FROM {descriptors[i].TableName} WHERE user_id = @uid");
-            }
-            cmd.CommandText = sql.ToString();
-            var uidParam = cmd.CreateParameter();
-            uidParam.ParameterName = "@uid";
-            uidParam.Value = uid;
-            cmd.Parameters.Add(uidParam);
-
-            var counts = new Dictionary<string, long>(descriptors.Count);
-            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                counts[reader.GetString(0)] = reader.GetInt64(1);
-            }
-
-            long GetCount(string key) => counts.TryGetValue(key, out var v) ? v : 0;
-            var total = counts.Values.Sum();
-
-            return Ok(new FeatureStatsResponse(
-                Area: GetCount(FeatureTypes.Area),
-                District: GetCount(FeatureTypes.District),
-                CityCenter: GetCount(FeatureTypes.CityCenter),
-                Road: GetCount(FeatureTypes.Road),
-                HouseEntrance: GetCount(FeatureTypes.HouseEntrance),
-                PublicBuilding: GetCount(FeatureTypes.PublicBuilding),
-                PublicSpace: GetCount(FeatureTypes.PublicSpace),
-                NamingPanel: GetCount(FeatureTypes.NamingPanel),
-                Total: total
-            ));
-        }
-        finally
-        {
-            if (!wasOpen && conn.State == System.Data.ConnectionState.Open)
-                await conn.CloseAsync();
-        }
+        return Ok(new FeatureStatsResponse(
+            Area: GetCount(FeatureTypes.Area),
+            District: GetCount(FeatureTypes.District),
+            CityCenter: GetCount(FeatureTypes.CityCenter),
+            Road: GetCount(FeatureTypes.Road),
+            HouseEntrance: GetCount(FeatureTypes.HouseEntrance),
+            PublicBuilding: GetCount(FeatureTypes.PublicBuilding),
+            PublicSpace: GetCount(FeatureTypes.PublicSpace),
+            NamingPanel: GetCount(FeatureTypes.NamingPanel),
+            Total: total
+        ));
     }
-
-    // ── GET /api/scattered-status ─────────────────────────────────────────────
 
     [HttpGet("scattered-status")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -229,8 +167,6 @@ public class FeaturesController(
         ));
     }
 
-    // ── PUT /api/update/{id} ──────────────────────────────────────────────────
-
     [HttpPut("update/{featureId:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -241,12 +177,10 @@ public class FeaturesController(
         var reg = await db.FeatureRegistry.FindAsync([featureId], cancellationToken);
         if (reg is null) return NotFound(new { detail = "Feature not found" });
 
-        // Verify ownership — prevent users from updating other users' features
         var owned = await FeatureTypeRegistry.GetDbSet(db, reg.FeatureType)!
             .AnyAsync(f => f.Id == featureId && f.UserId == CurrentUserId, cancellationToken);
         if (!owned) return NotFound(new { detail = "Feature not found" });
 
-        // Guard against oversized JSON payloads (max ~500 KB per feature)
         if (body.Data is JsonElement dataElement)
         {
             var rawJson = dataElement.GetRawText();
@@ -258,7 +192,7 @@ public class FeaturesController(
         if (descriptor is null)
             return BadRequest(new { detail = $"Unknown feature type in registry: {reg.FeatureType}" });
 
-        var updatedAt = DateTime.UtcNow;
+        var updatedAt = timeProvider.UtcNow;
         int updated = await UpdateEntity(descriptor, featureId, body, updatedAt, cancellationToken);
         if (updated == 0) return NotFound(new { detail = "Feature not found" });
 
@@ -267,8 +201,6 @@ public class FeaturesController(
 
         return Ok(new UpdateFeatureResponse(Success: true, Id: featureId.ToString(), UpdatedAt: updatedAt));
     }
-
-    // ── DELETE /api/delete/{id} ───────────────────────────────────────────────
 
     [HttpDelete("delete/{featureId:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -304,8 +236,6 @@ public class FeaturesController(
 
         return Ok(new ActionResponse(Success: true, Message: "Feature deleted successfully"));
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private async Task<int> UpdateEntity(FeatureTypeDescriptor descriptor, Guid id, FeatureUpdateRequest body, DateTime updatedAt, CancellationToken cancellationToken = default)
     {
@@ -352,10 +282,6 @@ public class FeaturesController(
         return rows;
     }
 
-    /// <summary>
-    /// Schedules a background refresh of the scattered area geometry.
-    /// Used after any manual change to the 'area' feature set.
-    /// </summary>
     private async ValueTask QueueScatteredRefresh()
     {
         await bgQueue.QueueBackgroundWorkItemAsync(async (sp, ct) =>

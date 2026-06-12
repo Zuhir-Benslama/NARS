@@ -194,9 +194,6 @@ smoke-test: ## Post-deploy smoke test: verify /health, frontend, and API auth
 
 .PHONY: cluster-stop
 cluster-stop: ## Scale all deployments to 0 (stop pods, keep cluster)
-
-.PHONY: cluster-stop
-cluster-stop: ## Scale all deployments to 0 (stop pods, keep cluster)
 	@echo "→ Stopping all pods..."
 	@for deploy in $(SCALABLE_DEPLOYS); do
 		saved="$(BACKUP_DIR)/replicas/$$deploy.txt"
@@ -743,7 +740,7 @@ infra-lint-shell: ## Shell-check nars-infra/scripts/*.sh
 	else
 		docker run --rm -v "$$(pwd):/mnt" koalaman/shellcheck:stable \
 			nars-infra/scripts/*.sh
-	endif
+	fi
 
 .PHONY: infra-lint-docker
 infra-lint-docker: ## Lint Dockerfiles with hadolint
@@ -753,7 +750,7 @@ infra-lint-docker: ## Lint Dockerfiles with hadolint
 		docker run --rm -i hadolint/hadolint < nars-infra/docker/Dockerfile.nars-api
 		docker run --rm -i hadolint/hadolint < nars-infra/docker/Dockerfile.nars-postgis
 		docker run --rm -i hadolint/hadolint < nars-infra/docker/Dockerfile.nars-vite
-	endif
+	fi
 
 .PHONY: infra-lint-yaml
 infra-lint-yaml: ## Lint k8s YAML with yamllint (uses .yamllint.yaml config)
@@ -762,7 +759,7 @@ infra-lint-yaml: ## Lint k8s YAML with yamllint (uses .yamllint.yaml config)
 	else
 		docker run --rm -v "$$(pwd):/mnt" cytopia/yamllint \
 			-c nars-infra/.yamllint.yaml nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml
-	endif
+	fi
 
 # ─── Docker Images ───────────────────────────────────────────
 

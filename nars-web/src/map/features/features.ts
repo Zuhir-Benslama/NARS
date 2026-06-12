@@ -10,6 +10,31 @@ import { checkMainUrbanExists, getRoadSide } from "../../lib/validation"
 import { debugLog, debugError } from "../../utils/debug"
 import type { FeatureData, LayerEntry, SaveResult, ModalResult } from "../../types"
 
+// ─── GEOMETRY COORDINATE EXTRACTOR ────────────────────────────────────────────
+
+function extractCoords(
+  geometry: GeoJSON.Geometry,
+): { lat: number; lng: number }[] | null {
+  switch (geometry.type) {
+    case "Point": {
+      return [{ lat: geometry.coordinates[1], lng: geometry.coordinates[0] }]
+    }
+    case "LineString": {
+      return geometry.coordinates.map((c) => ({ lat: c[1], lng: c[0] }))
+    }
+    case "Polygon": {
+      return geometry.coordinates[0].map((c) => ({ lat: c[1], lng: c[0] }))
+    }
+    case "MultiPolygon": {
+      const coords = geometry.coordinates[0][0].map((c) => ({ lat: c[1], lng: c[0] }))
+      debugLog("[SAVE] MultiPolygon flattened to single Polygon (first ring)")
+      return coords
+    }
+    default:
+      return null
+  }
+}
+
 // ─── FEATURE DATA BUILDER ────────────────────────────────────────────────────
 
 export function buildFeatureData(
@@ -38,67 +63,37 @@ export function buildFeatureData(
     buildingTypeKey: modalResult.buildingTypeKey,
   }
 
-  // City center: persist radius
   if (phase.key === "cityCenter") {
     base.radius = modalResult.radius as number | undefined
   }
 
-  // JSON.stringify strips undefined values automatically, so no need to
-  // explicitly clear them here.
+  const coords = extractCoords(geometry)
 
-  let result: FeatureData
-
-  if (geometry.type === "Point") {
-    const coords = [{ lat: geometry.coordinates[1], lng: geometry.coordinates[0] }]
-    result = {
-      ...base,
-      lat: coords[0].lat,
-      lng: coords[0].lng,
-      coordinates: coords,
-    }
-    // Circle radius from geometry (extracted from Geoman's polygon approximation)
-    const geomWithRadius = geometry as GeoJSON.Point & { radius?: number }
-    if (geomWithRadius.radius != null) {
-      result.radius = geomWithRadius.radius
-    }
-  } else if (geometry.type === "LineString") {
-    const coords = geometry.coordinates.map((c: number[]) => ({
-      lat: c[1],
-      lng: c[0],
-    }))
-    result = { ...base, coordinates: coords }
-  } else if (geometry.type === "Polygon") {
-    // Polygon: coordinates[0] is the outer ring
-    const coords = geometry.coordinates[0].map((c: number[]) => ({
-      lat: c[1],
-      lng: c[0],
-    }))
-    result = { ...base, coordinates: coords }
-  } else if (geometry.type === "MultiPolygon") {
-    // MultiPolygon: flatten by taking first (largest) ring from first polygon.
-    // This can happen when Geoman produces self-intersecting or multi-ring shapes.
-    const coords = (geometry as GeoJSON.MultiPolygon).coordinates[0][0].map((c) => ({
-      lat: c[1],
-      lng: c[0],
-    }))
-    result = { ...base, coordinates: coords }
-    debugLog("[SAVE] MultiPolygon flattened to single Polygon (first ring)")
-  } else {
-    // Unknown geometry type — log and return base without geometry
-    debugError("[SAVE] Unknown geometry type:", (geometry as { type: string }).type, geometry)
-    result = base
+  if (!coords) {
+    debugError("[SAVE] Unknown geometry type:", geometry.type, geometry)
+    return base
   }
 
-  // Log the saved data for debugging
+  const result: FeatureData = {
+    ...base,
+    coordinates: coords,
+    ...(geometry.type === "Point" ? { lat: coords[0].lat, lng: coords[0].lng } : {}),
+  }
+
+  if (geometry.type === "Point") {
+    const pt = geometry as GeoJSON.Point & { radius?: number }
+    if (pt.radius != null) {
+      result.radius = pt.radius
+    }
+  }
+
   debugLog(
     "[SAVE] buildFeatureData — type:",
     result.type,
     "geometry:",
     result.lat != null
       ? `Point(${result.lat}, ${result.lng})`
-      : result.coordinates
-        ? `${result.coordinates.length} coords`
-        : "NONE",
+      : `${coords.length} coords`,
     "keys:",
     Object.keys(result),
   )

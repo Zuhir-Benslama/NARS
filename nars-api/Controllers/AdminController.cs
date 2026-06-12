@@ -6,39 +6,18 @@ using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
+using NarsApi.Services;
 
 namespace NarsApi.Controllers;
 
-/// <summary>
-/// Monitoring and admin-user management endpoints.
-///
-/// Creation hierarchy (each role may only create the role one level below):
-///   commune_user  → field_worker  (inherits the creator's commune_id)
-///   daira_admin    → commune_user  (commune must belong to admin's daira)
-///   wilaya_admin   → daira_admin   (daira must belong to admin's wilaya)
-///   national_admin → wilaya_admin  (any wilaya)
-///   national_admin → created directly in the database only (no API endpoint)
-///
-/// Monitoring hierarchy:
-///   daira_admin    → GET /api/admin/overview   (own daira, full depth)
-///   wilaya_admin   → GET /api/admin/overview   (own wilaya, full depth)
-///                    GET /api/admin/daira/{id}  (one daira within scope)
-///   national_admin → GET /api/admin/overview   (all wilayas, shallow)
-///                    GET /api/admin/wilaya/{id} (one wilaya, full depth)
-///
-///   POST /api/admin/users — create an account one level below the caller's role.
-///   Auth is split action-level: commune_user may call POST /api/admin/users
-///   but not monitoring endpoints.
-/// </summary>
 [ApiController]
 [Route("/api")]
 [Tags("Admin")]
 public class AdminController(
     AppDbContext db,
-    ILogger<AdminController> logger) : NarsControllerBase
+    ILogger<AdminController> logger,
+    IFeatureStatsService featureStatsService) : NarsControllerBase
 {
-    // ── GET /api/admin/overview ───────────────────────────────────────────────
-
     [HttpGet("admin/overview")]
     [Authorize(Roles = "daira_admin,wilaya_admin,national_admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -46,9 +25,6 @@ public class AdminController(
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Overview(CancellationToken cancellationToken = default)
     {
-        // Read role and geographic IDs directly from the database.
-        // JWT claim names can vary depending on when the token was issued
-        // (before or after the claim mapping fix), so DB is the source of truth.
         var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
         if (user is null) return Unauthorized(new { detail = "User not found." });
 
@@ -65,9 +41,6 @@ public class AdminController(
         };
     }
 
-    // ── GET /api/admin/wilaya/{wilayaId} ─────────────────────────────────────
-    // National admin only — drill into a specific wilaya.
-
     [HttpGet("admin/wilaya/{wilayaId:int}")]
     [Authorize(Roles = "daira_admin,wilaya_admin,national_admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -83,9 +56,6 @@ public class AdminController(
         var result = await BuildWilayaReportAsync(wilayaId, cancellationToken);
         return result is null ? NotFound(new { detail = "Wilaya not found." }) : Ok(result);
     }
-
-    // ── GET /api/admin/daira/{dairaId} ───────────────────────────────────────
-    // Wilaya admin (own dairas) or national admin.
 
     [HttpGet("admin/daira/{dairaId:int}")]
     [Authorize(Roles = "daira_admin,wilaya_admin,national_admin")]
@@ -117,13 +87,6 @@ public class AdminController(
         return result is null ? NotFound(new { detail = "Daira not found." }) : Ok(result);
     }
 
-    // ── POST /api/admin/users ────────────────────────────────────────────────
-    // Create an account one level below the caller's role.
-    // daira_admin  → commune_user  (commune must be in their daira)
-    // wilaya_admin → daira_admin   (daira must be in their wilaya)
-    // national_admin → wilaya_admin (any wilaya)
-    // national_admin is NOT creatable via API.
-
     [HttpPost("admin/users")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -143,7 +106,6 @@ public class AdminController(
         switch (callerRole, body.Role)
         {
             case (UserRoles.CommuneUser, UserRoles.FieldWorker):
-                // field_worker inherits creator's commune_id, no extra validation needed
                 break;
             case (UserRoles.DairaAdmin, UserRoles.CommuneUser):
                 {
@@ -169,7 +131,7 @@ public class AdminController(
                 break;
         }
 
-        var geoError = ValidateGeographicFields(body);
+        var geoError = ValidateGeographicFields(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
         if (geoError is not null)
             return BadRequest(new { detail = geoError });
 
@@ -185,7 +147,6 @@ public class AdminController(
         if (pwdErr is not null)
             return BadRequest(new { detail = pwdErr });
 
-        // field_worker inherits the creator's commune_id
         var communeId = body.Role == UserRoles.FieldWorker
             ? creator.CommuneId
             : body.CommuneId;
@@ -198,343 +159,244 @@ public class AdminController(
             Username = body.Username,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(body.Password),
             Role = body.Role,
-            CommuneId = body.Role is UserRoles.CommuneUser or UserRoles.FieldWorker ? communeId : null,
-            DairaId = body.Role == UserRoles.DairaAdmin ? body.DairaId : null,
-            WilayaId = body.Role == UserRoles.WilayaAdmin ? body.WilayaId : null,
-            FailedLoginAttempts = 0,
+            WilayaId = body.WilayaId,
+            DairaId = body.DairaId,
+            CommuneId = communeId,
         };
 
         db.Users.Add(newUser);
         await db.SaveChangesAsync(cancellationToken);
 
-        logger.LogInformation("[Admin] {Creator} ({CreatorRole}) created {Role} account {Username}",
-            CurrentUsername, CurrentUserRole, newUser.Role, newUser.Username);
+        logger.LogInformation("[Admin] {CallerRole} {CallerId} created {Role} {UserId}",
+            callerRole, CurrentUserId, body.Role, newUser.Id);
 
-        return StatusCode(201, new CreateAdminResponse(Success: true, UserId: newUser.Id.ToString(), Message: "Account created."));
+        return StatusCode(201, new { success = true, id = newUser.Id.ToString() });
     }
 
-    // ─── Private: overview builders ──────────────────────────────────────────
+    // ── Permission helpers ──────────────────────────────────────────────────
 
-    private async Task<IActionResult> DairaOverview(int dairaId, CancellationToken cancellationToken)
+    private static bool CanCreateRole(string callerRole, string targetRole) => (callerRole, targetRole) switch
     {
-        var report = await BuildDairaReportAsync(dairaId, cancellationToken);
-        return report is null ? NotFound(new { detail = "Daira not found." }) : Ok(report);
-    }
+        (UserRoles.NationalAdmin, UserRoles.WilayaAdmin) => true,
+        (UserRoles.WilayaAdmin, UserRoles.DairaAdmin) => true,
+        (UserRoles.DairaAdmin, UserRoles.CommuneUser) => true,
+        (UserRoles.CommuneUser, UserRoles.FieldWorker) => true,
+        _ => false,
+    };
 
-    private async Task<IActionResult> WilayaOverview(int wilayaId, CancellationToken cancellationToken)
-    {
-        var report = await BuildWilayaReportAsync(wilayaId, cancellationToken);
-        return report is null ? NotFound(new { detail = "Wilaya not found." }) : Ok(report);
-    }
+    // ── Overview builders ──────────────────────────────────────────────────
 
     private async Task<IActionResult> NationalOverview(CancellationToken cancellationToken)
     {
         var wilayas = await db.Wilayas.OrderBy(w => w.WilayaId).ToListAsync(cancellationToken);
+        var wilayaIds = wilayas.Select(w => w.WilayaId).ToArray();
 
-        // Batch-load wilaya admins, daira counts, commune counts, user counts
-        var wilayaAdmins = await db.Users
-            .Where(u => u.Role == UserRoles.WilayaAdmin)
-            .Select(u => new { u.Id, u.Username, u.Name, u.Email, u.Role, u.WilayaId })
+        var admins = (await db.Users
+                .Where(u => u.Role == UserRoles.WilayaAdmin && u.WilayaId.HasValue && wilayaIds.Contains(u.WilayaId.Value))
+                .ToListAsync(cancellationToken))
+            .GroupBy(u => u.WilayaId!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var dairasByWilaya = (await db.Dairas
+                .Where(d => wilayaIds.Contains(d.WilayaId))
+                .ToListAsync(cancellationToken))
+            .GroupBy(d => d.WilayaId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var allDairaIds = dairasByWilaya.Values.SelectMany(d => d).Select(d => d.DairaId).ToArray();
+
+        var communesByDaira = (await db.Communes
+                .Where(c => allDairaIds.Contains(c.DairaId))
+                .ToListAsync(cancellationToken))
+            .GroupBy(c => c.DairaId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var allCommuneIds = communesByDaira.Values.SelectMany(c => c).Select(c => c.CommuneId).ToArray();
+
+        var communeUserCounts = await db.Users
+            .Where(u => u.Role == UserRoles.CommuneUser && u.CommuneId.HasValue && allCommuneIds.Contains(u.CommuneId.Value))
+            .GroupBy(u => u.CommuneId!.Value)
+            .Select(g => new { CommuneId = g.Key, Count = g.Count() })
             .ToListAsync(cancellationToken);
 
-        var dairaCounts = await db.Dairas
-            .GroupBy(d => d.WilayaId)
-            .Select(g => new { WilayaId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.WilayaId, x => x.Count, cancellationToken);
+        var userCountByCommune = communeUserCounts.ToDictionary(x => x.CommuneId, x => x.Count);
 
-        var communeByWilaya = await db.Communes
-            .Join(db.Dairas, c => c.DairaId, d => d.DairaId, (c, d) => new { c.CommuneId, d.WilayaId })
-            .GroupBy(x => x.WilayaId)
-            .Select(g => new { WilayaId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.WilayaId, x => x.Count, cancellationToken);
-
-        var usersByWilaya = await db.Users
-            .Where(u => (u.Role == UserRoles.CommuneUser || u.Role == UserRoles.FieldWorker) && u.CommuneId.HasValue)
-            .Join(db.Communes, u => u.CommuneId, c => c.CommuneId, (u, c) => new { c.DairaId, u.Id })
-            .Join(db.Dairas, x => x.DairaId, d => d.DairaId, (x, d) => new { d.WilayaId, x.Id })
-            .GroupBy(x => x.WilayaId)
-            .Select(g => new { WilayaId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.WilayaId, x => x.Count, cancellationToken);
-
-        var summaries = wilayas.Select(w =>
+        var results = wilayas.Select(wilaya =>
         {
-            var admin = wilayaAdmins.FirstOrDefault(a => a.WilayaId == w.WilayaId);
+            var admin = admins.GetValueOrDefault(wilaya.WilayaId);
+            var dairas = dairasByWilaya.GetValueOrDefault(wilaya.WilayaId) ?? [];
+            var communeIds = dairas.SelectMany(d =>
+                communesByDaira.GetValueOrDefault(d.DairaId) ?? []
+            ).Select(c => c.CommuneId).ToArray();
+
             return new WilayaSummary(
-                WilayaId: w.WilayaId,
-                WilayaNameFr: w.WilayaFr ?? "",
-                WilayaNameAr: w.WilayaAr ?? "",
-                WilayaAdmin: admin is null ? null
-                                   : new AdminInfo(admin.Id.ToString(), admin.Username, admin.Name, admin.Email, admin.Role),
-                DairaCount: dairaCounts.GetValueOrDefault(w.WilayaId),
-                CommuneCount: communeByWilaya.GetValueOrDefault(w.WilayaId),
-                CommuneUserCount: usersByWilaya.GetValueOrDefault(w.WilayaId)
+                WilayaId: wilaya.WilayaId,
+                WilayaNameFr: wilaya.WilayaFr ?? "",
+                WilayaNameAr: wilaya.WilayaAr ?? "",
+                WilayaAdmin: admin is null ? null : new AdminInfo(
+                    admin.Id.ToString(), admin.Username, admin.Name, admin.Email, admin.Role),
+                DairaCount: dairas.Count,
+                CommuneCount: communeIds.Length,
+                CommuneUserCount: communeIds.Sum(cid => userCountByCommune.GetValueOrDefault(cid))
             );
         }).ToList();
 
-        return Ok(new { wilayas = summaries });
+        return Ok(new { level = "national", wilayas = results });
     }
 
-    // ─── Private: report builders ─────────────────────────────────────────────
+    private async Task<IActionResult> WilayaOverview(int wilayaId, CancellationToken cancellationToken)
+    {
+        var dairas = await db.Dairas.Where(d => d.WilayaId == wilayaId)
+            .OrderBy(d => d.DairaFr).ToListAsync(cancellationToken);
+
+        var dairaIds = dairas.Select(d => d.DairaId).ToArray();
+
+        var admins = (await db.Users
+                .Where(u => u.Role == UserRoles.DairaAdmin && u.DairaId.HasValue && dairaIds.Contains(u.DairaId.Value))
+                .ToListAsync(cancellationToken))
+            .GroupBy(u => u.DairaId!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var communeReports = await BuildCommunesForDairasAsync(dairaIds, cancellationToken);
+
+        var results = dairas.Select(daira =>
+        {
+            var admin = admins.GetValueOrDefault(daira.DairaId);
+
+            return new DairaReport(
+                DairaId: daira.DairaId,
+                DairaNameFr: daira.DairaFr ?? "",
+                DairaNameAr: daira.DairaAr ?? "",
+                DairaAdmin: admin is null ? null : new AdminInfo(
+                    admin.Id.ToString(), admin.Username, admin.Name, admin.Email, admin.Role),
+                Communes: communeReports.GetValueOrDefault(daira.DairaId) ?? []
+            );
+        }).ToList();
+
+        return Ok(new { level = "wilaya", wilayaId, dairas = results });
+    }
+
+    private async Task<IActionResult> DairaOverview(int dairaId, CancellationToken cancellationToken)
+    {
+        var report = await BuildDairaReportAsync(dairaId, cancellationToken);
+        return Ok(report ?? new DairaReport(dairaId, "", "", null, Array.Empty<CommuneReport>()));
+    }
+
+    // ── Report builders ────────────────────────────────────────────────────
+
+    private async Task<DairaReport?> BuildDairaReportAsync(int dairaId, CancellationToken cancellationToken)
+    {
+        var daira = await db.Dairas.FindAsync([dairaId], cancellationToken);
+        if (daira is null) return null;
+
+        var admin = await db.Users.FirstOrDefaultAsync(u =>
+            u.Role == UserRoles.DairaAdmin && u.DairaId == dairaId, cancellationToken);
+
+        var communesByDaira = await BuildCommunesForDairasAsync([dairaId], cancellationToken);
+        var communes = communesByDaira.GetValueOrDefault(dairaId) ?? [];
+
+        return new DairaReport(
+            DairaId: dairaId,
+            DairaNameFr: daira.DairaFr,
+            DairaNameAr: daira.DairaAr,
+            DairaAdmin: admin is null ? null : new AdminInfo(
+                admin.Id.ToString(), admin.Username, admin.Name, admin.Email, admin.Role),
+            Communes: communes
+        );
+    }
 
     private async Task<WilayaReport?> BuildWilayaReportAsync(int wilayaId, CancellationToken cancellationToken)
     {
-        var wilaya = await db.Wilayas.FindAsync(wilayaId, cancellationToken);
+        var wilaya = await db.Wilayas.FindAsync([wilayaId], cancellationToken);
         if (wilaya is null) return null;
 
-        var wilayaAdmin = await db.Users
-            .Where(u => u.Role == UserRoles.WilayaAdmin && u.WilayaId == wilayaId)
-            .Select(u => new AdminInfo(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role))
-            .FirstOrDefaultAsync(cancellationToken);
+        var admin = await db.Users.FirstOrDefaultAsync(u =>
+            u.Role == UserRoles.WilayaAdmin && u.WilayaId == wilayaId, cancellationToken);
 
-        var dairas = await db.Dairas
-            .Where(d => d.WilayaId == wilayaId)
-            .OrderBy(d => d.DairaId)
-            .ToListAsync(cancellationToken);
+        var dairas = await db.Dairas.Where(d => d.WilayaId == wilayaId)
+            .OrderBy(d => d.DairaFr).ToListAsync(cancellationToken);
 
-        var dairaReports = await BuildDairaReportsBatchAsync(dairas, cancellationToken);
+        var dairaIds = dairas.Select(d => d.DairaId).ToArray();
+
+        var dairaAdmins = (await db.Users
+                .Where(u => u.Role == UserRoles.DairaAdmin && u.DairaId.HasValue && dairaIds.Contains(u.DairaId.Value))
+                .ToListAsync(cancellationToken))
+            .GroupBy(u => u.DairaId!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var communeReports = await BuildCommunesForDairasAsync(dairaIds, cancellationToken);
+
+        var dairaReports = dairas.Select(daira =>
+        {
+            var da = dairaAdmins.GetValueOrDefault(daira.DairaId);
+
+            return new DairaReport(
+                DairaId: daira.DairaId,
+                DairaNameFr: daira.DairaFr ?? "",
+                DairaNameAr: daira.DairaAr ?? "",
+                DairaAdmin: da is null ? null : new AdminInfo(
+                    da.Id.ToString(), da.Username, da.Name, da.Email, da.Role),
+                Communes: communeReports.GetValueOrDefault(daira.DairaId) ?? []
+            );
+        }).ToList();
 
         return new WilayaReport(
-            WilayaId: wilaya.WilayaId,
+            WilayaId: wilayaId,
             WilayaNameFr: wilaya.WilayaFr ?? "",
             WilayaNameAr: wilaya.WilayaAr ?? "",
-            WilayaAdmin: wilayaAdmin,
+            WilayaAdmin: admin is null ? null : new AdminInfo(
+                admin.Id.ToString(), admin.Username, admin.Name, admin.Email, admin.Role),
             Dairas: dairaReports
         );
     }
 
-    private async Task<DairaReport?> BuildDairaReportAsync(int dairaId, CancellationToken cancellationToken)
+    private async Task<Dictionary<int, List<CommuneReport>>> BuildCommunesForDairasAsync(int[] dairaIds, CancellationToken cancellationToken)
     {
-        var daira = await db.Dairas.FindAsync(dairaId, cancellationToken);
-        return daira is null ? null : await BuildDairaReportAsync(daira, cancellationToken);
-    }
+        var communes = await db.Communes.Where(c => dairaIds.Contains(c.DairaId))
+            .OrderBy(c => c.CommuneFr).ToListAsync(cancellationToken);
 
-    private async Task<DairaReport?> BuildDairaReportAsync(Daira daira, CancellationToken cancellationToken)
-    {
-        var dairaAdmin = await db.Users
-            .Where(u => u.Role == UserRoles.DairaAdmin && u.DairaId == daira.DairaId)
-            .Select(u => new AdminInfo(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role))
-            .FirstOrDefaultAsync(cancellationToken);
-
-        var communes = await db.Communes
-            .Where(c => c.DairaId == daira.DairaId)
-            .OrderBy(c => c.CommuneId)
-            .ToListAsync(cancellationToken);
-
-        // Batch-load all commune-scoped users for this daira in one query
         var communeIds = communes.Select(c => c.CommuneId).ToArray();
+
         var users = await db.Users
-            .Where(u => (u.Role == UserRoles.CommuneUser || u.Role == UserRoles.FieldWorker) && u.CommuneId.HasValue
-                     && communeIds.Contains(u.CommuneId!.Value))
-            .Select(u => new { u.Id, u.Username, u.Name, u.Email, u.CommuneId, u.Role })
+            .Where(u => u.CommuneId.HasValue && communeIds.Contains(u.CommuneId.Value))
+            .Where(u => u.Role == UserRoles.CommuneUser)
+            .Select(u => new { u.Id, u.Username, u.Name, u.Email, u.Role, u.CommuneId })
             .ToListAsync(cancellationToken);
 
-        // Batch feature counts for all users in one UNION ALL query
-        var userIds = users.Select(u => u.Id).ToArray();
-        var counts = await GetUserFeatureCountsAsync(userIds, cancellationToken);
-
-        var communeReports = communes.Select(c =>
-        {
-            var communeUsers = users
-                .Where(u => u.CommuneId == c.CommuneId)
-                .Select(u => counts.TryGetValue(u.Id, out var s) ? s
-                    : new UserFeatureStats(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role,
-                        0, 0, 0, 0, 0, 0, 0, 0, 0))
-                .ToList();
-
-            return new CommuneReport(
-                CommuneId: c.CommuneId,
-                CommuneNameFr: c.CommuneFr,
-                CommuneNameAr: c.CommuneAr,
-                Users: communeUsers
-            );
-        }).ToList();
-
-        return new DairaReport(
-            DairaId: daira.DairaId,
-            DairaNameFr: daira.DairaFr,
-            DairaNameAr: daira.DairaAr,
-            DairaAdmin: dairaAdmin,
-            Communes: communeReports
-        );
-    }
-
-    /// <summary>
-    /// Builds DairaReports for all given dairas using batched queries.
-    /// Eliminates the N+1 that would occur from calling BuildDairaReportAsync
-    /// per daira — all data is loaded in 4 round-trips regardless of daira count.
-    /// </summary>
-    private async Task<List<DairaReport>> BuildDairaReportsBatchAsync(
-        List<Daira> dairas, CancellationToken cancellationToken)
-    {
-        if (dairas.Count == 0) return [];
-
-        var dairaIds = dairas.Select(d => d.DairaId).ToArray();
-
-        // 1. All daira admins for these dairas — one query
-        var dairaAdmins = await db.Users
-            .Where(u => u.Role == UserRoles.DairaAdmin && u.DairaId.HasValue
-                     && dairaIds.Contains(u.DairaId!.Value))
-            .Select(u => new { u.DairaId, Admin = new AdminInfo(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role) })
-            .ToDictionaryAsync(x => x.DairaId!.Value, x => x.Admin, cancellationToken);
-
-        // 2. All communes for these dairas — one query
-        var communes = await db.Communes
-            .Where(c => dairaIds.Contains(c.DairaId))
-            .OrderBy(c => c.CommuneId)
-            .ToListAsync(cancellationToken);
-
-        var communesByDaira = communes.GroupBy(c => c.DairaId)
+        var userGroups = users.GroupBy(u => u.CommuneId!.Value)
             .ToDictionary(g => g.Key, g => g.ToList());
 
-        // 3. All commune-scoped users for these communes — one query
-        var communeIds = communes.Select(c => c.CommuneId).ToArray();
-        var users = communeIds.Length > 0
-            ? await db.Users
-                .Where(u => (u.Role == UserRoles.CommuneUser || u.Role == UserRoles.FieldWorker)
-                         && u.CommuneId.HasValue && communeIds.Contains(u.CommuneId!.Value))
-                .Select(u => new { u.Id, u.Username, u.Name, u.Email, u.CommuneId, u.Role })
-                .ToListAsync(cancellationToken)
-            : [];
+        var allUserIds = users.Select(u => u.Id).ToArray();
+        var featureCounts = allUserIds.Length > 0
+            ? await featureStatsService.GetUserFeatureCountsAsync(allUserIds, cancellationToken)
+            : new Dictionary<Guid, UserFeatureStats>();
 
-        var usersByCommune = users.GroupBy(u => u.CommuneId!.Value)
-            .ToDictionary(g => g.Key, g => g.ToList());
-
-        // 4. Feature counts for all users — one query
-        var userIds = users.Select(u => u.Id).ToArray();
-        var counts = await GetUserFeatureCountsAsync(userIds, cancellationToken);
-
-        // 5. Assemble reports in memory
-        return dairas.Select(d =>
+        var result = new Dictionary<int, List<CommuneReport>>();
+        foreach (var communeGroup in communes.GroupBy(c => c.DairaId))
         {
-            var dairaCommuneIds = communesByDaira.GetValueOrDefault(d.DairaId) ?? [];
-            var communeReports = dairaCommuneIds.Select(c =>
+            var reports = communeGroup.Select(commune =>
             {
-                var communeUsers = usersByCommune.GetValueOrDefault(c.CommuneId) ?? [];
-                var userStats = communeUsers
-                    .Select(u => counts.TryGetValue(u.Id, out var s) ? s
-                        : new UserFeatureStats(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role,
-                            0, 0, 0, 0, 0, 0, 0, 0, 0))
-                    .ToList();
+                var communeUsers = userGroups.GetValueOrDefault(commune.CommuneId);
+                var userStats = (communeUsers ?? []).Select(u =>
+                {
+                    featureCounts.TryGetValue(u.Id, out var stats);
+                    return stats ?? new UserFeatureStats(
+                        u.Id.ToString(), u.Username, u.Name, u.Email, u.Role,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0
+                    );
+                }).ToList();
 
                 return new CommuneReport(
-                    CommuneId: c.CommuneId,
-                    CommuneNameFr: c.CommuneFr,
-                    CommuneNameAr: c.CommuneAr,
+                    CommuneId: commune.CommuneId,
+                    CommuneNameFr: commune.CommuneFr ?? "",
+                    CommuneNameAr: commune.CommuneAr ?? "",
                     Users: userStats
                 );
             }).ToList();
 
-            return new DairaReport(
-                DairaId: d.DairaId,
-                DairaNameFr: d.DairaFr,
-                DairaNameAr: d.DairaAr,
-                DairaAdmin: dairaAdmins.GetValueOrDefault(d.DairaId),
-                Communes: communeReports
-            );
-        }).ToList();
-    }
-
-    /// <summary>
-    /// Returns per-user feature counts for the given user IDs in one UNION ALL
-    /// query — O(1) round-trips regardless of how many users are in scope.
-    /// </summary>
-    private async Task<Dictionary<Guid, UserFeatureStats>> GetUserFeatureCountsAsync(Guid[] userIds, CancellationToken cancellationToken)
-    {
-        if (userIds.Length == 0) return new Dictionary<Guid, UserFeatureStats>();
-
-        await db.Database.OpenConnectionAsync(cancellationToken);
-        var conn = db.Database.GetDbConnection();
-        try
-        {
-            await using var cmd = conn.CreateCommand();
-            // Build the inner UNION ALL from FeatureTypeRegistry so new types
-            // are automatically included — no more hardcoded table list.
-            var unionBuilder = new System.Text.StringBuilder();
-            var descriptors = FeatureTypeRegistry.GetAllDescriptors();
-            for (int i = 0; i < descriptors.Count; i++)
-            {
-                if (i > 0) unionBuilder.Append(" UNION ALL ");
-                unionBuilder.Append($"SELECT id, user_id, '{descriptors[i].Type}' AS ft FROM {descriptors[i].TableName}");
-            }
-
-            var caseBuilder = new System.Text.StringBuilder();
-            for (int i = 0; i < descriptors.Count; i++)
-            {
-                caseBuilder.AppendLine(
-                    $"                    COALESCE(SUM(CASE WHEN f.ft = '{descriptors[i].Type}' THEN 1 ELSE 0 END), 0),");
-            }
-
-            cmd.CommandText = $"""
-                SELECT
-                    u.id,
-                    u.username,
-                    u.name,
-                    u.email,
-                    u.role,
-                    {caseBuilder}                    COUNT(f.id)
-                FROM users u
-                LEFT JOIN (
-                    {unionBuilder}
-                ) f ON f.user_id = u.id
-                WHERE u.id = ANY(@ids)
-                GROUP BY u.id, u.username, u.name, u.email, u.role
-                """;
-
-            var param = cmd.CreateParameter();
-            param.ParameterName = "@ids";
-            param.Value = userIds;
-            cmd.Parameters.Add(param);
-
-            // Build column index map: first 5 columns are id/username/name/email/role,
-            // then one CASE SUM per descriptor (+ 1 for the final COUNT column).
-            var typeColIndex = new Dictionary<string, int>(descriptors.Count);
-            for (int i = 0; i < descriptors.Count; i++)
-                typeColIndex[descriptors[i].Type] = 5 + i;
-            var totalCol = 5 + descriptors.Count;
-
-            var result = new Dictionary<Guid, UserFeatureStats>();
-            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                var id = reader.GetGuid(0);
-                result[id] = new UserFeatureStats(
-                    UserId: id.ToString(),
-                    Username: reader.GetString(1),
-                    Name: reader.GetString(2),
-                    Email: reader.GetString(3),
-                    Role: reader.GetString(4),
-                    Areas: reader.GetInt64(typeColIndex[FeatureTypes.Area]),
-                    Districts: reader.GetInt64(typeColIndex[FeatureTypes.District]),
-                    CityCenters: reader.GetInt64(typeColIndex[FeatureTypes.CityCenter]),
-                    Roads: reader.GetInt64(typeColIndex[FeatureTypes.Road]),
-                    HouseEntrances: reader.GetInt64(typeColIndex[FeatureTypes.HouseEntrance]),
-                    PublicBuildings: reader.GetInt64(typeColIndex[FeatureTypes.PublicBuilding]),
-                    PublicSpaces: reader.GetInt64(typeColIndex[FeatureTypes.PublicSpace]),
-                    NamingPanels: reader.GetInt64(typeColIndex[FeatureTypes.NamingPanel]),
-                    Total: reader.GetInt64(totalCol)
-                );
-            }
-            return result;
+            result[communeGroup.Key] = reports;
         }
-        finally
-        {
-            await db.Database.CloseConnectionAsync();
-        }
+
+        return result;
     }
-
-    // ─── Helpers ──────────────────────────────────────────────────────────────
-
-    private static bool CanCreateRole(string creatorRole, string targetRole) =>
-        AuthController.CanCreateRole(creatorRole, targetRole);
-
-    private static string? ValidateGeographicFields(CreateAdminRequest body) =>
-        body.Role switch
-        {
-            UserRoles.CommuneUser when !body.CommuneId.HasValue => "commune_id is required for commune_user.",
-            UserRoles.DairaAdmin when !body.DairaId.HasValue => "daira_id is required for daira_admin.",
-            UserRoles.WilayaAdmin when !body.WilayaId.HasValue => "wilaya_id is required for wilaya_admin.",
-            UserRoles.NationalAdmin => "national_admin accounts must be created directly in the database.",
-            UserRoles.FieldWorker => null, // field_worker inherits commune_id from creator
-            _ => null,
-        };
 }

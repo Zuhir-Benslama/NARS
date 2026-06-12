@@ -16,7 +16,8 @@ public record RefreshTokenResult(
 public class RefreshTokenService(
     AppDbContext db,
     IJwtService jwt,
-    IConfiguration config) : IRefreshTokenService
+    IConfiguration config,
+    IDateTimeProvider timeProvider) : IRefreshTokenService
 {
     public async Task<RefreshTokenResult> RotateRefreshTokenAsync(string? rawRefreshToken, CancellationToken cancellationToken = default)
     {
@@ -51,7 +52,7 @@ public class RefreshTokenService(
         stored.Revoked = true;
         var (newRaw, newHash) = jwt.CreateRefreshToken();
         var refreshDays = int.TryParse(config["Jwt:RefreshExpiresInDays"], out var d) ? d : 30;
-        var refreshExpiry = DateTime.UtcNow.AddDays(refreshDays);
+        var refreshExpiry = timeProvider.UtcNow.AddDays(refreshDays);
 
         db.RefreshTokens.Add(new RefreshToken
         {
