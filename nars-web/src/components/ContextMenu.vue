@@ -8,11 +8,7 @@
     >
       <template v-for="(item, i) in store.items" :key="i">
         <div v-if="item.separator" class="ctx-separator" />
-        <div
-          v-else
-          :class="['ctx-item', { 'ctx-danger': item.danger }]"
-          @click="handleClick(item)"
-        >
+        <div v-else :class="['ctx-item', { 'ctx-danger': item.danger }]" @click="handleClick(item)">
           {{ item.label }}
         </div>
       </template>

@@ -82,9 +82,7 @@ export function renderScatteredAreas(geoJsonStr: string | GeoJSON.Geometry): voi
   }
 }
 
-export async function displayCommuneBoundary(
-  communeId: number,
-): Promise<void> {
+export async function displayCommuneBoundary(communeId: number): Promise<void> {
   try {
     const data = (await apiFetch(`/api/commune/${communeId}/boundary`).then((r) => r.json())) as {
       geometry: string | GeoJSON.Geometry
