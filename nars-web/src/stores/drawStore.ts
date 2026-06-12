@@ -12,7 +12,11 @@ export const useDrawStore = defineStore("draw", {
   }),
 
   actions: {
-    registerGeomanMarker(mp: Record<string, unknown>, _marker: unknown, orig: (...args: unknown[]) => void): void {
+    registerGeomanMarker(
+      mp: Record<string, unknown>,
+      _marker: unknown,
+      orig: (...args: unknown[]) => void,
+    ): void {
       this.geomanMarkerPointer = mp
       this.originalGeomanMarkerSetLngLat = orig
     },

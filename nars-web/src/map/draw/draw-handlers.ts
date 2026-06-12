@@ -276,7 +276,7 @@ function onKeyDown(e: KeyboardEvent): void {
         .catch((err) => debugError("[KEYDOWN] disableDraw:", err))
       return
     }
-  if (isEditMode()) {
+    if (isEditMode()) {
       e.preventDefault()
       e.stopImmediatePropagation()
       cancelEditMode().catch((err) => debugError("[KEYDOWN] cancelEditMode:", err))

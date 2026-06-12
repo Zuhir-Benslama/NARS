@@ -12,9 +12,7 @@ import type { FeatureData, LayerEntry, SaveResult, ModalResult } from "../../typ
 
 // ─── GEOMETRY COORDINATE EXTRACTOR ────────────────────────────────────────────
 
-function extractCoords(
-  geometry: GeoJSON.Geometry,
-): { lat: number; lng: number }[] | null {
+function extractCoords(geometry: GeoJSON.Geometry): { lat: number; lng: number }[] | null {
   switch (geometry.type) {
     case "Point": {
       return [{ lat: geometry.coordinates[1], lng: geometry.coordinates[0] }]
@@ -91,9 +89,7 @@ export function buildFeatureData(
     "[SAVE] buildFeatureData — type:",
     result.type,
     "geometry:",
-    result.lat != null
-      ? `Point(${result.lat}, ${result.lng})`
-      : `${coords.length} coords`,
+    result.lat != null ? `Point(${result.lat}, ${result.lng})` : `${coords.length} coords`,
     "keys:",
     Object.keys(result),
   )

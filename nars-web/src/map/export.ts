@@ -2,10 +2,7 @@ import { t, currentLang } from "../i18n"
 
 export type PaperSize = "A0" | "A3"
 
-type Html2Canvas = (
-  el: HTMLElement,
-  opts?: Record<string, unknown>,
-) => Promise<HTMLCanvasElement>
+type Html2Canvas = (el: HTMLElement, opts?: Record<string, unknown>) => Promise<HTMLCanvasElement>
 
 interface JsPDFInstance {
   save: (name: string) => void

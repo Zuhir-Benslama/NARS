@@ -136,9 +136,7 @@ function applyCityCenterOverride(
   storeGeometry: GeoJSON.Geometry,
 ): { style: Record<string, unknown>; storeGeometry: GeoJSON.Geometry } {
   if (!featureData.radius) return { style, storeGeometry }
-  const ring = closeRing(
-    computeCircleRing(featureData.lat!, featureData.lng!, featureData.radius),
-  )
+  const ring = closeRing(computeCircleRing(featureData.lat!, featureData.lng!, featureData.radius))
   return {
     storeGeometry: { type: "LineString", coordinates: ring },
     style: {
