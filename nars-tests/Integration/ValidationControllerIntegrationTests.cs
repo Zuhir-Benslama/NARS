@@ -33,7 +33,7 @@ public class ValidationControllerIntegrationTests : IAsyncLifetime
             ["Validation:RoadConnectivityMeters"] = "20",
             ["Validation:DistrictBoundaryToleranceMeters"] = "10",
         }).Build();
-        _controller = new ValidationController(_db, config, Mock.Of<IValidationService>());
+        _controller = new ValidationController(_db, config, new ValidationService(_db));
     }
 
     public async Task InitializeAsync()

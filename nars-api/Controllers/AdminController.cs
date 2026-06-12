@@ -246,34 +246,8 @@ public class AdminController(
 
     private async Task<IActionResult> WilayaOverview(int wilayaId, CancellationToken cancellationToken)
     {
-        var dairas = await db.Dairas.Where(d => d.WilayaId == wilayaId)
-            .OrderBy(d => d.DairaFr).ToListAsync(cancellationToken);
-
-        var dairaIds = dairas.Select(d => d.DairaId).ToArray();
-
-        var admins = (await db.Users
-                .Where(u => u.Role == UserRoles.DairaAdmin && u.DairaId.HasValue && dairaIds.Contains(u.DairaId.Value))
-                .ToListAsync(cancellationToken))
-            .GroupBy(u => u.DairaId!.Value)
-            .ToDictionary(g => g.Key, g => g.First());
-
-        var communeReports = await BuildCommunesForDairasAsync(dairaIds, cancellationToken);
-
-        var results = dairas.Select(daira =>
-        {
-            var admin = admins.GetValueOrDefault(daira.DairaId);
-
-            return new DairaReport(
-                DairaId: daira.DairaId,
-                DairaNameFr: daira.DairaFr ?? "",
-                DairaNameAr: daira.DairaAr ?? "",
-                DairaAdmin: admin is null ? null : new AdminInfo(
-                    admin.Id.ToString(), admin.Username, admin.Name, admin.Email, admin.Role),
-                Communes: communeReports.GetValueOrDefault(daira.DairaId) ?? []
-            );
-        }).ToList();
-
-        return Ok(new { level = "wilaya", wilayaId, dairas = results });
+        var report = await BuildWilayaReportAsync(wilayaId, cancellationToken);
+        return report is null ? NotFound(new { detail = "Wilaya not found." }) : Ok(report);
     }
 
     private async Task<IActionResult> DairaOverview(int dairaId, CancellationToken cancellationToken)
