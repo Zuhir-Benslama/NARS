@@ -8,7 +8,7 @@ RUN npm ci
 COPY nars-web/ .
 RUN npm run typecheck && npm run build
 
-FROM nginx:1.27-alpine AS final
+FROM nginx:1.31-alpine AS final
 
 LABEL org.opencontainers.image.title="NARS Vite Frontend" \
       org.opencontainers.image.description="NARS Vue 3 + Vite frontend" \
