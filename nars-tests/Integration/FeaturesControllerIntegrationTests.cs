@@ -36,7 +36,7 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
         scatteredMock.Setup(s => s.RefreshAsync(It.IsAny<Guid>(), It.IsAny<int>())).Returns(Task.CompletedTask);
         var bgQueueMock = Mock.Of<IBackgroundTaskQueue>();
 
-        _controller = new FeaturesController(_db, scatteredMock.Object, bgQueueMock, Mock.Of<Microsoft.Extensions.Logging.ILogger<FeaturesController>>(), config.Object, timeProvider, Mock.Of<IFeatureStatsService>());
+        _controller = new FeaturesController(_db, scatteredMock.Object, bgQueueMock, Mock.Of<Microsoft.Extensions.Logging.ILogger<FeaturesController>>(), config.Object, timeProvider, new FeatureStatsService(_db));
     }
 
     public async Task InitializeAsync()
