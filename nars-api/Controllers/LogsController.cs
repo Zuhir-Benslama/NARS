@@ -5,6 +5,7 @@ using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
+using NarsApi.Services;
 
 namespace NarsApi.Controllers;
 
@@ -12,10 +13,12 @@ namespace NarsApi.Controllers;
 [Route("/api")]
 [Tags("Logs")]
 [EnableRateLimiting(RateLimitPolicies.Logs)]
-public class LogsController(AppDbContext db) : ControllerBase
+public class LogsController(AppDbContext db, IConfiguration config, IDateTimeProvider timeProvider) : ControllerBase
 {
-    public const int MaxBatchSize = 50;
-    public const int MaxEntryLength = 10_000;
+    private int MaxBatchSize => int.TryParse(config["Logging:MaxBatchSize"], out var v) ? v : 50;
+    private int MaxEntryLength => int.TryParse(config["Logging:MaxEntryLength"], out var v) ? v : 10_000;
+
+    private static readonly HashSet<string> AllowedLevels = ["error", "warn", "info", "debug", "trace"];
 
     [HttpPost("logs")]
     [AllowAnonymous]
@@ -37,7 +40,7 @@ public class LogsController(AppDbContext db) : ControllerBase
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
         var userAgent = Request.Headers.UserAgent.FirstOrDefault();
 
-        var now = DateTime.UtcNow;
+        var now = timeProvider.UtcNow;
         var entries = new List<ErrorLog>(body.Logs.Count);
 
         foreach (var entry in body.Logs)
@@ -45,11 +48,14 @@ public class LogsController(AppDbContext db) : ControllerBase
             if (string.IsNullOrEmpty(entry.Message)) continue;
             if (entry.Message.Length > MaxEntryLength) continue;
 
+            var level = (entry.Level ?? "error").ToLowerInvariant();
+            if (!AllowedLevels.Contains(level)) continue;
+
             entries.Add(new ErrorLog
             {
                 Id = Guid.CreateVersion7(),
                 UserId = userId,
-                Level = (entry.Level ?? "error").ToLowerInvariant(),
+                Level = level,
                 Code = entry.Code ?? "",
                 Message = entry.Message[..Math.Min(entry.Message.Length, MaxEntryLength)],
                 Context = string.IsNullOrEmpty(entry.Context) ? null : entry.Context,

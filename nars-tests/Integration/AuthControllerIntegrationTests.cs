@@ -199,17 +199,20 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
     private static AuthController CreateController(AppDbContext db)
     {
         var config = CreateConfigMock();
+        var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == DateTime.UtcNow);
         var jwt = new JwtService(
             "integration-test-secret-key-that-is-32chars!!",
             null,
             null,
             config.Object,
-            Mock.Of<ILogger<JwtService>>());
+            Mock.Of<ILogger<JwtService>>(),
+            timeProvider);
         return new AuthController(
             db,
             jwt,
             config.Object,
-            Mock.Of<ILogger<AuthController>>());
+            Mock.Of<ILogger<AuthController>>(),
+            timeProvider);
     }
 
     private async Task SeedReferenceDataAsync()

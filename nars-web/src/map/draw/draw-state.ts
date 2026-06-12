@@ -1,86 +1,58 @@
-// ─── DRAW STATE ───────────────────────────────────────────────────────────────
-// Module-level state shared across draw-complete, draw-events, and draw-marker-patch:
-// - Geoman marker setLngLat bridge
-// - Drawing phase tracker
-// - Save-in-progress guard
-
 import { PHASES } from "../../phases"
-
-// ─── GEOMAN MARKER BRIDGE ─────────────────────────────────────────────────────
-
-let _geomanMarkerPointer: Record<string, unknown> | null = null
-let _originalGeomanMarkerSetLngLat: ((...args: unknown[]) => void) | null = null
-let _snappingEnabled = true
+import { useDrawStore } from "../../stores/drawStore"
 
 export function registerGeomanMarker(
   mp: Record<string, unknown>,
   _marker: unknown,
   orig: (...args: unknown[]) => void,
 ): void {
-  _geomanMarkerPointer = mp
-  _originalGeomanMarkerSetLngLat = orig
+  const store = useDrawStore()
+  store.geomanMarkerPointer = mp
+  store.originalGeomanMarkerSetLngLat = orig
 }
 
 export function unpatchGeomanMarker(): void {
-  _snappingEnabled = false
-  if (_geomanMarkerPointer?.marker && _originalGeomanMarkerSetLngLat) {
-    const marker = _geomanMarkerPointer.marker as Record<string, unknown>
-    marker.setLngLat = _originalGeomanMarkerSetLngLat
+  const store = useDrawStore()
+  store.snappingEnabled = false
+  if (store.geomanMarkerPointer?.marker && store.originalGeomanMarkerSetLngLat) {
+    const marker = store.geomanMarkerPointer.marker as Record<string, unknown>
+    marker.setLngLat = store.originalGeomanMarkerSetLngLat
     marker._narsSnapPatchedInstance = false
   }
 }
 
 export function isSnappingEnabled(): boolean {
-  return _snappingEnabled
+  return useDrawStore().snappingEnabled
 }
 
 export function setSnappingEnabled(v: boolean): void {
-  _snappingEnabled = v
+  useDrawStore().setSnappingEnabled(v)
 }
 
-// ─── RE-PATCH BRIDGE ──────────────────────────────────────────────────────────
-
-let _repatchMarkerPointer: (() => void) | null = null
-
 export function setRepatchMarkerPointer(fn: () => void): void {
-  _repatchMarkerPointer = fn
+  useDrawStore().setRepatchMarkerPointer(fn)
 }
 
 export function repatchMarker(): void {
-  _repatchMarkerPointer?.()
+  useDrawStore().repatchMarker()
 }
 
-// ─── DRAW PHASE ───────────────────────────────────────────────────────────────
-
-let _drawingPhase: (typeof PHASES)[number] | null = null
-
 export function setDrawingPhase(phase: (typeof PHASES)[number] | null): void {
-  _drawingPhase = phase
+  useDrawStore().setDrawingPhase(phase)
 }
 
 export function getDrawingPhase(): (typeof PHASES)[number] | null {
-  return _drawingPhase
+  return useDrawStore().drawingPhase
 }
 
-// ─── SAVE GUARD ───────────────────────────────────────────────────────────────
-
-let savingFeature = false
-
 export function isSavingFeature(): boolean {
-  return savingFeature
+  return useDrawStore().savingFeature
 }
 
 export function setSavingFeature(v: boolean): void {
-  savingFeature = v
+  useDrawStore().setSavingFeature(v)
 }
 
-// ─── STATE RESET (for testing & HMR) ──────────────────────────────────────────
-
 export function resetDrawState(): void {
-  _geomanMarkerPointer = null
-  _originalGeomanMarkerSetLngLat = null
-  _snappingEnabled = true
-  _repatchMarkerPointer = null
-  _drawingPhase = null
-  savingFeature = false
+  useDrawStore().resetDraw()
 }

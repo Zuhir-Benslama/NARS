@@ -18,7 +18,10 @@ namespace NarsApi.Controllers;
 [ApiController]
 [Route("/api")]
 [Tags("Spatial")]
-public class SpatialController(AppDbContext db, IScatteredAreaService scatteredService) : NarsControllerBase
+public class SpatialController(
+    AppDbContext db,
+    IScatteredAreaService scatteredService,
+    IEntranceQueryService entranceQuery) : NarsControllerBase
 {
     // ── POST /api/road-side ───────────────────────────────────────────────────
 
@@ -72,36 +75,10 @@ public class SpatialController(AppDbContext db, IScatteredAreaService scatteredS
 
         string side = cross >= 0 ? "left" : "right";
 
-        // Filter entrances by roadDbId inside PostgreSQL via JSONB operators
-        // instead of loading all entrances into memory and filtering in C#.
-        var usedNumbers = new HashSet<int>();
-        var conn = db.Database.GetDbConnection();
-
-        if (conn.State != ConnectionState.Open)
-            await conn.OpenAsync(cancellationToken);
-        try
-        {
-            var heTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.HouseEntrance)?.TableName ?? "house_entrances";
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = $@"
-                SELECT (data::jsonb->>'entranceNumber')::int
-                FROM {heTable}
-                WHERE user_id = @uid
-                  AND layer   = 'main_entrance'
-                  AND road_id = @rid
-                  AND data::jsonb->>'entranceNumber' IS NOT NULL";
-            AddParam(cmd, "@uid", RequiredCurrentUserId);
-            AddParam(cmd, "@rid", body.RoadId);
-
-            using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
-                if (!await reader.IsDBNullAsync(0, cancellationToken))
-                    usedNumbers.Add(reader.GetInt32(0));
-        }
-        finally
-        {
-            await conn.CloseAsync();
-        }
+        // Query used entrance numbers via dedicated service (raw ADO.NET
+        // is required for JSONB field extraction that EF Core doesn't handle).
+        var usedNumbers = await entranceQuery.GetUsedEntranceNumbersAsync(
+            RequiredCurrentUserId, body.RoadId, cancellationToken);
 
         // Next available odd (left) or even (right) number
         int suggested = side == "left" ? 1 : 2;

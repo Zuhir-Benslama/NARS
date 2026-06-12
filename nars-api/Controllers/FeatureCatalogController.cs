@@ -4,30 +4,22 @@ using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
+using NarsApi.Services;
 
 namespace NarsApi.Controllers;
 
-/// <summary>
-/// Read-only / metadata endpoints for feature type definitions and
-/// layer-scoped feature queries. Separated from FeaturesController (CRUD)
-/// to keep each file focused on one responsibility.
-/// </summary>
 [ApiController]
 [Route("/api")]
 [Tags("Feature Catalog")]
-public class FeatureCatalogController(AppDbContext db) : NarsControllerBase
+public class FeatureCatalogController(
+    IFeatureStatsService featureStatsService) : NarsControllerBase
 {
-    // Feature type icons — presentation layer symbols.
-    private const string IconArea = "\u2B1F";       // ⬟
-    private const string IconRoad = "\U0001F6E3️";   // 🛣️
-    private const string IconDistrict = "\U0001F3D8️"; // 🏘️
-    private const string IconHouseEntrance = "\U0001F6AA"; // 🚪
-    private const string IconPublicBuilding = "\U0001F3DB️"; // 🏛️
-    private const string IconPublicSpace = "\U0001F333"; // 🌳
-
-    // ── GET /api/feature-types ────────────────────────────────────────────────
-    // Returns the full type/layer hierarchy used by the frontend to populate
-    // selectors. Statically defined — no DB query needed.
+    private const string IconArea = "\u2B1F";
+    private const string IconRoad = "\U0001F6E3️";
+    private const string IconDistrict = "\U0001F3D8️";
+    private const string IconHouseEntrance = "\U0001F6AA";
+    private const string IconPublicBuilding = "\U0001F3DB️";
+    private const string IconPublicSpace = "\U0001F333";
 
     [HttpGet("feature-types")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -80,21 +72,14 @@ public class FeatureCatalogController(AppDbContext db) : NarsControllerBase
         return Ok(types);
     }
 
-    // ── GET /api/load/layer/{layerType} ───────────────────────────────────────
-    // Returns all features for the current user that belong to a specific layer.
-    // Useful for targeted refreshes (e.g. reload only roads after direction compute).
-    // Supports pagination via ?skip=0&take=100 query parameters.
-    // Uses UNION ALL across tables so pagination applies to the combined result.
-
     [HttpGet("load/layer/{layerType}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> LoadByLayer(string layerType, [FromQuery] int skip = 0, [FromQuery] int take = 100, CancellationToken cancellationToken = default)
     {
-        // Cap page size to prevent oversized responses.
         take = Math.Clamp(take, 1, 500);
 
-        var (features, totalCount) = await FeatureQueryHelper.LoadByLayerAsync(
-            db.Database.GetDbConnection(), RequiredCurrentUserId, layerType, skip, take, cancellationToken);
+        var (features, totalCount) = await featureStatsService.LoadByLayerAsync(
+            RequiredCurrentUserId, layerType, skip, take, cancellationToken);
 
         return Ok(new
         {

@@ -12,6 +12,12 @@ import type { ScatteredRefreshResponse } from "../../types"
 // ─── MUNICIPALITY BOUNDARY ────────────────────────────────────────────────────
 
 let municipalLimitRings: number[][][] = []
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    municipalLimitRings = []
+    scatteredPolygons = []
+  })
+}
 
 function pointInRing(lat: number, lng: number, ring: number[][]): boolean {
   let inside = false
@@ -78,7 +84,6 @@ export function renderScatteredAreas(geoJsonStr: string | GeoJSON.Geometry): voi
 
 export async function displayCommuneBoundary(
   communeId: number,
-  _communeName: string,
 ): Promise<void> {
   try {
     const data = (await apiFetch(`/api/commune/${communeId}/boundary`).then((r) => r.json())) as {

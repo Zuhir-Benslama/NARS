@@ -21,7 +21,10 @@ public class PagesController(
     IAntiforgery antiforgery,
     IMemoryCache cache,
     IHostEnvironment env,
-    ILogger<PagesController> logger) : NarsControllerBase
+    ILogger<PagesController> logger,
+    IRefreshTokenService refreshService,
+    IConfiguration config,
+    IDateTimeProvider timeProvider) : NarsControllerBase
 {
     // GET / — redirect to map if authenticated, otherwise to login
     [HttpGet("/")]
@@ -100,9 +103,10 @@ public class PagesController(
         if (env.IsDevelopment())
             return System.IO.File.ReadAllText(path);
 
+        var cacheHours = int.TryParse(config["Cache:PageTemplateDurationHours"], out var ch) ? ch : 1;
         return cache.GetOrCreate(cacheKey, entry =>
         {
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(cacheHours);
             return System.IO.File.ReadAllText(path);
         }) ?? string.Empty;
     }
@@ -165,7 +169,6 @@ public class PagesController(
 
         try
         {
-            var refreshService = HttpContext.RequestServices.GetRequiredService<RefreshTokenService>();
             var result = await refreshService.RotateRefreshTokenAsync(refreshToken, cancellationToken);
             if (!result.Success)
             {
@@ -173,7 +176,7 @@ public class PagesController(
                 return false;
             }
 
-            var maxAge = result.RefreshExpiry!.Value - DateTime.UtcNow;
+            var maxAge = result.RefreshExpiry!.Value - timeProvider.UtcNow;
             logger.LogInformation("[Pages] Silent refresh SUCCESS. Issuing new cookies for {Username}", result.User!.Username);
             Response.Cookies.Append("access_token", result.NewAccessToken!, MakeCookieOptions(TimeSpan.FromHours(24)));
             Response.Cookies.Append("refresh_token", result.NewRawToken!, MakeCookieOptions(maxAge));

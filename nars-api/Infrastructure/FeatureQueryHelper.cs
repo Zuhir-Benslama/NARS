@@ -101,62 +101,52 @@ public static class FeatureQueryHelper
         int take,
         CancellationToken ct)
     {
-        var wasOpen = conn.State == System.Data.ConnectionState.Open;
-        if (!wasOpen)
-            await conn.OpenAsync(ct);
+        await using var handle = await conn.EnsureOpenAsync(ct);
 
-        try
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql;
+        cmd.CommandTimeout = 30;
+
+        AddParameter(cmd, "@uid", userId);
+        if (layer is not null)
+            AddParameter(cmd, "@layer", layer);
+        AddParameter(cmd, "@skip", skip);
+        AddParameter(cmd, "@take", take);
+
+        var rows = new List<object>();
+        int totalCount = 0;
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
         {
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = sql;
-            cmd.CommandTimeout = 30;
-
-            AddParameter(cmd, "@uid", userId);
-            if (layer is not null)
-                AddParameter(cmd, "@layer", layer);
-            AddParameter(cmd, "@skip", skip);
-            AddParameter(cmd, "@take", take);
-
-            var rows = new List<object>();
-            int totalCount = 0;
-
-            await using var reader = await cmd.ExecuteReaderAsync(ct);
-            while (await reader.ReadAsync(ct))
+            var idValue = reader.GetValue(0);
+            Guid id = idValue switch
             {
-                var idValue = reader.GetValue(0);
-                Guid id = idValue switch
-                {
-                    Guid g => g,
-                    string s => Guid.Parse(s),
-                    _ => throw new InvalidOperationException($"Unexpected ID type: {idValue?.GetType().Name}")
-                };
-                var label = await reader.IsDBNullAsync(1) ? null : reader.GetString(1);
-                var dataJson = await reader.IsDBNullAsync(2) ? "{}" : reader.GetString(2);
-                var createdAt = reader.GetDateTime(3);
-                var layerVal = await reader.IsDBNullAsync(4) ? null : reader.GetString(4);
-                var type = reader.GetString(5);
-                totalCount = (int)reader.GetInt64(6);
+                Guid g => g,
+                string s => Guid.Parse(s),
+                _ => throw new InvalidOperationException($"Unexpected ID type: {idValue?.GetType().Name}")
+            };
+            var label = await reader.IsDBNullAsync(1) ? null : reader.GetString(1);
+            var dataJson = await reader.IsDBNullAsync(2) ? "{}" : reader.GetString(2);
+            var createdAt = reader.GetDateTime(3);
+            var layerVal = await reader.IsDBNullAsync(4) ? null : reader.GetString(4);
+            var type = reader.GetString(5);
+            totalCount = (int)reader.GetInt64(6);
 
-                rows.Add(new
-                {
-                    id = id.ToString(),
-                    type,
-                    layer = layerVal,
-                    label,
-                    data = string.IsNullOrWhiteSpace(dataJson)
-                        ? JsonDocument.Parse("{}").RootElement
-                        : JsonSerializer.Deserialize<JsonElement>(dataJson),
-                    created_at = createdAt.ToString("o"),
-                });
-            }
+            rows.Add(new
+            {
+                id = id.ToString(),
+                type,
+                layer = layerVal,
+                label,
+                data = string.IsNullOrWhiteSpace(dataJson)
+                    ? JsonDocument.Parse("{}").RootElement
+                    : JsonSerializer.Deserialize<JsonElement>(dataJson),
+                created_at = createdAt.ToString("o"),
+            });
+        }
 
-            return (rows, totalCount);
-        }
-        finally
-        {
-            if (!wasOpen && conn.State == System.Data.ConnectionState.Open)
-                await conn.CloseAsync();
-        }
+        return (rows, totalCount);
     }
 
     private static void AddParameter(DbCommand cmd, string name, object value)

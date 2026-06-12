@@ -2,9 +2,18 @@
 # Build from repo root:
 #   docker build -f nars-infra/docker/Dockerfile.nars-api -t nars-api:latest .
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble AS base
+
+LABEL org.opencontainers.image.title="NARS API" \
+      org.opencontainers.image.description="NARS ASP.NET Core backend" \
+      org.opencontainers.image.source="https://github.com/zuhirbenslama/nars"
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # curl is needed for Docker HEALTHCHECK. The ~5MB is a deliberate trade-off
 # for non-K8s deployments (docker-compose, local runs) that rely on HEALTHCHECK.
-RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl=7.* \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 USER ubuntu
 EXPOSE 8080

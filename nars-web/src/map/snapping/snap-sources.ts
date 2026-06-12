@@ -8,6 +8,11 @@ import { useLayerStore } from "../../stores/layerStore"
 import type { LayerState } from "../../stores/layerStore"
 
 let _snapExclude: string | null = null
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    _snapExclude = null
+  })
+}
 
 /** Called by snapping.ts when the exclude target changes. */
 export function setSnapSourceExclude(id: string | null): void {

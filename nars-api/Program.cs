@@ -108,22 +108,30 @@ builder.Services.AddNarsJwtAuthentication(
 // ═══════════════════════════════════════════════════════════════
 // 3. Application services
 // ═══════════════════════════════════════════════════════════════
+builder.Services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
 builder.Services.AddSingleton<IBackgroundTaskQueue, BackgroundTaskQueue>();
 builder.Services.AddHostedService<BackgroundQueueProcessor>();
 builder.Services.AddScoped<IScatteredAreaService, ScatteredAreaService>();
 builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
+builder.Services.AddScoped<IValidationService, ValidationService>();
+builder.Services.AddScoped<IFieldService, FieldService>();
+builder.Services.AddScoped<IFeatureStatsService, FeatureStatsService>();
+builder.Services.AddScoped<IBoundaryService, BoundaryService>();
+builder.Services.AddScoped<IEntranceQueryService, EntranceQueryService>();
 
 // HTTP client for tile proxy
+var tileTimeout = int.TryParse(builder.Configuration["HttpClient:TileProxyTimeoutSeconds"], out var tts) ? tts : 15;
 builder.Services.AddHttpClient("tile-proxy", client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(15);
+    client.Timeout = TimeSpan.FromSeconds(tileTimeout);
     client.DefaultRequestHeaders.Add("User-Agent", "NARS-TileProxy/1.0");
 });
 
 // HTTP client for Planetary Computer satellite tiles
+var satTimeout = int.TryParse(builder.Configuration["HttpClient:SatelliteTimeoutSeconds"], out var sts) ? sts : 30;
 builder.Services.AddHttpClient("satellite", client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(30);
+    client.Timeout = TimeSpan.FromSeconds(satTimeout);
     client.DefaultRequestHeaders.Add("User-Agent", "NARS-Satellite/1.0");
 });
 
@@ -184,10 +192,12 @@ builder.Services.AddAntiforgery(options =>
 // ═══════════════════════════════════════════════════════════════
 // 10. Request body size limits
 // ═══════════════════════════════════════════════════════════════
+var multipartLimit = int.TryParse(builder.Configuration["FeatureDefaults:MultipartBodyLengthLimit"], out var mll) ? mll : 10_485_760;
+var valueLimit = int.TryParse(builder.Configuration["FeatureDefaults:ValueLengthLimit"], out var vl) ? vl : 1_048_576;
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
 {
-    options.MultipartBodyLengthLimit = 10_485_760;  // 10 MB
-    options.ValueLengthLimit = 1_048_576;   // 1 MB
+    options.MultipartBodyLengthLimit = multipartLimit;
+    options.ValueLengthLimit = valueLimit;
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -225,7 +235,7 @@ app.UseExceptionHandler(errApp =>
         var feature = ctx.Features.Get<IExceptionHandlerPathFeature>();
         var ex = feature?.Error;
 
-        if (app.Environment.IsDevelopment() && ex is not null)
+        if (ex is not null)
         {
             var logger = ctx.RequestServices.GetRequiredService<ILogger<Program>>();
             logger.LogError(ex, "Unhandled exception");

@@ -371,6 +371,12 @@ watch(communeQuery, (q) => {
   fetchCommunes(q ?? "")
 })
 
+onUnmounted(() => {
+  if (wilayaTimer) clearTimeout(wilayaTimer)
+  if (dairaTimer) clearTimeout(dairaTimer)
+  if (communeTimer) clearTimeout(communeTimer)
+})
+
 function selectWilaya(w: { id: number; name_fr: string }) {
   selectedWilayaId.value = w.id
   wilayaQuery.value = w.name_fr

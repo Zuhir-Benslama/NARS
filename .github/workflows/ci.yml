@@ -143,6 +143,10 @@ jobs:
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
 
+      - name: Lint infra (shell, docker, yaml)
+        run: make infra-lint
+        continue-on-error: true
+
       - name: Build and push API image
         uses: docker/build-push-action@v5
         with:

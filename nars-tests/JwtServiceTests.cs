@@ -21,7 +21,8 @@ public class JwtServiceTests
         configMock.Setup(c => c["Jwt:RefreshExpiresInDays"]).Returns(refreshExpiresDays.ToString());
 
         var loggerMock = Mock.Of<ILogger<JwtService>>();
-        return new JwtService(secret, null, null, configMock.Object, loggerMock);
+        var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == DateTime.UtcNow);
+        return new JwtService(secret, null, null, configMock.Object, loggerMock, timeProvider);
     }
 
     [Fact]

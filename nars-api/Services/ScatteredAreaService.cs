@@ -56,46 +56,40 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
             var conn = db.Database.GetDbConnection();
 
             string? scatteredGeoJson = null;
-            await db.Database.OpenConnectionAsync(cancellationToken);
-            try
-            {
-                var areaTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.Area)?.TableName ?? "areas";
-                using var cmd = conn.CreateCommand();
-                cmd.CommandText = $@"
-                    WITH
-                    boundary AS (
-                        SELECT geometry AS geom
-                        FROM communes_boundaries
-                        WHERE commune_id = @cid
+            await using var handle = await conn.EnsureOpenAsync(cancellationToken);
+
+            var areaTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.Area)?.TableName ?? "areas";
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $@"
+                WITH
+                boundary AS (
+                    SELECT geometry AS geom
+                    FROM communes_boundaries
+                    WHERE commune_id = @cid
+                ),
+                urban AS (
+                    SELECT ST_Union({SqlFragments.PolygonFromData}) AS geom
+                    FROM {areaTable} f
+                    WHERE f.user_id = @uid
+                      AND f.layer  IN ('central_urban', 'secondary_urban')
+                )
+                SELECT ST_AsGeoJSON(
+                    ST_Difference(
+                        boundary.geom,
+                        COALESCE(urban.geom, ST_GeomFromText('GEOMETRYCOLLECTION EMPTY', 4326))
                     ),
-                    urban AS (
-                        SELECT ST_Union({SqlFragments.PolygonFromData}) AS geom
-                        FROM {areaTable} f
-                        WHERE f.user_id = @uid
-                          AND f.layer  IN ('central_urban', 'secondary_urban')
-                    )
-                    SELECT ST_AsGeoJSON(
-                        ST_Difference(
-                            boundary.geom,
-                            COALESCE(urban.geom, ST_GeomFromText('GEOMETRYCOLLECTION EMPTY', 4326))
-                        ),
-                        6
-                    )
-                    FROM boundary LEFT JOIN urban ON true";
+                    6
+                )
+                FROM boundary LEFT JOIN urban ON true";
 
-                SqlFragments.AddParam(cmd, "@cid", communeId);
-                SqlFragments.AddParam(cmd, "@uid", userId);
+            SqlFragments.AddParam(cmd, "@cid", communeId);
+            SqlFragments.AddParam(cmd, "@uid", userId);
 
-                // CommandBehavior.SequentialAccess streams the large GeoJSON column
-                // instead of buffering it in Npgsql's internal buffer.
-                using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken);
-                if (await reader.ReadAsync(cancellationToken) && !await reader.IsDBNullAsync(0, cancellationToken))
-                    scatteredGeoJson = await reader.GetTextReader(0).ReadToEndAsync(cancellationToken);
-            }
-            finally
-            {
-                await db.Database.CloseConnectionAsync(); // no CancellationToken on CloseConnectionAsync
-            }
+            // CommandBehavior.SequentialAccess streams the large GeoJSON column
+            // instead of buffering it in Npgsql's internal buffer.
+            using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken);
+            if (await reader.ReadAsync(cancellationToken) && !await reader.IsDBNullAsync(0, cancellationToken))
+                scatteredGeoJson = await reader.GetTextReader(0).ReadToEndAsync(cancellationToken);
 
             if (scatteredGeoJson is null) return;
 

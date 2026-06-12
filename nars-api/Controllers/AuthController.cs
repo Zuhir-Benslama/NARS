@@ -21,7 +21,8 @@ public partial class AuthController(
     // config: read by SignIn + Refresh for Jwt:RefreshExpiresInDays.
     // Accessed in the main AuthController.cs file; in scope for all partials.
     IConfiguration config,
-    ILogger<AuthController> logger
+    ILogger<AuthController> logger,
+    IDateTimeProvider timeProvider
 ) : NarsControllerBase
 {
     // ── POST /api/signup — DISABLED ────────────────────────────────────────
@@ -55,9 +56,9 @@ public partial class AuthController(
             return Unauthorized(new { detail = "Invalid username or password" });
 
         // Check if account is locked
-        if (user.LockedUntil.HasValue && user.LockedUntil.Value > DateTime.UtcNow)
+        if (user.LockedUntil.HasValue && user.LockedUntil.Value > timeProvider.UtcNow)
         {
-            var remaining = (int)(user.LockedUntil.Value - DateTime.UtcNow).TotalMinutes + 1;
+            var remaining = (int)(user.LockedUntil.Value - timeProvider.UtcNow).TotalMinutes + 1;
             return Unauthorized(new { detail = $"Account locked due to too many failed attempts. Try again in {remaining} minute{(remaining == 1 ? "" : "s")}." });
         }
 
@@ -80,7 +81,7 @@ public partial class AuthController(
 
         // Issue a refresh token for silent re-authentication before the access token expires.
         var (refreshRaw, refreshHash) = jwt.CreateRefreshToken();
-        var refreshExpiry = DateTime.UtcNow.AddDays(
+        var refreshExpiry = timeProvider.UtcNow.AddDays(
             ParseIntConfig(config["Jwt:RefreshExpiresInDays"], 30));
 
         logger.LogDebug("Setting auth cookies, Secure={IsHttps}", Request.IsHttps);
@@ -98,7 +99,7 @@ public partial class AuthController(
         // "cookie silently dropped on HTTP because Secure is true" trap
         // when ASPNETCORE_ENVIRONMENT is unset but the server is running
         // behind a local HTTP dev server.
-        var refreshMaxAge = refreshExpiry - DateTime.UtcNow;
+        var refreshMaxAge = refreshExpiry - timeProvider.UtcNow;
 
         Response.Cookies.Append("access_token", token, MakeCookieOptions(TimeSpan.FromHours(24)));
         Response.Cookies.Append("refresh_token", refreshRaw, MakeCookieOptions(refreshMaxAge));
@@ -165,7 +166,7 @@ public partial class AuthController(
         if (!result.Success)
             return Unauthorized(new { detail = result.Detail });
 
-        var cookieMaxAge = result.RefreshExpiry!.Value - DateTime.UtcNow;
+        var cookieMaxAge = result.RefreshExpiry!.Value - timeProvider.UtcNow;
         Response.Cookies.Append("access_token", result.NewAccessToken!, MakeCookieOptions(TimeSpan.FromHours(24)));
         Response.Cookies.Append("refresh_token", result.NewRawToken!, MakeCookieOptions(cookieMaxAge));
 
@@ -246,7 +247,7 @@ public partial class AuthController(
     {
         user.FailedLoginAttempts = (user.FailedLoginAttempts ?? 0) + 1;
         if (user.FailedLoginAttempts >= MaxFailedAttempts)
-            user.LockedUntil = DateTime.UtcNow.AddMinutes(LockoutMinutes);
+            user.LockedUntil = timeProvider.UtcNow.AddMinutes(LockoutMinutes);
 
         await db.SaveChangesAsync(cancellationToken);
     }

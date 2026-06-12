@@ -15,7 +15,7 @@ export async function loadUserAndCommune(): Promise<void> {
     appStore.setUser(user)
     appStore.municipalityName = user.commune?.name_fr ?? ""
     if (user.commune?.id)
-      await displayCommuneBoundary(user.commune.id as number, user.commune.name_fr as string)
+      await displayCommuneBoundary(user.commune.id as number)
   } catch (err) {
     debugError("Commune nav error:", err)
   }

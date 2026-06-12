@@ -1,17 +1,8 @@
-// ─── SNAP STATE MACHINE ───────────────────────────────────────────────────────
-// Snap priority (highest first): circle → vertex → midpoint → edge
-// Only searches phases that are ≤ current phase (completed phases), not future ones.
-//
-// Matching the reference (nars-web/Leaflet) snapping.ts:
-// - Snap freeze on mousedown (prevents cursor jump during click)
-// - Vertex + edge snapping for polygons/roads
-// - Circle perimeter snapping for city centers
-// - Edit-mode vertex hooking (in-place ring mutation on dragend)
-// - installSnapInterceptors patches map events for drawing-mode snap
-
+import maplibregl from "maplibre-gl"
 import { ctx } from "../core/state"
 import { useAppStore } from "../../stores/appStore"
 import { useLayerStore } from "../../stores/layerStore"
+import { useSnapStore } from "../../stores/snapStore"
 import type { LayerState } from "../../stores/layerStore"
 import { SNAP_CONFIG } from "../../config"
 import { PHASES } from "../../phases"
@@ -28,61 +19,53 @@ export type { SnapResult } from "./snap-search"
 import { setSnapSourceExclude } from "./snap-sources"
 export { getSnapRings, getRoadChains, getCityCenterCircles, getSnapPoints } from "./snap-sources"
 
-// ─── DEV WINDOW EXTENSION ─────────────────────────────────────────────────────
-
 declare global {
   interface Window {
     __narsSnapLatLng?: { lat: number; lng: number } | null
   }
 }
 
-// ─── SNAP STATE ───────────────────────────────────────────────────────────────
-
-let crosshairActive = false
-let snapMarker: HTMLDivElement | null = null
+let snapMarker: maplibregl.Marker | null = null
 let snapCursor: HTMLDivElement | null = null
-let snapActive = false
-let snapLatLng: { lat: number; lng: number } | null = null
-let snapFrozen = false
-let snapRafId: number | null = null
-let snapPendingEvent: MouseEvent | null = null
-
-// ─── STATE RESET (for testing & HMR) ──────────────────────────────────────────
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    snapMarker?.remove()
+    snapCursor?.remove()
+    snapMarker = null
+    snapCursor = null
+  })
+}
 
 export function resetSnapState(): void {
-  crosshairActive = false
+  const store = useSnapStore()
+  store.resetSnap()
   snapMarker = null
   snapCursor = null
-  snapActive = false
-  snapLatLng = null
-  snapFrozen = false
-  editModeActive = false
-  editDragActive = false
-  snapRafId = null
-  snapPendingEvent = null
 }
+
 export function isSnapFrozen(): boolean {
-  return snapFrozen
+  return useSnapStore().snapFrozen
 }
 
 export function getFrozenSnapPos(): { lat: number; lng: number } | null {
-  return snapFrozen && snapLatLng ? { lat: snapLatLng.lat, lng: snapLatLng.lng } : null
+  return useSnapStore().getFrozenSnapPos
 }
 
-export let editModeActive = false
 export function setEditModeActive(v: boolean): void {
-  editModeActive = v
+  useSnapStore().setEditModeActive(v)
 }
-export let editDragActive = false
+
 export function setEditDragActive(v: boolean): void {
-  editDragActive = v
+  useSnapStore().setEditDragActive(v)
 }
+
 export function setSnapExclude(id: string | null): void {
   setSnapSourceExclude(id)
 }
 
 export function getActiveSnapPhases(): string[] {
-  if (editModeActive) {
+  const store = useSnapStore()
+  if (store.editModeActive) {
     const layerStore = useLayerStore()
     const state = layerStore.$state as LayerState
     return Object.keys(state).filter((key) => {
@@ -103,33 +86,34 @@ export function getActiveSnapPhases(): string[] {
   return ([...allowedTargets] as string[]).filter((key) => completedPhaseKeys.has(key))
 }
 
-// ─── CROSSHAIR CURSOR ─────────────────────────────────────────────────────────
-
 export function enableCrosshair(): void {
-  if (crosshairActive) return
-  crosshairActive = true
+  const store = useSnapStore()
+  if (store.crosshairActive) return
+  store.crosshairActive = true
   ctx.map.getCanvas().style.cursor = "crosshair"
 }
 
 export function disableCrosshair(): void {
-  if (!crosshairActive) return
-  crosshairActive = false
+  const store = useSnapStore()
+  if (!store.crosshairActive) return
+  store.crosshairActive = false
   ctx.map.getCanvas().style.cursor = ""
 }
 
-// ─── SNAP LIFECYCLE ───────────────────────────────────────────────────────────
-
 function onMouseDown(): void {
-  if (!editModeActive && snapActive && snapLatLng) snapFrozen = true
+  const store = useSnapStore()
+  if (!store.editModeActive && store.snapActive && store.snapLatLng) store.snapFrozen = true
 }
+
 function onMouseUp(): void {
-  snapFrozen = false
+  useSnapStore().snapFrozen = false
 }
 
 export function enableSnapping(): void {
   if (isSnappingEnabled()) return
+  const store = useSnapStore()
   setSnappingEnabled(true)
-  snapActive = true
+  store.snapActive = true
   setSnapSourceExclude(null)
   ctx.map.getContainer().addEventListener("mousemove", onSnapMove, true)
   ctx.map.getContainer().addEventListener("mousedown", onMouseDown, true)
@@ -139,16 +123,17 @@ export function enableSnapping(): void {
 
 export function disableSnapping(): void {
   if (!isSnappingEnabled()) return
+  const store = useSnapStore()
   setSnappingEnabled(false)
-  snapActive = false
+  store.snapActive = false
   setSnapSourceExclude(null)
-  snapFrozen = false
-  editModeActive = false
-  if (snapRafId !== null) {
-    cancelAnimationFrame(snapRafId)
-    snapRafId = null
+  store.snapFrozen = false
+  store.editModeActive = false
+  if (store.snapRafId !== null) {
+    cancelAnimationFrame(store.snapRafId)
+    store.snapRafId = null
   }
-  snapPendingEvent = null
+  store.snapPendingEvent = null
   ctx.map.getContainer().removeEventListener("mousemove", onSnapMove, true)
   ctx.map.getContainer().removeEventListener("mousedown", onMouseDown, true)
   ctx.map.getContainer().removeEventListener("mouseup", onMouseUp, true)
@@ -160,8 +145,10 @@ export function disableSnapping(): void {
     snapCursor.remove()
     snapCursor = null
   }
-  if (import.meta.env.DEV) window.__narsSnapLatLng = null
-  ctx.map.getCanvas().style.cursor = crosshairActive ? "crosshair" : ""
+  if (import.meta.env.DEV) {
+    window.__narsSnapLatLng = null
+  }
+  ctx.map.getCanvas().style.cursor = store.crosshairActive ? "crosshair" : ""
   unpatchGeomanMarker()
 }
 
@@ -176,46 +163,43 @@ export function toggleSnapping(): boolean {
 }
 
 export function isSnappingActive(): boolean {
-  return snapActive
+  return useSnapStore().snapActive
 }
 
-// ─── SNAP EVENT ───────────────────────────────────────────────────────────────
-
 function onSnapMove(e: MouseEvent): void {
-  snapPendingEvent = e
-  if (snapRafId !== null) return
-  snapRafId = requestAnimationFrame(processSnapMove)
+  const store = useSnapStore()
+  store.snapPendingEvent = e
+  if (store.snapRafId !== null) return
+  store.snapRafId = requestAnimationFrame(processSnapMove)
 }
 
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
-    if (snapRafId !== null) {
-      cancelAnimationFrame(snapRafId)
-      snapRafId = null
+    const store = useSnapStore()
+    if (store.snapRafId !== null) {
+      cancelAnimationFrame(store.snapRafId)
+      store.snapRafId = null
     }
   })
 }
 
 function processSnapMove(): void {
-  snapRafId = null
-  const e = snapPendingEvent
-  snapPendingEvent = null
-  if (!e || snapFrozen) return
+  const store = useSnapStore()
+  store.snapRafId = null
+  const e = store.snapPendingEvent
+  store.snapPendingEvent = null
+  if (!e || store.snapFrozen) return
 
   if (!ctx.map.getContainer().contains(e.target as Node)) return
 
-  if (editModeActive && !editDragActive) {
-    if (snapActive) {
-      snapActive = false
-      snapLatLng = null
-      if (snapMarker) {
-        snapMarker.remove()
-        snapMarker = null
-      }
-      if (snapCursor) {
-        snapCursor.remove()
-        snapCursor = null
-      }
+  if (store.editModeActive && !store.editDragActive) {
+    if (store.snapActive) {
+      store.snapActive = false
+      store.snapLatLng = null
+      snapMarker?.remove()
+      snapMarker = null
+      snapCursor?.remove()
+      snapCursor = null
     }
     return
   }
@@ -229,28 +213,22 @@ function processSnapMove(): void {
 
   const snap = findNearestSnap(x, y, activePhases, false)
   if (snap) {
-    snapActive = true
-    snapLatLng = { lat: snap.lat, lng: snap.lng }
+    store.snapActive = true
+    store.snapLatLng = { lat: snap.lat, lng: snap.lng }
     const pos = ctx.map.project([snap.lng, snap.lat])
     showSnapIndicator(pos.x, pos.y, snap.type)
-    if (import.meta.env.DEV) window.__narsSnapLatLng = snapLatLng
+    if (import.meta.env.DEV) window.__narsSnapLatLng = store.snapLatLng
   } else {
-    snapActive = false
-    snapLatLng = null
+    store.snapActive = false
+    store.snapLatLng = null
     if (import.meta.env.DEV) window.__narsSnapLatLng = null
-    if (snapMarker) {
-      snapMarker.remove()
-      snapMarker = null
-    }
-    if (snapCursor) {
-      snapCursor.remove()
-      snapCursor = null
-    }
-    ctx.map.getCanvas().style.cursor = crosshairActive ? "crosshair" : ""
+    snapMarker?.remove()
+    snapMarker = null
+    snapCursor?.remove()
+    snapCursor = null
+    ctx.map.getCanvas().style.cursor = store.crosshairActive ? "crosshair" : ""
   }
 }
-
-// ─── SNAP INDICATOR STYLES ────────────────────────────────────────────────────
 
 const SNAP_COLORS: Record<string, string> = {
   vertex: "#f39c12",
@@ -259,7 +237,7 @@ const SNAP_COLORS: Record<string, string> = {
   circle: "#e74c3c",
 }
 
-const MARKER_STYLE: Record<string, string> = {
+const MARKER_SHAPES: Record<string, string> = {
   vertex:
     "width:16px;height:16px;background:yellow;border:3px solid {color};border-radius:50%;box-shadow:0 0 8px rgba(0,0,0,0.5);",
   midpoint:
@@ -271,14 +249,17 @@ const MARKER_STYLE: Record<string, string> = {
 
 function showSnapIndicator(px: number, py: number, type: string): void {
   const color = SNAP_COLORS[type]
+  const snapLngLat = useSnapStore().snapLatLng
   if (!snapMarker) {
-    snapMarker = document.createElement("div")
-    ctx.map.getContainer().appendChild(snapMarker)
+    const el = document.createElement("div")
+    snapMarker = new maplibregl.Marker({ element: el, anchor: "center", pitchAlignment: "map" })
+    snapMarker.setLngLat([snapLngLat?.lng ?? 0, snapLngLat?.lat ?? 0]).addTo(ctx.map)
   }
-
-  const position = `position:absolute;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);left:${px}px;top:${py}px;`
-  const shape = MARKER_STYLE[type].replace("{color}", color)
-  snapMarker.style.cssText = position + shape
+  if (snapLngLat) {
+    snapMarker.setLngLat([snapLngLat.lng, snapLngLat.lat])
+    const el = snapMarker.getElement()
+    el.style.cssText = MARKER_SHAPES[type].replace("{color}", color)
+  }
 
   ctx.map.getCanvas().style.cursor = "crosshair"
   if (!snapCursor) {
@@ -293,8 +274,6 @@ function showSnapIndicator(px: number, py: number, type: string): void {
   `
 }
 
-// ─── EDIT MODE SNAP ───────────────────────────────────────────────────────────
-
 export function snapPointForEdit(
   cursorX: number,
   cursorY: number,
@@ -308,8 +287,9 @@ export function installSnapInterceptors(): void {
   const map = ctx.map
 
   const snapLngLat = (e: Record<string, unknown>): void => {
-    if (!snapActive || !snapLatLng) return
-    const { lng, lat } = snapLatLng
+    const store = useSnapStore()
+    if (!store.snapActive || !store.snapLatLng) return
+    const { lng, lat } = store.snapLatLng
     try {
       Object.defineProperty(e, "lngLat", {
         value: { lng, lat, toArray: () => [lng, lat] },

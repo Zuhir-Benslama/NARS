@@ -31,7 +31,7 @@ public partial class AuthController
 
     [HttpPost("admin/authorized-signup")]
     [AllowAnonymous]
-    [EnableRateLimiting("auth")]
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -39,7 +39,8 @@ public partial class AuthController
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status423Locked)]
     public async Task<IActionResult> AuthorizedAdminSignup(
-        [FromBody] AuthorizedAdminSignupRequest body)
+        [FromBody] AuthorizedAdminSignupRequest body,
+        CancellationToken cancellationToken = default)
     {
         if (body is null) return BadRequest(new { detail = "Request body is required." });
         // 1. Verify the authorizing admin's credentials.
@@ -47,7 +48,7 @@ public partial class AuthController
         // Short-circuiting on "admin is null" leaks whether a username exists
         // via response-time difference (~0 µs vs ~300 ms for a real BCrypt check).
         var admin = await db.Users
-            .FirstOrDefaultAsync(u => u.Username == body.AdminUsername);
+            .FirstOrDefaultAsync(u => u.Username == body.AdminUsername, cancellationToken);
 
         // Use a stable dummy hash so BCrypt always does the full work.
         const string _dummyHash = "$2a$11$dummy.constant.time.hash.padding.abcdefghijklmnop";
@@ -61,7 +62,7 @@ public partial class AuthController
             return Forbid();
 
         // 2. Lockout check.
-        if (admin.LockedUntil.HasValue && admin.LockedUntil > DateTime.UtcNow)
+        if (admin.LockedUntil.HasValue && admin.LockedUntil > timeProvider.UtcNow)
             return StatusCode(423, new { detail = "Admin account is temporarily locked." });
 
         // 3. Role hierarchy.
@@ -72,7 +73,7 @@ public partial class AuthController
             });
 
         // 4. Geographic scope per role.
-        var scopeError = await ValidateScopeAsync(admin, body);
+        var scopeError = await ValidateScopeAsync(admin, body, cancellationToken);
         if (scopeError is not null)
             return StatusCode(403, new { detail = scopeError });
 
@@ -83,7 +84,7 @@ public partial class AuthController
 
         // 6. Uniqueness.
         var existing = await db.Users
-            .FirstOrDefaultAsync(u => u.Username == body.Username || u.Email == body.Email);
+            .FirstOrDefaultAsync(u => u.Username == body.Username || u.Email == body.Email, cancellationToken);
         if (existing is not null)
         {
             var field = existing.Username == body.Username ? "Username" : "Email";
@@ -112,7 +113,7 @@ public partial class AuthController
         };
 
         db.Users.Add(newUser);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
             "[Auth] {AdminUser} ({AdminRole}) created {NewRole} account {NewUser} via login page",
@@ -127,7 +128,7 @@ public partial class AuthController
 
     // ─── Scope validation ─────────────────────────────────────────────────────
 
-    private async Task<string?> ValidateScopeAsync(User admin, AuthorizedAdminSignupRequest body)
+    private async Task<string?> ValidateScopeAsync(User admin, AuthorizedAdminSignupRequest body, CancellationToken cancellationToken = default)
     {
         switch (admin.Role, body.Role)
         {
@@ -139,7 +140,7 @@ public partial class AuthController
                 {
                     if (!body.CommuneId.HasValue)
                         return "commune_id is required when creating a commune_user.";
-                    var commune = await db.Communes.FindAsync(body.CommuneId.Value);
+                    var commune = await db.Communes.FindAsync([body.CommuneId.Value], cancellationToken);
                     if (commune is null)
                         return "Commune not found.";
                     if (commune.DairaId != admin.DairaId)
@@ -151,7 +152,7 @@ public partial class AuthController
                 {
                     if (!body.DairaId.HasValue)
                         return "daira_id is required when creating a daira_admin.";
-                    var daira = await db.Dairas.FindAsync(body.DairaId.Value);
+                    var daira = await db.Dairas.FindAsync([body.DairaId.Value], cancellationToken);
                     if (daira is null)
                         return "Daira not found.";
                     if (daira.WilayaId != admin.WilayaId)
@@ -160,7 +161,7 @@ public partial class AuthController
                 }
             // national_admin creates wilaya_admin: any wilaya is valid.
             case (UserRoles.NationalAdmin, UserRoles.WilayaAdmin):
-                if (body.WilayaId.HasValue && await db.Wilayas.FindAsync(body.WilayaId.Value) is null)
+                if (body.WilayaId.HasValue && await db.Wilayas.FindAsync([body.WilayaId.Value], cancellationToken) is null)
                     return "Wilaya not found.";
                 return null;
 
@@ -190,13 +191,5 @@ public partial class AuthController
         };
 
     private static string? ValidateAdminGeo(AuthorizedAdminSignupRequest body) =>
-        body.Role switch
-        {
-            UserRoles.CommuneUser when !body.CommuneId.HasValue => "commune_id is required for commune_user.",
-            UserRoles.DairaAdmin when !body.DairaId.HasValue => "daira_id is required for daira_admin.",
-            UserRoles.WilayaAdmin when !body.WilayaId.HasValue => "wilaya_id is required for wilaya_admin.",
-            UserRoles.NationalAdmin => "national_admin accounts must be created directly in the database.",
-            UserRoles.FieldWorker => null, // field_worker inherits commune_id from creator
-            _ => null,
-        };
+        ValidateGeographicFields(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
 }

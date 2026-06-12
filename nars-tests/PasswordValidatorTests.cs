@@ -62,4 +62,16 @@ public class PasswordValidatorTests
         Assert.Equal("Password must be at least 8 characters.",
             PasswordValidator.Validate("Aa1!xxx"));
     }
+
+    [Theory]
+    [InlineData("P@ssw0rd")]
+    [InlineData("Passw0rd!")]
+    [InlineData("Abc123!@")]
+    [InlineData("Xyz789#!")]
+    [InlineData("Qwerty!1")]
+    public void CommonPassword_ReturnsError(string password)
+    {
+        Assert.Equal("Password is too common. Choose a more complex password.",
+            PasswordValidator.Validate(password));
+    }
 }

@@ -211,7 +211,7 @@ describe("draw-state.ts", () => {
     it("setDrawingPhase stores and retrieves the phase", () => {
       const phase = PHASES[0]
       setDrawingPhase(phase)
-      expect(getDrawingPhase()).toBe(phase)
+      expect(getDrawingPhase()).toEqual(phase)
     })
 
     it("setDrawingPhase(null) clears the phase", () => {

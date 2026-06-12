@@ -35,23 +35,27 @@ public class AuthControllerTests
         return config;
     }
 
-    private static JwtService CreateJwtService(IConfiguration config)
+    private static JwtService CreateJwtService(IConfiguration config, IDateTimeProvider? timeProvider = null)
     {
+        timeProvider ??= Mock.Of<IDateTimeProvider>(x => x.UtcNow == DateTime.UtcNow);
         return new JwtService(
             "test-secret-key-that-is-at-least-32-chars-long!!",
             null,
             null,
             config,
-            Mock.Of<ILogger<JwtService>>());
+            Mock.Of<ILogger<JwtService>>(),
+            timeProvider);
     }
 
     private static AuthController CreateController(AppDbContext db, IConfiguration config)
     {
+        var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == DateTime.UtcNow);
         return new AuthController(
             db,
-            CreateJwtService(config),
+            CreateJwtService(config, timeProvider),
             config,
-            Mock.Of<ILogger<AuthController>>());
+            Mock.Of<ILogger<AuthController>>(),
+            timeProvider);
     }
 
     [Fact]

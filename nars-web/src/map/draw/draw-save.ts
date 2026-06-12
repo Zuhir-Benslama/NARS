@@ -6,7 +6,7 @@ import { PHASES } from "../../phases"
 import { useAppStore } from "../../stores/appStore"
 import { useLayerStore } from "../../stores/layerStore"
 import type { LayerState } from "../../stores/layerStore"
-import type { LayerEntry } from "../../types"
+import type { LayerEntry, FeatureData } from "../../types"
 import { ctx, featuresStore } from "../core/state"
 import { buildDrawControl } from "./draw-control"
 import { refreshLayerVisibility } from "../rendering/labels"
@@ -128,6 +128,28 @@ async function checkExistingCityCenter(
   return false
 }
 
+// ─── CITY CENTER GEOMETRY OVERRIDE ─────────────────────────────────
+
+function applyCityCenterOverride(
+  featureData: FeatureData,
+  style: Record<string, unknown>,
+  storeGeometry: GeoJSON.Geometry,
+): { style: Record<string, unknown>; storeGeometry: GeoJSON.Geometry } {
+  if (!featureData.radius) return { style, storeGeometry }
+  const ring = closeRing(
+    computeCircleRing(featureData.lat!, featureData.lng!, featureData.radius),
+  )
+  return {
+    storeGeometry: { type: "LineString", coordinates: ring },
+    style: {
+      lineColor: "#e74c3c",
+      lineWidth: 6,
+      textColor: "#333333",
+      radius: featureData.radius,
+    },
+  }
+}
+
 // ─── SAVE & UPDATE STORE ──────────────────────────────────────────
 
 async function saveAndUpdateStore(
@@ -148,20 +170,13 @@ async function saveAndUpdateStore(
     }
 
     const dbId = saveResult.data.id
-    let style = getFeatureStyle(drawingPhase, modalResult)
-    let storeGeometry = normalizeGeometry(geometry, drawingPhase.drawType)
+    let style: Record<string, unknown> = getFeatureStyle(drawingPhase, modalResult)
+    let storeGeometry: GeoJSON.Geometry = normalizeGeometry(geometry, drawingPhase.drawType)
 
-    if (drawingPhase.key === "cityCenter" && featureData.radius) {
-      const ring = closeRing(
-        computeCircleRing(featureData.lat!, featureData.lng!, featureData.radius),
-      )
-      storeGeometry = { type: "LineString", coordinates: ring }
-      style = {
-        lineColor: "#e74c3c",
-        lineWidth: 6,
-        textColor: "#333333",
-        radius: featureData.radius,
-      }
+    if (drawingPhase.key === "cityCenter") {
+      const overridden = applyCityCenterOverride(featureData, style, storeGeometry)
+      style = overridden.style
+      storeGeometry = overridden.storeGeometry
     }
 
     featuresStore.add({

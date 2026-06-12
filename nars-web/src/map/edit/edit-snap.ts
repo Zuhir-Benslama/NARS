@@ -8,6 +8,11 @@ import { ctx } from "../core/state"
 import { snapPointForEdit } from "../snapping/snapping"
 
 let _origSetLngLat: ((lngLat: LngLatTuple) => void) | null = null
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    _origSetLngLat = null
+  })
+}
 
 export function patchMarkerPointerSnap(editEntryId: string | null): void {
   const mp = ctx.geoman?.markerPointer?.marker

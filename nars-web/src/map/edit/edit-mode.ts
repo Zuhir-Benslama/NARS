@@ -11,6 +11,7 @@ import {
   setEditModeActive,
 } from "../snapping/snapping"
 import { debugError } from "../../utils/debug"
+import { useEditStore } from "../../stores/editStore"
 import {
   findLayerEntryByFeatureId,
   setActiveGeomanFeatureId,
@@ -19,8 +20,6 @@ import {
 } from "./edit-state"
 import { buildGeomanImportFeature } from "./edit-import"
 import { patchMarkerPointerSnap } from "./edit-snap"
-import { showEditSaveButton } from "./edit-ui"
-
 export {
   isEditMode,
   getActiveEditEntry,
@@ -67,9 +66,8 @@ export async function enableEditMode(featureId?: string): Promise<void> {
 
   await ctx.geoman.enableGlobalEditMode()
   setEditModeActive(true)
+  useEditStore().isEditMode = true
   setSnapExclude(featureId ?? null)
 
   patchMarkerPointerSnap(featureId ?? null)
-
-  showEditSaveButton()
 }

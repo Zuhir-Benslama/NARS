@@ -8,6 +8,7 @@ using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
+using NarsApi.Services;
 using Xunit;
 
 namespace NarsApi.Tests.Integration;
@@ -23,7 +24,7 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     {
         _fixture = fixture;
         _db = fixture.CreateDbContext();
-        _controller = new AdminController(_db, Mock.Of<Microsoft.Extensions.Logging.ILogger<AdminController>>());
+        _controller = new AdminController(_db, Mock.Of<Microsoft.Extensions.Logging.ILogger<AdminController>>(), Mock.Of<IFeatureStatsService>());
     }
 
     public async Task InitializeAsync()

@@ -5,6 +5,7 @@ using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
+using NarsApi.Services;
 
 namespace NarsApi.Controllers;
 
@@ -13,15 +14,13 @@ namespace NarsApi.Controllers;
 [Tags("Field")]
 public class FieldController(
     AppDbContext db,
-    ILogger<FieldController> logger) : NarsControllerBase
+    ILogger<FieldController> logger,
+    IConfiguration config,
+    IDateTimeProvider timeProvider,
+    IFieldService fieldService) : NarsControllerBase
 {
-    private const int MaxFeatureDataSize = 524_288;
+    private int MaxFeatureDataSize => int.TryParse(config["FeatureDefaults:MaxFeatureDataSize"], out var v) ? v : 524_288;
 
-    /// <summary>
-    /// Returns features available for inspection in the field worker's commune.
-    /// Field workers can inspect features created by commune_user accounts
-    /// within the same commune.
-    /// </summary>
     [HttpGet("field/features")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -42,7 +41,6 @@ public class FieldController(
         if (communeId is null)
             return BadRequest(new { detail = "Field worker has no assigned commune." });
 
-        // Find all commune_user IDs in the same commune
         var communeUserIds = await db.Users
             .Where(u => u.Role == UserRoles.CommuneUser && u.CommuneId == communeId)
             .Select(u => u.Id)
@@ -54,25 +52,16 @@ public class FieldController(
         take = Math.Clamp(take, 1, 1000);
         var userIds = communeUserIds.ToArray();
 
-        // Query the specific feature type table if type is specified
-        (List<object> Items, int Total)? results = (type?.ToLowerInvariant()) switch
-        {
-            FeatureTypes.Road => await QueryFeaturesAsync("roads", userIds, skip, take),
-            FeatureTypes.HouseEntrance => await QueryFeaturesAsync("house_entrances", userIds, skip, take),
-            FeatureTypes.NamingPanel => await QueryFeaturesAsync("naming_panels", userIds, skip, take),
-            _ => null
-        };
+        if (type is null) return BadRequest(new { detail = "type query parameter is required." });
 
-        if (results is null)
+        var descriptor = FeatureTypeRegistry.GetDescriptor(type.ToLowerInvariant());
+        if (descriptor is null)
             return BadRequest(new { detail = "Invalid or missing type. Use: road, house_entrance, or naming_panel." });
 
-        return Ok(new { features = results.Value.Items, count = results.Value.Total });
+        var results = await fieldService.QueryFeaturesAsync(descriptor.TableName, userIds, skip, take, cancellationToken);
+        return Ok(new { features = results.Items, count = results.Total });
     }
 
-    /// <summary>
-    /// Saves a new inspection result for a feature.
-    /// Field workers submit road/entrance/naming panel inspection data here.
-    /// </summary>
     [HttpPost("field/inspect")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -87,12 +76,11 @@ public class FieldController(
         if (!Guid.TryParse(body.FeatureId, out var featureId))
             return BadRequest(new { detail = "Invalid feature_id." });
 
-        // Verify the feature exists and belongs to a user in the same commune
         var registryEntry = await db.FeatureRegistry.FindAsync([featureId], cancellationToken);
         if (registryEntry is null)
             return BadRequest(new { detail = "Feature not found." });
 
-        var feature = await GetFeatureOwnerAsync(registryEntry.FeatureType, featureId);
+        var feature = await fieldService.GetFeatureOwnerAsync(registryEntry.FeatureType, featureId, cancellationToken);
         if (feature is null)
             return BadRequest(new { detail = "Feature not found." });
 
@@ -122,7 +110,7 @@ public class FieldController(
             Type = body.Type,
             Data = rawData,
             Status = body.Status,
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = timeProvider.UtcNow,
         };
 
         db.Add(inspection);
@@ -139,9 +127,6 @@ public class FieldController(
         });
     }
 
-    /// <summary>
-    /// Gets the inspection history for a specific feature.
-    /// </summary>
     [HttpGet("field/inspections/{featureId:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -167,10 +152,6 @@ public class FieldController(
         return Ok(new { inspections });
     }
 
-    /// <summary>
-    /// Creates a new house entrance feature from the inspection form.
-    /// Used when a field worker finds a missing entrance and needs to add one.
-    /// </summary>
     [HttpPost("field/entrance/create")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -185,7 +166,6 @@ public class FieldController(
         if (!Guid.TryParse(body.RoadId, out var roadId))
             return BadRequest(new { detail = "Invalid road_id." });
 
-        // Verify the road exists and belongs to a user in the same commune
         var road = await db.Roads.FindAsync([roadId], cancellationToken);
         if (road is null)
             return BadRequest(new { detail = "Road not found." });
@@ -207,12 +187,12 @@ public class FieldController(
         var entrance = new HouseEntrance
         {
             Id = newId,
-            UserId = road.UserId, // entrance belongs to the road owner's commune_user
+            UserId = road.UserId,
             Layer = FeatureTypes.HouseEntranceLayers.Main,
             Label = label,
             Data = rawData,
             RoadId = roadId,
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = timeProvider.UtcNow,
         };
 
         await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -240,98 +220,9 @@ public class FieldController(
         });
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
     private static JsonElement DeserializeJsonSafe(string json)
     {
         try { return JsonSerializer.Deserialize<JsonElement>(json); }
         catch (JsonException) { return JsonDocument.Parse("{}").RootElement; }
-    }
-
-    private async Task<(List<object> Items, int Total)> QueryFeaturesAsync(
-        string tableName, Guid[] userIds, int skip, int take)
-    {
-        var conn = db.Database.GetDbConnection();
-        var wasOpen = conn.State == System.Data.ConnectionState.Open;
-        if (!wasOpen) await conn.OpenAsync();
-
-        try
-        {
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = $"""
-                SELECT id, user_id, layer, label, data, created_at, updated_at,
-                       COUNT(*) OVER() AS total
-                FROM {tableName}
-                WHERE user_id = ANY(@user_ids)
-                ORDER BY created_at DESC
-                OFFSET @skip
-                LIMIT @take
-                """;
-
-            SqlFragments.AddParam(cmd, "@user_ids", userIds);
-            SqlFragments.AddParam(cmd, "@skip", skip);
-            SqlFragments.AddParam(cmd, "@take", take);
-
-            var items = new List<object>();
-            int total = 0;
-
-            await using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
-            {
-                if (total == 0) total = reader.GetInt32(6);
-                var id = reader.GetGuid(0);
-                var rawData = await reader.IsDBNullAsync(4) ? "{}" : reader.GetString(4);
-                JsonElement? data = null;
-                try { data = JsonSerializer.Deserialize<JsonElement>(rawData); }
-                catch (JsonException ex) { logger.LogWarning(ex, "Failed to parse feature data for {Id}", id); }
-
-                items.Add(new
-                {
-                    id = id.ToString(),
-                    user_id = reader.GetGuid(1).ToString(),
-                    layer = reader.GetString(2),
-                    label = reader.GetString(3),
-                    data,
-                    created_at = reader.GetDateTime(5),
-                    updated_at = await reader.IsDBNullAsync(6) ? null : (DateTime?)reader.GetDateTime(6)
-                });
-            }
-
-            return (items, total);
-        }
-        finally
-        {
-            if (!wasOpen && conn.State == System.Data.ConnectionState.Open)
-                await conn.CloseAsync();
-        }
-    }
-
-    private async Task<(Guid UserId, int? CommuneId)?> GetFeatureOwnerAsync(string featureType, Guid featureId)
-    {
-        var tableName = FeatureTypeRegistry.GetDescriptor(featureType)?.TableName;
-        if (tableName is null) return null;
-
-        var conn = db.Database.GetDbConnection();
-        var wasOpen = conn.State == System.Data.ConnectionState.Open;
-        if (!wasOpen) await conn.OpenAsync();
-
-        try
-        {
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = $"SELECT user_id FROM {tableName} WHERE id = @id";
-            SqlFragments.AddParam(cmd, "@id", featureId);
-
-            var result = await cmd.ExecuteScalarAsync();
-            if (result is null || result == DBNull.Value) return null;
-
-            var userId = (Guid)result;
-            var owner = await db.Users.FindAsync([userId], CancellationToken.None);
-            return owner is null ? null : (owner.Id, owner.CommuneId);
-        }
-        finally
-        {
-            if (!wasOpen && conn.State == System.Data.ConnectionState.Open)
-                await conn.CloseAsync();
-        }
     }
 }
