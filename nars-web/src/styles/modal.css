@@ -125,6 +125,13 @@
 .modal-btn-cancel:hover {
   background: var(--btn-cancel-hover) !important;
 }
+.modal-btn-danger {
+  background: #dc2626;
+  color: #fff;
+}
+.modal-btn-danger:hover {
+  background: #b91c1c;
+}
 
 .modal-side-hint {
   font-weight: 400;

@@ -208,5 +208,14 @@
   "su_err_daira": "Please select a daïra.",
   "su_err_commune": "Please select a commune.",
   "su_err_generic": "Failed to create account.",
-  "su_err_network": "Network error. Please try again."
+  "su_err_network": "Network error. Please try again.",
+  "su_user_list_title": "Existing Users",
+  "su_edit_btn": "Edit",
+  "su_delete_btn": "Delete",
+  "su_update_btn": "Update",
+  "su_cancel_btn": "Cancel",
+  "su_confirm_delete": "Delete {username}?",
+  "su_delete_success": "User deleted successfully.",
+  "su_update_success": "User updated successfully.",
+  "su_err_update_generic": "Failed to update account."
 }

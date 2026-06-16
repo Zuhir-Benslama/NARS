@@ -92,6 +92,26 @@ export async function getAdminOverview(): Promise<
   return res.json()
 }
 
+export async function getManageableUsers(): Promise<Record<string, unknown>[]> {
+  const res = await apiFetch("/api/admin/users")
+  return res.json()
+}
+
+export async function updateAdminUser(
+  userId: string,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  return apiFetch(`/api/admin/users/${userId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+}
+
+export async function deleteAdminUser(userId: string): Promise<Response> {
+  return apiFetch(`/api/admin/users/${userId}`, { method: "DELETE" })
+}
+
 export async function getWilayaReport(
   wilayaId: number,
 ): Promise<Json<paths["/api/admin/wilaya/{wilayaId}"]["get"]["responses"][200]>> {

@@ -208,5 +208,14 @@
   "su_err_daira": "الرجاء اختيار الدائرة.",
   "su_err_commune": "الرجاء اختيار البلدية.",
   "su_err_generic": "فشل إنشاء الحساب.",
-  "su_err_network": "خطأ في الشبكة. حاول مرة أخرى."
+  "su_err_network": "خطأ في الشبكة. حاول مرة أخرى.",
+  "su_user_list_title": "المستخدمون الموجودون",
+  "su_edit_btn": "تعديل",
+  "su_delete_btn": "حذف",
+  "su_update_btn": "تحديث",
+  "su_cancel_btn": "إلغاء",
+  "su_confirm_delete": "حذف {username}؟",
+  "su_delete_success": "تم حذف المستخدم بنجاح.",
+  "su_update_success": "تم تحديث المستخدم بنجاح.",
+  "su_err_update_generic": "فشل تحديث الحساب."
 }
