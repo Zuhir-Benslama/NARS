@@ -5,6 +5,7 @@ import { createPinia } from "pinia"
 import App from "./App.vue"
 import "./app.css"
 import { i18n } from "./i18n"
+import router from "./router"
 import { initTheme } from "./composables/useTheme"
 import { initMap, loadFromDatabase, loadUserAndCommune } from "./map"
 import { useAppStore } from "./stores/appStore"
@@ -66,6 +67,7 @@ initTheme()
 
   app.use(pinia)
   app.use(i18n)
+  app.use(router)
 
   // ── Global Error Handler ──────────────────────────────────────────────
   // Catches all Vue-level errors and logs them with context

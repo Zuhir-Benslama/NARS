@@ -24,6 +24,39 @@ public record CreateAdminRequest(
     [property: JsonPropertyName("wilaya_id")] int? WilayaId
 );
 
+// ─── ADMIN USER UPDATE ───────────────────────────────────────────────────────
+
+/// <summary>
+/// Request body for updating an existing admin account.
+/// All fields are optional — only provided fields will be updated.
+/// </summary>
+public record UpdateAdminRequest(
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("email")] string? Email,
+    [property: JsonPropertyName("phone")] string? Phone,
+    [property: JsonPropertyName("role")] string? Role,
+    [property: JsonPropertyName("commune_id")] int? CommuneId,
+    [property: JsonPropertyName("daira_id")] int? DairaId,
+    [property: JsonPropertyName("wilaya_id")] int? WilayaId
+);
+
+// ─── ADMIN USER SUMMARY ──────────────────────────────────────────────────────
+
+/// <summary>
+/// Slim user record returned in GET /api/admin/users list.
+/// </summary>
+public record AdminUserSummary(
+    [property: JsonPropertyName("user_id")] string UserId,
+    [property: JsonPropertyName("username")] string Username,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("role")] string Role,
+    [property: JsonPropertyName("phone")] string Phone,
+    [property: JsonPropertyName("commune_id")] int? CommuneId,
+    [property: JsonPropertyName("daira_id")] int? DairaId,
+    [property: JsonPropertyName("wilaya_id")] int? WilayaId
+);
+
 // ─── MONITORING HIERARCHY ─────────────────────────────────────────────────────
 
 /// <summary>Per-feature-type count summary for one commune user.</summary>

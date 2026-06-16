@@ -208,5 +208,14 @@
   "su_err_daira": "Veuillez sélectionner une daïra.",
   "su_err_commune": "Veuillez sélectionner une commune.",
   "su_err_generic": "Échec de la création du compte.",
-  "su_err_network": "Erreur réseau. Veuillez réessayer."
+  "su_err_network": "Erreur réseau. Veuillez réessayer.",
+  "su_user_list_title": "Utilisateurs existants",
+  "su_edit_btn": "Modifier",
+  "su_delete_btn": "Supprimer",
+  "su_update_btn": "Mettre à jour",
+  "su_cancel_btn": "Annuler",
+  "su_confirm_delete": "Supprimer {username}?",
+  "su_delete_success": "Utilisateur supprimé avec succès.",
+  "su_update_success": "Utilisateur mis à jour avec succès.",
+  "su_err_update_generic": "Échec de la mise à jour du compte."
 }

@@ -47,13 +47,6 @@ spec:
     - host: localhost
       http:
         paths:
-          - path: /api(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: nars-api
-                port:
-                  number: 80
           - path: /(.*)
             pathType: ImplementationSpecific
             backend:

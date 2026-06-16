@@ -4,7 +4,7 @@
   <ContextMenu />
 
   <template v-if="isAdminUser">
-    <AdminDashboard />
+    <router-view />
   </template>
 
   <template v-else-if="isFieldWorker">
@@ -56,7 +56,6 @@ import InfoPanel from "./components/InfoPanel.vue"
 import ProfileMenu from "./components/ProfileMenu.vue"
 import TileControl from "./components/TileControl.vue"
 import FeatureModal from "./components/FeatureModal.vue"
-import AdminDashboard from "./components/AdminDashboard.vue"
 import FieldPanel from "./components/FieldPanel.vue"
 import EditSaveButton from "./components/EditSaveButton.vue"
 import ContextMenu from "./components/ContextMenu.vue"

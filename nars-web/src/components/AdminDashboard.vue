@@ -6,20 +6,6 @@
         <span class="role-badge" :class="roleBadgeClass">{{ roleLabel }}</span>
         <h1>{{ t("admin.dashboard") }}</h1>
       </div>
-      <div class="admin-header-actions">
-        <button class="admin-action-btn" @click="showCreateUser = !showCreateUser">
-          {{ showCreateUser ? t("admin.cancel") : "+ " + t("admin.create_user") }}
-        </button>
-        <button class="admin-refresh-btn" :disabled="loading" @click="loadOverview">
-          <span v-if="loading" class="spinner" />
-          <span v-else>↻</span>
-          {{ t("admin.refresh") }}
-        </button>
-      </div>
-    </div>
-
-    <div v-if="showCreateUser" class="create-user-panel">
-      <SettingsUsers />
     </div>
 
     <div v-if="error" class="admin-error">{{ error }}</div>
@@ -31,11 +17,11 @@
       </div>
       <div class="content-scroll">
         <div class="wilaya-grid">
-          <div
+          <router-link
             v-for="w in nationalData.wilayas"
             :key="w.wilaya_id"
+            :to="`/nars/${slugify(w.wilaya_name_fr)}`"
             class="wilaya-card"
-            @click="drillWilaya(w.wilaya_id)"
           >
             <div class="wilaya-card-head">
               <span class="wilaya-name">{{ w.wilaya_name_fr }}</span>
@@ -52,18 +38,8 @@
               <span v-else class="admin-missing">{{ t("admin.none_assigned") }}</span>
             </div>
             <button class="drill-btn">{{ t("admin.view_detail") }} →</button>
-          </div>
+          </router-link>
         </div>
-
-        <!-- Drilled wilaya detail -->
-        <template v-if="drilledWilaya">
-          <div class="section-title drill-title">
-            <button class="back-btn" @click="drilledWilaya = null">← {{ t("admin.back") }}</button>
-            {{ drilledWilaya.wilaya_name_fr }} —
-            {{ drilledWilaya.wilaya_name_ar }}
-          </div>
-          <DairaList :dairas="drilledWilaya.dairas" :role="userRole" />
-        </template>
       </div>
     </template>
 
@@ -100,20 +76,16 @@ import type { NationalOverview, WilayaReport, DairaReport, UserRole } from "../t
 import StatPill from "./admin/StatPill.vue"
 import DairaList from "./admin/DairaList.vue"
 import CommuneList from "./admin/CommuneList.vue"
-import SettingsUsers from "./settings/SettingsUsers.vue"
 
 const { t } = useI18n()
 const appStore = useAppStore()
 
 const loading = ref(false)
 const error = ref<string | null>(null)
-const showCreateUser = ref(false)
 
 const nationalData = ref<NationalOverview | null>(null)
 const wilayaData = ref<WilayaReport | null>(null)
 const dairaData = ref<DairaReport | null>(null)
-const drilledWilaya = ref<WilayaReport | null>(null)
-
 const userRole = computed<UserRole>(() => appStore.user?.role ?? "commune_user")
 const isNational = computed(() => userRole.value === "national_admin")
 const isWilaya = computed(() => userRole.value === "wilaya_admin")
@@ -150,7 +122,6 @@ async function loadOverview() {
   nationalData.value = null
   wilayaData.value = null
   dairaData.value = null
-  drilledWilaya.value = null
 
   try {
     const res = await apiFetch("/api/admin/overview")
@@ -166,17 +137,8 @@ async function loadOverview() {
   }
 }
 
-async function drillWilaya(wilayaId: number) {
-  loading.value = true
-  error.value = null
-  try {
-    const res = await apiFetch(`/api/admin/wilaya/${wilayaId}`)
-    drilledWilaya.value = (await res.json()) as WilayaReport
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : t("admin.load_error")
-  } finally {
-    loading.value = false
-  }
+function slugify(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, "-")
 }
 
 onMounted(loadOverview)
@@ -185,7 +147,7 @@ onMounted(loadOverview)
 <style scoped>
 .admin-dashboard {
   padding: 1.5rem;
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
   font-family: var(--font-sans, sans-serif);
   height: 100dvh;
@@ -238,65 +200,6 @@ onMounted(loadOverview)
   background: #64b5f6;
   color: #0d47a1;
 }
-.admin-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.admin-action-btn {
-  padding: 0.45rem 1rem;
-  border: 1px solid #1976d2;
-  border-radius: 6px;
-  background: #1976d2;
-  color: #fff;
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-  white-space: nowrap;
-}
-.admin-action-btn:hover {
-  background: #1565c0;
-}
-.create-user-panel {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: 10px;
-  padding: 1.25rem;
-  margin-bottom: 1rem;
-}
-.admin-refresh-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.45rem 1rem;
-  border: 1px solid var(--glass-border);
-  border-radius: 6px;
-  background: var(--glass-bg);
-  color: var(--text-primary);
-  cursor: pointer;
-  font-size: 0.875rem;
-}
-.admin-refresh-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.admin-refresh-btn:hover:not(:disabled) {
-  background: var(--glass-bg-hover);
-}
-.spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid #ccc;
-  border-top-color: #1976d2;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-  display: inline-block;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 .admin-error {
   background: #ffebee;
   border: 1px solid #ef9a9a;
@@ -323,24 +226,9 @@ onMounted(loadOverview)
   align-items: center;
   gap: 0.75rem;
 }
-.drill-title {
-  margin-top: 2rem;
-}
-.back-btn {
-  font-size: 0.8rem;
-  padding: 0.2rem 0.6rem;
-  border: 1px solid var(--glass-border);
-  color: var(--text-primary);
-  border-radius: 5px;
-  background: var(--glass-bg);
-  cursor: pointer;
-}
-.back-btn:hover {
-  background: var(--glass-bg-hover);
-}
 .wilaya-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
 }
 .wilaya-card {

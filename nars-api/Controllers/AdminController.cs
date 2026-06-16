@@ -173,6 +173,144 @@ public class AdminController(
         return StatusCode(201, new { success = true, id = newUser.Id.ToString() });
     }
 
+    [HttpGet("admin/users")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetManageableUsers(CancellationToken cancellationToken = default)
+    {
+        var creator = await db.Users.FindAsync([CurrentUserId], cancellationToken);
+        if (creator is null) return Unauthorized();
+
+        var users = new List<AdminUserSummary>();
+        switch (creator.Role)
+        {
+            case UserRoles.NationalAdmin:
+                var wilayaAdmins = await db.Users
+                    .Where(u => u.Role == UserRoles.WilayaAdmin)
+                    .Select(u => new AdminUserSummary(
+                        u.Id.ToString(), u.Username, u.Name, u.Email, u.Role,
+                        u.Phone ?? "", u.CommuneId, u.DairaId, u.WilayaId))
+                    .ToListAsync(cancellationToken);
+                users = wilayaAdmins;
+                break;
+
+            case UserRoles.WilayaAdmin when creator.WilayaId.HasValue:
+                var dairaAdmins = await db.Users
+                    .Where(u => u.Role == UserRoles.DairaAdmin && u.DairaId.HasValue)
+                    .Join(db.Dairas.Where(d => d.WilayaId == creator.WilayaId.Value),
+                        u => u.DairaId!.Value, d => d.DairaId, (u, _) => u)
+                    .Select(u => new AdminUserSummary(
+                        u.Id.ToString(), u.Username, u.Name, u.Email, u.Role,
+                        u.Phone ?? "", u.CommuneId, u.DairaId, u.WilayaId))
+                    .ToListAsync(cancellationToken);
+                users = dairaAdmins;
+                break;
+
+            case UserRoles.DairaAdmin when creator.DairaId.HasValue:
+                var communeUsers = await db.Users
+                    .Where(u => u.Role == UserRoles.CommuneUser && u.CommuneId.HasValue)
+                    .Join(db.Communes.Where(c => c.DairaId == creator.DairaId.Value),
+                        u => u.CommuneId!.Value, c => c.CommuneId, (u, _) => u)
+                    .Select(u => new AdminUserSummary(
+                        u.Id.ToString(), u.Username, u.Name, u.Email, u.Role,
+                        u.Phone ?? "", u.CommuneId, u.DairaId, u.WilayaId))
+                    .ToListAsync(cancellationToken);
+                users = communeUsers;
+                break;
+
+            case UserRoles.CommuneUser when creator.CommuneId.HasValue:
+                var fieldWorkers = await db.Users
+                    .Where(u => u.Role == UserRoles.FieldWorker && u.CommuneId == creator.CommuneId)
+                    .Select(u => new AdminUserSummary(
+                        u.Id.ToString(), u.Username, u.Name, u.Email, u.Role,
+                        u.Phone ?? "", u.CommuneId, u.DairaId, u.WilayaId))
+                    .ToListAsync(cancellationToken);
+                users = fieldWorkers;
+                break;
+        }
+
+        return Ok(users);
+    }
+
+    [HttpPut("admin/users/{userId:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateAdmin(
+        Guid userId, [FromBody] UpdateAdminRequest body,
+        CancellationToken cancellationToken = default)
+    {
+        if (body is null) return BadRequest(new { detail = "Request body is required." });
+        var creator = await db.Users.FindAsync([CurrentUserId], cancellationToken);
+        if (creator is null) return Unauthorized();
+
+        var target = await db.Users.FindAsync([userId], cancellationToken);
+        if (target is null) return NotFound(new { detail = "User not found." });
+
+        if (!CanCreateRole(creator.Role, target.Role))
+            return Forbid();
+
+        if (body.Role is not null && !CanCreateRole(creator.Role, body.Role))
+            return Forbid();
+
+        if (body.Name is not null) target.Name = body.Name;
+        if (body.Email is not null)
+        {
+            var emailConflict = await db.Users.AnyAsync(
+                u => u.Email == body.Email && u.Id != userId, cancellationToken);
+            if (emailConflict) return Conflict(new { detail = "Email already exists." });
+            target.Email = body.Email;
+        }
+        if (body.Phone is not null) target.Phone = body.Phone;
+
+        if (body.Role is not null)
+        {
+            var geoCheck = ValidateGeographicFields(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
+            if (geoCheck is not null) return BadRequest(new { detail = geoCheck });
+            target.Role = body.Role;
+        }
+
+        if (body.WilayaId is not null) target.WilayaId = body.WilayaId;
+        if (body.DairaId is not null) target.DairaId = body.DairaId;
+        if (body.CommuneId is not null) target.CommuneId = body.CommuneId;
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation("[Admin] {CallerRole} {CallerId} updated user {UserId}",
+            creator.Role, CurrentUserId, userId);
+
+        return Ok(new { success = true });
+    }
+
+    [HttpDelete("admin/users/{userId:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteAdmin(
+        Guid userId, CancellationToken cancellationToken = default)
+    {
+        var creator = await db.Users.FindAsync([CurrentUserId], cancellationToken);
+        if (creator is null) return Unauthorized();
+
+        var target = await db.Users.FindAsync([userId], cancellationToken);
+        if (target is null) return NotFound(new { detail = "User not found." });
+
+        if (!CanCreateRole(creator.Role, target.Role))
+            return Forbid();
+
+        db.Users.Remove(target);
+        await db.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation("[Admin] {CallerRole} {CallerId} deleted user {UserId} ({Username})",
+            creator.Role, CurrentUserId, userId, target.Username);
+
+        return Ok(new { success = true });
+    }
+
     // ── Permission helpers ──────────────────────────────────────────────────
 
     private static bool CanCreateRole(string callerRole, string targetRole) => (callerRole, targetRole) switch
