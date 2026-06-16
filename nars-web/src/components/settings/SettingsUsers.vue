@@ -12,7 +12,9 @@
         </div>
         <div class="su-user-actions">
           <button class="su-btn su-btn-edit" @click="startEdit(u)">{{ t("su_edit_btn") }}</button>
-          <button class="su-btn su-btn-delete" @click="confirmDelete(u)">{{ t("su_delete_btn") }}</button>
+          <button class="su-btn su-btn-delete" @click="confirmDelete(u)">
+            {{ t("su_delete_btn") }}
+          </button>
         </div>
       </div>
     </div>
@@ -32,7 +34,9 @@
       <div v-if="availableTargetRoles.length > 1" class="modal-field">
         <label>{{ t("su_account_type") }}</label>
         <select v-model="targetRole" class="modal-input su-select" :disabled="!!editingUser">
-          <option v-for="r in availableTargetRoles" :key="r.value" :value="r.value">{{ r.label }}</option>
+          <option v-for="r in availableTargetRoles" :key="r.value" :value="r.value">
+            {{ r.label }}
+          </option>
         </select>
       </div>
 
@@ -50,20 +54,46 @@
       </div>
       <div class="modal-field">
         <label>{{ t("su_username") }}</label>
-        <input v-model="form.username" type="text" class="modal-input" autocomplete="off" :disabled="!!editingUser" />
+        <input
+          v-model="form.username"
+          type="text"
+          class="modal-input"
+          autocomplete="off"
+          :disabled="!!editingUser"
+        />
       </div>
       <div v-if="!editingUser" class="modal-field">
         <label>{{ t("su_password") }}</label>
-        <input v-model="form.password" type="password" class="modal-input" autocomplete="new-password" />
+        <input
+          v-model="form.password"
+          type="password"
+          class="modal-input"
+          autocomplete="new-password"
+        />
       </div>
 
       <div v-if="showWilayaSelect" class="modal-field">
         <label>{{ t("su_wilaya") }}</label>
         <div class="su-search-wrap">
-          <input ref="wilayaInputRef" v-model="wilayaQuery" type="text" class="modal-input" :placeholder="t('su_search_wilaya')" autocomplete="off" @focus="fetchWilayas('')" />
+          <input
+            ref="wilayaInputRef"
+            v-model="wilayaQuery"
+            type="text"
+            class="modal-input"
+            :placeholder="t('su_search_wilaya')"
+            autocomplete="off"
+            @focus="fetchWilayas('')"
+          />
           <Teleport v-if="wilayaOptions.length" to="body">
             <div class="su-dropdown" :style="wilayaDropdownStyle" @mousedown.prevent>
-              <div v-for="w in wilayaOptions" :key="w.id" class="su-dropdown-item" @click="selectWilaya(w)">{{ w.name_fr }}</div>
+              <div
+                v-for="w in wilayaOptions"
+                :key="w.id"
+                class="su-dropdown-item"
+                @click="selectWilaya(w)"
+              >
+                {{ w.name_fr }}
+              </div>
             </div>
           </Teleport>
         </div>
@@ -72,10 +102,26 @@
       <div v-if="showDairaSelect" class="modal-field">
         <label>{{ t("su_daira") }}</label>
         <div class="su-search-wrap">
-          <input ref="dairaInputRef" v-model="dairaQuery" type="text" class="modal-input" :placeholder="dairaPlaceholder" autocomplete="off" :disabled="needWilayaFirst && !selectedWilayaId" @focus="fetchDairas('')" />
+          <input
+            ref="dairaInputRef"
+            v-model="dairaQuery"
+            type="text"
+            class="modal-input"
+            :placeholder="dairaPlaceholder"
+            autocomplete="off"
+            :disabled="needWilayaFirst && !selectedWilayaId"
+            @focus="fetchDairas('')"
+          />
           <Teleport v-if="dairaOptions.length" to="body">
             <div class="su-dropdown" :style="dairaDropdownStyle" @mousedown.prevent>
-              <div v-for="d in dairaOptions" :key="d.id" class="su-dropdown-item" @click="selectDaira(d)">{{ d.name_fr }}</div>
+              <div
+                v-for="d in dairaOptions"
+                :key="d.id"
+                class="su-dropdown-item"
+                @click="selectDaira(d)"
+              >
+                {{ d.name_fr }}
+              </div>
             </div>
           </Teleport>
         </div>
@@ -84,10 +130,25 @@
       <div v-if="showCommuneSelect" class="modal-field">
         <label>{{ t("su_commune") }}</label>
         <div class="su-search-wrap">
-          <input ref="communeInputRef" v-model="communeQuery" type="text" class="modal-input" :placeholder="t('su_search_commune')" autocomplete="off" @focus="fetchCommunes('')" />
+          <input
+            ref="communeInputRef"
+            v-model="communeQuery"
+            type="text"
+            class="modal-input"
+            :placeholder="t('su_search_commune')"
+            autocomplete="off"
+            @focus="fetchCommunes('')"
+          />
           <Teleport v-if="communeOptions.length" to="body">
             <div class="su-dropdown" :style="communeDropdownStyle" @mousedown.prevent>
-              <div v-for="c in communeOptions" :key="c.id" class="su-dropdown-item" @click="selectCommune(c)">{{ c.name_fr }}</div>
+              <div
+                v-for="c in communeOptions"
+                :key="c.id"
+                class="su-dropdown-item"
+                @click="selectCommune(c)"
+              >
+                {{ c.name_fr }}
+              </div>
             </div>
           </Teleport>
         </div>
@@ -98,7 +159,9 @@
           <span v-if="loading">…</span>
           <span v-else>{{ editingUser ? t("su_update_btn") : t("su_create_btn") }}</span>
         </button>
-        <button v-if="editingUser" class="modal-btn modal-btn-cancel" @click="cancelEdit">{{ t("su_cancel_btn") }}</button>
+        <button v-if="editingUser" class="modal-btn modal-btn-cancel" @click="cancelEdit">
+          {{ t("su_cancel_btn") }}
+        </button>
       </div>
     </div>
 
@@ -112,7 +175,9 @@
               <span v-if="deleting">…</span>
               <span v-else>{{ t("su_delete_btn") }}</span>
             </button>
-            <button class="modal-btn modal-btn-cancel" @click="deleteTarget = null">{{ t("su_cancel_btn") }}</button>
+            <button class="modal-btn modal-btn-cancel" @click="deleteTarget = null">
+              {{ t("su_cancel_btn") }}
+            </button>
           </div>
         </div>
       </div>
@@ -154,7 +219,14 @@ function extractSearchOptions(payload: unknown): SearchOption[] {
     .map((item): SearchOption | null => {
       if (!item || typeof item !== "object") return null
       const id = Number((item as { id?: unknown }).id)
-      const raw = item as { name_fr?: unknown; nameFr?: unknown; name_ar?: unknown; nameAr?: unknown; full_name?: unknown; fullName?: unknown }
+      const raw = item as {
+        name_fr?: unknown
+        nameFr?: unknown
+        name_ar?: unknown
+        nameAr?: unknown
+        full_name?: unknown
+        fullName?: unknown
+      }
       const label =
         (typeof raw.name_fr === "string" && raw.name_fr.trim()) ||
         (typeof raw.nameFr === "string" && raw.nameFr.trim()) ||
@@ -208,7 +280,9 @@ async function doDelete() {
   if (!deleteTarget.value) return
   deleting.value = true
   try {
-    const res = await apiFetch(`/api/admin/users/${deleteTarget.value.user_id}`, { method: "DELETE" })
+    const res = await apiFetch(`/api/admin/users/${deleteTarget.value.user_id}`, {
+      method: "DELETE",
+    })
     if (res.ok) {
       showToast(t("su_delete_success"), "success")
       users.value = users.value.filter((u) => u.user_id !== deleteTarget.value!.user_id)
@@ -222,7 +296,10 @@ async function doDelete() {
 }
 
 // ── Target role ──────────────────────────────────────────────────────────
-interface RoleOption { value: string; label: string }
+interface RoleOption {
+  value: string
+  label: string
+}
 
 const availableTargetRoles = computed<RoleOption[]>(() => {
   switch (role.value) {
@@ -249,18 +326,31 @@ watch(availableTargetRoles, (opts) => {
 // ── Hint text ────────────────────────────────────────────────────────────
 const hintText = computed(() => {
   switch (role.value) {
-    case "commune_user": return t("su_hint_commune")
-    case "daira_admin": return t("su_hint_daira")
-    case "wilaya_admin": return t("su_hint_wilaya")
-    case "national_admin": return t("su_hint_national")
-    default: return ""
+    case "commune_user":
+      return t("su_hint_commune")
+    case "daira_admin":
+      return t("su_hint_daira")
+    case "wilaya_admin":
+      return t("su_hint_wilaya")
+    case "national_admin":
+      return t("su_hint_national")
+    default:
+      return ""
   }
 })
 
 // ── Field visibility ─────────────────────────────────────────────────────
 const showWilayaSelect = computed(() => role.value === "national_admin")
-const showDairaSelect = computed(() => (role.value === "national_admin" && targetRole.value === "daira_admin") || role.value === "wilaya_admin")
-const showCommuneSelect = computed(() => role.value === "daira_admin" || (role.value === "commune_user" && targetRole.value !== "field_worker"))
+const showDairaSelect = computed(
+  () =>
+    (role.value === "national_admin" && targetRole.value === "daira_admin") ||
+    role.value === "wilaya_admin",
+)
+const showCommuneSelect = computed(
+  () =>
+    role.value === "daira_admin" ||
+    (role.value === "commune_user" && targetRole.value !== "field_worker"),
+)
 const needWilayaFirst = computed(() => role.value === "national_admin")
 
 // ── Form state ───────────────────────────────────────────────────────────
@@ -309,12 +399,19 @@ const dairaInputRef = ref<HTMLInputElement | null>(null)
 const communeInputRef = ref<HTMLInputElement | null>(null)
 
 const positionTick = ref(0)
-function updatePositions() { positionTick.value++ }
+function updatePositions() {
+  positionTick.value++
+}
 function getDropdownStyle(el: HTMLInputElement | null): Record<string, string> | null {
   void positionTick.value
   if (!el) return null
   const rect = el.getBoundingClientRect()
-  return { position: "fixed", top: `${rect.bottom + 2}px`, left: `${rect.left}px`, width: `${rect.width}px` }
+  return {
+    position: "fixed",
+    top: `${rect.bottom + 2}px`,
+    left: `${rect.left}px`,
+    width: `${rect.width}px`,
+  }
 }
 const wilayaDropdownStyle = computed(() => getDropdownStyle(wilayaInputRef.value))
 const dairaDropdownStyle = computed(() => getDropdownStyle(dairaInputRef.value))
@@ -332,7 +429,11 @@ onUnmounted(() => {
   if (main) main.removeEventListener("scroll", updatePositions)
 })
 
-const dairaPlaceholder = computed(() => needWilayaFirst.value && !selectedWilayaId.value ? t("su_select_wilaya_first") : t("su_search_daira"))
+const dairaPlaceholder = computed(() =>
+  needWilayaFirst.value && !selectedWilayaId.value
+    ? t("su_select_wilaya_first")
+    : t("su_search_daira"),
+)
 
 watch(targetRole, () => {
   if (!editingUser.value) {
@@ -356,10 +457,14 @@ async function fetchWilayas(q: string) {
     try {
       const res = await apiFetch(`/api/wilayas?search=${encodeURIComponent(q)}`)
       wilayaOptions.value = extractSearchOptions(await res.json())
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }, 200)
 }
-watch(wilayaQuery, (q) => { fetchWilayas(q ?? "") })
+watch(wilayaQuery, (q) => {
+  fetchWilayas(q ?? "")
+})
 
 let dairaTimer: ReturnType<typeof setTimeout> | null = null
 async function fetchDairas(q: string) {
@@ -370,10 +475,14 @@ async function fetchDairas(q: string) {
       const wilayaParam = selectedWilayaId.value ? `&wilaya_id=${selectedWilayaId.value}` : ""
       const res = await apiFetch(`/api/dairas?search=${encodeURIComponent(q)}${wilayaParam}`)
       dairaOptions.value = extractSearchOptions(await res.json())
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }, 200)
 }
-watch(dairaQuery, (q) => { fetchDairas(q ?? "") })
+watch(dairaQuery, (q) => {
+  fetchDairas(q ?? "")
+})
 
 let communeTimer: ReturnType<typeof setTimeout> | null = null
 async function fetchCommunes(q: string) {
@@ -382,10 +491,14 @@ async function fetchCommunes(q: string) {
     try {
       const res = await apiFetch(`/api/communes?search=${encodeURIComponent(q)}`)
       communeOptions.value = extractSearchOptions(await res.json())
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }, 200)
 }
-watch(communeQuery, (q) => { fetchCommunes(q ?? "") })
+watch(communeQuery, (q) => {
+  fetchCommunes(q ?? "")
+})
 
 onUnmounted(() => {
   if (wilayaTimer) clearTimeout(wilayaTimer)
@@ -430,7 +543,10 @@ async function submit() {
   successMsg.value = ""
   errorMsg.value = ""
   const err = validate()
-  if (err) { errorMsg.value = err; return }
+  if (err) {
+    errorMsg.value = err
+    return
+  }
 
   loading.value = true
   try {
@@ -440,9 +556,12 @@ async function submit() {
       if (form.value.email.trim() !== editingUser.value.email) body.email = form.value.email.trim()
       if (form.value.phone.trim() !== editingUser.value.phone) body.phone = form.value.phone.trim()
       if (targetRole.value !== editingUser.value.role) body.role = targetRole.value
-      if (selectedWilayaId.value !== editingUser.value.wilaya_id) body.wilaya_id = selectedWilayaId.value
-      if (selectedDairaId.value !== editingUser.value.daira_id) body.daira_id = selectedDairaId.value
-      if (selectedCommuneId.value !== editingUser.value.commune_id) body.commune_id = selectedCommuneId.value
+      if (selectedWilayaId.value !== editingUser.value.wilaya_id)
+        body.wilaya_id = selectedWilayaId.value
+      if (selectedDairaId.value !== editingUser.value.daira_id)
+        body.daira_id = selectedDairaId.value
+      if (selectedCommuneId.value !== editingUser.value.commune_id)
+        body.commune_id = selectedCommuneId.value
 
       if (Object.keys(body).length === 0) {
         successMsg.value = t("su_update_success")
@@ -506,53 +625,180 @@ async function submit() {
 </script>
 
 <style scoped>
-.settings-users { display: flex; flex-direction: column; gap: 0; }
-.su-section { margin-bottom: 1rem; }
-.su-section-title { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.75rem; }
-.su-empty { font-size: 0.85rem; color: var(--text-muted); padding: 0.5rem 0; }
+.settings-users {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.su-section {
+  margin-bottom: 1rem;
+}
+.su-section-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.75rem;
+}
+.su-empty {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  padding: 0.5rem 0;
+}
 .su-user-row {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 0.6rem 0; border-bottom: 1px solid var(--glass-border, rgba(255,255,255,0.08));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
 }
-.su-user-info { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
-.su-user-name { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); }
-.su-user-meta { font-size: 0.75rem; color: var(--text-muted); }
-.su-user-role { font-size: 0.72rem; color: var(--text-secondary); }
-.su-user-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+.su-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.su-user-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.su-user-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.su-user-role {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+.su-user-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
 .su-btn {
-  padding: 0.3rem 0.7rem; font-size: 0.75rem; border-radius: 5px;
-  cursor: pointer; border: 1px solid var(--glass-border);
-  background: var(--glass-bg); color: var(--text-primary);
+  padding: 0.3rem 0.7rem;
+  font-size: 0.75rem;
+  border-radius: 5px;
+  cursor: pointer;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--text-primary);
 }
-.su-btn:hover { background: var(--glass-bg-hover); }
-.su-btn-delete { color: #ef4444; border-color: rgba(239,68,68,0.3); }
-.su-btn-delete:hover { background: rgba(239,68,68,0.12); }
-.su-divider { border: none; border-top: 1px solid var(--glass-border, rgba(255,255,255,0.1)); margin: 1rem 0; }
-.su-feedback { font-size: 13px; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; line-height: 1.5; }
-.su-success { background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
-.su-error { background: rgba(239,68,68,0.12); color: #ef4444; border: 1px solid rgba(239,68,68,0.25); }
-.su-select { appearance: none; cursor: pointer; }
-.su-search-wrap { position: relative; }
-.su-dropdown { background: var(--modal-bg, #1a2035); border: 1px solid var(--glass-border, rgba(255,255,255,0.15)); border-radius: 8px; max-height: 180px; overflow-y: auto; z-index: 10001; box-shadow: 0 4px 20px rgba(0,0,0,0.35); }
-.su-dropdown-item { padding: 9px 14px; font-size: 13px; color: var(--text-secondary); cursor: pointer; transition: background 0.15s; }
-.su-dropdown-item:hover { background: var(--glass-bg-hover, rgba(255,255,255,0.07)); color: var(--text-primary); }
-.su-form-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+.su-btn:hover {
+  background: var(--glass-bg-hover);
+}
+.su-btn-delete {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+.su-btn-delete:hover {
+  background: rgba(239, 68, 68, 0.12);
+}
+.su-divider {
+  border: none;
+  border-top: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+  margin: 1rem 0;
+}
+.su-feedback {
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+.su-success {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.su-error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+.su-select {
+  appearance: none;
+  cursor: pointer;
+}
+.su-search-wrap {
+  position: relative;
+}
+.su-dropdown {
+  background: var(--modal-bg, #1a2035);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.15));
+  border-radius: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  z-index: 10001;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+.su-dropdown-item {
+  padding: 9px 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.su-dropdown-item:hover {
+  background: var(--glass-bg-hover, rgba(255, 255, 255, 0.07));
+  color: var(--text-primary);
+}
+.su-form-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
 .su-modal-overlay {
-  position: fixed; inset: 0; z-index: 10002;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);
+  position: fixed;
+  inset: 0;
+  z-index: 10002;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
 }
 .su-modal {
-  background: var(--modal-bg, #1a2035); border: 1px solid var(--glass-border);
-  border-radius: 10px; padding: 1.5rem; max-width: 360px; width: 90%;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  background: var(--modal-bg, #1a2035);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  padding: 1.5rem;
+  max-width: 360px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
-.su-modal p { margin: 0 0 1rem; font-size: 0.9rem; color: var(--text-primary); }
-.su-modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+.su-modal p {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+.su-modal-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
 </style>
 
 <style>
-.su-dropdown { position: fixed; background: var(--modal-bg, #1a2035); border: 1px solid var(--glass-border, rgba(255,255,255,0.15)); border-radius: 8px; max-height: 180px; overflow-y: auto; z-index: 10001; box-shadow: 0 4px 20px rgba(0,0,0,0.35); }
-.su-dropdown-item { padding: 9px 14px; font-size: 13px; color: var(--text-secondary); cursor: pointer; transition: background 0.15s; }
-.su-dropdown-item:hover { background: var(--glass-bg-hover, rgba(255,255,255,0.07)); color: var(--text-primary); }
+.su-dropdown {
+  position: fixed;
+  background: var(--modal-bg, #1a2035);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.15));
+  border-radius: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  z-index: 10001;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+.su-dropdown-item {
+  padding: 9px 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.su-dropdown-item:hover {
+  background: var(--glass-bg-hover, rgba(255, 255, 255, 0.07));
+  color: var(--text-primary);
+}
 </style>

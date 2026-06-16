@@ -96,30 +96,10 @@ describe("AdminDashboard", () => {
       expect(wrapper.find(".role-badge").exists()).toBe(true)
     })
 
-    it("shows refresh button", () => {
-      const wrapper = shallowMount(AdminDashboard)
-      expect(wrapper.find(".admin-refresh-btn").exists()).toBe(true)
-    })
-
-    it("shows create user toggle button", () => {
-      const wrapper = shallowMount(AdminDashboard)
-      expect(wrapper.find(".admin-action-btn").exists()).toBe(true)
-    })
-
-    it("toggles SettingsUsers panel on button click", async () => {
-      const wrapper = shallowMount(AdminDashboard)
-      expect(wrapper.find(".create-user-panel").exists()).toBe(false)
-      await wrapper.find(".admin-action-btn").trigger("click")
-      expect(wrapper.find(".create-user-panel").exists()).toBe(true)
-      await wrapper.find(".admin-action-btn").trigger("click")
-      expect(wrapper.find(".create-user-panel").exists()).toBe(false)
-    })
-
-    it("shows loading state in refresh button", async () => {
+    it("renders loading text while fetching", async () => {
       mockApiFetch.mockImplementationOnce(() => new Promise(() => {}))
       const wrapper = shallowMount(AdminDashboard)
-      await flush()
-      expect(wrapper.find(".admin-refresh-btn").attributes("disabled")).toBeDefined()
+      expect(wrapper.find(".admin-empty").exists()).toBe(true)
     })
 
     it("shows error message on API failure", async () => {
@@ -183,47 +163,22 @@ describe("AdminDashboard", () => {
   describe("drill-down", () => {
     beforeEach(() => {
       mockAppStore.mockReturnValue({ user: { role: "national_admin" } })
-      mockApiFetch
-        .mockResolvedValueOnce(createMockSuccessResponse(makeNationalOverview()))
-        .mockResolvedValueOnce(createMockSuccessResponse(makeWilayaReport()))
+      mockApiFetch.mockResolvedValue(createMockSuccessResponse(makeNationalOverview()))
     })
 
-    it("drills into wilaya on card click", async () => {
+    it("renders router-link with correct slugified path", async () => {
       const wrapper = shallowMount(AdminDashboard)
       await flush()
-      await wrapper.findAll(".wilaya-card")[0].trigger("click")
-      await flush()
-
-      expect(wrapper.find(".drill-title").exists()).toBe(true)
-      expect(wrapper.text()).toContain("Alger")
+      const html = wrapper.html()
+      expect(html).toContain('to="/nars/alger"')
+      expect(html).toContain('to="/nars/oran"')
     })
 
-    it("shows back button in drilled view", async () => {
+    it("wilaya card has drill button", async () => {
       const wrapper = shallowMount(AdminDashboard)
       await flush()
-      await wrapper.findAll(".wilaya-card")[0].trigger("click")
-      await flush()
-
-      expect(wrapper.find(".back-btn").exists()).toBe(true)
-    })
-
-    it("drills into correct wilaya", async () => {
-      const wrapper = shallowMount(AdminDashboard)
-      await flush()
-      await wrapper.findAll(".wilaya-card")[0].trigger("click")
-      await flush()
-
-      expect(mockApiFetch).toHaveBeenCalledWith("/api/admin/wilaya/1")
-    })
-
-    it("navigates back from drilled view", async () => {
-      const wrapper = shallowMount(AdminDashboard)
-      await flush()
-      await wrapper.findAll(".wilaya-card")[0].trigger("click")
-      await flush()
-      await wrapper.find(".back-btn").trigger("click")
-
-      expect(wrapper.find(".drill-title").exists()).toBe(false)
+      expect(wrapper.findAll(".wilaya-card").length).toBe(2)
+      expect(wrapper.find(".drill-btn").exists()).toBe(true)
     })
   })
 

@@ -62,9 +62,7 @@ onMounted(async () => {
 
     if (userRole.value === "national_admin") {
       const overview = data as NationalOverview
-      const match = overview.wilayas.find(
-        (w) => slugify(w.wilaya_name_fr) === wilayaNameSlug,
-      )
+      const match = overview.wilayas.find((w) => slugify(w.wilaya_name_fr) === wilayaNameSlug)
       wilayaId = match?.wilaya_id ?? null
     } else if (userRole.value === "wilaya_admin") {
       const report = data as WilayaReport
@@ -155,7 +153,9 @@ onMounted(async () => {
   display: inline-block;
 }
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 .admin-error {
   background: #ffebee;
