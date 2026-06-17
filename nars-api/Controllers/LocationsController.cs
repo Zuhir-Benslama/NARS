@@ -41,6 +41,42 @@ public class LocationsController(
         }))!;
     }
 
+    private async Task<IActionResult> PaginateAsync<TEntity, TDto>(
+        string search, int skip, int take,
+        string cacheKey,
+        Func<IQueryable<TEntity>> baseQuery,
+        Func<IQueryable<TEntity>, IQueryable<TEntity>>? searchFilter,
+        Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>> orderBy,
+        Func<TEntity, TDto> mapper,
+        CancellationToken cancellationToken)
+    {
+        take = Math.Clamp(take, 1, 500);
+
+        var maxSearchLength = int.TryParse(config["Locations:MaxSearchLength"], out var msl) ? msl : 200;
+        if (search.Length > maxSearchLength)
+            return BadRequest(new { detail = $"Search query is too long (max {maxSearchLength} characters)." });
+
+        if (string.IsNullOrEmpty(search) && skip == 0 && take >= 500)
+        {
+            var cached = await CacheOrFetchAsync(cacheKey, async () =>
+            {
+                var all = await orderBy(baseQuery()).ToListAsync(cancellationToken);
+                return all.Select(mapper).ToList();
+            });
+            return Ok(new PagedResponse<TDto>(cached, cached.Count, 0, cached.Count));
+        }
+
+        var q = baseQuery();
+        if (!string.IsNullOrEmpty(search) && searchFilter is not null)
+            q = searchFilter(q);
+
+        var total = await q.CountAsync(cancellationToken);
+        var result = await orderBy(q).Skip(skip).Take(take).ToListAsync(cancellationToken);
+        var items = result.Select(mapper).ToList();
+
+        return Ok(new PagedResponse<TDto>(items, total, skip, take));
+    }
+
     // ── GET /api/wilayas ──────────────────────────────────────
 
     [HttpGet("wilayas")]
@@ -52,42 +88,15 @@ public class LocationsController(
         [FromQuery] int take = 100,
         CancellationToken cancellationToken = default)
     {
-        // Cap page size to prevent oversized responses.
-        take = Math.Clamp(take, 1, 500);
-
-        // Guard against excessively long search strings (defense-in-depth).
-        var maxSearchLength = int.TryParse(config["Locations:MaxSearchLength"], out var msl) ? msl : 200;
-        if (search.Length > maxSearchLength)
-            return BadRequest(new { detail = $"Search query is too long (max {maxSearchLength} characters)." });
-
-        // Use cache for full list (no search, no pagination)
-        if (string.IsNullOrEmpty(search) && skip == 0 && take >= 500)
-        {
-            var cached = await CacheOrFetchAsync(WilayaCacheKey, async () =>
-            {
-                var all = await db.Wilayas.OrderBy(w => w.WilayaFr).ToListAsync(cancellationToken);
-                return all.Select(w => new WilayaItem(
-                    w.WilayaId, w.WilayaFr ?? "", w.WilayaAr ?? "", w.WilayaLatitude, w.WilayaLongitude
-                )).ToList();
-            });
-            return Ok(new PagedResponse<WilayaItem>(cached, cached.Count, 0, cached.Count));
-        }
-
-        var q = db.Wilayas.AsQueryable();
-        if (!string.IsNullOrEmpty(search))
-        {
-            q = q.Where(w => EF.Functions.ILike(w.WilayaFr!, $"%{search}%")
-                          || EF.Functions.ILike(w.WilayaAr!, $"%{search}%"));
-        }
-
-        var total = await q.CountAsync(cancellationToken);
-        var result = await q.OrderBy(w => w.WilayaFr).Skip(skip).Take(take).ToListAsync(cancellationToken);
-
-        var items = result.Select(w => new WilayaItem(
-            w.WilayaId, w.WilayaFr ?? "", w.WilayaAr ?? "", w.WilayaLatitude, w.WilayaLongitude
-        )).ToList();
-
-        return Ok(new PagedResponse<WilayaItem>(items, total, skip, take));
+        return await PaginateAsync(
+            search, skip, take,
+            WilayaCacheKey,
+            () => db.Wilayas.AsQueryable(),
+            q => q.Where(w => EF.Functions.ILike(w.WilayaFr!, $"%{search}%")
+                           || EF.Functions.ILike(w.WilayaAr!, $"%{search}%")),
+            q => q.OrderBy(w => w.WilayaFr),
+            w => new WilayaItem(w.WilayaId, w.WilayaFr ?? "", w.WilayaAr ?? "", w.WilayaLatitude, w.WilayaLongitude),
+            cancellationToken);
     }
 
     // ── GET /api/dairas ───────────────────────────────────────
@@ -102,43 +111,17 @@ public class LocationsController(
         [FromQuery] int take = 100,
         CancellationToken cancellationToken = default)
     {
-        // Cap page size to prevent oversized responses.
-        take = Math.Clamp(take, 1, 500);
-
-        // Guard against excessively long search strings (defense-in-depth).
-        var maxSearchLength = int.TryParse(config["Locations:MaxSearchLength"], out var msl) ? msl : 200;
-        if (search.Length > maxSearchLength)
-            return BadRequest(new { detail = $"Search query is too long (max {maxSearchLength} characters)." });
-
-        // Use cache for full list (no search, no pagination)
-        var dairaCacheKey = $"{DairaCacheKeyPrefix}{wilaya_id}";
-        if (string.IsNullOrEmpty(search) && skip == 0 && take >= 500)
-        {
-            var cached = await CacheOrFetchAsync(dairaCacheKey, async () =>
-            {
-                var all = await db.Dairas.Where(d => d.WilayaId == wilaya_id).OrderBy(d => d.DairaFr).ToListAsync(cancellationToken);
-                return all.Select(d => new DairaItem(
-                    d.DairaId, d.DairaFr, d.DairaAr, d.DairaLatitude, d.DairaLongitude, d.DairaName ?? ""
-                )).ToList();
-            });
-            return Ok(new PagedResponse<DairaItem>(cached, cached.Count, 0, cached.Count));
-        }
-
-        var q = db.Dairas.Where(d => d.WilayaId == wilaya_id);
-        if (!string.IsNullOrEmpty(search))
-        {
-            q = q.Where(d => EF.Functions.ILike(d.DairaFr, $"%{search}%")
-                          || EF.Functions.ILike(d.DairaAr, $"%{search}%"));
-        }
-
-        var total = await q.CountAsync(cancellationToken);
-        var result = await q.OrderBy(d => d.DairaFr).Skip(skip).Take(take).ToListAsync(cancellationToken);
-
-        var items = result.Select(d => new DairaItem(
-            d.DairaId, d.DairaFr, d.DairaAr, d.DairaLatitude, d.DairaLongitude, d.DairaName ?? ""
-        )).ToList();
-
-        return Ok(new PagedResponse<DairaItem>(items, total, skip, take));
+        if (wilaya_id <= 0)
+            return BadRequest(new { detail = "wilaya_id is required." });
+        return await PaginateAsync(
+            search, skip, take,
+            $"{DairaCacheKeyPrefix}{wilaya_id}",
+            () => db.Dairas.Where(d => d.WilayaId == wilaya_id),
+            q => q.Where(d => EF.Functions.ILike(d.DairaFr, $"%{search}%")
+                           || EF.Functions.ILike(d.DairaAr, $"%{search}%")),
+            q => q.OrderBy(d => d.DairaFr),
+            d => new DairaItem(d.DairaId, d.DairaFr, d.DairaAr, d.DairaLatitude, d.DairaLongitude, d.DairaName ?? ""),
+            cancellationToken);
     }
 
     // ── GET /api/communes ─────────────────────────────────────
@@ -147,49 +130,23 @@ public class LocationsController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetCommunes(
-        [FromQuery] int daira_id,
+        [FromQuery] int? daira_id,
         [FromQuery] string search = "",
         [FromQuery] int skip = 0,
         [FromQuery] int take = 100,
         CancellationToken cancellationToken = default)
     {
-        // Cap page size to prevent oversized responses.
-        take = Math.Clamp(take, 1, 500);
-
-        // Guard against excessively long search strings (defense-in-depth).
-        var maxSearchLength = int.TryParse(config["Locations:MaxSearchLength"], out var msl) ? msl : 200;
-        if (search.Length > maxSearchLength)
-            return BadRequest(new { detail = $"Search query is too long (max {maxSearchLength} characters)." });
-
-        // Use cache for full list (no search, no pagination)
-        var communeCacheKey = $"{CommuneCacheKeyPrefix}{daira_id}";
-        if (string.IsNullOrEmpty(search) && skip == 0 && take >= 500)
-        {
-            var cached = await CacheOrFetchAsync(communeCacheKey, async () =>
-            {
-                var all = await db.Communes.Where(c => c.DairaId == daira_id).OrderBy(c => c.CommuneFr).ToListAsync(cancellationToken);
-                return all.Select(c => new CommuneItem(
-                    c.CommuneId, c.CommuneFr, c.CommuneAr, c.CommuneCode?.ToString(), c.CommuneLatitude, c.CommuneLongitude, c.CommuneName ?? ""
-                )).ToList();
-            });
-            return Ok(new PagedResponse<CommuneItem>(cached, cached.Count, 0, cached.Count));
-        }
-
-        var q = db.Communes.Where(c => c.DairaId == daira_id);
-        if (!string.IsNullOrEmpty(search))
-        {
-            q = q.Where(c => EF.Functions.ILike(c.CommuneFr, $"%{search}%")
-                          || EF.Functions.ILike(c.CommuneAr, $"%{search}%"));
-        }
-
-        var total = await q.CountAsync(cancellationToken);
-        var result = await q.OrderBy(c => c.CommuneFr).Skip(skip).Take(take).ToListAsync(cancellationToken);
-
-        var items = result.Select(c => new CommuneItem(
-            c.CommuneId, c.CommuneFr, c.CommuneAr, c.CommuneCode?.ToString(), c.CommuneLatitude, c.CommuneLongitude, c.CommuneName ?? ""
-        )).ToList();
-
-        return Ok(new PagedResponse<CommuneItem>(items, total, skip, take));
+        if (daira_id is null or <= 0)
+            return BadRequest(new { detail = "daira_id is required." });
+        return await PaginateAsync(
+            search, skip, take,
+            $"{CommuneCacheKeyPrefix}{daira_id}",
+            () => db.Communes.Where(c => c.DairaId == daira_id),
+            q => q.Where(c => EF.Functions.ILike(c.CommuneFr, $"%{search}%")
+                           || EF.Functions.ILike(c.CommuneAr, $"%{search}%")),
+            q => q.OrderBy(c => c.CommuneFr),
+            c => new CommuneItem(c.CommuneId, c.CommuneFr, c.CommuneAr, c.CommuneCode?.ToString(), c.CommuneLatitude, c.CommuneLongitude, c.CommuneName ?? ""),
+            cancellationToken);
     }
 
     // ── GET /api/commune/{id}/boundary ────────────────────────
