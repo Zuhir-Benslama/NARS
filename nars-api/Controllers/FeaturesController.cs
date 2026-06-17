@@ -56,17 +56,13 @@ public class FeaturesController(
         Guid newId = Guid.CreateVersion7();
 
         var entity = FeatureTypeRegistry.CreateEntity(body.Type, newId, RequiredCurrentUserId, body.Layer, body.Label, dataJson);
-        if (entity is null)
-            return BadRequest(new { detail = $"Unknown feature type '{body.Type}'." });
 
         if (entity is HouseEntrance entrance)
             entrance.RoadId = roadId;
 
         await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
 
-        var entry = FeatureTypeRegistry.AddToDbContext(db, entity);
-        if (entry is null)
-            return BadRequest(new { detail = $"Unknown feature type '{body.Type}'." });
+        FeatureTypeRegistry.AddToDbContext(db, entity!);
 
         db.FeatureRegistry.Add(new FeatureRegistry { Id = newId, FeatureType = body.Type });
         await db.SaveChangesAsync(cancellationToken);
@@ -107,26 +103,24 @@ public class FeaturesController(
 
         var uid = CurrentUserId;
         int total = 0;
+        var userFeatureIds = new List<Guid>();
 
         await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
 
         foreach (var type in FeatureTypeRegistry.GetAllTypes())
         {
             var dbSet = FeatureTypeRegistry.GetDbSet(db, type)!;
+            var ids = await dbSet.Where(f => f.UserId == uid).Select(f => f.Id).ToListAsync(cancellationToken);
+            userFeatureIds.AddRange(ids);
             total += await dbSet.Where(f => f.UserId == uid).ExecuteDeleteAsync(cancellationToken);
         }
 
-        var allIds = new HashSet<Guid>();
-        foreach (var type in FeatureTypeRegistry.GetAllTypes())
+        if (userFeatureIds.Count > 0)
         {
-            var dbSet = FeatureTypeRegistry.GetDbSet(db, type)!;
-            var ids = await dbSet.Select(f => f.Id).ToListAsync(cancellationToken);
-            foreach (var id in ids) allIds.Add(id);
+            await db.FeatureRegistry
+                .Where(r => userFeatureIds.Contains(r.Id))
+                .ExecuteDeleteAsync(cancellationToken);
         }
-
-        await db.FeatureRegistry
-            .Where(r => !allIds.Contains(r.Id))
-            .ExecuteDeleteAsync(cancellationToken);
 
         await tx.CommitAsync(cancellationToken);
 
@@ -242,37 +236,26 @@ public class FeaturesController(
         await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
 
         var query = descriptor.GetDbSet(db);
+        string? dataStr = null;
+        if (body.Data is not null)
+        {
+            dataStr = body.Data.Value.ValueKind == JsonValueKind.String
+                ? body.Data.Value.GetString()!
+                : body.Data.Value.GetRawText();
+        }
+
         var rows = await query
             .Where(f => f.Id == id && f.UserId == CurrentUserId)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(f => f.UpdatedAt, updatedAt)
+                .SetProperty(f => f.Label, f => body.Label ?? f.Label)
+                .SetProperty(f => f.Data, f => dataStr ?? f.Data)
             , cancellationToken);
 
         if (rows == 0)
         {
             await tx.RollbackAsync(cancellationToken);
             return 0;
-        }
-
-        if (body.Label is not null)
-        {
-            await query
-                .Where(f => f.Id == id && f.UserId == CurrentUserId)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(f => f.Label, body.Label)
-                , cancellationToken);
-        }
-
-        if (body.Data is not null)
-        {
-            var dataStr = body.Data.Value.ValueKind == JsonValueKind.String
-                ? body.Data.Value.GetString()!
-                : body.Data.Value.GetRawText();
-            await query
-                .Where(f => f.Id == id && f.UserId == CurrentUserId)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(f => f.Data, dataStr)
-                , cancellationToken);
         }
 
         if (descriptor.PostUpdateAction is not null)

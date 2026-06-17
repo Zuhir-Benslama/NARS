@@ -66,7 +66,7 @@ public partial class AuthController
             return StatusCode(423, new { detail = "Admin account is temporarily locked." });
 
         // 3. Role hierarchy.
-        if (!CanCreateRole(admin.Role, body.Role))
+        if (!AdminController.CanCreateRole(admin.Role, body.Role))
             return StatusCode(403, new
             {
                 detail = $"A {admin.Role} cannot create a {body.Role} account."
@@ -78,7 +78,7 @@ public partial class AuthController
             return StatusCode(403, new { detail = scopeError });
 
         // 5. Geographic fields present.
-        var geoError = ValidateAdminGeo(body);
+        var geoError = ValidateGeographicFields(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
         if (geoError is not null)
             return BadRequest(new { detail = geoError });
 
@@ -170,26 +170,4 @@ public partial class AuthController
         }
     }
 
-    // ─── Shared helpers ───────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Role creation hierarchy:
-    ///   commune_user  → field_worker
-    ///   daira_admin   → commune_user
-    ///   wilaya_admin  → daira_admin
-    ///   national_admin → wilaya_admin
-    /// national_admin accounts are created directly in the database only.
-    /// </summary>
-    internal static bool CanCreateRole(string creatorRole, string targetRole) =>
-        (creatorRole, targetRole) switch
-        {
-            (UserRoles.CommuneUser, UserRoles.FieldWorker) => true,
-            (UserRoles.DairaAdmin, UserRoles.CommuneUser) => true,
-            (UserRoles.WilayaAdmin, UserRoles.DairaAdmin) => true,
-            (UserRoles.NationalAdmin, UserRoles.WilayaAdmin) => true,
-            _ => false,
-        };
-
-    private static string? ValidateAdminGeo(AuthorizedAdminSignupRequest body) =>
-        ValidateGeographicFields(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
 }

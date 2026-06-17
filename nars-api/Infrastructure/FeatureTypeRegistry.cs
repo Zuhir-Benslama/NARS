@@ -70,17 +70,26 @@ public sealed class FeatureTypeDescriptor
 /// </summary>
 public static class FeatureTypeRegistry
 {
+    private static FeatureTypeDescriptor Descriptor<T>(string type, string tableName, Func<AppDbContext, Microsoft.EntityFrameworkCore.DbSet<T>> dbSet, Func<AppDbContext, Guid, Guid, System.Text.Json.JsonElement?, CancellationToken, Task>? postUpdateAction = null) where T : FeatureBase =>
+        new()
+        {
+            Type = type, TableName = tableName, EntityType = typeof(T),
+            DbSetAccessor = db => dbSet(db),
+            AddToContext = (db, e) => db.Entry(dbSet(db).Add((T)e).Entity),
+            PostUpdateAction = postUpdateAction,
+        };
+
     private static readonly IReadOnlyDictionary<string, FeatureTypeDescriptor> _registry =
         new Dictionary<string, FeatureTypeDescriptor>
         {
-            [FeatureTypes.Area] = new() { Type = FeatureTypes.Area, TableName = "areas", EntityType = typeof(Area), DbSetAccessor = db => db.Areas, AddToContext = (db, e) => db.Entry(db.Areas.Add((Area)e).Entity) },
-            [FeatureTypes.District] = new() { Type = FeatureTypes.District, TableName = "districts", EntityType = typeof(District), DbSetAccessor = db => db.Districts, AddToContext = (db, e) => db.Entry(db.Districts.Add((District)e).Entity) },
-            [FeatureTypes.CityCenter] = new() { Type = FeatureTypes.CityCenter, TableName = "city_centers", EntityType = typeof(CityCenter), DbSetAccessor = db => db.CityCenters, AddToContext = (db, e) => db.Entry(db.CityCenters.Add((CityCenter)e).Entity) },
-            [FeatureTypes.Road] = new() { Type = FeatureTypes.Road, TableName = "roads", EntityType = typeof(Road), DbSetAccessor = db => db.Roads, AddToContext = (db, e) => db.Entry(db.Roads.Add((Road)e).Entity) },
-            [FeatureTypes.HouseEntrance] = new() { Type = FeatureTypes.HouseEntrance, TableName = "house_entrances", EntityType = typeof(HouseEntrance), DbSetAccessor = db => db.HouseEntrances, AddToContext = (db, e) => db.Entry(db.HouseEntrances.Add((HouseEntrance)e).Entity), PostUpdateAction = UpdateHouseEntranceRoadId },
-            [FeatureTypes.PublicBuilding] = new() { Type = FeatureTypes.PublicBuilding, TableName = "public_buildings", EntityType = typeof(PublicBuilding), DbSetAccessor = db => db.PublicBuildings, AddToContext = (db, e) => db.Entry(db.PublicBuildings.Add((PublicBuilding)e).Entity) },
-            [FeatureTypes.PublicSpace] = new() { Type = FeatureTypes.PublicSpace, TableName = "public_spaces", EntityType = typeof(PublicSpace), DbSetAccessor = db => db.PublicSpaces, AddToContext = (db, e) => db.Entry(db.PublicSpaces.Add((PublicSpace)e).Entity) },
-            [FeatureTypes.NamingPanel] = new() { Type = FeatureTypes.NamingPanel, TableName = "naming_panels", EntityType = typeof(NamingPanel), DbSetAccessor = db => db.NamingPanels, AddToContext = (db, e) => db.Entry(db.NamingPanels.Add((NamingPanel)e).Entity) },
+            [FeatureTypes.Area] = Descriptor<Area>(FeatureTypes.Area, "areas", db => db.Areas),
+            [FeatureTypes.District] = Descriptor<District>(FeatureTypes.District, "districts", db => db.Districts),
+            [FeatureTypes.CityCenter] = Descriptor<CityCenter>(FeatureTypes.CityCenter, "city_centers", db => db.CityCenters),
+            [FeatureTypes.Road] = Descriptor<Road>(FeatureTypes.Road, "roads", db => db.Roads),
+            [FeatureTypes.HouseEntrance] = Descriptor<HouseEntrance>(FeatureTypes.HouseEntrance, "house_entrances", db => db.HouseEntrances, postUpdateAction: UpdateHouseEntranceRoadId),
+            [FeatureTypes.PublicBuilding] = Descriptor<PublicBuilding>(FeatureTypes.PublicBuilding, "public_buildings", db => db.PublicBuildings),
+            [FeatureTypes.PublicSpace] = Descriptor<PublicSpace>(FeatureTypes.PublicSpace, "public_spaces", db => db.PublicSpaces),
+            [FeatureTypes.NamingPanel] = Descriptor<NamingPanel>(FeatureTypes.NamingPanel, "naming_panels", db => db.NamingPanels),
         };
 
     /// <summary>

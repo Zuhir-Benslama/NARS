@@ -118,6 +118,7 @@ builder.Services.AddScoped<IFieldService, FieldService>();
 builder.Services.AddScoped<IFeatureStatsService, FeatureStatsService>();
 builder.Services.AddScoped<IBoundaryService, BoundaryService>();
 builder.Services.AddScoped<IEntranceQueryService, EntranceQueryService>();
+builder.Services.AddScoped<IAdminOverviewService, AdminOverviewService>();
 
 // HTTP client for tile proxy
 var tileTimeout = int.TryParse(builder.Configuration["HttpClient:TileProxyTimeoutSeconds"], out var tts) ? tts : 15;
@@ -375,6 +376,7 @@ app.MapControllers();
 
 // Health check endpoint — includes database connectivity check
 app.MapHealthChecks("/health");
+app.MapHealthChecks("/api/health");
 
 app.Lifetime.ApplicationStarted.Register(() =>
 {

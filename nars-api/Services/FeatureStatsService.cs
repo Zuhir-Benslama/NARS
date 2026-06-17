@@ -9,8 +9,17 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
+public class FeatureStatsService(AppDbContext db, Microsoft.Extensions.Configuration.IConfiguration? config = null) : IFeatureStatsService
 {
+    private int CommandTimeoutSeconds
+    {
+        get
+        {
+            if (config is null) return 30;
+            return int.TryParse(config["FeatureStats:CommandTimeoutSeconds"], out var v) ? v : 30;
+        }
+    }
+
     public async Task<Dictionary<string, long>> GetFeatureCountsAsync(Guid userId, CancellationToken ct = default)
     {
         var conn = db.Database.GetDbConnection();
@@ -74,10 +83,7 @@ public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
             GROUP BY u.id, u.username, u.name, u.email, u.role
             """;
 
-        var param = cmd.CreateParameter();
-        param.ParameterName = "@ids";
-        param.Value = userIds;
-        cmd.Parameters.Add(param);
+        AddParameter(cmd, "@ids", userIds);
 
         var typeColIndex = new Dictionary<string, int>(descriptors.Count);
         for (int i = 0; i < descriptors.Count; i++)
@@ -127,7 +133,7 @@ public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
 
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = sql;
-        cmd.CommandTimeout = 30;
+        cmd.CommandTimeout = CommandTimeoutSeconds;
 
         AddParameter(cmd, "@uid", userId);
         if (layer is not null)
@@ -226,6 +232,14 @@ public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
         var param = cmd.CreateParameter();
         param.ParameterName = name;
         param.Value = value;
+        cmd.Parameters.Add(param);
+    }
+
+    private static void AddParameter(DbCommand cmd, string name, Guid[] values)
+    {
+        var param = cmd.CreateParameter();
+        param.ParameterName = name;
+        param.Value = values;
         cmd.Parameters.Add(param);
     }
 }

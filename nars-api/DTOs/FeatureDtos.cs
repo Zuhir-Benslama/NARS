@@ -8,7 +8,7 @@ namespace NarsApi.DTOs;
 /// Request body for deleting all user features. Requires explicit confirmation.
 /// </summary>
 public record ClearFeaturesRequest(
-    [property: JsonPropertyName("confirm")][property: JsonRequired] bool Confirm
+    [property: JsonRequired] bool Confirm
 );
 
 /// <summary>
@@ -16,10 +16,10 @@ public record ClearFeaturesRequest(
 /// GeoJSON-like coordinate data as a raw JsonElement.
 /// </summary>
 public record FeatureSaveRequest(
-    [property: JsonPropertyName("type")][param: Required] string Type,
-    [property: JsonPropertyName("layer")][param: Required] string Layer,
-    [property: JsonPropertyName("label")][param: Required] string Label,
-    [property: JsonPropertyName("data")][property: JsonRequired] JsonElement Data
+    [param: Required] string Type,
+    [param: Required] string Layer,
+    [param: Required] string Label,
+    [property: JsonRequired] JsonElement Data
 );
 
 /// <summary>
@@ -27,84 +27,84 @@ public record FeatureSaveRequest(
 /// will be applied — partial updates are supported.
 /// </summary>
 public record FeatureUpdateRequest(
-    [property: JsonPropertyName("label")] string? Label,
-    [property: JsonPropertyName("data")] JsonElement? Data
+    string? Label,
+    JsonElement? Data
 );
 
 /// <summary>
 /// A single layer option in the feature type definition response.
 /// </summary>
 public record LayerOption(
-    [property: JsonPropertyName("key")] string Key,
-    [property: JsonPropertyName("label")] string Label,
-    [property: JsonPropertyName("category")] string? Category = null
+    string Key,
+    string Label,
+    string? Category = null
 );
 
 /// <summary>
 /// Complete feature type definition (e.g. "area" with its layers).
 /// </summary>
 public record FeatureTypeDefinition(
-    [property: JsonPropertyName("key")] string Key,
-    [property: JsonPropertyName("label")] string Label,
-    [property: JsonPropertyName("icon")] string Icon,
-    [property: JsonPropertyName("layers")] IReadOnlyList<LayerOption> Layers
+    string Key,
+    string Label,
+    string Icon,
+    IReadOnlyList<LayerOption> Layers
 );
 
 // ─── RESPONSE DTOs ────────────────────────────────────────────────────────────
 
 public record SaveFeatureResponse(
-    [property: JsonPropertyName("success")] bool Success,
-    [property: JsonPropertyName("id")] string Id,
-    [property: JsonPropertyName("message")] string Message
+    bool Success,
+    string Id,
+    string Message
 );
 
 public record LoadFeaturesResponse(
-    [property: JsonPropertyName("features")] object Features,
-    [property: JsonPropertyName("count")] int Count,
-    [property: JsonPropertyName("skip")] int Skip,
-    [property: JsonPropertyName("take")] int Take
+    object Features,
+    int Count,
+    int Skip,
+    int Take
 );
 
 public record FeatureStatsResponse(
-    [property: JsonPropertyName("area")] long Area,
-    [property: JsonPropertyName("district")] long District,
-    [property: JsonPropertyName("city_center")] long CityCenter,
-    [property: JsonPropertyName("road")] long Road,
-    [property: JsonPropertyName("house_entrance")] long HouseEntrance,
-    [property: JsonPropertyName("public_building")] long PublicBuilding,
-    [property: JsonPropertyName("public_space")] long PublicSpace,
-    [property: JsonPropertyName("naming_panel")] long NamingPanel,
-    [property: JsonPropertyName("total")] long Total
+    long Area,
+    long District,
+    long CityCenter,
+    long Road,
+    long HouseEntrance,
+    long PublicBuilding,
+    long PublicSpace,
+    long NamingPanel,
+    long Total
 );
 
 public record ScatteredStatusResponse(
-    [property: JsonPropertyName("lastErrorTime")] string? LastErrorTime,
-    [property: JsonPropertyName("lastErrorMessage")] string? LastErrorMessage,
-    [property: JsonPropertyName("hasError")] bool HasError
+    string? LastErrorTime,
+    string? LastErrorMessage,
+    bool HasError
 );
 
 public record UpdateFeatureResponse(
-    [property: JsonPropertyName("success")] bool Success,
-    [property: JsonPropertyName("id")] string Id,
-    [property: JsonPropertyName("updated_at")] DateTime UpdatedAt
+    bool Success,
+    string Id,
+    DateTime UpdatedAt
 );
 
 public record ActionResponse(
-    [property: JsonPropertyName("success")] bool Success,
-    [property: JsonPropertyName("message")] string? Message = null
+    bool Success,
+    string? Message = null
 );
 
 public record UpdateCredentialsResponse(
-    [property: JsonPropertyName("success")] bool Success,
-    [property: JsonPropertyName("message")] string Message,
-    [property: JsonPropertyName("user")] UserCredentialsInfo? User = null
+    bool Success,
+    string Message,
+    UserCredentialsInfo? User = null
 );
 
 public record UserCredentialsInfo(
-    [property: JsonPropertyName("username")] string? Username,
-    [property: JsonPropertyName("email")] string? Email
+    string? Username,
+    string? Email
 );
 
 public record DetailResponse(
-    [property: JsonPropertyName("detail")] string Detail
+    string Detail
 );

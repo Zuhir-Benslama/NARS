@@ -241,18 +241,8 @@ public class AuthControllerTests
         Assert.IsType<UnauthorizedObjectResult>(result);
     }
 
-    [Fact(Skip = "EF Core InMemory provider does not support ExecuteUpdateAsync. " +
-        "Logout test requires a real PostgreSQL database or a mock DbContext. " +
-        "The controller logic (cookie deletion + success response) is verified " +
-        "manually and in integration tests.")]
-    public async Task Logout_WithAuthenticatedUser_ThrowsOnInMemoryExecuteUpdate()
-    {
-        // This test documents a known limitation: EF Core's InMemory provider
-        // throws InvalidOperationException on ExecuteUpdateAsync calls.
-        // See AuthController.Logout() → ExecuteUpdateAsync for revoking tokens.
-        // When running against PostgreSQL this works correctly.
-        await Task.CompletedTask;
-    }
+    // Logout is tested in AuthControllerIntegrationTests.Logout_RevokesRefreshTokens
+    // (real PostgreSQL supports ExecuteUpdateAsync; InMemory does not).
 
     private static async Task SeedLocationDataAsync(AppDbContext db)
     {
