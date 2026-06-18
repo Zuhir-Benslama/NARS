@@ -65,8 +65,14 @@ export default [
         },
     },
     // Prettier must be last — disables all formatting rules that conflict
+    {
+        files: ['**/*.test.ts', '**/*.spec.ts', 'e2e/**/*.ts'],
+        rules: {
+            '@typescript-eslint/no-explicit-any': 'off',
+        },
+    },
     prettier,
     {
-        ignores: ['dist/', 'node_modules/', 'coverage/', 'src/test/', 'src/api/schema.d.ts', '**/*.test.ts', '**/*.spec.ts'],
+        ignores: ['dist/', 'node_modules/', 'coverage/', 'src/test/', 'src/api/schema.d.ts'],
     },
 ]

@@ -24,9 +24,8 @@ test.describe("Map flows — draw, edit, save", () => {
   test("FeatureModal can be filled and saved", async ({ page }) => {
     await page.waitForFunction(() => !!(window as any).__TEST__, { timeout: 20000 })
 
-    let saveBody: Record<string, unknown> | null = null
     await page.route("**/api/save", async (route) => {
-      saveBody = route.request().postDataJSON()
+      void route.request().postDataJSON()
       await route.fulfill({
         status: 200,
         contentType: "application/json",

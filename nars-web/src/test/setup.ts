@@ -1,7 +1,7 @@
 // ─── TEST SETUP ───────────────────────────────────────────────────────────────
 // Global test utilities and mocks for Vitest.
 
-import { config } from "@vue/test-utils"
+import { config, RouterLinkStub } from "@vue/test-utils"
 import { vi, beforeEach } from "vitest"
 import { createPinia, setActivePinia } from "pinia"
 
@@ -139,6 +139,10 @@ export async function nextTick(): Promise<void> {
 // Configure Vue Test Utils globally
 config.global.mocks = {
   $t: (key: string) => key,
+}
+config.global.stubs = {
+  "router-link": RouterLinkStub,
+  "router-view": true,
 }
 
 // Note: beforeEach is called by Vitest automatically via the test setup
