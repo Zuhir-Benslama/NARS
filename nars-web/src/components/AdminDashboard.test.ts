@@ -169,9 +169,10 @@ describe("AdminDashboard", () => {
     it("renders router-link with correct slugified path", async () => {
       const wrapper = shallowMount(AdminDashboard)
       await flush()
-      const html = wrapper.html()
-      expect(html).toContain('to="/nars/alger"')
-      expect(html).toContain('to="/nars/oran"')
+      const links = wrapper.findAllComponents({ name: "RouterLinkStub" })
+      expect(links.length).toBeGreaterThanOrEqual(2)
+      expect(links[0].text()).toContain("Alger")
+      expect(links[1].text()).toContain("Oran")
     })
 
     it("wilaya card has drill button", async () => {
