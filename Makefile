@@ -334,6 +334,15 @@ cluster-create: ## Create the kind cluster with host-mounted postgis data (idemp
 		kind create cluster --name "$(CLUSTER_NAME)" --config /tmp/kind-$(CLUSTER_NAME).yaml
 		echo "✓ Cluster created"
 	fi
+	$(MAKE) cluster-wait
+
+.PHONY: cluster-wait
+cluster-wait: ## Wait for API server and nodes to be ready
+	@echo "→ Waiting for API server and nodes..."
+	@kubectl wait --for=condition=Ready node --all --timeout=120s 2>/dev/null || \
+		until kubectl get nodes 2>/dev/null; do sleep 2; done && \
+		kubectl wait --for=condition=Ready node --all --timeout=120s
+	@echo "✓ Cluster ready"
 
 .PHONY: ingress-install
 ingress-install: ## Install NGINX Ingress Controller (idempotent)
@@ -475,6 +484,8 @@ kustomize-apply: ## Apply k8s manifests via kustomize
 	@kubectl apply -k "$(K8S_DIR)"
 	@echo "✓ Kustomization applied"
 
+	$(MAKE) postgis-pv-fix
+
 	@echo "→ Waiting for postgis..."
 	@if kubectl get deployment postgis -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
 		kubectl wait --namespace "$(NAMESPACE)" \
@@ -561,6 +572,19 @@ postgis-migration-baseline: ## Backfill EF migration history for pre-existing sc
 	END $$$$;
 	SQL
 	@echo "✓ EF migration history baseline ensured"
+
+.PHONY: postgis-pv-fix
+postgis-pv-fix: ## Fix postgis PV permissions inside kind container (rootless Docker workaround)
+	@echo "→ Fixing postgis PV permissions..."
+	@docker exec nars-control-plane sh -c '
+		if [ -d /mnt/nars/postgis/data ]; then
+			chown -R 999:999 /mnt/nars/postgis/data
+			echo "✓ postgis data dir ownership set to 999:999"
+		else
+			echo "⚠  /mnt/nars/postgis/data not found inside kind (PV not mounted yet?)"
+		fi
+	' 2>/dev/null || echo "⚠  Could not chown postgis data dir (non-fatal)"
+	@echo "✓ Postgis PV permission fix applied"
 
 # ─── Observability (Grafana LGTM + OTel) ─────────────────────
 
