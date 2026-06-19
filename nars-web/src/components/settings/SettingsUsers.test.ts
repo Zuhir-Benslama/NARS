@@ -37,13 +37,13 @@ describe("SettingsUsers", () => {
   })
 
   describe("role selector visibility", () => {
-    it("shows role selector for national_admin", () => {
+    it("hides role selector for national_admin (single target)", () => {
       mockAppStore.mockReturnValue({ user: { role: "national_admin" } })
       const wrapper = mount(SettingsUsers)
-      expect(wrapper.find("select").exists()).toBe(true)
+      expect(wrapper.find("select").exists()).toBe(false)
     })
 
-    it("hides role selector for single-target roles", () => {
+    it("hides role selector for commune_user (single target)", () => {
       mockAppStore.mockReturnValue({ user: { role: "commune_user" } })
       const wrapper = mount(SettingsUsers)
       expect(wrapper.find("select").exists()).toBe(false)
@@ -267,19 +267,10 @@ describe("SettingsUsers", () => {
   })
 
   describe("role options for national_admin", () => {
-    it("offers wilaya_admin and daira_admin options", () => {
+    it("defaults target to wilaya_admin (single target)", () => {
       mockAppStore.mockReturnValue({ user: { role: "national_admin" } })
       const wrapper = mount(SettingsUsers)
-      const options = wrapper.findAll("select option").map((o) => o.text())
-      expect(options).toContain("su_role_wilaya")
-      expect(options).toContain("su_role_daira")
-    })
-
-    it("defaults target to wilaya_admin", () => {
-      mockAppStore.mockReturnValue({ user: { role: "national_admin" } })
-      const wrapper = mount(SettingsUsers)
-      const select = wrapper.find("select").element as HTMLSelectElement
-      expect(select.value).toBe("wilaya_admin")
+      expect((wrapper.vm as any).targetRole).toBe("wilaya_admin")
     })
   })
 

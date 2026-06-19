@@ -197,7 +197,7 @@
   "su_hint_commune": "Create a field worker account. They will inspect features in your commune.",
   "su_hint_daira": "Create a commune user account. The commune must belong to your daïra.",
   "su_hint_wilaya": "Create a daïra admin account. The daïra must belong to your wilaya.",
-  "su_hint_national": "Create a wilaya or daïra admin account.",
+  "su_hint_national": "Create a wilaya admin account.",
   "su_create_btn": "Create Account",
   "su_success": "Account created successfully.",
   "su_err_name": "Full name is required.",

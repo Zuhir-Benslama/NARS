@@ -34,19 +34,19 @@ const { t } = useI18n()
   gap: 1rem;
 }
 .daira-block {
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--glass-border);
   border-radius: 8px;
   overflow: hidden;
 }
 .daira-block[open] > .daira-header {
-  background: #e8f0fe;
+  background: var(--glass-bg-hover);
 }
 .daira-header {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   padding: 0.7rem 1rem;
-  background: #f0f4ff;
+  background: var(--glass-bg);
   cursor: pointer;
   list-style: none;
   user-select: none;
@@ -57,7 +57,7 @@ const { t } = useI18n()
 .daira-header::before {
   content: "▶";
   font-size: 0.65rem;
-  color: #1976d2;
+  color: var(--text-primary);
   transition: transform 0.2s;
 }
 .daira-block[open] > .daira-header::before {
@@ -66,11 +66,11 @@ const { t } = useI18n()
 .daira-name {
   font-weight: 600;
   font-size: 1rem;
-  color: #1a237e;
+  color: var(--text-primary);
 }
 .daira-name-ar {
   font-size: 0.85rem;
-  color: #555;
+  color: var(--text-secondary);
   direction: rtl;
   flex: 1;
   text-align: right;
@@ -80,22 +80,22 @@ const { t } = useI18n()
   white-space: nowrap;
 }
 .admin-assigned {
-  background: #e8f5e9;
-  color: #1b5e20;
+  background: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
   border-radius: 999px;
   padding: 0.15rem 0.6rem;
 }
 .admin-missing {
-  background: #ffebee;
-  color: #c62828;
+  background: rgba(244, 67, 54, 0.2);
+  color: #ef5350;
   border-radius: 999px;
   padding: 0.15rem 0.6rem;
   font-style: italic;
 }
 .commune-count {
   font-size: 0.78rem;
-  background: #e3f2fd;
-  color: #0d47a1;
+  background: var(--glass-bg);
+  color: var(--text-primary);
   border-radius: 999px;
   padding: 0.15rem 0.55rem;
   white-space: nowrap;

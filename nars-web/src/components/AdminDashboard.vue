@@ -43,21 +43,85 @@
       </div>
     </template>
 
-    <!-- WILAYA ADMIN: own wilaya full report -->
-    <template v-else-if="isWilaya && wilayaData">
+    <!-- WILAYA ADMIN: daira cards grid -->
+    <template v-else-if="isWilaya && wilayaData && !selectedDaira">
       <div class="section-title">
         {{ wilayaData.wilaya_name_fr }} — {{ wilayaData.wilaya_name_ar }}
       </div>
       <div class="content-scroll">
-        <DairaList :dairas="wilayaData.dairas" :role="userRole" />
+        <div class="wilaya-grid">
+          <div
+            v-for="d in wilayaData.dairas"
+            :key="d.daira_id"
+            class="wilaya-card"
+            @click="selectedDaira = d"
+          >
+            <div class="wilaya-card-head">
+              <span class="wilaya-name">{{ d.daira_name_fr }}</span>
+              <span class="wilaya-name-ar">{{ d.daira_name_ar }}</span>
+            </div>
+            <div class="wilaya-stats">
+              <StatPill :label="t('admin.communes')" :value="d.communes.length" />
+              <StatPill
+                :label="t('admin.users')"
+                :value="d.communes.reduce((sum, c) => sum + c.users.length, 0)"
+                color="blue"
+              />
+            </div>
+            <div class="wilaya-admin-row">
+              <span class="admin-label">{{ t("admin.daira_admin") }}:</span>
+              <span v-if="d.daira_admin" class="admin-name">{{ d.daira_admin.name }}</span>
+              <span v-else class="admin-missing">{{ t("admin.none_assigned") }}</span>
+            </div>
+            <button class="drill-btn">{{ t("admin.view_detail") }} →</button>
+          </div>
+        </div>
       </div>
     </template>
 
-    <!-- DAIRA ADMIN: own daira full report -->
-    <template v-else-if="isDaira && dairaData">
+    <!-- WILAYA ADMIN: single daira detail -->
+    <template v-else-if="isWilaya && wilayaData && selectedDaira">
+      <div class="section-title">
+        <button class="back-btn" @click="selectedDaira = null">← {{ t("admin.back") }}</button>
+        {{ selectedDaira.daira_name_fr }} — {{ selectedDaira.daira_name_ar }}
+      </div>
+      <div class="content-scroll">
+        <CommuneList :communes="selectedDaira.communes" />
+      </div>
+    </template>
+
+    <!-- DAIRA ADMIN: commune cards grid -->
+    <template v-else-if="isDaira && dairaData && !selectedCommune">
       <div class="section-title">{{ dairaData.daira_name_fr }} — {{ dairaData.daira_name_ar }}</div>
       <div class="content-scroll">
-        <CommuneList :communes="dairaData.communes" />
+        <div class="wilaya-grid">
+          <div
+            v-for="c in dairaData.communes"
+            :key="c.commune_id"
+            class="wilaya-card"
+            @click="selectedCommune = c"
+          >
+            <div class="wilaya-card-head">
+              <span class="wilaya-name">{{ c.commune_name_fr }}</span>
+              <span class="wilaya-name-ar">{{ c.commune_name_ar }}</span>
+            </div>
+            <div class="wilaya-stats">
+              <StatPill :label="t('admin.users')" :value="c.users.length" color="blue" />
+            </div>
+            <button class="drill-btn">{{ t("admin.view_detail") }} →</button>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- DAIRA ADMIN: single commune detail -->
+    <template v-else-if="isDaira && dairaData && selectedCommune">
+      <div class="section-title">
+        <button class="back-btn" @click="selectedCommune = null">← {{ t("admin.back") }}</button>
+        {{ selectedCommune.commune_name_fr }} — {{ selectedCommune.commune_name_ar }}
+      </div>
+      <div class="content-scroll">
+        <CommuneList :communes="[selectedCommune]" />
       </div>
     </template>
 
@@ -73,9 +137,8 @@ import { useI18n } from "vue-i18n"
 import { apiFetch } from "../api"
 import { useAppStore } from "../stores/appStore"
 import { slugify } from "../utils/string"
-import type { NationalOverview, WilayaReport, DairaReport, UserRole } from "../types"
+import type { NationalOverview, WilayaReport, DairaReport, CommuneReport, UserRole } from "../types"
 import StatPill from "./admin/StatPill.vue"
-import DairaList from "./admin/DairaList.vue"
 import CommuneList from "./admin/CommuneList.vue"
 
 const { t } = useI18n()
@@ -87,6 +150,8 @@ const error = ref<string | null>(null)
 const nationalData = ref<NationalOverview | null>(null)
 const wilayaData = ref<WilayaReport | null>(null)
 const dairaData = ref<DairaReport | null>(null)
+const selectedDaira = ref<DairaReport | null>(null)
+const selectedCommune = ref<CommuneReport | null>(null)
 const userRole = computed<UserRole>(() => appStore.user?.role ?? "commune_user")
 const isNational = computed(() => userRole.value === "national_admin")
 const isWilaya = computed(() => userRole.value === "wilaya_admin")
@@ -289,6 +354,19 @@ onMounted(loadOverview)
   cursor: pointer;
 }
 .drill-btn:hover {
+  background: var(--glass-bg-hover);
+}
+.back-btn {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  border-radius: 5px;
+  background: var(--glass-bg);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.back-btn:hover {
   background: var(--glass-bg-hover);
 }
 </style>

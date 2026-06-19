@@ -10,6 +10,7 @@ K8S_DIR            ?= nars-infra/k8s
 DOCKER_DIR         ?= nars-infra/docker
 DOCKER_ORG         ?= zuhirbenslama
 DOCKER_USERNAME    ?= zuhirbenslama
+KUBECTL            ?= kubectl
 DOCKER_TOKEN       ?=
 BACKUP_DIR         ?= backup
 DB_NAME            ?= nars_db
@@ -72,19 +73,20 @@ cluster-up: prerequisites ## Full bootstrap: create cluster, build images, deplo
 	@echo ""
 	@echo "✓ Cluster '$(CLUSTER_NAME)' is ready!"
 	@echo ""
-	@echo "  Port-forward:  make cluster-port-forward"
+	@echo "  Proxy:         make proxy-up"
 	@echo "  Smoke test:    make smoke-test"
-	@echo "  Visit:         http://$(DOMAIN):8080/"
+	@echo "  Visit:         http://localhost:8080/"
+	@echo "  Stop proxy:    make proxy-down"
 	@echo "  Stop pods:     make cluster-stop"
 	@echo "  Tear down:     make cluster-down (data preserved)"
 	@echo "  Destroy data:  make cluster-clean"
 
 .PHONY: namespace-ensure
 namespace-ensure: ## Ensure $(NAMESPACE) namespace exists (idempotent)
-	@kubectl create namespace "$(NAMESPACE)" --dry-run=client -o yaml | kubectl apply -f -
+	@$(KUBECTL) create namespace "$(NAMESPACE)" --dry-run=client -o yaml | $(KUBECTL) apply -f -
 
 .PHONY: cluster-down
-cluster-down: ## Delete the kind cluster (preserves postgis data)
+cluster-down: proxy-down ## Delete the kind cluster (preserves postgis data)
 	@echo "→ Deleting cluster '$(CLUSTER_NAME)'..."
 	@kind delete cluster --name "$(CLUSTER_NAME)" 2>/dev/null || true
 	@rm -f /tmp/$(CLUSTER_NAME)-tls.crt /tmp/$(CLUSTER_NAME)-tls.key
@@ -110,33 +112,87 @@ cluster-clean: ## Delete cluster AND wipe postgis data (irreversible!)
 .PHONY: cluster-status
 cluster-status: ## Show cluster resources
 	@echo "=== Nodes ==="
-	@kubectl get nodes 2>/dev/null || echo "(cluster not running)"
+	@$(KUBECTL) get nodes 2>/dev/null || echo "(cluster not running)"
 	@echo ""
 	@echo "=== Namespace: $(NAMESPACE) ==="
-	@kubectl get all,ingress,pvc -n "$(NAMESPACE)" 2>/dev/null || echo "(not deployed)"
+	@$(KUBECTL) get all,ingress,pvc -n "$(NAMESPACE)" 2>/dev/null || echo "(not deployed)"
 	@echo ""
 	@echo "=== Endpoints ==="
-	@kubectl get endpoints -n "$(NAMESPACE)" 2>/dev/null || true
+	@$(KUBECTL) get endpoints -n "$(NAMESPACE)" 2>/dev/null || true
 
 .PHONY: cluster-logs
 cluster-logs: ## Tail logs from all pods in the namespace
-	@kubectl logs -n "$(NAMESPACE)" --all-containers --tail=50 --follow 2>/dev/null \
+	@$(KUBECTL) logs -n "$(NAMESPACE)" --all-containers --tail=50 --follow 2>/dev/null \
 		|| echo "No pods found in namespace '$(NAMESPACE)'"
 
+PROXY_DIR        ?= /tmp/kind-proxy
+KUBECTL_INSIDE    = docker exec -i nars-control-plane kubectl
+PROXY_IMAGE      ?= alpine/socat
+
 .PHONY: cluster-port-forward
-cluster-port-forward: ## Port-forward ingress controller to localhost (background)
-	@echo "→ Starting port-forward (background)..."
-	@-pkill -f "kubectl port-forward.*ingress-nginx" 2>/dev/null || true
+cluster-port-forward: proxy-up ## Port-forward + proxy (rootless Docker). Use proxy-up directly if already running.
+
+.PHONY: port-forward-start
+port-forward-start: ## Start kubectl port-forward INSIDE the kind container (background)
+	@echo "→ Starting port-forward inside kind container..."
+	@-docker exec nars-control-plane sh -c 'pkill -f "port-forward.*ingress-nginx" 2>/dev/null; true' || true
 	@sleep 0.5
-	@nohup kubectl port-forward -n ingress-nginx \
-		service/ingress-nginx-controller \
-		8080:80 8443:443 \
-		> /tmp/port-forward-$(CLUSTER_NAME).log 2>&1 &
-	@echo "✓ Port-forward running (PID: $$!)"
-	@echo "  HTTP:       http://$(DOMAIN):8080/"
-	@echo "  HTTPS:      https://$(DOMAIN):8443/"
-	@echo "  Smoke test: make smoke-test"
-	@echo "  Logs:       tail -f /tmp/port-forward-$(CLUSTER_NAME).log"
+	@docker exec -d nars-control-plane kubectl port-forward --address 0.0.0.0 \
+		-n ingress-nginx service/ingress-nginx-controller 8080:80 > /dev/null 2>&1
+	@sleep 1
+	@echo "✓ Port-forward started inside kind container"
+
+.PHONY: port-forward-stop
+port-forward-stop: ## Stop port-forward inside the kind container
+	@docker exec nars-control-plane sh -c 'pkill -f "port-forward.*ingress-nginx" 2>/dev/null; true' || true
+	@echo "✓ Port-forward stopped"
+
+.PHONY: proxy-up
+proxy-up: port-forward-start ## Start socat bridge from host:8080 → kind container (requires port-forward)
+	@echo "→ Setting up Unix socket proxy bridge..."
+	@mkdir -p "$(PROXY_DIR)"
+	@-docker rm -f kind-proxy 2>/dev/null || true
+	@echo "  Starting socat in kind network namespace..."
+	@docker run -d --name kind-proxy --rm \
+		--network container:nars-control-plane \
+		-v "$(PROXY_DIR):/tmp/kind-proxy" \
+		$(PROXY_IMAGE) \
+		UNIX-LISTEN:/tmp/kind-proxy/proxy.sock,fork,reuseaddr TCP:localhost:8080 > /dev/null
+	@sleep 1
+	@echo "  Starting host-side socat listener on :8080..."
+	@-kill $$$$(lsof -tiTCP:8080 2>/dev/null) 2>/dev/null || true
+	@sleep 0.3
+	@nohup socat TCP-LISTEN:8080,reuseaddr,fork \
+		UNIX-CONNECT:"$(PROXY_DIR)/proxy.sock" \
+		> /tmp/kind-proxy-socat.log 2>&1 &
+	@sleep 1
+	@echo ""
+	@echo "✓ App accessible at http://localhost:8080/"
+	@echo "  Health:      http://localhost:8080/health"
+	@echo "  Smoke test:  make smoke-test"
+	@echo "  Stop proxy:  make proxy-down"
+
+.PHONY: proxy-down
+proxy-down: port-forward-stop ## Stop the socat proxy bridge and port-forward
+	@echo "→ Stopping socat proxy..."
+	@-docker rm -f kind-proxy 2>/dev/null || true
+	@-kill $$$$(lsof -tiTCP:8080 2>/dev/null) 2>/dev/null || true
+	@-rm -f "$(PROXY_DIR)/proxy.sock" 2>/dev/null || true
+	@echo "✓ Proxy stopped"
+
+.PHONY: proxy-status
+proxy-status: ## Show proxy bridge status
+	@echo "=== Port-forward (kind container) ==="
+	@docker exec nars-control-plane ss -tlnp 2>/dev/null | grep 8080 || echo "  NOT RUNNING"
+	@echo ""
+	@echo "=== kind-proxy container ==="
+	@docker ps --filter name=kind-proxy --format '  {{.ID}} {{.Status}} {{.Image}}' 2>/dev/null || echo "  NOT RUNNING"
+	@echo ""
+	@echo "=== Host socat listener ==="
+	@lsof -tiTCP:8080 2>/dev/null | head -1 | xargs -r ps -p 2>/dev/null | tail -1 || echo "  NOT RUNNING"
+	@echo ""
+	@echo "=== App health ==="
+	@curl -s -o /dev/null -w "  HTTP %{http_code}\n" --connect-timeout 3 http://localhost:8080/ 2>/dev/null || echo "  UNREACHABLE"
 
 # ─── Smoke Test ────────────────────────────────────────────
 
@@ -154,7 +210,7 @@ smoke-test: ## Post-deploy smoke test: verify /health, frontend, and API auth
 	health=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/health" 2>/dev/null || echo "000"); \
 	if [ "$$health" = "200" ]; then \
 		body=$$(curl -s --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/health" 2>/dev/null); \
-		if echo "$$body" | grep -q '"status"[[:space:]]*:[[:space:]]*"Healthy"'; then \
+		if echo "$$body" | grep -q "^Healthy$$"; then \
 			pass "/health → 200 Healthy"; \
 		else \
 			fail "/health → 200 but body unexpected: $$body"; \
@@ -197,11 +253,11 @@ cluster-stop: ## Scale all deployments to 0 (stop pods, keep cluster)
 	@echo "→ Stopping all pods..."
 	@for deploy in $(SCALABLE_DEPLOYS); do
 		saved="$(BACKUP_DIR)/replicas/$$deploy.txt"
-		replicas=$$(kubectl get deployment $$deploy -n "$(NAMESPACE)" \
+		replicas=$$($(KUBECTL) get deployment $$deploy -n "$(NAMESPACE)" \
 			-o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
 		mkdir -p "$(BACKUP_DIR)/replicas"
 		echo "$$replicas" > "$$saved"
-		kubectl scale deployment $$deploy -n "$(NAMESPACE)" --replicas=0
+		$(KUBECTL) scale deployment $$deploy -n "$(NAMESPACE)" --replicas=0
 		echo "  ✓ $$deploy → 0 (was $$replicas)"
 	done
 	@echo "✓ All pods stopped. Run 'make cluster-start' to resume."
@@ -216,12 +272,12 @@ cluster-start: ## Scale all deployments back to their original replica count
 		else
 			replicas=1
 		fi
-		kubectl scale deployment $$deploy -n "$(NAMESPACE)" --replicas=$$replicas
+		$(KUBECTL) scale deployment $$deploy -n "$(NAMESPACE)" --replicas=$$replicas
 		echo "  ✓ $$deploy → $$replicas"
 	done
 	@echo "→ Waiting for deployments..."
 	@for deploy in $(SCALABLE_DEPLOYS); do
-		kubectl wait --namespace "$(NAMESPACE)" \
+		$(KUBECTL) wait --namespace "$(NAMESPACE)" \
 			--for=condition=Available deployment/$$deploy --timeout=180s 2>/dev/null || true
 	done
 	@echo "✓ All pods running"
@@ -233,28 +289,28 @@ cluster-restart: cluster-stop cluster-start ## Stop all pods, then start them ag
 
 .PHONY: db-get-pod
 db-get-pod:
-	@kubectl get pod -n "$(NAMESPACE)" -l app.kubernetes.io/name=postgis \
+	@$(KUBECTL) get pod -n "$(NAMESPACE)" -l app.kubernetes.io/name=postgis \
 		-o jsonpath='{.items[0].metadata.name}' 2>/dev/null \
 		|| echo ""
 
 .PHONY: db-get-password
 db-get-password:
-	@kubectl get secret nars-secrets -n "$(NAMESPACE)" \
+	@$(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
 		-o jsonpath='{.data.postgres_password}' 2>/dev/null \
 		| base64 -d 2>/dev/null || echo ""
 
 .PHONY: db-backup
 db-backup: ## Dump the PostGIS database to a local file
-	@POD=$$(kubectl get pod -n "$(NAMESPACE)" 	-l app.kubernetes.io/name=postgis \
+	@POD=$$($(KUBECTL) get pod -n "$(NAMESPACE)" 	-l app.kubernetes.io/name=postgis \
 		-o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
 	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found in namespace '$(NAMESPACE)'"; exit 1; fi
-	@PASS=$$(kubectl get secret nars-secrets -n "$(NAMESPACE)" \
+	@PASS=$$($(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
 		-o jsonpath='{.data.postgres_password}' | base64 -d)
 	@mkdir -p "$(BACKUP_DIR)"
 	@TIMESTAMP=$$(date +"%Y%m%d_%H%M%S")
 	@FILE="$(BACKUP_DIR)/nars_db_$${TIMESTAMP}.sql"
 	@echo "→ Backing up database '$(DB_NAME)' from pod $$POD..."
-	@kubectl exec "$$POD" -n "$(NAMESPACE)" -- env PGPASSWORD="$$PASS" \
+	@$(KUBECTL) exec "$$POD" -n "$(NAMESPACE)" -- env PGPASSWORD="$$PASS" \
 		pg_dump -U postgres -d "$(DB_NAME)" --no-owner > "$$FILE"
 	@gzip -f "$$FILE"
 	@echo "✓ Backup saved: $${FILE}.gz"
@@ -262,7 +318,7 @@ db-backup: ## Dump the PostGIS database to a local file
 
 .PHONY: db-restore
 db-restore: ## Restore a backup. Usage: make db-restore FILE=data/nars/postgis/backups/nars_db_20250101_120000.sql.gz
-	@POD=$$(kubectl get pod -n "$(NAMESPACE)" 	-l app.kubernetes.io/name=postgis \
+	@POD=$$($(KUBECTL) get pod -n "$(NAMESPACE)" 	-l app.kubernetes.io/name=postgis \
 		-o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
 	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found in namespace '$(NAMESPACE)'"; exit 1; fi
 	@if [ -z "$(FILE)" ]; then
@@ -273,27 +329,27 @@ db-restore: ## Restore a backup. Usage: make db-restore FILE=data/nars/postgis/b
 		exit 1
 	fi
 	@if [ ! -f "$(FILE)" ]; then echo "✖ File not found: $(FILE)"; exit 1; fi
-	@PASS=$$(kubectl get secret nars-secrets -n "$(NAMESPACE)" \
+	@PASS=$$($(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
 		-o jsonpath='{.data.postgres_password}' | base64 -d)
 	@echo "→ Restoring '$(FILE)' into $(DB_NAME)..."
 	@echo "  ⚠ This will OVERWRITE the current database."
 	@read -p "  Continue? (yes/no): " confirm; \
 		if [ "$$confirm" != "yes" ]; then echo "  Cancelled."; exit 0; fi
 	@if echo "$(FILE)" | grep -q '\.gz$$'; then
-		gunzip -c "$(FILE)" | kubectl exec -i "$$POD" -n "$(NAMESPACE)" -- \
+		gunzip -c "$(FILE)" | $(KUBECTL) exec -i "$$POD" -n "$(NAMESPACE)" -- \
 			env PGPASSWORD="$$PASS" psql -U postgres -d "$(DB_NAME)"
 	else
-		kubectl exec -i "$$POD" -n "$(NAMESPACE)" -- \
+		$(KUBECTL) exec -i "$$POD" -n "$(NAMESPACE)" -- \
 			env PGPASSWORD="$$PASS" psql -U postgres -d "$(DB_NAME)" < "$(FILE)"
 	fi
 	@echo "✓ Restore complete"
 
 .PHONY: db-shell
 db-shell: ## Open an interactive psql shell inside the postgis pod
-	@POD=$$(kubectl get pod -n "$(NAMESPACE)" 	-l app.kubernetes.io/name=postgis \
+	@POD=$$($(KUBECTL) get pod -n "$(NAMESPACE)" 	-l app.kubernetes.io/name=postgis \
 		-o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
 	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found"; exit 1; fi
-	@kubectl exec -it "$$POD" -n "$(NAMESPACE)" -- psql -U postgres -d "$(DB_NAME)"
+	@$(KUBECTL) exec -it "$$POD" -n "$(NAMESPACE)" -- psql -U postgres -d "$(DB_NAME)"
 
 .PHONY: db-admin
 db-admin: export NON_INTERACTIVE := 1
@@ -328,7 +384,7 @@ cluster-create: ## Create the kind cluster with host-mounted postgis data (idemp
 		if echo "$$DATA_DIR" | grep -qv '^/'; then
 			DATA_DIR="$$(cd "$$DATA_DIR" && pwd)"
 		fi
-		printf 'kind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\nname: %s\nnodes:\n  - role: control-plane\n    extraMounts:\n      - hostPath: %s\n        containerPath: /mnt/nars/postgis\n' \
+		printf 'kind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\nname: %s\nkubeadmConfigPatches:\n  - |\n    kind: ClusterConfiguration\n    apiServer:\n      certSANs:\n        - localhost\n        - 127.0.0.1\n        - 0.0.0.0\nnodes:\n  - role: control-plane\n    extraMounts:\n      - hostPath: %s\n        containerPath: /mnt/nars/postgis\n' \
 			"$(CLUSTER_NAME)" "$$DATA_DIR" > /tmp/kind-$(CLUSTER_NAME).yaml
 		echo "→ Creating kind cluster '$(CLUSTER_NAME)'..."
 		kind create cluster --name "$(CLUSTER_NAME)" --config /tmp/kind-$(CLUSTER_NAME).yaml
@@ -339,22 +395,22 @@ cluster-create: ## Create the kind cluster with host-mounted postgis data (idemp
 .PHONY: cluster-wait
 cluster-wait: ## Wait for API server and nodes to be ready
 	@echo "→ Waiting for API server and nodes..."
-	@kubectl wait --for=condition=Ready node --all --timeout=120s 2>/dev/null || \
-		until kubectl get nodes 2>/dev/null; do sleep 2; done && \
-		kubectl wait --for=condition=Ready node --all --timeout=120s
+	@$(KUBECTL) wait --for=condition=Ready node --all --timeout=120s 2>/dev/null || \
+		until $(KUBECTL) get nodes 2>/dev/null; do sleep 2; done && \
+		$(KUBECTL) wait --for=condition=Ready node --all --timeout=120s
 	@echo "✓ Cluster ready"
 
 .PHONY: ingress-install
 ingress-install: ## Install NGINX Ingress Controller (idempotent)
 	@echo "→ Installing NGINX Ingress Controller..."
-	@kubectl apply -f \
+	@$(KUBECTL) apply -f \
 		https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
 	@echo "✓ Ingress controller installed"
 
 .PHONY: ingress-wait
 ingress-wait: ## Wait for ingress controller to be ready
 	@echo "→ Waiting for ingress controller..."
-	@kubectl wait --namespace ingress-nginx \
+	@$(KUBECTL) wait --namespace ingress-nginx \
 		--for=condition=available deployment/ingress-nginx-controller \
 		--timeout=180s
 	@echo "✓ Ingress controller ready"
@@ -362,14 +418,14 @@ ingress-wait: ## Wait for ingress controller to be ready
 .PHONY: metrics-install
 metrics-install: ## Install metrics-server for HPA autoscaling (idempotent)
 	@echo "→ Installing metrics-server..."
-	@kubectl apply -f \
+	@$(KUBECTL) apply -f \
 		https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-	@if kubectl get deployment metrics-server -n kube-system \
+	@if $(KUBECTL) get deployment metrics-server -n kube-system \
 		-o jsonpath='{.spec.template.spec.containers[0].args}' 2>/dev/null \
 		| grep -q -- '--kubelet-insecure-tls'; then
 		echo "→ metrics-server already has --kubelet-insecure-tls"
 	else
-		kubectl patch deployment metrics-server -n kube-system --type=json \
+		$(KUBECTL) patch deployment metrics-server -n kube-system --type=json \
 			-p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
 	fi
 	@echo "✓ metrics-server installed"
@@ -377,7 +433,7 @@ metrics-install: ## Install metrics-server for HPA autoscaling (idempotent)
 .PHONY: metrics-wait
 metrics-wait: ## Wait for metrics-server to be ready
 	@echo "→ Waiting for metrics-server..."
-	@kubectl wait --namespace kube-system \
+	@$(KUBECTL) wait --namespace kube-system \
 		--for=condition=available deployment/metrics-server \
 		--timeout=180s
 	@echo "✓ metrics-server ready"
@@ -385,31 +441,32 @@ metrics-wait: ## Wait for metrics-server to be ready
 .PHONY: storage-provisioner-install
 storage-provisioner-install: ## Install local-path StorageClass (dynamic provisioning, idempotent)
 	@echo "→ Installing local-path StorageClass..."
-	@kubectl apply -f \
+	@$(KUBECTL) apply -f \
 		https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.30/deploy/local-path-storage.yaml
 	@echo "✓ local-path StorageClass installed"
 
 .PHONY: storage-provisioner-wait
 storage-provisioner-wait: ## Wait for local-path-provisioner to be ready
 	@echo "→ Waiting for local-path-provisioner..."
-	@kubectl wait --namespace local-path-storage \
+	@$(KUBECTL) wait --namespace local-path-storage \
 		--for=condition=available deployment/local-path-provisioner \
 		--timeout=120s 2>/dev/null || echo "  ⚠ local-path-provisioner not found (may use different namespace)"
 	@echo "✓ local-path-provisioner ready"
 
 .PHONY: tls-generate
 tls-generate: namespace-ensure ## Generate TLS certificate for $(DOMAIN) (idempotent)
-	@if kubectl get secret nars-tls -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
+	@if $(KUBECTL) get secret nars-tls -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
 		echo "→ TLS secret 'nars-tls' already exists"
 	else
 		echo "→ Generating TLS certificate for $(DOMAIN)..."
 		CERT_FILE=/tmp/$(CLUSTER_NAME)-tls.crt
 		KEY_FILE=/tmp/$(CLUSTER_NAME)-tls.key
 		mkcert -cert-file "$$CERT_FILE" -key-file "$$KEY_FILE" "$(DOMAIN)" 2>/dev/null
-		kubectl create secret tls nars-tls -n "$(NAMESPACE)" \
-			--cert="$$CERT_FILE" --key="$$KEY_FILE" \
-			--dry-run=client -o yaml \
-		| kubectl apply -f -
+		CERT_B64=$$(base64 -w0 < "$$CERT_FILE")
+		KEY_B64=$$(base64 -w0 < "$$KEY_FILE")
+		printf 'apiVersion: v1\nkind: Secret\nmetadata:\n  name: nars-tls\n  namespace: %s\ntype: kubernetes.io/tls\ndata:\n  tls.crt: %s\n  tls.key: %s\n' \
+			"$(NAMESPACE)" "$$CERT_B64" "$$KEY_B64" \
+		| $(KUBECTL) apply -f -
 		echo "✓ TLS secret created"
 	fi
 
@@ -442,37 +499,38 @@ ca-generate: ## Generate a self-signed CA certificate for mTLS (idempotent)
 
 .PHONY: ca-secret
 ca-secret: ca-generate namespace-ensure ## Create mTLS CA secret from k8s/certs/ca.crt (idempotent)
-	@if kubectl get secret nars-ca -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
+	@if $(KUBECTL) get secret nars-ca -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
 		echo "→ CA secret 'nars-ca' already exists"
 	else
 		echo "→ Creating mTLS CA secret..."
-		kubectl create secret generic nars-ca -n "$(NAMESPACE)" \
-			--from-file=ca.crt="$(K8S_DIR)/certs/ca.crt" \
-			--dry-run=client -o yaml \
-		| kubectl apply -f -
+		CA_FILE="$(K8S_DIR)/certs/ca.crt"
+		CA_B64=$$(base64 -w0 < "$$CA_FILE")
+		printf 'apiVersion: v1\nkind: Secret\nmetadata:\n  name: nars-ca\n  namespace: %s\ndata:\n  ca.crt: %s\n' \
+			"$(NAMESPACE)" "$$CA_B64" \
+		| $(KUBECTL) apply -f -
 		echo "✓ CA secret created"
 	fi
 
 .PHONY: secrets-apply
 secrets-apply: .env namespace-ensure ## Create nars-secrets and regcred with generated/variable values
 	@echo "→ Creating 'nars-secrets'..."
-	@kubectl create secret generic nars-secrets -n "$(NAMESPACE)" \
+	@$(KUBECTL) create secret generic nars-secrets -n "$(NAMESPACE)" \
 		--from-literal=postgres_password="$(POSTGRES_PASSWORD)" \
 		--from-literal=ConnectionStrings__DefaultConnection=\
 "Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=$(POSTGRES_PASSWORD)" \
 		--from-literal=Jwt__SecretKey="$(JWT_SECRET)" \
 		--dry-run=client -o yaml \
-	| kubectl apply -f -
+	| $(KUBECTL) apply -f -
 	@echo "✓ nars-secrets created"
 
 	@if [ -n "$(DOCKER_TOKEN)" ]; then
 		echo "→ Creating 'regcred'..."
-		kubectl create secret docker-registry regcred -n "$(NAMESPACE)" \
+		$(KUBECTL) create secret docker-registry regcred -n "$(NAMESPACE)" \
 			--docker-server=https://index.docker.io/v1/ \
 			--docker-username="$(DOCKER_USERNAME)" \
 			--docker-password="$(DOCKER_TOKEN)" \
 			--dry-run=client -o yaml \
-		| kubectl apply -f -
+		| $(KUBECTL) apply -f -
 		echo "✓ regcred created"
 	else
 		echo "→ Skipping regcred (DOCKER_TOKEN not set — using locally loaded images)"
@@ -481,14 +539,14 @@ secrets-apply: .env namespace-ensure ## Create nars-secrets and regcred with gen
 .PHONY: kustomize-apply
 kustomize-apply: ## Apply k8s manifests via kustomize
 	@echo "→ Applying kustomization..."
-	@kubectl apply -k "$(K8S_DIR)"
+	@kubectl kustomize "$(K8S_DIR)" | $(KUBECTL) apply -f -
 	@echo "✓ Kustomization applied"
 
 	$(MAKE) postgis-pv-fix
 
 	@echo "→ Waiting for postgis..."
-	@if kubectl get deployment postgis -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
-		kubectl wait --namespace "$(NAMESPACE)" \
+	@if $(KUBECTL) get deployment postgis -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
+		$(KUBECTL) wait --namespace "$(NAMESPACE)" \
 			--for=condition=Available deployment/postgis --timeout=240s
 		$(MAKE) postgis-password-sync
 		$(MAKE) postgis-migration-baseline
@@ -496,19 +554,19 @@ kustomize-apply: ## Apply k8s manifests via kustomize
 
 	@echo "→ Waiting for app deployments..."
 	@for deploy in nars-api nars-frontend; do
-		if kubectl get deployment $$deploy -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
-			if ! kubectl wait --namespace "$(NAMESPACE)" \
+		if $(KUBECTL) get deployment $$deploy -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
+			if ! $(KUBECTL) wait --namespace "$(NAMESPACE)" \
 				--for=condition=Available deployment/$$deploy --timeout=240s; then
 				echo "✖ Deployment '$$deploy' did not become Available in time."
 				echo "→ describe deployment/$$deploy"
-				kubectl describe deployment $$deploy -n "$(NAMESPACE)" || true
+				$(KUBECTL) describe deployment $$deploy -n "$(NAMESPACE)" || true
 				echo "→ pods for $$deploy"
-				kubectl get pods -n "$(NAMESPACE)" -l app.kubernetes.io/name=$$deploy -o wide || true
-				for pod in $$(kubectl get pods -n "$(NAMESPACE)" -l app.kubernetes.io/name=$$deploy -o name); do
+				$(KUBECTL) get pods -n "$(NAMESPACE)" -l app.kubernetes.io/name=$$deploy -o wide || true
+				for pod in $$($(KUBECTL) get pods -n "$(NAMESPACE)" -l app.kubernetes.io/name=$$deploy -o name); do
 					echo "→ logs $$pod (current)"
-					kubectl logs -n "$(NAMESPACE)" $$pod --tail=120 || true
+					$(KUBECTL) logs -n "$(NAMESPACE)" $$pod --tail=120 || true
 					echo "→ logs $$pod (previous)"
-					kubectl logs -n "$(NAMESPACE)" $$pod --previous --tail=120 || true
+					$(KUBECTL) logs -n "$(NAMESPACE)" $$pod --previous --tail=120 || true
 				done
 				exit 1
 			fi
@@ -519,7 +577,7 @@ kustomize-apply: ## Apply k8s manifests via kustomize
 .PHONY: postgis-password-sync
 postgis-password-sync: ## Align postgres user password with POSTGRES_PASSWORD (for persisted volumes)
 	@echo "→ Syncing postgres password..."
-	@kubectl exec -n "$(NAMESPACE)" deployment/postgis -- \
+	@$(KUBECTL) exec -n "$(NAMESPACE)" deployment/postgis -- \
 		psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
 		-c "ALTER USER postgres WITH PASSWORD '$(POSTGRES_PASSWORD)';" >/dev/null
 	@echo "✓ Postgres password synced"
@@ -527,7 +585,7 @@ postgis-password-sync: ## Align postgres user password with POSTGRES_PASSWORD (f
 .PHONY: postgis-migration-baseline
 postgis-migration-baseline: ## Backfill EF migration history for pre-existing schemas
 	@echo "→ Ensuring EF migration history baseline..."
-	@cat <<'SQL' | kubectl exec -i -n "$(NAMESPACE)" deployment/postgis -- \
+	@cat <<'SQL' | $(KUBECTL) exec -i -n "$(NAMESPACE)" deployment/postgis -- \
 		psql -U postgres -d nars_db -v ON_ERROR_STOP=1 >/dev/null
 	CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
 	    "MigrationId" character varying(150) NOT NULL,
@@ -621,7 +679,7 @@ helm-repos: ## Ensure required Helm chart repos are configured
 
 .PHONY: observability-namespace
 observability-namespace:
-	@kubectl create namespace $(OBSERVABILITY_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+	@$(KUBECTL) create namespace $(OBSERVABILITY_NAMESPACE) --dry-run=client -o yaml | $(KUBECTL) apply -f -
 
 .PHONY: observability-prometheus-stack
 observability-prometheus-stack: ## Install Prometheus + Grafana + AlertManager
@@ -713,24 +771,24 @@ observability-otel-collector: ## Install OpenTelemetry Collector
 .PHONY: observability-servicemonitor
 observability-servicemonitor: ## Apply OTel metrics Service + ServiceMonitor (requires prometheus CRDs)
 	@echo "→ Applying OTel metrics Service and ServiceMonitor..."
-	@kubectl apply -f $(K8S_DIR)/otel-metrics-service.yaml
-	@kubectl apply -f $(K8S_DIR)/servicemonitor.yaml
+	@$(KUBECTL) apply -f $(K8S_DIR)/otel-metrics-service.yaml
+	@$(KUBECTL) apply -f $(K8S_DIR)/servicemonitor.yaml
 	@echo "✓ OTel metrics Service + ServiceMonitor applied"
 
 .PHONY: observability-port-forward
 observability-port-forward: ## Port-forward Grafana, Loki, Tempo (background)
 	@echo "→ Starting observability port-forwards (background)..."
-	@-pkill -f "kubectl port-forward.*observability.*grafana" 2>/dev/null || true
-	@-pkill -f "kubectl port-forward.*observability.*loki-gateway" 2>/dev/null || true
-	@-pkill -f "kubectl port-forward.*observability.*tempo" 2>/dev/null || true
+	@-pkill -f "port-forward.*observability.*grafana" 2>/dev/null || true
+	@-pkill -f "port-forward.*observability.*loki-gateway" 2>/dev/null || true
+	@-pkill -f "port-forward.*observability.*tempo" 2>/dev/null || true
 	@sleep 0.5
-	@nohup kubectl port-forward -n $(OBSERVABILITY_NAMESPACE) \
+	@nohup $(KUBECTL) port-forward -n $(OBSERVABILITY_NAMESPACE) \
 		service/prometheus-stack-grafana 3000:80 \
 		> /tmp/port-forward-grafana.log 2>&1 &
-	@nohup kubectl port-forward -n $(OBSERVABILITY_NAMESPACE) \
+	@nohup $(KUBECTL) port-forward -n $(OBSERVABILITY_NAMESPACE) \
 		service/loki-gateway 3100:80 \
 		> /tmp/port-forward-loki.log 2>&1 &
-	@nohup kubectl port-forward -n $(OBSERVABILITY_NAMESPACE) \
+	@nohup $(KUBECTL) port-forward -n $(OBSERVABILITY_NAMESPACE) \
 		service/tempo 3200:3200 \
 		> /tmp/port-forward-tempo.log 2>&1 &
 	@echo "✓ Port-forwards running"
@@ -741,7 +799,7 @@ observability-port-forward: ## Port-forward Grafana, Loki, Tempo (background)
 
 .PHONY: observability-stop
 observability-stop: ## Stop observability port-forwards
-	@-pkill -f "kubectl port-forward.*observability" 2>/dev/null || true
+	@-pkill -f "port-forward.*observability" 2>/dev/null || true
 	@echo "✓ Port-forwards stopped"
 
 .PHONY: grafana-password
@@ -837,6 +895,6 @@ images-load: ## Load locally built Docker images into the kind cluster
 frontend-update: ## Rebuild nars-vite, load into kind, and rollout restart
 	$(MAKE) _build-nars-vite
 	@kind load docker-image "$(DOCKER_ORG)/nars-vite:latest" --name "$(CLUSTER_NAME)"
-	@kubectl rollout restart deployment nars-frontend -n "$(NAMESPACE)"
-	@kubectl rollout status deployment nars-frontend -n "$(NAMESPACE)" --timeout=120s
+	@$(KUBECTL) rollout restart deployment nars-frontend -n "$(NAMESPACE)"
+	@$(KUBECTL) rollout status deployment nars-frontend -n "$(NAMESPACE)" --timeout=120s
 	@echo "✓ nars-vite rebuilt and deployed"

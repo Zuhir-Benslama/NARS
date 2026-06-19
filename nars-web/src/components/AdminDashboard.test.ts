@@ -68,7 +68,7 @@ function makeDairaReport() {
         commune_id: 1,
         commune_name_fr: "Alger Centre",
         commune_name_ar: "الجزائر الوسطى",
-        user_count: 5,
+        users: [],
       },
     ],
   }
@@ -194,6 +194,46 @@ describe("AdminDashboard", () => {
       await flush()
       expect(wrapper.find(".section-title").exists()).toBe(true)
     })
+
+    it("renders daira cards grid", async () => {
+      const wrapper = shallowMount(AdminDashboard)
+      await flush()
+      expect(wrapper.findAll(".wilaya-card").length).toBe(1)
+    })
+
+    it("shows daira names", async () => {
+      const wrapper = shallowMount(AdminDashboard)
+      await flush()
+      expect(wrapper.text()).toContain("Sidi M'Hamed")
+      expect(wrapper.text()).toContain("سيدي امحمد")
+    })
+
+    it("shows daira admin name when assigned", async () => {
+      const wrapper = shallowMount(AdminDashboard)
+      await flush()
+      expect(wrapper.text()).toContain("Admin SM")
+    })
+
+    it("drills into daira on card click", async () => {
+      const wrapper = shallowMount(AdminDashboard)
+      await flush()
+      await wrapper.find(".wilaya-card").trigger("click")
+      await flush()
+      expect(wrapper.find(".back-btn").exists()).toBe(true)
+      expect(wrapper.find(".section-title").text()).toContain("Sidi M'Hamed")
+      expect(wrapper.findAll(".wilaya-card").length).toBe(0)
+    })
+
+    it("returns to card grid on back click", async () => {
+      const wrapper = shallowMount(AdminDashboard)
+      await flush()
+      await wrapper.find(".wilaya-card").trigger("click")
+      await flush()
+      await wrapper.find(".back-btn").trigger("click")
+      await flush()
+      expect(wrapper.findAll(".wilaya-card").length).toBe(1)
+      expect(wrapper.find(".back-btn").exists()).toBe(false)
+    })
   })
 
   describe("daira_admin view", () => {
@@ -206,6 +246,40 @@ describe("AdminDashboard", () => {
       const wrapper = shallowMount(AdminDashboard)
       await flush()
       expect(wrapper.find(".section-title").exists()).toBe(true)
+    })
+
+    it("renders commune cards grid", async () => {
+      const wrapper = shallowMount(AdminDashboard)
+      await flush()
+      expect(wrapper.findAll(".wilaya-card").length).toBe(1)
+    })
+
+    it("shows commune names", async () => {
+      const wrapper = shallowMount(AdminDashboard)
+      await flush()
+      expect(wrapper.text()).toContain("Alger Centre")
+      expect(wrapper.text()).toContain("الجزائر الوسطى")
+    })
+
+    it("drills into commune on card click", async () => {
+      const wrapper = shallowMount(AdminDashboard)
+      await flush()
+      await wrapper.find(".wilaya-card").trigger("click")
+      await flush()
+      expect(wrapper.find(".back-btn").exists()).toBe(true)
+      expect(wrapper.find(".section-title").text()).toContain("Alger Centre")
+      expect(wrapper.findAll(".wilaya-card").length).toBe(0)
+    })
+
+    it("returns to card grid on back click", async () => {
+      const wrapper = shallowMount(AdminDashboard)
+      await flush()
+      await wrapper.find(".wilaya-card").trigger("click")
+      await flush()
+      await wrapper.find(".back-btn").trigger("click")
+      await flush()
+      expect(wrapper.findAll(".wilaya-card").length).toBe(1)
+      expect(wrapper.find(".back-btn").exists()).toBe(false)
     })
   })
 
