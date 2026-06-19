@@ -156,4 +156,12 @@ public static class FeatureQueryHelper
         param.Value = value;
         cmd.Parameters.Add(param);
     }
+
+    public static void AddParameter(DbCommand cmd, string name, Guid[] values)
+    {
+        var param = cmd.CreateParameter();
+        param.ParameterName = name;
+        param.Value = values;
+        cmd.Parameters.Add(param);
+    }
 }

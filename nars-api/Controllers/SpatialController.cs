@@ -39,7 +39,9 @@ public class SpatialController(
             return NotFound(new { detail = "Road not found." });
 
         var roadData = JsonSerializer.Deserialize<JsonElement>(road.Data);
-        var coordsEl = roadData.GetProperty("coordinates");
+        if (!roadData.TryGetProperty("coordinates", out var coordsEl))
+            return BadRequest(new { detail = "Road data is missing coordinates." });
+
         var roadCoords = coordsEl.EnumerateArray()
             .Select(c => (Lat: c.GetProperty("lat").GetDouble(),
                           Lng: c.GetProperty("lng").GetDouble()))

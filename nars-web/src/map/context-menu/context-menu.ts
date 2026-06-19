@@ -57,7 +57,12 @@ export function showContextMenu(x: number, y: number, dbId: string, phaseKey: st
       false)
 
   if (isCityCenter && currentPhaseKey !== "cityCenter") {
-    useContextMenuStore().show(x, y, [{ label: t("ctx_cc_lock"), onClick: () => {} }])
+    useContextMenuStore().show(x, y, [
+      {
+        label: t("ctx_cc_lock"),
+        onClick: () => showToast(t("ctx_cc_lock_msg"), "info"),
+      },
+    ])
     return
   }
 

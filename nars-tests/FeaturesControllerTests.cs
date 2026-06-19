@@ -158,6 +158,42 @@ public class FeaturesControllerTests
         Assert.Equal(1, await db.Areas.CountAsync());
     }
 
+    [Fact]
+    public async Task SaveFeature_Area_QueuesScatteredRefresh()
+    {
+        var bgQueueMock = new Mock<IBackgroundTaskQueue>();
+        bgQueueMock.Setup(x => x.QueueBackgroundWorkItemAsync(It.IsAny<Func<IServiceProvider, CancellationToken, Task>>()))
+            .Returns(ValueTask.CompletedTask);
+
+        var (ctrl, _) = CreateController(bgQueue: bgQueueMock.Object);
+        var data = Json("""{"coordinates":[[{"lat":36.0,"lng":3.0}]]}""");
+        var body = new FeatureSaveRequest(FeatureTypes.Area, FeatureTypes.AreaLayers.CentralUrban, "area", data);
+
+        await ctrl.SaveFeature(body);
+
+        bgQueueMock.Verify(
+            x => x.QueueBackgroundWorkItemAsync(It.IsAny<Func<IServiceProvider, CancellationToken, Task>>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task SaveFeature_NonArea_DoesNotQueueScatteredRefresh()
+    {
+        var bgQueueMock = new Mock<IBackgroundTaskQueue>();
+        bgQueueMock.Setup(x => x.QueueBackgroundWorkItemAsync(It.IsAny<Func<IServiceProvider, CancellationToken, Task>>()))
+            .Returns(ValueTask.CompletedTask);
+
+        var (ctrl, _) = CreateController(bgQueue: bgQueueMock.Object);
+        var data = Json("""{"coordinates":[{"lat":36.0,"lng":3.0}]}""");
+        var body = new FeatureSaveRequest(FeatureTypes.Road, FeatureTypes.RoadLayers.Street, "road", data);
+
+        await ctrl.SaveFeature(body);
+
+        bgQueueMock.Verify(
+            x => x.QueueBackgroundWorkItemAsync(It.IsAny<Func<IServiceProvider, CancellationToken, Task>>()),
+            Times.Never);
+    }
+
     // ── POST /api/clear ───────────────────────────────────────────────────
 
     [Fact]

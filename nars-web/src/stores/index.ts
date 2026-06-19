@@ -8,8 +8,6 @@ export { useAppStore } from "./appStore"
 export {
   useModalStore,
   awaitModalResult,
-  setCurrentModalFeatureId,
-  currentModalFeatureId,
   openModal,
   openEditModal,
   resolveModal,

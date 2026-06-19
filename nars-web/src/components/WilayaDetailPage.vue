@@ -27,6 +27,7 @@ import { useRoute, useRouter } from "vue-router"
 import { useI18n } from "vue-i18n"
 import { apiFetch } from "../api"
 import { useAppStore } from "../stores/appStore"
+import { slugify } from "../utils/string"
 import type { NationalOverview, WilayaReport, UserRole } from "../types"
 import DairaList from "./admin/DairaList.vue"
 
@@ -40,10 +41,6 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 
 const userRole = computed<UserRole>(() => appStore.user?.role ?? "commune_user")
-
-function slugify(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, "-")
-}
 
 function goBack() {
   router.push("/admin")

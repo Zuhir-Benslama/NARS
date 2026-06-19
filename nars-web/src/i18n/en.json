@@ -43,6 +43,7 @@
   "cat_publicSpaces": "Public spaces",
   "cat_roads": "Roads",
   "ctx_cc_lock": "City center locked",
+  "ctx_cc_lock_msg": "City center can only be edited in its own phase",
   "ctx_edit_geom": "Edit geometry",
   "ctx_edit_info": "Edit info",
   "ctx_ent_ref": "Set reference entrance",

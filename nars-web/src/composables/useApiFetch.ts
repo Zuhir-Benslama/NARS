@@ -4,7 +4,7 @@
 
 import { ref, type Ref } from "vue"
 import { apiFetch, type ApiFetchOptions } from "../api"
-import { isNarsError } from "../lib/errors"
+import { isNarsError, logError, createNetworkError } from "../lib/errors"
 
 export interface UseApiFetchReturn<T> {
   /** Reactive response data, or null if not yet loaded / error occurred. */
@@ -77,7 +77,8 @@ export async function apiRequest<T = unknown>(
     const response = await apiFetch(path, options)
     if (!response.ok) return null
     return (await response.json()) as T
-  } catch {
+  } catch (err) {
+    logError(createNetworkError(`apiRequest failed: ${path}`, { url: path }, err))
     return null
   }
 }

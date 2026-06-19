@@ -16,7 +16,7 @@ globalThis.SVGElement = dom.window.SVGElement;
 globalThis.Node = dom.window.Node;
 globalThis.XMLSerializer = dom.window.XMLSerializer;
 
-const { initialize, mermaidAPI } = mermaid;
+const { initialize } = mermaid;
 
 await initialize({
   startOnLoad: false,
@@ -59,7 +59,7 @@ for (const file of files) {
     console.log(`  Rendering diagram ${i + 1}/${codeBlocks.length}...`);
 
     try {
-      const { svg } = await mermaidAPI.render(`diagram-${i}`, code);
+      const { svg } = await mermaid.render(`diagram-${i}`, code);
       writeFileSync(outputPath, svg);
       console.log(`  -> ${outputName}`);
     } catch (err) {

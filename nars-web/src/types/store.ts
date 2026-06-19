@@ -1,5 +1,4 @@
 import type { LatLng } from "./coordinates"
-import type { ModalState } from "./modal"
 import type { UserInfo } from "./user"
 
 export interface FeatureCounts {
@@ -36,7 +35,6 @@ export interface AppStore {
   municipalityName: string
   loadError: boolean
   isLoading: boolean
-  modal: ModalState
   referenceRoadDbId: string | null
   referenceEntranceDbId: string | null
 }

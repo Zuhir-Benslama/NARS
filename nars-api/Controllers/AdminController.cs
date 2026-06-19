@@ -170,7 +170,11 @@ public class AdminController(
         logger.LogInformation("[Admin] {CallerRole} {CallerId} created {Role} {UserId}",
             callerRole, CurrentUserId, body.Role, newUser.Id);
 
-        return StatusCode(201, new { success = true, id = newUser.Id.ToString() });
+        return StatusCode(201, new CreateAdminResponse(
+            Success: true,
+            UserId: newUser.Id.ToString(),
+            Message: $"{body.Role} account created successfully."
+        ));
     }
 
     private static readonly System.Linq.Expressions.Expression<Func<User, AdminUserSummary>> ToAdminSummary =
@@ -266,7 +270,7 @@ public class AdminController(
         logger.LogInformation("[Admin] {CallerRole} {CallerId} updated user {UserId}",
             creator.Role, CurrentUserId, userId);
 
-        return Ok(new { success = true });
+        return Ok(new ActionResponse(Success: true));
     }
 
     [HttpDelete("admin/users/{userId:guid}")]
@@ -292,7 +296,7 @@ public class AdminController(
         logger.LogInformation("[Admin] {CallerRole} {CallerId} deleted user {UserId} ({Username})",
             creator.Role, CurrentUserId, userId, target.Username);
 
-        return Ok(new { success = true });
+        return Ok(new ActionResponse(Success: true));
     }
 
     // ── Permission helpers ──────────────────────────────────────────────────

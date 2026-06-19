@@ -54,7 +54,7 @@ for (const file of files) {
   <script type="module">
     import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
     mermaid.initialize({ startOnLoad: false, theme: 'default', fontFamily: 'monospace' });
-    const code = JSON.parse(${JSON.stringify(JSON.stringify(code))});
+    const code = ${JSON.stringify(code)};
     try {
       const { svg } = await mermaid.render('d' + Date.now(), code);
       document.getElementById('diagram').innerHTML = svg;

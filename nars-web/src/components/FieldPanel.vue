@@ -55,6 +55,7 @@
 import { ref, watch } from "vue"
 import { useFieldStore } from "../stores/fieldStore"
 import { apiFetch } from "../api"
+import { logError, createNetworkError } from "../lib/errors"
 import RoadInspectionForm from "./inspection/RoadInspectionForm.vue"
 import EntranceInspectionForm from "./inspection/EntranceInspectionForm.vue"
 import NamingPanelInspectionForm from "./inspection/NamingPanelInspectionForm.vue"
@@ -103,8 +104,8 @@ async function fetchFeatures() {
         label: f.label || `Unnamed ${tab.label.toLowerCase()}`,
       }))
     }
-  } catch {
-    // silent
+  } catch (err) {
+    logError(createNetworkError("Failed to load field features", { action: "fetchFeatures" }, err))
   } finally {
     loading.value = false
   }

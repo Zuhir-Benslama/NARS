@@ -263,7 +263,6 @@ export function logError(error: NarsError, additionalContext?: ErrorContext): vo
   } else {
     // Production: send to backend logging endpoint
     captureError(error, additionalContext)
-    console.error(`[NarsError] ${error.code}: ${error.message}`)
   }
   /* eslint-enable no-console */
 }

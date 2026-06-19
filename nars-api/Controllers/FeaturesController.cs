@@ -106,13 +106,27 @@ public class FeaturesController(
         var userFeatureIds = new List<Guid>();
 
         await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+        var conn = db.Database.GetDbConnection();
+        await using var handle = await conn.EnsureOpenAsync(cancellationToken);
 
         foreach (var type in FeatureTypeRegistry.GetAllTypes())
         {
-            var dbSet = FeatureTypeRegistry.GetDbSet(db, type)!;
-            var ids = await dbSet.Where(f => f.UserId == uid).Select(f => f.Id).ToListAsync(cancellationToken);
-            userFeatureIds.AddRange(ids);
-            total += await dbSet.Where(f => f.UserId == uid).ExecuteDeleteAsync(cancellationToken);
+            var descriptor = FeatureTypeRegistry.GetDescriptor(type);
+            if (descriptor?.TableName is null) continue;
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"DELETE FROM {descriptor.TableName} WHERE user_id = @uid RETURNING id";
+            var uidParam = cmd.CreateParameter();
+            uidParam.ParameterName = "@uid";
+            uidParam.Value = uid;
+            cmd.Parameters.Add(uidParam);
+
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                userFeatureIds.Add(reader.GetGuid(0));
+                total++;
+            }
         }
 
         if (userFeatureIds.Count > 0)
@@ -267,12 +281,14 @@ public class FeaturesController(
 
     private async ValueTask QueueScatteredRefresh()
     {
+        var currentUserId = RequiredCurrentUserId;
+        var currentCommuneId = RequiredCommuneId;
         await bgQueue.QueueBackgroundWorkItemAsync(async (sp, ct) =>
         {
             try
             {
                 var svc = sp.GetRequiredService<IScatteredAreaService>();
-                await svc.RefreshAsync(RequiredCurrentUserId, RequiredCommuneId);
+                await svc.RefreshAsync(currentUserId, currentCommuneId);
             }
             catch (Exception ex)
             {

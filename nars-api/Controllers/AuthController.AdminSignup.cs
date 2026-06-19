@@ -113,17 +113,26 @@ public partial class AuthController
         };
 
         db.Users.Add(newUser);
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            var field = await db.Users.AnyAsync(u => u.Username == body.Username, cancellationToken)
+                ? "Username"
+                : "Email";
+            return Conflict(new { detail = $"{field} already exists." });
+        }
 
         logger.LogInformation(
             "[Auth] {AdminUser} ({AdminRole}) created {NewRole} account {NewUser} via login page",
             admin.Username, admin.Role, newUser.Role, newUser.Username);
 
-        return StatusCode(201, new
-        {
-            success = true,
-            message = $"{body.Role} account created successfully."
-        });
+        return StatusCode(201, new ActionResponse(
+            Success: true,
+            Message: $"{body.Role} account created successfully."
+        ));
     }
 
     // ─── Scope validation ─────────────────────────────────────────────────────
