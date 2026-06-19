@@ -31,6 +31,7 @@ function createDefaultModalState(): ModalState {
     sectorKey: "banking_postal",
     buildingTypeKey: "bank",
     radius: null,
+    currentModalFeatureId: null,
   }
 }
 
@@ -118,14 +119,6 @@ const _modalQueue: Array<{
   resolve: (result: ModalResult | null) => void
 }> = []
 
-/**
- * The feature ID currently open in the modal, exposed for non-reactive reads
- * (e.g. in draw-complete callbacks that fire outside the Vue reactivity system).
- * Intentionally a plain `let` — components that need reactive tracking should
- * read from the modal store's `editDbId` state instead.
- */
-export let currentModalFeatureId: string | null = null
-
 export function awaitModalResult(): Promise<ModalResult | null> {
   return new Promise((resolve) => {
     _modalQueue.push({ resolve })
@@ -133,17 +126,13 @@ export function awaitModalResult(): Promise<ModalResult | null> {
 }
 
 function resolveModalPromise(result: ModalResult | null): void {
-  currentModalFeatureId = null
+  const modalStore = useModalStore()
+  modalStore.currentModalFeatureId = null
   // Drain all pending promises — prevents orphaned entries from stale modals
   while (_modalQueue.length > 0) {
     const pending = _modalQueue.shift()!
     pending.resolve(result)
   }
-}
-
-/** For use within the modal component — sets the current feature being edited. */
-export function setCurrentModalFeatureId(id: string | null): void {
-  currentModalFeatureId = id
 }
 
 // ─── LEGACY HELPER FUNCTIONS ───────────────────────────────────────────────────
@@ -158,9 +147,10 @@ export function openModal(
   featureId: string,
   extras?: { radius?: number },
 ): Promise<ModalResult | null> {
-  setCurrentModalFeatureId(featureId)
   const modalStore = useModalStore()
   modalStore.openCreate(phaseIndex, extras)
+  // Set after openCreate (which resets state via createDefaultModalState)
+  modalStore.currentModalFeatureId = featureId
   const phase = PHASES[phaseIndex]
   if (phase?.key === "cityCenter") {
     modalStore.label = t("phase_cityCenter_label")

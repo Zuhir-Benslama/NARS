@@ -47,7 +47,7 @@ public class FieldController(
             .ToListAsync(cancellationToken);
 
         if (communeUserIds.Count == 0)
-            return Ok(new { features = Array.Empty<object>(), count = 0 });
+            return Ok(new LoadFeaturesResponse(Features: Array.Empty<object>(), Count: 0, Skip: 0, Take: 0));
 
         take = Math.Clamp(take, 1, 1000);
         var userIds = communeUserIds.ToArray();
@@ -59,7 +59,7 @@ public class FieldController(
             return BadRequest(new { detail = "Invalid or missing type. Use: road, house_entrance, or naming_panel." });
 
         var results = await fieldService.QueryFeaturesAsync(descriptor.TableName, userIds, skip, take, cancellationToken);
-        return Ok(new { features = results.Items, count = results.Total });
+        return Ok(new LoadFeaturesResponse(Features: results.Items, Count: results.Total, Skip: skip, Take: take));
     }
 
     [HttpPost("field/inspect")]
@@ -119,12 +119,11 @@ public class FieldController(
         logger.LogInformation("[Field] Worker {WorkerId} inspected {Type} {FeatureId} — status: {Status}",
             CurrentUserId, body.Type, featureId, body.Status);
 
-        return StatusCode(201, new
-        {
-            success = true,
-            id = inspection.Id.ToString(),
-            message = "Inspection saved."
-        });
+        return StatusCode(201, new FieldInspectSubmitResponse(
+            Success: true,
+            Id: inspection.Id.ToString(),
+            Message: "Inspection saved."
+        ));
     }
 
     [HttpGet("field/inspections/{featureId:guid}")]
@@ -149,7 +148,7 @@ public class FieldController(
             ))
             .ToListAsync(cancellationToken);
 
-        return Ok(new { inspections });
+        return Ok(new FieldInspectionsResponse(inspections));
     }
 
     [HttpPost("field/entrance/create")]
@@ -171,7 +170,13 @@ public class FieldController(
             return BadRequest(new { detail = "Road not found." });
 
         var roadOwner = await db.Users.FindAsync([road.UserId], cancellationToken);
-        if (roadOwner is null || roadOwner.CommuneId != user.CommuneId)
+        if (roadOwner is null)
+            return Forbid();
+
+        if (roadOwner.LockedUntil.HasValue && roadOwner.LockedUntil > timeProvider.UtcNow)
+            return Forbid();
+
+        if (roadOwner.CommuneId.HasValue && user.CommuneId.HasValue && roadOwner.CommuneId != user.CommuneId)
             return Forbid();
 
         var rawData = body.Data.ValueKind == JsonValueKind.String
@@ -212,12 +217,11 @@ public class FieldController(
             "[Field] Worker {WorkerId} created entrance {EntranceId} for road {RoadId} (owner: {OwnerId})",
             CurrentUserId, newId, roadId, road.UserId);
 
-        return StatusCode(201, new
-        {
-            success = true,
-            id = newId.ToString(),
-            message = "Entrance created from inspection."
-        });
+        return StatusCode(201, new CreateEntranceResponse(
+            Success: true,
+            Id: newId.ToString(),
+            Message: "Entrance created from inspection."
+        ));
     }
 
     private static JsonElement DeserializeJsonSafe(string json)

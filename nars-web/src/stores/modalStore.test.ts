@@ -6,7 +6,6 @@ import {
   openModal,
   openEditModal,
   resolveModal,
-  currentModalFeatureId,
 } from "./modalStore"
 import type { ModalResult } from "../types/modal"
 
@@ -132,7 +131,7 @@ describe("modalStore", () => {
       const promise = openModal(0, "feat-1")
       const store = useModalStore()
       expect(store.visible).toBe(true)
-      expect(currentModalFeatureId).toBe("feat-1")
+      expect(store.currentModalFeatureId).toBe("feat-1")
       resolveModal(emptyResult)
       await expect(promise).resolves.toEqual(emptyResult)
     })

@@ -17,6 +17,7 @@ public class JwtService(string secret, string? issuer, string? audience, IConfig
 {
     private readonly string _secret = secret ?? throw new ArgumentNullException(nameof(secret));
     private readonly int _expiresMinutes = ParseIntConfig(config["Jwt:ExpiresInMinutes"], 1440);
+    public TimeSpan AccessTokenExpiresIn => TimeSpan.FromMinutes(_expiresMinutes);
     private readonly string? _issuer = issuer;
     private readonly string? _audience = audience;
 

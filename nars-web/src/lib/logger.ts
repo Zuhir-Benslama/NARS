@@ -1,5 +1,6 @@
 import { NarsError, type ErrorContext } from "./errors"
-import { getApiBaseUrl } from "../config"
+import { getApiBaseUrl, isDev } from "../config"
+import { debugWarn } from "../utils/debug"
 
 interface LogEntry {
   level: string
@@ -46,8 +47,9 @@ async function flush(): Promise<void> {
         body: JSON.stringify({ logs: entries }),
       })
       if (res.ok) break
-    } catch {
-      // Silently ignore — don't create a feedback loop by logging the logger
+    } catch (err) {
+      // Silently ignore in production — don't create a feedback loop by logging the logger
+      if (isDev()) debugWarn("[Logger] Failed to send log batch:", err)
     }
   }
 

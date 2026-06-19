@@ -31,6 +31,8 @@ import { isEditMode } from "../edit/edit-mode"
 
 // ─── REGISTRATION ─────────────────────────────────────────────────────
 
+let _cleanupDrawWatcher: (() => void) | null = null
+
 export function registerDrawEvents(): void {
   setRepatchMarkerPointer(repatchMarkerPointer)
   watchDrawType()
@@ -39,11 +41,17 @@ export function registerDrawEvents(): void {
   installSnapInterceptors()
 }
 
+/** Cleanup watchers and handlers registered by registerDrawEvents(). */
+export function destroyDrawEvents(): void {
+  _cleanupDrawWatcher?.()
+  _cleanupDrawWatcher = null
+}
+
 // ─── FIX #4: REACTIVE DRAW TYPE ───────────────────────────────────────
 
 function watchDrawType() {
   const appStore = useAppStore()
-  watch(
+  _cleanupDrawWatcher = watch(
     () => appStore.currentPhase,
     (phaseIdx) => {
       const activeDrawModes = ctx.geoman?.getActiveDrawModes?.() || []

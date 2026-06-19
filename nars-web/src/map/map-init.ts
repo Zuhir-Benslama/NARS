@@ -9,6 +9,7 @@ import { initSources } from "./map-layers"
 import { suppressGeomanFill } from "./edit/edit-mode"
 import { updateEndpointMarkers } from "./roads/road-directions"
 import { refreshLayerVisibility } from "./rendering/labels"
+import { MAP_CONFIG } from "../config"
 import { debugWarn } from "../utils/debug"
 
 let currentActiveStyle: maplibregl.StyleSpecification | undefined
@@ -42,10 +43,10 @@ export async function initMap(): Promise<void> {
   ctx.map = new maplibregl.Map({
     container: "map",
     style: satelliteStyle,
-    center: [2.5, 28.0],
-    zoom: 5,
-    bearing: 0,
-    pitch: 0,
+    center: MAP_CONFIG.defaultCenter,
+    zoom: MAP_CONFIG.defaultZoom,
+    bearing: MAP_CONFIG.defaultBearing,
+    pitch: MAP_CONFIG.defaultPitch,
     minZoom: 4,
     maxZoom: 18,
   })

@@ -9,17 +9,8 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public class FeatureStatsService(AppDbContext db, Microsoft.Extensions.Configuration.IConfiguration? config = null) : IFeatureStatsService
+public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
 {
-    private int CommandTimeoutSeconds
-    {
-        get
-        {
-            if (config is null) return 30;
-            return int.TryParse(config["FeatureStats:CommandTimeoutSeconds"], out var v) ? v : 30;
-        }
-    }
-
     public async Task<Dictionary<string, long>> GetFeatureCountsAsync(Guid userId, CancellationToken ct = default)
     {
         var conn = db.Database.GetDbConnection();
@@ -83,7 +74,7 @@ public class FeatureStatsService(AppDbContext db, Microsoft.Extensions.Configura
             GROUP BY u.id, u.username, u.name, u.email, u.role
             """;
 
-        AddParameter(cmd, "@ids", userIds);
+        FeatureQueryHelper.AddParameter(cmd, "@ids", userIds);
 
         var typeColIndex = new Dictionary<string, int>(descriptors.Count);
         for (int i = 0; i < descriptors.Count; i++)
@@ -117,129 +108,13 @@ public class FeatureStatsService(AppDbContext db, Microsoft.Extensions.Configura
 
     public async Task<(List<object> features, int totalCount)> LoadAllFeaturesAsync(Guid userId, int skip, int take, CancellationToken ct = default)
     {
-        return await ExecuteQueryAsync(BuildLoadFeaturesSql(), userId, null, skip, take, ct);
+        var conn = db.Database.GetDbConnection();
+        return await FeatureQueryHelper.LoadAllFeaturesAsync(conn, userId, skip, take, ct);
     }
 
     public async Task<(List<object> features, int totalCount)> LoadByLayerAsync(Guid userId, string layer, int skip, int take, CancellationToken ct = default)
     {
-        return await ExecuteQueryAsync(BuildLoadByLayerSql(), userId, layer, skip, take, ct);
-    }
-
-    private async Task<(List<object> features, int totalCount)> ExecuteQueryAsync(
-        string sql, Guid userId, string? layer, int skip, int take, CancellationToken ct)
-    {
         var conn = db.Database.GetDbConnection();
-        await using var handle = await conn.EnsureOpenAsync(ct);
-
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText = sql;
-        cmd.CommandTimeout = CommandTimeoutSeconds;
-
-        AddParameter(cmd, "@uid", userId);
-        if (layer is not null)
-            AddParameter(cmd, "@layer", layer);
-        AddParameter(cmd, "@skip", skip);
-        AddParameter(cmd, "@take", take);
-
-        var rows = new List<object>();
-        int totalCount = 0;
-
-        await using var reader = await cmd.ExecuteReaderAsync(ct);
-        while (await reader.ReadAsync(ct))
-        {
-            var idValue = reader.GetValue(0);
-            Guid id = idValue switch
-            {
-                Guid g => g,
-                string s => Guid.Parse(s),
-                _ => throw new InvalidOperationException($"Unexpected ID type: {idValue?.GetType().Name}")
-            };
-            var label = await reader.IsDBNullAsync(1) ? null : reader.GetString(1);
-            var dataJson = await reader.IsDBNullAsync(2) ? "{}" : reader.GetString(2);
-            var createdAt = reader.GetDateTime(3);
-            var layerVal = await reader.IsDBNullAsync(4) ? null : reader.GetString(4);
-            var type = reader.GetString(5);
-            totalCount = (int)reader.GetInt64(6);
-
-            rows.Add(new
-            {
-                id = id.ToString(),
-                type,
-                layer = layerVal,
-                label,
-                data = string.IsNullOrWhiteSpace(dataJson)
-                    ? JsonDocument.Parse("{}").RootElement
-                    : JsonSerializer.Deserialize<JsonElement>(dataJson),
-                created_at = createdAt.ToString("o"),
-            });
-        }
-
-        return (rows, totalCount);
-    }
-
-    private static string BuildUnionAllCte()
-    {
-        var sb = new StringBuilder();
-        var descriptors = FeatureTypeRegistry.GetAllDescriptors();
-        for (int i = 0; i < descriptors.Count; i++)
-        {
-            if (i > 0) sb.AppendLine().Append("UNION ALL ");
-            sb.Append($"SELECT id, user_id, label, data, created_at, layer, '{descriptors[i].Type}' AS feature_type FROM {descriptors[i].TableName}");
-        }
-        return sb.ToString();
-    }
-
-    private static string BuildLoadFeaturesSql() =>
-        $"""
-        WITH all_features AS (
-            {BuildUnionAllCte()}
-        ),
-        filtered AS (
-            SELECT id, label, data, created_at, layer, feature_type
-            FROM all_features
-            WHERE user_id = @uid
-        ),
-        total AS (
-            SELECT COUNT(*) AS total_count FROM filtered
-        )
-        SELECT f.id, f.label, f.data, f.created_at, f.layer, f.feature_type, t.total_count
-        FROM filtered f, total t
-        ORDER BY f.created_at
-        OFFSET @skip LIMIT @take
-        """;
-
-    private static string BuildLoadByLayerSql() =>
-        $"""
-        WITH all_features AS (
-            {BuildUnionAllCte()}
-        ),
-        filtered AS (
-            SELECT id, label, data, created_at, layer, feature_type
-            FROM all_features
-            WHERE user_id = @uid AND layer = @layer
-        ),
-        total AS (
-            SELECT COUNT(*) AS total_count FROM filtered
-        )
-        SELECT f.id, f.label, f.data, f.created_at, f.layer, f.feature_type, t.total_count
-        FROM filtered f, total t
-        ORDER BY f.created_at
-        OFFSET @skip LIMIT @take
-        """;
-
-    private static void AddParameter(DbCommand cmd, string name, object value)
-    {
-        var param = cmd.CreateParameter();
-        param.ParameterName = name;
-        param.Value = value;
-        cmd.Parameters.Add(param);
-    }
-
-    private static void AddParameter(DbCommand cmd, string name, Guid[] values)
-    {
-        var param = cmd.CreateParameter();
-        param.ParameterName = name;
-        param.Value = values;
-        cmd.Parameters.Add(param);
+        return await FeatureQueryHelper.LoadByLayerAsync(conn, userId, layer, skip, take, ct);
     }
 }

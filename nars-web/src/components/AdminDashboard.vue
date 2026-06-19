@@ -72,6 +72,7 @@ import { ref, computed, onMounted } from "vue"
 import { useI18n } from "vue-i18n"
 import { apiFetch } from "../api"
 import { useAppStore } from "../stores/appStore"
+import { slugify } from "../utils/string"
 import type { NationalOverview, WilayaReport, DairaReport, UserRole } from "../types"
 import StatPill from "./admin/StatPill.vue"
 import DairaList from "./admin/DairaList.vue"
@@ -135,10 +136,6 @@ async function loadOverview() {
   } finally {
     loading.value = false
   }
-}
-
-function slugify(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, "-")
 }
 
 onMounted(loadOverview)

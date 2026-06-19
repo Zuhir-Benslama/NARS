@@ -10,4 +10,6 @@ public interface IJwtService
     ClaimsPrincipal? ValidateToken(string token);
 
     (string rawToken, string hash) CreateRefreshToken();
+
+    TimeSpan AccessTokenExpiresIn { get; }
 }

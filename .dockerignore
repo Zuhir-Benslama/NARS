@@ -1,33 +1,44 @@
-# ─── Git / VCS ───────────────────────────────────────────────────────────────
-.git
-.gitignore
-.gitattributes
+# Prevent secrets from leaking into image layers
 .env
 .env.*
 
-# ─── Node / Frontend ────────────────────────────────────────────────────────
+# Development artifacts
+.git/
+.gitignore
+.dockerignore
+.gitattributes
+backup/
+data/
 node_modules/
-dist/
-.vite/
-*.tsbuildinfo
-
-# ─── .NET / Backend ─────────────────────────────────────────────────────────
-bin/
-obj/
-*.user
-*.suo
-*.DotSettings
-.vs/
-
-# ─── Docker ─────────────────────────────────────────────────────────────────
-nars-infra/k8s/
-
-# ─── IDE / Editor ───────────────────────────────────────────────────────────
-.idea/
-.vscode/
 *.swp
 *.swo
+*.log
+*.bak
 
-# ─── OS ─────────────────────────────────────────────────────────────────────
-.DS_Store
-Thumbs.db
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Generated build output
+nars-api/bin/
+nars-api/obj/
+nars-web/node_modules/
+nars-web/dist/
+
+# Generated documentation output
+nars-infra/docs/pdf/
+nars-infra/docs/uml/*.svg
+nars-infra/docs/uml/*.png
+nars-infra/docs/uml/*.pdf
+
+# Generates during build — not needed in context
+nars-web/npm-debug.log*
+nars-web/yarn-debug.log*
+nars-web/yarn-error.log*
+
+# mkcert / self-signed CA output
+nars-infra/k8s/certs/ca.key
+nars-infra/k8s/certs/ca.srl

@@ -13,41 +13,40 @@ public class AdminOverviewService(AppDbContext db, IFeatureStatsService featureS
         var wilayas = await db.Wilayas.OrderBy(w => w.WilayaId).ToListAsync(cancellationToken);
         var wilayaIds = wilayas.Select(w => w.WilayaId).ToArray();
 
-        var admins = (await db.Users
-                .Where(u => u.Role == UserRoles.WilayaAdmin && u.WilayaId.HasValue && wilayaIds.Contains(u.WilayaId.Value))
-                .ToListAsync(cancellationToken))
-            .GroupBy(u => u.WilayaId!.Value)
-            .ToDictionary(g => g.Key, g => g.First());
+        var admins = await db.Users
+            .Where(u => u.Role == UserRoles.WilayaAdmin && u.WilayaId.HasValue && wilayaIds.Contains(u.WilayaId.Value))
+            .ToDictionaryAsync(u => u.WilayaId!.Value, cancellationToken);
 
-        var dairasByWilaya = (await db.Dairas
-                .Where(d => wilayaIds.Contains(d.WilayaId))
-                .ToListAsync(cancellationToken))
+        var dairaCounts = await db.Dairas
+            .Where(d => wilayaIds.Contains(d.WilayaId))
             .GroupBy(d => d.WilayaId)
-            .ToDictionary(g => g.Key, g => g.ToList());
+            .Select(g => new { WilayaId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.WilayaId, x => x.Count, cancellationToken);
 
-        var allDairaIds = dairasByWilaya.Values.SelectMany(d => d).Select(d => d.DairaId).ToArray();
+        var dairas = await db.Dairas
+            .Where(d => wilayaIds.Contains(d.WilayaId))
+            .ToListAsync(cancellationToken);
 
-        var communesByDaira = (await db.Communes
-                .Where(c => allDairaIds.Contains(c.DairaId))
-                .ToListAsync(cancellationToken))
+        var allDairaIds = dairas.Select(d => d.DairaId).ToArray();
+
+        var communesByDaira = await db.Communes
+            .Where(c => allDairaIds.Contains(c.DairaId))
             .GroupBy(c => c.DairaId)
-            .ToDictionary(g => g.Key, g => g.ToList());
+            .ToDictionaryAsync(g => g.Key, g => g.ToList(), cancellationToken);
 
         var allCommuneIds = communesByDaira.Values.SelectMany(c => c).Select(c => c.CommuneId).ToArray();
 
-        var communeUserCounts = await db.Users
+        var userCountByCommune = await db.Users
             .Where(u => u.Role == UserRoles.CommuneUser && u.CommuneId.HasValue && allCommuneIds.Contains(u.CommuneId.Value))
             .GroupBy(u => u.CommuneId!.Value)
             .Select(g => new { CommuneId = g.Key, Count = g.Count() })
-            .ToListAsync(cancellationToken);
-
-        var userCountByCommune = communeUserCounts.ToDictionary(x => x.CommuneId, x => x.Count);
+            .ToDictionaryAsync(x => x.CommuneId, x => x.Count, cancellationToken);
 
         return wilayas.Select(wilaya =>
         {
             var admin = admins.GetValueOrDefault(wilaya.WilayaId);
-            var dairas = dairasByWilaya.GetValueOrDefault(wilaya.WilayaId) ?? [];
-            var communeIds = dairas.SelectMany(d =>
+            var wilayaDairas = dairas.Where(d => d.WilayaId == wilaya.WilayaId).ToList();
+            var communeIds = wilayaDairas.SelectMany(d =>
                 communesByDaira.GetValueOrDefault(d.DairaId) ?? []
             ).Select(c => c.CommuneId).ToArray();
 
@@ -57,7 +56,7 @@ public class AdminOverviewService(AppDbContext db, IFeatureStatsService featureS
                 WilayaNameAr: wilaya.WilayaAr ?? "",
                 WilayaAdmin: admin is null ? null : new AdminInfo(
                     admin.Id.ToString(), admin.Username, admin.Name, admin.Email, admin.Role),
-                DairaCount: dairas.Count,
+                DairaCount: dairaCounts.GetValueOrDefault(wilaya.WilayaId),
                 CommuneCount: communeIds.Length,
                 CommuneUserCount: communeIds.Sum(cid => userCountByCommune.GetValueOrDefault(cid))
             );

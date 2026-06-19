@@ -88,6 +88,19 @@ public class SpatialControllerTests
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
+    [Fact]
+    public async Task GetRoadSide_MissingCoordinatesProperty_Returns400()
+    {
+        var uid = Guid.NewGuid();
+        var (ctrl, db) = CreateController(userId: uid);
+
+        // Road data without a "coordinates" property
+        var roadId = AddRoad(db, uid, """{"foo":"bar"}""");
+
+        var result = await ctrl.GetRoadSide(new RoadSideRequest(RoadId: roadId, Lat: 36.0, Lng: 3.0));
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
     [Theory]
     [InlineData(36.5, 3.0, "left")]   // marker above the segment
     [InlineData(36.3, 3.0, "right")]  // marker below the segment

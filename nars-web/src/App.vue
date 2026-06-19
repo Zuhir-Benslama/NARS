@@ -11,20 +11,6 @@
     <TileControl />
     <FieldPanel />
     <FeatureModal />
-
-    <div v-if="appStore.loadError" class="load-error-banner">
-      <span>⚠ Could not load saved features. Check your connection and refresh the page.</span>
-      <button class="load-error-dismiss" @click="appStore.loadError = false">✕</button>
-    </div>
-
-    <Teleport to="body">
-      <div v-if="appStore.isLoading" class="loading-overlay">
-        <div class="loading-spinner">
-          <div class="spinner" />
-          <p>Loading map data…</p>
-        </div>
-      </div>
-    </Teleport>
   </template>
 
   <template v-else>
@@ -32,21 +18,21 @@
     <InfoPanel />
     <TileControl />
     <FeatureModal />
-
-    <div v-if="appStore.loadError" class="load-error-banner">
-      <span>⚠ Could not load saved features. Check your connection and refresh the page.</span>
-      <button class="load-error-dismiss" @click="appStore.loadError = false">✕</button>
-    </div>
-
-    <Teleport to="body">
-      <div v-if="appStore.isLoading" class="loading-overlay">
-        <div class="loading-spinner">
-          <div class="spinner" />
-          <p>Loading map data…</p>
-        </div>
-      </div>
-    </Teleport>
   </template>
+
+  <div v-if="appStore.loadError" class="load-error-banner">
+    <span>⚠ Could not load saved features. Check your connection and refresh the page.</span>
+    <button class="load-error-dismiss" @click="appStore.loadError = false">✕</button>
+  </div>
+
+  <Teleport to="body">
+    <div v-if="appStore.isLoading" class="loading-overlay">
+      <div class="loading-spinner">
+        <div class="spinner" />
+        <p>Loading map data…</p>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">

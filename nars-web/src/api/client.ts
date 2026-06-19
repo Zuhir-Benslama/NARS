@@ -5,6 +5,27 @@ import type { paths, components } from "./schema"
 
 type Json<T> = T extends { content: { "application/json": infer J } } ? J : never
 
+// ─── LOCAL RESPONSE TYPES ────────────────────────────────────────────────
+// These endpoints are not documented in the OpenAPI schema.
+// Types mirror the C# records returned by the API.
+
+export interface AdminUserSummary {
+  userId: string
+  username: string
+  name: string
+  email: string
+  role: string
+  phone: string
+  communeId: number | null
+  dairaId: number | null
+  wilayaId: number | null
+}
+
+export interface ActionResponse {
+  success: boolean
+  message?: string
+}
+
 // ─── OPTIONS BUILDER ──────────────────────────────────────────────────────
 
 function jsonBody(body: unknown): RequestInit {
@@ -92,7 +113,7 @@ export async function getAdminOverview(): Promise<
   return res.json()
 }
 
-export async function getManageableUsers(): Promise<Record<string, unknown>[]> {
+export async function getManageableUsers(): Promise<AdminUserSummary[]> {
   const res = await apiFetch("/api/admin/users")
   return res.json()
 }
@@ -100,16 +121,18 @@ export async function getManageableUsers(): Promise<Record<string, unknown>[]> {
 export async function updateAdminUser(
   userId: string,
   body: Record<string, unknown>,
-): Promise<Response> {
-  return apiFetch(`/api/admin/users/${userId}`, {
+): Promise<ActionResponse> {
+  const res = await apiFetch(`/api/admin/users/${userId}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   })
+  return res.json()
 }
 
-export async function deleteAdminUser(userId: string): Promise<Response> {
-  return apiFetch(`/api/admin/users/${userId}`, { method: "DELETE" })
+export async function deleteAdminUser(userId: string): Promise<ActionResponse> {
+  const res = await apiFetch(`/api/admin/users/${userId}`, { method: "DELETE" })
+  return res.json()
 }
 
 export async function getWilayaReport(

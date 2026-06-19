@@ -38,6 +38,7 @@ public interface IScatteredAreaService
 public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFactory, ILogger<ScatteredAreaService> logger)
     : IScatteredAreaService
 {
+    private const string DefaultLabel = "Scattered Area";
     private readonly object _errorLock = new();
     private (DateTimeOffset Timestamp, string Message)? _lastError;
 
@@ -113,11 +114,11 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
             {
                 UserId = userId,
                 Layer = FeatureTypes.AreaLayers.Scattered,
-                Label = "Scattered Area",
+                Label = DefaultLabel,
                 Data = JsonSerializer.Serialize(new
                 {
                     type = "areas",
-                    label = "Scattered Area",
+                    label = DefaultLabel,
                     layer = "scattered",
                     geometry = scatteredGeoJson,
                     coordinates = coordinates,

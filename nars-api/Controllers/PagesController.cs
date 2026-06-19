@@ -145,7 +145,7 @@ public class PagesController(
             if (!string.IsNullOrEmpty(bearerToken) && jwt.ValidateToken(bearerToken) is not null)
             {
                 logger.LogInformation("[Pages] Valid bearer token header found. Setting access_token cookie.");
-                Response.Cookies.Append("access_token", bearerToken, MakeCookieOptions(TimeSpan.FromHours(24)));
+                Response.Cookies.Append("access_token", bearerToken, MakeCookieOptions(jwt.AccessTokenExpiresIn));
                 return true;
             }
 
@@ -178,7 +178,7 @@ public class PagesController(
 
             var maxAge = result.RefreshExpiry!.Value - timeProvider.UtcNow;
             logger.LogInformation("[Pages] Silent refresh SUCCESS. Issuing new cookies for {Username}", result.User!.Username);
-            Response.Cookies.Append("access_token", result.NewAccessToken!, MakeCookieOptions(TimeSpan.FromHours(24)));
+            Response.Cookies.Append("access_token", result.NewAccessToken!, MakeCookieOptions(jwt.AccessTokenExpiresIn));
             Response.Cookies.Append("refresh_token", result.NewRawToken!, MakeCookieOptions(maxAge));
 
             return true;

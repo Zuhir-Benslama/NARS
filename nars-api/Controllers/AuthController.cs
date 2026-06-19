@@ -101,7 +101,7 @@ public partial class AuthController(
         // behind a local HTTP dev server.
         var refreshMaxAge = refreshExpiry - timeProvider.UtcNow;
 
-        Response.Cookies.Append("access_token", token, MakeCookieOptions(TimeSpan.FromHours(24)));
+        Response.Cookies.Append("access_token", token, MakeCookieOptions(jwt.AccessTokenExpiresIn));
         Response.Cookies.Append("refresh_token", refreshRaw, MakeCookieOptions(refreshMaxAge));
 
         // fix #7: single joined query instead of 3 sequential round-trips.
@@ -167,7 +167,7 @@ public partial class AuthController(
             return Unauthorized(new { detail = result.Detail });
 
         var cookieMaxAge = result.RefreshExpiry!.Value - timeProvider.UtcNow;
-        Response.Cookies.Append("access_token", result.NewAccessToken!, MakeCookieOptions(TimeSpan.FromHours(24)));
+        Response.Cookies.Append("access_token", result.NewAccessToken!, MakeCookieOptions(jwt.AccessTokenExpiresIn));
         Response.Cookies.Append("refresh_token", result.NewRawToken!, MakeCookieOptions(cookieMaxAge));
 
         return Ok(new RefreshResponse(Success: true, TokenType: "bearer"));

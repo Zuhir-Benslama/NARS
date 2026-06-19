@@ -25,3 +25,19 @@ public record FieldInspectionResponse(
     [property: JsonPropertyName("status")] string Status,
     [property: JsonPropertyName("created_at")] DateTime CreatedAt
 );
+
+public record FieldInspectionsResponse(
+    [property: JsonPropertyName("inspections")] IReadOnlyList<FieldInspectionResponse> Inspections
+);
+
+public record FieldInspectSubmitResponse(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("message")] string Message
+);
+
+public record CreateEntranceResponse(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("message")] string Message
+);

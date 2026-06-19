@@ -8,6 +8,7 @@ import type { LayerState } from "../../stores/layerStore"
 import { apiFetch } from "../../api"
 import { checkMainUrbanExists, getRoadSide } from "../../lib/validation"
 import { debugLog, debugError } from "../../utils/debug"
+import { logError, createServerError } from "../../lib/errors"
 import type { FeatureData, LayerEntry, SaveResult, ModalResult } from "../../types"
 
 // ─── GEOMETRY COORDINATE EXTRACTOR ────────────────────────────────────────────
@@ -148,13 +149,14 @@ export async function saveToDatabase(featureData: FeatureData): Promise<SaveResu
     return { ok: true, data }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error"
-    const context =
+    const cause =
       err instanceof Error && "cause" in err
         ? String((err as Error & { cause?: unknown }).cause)
         : undefined
+    logError(createServerError(message, { action: "saveToDatabase" }, err))
     debugError("[SAVE] Database save failed:", {
       message,
-      context,
+      context: cause,
       stack: err instanceof Error ? err.stack : undefined,
     })
     return { ok: false, error: message }
@@ -172,12 +174,7 @@ export async function prepareModalExtras(phase: (typeof PHASES)[number]): Promis
   if (phase.key === "areas") {
     modalStore.mainUrbanExists = await checkMainUrbanExists()
     if (!modalStore.mainUrbanExists) {
-      const name =
-        appStore.municipalityName ||
-        appStore.user?.commune.name_fr ||
-        appStore.user?.commune.name_ar ||
-        ""
-      modalStore.label = name
+      modalStore.label = appStore.communeName
     } else {
       modalStore.label = ""
     }
@@ -204,13 +201,11 @@ export async function prepareModalExtras(phase: (typeof PHASES)[number]): Promis
 
 export async function fetchRoadSide(roadDbId: string): Promise<void> {
   const modalStore = useModalStore()
-  const layerStore = useLayerStore()
-  const state = layerStore.$state as LayerState
   modalStore.entranceSideLoading = true
   modalStore.entranceSide = null
   modalStore.entranceNumber = null
 
-  // Try to get position from current drawing geometry first (dev-only global)
+  // Try to get position from current drawing geometry (dev-only global)
   const narsWindow = window as Window & {
     __narsCurrentGeometry?: [number, number][] | null
   }
@@ -221,15 +216,6 @@ export async function fetchRoadSide(roadDbId: string): Promise<void> {
   if (currentGeometry && currentGeometry.length > 0) {
     // Use the last vertex position (the one being placed)
     ;[lng, lat] = currentGeometry[currentGeometry.length - 1]
-  } else {
-    // Fallback to existing entrance (edit mode or if geometry not available)
-    const feature = (state.houseEntrances || []).find(
-      (e) => e.data.entranceTypeKey === "main_entrance" && e.data.lat && e.data.lng,
-    )
-    if (feature) {
-      lat = feature.data.lat
-      lng = feature.data.lng
-    }
   }
 
   if (lat && lng) {

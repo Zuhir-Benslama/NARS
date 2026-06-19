@@ -27,10 +27,4 @@ export type {
   isGeomanRemoveEvent,
   isGeomanMarkerDragEvent,
 } from "./geoman-types"
-export type {
-  DrawMode,
-  DrawingState,
-  EditState,
-  MapContext as MapContextType,
-  SnapState,
-} from "./types"
+

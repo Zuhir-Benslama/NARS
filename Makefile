@@ -698,7 +698,6 @@ observability-tempo: ## Install Tempo (traces)
 		--set tempo.readinessProbe.failureThreshold=10 \
 		--set tempo.livenessProbe.initialDelaySeconds=60 \
 		--set tempo.livenessProbe.failureThreshold=10 \
-		--set tempoSearchEnabled=true \
 		--set memBallastSizeMbs=128 \
 		--set test.enabled=false \
 		--reuse-values --timeout 10m

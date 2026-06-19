@@ -9,9 +9,12 @@ namespace NarsApi.Services;
 
 public class ValidationService(AppDbContext db) : IValidationService
 {
-    private static string RoadTable => FeatureTypeRegistry.GetDescriptor(FeatureTypes.Road)?.TableName ?? "roads";
-    private static string AreaTable => FeatureTypeRegistry.GetDescriptor(FeatureTypes.Area)?.TableName ?? "areas";
-    private static string DistrictTable => FeatureTypeRegistry.GetDescriptor(FeatureTypes.District)?.TableName ?? "districts";
+    private static string RoadTable => FeatureTypeRegistry.GetDescriptor(FeatureTypes.Road)?.TableName
+        ?? throw new InvalidOperationException("FeatureTypeRegistry missing Road descriptor");
+    private static string AreaTable => FeatureTypeRegistry.GetDescriptor(FeatureTypes.Area)?.TableName
+        ?? throw new InvalidOperationException("FeatureTypeRegistry missing Area descriptor");
+    private static string DistrictTable => FeatureTypeRegistry.GetDescriptor(FeatureTypes.District)?.TableName
+        ?? throw new InvalidOperationException("FeatureTypeRegistry missing District descriptor");
 
     public async Task<bool> CheckRoadConnectivityAsync(Guid userId, string wkt, double maxDistanceMeters, CancellationToken ct = default)
     {

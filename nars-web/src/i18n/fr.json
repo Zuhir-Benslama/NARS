@@ -43,6 +43,7 @@
   "cat_publicSpaces": "Espaces publics",
   "cat_roads": "Routes",
   "ctx_cc_lock": "Centre-ville verrouillé",
+  "ctx_cc_lock_msg": "Le centre-ville ne peut être modifié que dans sa propre phase",
   "ctx_edit_geom": "Modifier la géométrie",
   "ctx_edit_info": "Modifier les infos",
   "ctx_ent_ref": "Définir l'entrée de référence",

@@ -218,13 +218,7 @@ watch(
   () => m.areaTypeKey,
   (val) => {
     if (val === "central_urban") {
-      // Use municipalityName or fall back to user.commune.name_fr
-      const communeName =
-        appStore.municipalityName ||
-        appStore.user?.commune.name_fr ||
-        appStore.user?.commune.name_ar ||
-        ""
-      m.label = communeName
+      m.label = appStore.communeName
     } else if (!m.isEdit && m.label === appStore.municipalityName) {
       m.label = ""
     }

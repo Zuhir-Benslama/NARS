@@ -38,6 +38,7 @@ export interface ModalState {
   sectorKey: string
   buildingTypeKey: string
   radius: number | null
+  currentModalFeatureId: string | null
 }
 
 export type ModalResult = Omit<FeatureData, "type" | "coordinates" | "lat" | "lng">

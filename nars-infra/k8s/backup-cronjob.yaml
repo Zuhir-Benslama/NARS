@@ -45,6 +45,7 @@ spec:
               imagePullPolicy: IfNotPresent
               securityContext:
                 allowPrivilegeEscalation: false
+                # Must write backup files to /backup; enforced ro would block pg_dump output.
                 readOnlyRootFilesystem: false
                 runAsNonRoot: true
                 seccompProfile:
@@ -59,7 +60,7 @@ spec:
                   TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
                   FILE="/backup/nars_db_${TIMESTAMP}.sql"
                   echo "→ Backing up database 'nars_db'..."
-                  PGPASSWORD="${PGPASSWORD}" pg_dump \
+                  pg_dump \
                     -h "${PGHOST}" -U "${PGUSER}" -d "${PGDATABASE}" \
                     --no-owner > "$FILE"
                   gzip -f "$FILE"

@@ -179,7 +179,8 @@ info "Hashing password and inserting record..."
 
 export NARS_ADMIN_PASSWORD_VAL="${ADMIN_PASSWORD}"
 
-python3 - "$ADMIN_NAME" "$ADMIN_EMAIL" "$ADMIN_PHONE" \
+set +e
+NEW_UUID=$(python3 - "$ADMIN_NAME" "$ADMIN_EMAIL" "$ADMIN_PHONE" \
          "$ADMIN_USERNAME" << 'PYEOF'
 import os, sys, uuid, bcrypt, psycopg2
 
@@ -221,36 +222,15 @@ try:
 except Exception as e:
     print(f"DB_ERROR: {e}", file=sys.stderr); sys.exit(1)
 PYEOF
-
+)
 PYEXIT=$?
+set -e
+
 if   [[ ${PYEXIT} -eq 2 ]]; then
     die "Username '${ADMIN_USERNAME}' or email '${ADMIN_EMAIL}' is already in use."
 elif [[ ${PYEXIT} -ne 0 ]]; then
     die "Insert failed. See error above."
 fi
-
-# Capture UUID by re-querying
-NEW_UUID=$(python3 - "$ADMIN_USERNAME" << 'PYEOF'
-import os, sys, psycopg2
-
-username = sys.argv[1]
-host    = os.environ["NARS_DB_HOST"]
-port    = int(os.environ["NARS_DB_PORT"])
-dbname  = os.environ["NARS_DB_NAME"]
-user    = os.environ["NARS_DB_USER"]
-pw      = os.environ["NARS_DB_PASSWORD_VAL"]
-
-try:
-    conn = psycopg2.connect(host=host, port=port, dbname=dbname, user=user, password=pw)
-    cur  = conn.cursor()
-    cur.execute("SELECT id FROM users WHERE username = %s AND role = 'national_admin'", (username,))
-    row = cur.fetchone()
-    conn.close()
-    if row: print(row[0])
-except Exception as e:
-    print(f"ERR: {e}", file=sys.stderr)
-PYEOF
-)
 
 echo ""
 success "National admin account created successfully!"
