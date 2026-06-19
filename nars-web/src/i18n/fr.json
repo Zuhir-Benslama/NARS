@@ -197,7 +197,7 @@
   "su_hint_commune": "Créer un compte agent de terrain. Il inspectera les entités dans votre commune.",
   "su_hint_daira": "Créer un compte utilisateur commune. La commune doit appartenir à votre daïra.",
   "su_hint_wilaya": "Créer un compte admin daïra. La daïra doit appartenir à votre wilaya.",
-  "su_hint_national": "Créer un compte admin wilaya ou daïra.",
+  "su_hint_national": "Créer un compte admin wilaya.",
   "su_create_btn": "Créer le compte",
   "su_success": "Compte créé avec succès.",
   "su_err_name": "Le nom complet est requis.",

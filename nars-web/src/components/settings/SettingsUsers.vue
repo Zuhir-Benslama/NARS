@@ -191,6 +191,7 @@ import { useI18n } from "vue-i18n"
 import { useAppStore } from "../../stores/appStore"
 import { apiFetch } from "../../api"
 import { showToast } from "../../lib/toast"
+import { NarsError } from "../../lib/errors"
 import type { UserRole } from "../../types"
 
 interface ManageableUser {
@@ -288,8 +289,8 @@ async function doDelete() {
       users.value = users.value.filter((u) => u.user_id !== deleteTarget.value!.user_id)
       deleteTarget.value = null
     }
-  } catch {
-    showToast(t("su_err_network"), "error")
+  } catch (err) {
+    showToast(err instanceof NarsError ? err.message : t("su_err_network"), "error")
   } finally {
     deleting.value = false
   }
@@ -310,10 +311,7 @@ const availableTargetRoles = computed<RoleOption[]>(() => {
     case "wilaya_admin":
       return [{ value: "daira_admin", label: t("su_role_daira") }]
     case "national_admin":
-      return [
-        { value: "wilaya_admin", label: t("su_role_wilaya") },
-        { value: "daira_admin", label: t("su_role_daira") },
-      ]
+      return [{ value: "wilaya_admin", label: t("su_role_wilaya") }]
     default:
       return []
   }
@@ -341,11 +339,7 @@ const hintText = computed(() => {
 
 // ── Field visibility ─────────────────────────────────────────────────────
 const showWilayaSelect = computed(() => role.value === "national_admin")
-const showDairaSelect = computed(
-  () =>
-    (role.value === "national_admin" && targetRole.value === "daira_admin") ||
-    role.value === "wilaya_admin",
-)
+const showDairaSelect = computed(() => role.value === "wilaya_admin")
 const showCommuneSelect = computed(
   () =>
     role.value === "daira_admin" ||
@@ -616,8 +610,8 @@ async function submit() {
         errorMsg.value = data.detail || data.error || t("su_err_generic")
       }
     }
-  } catch {
-    errorMsg.value = t("su_err_network")
+  } catch (err) {
+    errorMsg.value = err instanceof NarsError ? err.message : t("su_err_network")
   } finally {
     loading.value = false
   }

@@ -88,8 +88,8 @@ function sum(users: UserFeatureStats[], field: keyof UserFeatureStats): number {
   gap: 1.25rem;
 }
 .commune-block {
-  background: #fff;
-  border: 1px solid #e0e0e0;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -98,25 +98,25 @@ function sum(users: UserFeatureStats[], field: keyof UserFeatureStats): number {
   align-items: center;
   gap: 0.75rem;
   padding: 0.65rem 1rem;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e0e0e0;
+  background: var(--glass-bg-hover);
+  border-bottom: 1px solid var(--glass-border);
 }
 .commune-name {
   font-weight: 600;
   font-size: 0.95rem;
-  color: #111;
+  color: var(--text-primary);
 }
 .commune-name-ar {
   font-size: 0.85rem;
-  color: #555;
+  color: var(--text-secondary);
   direction: rtl;
   flex: 1;
   text-align: right;
 }
 .user-count {
   font-size: 0.78rem;
-  background: #e3f2fd;
-  color: #0d47a1;
+  background: var(--glass-bg);
+  color: var(--text-primary);
   border-radius: 999px;
   padding: 0.15rem 0.55rem;
   white-space: nowrap;
@@ -124,7 +124,7 @@ function sum(users: UserFeatureStats[], field: keyof UserFeatureStats): number {
 .no-users {
   padding: 0.75rem 1rem;
   font-size: 0.85rem;
-  color: #888;
+  color: var(--text-muted);
   font-style: italic;
 }
 .stats-table {
@@ -133,9 +133,9 @@ function sum(users: UserFeatureStats[], field: keyof UserFeatureStats): number {
   font-size: 0.82rem;
 }
 .stats-table th {
-  background: #1976d2;
-  color: #fff;
-  font-weight: 500;
+  background: rgba(25, 118, 210, 0.2);
+  color: var(--text-primary);
+  font-weight: 600;
   padding: 0.4rem 0.6rem;
   text-align: center;
   white-space: nowrap;
@@ -146,24 +146,24 @@ function sum(users: UserFeatureStats[], field: keyof UserFeatureStats): number {
 .stats-table td {
   padding: 0.4rem 0.6rem;
   text-align: center;
-  border-bottom: 1px solid #f0f0f0;
-  color: #333;
+  border-bottom: 1px solid var(--glass-border);
+  color: var(--text-primary);
 }
 .stats-table td:first-child {
   text-align: left;
 }
 .stats-table tbody tr:hover {
-  background: #f5f9ff;
+  background: var(--glass-bg-hover);
 }
 .stats-table tbody tr:last-child td {
   border-bottom: none;
 }
 .row-complete td {
-  color: #1b5e20;
+  color: #4caf50;
 }
 .total-col {
   font-weight: 700;
-  background: #fafafa;
+  background: var(--glass-bg);
 }
 .user-cell {
   display: flex;
@@ -175,7 +175,7 @@ function sum(users: UserFeatureStats[], field: keyof UserFeatureStats): number {
 }
 .uname-full {
   font-size: 0.75rem;
-  color: #666;
+  color: var(--text-secondary);
 }
 .fw-badge {
   display: inline-block;
@@ -191,9 +191,9 @@ function sum(users: UserFeatureStats[], field: keyof UserFeatureStats): number {
 }
 .totals-row td {
   font-weight: 700;
-  border-top: 2px solid #1976d2;
-  background: #e3f2fd;
-  color: #0d47a1;
+  border-top: 2px solid var(--glass-border);
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
 }
 .totals-label {
   font-size: 0.8rem;
