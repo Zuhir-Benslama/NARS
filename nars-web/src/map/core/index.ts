@@ -27,4 +27,3 @@ export type {
   isGeomanRemoveEvent,
   isGeomanMarkerDragEvent,
 } from "./geoman-types"
-

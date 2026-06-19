@@ -36,10 +36,7 @@ export const useAppStore = defineStore("app", {
       state.user.role !== "commune_user" &&
       state.user.role !== "field_worker",
     communeName: (state) =>
-      state.municipalityName ||
-      state.user?.commune?.name_fr ||
-      state.user?.commune?.name_ar ||
-      "",
+      state.municipalityName || state.user?.commune?.name_fr || state.user?.commune?.name_ar || "",
   },
 
   actions: {
