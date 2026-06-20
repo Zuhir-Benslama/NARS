@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
+using NarsApi.Infrastructure;
 using static NarsApi.Infrastructure.SqlFragments;
 
 namespace NarsApi.Services;
@@ -29,19 +30,19 @@ public class JwtService(string secret, string? issuer, string? audience, IConfig
 
         var claims = new List<Claim>
         {
-            new("user_id",  userId.ToString()),
-            new("username", username),
-            new("name",     name),
-            new("email",    email),
-            new("role",     role),
+            new(ClaimNames.UserId,  userId.ToString()),
+            new(ClaimNames.Username, username),
+            new(ClaimNames.Name,    name),
+            new(ClaimNames.Email,   email),
+            new(ClaimNames.Role,    role),
         };
 
         // Only include geographic claims that are relevant to this role.
         // This keeps tokens minimal and avoids confusion when a claim is present
         // but meaningless for the role.
-        if (communeId.HasValue) claims.Add(new Claim("commune_id", communeId.Value.ToString()));
-        if (dairaId.HasValue) claims.Add(new Claim("daira_id", dairaId.Value.ToString()));
-        if (wilayaId.HasValue) claims.Add(new Claim("wilaya_id", wilayaId.Value.ToString()));
+        if (communeId.HasValue) claims.Add(new Claim(ClaimNames.CommuneId, communeId.Value.ToString()));
+        if (dairaId.HasValue) claims.Add(new Claim(ClaimNames.DairaId, dairaId.Value.ToString()));
+        if (wilayaId.HasValue) claims.Add(new Claim(ClaimNames.WilayaId, wilayaId.Value.ToString()));
 
         var token = new JwtSecurityToken(
             issuer: _issuer,

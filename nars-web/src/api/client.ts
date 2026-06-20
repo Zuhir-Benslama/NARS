@@ -61,30 +61,30 @@ export async function logout(): Promise<Json<paths["/api/logout"]["post"]["respo
 export async function loadFeatures(
   skip = 0,
   take = 1000,
-): Promise<Json<paths["/api/load"]["get"]["responses"][200]>> {
-  const res = await apiFetch(`/api/load?skip=${skip}&take=${take}`)
+): Promise<Json<paths["/api/features"]["get"]["responses"][200]>> {
+  const res = await apiFetch(`/api/features?skip=${skip}&take=${take}`)
   return res.json()
 }
 
 export async function saveFeature(
   body: components["schemas"]["FeatureSaveRequest"],
-): Promise<Json<paths["/api/save"]["post"]["responses"][201]>> {
-  const res = await apiFetch("/api/save", { method: "POST", ...jsonBody(body) })
+): Promise<Json<paths["/api/features"]["post"]["responses"][201]>> {
+  const res = await apiFetch("/api/features", { method: "POST", ...jsonBody(body) })
   return res.json()
 }
 
 export async function updateFeature(
   featureId: string,
   body: components["schemas"]["FeatureUpdateRequest"],
-): Promise<Json<paths["/api/update/{featureId}"]["put"]["responses"][200]>> {
-  const res = await apiFetch(`/api/update/${featureId}`, { method: "PUT", ...jsonBody(body) })
+): Promise<Json<paths["/api/features/{featureId}"]["put"]["responses"][200]>> {
+  const res = await apiFetch(`/api/features/${featureId}`, { method: "PUT", ...jsonBody(body) })
   return res.json()
 }
 
 export async function deleteFeature(
   featureId: string,
-): Promise<Json<paths["/api/delete/{featureId}"]["delete"]["responses"][200]>> {
-  const res = await apiFetch(`/api/delete/${featureId}`, { method: "DELETE" })
+): Promise<Json<paths["/api/features/{featureId}"]["delete"]["responses"][200]>> {
+  const res = await apiFetch(`/api/features/${featureId}`, { method: "DELETE" })
   return res.json()
 }
 

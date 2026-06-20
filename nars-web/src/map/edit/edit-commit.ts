@@ -100,7 +100,7 @@ async function readGeomanGeometry(entry: LayerEntry): Promise<boolean> {
 
 async function saveGeometry(entry: LayerEntry): Promise<boolean> {
   try {
-    await apiFetch(`/api/update/${entry.dbId}`, {
+    await apiFetch(`/api/features/${entry.dbId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ data: entry.data }),

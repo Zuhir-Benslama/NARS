@@ -100,8 +100,8 @@ export async function loadFromDatabase(): Promise<void> {
   debugLog("[LOAD] Starting...")
   appStore.isLoading = true
   try {
-    debugLog("[LOAD] Fetching /api/load...")
-    const response = await apiFetch("/api/load")
+    debugLog("[LOAD] Fetching /api/features...")
+    const response = await apiFetch("/api/features")
     debugLog("[LOAD] Response status:", response.status)
     const json = (await response.json()) as { features?: DbFeature[]; count?: number } | DbFeature[]
 

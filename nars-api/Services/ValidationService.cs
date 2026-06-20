@@ -96,14 +96,18 @@ public class ValidationService(AppDbContext db) : IValidationService
         await using var handle = await conn.EnsureOpenAsync(ct);
         using var cmd = conn.CreateCommand();
         cmd.CommandText = $@"
+            WITH area_geom AS (
+                SELECT {SqlFragments.PolygonFromDataWithAlias("a")} AS geom
+                FROM {AreaTable} a
+                WHERE a.user_id = @uid
+                  AND a.layer IN ('central_urban', 'secondary_urban')
+            )
             SELECT COUNT(*) FROM {DistrictTable} d
             WHERE d.user_id = @uid
               AND EXISTS (
-                  SELECT 1 FROM {AreaTable} a
-                  WHERE a.user_id = @uid
-                    AND a.layer IN ('central_urban', 'secondary_urban')
-                    AND ST_Intersects(({SqlFragments.PolygonFromDataWithAlias("a")}), ST_SetSRID(ST_GeomFromText(@wkt), 4326))
-                    AND ST_Intersects(({SqlFragments.PolygonFromDataWithAlias("a")}), ({SqlFragments.PolygonFromDataWithAlias("d")}))
+                  SELECT 1 FROM area_geom ag
+                  WHERE ST_Intersects(ag.geom, ST_SetSRID(ST_GeomFromText(@wkt), 4326))
+                    AND ST_Intersects(ag.geom, ({SqlFragments.PolygonFromDataWithAlias("d")}))
               )";
         SqlFragments.AddParam(cmd, "@uid", userId);
         SqlFragments.AddParam(cmd, "@wkt", wkt);
@@ -116,17 +120,25 @@ public class ValidationService(AppDbContext db) : IValidationService
         await using var handle = await conn.EnsureOpenAsync(ct);
         using var cmd = conn.CreateCommand();
         cmd.CommandText = $@"
-            SELECT EXISTS (
-                SELECT 1 FROM {DistrictTable} f
+            WITH district_geom AS (
+                SELECT {SqlFragments.PolygonFromData} AS geom
+                FROM {DistrictTable} f
                 WHERE f.user_id = @uid
-                  AND (ST_Touches(ST_SetSRID(ST_GeomFromText(@wkt), 4326), ({SqlFragments.PolygonFromData}))
-                       OR ST_Intersects(ST_Boundary(ST_SetSRID(ST_GeomFromText(@wkt), 4326)), ST_Boundary({SqlFragments.PolygonFromData})))
+            ),
+            area_geom AS (
+                SELECT {SqlFragments.PolygonFromDataWithAlias("a")} AS geom
+                FROM {AreaTable} a
+                WHERE a.user_id = @uid
+                  AND a.layer IN ('central_urban', 'secondary_urban')
+            )
+            SELECT EXISTS (
+                SELECT 1 FROM district_geom dg
+                WHERE ST_Touches(ST_SetSRID(ST_GeomFromText(@wkt), 4326), dg.geom)
+                   OR ST_Intersects(ST_Boundary(ST_SetSRID(ST_GeomFromText(@wkt), 4326)), ST_Boundary(dg.geom))
                   AND EXISTS (
-                      SELECT 1 FROM {AreaTable} a
-                      WHERE a.user_id = @uid
-                        AND a.layer IN ('central_urban', 'secondary_urban')
-                        AND ST_Intersects(({SqlFragments.PolygonFromDataWithAlias("a")}), ST_SetSRID(ST_GeomFromText(@wkt), 4326))
-                        AND ST_Intersects(({SqlFragments.PolygonFromDataWithAlias("a")}), ({SqlFragments.PolygonFromDataWithAlias("f")}))
+                      SELECT 1 FROM area_geom ag
+                      WHERE ST_Intersects(ag.geom, ST_SetSRID(ST_GeomFromText(@wkt), 4326))
+                        AND ST_Intersects(ag.geom, dg.geom)
                   )
             )";
         SqlFragments.AddParam(cmd, "@uid", userId);

@@ -26,12 +26,12 @@ public class LogsController(AppDbContext db, IConfiguration config, IDateTimePro
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> SubmitLogs([FromBody] LogBatch body, CancellationToken cancellationToken = default)
     {
-        if (body is null) return BadRequest(new { detail = "Request body is required." });
+        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
         if (body.Logs is null || body.Logs.Count == 0)
-            return BadRequest(new { detail = "No log entries provided." });
+            return Problem(detail: "No log entries provided.", statusCode: 400);
 
         if (body.Logs.Count > MaxBatchSize)
-            return BadRequest(new { detail = $"Batch size exceeds maximum of {MaxBatchSize}." });
+            return Problem(detail: $"Batch size exceeds maximum of {MaxBatchSize}.", statusCode: 400);
 
         var userId = User.Identity?.IsAuthenticated == true
             ? GetUserId()

@@ -50,7 +50,7 @@ public partial class AuthController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> SignIn([FromBody] SignInRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null) return BadRequest(new { detail = "Request body is required." });
+        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
         var user = await db.Users.FirstOrDefaultAsync(u => u.Username == body.Username, cancellationToken);
         if (user is null)
             return Unauthorized(new { detail = "Invalid username or password" });

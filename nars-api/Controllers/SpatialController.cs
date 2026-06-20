@@ -31,16 +31,16 @@ public class SpatialController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetRoadSide([FromBody] RoadSideRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null) return BadRequest(new { detail = "Request body is required." });
+        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
         var road = await db.Roads.FirstOrDefaultAsync(f =>
             f.Id == body.RoadId && f.UserId == CurrentUserId, cancellationToken);
 
         if (road is null)
-            return NotFound(new { detail = "Road not found." });
+            return Problem(detail: "Road not found.", statusCode: 404);
 
         var roadData = JsonSerializer.Deserialize<JsonElement>(road.Data);
         if (!roadData.TryGetProperty("coordinates", out var coordsEl))
-            return BadRequest(new { detail = "Road data is missing coordinates." });
+            return Problem(detail: "Road data is missing coordinates.", statusCode: 400);
 
         var roadCoords = coordsEl.EnumerateArray()
             .Select(c => (Lat: c.GetProperty("lat").GetDouble(),
@@ -48,7 +48,7 @@ public class SpatialController(
             .ToList();
 
         if (roadCoords.Count < 2)
-            return BadRequest(new { detail = "Road has insufficient coordinates." });
+            return Problem(detail: "Road has insufficient coordinates.", statusCode: 400);
 
         // Find the nearest segment midpoint to the marker.
         // Apply cosine correction so the Δlng component is in the same
@@ -98,7 +98,7 @@ public class SpatialController(
     {
         var communeId = CurrentCommuneId;
         if (communeId is null)
-            return BadRequest(new { detail = "This endpoint requires a commune-level account." });
+            return Problem(detail: "This endpoint requires a commune-level account.", statusCode: 400);
         await scatteredService.RefreshAsync(RequiredCurrentUserId, communeId.Value, cancellationToken);
         return Ok(new ScatteredRefreshResponse(true, null, "Scattered area recomputed."));
     }

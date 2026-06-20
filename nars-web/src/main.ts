@@ -7,7 +7,7 @@ import "./app.css"
 import { i18n } from "./i18n"
 import router from "./router"
 import { initTheme } from "./composables/useTheme"
-import { initMap, loadFromDatabase, loadUserAndCommune } from "./map"
+import { initMap, loadFromDatabase, loadUserAndCommune, displayCommuneBoundary } from "./map"
 import { useAppStore } from "./stores/appStore"
 import { apiUrl } from "./api"
 import { logError, createServerError } from "./lib/errors"
@@ -99,6 +99,8 @@ initTheme()
     if (role === "commune_user") {
       // Full map + feature init — not needed for admin roles.
       await initMap()
+      const communeId = appStore.user?.commune?.id
+      if (communeId) await displayCommuneBoundary(communeId)
       await loadFromDatabase()
       debugLog("NARS Urban Addressing — Maplibre GL initialized")
     } else {

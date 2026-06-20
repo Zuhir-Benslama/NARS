@@ -152,6 +152,7 @@ proxy-up: port-forward-start ## Start socat bridge from host:8080 → kind conta
 	@echo "→ Setting up Unix socket proxy bridge..."
 	@mkdir -p "$(PROXY_DIR)"
 	@-docker rm -f kind-proxy 2>/dev/null || true
+	@rm -f "$(PROXY_DIR)/proxy.sock" 2>/dev/null || true
 	@echo "  Starting socat in kind network namespace..."
 	@docker run -d --name kind-proxy --rm \
 		--network container:nars-control-plane \
@@ -160,7 +161,7 @@ proxy-up: port-forward-start ## Start socat bridge from host:8080 → kind conta
 		UNIX-LISTEN:/tmp/kind-proxy/proxy.sock,fork,reuseaddr TCP:localhost:8080 > /dev/null
 	@sleep 1
 	@echo "  Starting host-side socat listener on :8080..."
-	@-kill $$$$(lsof -tiTCP:8080 2>/dev/null) 2>/dev/null || true
+	@-kill $(lsof -tiTCP:8080 2>/dev/null) 2>/dev/null || true
 	@sleep 0.3
 	@nohup socat TCP-LISTEN:8080,reuseaddr,fork \
 		UNIX-CONNECT:"$(PROXY_DIR)/proxy.sock" \
@@ -176,7 +177,7 @@ proxy-up: port-forward-start ## Start socat bridge from host:8080 → kind conta
 proxy-down: port-forward-stop ## Stop the socat proxy bridge and port-forward
 	@echo "→ Stopping socat proxy..."
 	@-docker rm -f kind-proxy 2>/dev/null || true
-	@-kill $$$$(lsof -tiTCP:8080 2>/dev/null) 2>/dev/null || true
+	@-kill $(lsof -tiTCP:8080 2>/dev/null) 2>/dev/null || true
 	@-rm -f "$(PROXY_DIR)/proxy.sock" 2>/dev/null || true
 	@echo "✓ Proxy stopped"
 

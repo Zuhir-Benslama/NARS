@@ -41,10 +41,9 @@ spec:
         fsGroup: 1000
       containers:
         - name: nars-api
-          # TODO: pin to a specific version tag for CI/CD.
-          # The :latest + Always combo ensures dev clusters always
-          # pull fresh, but wastes one pull per pod start for
-          # pinned tags — override pullPolicy in CI via kustomize patch.
+          # Dev default — override the tag via kustomize in CI/CD (e.g.
+          # with --edit-image or a patch). The :latest + Always combo
+          # ensures dev clusters always pull fresh.
           image: zuhirbenslama/nars-api:latest
           imagePullPolicy: Always
           ports:

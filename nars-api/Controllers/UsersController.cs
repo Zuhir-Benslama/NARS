@@ -21,9 +21,9 @@ public class UsersController(AppDbContext db) : NarsControllerBase
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateCredentials([FromBody] UpdateUserRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null) return BadRequest(new { detail = "Request body is required." });
+        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
         var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
-        if (user is null) return NotFound(new { detail = "User not found." });
+        if (user is null) return Problem(detail: "User not found.", statusCode: 404);
 
         // Validate username uniqueness if changed
         if (!string.IsNullOrWhiteSpace(body.Username) && body.Username != user.Username)
@@ -47,7 +47,7 @@ public class UsersController(AppDbContext db) : NarsControllerBase
         {
             var pwdErr = PasswordValidator.Validate(body.Password);
             if (pwdErr is not null)
-                return BadRequest(new { detail = pwdErr });
+                return Problem(detail: pwdErr, statusCode: 400);
 
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(body.Password);
         }

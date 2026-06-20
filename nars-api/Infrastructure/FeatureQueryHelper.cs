@@ -13,6 +13,30 @@ namespace NarsApi.Infrastructure;
 /// </summary>
 public static class FeatureQueryHelper
 {
+    private static readonly string _loadFeaturesSql = BuildSql(withLayer: false);
+    private static readonly string _loadByLayerSql = BuildSql(withLayer: true);
+
+    private static string BuildSql(bool withLayer)
+    {
+        var cte = BuildUnionAllCte();
+        var layerFilter = withLayer ? " AND layer = @layer" : "";
+        return $"""
+            WITH all_features AS ({cte}),
+            filtered AS (
+                SELECT id, label, data, created_at, layer, feature_type
+                FROM all_features
+                WHERE user_id = @uid{layerFilter}
+            ),
+            total AS (
+                SELECT COUNT(*) AS total_count FROM filtered
+            )
+            SELECT f.id, f.label, f.data, f.created_at, f.layer, f.feature_type, t.total_count
+            FROM filtered f, total t
+            ORDER BY f.created_at
+            OFFSET @skip LIMIT @take
+            """;
+    }
+
     private static string BuildUnionAllCte()
     {
         var sb = new StringBuilder();
@@ -25,44 +49,6 @@ public static class FeatureQueryHelper
         return sb.ToString();
     }
 
-    private static string BuildLoadFeaturesSql() =>
-        $"""
-        WITH all_features AS (
-            {BuildUnionAllCte()}
-        ),
-        filtered AS (
-            SELECT id, label, data, created_at, layer, feature_type
-            FROM all_features
-            WHERE user_id = @uid
-        ),
-        total AS (
-            SELECT COUNT(*) AS total_count FROM filtered
-        )
-        SELECT f.id, f.label, f.data, f.created_at, f.layer, f.feature_type, t.total_count
-        FROM filtered f, total t
-        ORDER BY f.created_at
-        OFFSET @skip LIMIT @take
-        """;
-
-    private static string BuildLoadByLayerSql() =>
-        $"""
-        WITH all_features AS (
-            {BuildUnionAllCte()}
-        ),
-        filtered AS (
-            SELECT id, label, data, created_at, layer, feature_type
-            FROM all_features
-            WHERE user_id = @uid AND layer = @layer
-        ),
-        total AS (
-            SELECT COUNT(*) AS total_count FROM filtered
-        )
-        SELECT f.id, f.label, f.data, f.created_at, f.layer, f.feature_type, t.total_count
-        FROM filtered f, total t
-        ORDER BY f.created_at
-        OFFSET @skip LIMIT @take
-        """;
-
     /// <summary>
     /// Loads features across all tables for a given user with pagination.
     /// Returns the feature rows and the total count (for pagination UI).
@@ -74,7 +60,7 @@ public static class FeatureQueryHelper
         int take,
         CancellationToken ct = default)
     {
-        return await ExecuteQueryAsync(conn, BuildLoadFeaturesSql(), userId, layer: null, skip, take, ct);
+        return await ExecuteQueryAsync(conn, _loadFeaturesSql, userId, layer: null, skip, take, ct);
     }
 
     /// <summary>
@@ -89,7 +75,7 @@ public static class FeatureQueryHelper
         int take,
         CancellationToken ct = default)
     {
-        return await ExecuteQueryAsync(conn, BuildLoadByLayerSql(), userId, layer, skip, take, ct);
+        return await ExecuteQueryAsync(conn, _loadByLayerSql, userId, layer, skip, take, ct);
     }
 
     private static async Task<(List<object> features, int totalCount)> ExecuteQueryAsync(
@@ -107,11 +93,11 @@ public static class FeatureQueryHelper
         cmd.CommandText = sql;
         cmd.CommandTimeout = 30;
 
-        AddParameter(cmd, "@uid", userId);
+        SqlFragments.AddParam(cmd, "@uid", userId);
         if (layer is not null)
-            AddParameter(cmd, "@layer", layer);
-        AddParameter(cmd, "@skip", skip);
-        AddParameter(cmd, "@take", take);
+            SqlFragments.AddParam(cmd, "@layer", layer);
+        SqlFragments.AddParam(cmd, "@skip", skip);
+        SqlFragments.AddParam(cmd, "@take", take);
 
         var rows = new List<object>();
         int totalCount = 0;
@@ -149,19 +135,6 @@ public static class FeatureQueryHelper
         return (rows, totalCount);
     }
 
-    private static void AddParameter(DbCommand cmd, string name, object value)
-    {
-        var param = cmd.CreateParameter();
-        param.ParameterName = name;
-        param.Value = value;
-        cmd.Parameters.Add(param);
-    }
-
     public static void AddParameter(DbCommand cmd, string name, Guid[] values)
-    {
-        var param = cmd.CreateParameter();
-        param.ParameterName = name;
-        param.Value = values;
-        cmd.Parameters.Add(param);
-    }
+        => SqlFragments.AddParam(cmd, name, values);
 }

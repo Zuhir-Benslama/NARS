@@ -62,6 +62,18 @@ internal static class SqlFragments
     }
 
     /// <summary>
+    /// Adds a GUID array parameter for use with PostgreSQL ANY(@ids).
+    /// Avoids boxing each GUID individually.
+    /// </summary>
+    internal static void AddParam(IDbCommand cmd, string name, Guid[] values)
+    {
+        var p = cmd.CreateParameter();
+        p.ParameterName = name;
+        p.Value = values;
+        cmd.Parameters.Add(p);
+    }
+
+    /// <summary>
     /// Safely parse an integer configuration value, falling back to a default.
     /// Shared by JwtService and AuthController to avoid duplication.
     /// </summary>

@@ -54,7 +54,7 @@ public class AdminController(
         if (user.Role != UserRoles.NationalAdmin) return Forbid();
 
         var result = await overviewService.GetWilayaReportAsync(wilayaId, cancellationToken);
-        return result is null ? NotFound(new { detail = "Wilaya not found." }) : Ok(result);
+        return result is null ? Problem(detail: "Wilaya not found.", statusCode: 404) : Ok(result);
     }
 
     [HttpGet("admin/daira/{dairaId:int}")]
@@ -84,7 +84,7 @@ public class AdminController(
         }
 
         var result = await overviewService.GetDairaReportAsync(dairaId, cancellationToken);
-        return result is null ? NotFound(new { detail = "Daira not found." }) : Ok(result);
+        return result is null ? Problem(detail: "Daira not found.", statusCode: 404) : Ok(result);
     }
 
     [HttpPost("admin/users")]
@@ -95,7 +95,7 @@ public class AdminController(
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateAdmin([FromBody] CreateAdminRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null) return BadRequest(new { detail = "Request body is required." });
+        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
         var creator = await db.Users.FindAsync([CurrentUserId], cancellationToken);
         if (creator is null) return Unauthorized();
         var callerRole = creator.Role;
@@ -110,7 +110,7 @@ public class AdminController(
             case (UserRoles.DairaAdmin, UserRoles.CommuneUser):
                 {
                     if (!body.CommuneId.HasValue)
-                        return BadRequest(new { detail = "commune_id is required." });
+                        return Problem(detail: "commune_id is required.", statusCode: 400);
                     var commune = await db.Communes.FindAsync(body.CommuneId.Value, cancellationToken);
                     if (commune is null || commune.DairaId != creator.DairaId)
                         return Forbid();
@@ -119,7 +119,7 @@ public class AdminController(
             case (UserRoles.WilayaAdmin, UserRoles.DairaAdmin):
                 {
                     if (!body.DairaId.HasValue)
-                        return BadRequest(new { detail = "daira_id is required." });
+                        return Problem(detail: "daira_id is required.", statusCode: 400);
                     var daira = await db.Dairas.FindAsync(body.DairaId.Value, cancellationToken);
                     if (daira is null || daira.WilayaId != creator.WilayaId)
                         return Forbid();
@@ -127,13 +127,13 @@ public class AdminController(
                 }
             case (UserRoles.NationalAdmin, UserRoles.WilayaAdmin):
                 if (!body.WilayaId.HasValue)
-                    return BadRequest(new { detail = "wilaya_id is required." });
+                    return Problem(detail: "wilaya_id is required.", statusCode: 400);
                 break;
         }
 
         var geoError = ValidateGeographicFields(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
         if (geoError is not null)
-            return BadRequest(new { detail = geoError });
+            return Problem(detail: geoError, statusCode: 400);
 
         var existing = await db.Users.FirstOrDefaultAsync(u =>
             u.Username == body.Username || u.Email == body.Email, cancellationToken);
@@ -145,7 +145,7 @@ public class AdminController(
 
         var pwdErr = PasswordValidator.Validate(body.Password);
         if (pwdErr is not null)
-            return BadRequest(new { detail = pwdErr });
+            return Problem(detail: pwdErr, statusCode: 400);
 
         var communeId = body.Role == UserRoles.FieldWorker
             ? creator.CommuneId
@@ -231,12 +231,12 @@ public class AdminController(
         Guid userId, [FromBody] UpdateAdminRequest body,
         CancellationToken cancellationToken = default)
     {
-        if (body is null) return BadRequest(new { detail = "Request body is required." });
+        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
         var creator = await db.Users.FindAsync([CurrentUserId], cancellationToken);
         if (creator is null) return Unauthorized();
 
         var target = await db.Users.FindAsync([userId], cancellationToken);
-        if (target is null) return NotFound(new { detail = "User not found." });
+        if (target is null) return Problem(detail: "User not found.", statusCode: 404);
 
         if (!CanCreateRole(creator.Role, target.Role))
             return Forbid();
@@ -257,7 +257,7 @@ public class AdminController(
         if (body.Role is not null)
         {
             var geoCheck = ValidateGeographicFields(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
-            if (geoCheck is not null) return BadRequest(new { detail = geoCheck });
+            if (geoCheck is not null) return Problem(detail: geoCheck, statusCode: 400);
             target.Role = body.Role;
         }
 
@@ -285,7 +285,7 @@ public class AdminController(
         if (creator is null) return Unauthorized();
 
         var target = await db.Users.FindAsync([userId], cancellationToken);
-        if (target is null) return NotFound(new { detail = "User not found." });
+        if (target is null) return Problem(detail: "User not found.", statusCode: 404);
 
         if (!CanCreateRole(creator.Role, target.Role))
             return Forbid();
@@ -319,7 +319,7 @@ public class AdminController(
     private async Task<IActionResult> WilayaOverview(int wilayaId, CancellationToken cancellationToken)
     {
         var report = await overviewService.GetWilayaReportAsync(wilayaId, cancellationToken);
-        return report is null ? NotFound(new { detail = "Wilaya not found." }) : Ok(report);
+        return report is null ? Problem(detail: "Wilaya not found.", statusCode: 404) : Ok(report);
     }
 
     private async Task<IActionResult> DairaOverview(int dairaId, CancellationToken cancellationToken)

@@ -92,24 +92,28 @@ public static class FeatureTypeRegistry
             [FeatureTypes.NamingPanel] = Descriptor<NamingPanel>(FeatureTypes.NamingPanel, "naming_panels", db => db.NamingPanels),
         };
 
+    private static readonly IReadOnlyList<string> _allTypes = [.. _registry.Keys];
+
     /// <summary>
     /// Returns all registered feature types.
     /// </summary>
-    public static IReadOnlyList<string> GetAllTypes() => _registry.Keys.ToList();
+    public static IReadOnlyList<string> GetAllTypes() => _allTypes;
+
+    private static readonly IReadOnlyList<FeatureTypeDescriptor> _allDescriptors = [.. _registry.Values];
 
     /// <summary>
     /// Returns all registered feature type descriptors.
     /// Used to build dynamic UNION ALL SQL queries that stay in sync with the registry.
     /// </summary>
-    public static IReadOnlyList<FeatureTypeDescriptor> GetAllDescriptors() =>
-        _registry.Values.ToList();
+    public static IReadOnlyList<FeatureTypeDescriptor> GetAllDescriptors() => _allDescriptors;
+
+    private static readonly IReadOnlyList<string> _allTableNames = [.. _registry.Values.Select(d => d.TableName)];
 
     /// <summary>
     /// Returns the table names for all registered feature types.
     /// Used to build dynamic SQL that must stay in sync with the registry.
     /// </summary>
-    public static IReadOnlyList<string> GetAllTableNames() =>
-        _registry.Values.Select(d => d.TableName).ToList();
+    public static IReadOnlyList<string> GetAllTableNames() => _allTableNames;
 
     /// <summary>
     /// Looks up a descriptor by type. Returns null if unknown.

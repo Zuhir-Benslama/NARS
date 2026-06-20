@@ -89,7 +89,7 @@ export async function setHouseNumbers(options?: { syncCounts?: boolean }): Promi
     })
 
     updates.push(
-      apiFetch(`/api/update/${entry.dbId}`, {
+      apiFetch(`/api/features/${entry.dbId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ data: entry.data }),

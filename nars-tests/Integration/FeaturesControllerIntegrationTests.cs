@@ -36,7 +36,7 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
         scatteredMock.Setup(s => s.RefreshAsync(It.IsAny<Guid>(), It.IsAny<int>())).Returns(Task.CompletedTask);
         var bgQueueMock = Mock.Of<IBackgroundTaskQueue>();
 
-        _controller = new FeaturesController(_db, scatteredMock.Object, bgQueueMock, Mock.Of<Microsoft.Extensions.Logging.ILogger<FeaturesController>>(), config.Object, timeProvider, new FeatureStatsService(_db));
+        _controller = new FeaturesController(new FeatureRepository(_db), scatteredMock.Object, bgQueueMock, Mock.Of<Microsoft.Extensions.Logging.ILogger<FeaturesController>>(), config.Object, timeProvider, new FeatureStatsService(_db));
     }
 
     public async Task InitializeAsync()
@@ -114,7 +114,8 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
             Data: System.Text.Json.JsonDocument.Parse("{}").RootElement
         ));
 
-        Assert.IsType<BadRequestObjectResult>(result);
+        var badRequest = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, badRequest.StatusCode);
     }
 
     [Fact]
@@ -172,7 +173,8 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
     public async Task DeleteFeature_NonExistent_Returns404()
     {
         var result = await _controller.DeleteFeature(Guid.NewGuid());
-        Assert.IsType<NotFoundObjectResult>(result);
+        var notFound = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(404, notFound.StatusCode);
     }
 
     [Fact]
@@ -232,7 +234,8 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
     public async Task UpdateFeature_NonExistent_Returns404()
     {
         var result = await _controller.UpdateFeature(Guid.NewGuid(), new FeatureUpdateRequest(Label: "Test", Data: null));
-        Assert.IsType<NotFoundObjectResult>(result);
+        var notFound = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(404, notFound.StatusCode);
     }
 
     [Fact]

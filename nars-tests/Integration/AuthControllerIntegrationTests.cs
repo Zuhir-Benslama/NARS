@@ -112,6 +112,57 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task AuthorizedAdminSignup_RaceCondition_OneSucceedsOneConflicts()
+    {
+        // Seed the authorizing admin
+        await CreateAdminAsync(
+            username: "race_admin",
+            role: UserRoles.DairaAdmin,
+            password: "Str0ng!Pass",
+            dairaId: 1);
+
+        // Two independent contexts + controllers simulating concurrent requests
+        var db1 = _fixture.CreateDbContext();
+        var ctrl1 = CreateController(db1);
+        var db2 = _fixture.CreateDbContext();
+        var ctrl2 = CreateController(db2);
+
+        var request = new AuthorizedAdminSignupRequest(
+            AdminUsername: "race_admin",
+            AdminPassword: "Str0ng!Pass",
+            Name: "Race User",
+            Email: "race@test.com",
+            Phone: "0555999888",
+            Username: "race_user",
+            Password: "Str0ng!Pass",
+            Role: UserRoles.CommuneUser,
+            CommuneId: 1,
+            DairaId: null,
+            WilayaId: null
+        );
+
+        // Fire both concurrently — both pass the SELECT uniqueness check,
+        // then one INSERT succeeds while the other hits the unique constraint.
+        var results = await Task.WhenAll(
+            ctrl1.AuthorizedAdminSignup(request, CancellationToken.None),
+            ctrl2.AuthorizedAdminSignup(request, CancellationToken.None)
+        );
+
+        var statusCodes = results
+            .Select(r => (r as ObjectResult)?.StatusCode ?? 0)
+            .OrderBy(x => x)
+            .ToList();
+
+        Assert.Contains(201, statusCodes);
+        Assert.Contains(409, statusCodes);
+
+        // Exactly one user persisted
+        await using var verifyDb = _fixture.CreateDbContext();
+        var userCount = await verifyDb.Users.CountAsync(u => u.Username == "race_user");
+        Assert.Equal(1, userCount);
+    }
+
+    [Fact]
     public async Task SignIn_CorrectCredentials_ReturnsTokens()
     {
         await CreateCommuneUserAsync(
