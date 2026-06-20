@@ -123,7 +123,8 @@ public class AuthControllerTests
             WilayaId: null
         ));
 
-        Assert.IsType<BadRequestObjectResult>(result);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     [Fact]

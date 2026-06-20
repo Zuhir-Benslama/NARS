@@ -25,10 +25,7 @@ public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
             sql.Append($"SELECT '{descriptors[i].Type}' AS type, COUNT(*) FROM {descriptors[i].TableName} WHERE user_id = @uid");
         }
         cmd.CommandText = sql.ToString();
-        var uidParam = cmd.CreateParameter();
-        uidParam.ParameterName = "@uid";
-        uidParam.Value = userId;
-        cmd.Parameters.Add(uidParam);
+        SqlFragments.AddParam(cmd, "@uid", userId);
 
         var counts = new Dictionary<string, long>(descriptors.Count);
         await using var reader = await cmd.ExecuteReaderAsync(ct);

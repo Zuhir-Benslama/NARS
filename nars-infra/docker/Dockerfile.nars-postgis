@@ -6,7 +6,7 @@ LABEL org.opencontainers.image.title="NARS PostGIS" \
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-COPY nars-infra/docs/nars_db.sql /docker-entrypoint-initdb.d/01-nars-schema.sql
+COPY nars-infra/scripts/create_nars_db.sql /docker-entrypoint-initdb.d/01-nars-schema.sql
 COPY nars-infra/docs/seed_reference_data.sql /docker-entrypoint-initdb.d/02-seed-reference-data.sql
 
 EXPOSE 5432

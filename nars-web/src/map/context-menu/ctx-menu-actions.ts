@@ -85,7 +85,7 @@ export async function editFeatureInfo(dbId: string): Promise<void> {
   if (!result) return
 
   try {
-    await apiFetch(`/api/update/${dbId}`, {
+    await apiFetch(`/api/features/${dbId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ data: { ...entry.data, ...result } }),
@@ -153,7 +153,7 @@ export async function removeFeature(dbId: string): Promise<void> {
   if (phaseKey) recordDelete(entry, phaseKey)
 
   try {
-    await apiFetch(`/api/delete/${dbId}`, { method: "DELETE" })
+    await apiFetch(`/api/features/${dbId}`, { method: "DELETE" })
 
     featuresStore.remove(entry.id)
     const currentState = layerStore.$state as LayerState

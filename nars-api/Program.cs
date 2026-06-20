@@ -116,6 +116,7 @@ builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 builder.Services.AddScoped<IValidationService, ValidationService>();
 builder.Services.AddScoped<IFieldService, FieldService>();
 builder.Services.AddScoped<IFeatureStatsService, FeatureStatsService>();
+builder.Services.AddScoped<IFeatureRepository, FeatureRepository>();
 builder.Services.AddScoped<IBoundaryService, BoundaryService>();
 builder.Services.AddScoped<IEntranceQueryService, EntranceQueryService>();
 builder.Services.AddScoped<IAdminOverviewService, AdminOverviewService>();
@@ -186,6 +187,9 @@ builder.Services.AddAntiforgery(options =>
 {
     options.HeaderName = "X-CSRF-Token";
     options.Cookie.Name = "X-CSRF-TOKEN-COOKIE";
+    // HttpOnly = false is intentional: the SPA reads the cookie value via
+    // document.cookie to set the X-CSRF-Token header on state-mutating requests.
+    // This is a standard pattern for SPA CSRF protection with SameSite cookies.
     options.Cookie.HttpOnly = false;
     options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 });
@@ -246,8 +250,15 @@ app.UseExceptionHandler(errApp =>
             ? ex?.Message ?? "An unexpected error occurred."
             : "An internal server error occurred. Please try again.";
 
+        var problem = new Microsoft.AspNetCore.Mvc.ProblemDetails
+        {
+            Detail = message,
+            Status = 500,
+            Title = "Internal Server Error",
+            Type = "https://tools.ietf.org/html/rfc7231#section-6.6.1",
+        };
         await ctx.Response.WriteAsync(
-            JsonSerializer.Serialize(new { detail = message, status = 500 }));
+            JsonSerializer.Serialize(problem, new JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
     });
 });
 
@@ -328,7 +339,7 @@ app.Use(async (ctx, next) =>
             "style-src 'self' https://cdn.jsdelivr.net https://unpkg.com 'unsafe-inline' https://fonts.googleapis.com; " +
             "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.arcgisonline.com; " +
             "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; " +
-            "connect-src 'self' http: https: data: ws://127.0.0.1:* http://127.0.0.1:* https://*.arcgisonline.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com; " +
+            "connect-src 'self' https: data: ws://127.0.0.1:* http://127.0.0.1:* https://*.arcgisonline.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com; " +
             "frame-ancestors 'none'; " +
             "base-uri 'self'; " +
             "form-action 'self'";
@@ -359,7 +370,14 @@ app.Use(async (ctx, next) =>
         catch (AntiforgeryValidationException)
         {
             ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
-            await ctx.Response.WriteAsJsonAsync(new { detail = "CSRF validation failed." });
+            var problem = new Microsoft.AspNetCore.Mvc.ProblemDetails
+            {
+                Detail = "CSRF validation failed.",
+                Status = 403,
+                Title = "Forbidden",
+                Type = "https://tools.ietf.org/html/rfc7231#section-6.5.3",
+            };
+            await ctx.Response.WriteAsJsonAsync(problem, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
             return;
         }
     }

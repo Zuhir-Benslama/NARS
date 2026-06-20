@@ -1,44 +1,24 @@
 # nars-api — Code Quality TODO
 
-All items have been addressed. The issues marked "Remaining" below are cosmetic/design decisions that would break the API contract or are inherently integration-level concerns.
-
 ## Completed
 
-### Bugs Fixed
-1. **FeaturesController** — HttpContext values now captured into locals before background task queueing (prevented `ObjectDisposedException`)
-2. **SpatialController** — `JsonElement.GetProperty` → `TryGetProperty` with proper 400 response
-3. **FieldController** — Null-safe `CommuneId` comparison; locked road owner check added
-
-### Code Quality - Structure
-4. **FeatureStatsService + FeatureQueryHelper** — DRY: eliminated ~100 lines of duplicated SQL generation (FeatureStatsService now delegates to FeatureQueryHelper)
-5. **FeatureStatsService** — Removed unused `CommandTimeoutSeconds` and `config` parameter
-6. **AdminOverviewService** — Replaced in-memory table loads with targeted grouped queries
-7. **FeatureDtoConverter** — Returns typed `FeatureDto` instead of `object`
-8. **ClearFeatures** — Uses `DELETE ... RETURNING id` raw SQL (one round-trip per table instead of two)
-
-### Code Quality - Safety
-9. **AuthController.AdminSignup** — `SaveChangesAsync` wrapped in `try-catch (DbUpdateException)` for race condition safety
-10. **ValidationService** — Table name fallbacks now throw `InvalidOperationException` (no silent fallback)
-11. **PasswordValidator** — Type annotation updated for immutability
-
-### API Consistency
-12. **AuthController/PagesController** — All `access_token` cookies use `jwt.AccessTokenExpiresIn` (respects `Jwt:ExpiresInMinutes` config). Added `AccessTokenExpiresIn` to `IJwtService`.
-13. **Response DTOs** — All endpoints now return typed DTOs instead of anonymous objects (`ActionResponse`, `CreateAdminResponse`, `LoadFeaturesResponse`, `FieldInspectionsResponse`, `FieldInspectSubmitResponse`, `CreateEntranceResponse`)
-
-### Testing
-14. Added 8 new tests covering:
-    - SpatialController missing coordinates property
-    - FieldController commune null/equal/different/mismatch edge cases
-    - FieldController locked/unlocked road owner
-    - FeaturesController area saves trigger background refresh
-    - FeaturesController non-area saves don't trigger background refresh
+- [x] **Consistent error responses** — All error responses now use `ProblemDetails` instead of anonymous `{ detail }` objects.
+- [x] **Extract repository layer** — `IFeatureRepository` + `FeatureRepository` wraps all data access. Controller no longer depends on `AppDbContext` or raw ADO.NET.
+- [x] **Consolidate ADO.NET helpers** — `SqlFragments.AddParam` is the single source of truth. Private duplicates in `FeatureQueryHelper` and inline in `ClearFeatures` removed.
+- [x] **Cache SQL templates** — `BuildUnionAllCte()` runs once at startup. `_loadFeaturesSql`/`_loadByLayerSql` are cached `static readonly` fields.
+- [x] **Reduce ClearFeatures round-trips** — 8 sequential `DELETE` queries consolidated into a single multi-CTE SQL batch.
+- [x] **Validate `skip` parameter** — `Math.Max(skip, 0)` guards against negative values.
+- [x] **Replace magic strings** — Claim names centralized in `ClaimNames` constants; `NarsControllerBase`, `JwtService` updated.
+- [x] **Remove dead initializer** — `FeatureBase.CreatedAt` property initializer removed; set only in `FeatureTypeRegistry.CreateEntity`.
+- [x] **Cache `GetAllTypes().Keys`** — `_allTypes`, `_allDescriptors`, `_allTableNames` are cached `static readonly` lists computed once.
+- [x] **Document CSRF cookie trade-off** — Inline comment explains `HttpOnly = false` for SPA token reading.
+- [x] **Narrow CSP `connect-src`** — Removed broad `http:` scheme-wide allow; kept specific domains and dev addresses.
+- [x] **Cache `MaxFeatureDataSize`** — Parsed once in constructor field instead of on every property access.
 
 ## Remaining
 
-### Would break API contract
-- **DTO JSON naming inconsistency** — Mix of `snake_case` (`[JsonPropertyName]`) and `camelCase` (global policy)
-- **CommuneInfo misnamed** — Used for Wilaya/Daira in responses
-
-### Integration-level only
-- **ValidationService DB-level optimizations** — `ST_MakeValid` repetition, uncached `DbCommand` (inner-database concern)
-- **AuthController.AdminSignup race test** — Requires real DB with unique constraints; InMemory cannot trigger unique violation `DbUpdateException`
+- [ ] **RESTful URLs** — Endpoints use RPC-style paths (`/api/save`, `/api/load`, `/api/clear`) instead of resource-based (`/api/features`, `DELETE /api/features`). Breaking change — plan a versioned transition.
+- [ ] **DTO validation** — `FeatureUpdateRequest.Data` is `JsonElement?` with no `[Required]` or validation attributes. Consider FluentValidation or data annotations.
+- [ ] **Singleton review** — Services registered as `Singleton` that capture scoped state via factory. Verify none hold per-request state.
+- [ ] **AuthController.AdminSignup race test** — Requires real DB with unique constraints; `InMemory` cannot trigger `DbUpdateException`.
+- [ ] **ValidationService DB-level optimizations** — `ST_MakeValid` repetition, uncached `DbCommand` (inner-database concern).

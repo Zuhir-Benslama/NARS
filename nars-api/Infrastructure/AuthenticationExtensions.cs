@@ -59,16 +59,14 @@ public static class AuthenticationExtensions
                     },
                     OnAuthenticationFailed = ctx =>
                     {
-                        var loggerFactory = ctx.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>();
-                        var logger = loggerFactory.CreateLogger("NarsApi.Auth");
+                        var logger = ctx.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("NarsApi.Auth");
                         logger.LogWarning("[Auth] Authentication failed for {Path}: {Message}",
                             ctx.Request.Path, ctx.Exception.Message);
                         return Task.CompletedTask;
                     },
                     OnChallenge = ctx =>
                     {
-                        var loggerFactory = ctx.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>();
-                        var logger = loggerFactory.CreateLogger("NarsApi.Auth");
+                        var logger = ctx.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("NarsApi.Auth");
                         logger.LogInformation("[Auth] Challenging {Path} (401)", ctx.Request.Path);
                         return Task.CompletedTask;
                     }

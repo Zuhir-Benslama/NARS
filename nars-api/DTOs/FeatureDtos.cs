@@ -16,9 +16,9 @@ public record ClearFeaturesRequest(
 /// GeoJSON-like coordinate data as a raw JsonElement.
 /// </summary>
 public record FeatureSaveRequest(
-    [param: Required] string Type,
-    [param: Required] string Layer,
-    [param: Required] string Label,
+    [param: Required][param: MaxLength(30)] string Type,
+    [param: Required][param: MaxLength(50)] string Layer,
+    [param: Required][param: MaxLength(500)] string Label,
     [property: JsonRequired] JsonElement Data
 );
 
@@ -27,7 +27,7 @@ public record FeatureSaveRequest(
 /// will be applied — partial updates are supported.
 /// </summary>
 public record FeatureUpdateRequest(
-    string? Label,
+    [param: MaxLength(500)] string? Label,
     JsonElement? Data
 );
 

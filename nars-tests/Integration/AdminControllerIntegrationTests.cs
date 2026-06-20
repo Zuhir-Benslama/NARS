@@ -269,7 +269,8 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
 
         var result = await _controller.GetWilaya(999);
 
-        Assert.IsType<NotFoundObjectResult>(result);
+        var notFound = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(404, notFound.StatusCode);
     }
 
     // ── Daira drill-down ───────────────────────────────────────────────────────
@@ -321,7 +322,8 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
 
         var result = await _controller.GetDaira(999);
 
-        Assert.IsType<NotFoundObjectResult>(result);
+        var notFound = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(404, notFound.StatusCode);
     }
 
     private static CreateAdminRequest BuildRequest(

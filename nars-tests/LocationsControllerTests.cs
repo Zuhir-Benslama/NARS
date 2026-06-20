@@ -101,8 +101,8 @@ public class LocationsControllerTests
 
         var result = await ctrl.GetWilayas(search: new string('x', 201), skip: 0, take: 100);
 
-        var bad = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.NotNull(bad.Value);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     [Fact]
@@ -153,8 +153,8 @@ public class LocationsControllerTests
 
         var result = await ctrl.GetDairas(wilaya_id: 0);
 
-        var bad = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.NotNull(bad.Value);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     [Fact]
@@ -182,8 +182,8 @@ public class LocationsControllerTests
 
         var result = await ctrl.GetCommunes(daira_id: null);
 
-        var bad = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.NotNull(bad.Value);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     [Fact]
@@ -194,8 +194,8 @@ public class LocationsControllerTests
 
         var result = await ctrl.GetCommunes(daira_id: 0);
 
-        var bad = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.NotNull(bad.Value);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     [Fact]
@@ -243,7 +243,8 @@ public class LocationsControllerTests
 
         var result = await ctrl.GetCommuneBoundary(999);
 
-        Assert.IsType<NotFoundObjectResult>(result);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(404, objResult.StatusCode);
     }
 
     // ── GET /api/commune/{id}/boundary-debug ──────────────────────────────

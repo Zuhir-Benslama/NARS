@@ -62,7 +62,7 @@ export async function undo(): Promise<void> {
     const shape = toApiSaveShape(entry.data)
     if (!shape) throw new Error("Could not determine feature type")
 
-    const json = await apiFetch("/api/save", {
+    const json = await apiFetch("/api/features", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

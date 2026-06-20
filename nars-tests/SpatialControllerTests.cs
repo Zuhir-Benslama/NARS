@@ -64,7 +64,8 @@ public class SpatialControllerTests
     {
         var (ctrl, _) = CreateController();
         var result = await ctrl.GetRoadSide(null!);
-        Assert.IsType<BadRequestObjectResult>(result);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     [Fact]
@@ -73,7 +74,8 @@ public class SpatialControllerTests
         var (ctrl, _) = CreateController();
         var result = await ctrl.GetRoadSide(new RoadSideRequest(
             RoadId: Guid.NewGuid(), Lat: 36.0, Lng: 3.0));
-        Assert.IsType<NotFoundObjectResult>(result);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(404, objResult.StatusCode);
     }
 
     [Fact]
@@ -85,7 +87,8 @@ public class SpatialControllerTests
         var roadId = AddRoad(db, uid, /* single point */ """{"coordinates":[{"lat":36.0,"lng":3.0}]}""");
 
         var result = await ctrl.GetRoadSide(new RoadSideRequest(RoadId: roadId, Lat: 36.0, Lng: 3.0));
-        Assert.IsType<BadRequestObjectResult>(result);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     [Fact]
@@ -98,7 +101,8 @@ public class SpatialControllerTests
         var roadId = AddRoad(db, uid, """{"foo":"bar"}""");
 
         var result = await ctrl.GetRoadSide(new RoadSideRequest(RoadId: roadId, Lat: 36.0, Lng: 3.0));
-        Assert.IsType<BadRequestObjectResult>(result);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     [Theory]
@@ -165,7 +169,8 @@ public class SpatialControllerTests
         };
 
         var result = await ctrl.RefreshScattered();
-        Assert.IsType<BadRequestObjectResult>(result);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     [Fact]

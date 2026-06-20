@@ -42,7 +42,7 @@ public partial class AuthController
         [FromBody] AuthorizedAdminSignupRequest body,
         CancellationToken cancellationToken = default)
     {
-        if (body is null) return BadRequest(new { detail = "Request body is required." });
+        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
         // 1. Verify the authorizing admin's credentials.
         // IMPORTANT: always run BCrypt.Verify even when the user is not found.
         // Short-circuiting on "admin is null" leaks whether a username exists
@@ -80,7 +80,7 @@ public partial class AuthController
         // 5. Geographic fields present.
         var geoError = ValidateGeographicFields(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
         if (geoError is not null)
-            return BadRequest(new { detail = geoError });
+            return Problem(detail: geoError, statusCode: 400);
 
         // 6. Uniqueness.
         var existing = await db.Users
@@ -94,7 +94,7 @@ public partial class AuthController
         // 7. Password strength.
         var pwdErr = PasswordValidator.Validate(body.Password);
         if (pwdErr is not null)
-            return BadRequest(new { detail = pwdErr });
+            return Problem(detail: pwdErr, statusCode: 400);
 
         // 8. Create.
         var newUser = new User

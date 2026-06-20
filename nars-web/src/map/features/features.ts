@@ -136,7 +136,7 @@ export async function saveToDatabase(featureData: FeatureData): Promise<SaveResu
     const shape = toApiSaveShape(featureData)
     if (!shape) return { ok: false, error: `Unknown type '${featureData.type}'.` }
 
-    const data = (await apiFetch("/api/save", {
+    const data = (await apiFetch("/api/features", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

@@ -83,7 +83,7 @@ export interface paths {
     }
   }
 
-  "/api/load": {
+  "/api/features": {
     get: {
       parameters: {
         query?: {
@@ -99,9 +99,6 @@ export interface paths {
         }
       }
     }
-  }
-
-  "/api/save": {
     post: {
       parameters: {
         query?: never
@@ -126,7 +123,7 @@ export interface paths {
     }
   }
 
-  "/api/update/{featureId}": {
+  "/api/features/{featureId}": {
     put: {
       parameters: {
         path: {
@@ -156,9 +153,6 @@ export interface paths {
         }
       }
     }
-  }
-
-  "/api/delete/{featureId}": {
     delete: {
       parameters: {
         path: {
@@ -185,7 +179,7 @@ export interface paths {
     }
   }
 
-  "/api/stats": {
+  "/api/features/stats": {
     get: {
       parameters: {
         query?: never

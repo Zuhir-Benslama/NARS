@@ -34,10 +34,13 @@ spec:
     spec:
       serviceAccountName: postgis
       terminationGracePeriodSeconds: 60
+      # rootless Docker requirement: the official postgis entrypoint starts
+      # as root (uid 0) to chmod the data directory, then drops to the
+      # postgres user for the actual server. In rootless Docker, uid 0
+      # inside the container maps to the host user who owns the data dir.
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 999
-        fsGroup: 999
+        runAsUser: 0
+        fsGroup: 0
       containers:
         - name: postgis
           image: zuhirbenslama/nars-postgis:latest
@@ -109,7 +112,7 @@ spec:
           securityContext:
             allowPrivilegeEscalation: true
             readOnlyRootFilesystem: false
-            runAsNonRoot: true
+            runAsNonRoot: false
             seccompProfile:
               type: RuntimeDefault
             capabilities:

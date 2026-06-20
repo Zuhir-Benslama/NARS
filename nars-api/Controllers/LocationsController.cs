@@ -54,7 +54,7 @@ public class LocationsController(
 
         var maxSearchLength = int.TryParse(config["Locations:MaxSearchLength"], out var msl) ? msl : 200;
         if (search.Length > maxSearchLength)
-            return BadRequest(new { detail = $"Search query is too long (max {maxSearchLength} characters)." });
+            return Problem(detail: $"Search query is too long (max {maxSearchLength} characters).", statusCode: 400);
 
         if (string.IsNullOrEmpty(search) && skip == 0 && take >= 500)
         {
@@ -112,7 +112,7 @@ public class LocationsController(
         CancellationToken cancellationToken = default)
     {
         if (wilaya_id <= 0)
-            return BadRequest(new { detail = "wilaya_id is required." });
+            return Problem(detail: "wilaya_id is required.", statusCode: 400);
         return await PaginateAsync(
             search, skip, take,
             $"{DairaCacheKeyPrefix}{wilaya_id}",
@@ -137,7 +137,7 @@ public class LocationsController(
         CancellationToken cancellationToken = default)
     {
         if (daira_id is null or <= 0)
-            return BadRequest(new { detail = "daira_id is required." });
+            return Problem(detail: "daira_id is required.", statusCode: 400);
         return await PaginateAsync(
             search, skip, take,
             $"{CommuneCacheKeyPrefix}{daira_id}",
@@ -163,7 +163,12 @@ public class LocationsController(
         var geoJson = await boundaryService.GetBoundaryGeoJsonAsync(communeId, cancellationToken);
 
         if (geoJson is null)
-            return NotFound(new { detail = "Boundary not found for this commune" });
+        {
+            if (commune?.CommuneLatitude is not null && commune.CommuneLongitude is not null)
+                geoJson = $"{{\"type\":\"Point\",\"coordinates\":[{commune.CommuneLongitude.Value},{commune.CommuneLatitude.Value}]}}";
+            else
+                return Problem(detail: "Boundary not found for this commune", statusCode: 404);
+        }
 
         return Ok(new
         {

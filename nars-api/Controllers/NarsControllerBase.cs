@@ -21,7 +21,7 @@ public abstract class NarsControllerBase : ControllerBase
     /// Use <see cref="RequiredCurrentUserId"/> if a non-null value is guaranteed.
     /// </summary>
     protected Guid? CurrentUserId =>
-        Guid.TryParse(User.FindFirstValue("user_id"), out Guid id)
+        Guid.TryParse(User.FindFirstValue(ClaimNames.UserId), out Guid id)
             ? id
             : null;
 
@@ -34,7 +34,7 @@ public abstract class NarsControllerBase : ControllerBase
 
     /// <summary>The authenticated user's username.</summary>
     protected string CurrentUsername =>
-        User.FindFirstValue("username") ?? string.Empty;
+        User.FindFirstValue(ClaimNames.Username) ?? string.Empty;
 
     /// <summary>
     /// The role of the authenticated user (e.g. "commune_user", "daira_admin").
@@ -42,7 +42,7 @@ public abstract class NarsControllerBase : ControllerBase
     /// tokens issued before the roles migration).
     /// </summary>
     protected string CurrentUserRole =>
-        User.FindFirstValue("role") ?? UserRoles.CommuneUser;
+        User.FindFirstValue(ClaimNames.Role) ?? UserRoles.CommuneUser;
 
     /// <summary>
     /// The commune ID for commune_user accounts, or null for admin accounts.
@@ -50,7 +50,7 @@ public abstract class NarsControllerBase : ControllerBase
     /// a commune_id don't need to catch exceptions.
     /// </summary>
     protected int? CurrentCommuneId =>
-        int.TryParse(User.FindFirstValue("commune_id"), out int id) && id > 0
+        int.TryParse(User.FindFirstValue(ClaimNames.CommuneId), out int id) && id > 0
             ? id
             : null;
 
@@ -64,13 +64,13 @@ public abstract class NarsControllerBase : ControllerBase
 
     /// <summary>The daira ID for daira_admin accounts, or null for other roles.</summary>
     protected int? CurrentDairaId =>
-        int.TryParse(User.FindFirstValue("daira_id"), out int id) && id > 0
+        int.TryParse(User.FindFirstValue(ClaimNames.DairaId), out int id) && id > 0
             ? id
             : null;
 
     /// <summary>The wilaya ID for wilaya_admin accounts, or null for other roles.</summary>
     protected int? CurrentWilayaId =>
-        int.TryParse(User.FindFirstValue("wilaya_id"), out int id) && id > 0
+        int.TryParse(User.FindFirstValue(ClaimNames.WilayaId), out int id) && id > 0
             ? id
             : null;
 

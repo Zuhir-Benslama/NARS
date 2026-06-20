@@ -196,7 +196,7 @@ export function registerGeomanEvents(): void {
     if (removed) recordDelete(removed, phaseKey)
 
     try {
-      const response = await apiFetch(`/api/delete/${dbId}`, {
+      const response = await apiFetch(`/api/features/${dbId}`, {
         method: "DELETE",
       })
       if (!response.ok) {

@@ -37,7 +37,7 @@ public class FeaturesControllerTests
 
         var cfg = config ?? CreateConfig().Object;
         var ctrl = new FeaturesController(
-            context,
+            new FeatureRepository(context),
             scatteredService ?? Mock.Of<IScatteredAreaService>(),
             bgQueue ?? Mock.Of<IBackgroundTaskQueue>(),
             Mock.Of<ILogger<FeaturesController>>(),
@@ -72,7 +72,8 @@ public class FeaturesControllerTests
     {
         var (ctrl, _) = CreateController();
         var result = await ctrl.SaveFeature(null!);
-        Assert.IsType<BadRequestObjectResult>(result);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     [Fact]
@@ -81,7 +82,8 @@ public class FeaturesControllerTests
         var (ctrl, _) = CreateController();
         var body = new FeatureSaveRequest("invalid_type", "main", "label", Json("{}"));
         var result = await ctrl.SaveFeature(body);
-        Assert.IsType<BadRequestObjectResult>(result);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     [Fact]
@@ -90,7 +92,8 @@ public class FeaturesControllerTests
         var (ctrl, _) = CreateController();
         var body = new FeatureSaveRequest(FeatureTypes.Road, "invalid_layer", "label", Json("{}"));
         var result = await ctrl.SaveFeature(body);
-        Assert.IsType<BadRequestObjectResult>(result);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     [Fact]
@@ -99,7 +102,8 @@ public class FeaturesControllerTests
         var (ctrl, _) = CreateController();
         var body = new FeatureSaveRequest(FeatureTypes.Area, FeatureTypes.AreaLayers.Scattered, "label", Json("{}"));
         var result = await ctrl.SaveFeature(body);
-        Assert.IsType<BadRequestObjectResult>(result);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     [Fact]
@@ -109,7 +113,8 @@ public class FeaturesControllerTests
         var largeData = new string('x', 600_000);
         var body = new FeatureSaveRequest(FeatureTypes.Road, FeatureTypes.RoadLayers.Street, "label", Json($"\"{largeData}\""));
         var result = await ctrl.SaveFeature(body);
-        Assert.IsType<BadRequestObjectResult>(result);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     [Fact]
@@ -119,7 +124,8 @@ public class FeaturesControllerTests
         var data = Json("""{"coordinates":[{"lat":36.0,"lng":3.0}],"roadDbId":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}""");
         var body = new FeatureSaveRequest(FeatureTypes.HouseEntrance, FeatureTypes.HouseEntranceLayers.Main, "label", data);
         var result = await ctrl.SaveFeature(body);
-        Assert.IsType<BadRequestObjectResult>(result);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     [Fact]
@@ -201,7 +207,8 @@ public class FeaturesControllerTests
     {
         var (ctrl, _) = CreateController();
         var result = await ctrl.ClearFeatures(null!);
-        Assert.IsType<BadRequestObjectResult>(result);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     [Fact]
@@ -209,7 +216,8 @@ public class FeaturesControllerTests
     {
         var (ctrl, _) = CreateController();
         var result = await ctrl.ClearFeatures(new ClearFeaturesRequest(Confirm: false));
-        Assert.IsType<BadRequestObjectResult>(result);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     [Fact(Skip = "InMemory provider does not support ExecuteDeleteAsync")]
@@ -242,7 +250,8 @@ public class FeaturesControllerTests
     {
         var (ctrl, _) = CreateController();
         var result = await ctrl.UpdateFeature(Guid.NewGuid(), null!);
-        Assert.IsType<BadRequestObjectResult>(result);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     [Fact]
@@ -251,7 +260,8 @@ public class FeaturesControllerTests
         var (ctrl, _) = CreateController();
         var body = new FeatureUpdateRequest(Label: "new", Data: null);
         var result = await ctrl.UpdateFeature(Guid.NewGuid(), body);
-        Assert.IsType<NotFoundObjectResult>(result);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(404, objResult.StatusCode);
     }
 
     [Fact]
@@ -269,7 +279,8 @@ public class FeaturesControllerTests
 
         var body = new FeatureUpdateRequest(Label: "new_label", Data: null);
         var result = await ctrl.UpdateFeature(otherId, body);
-        Assert.IsType<NotFoundObjectResult>(result);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(404, objResult.StatusCode);
     }
 
     [Fact]
@@ -288,7 +299,8 @@ public class FeaturesControllerTests
         var largeData = new string('x', 600_000);
         var body = new FeatureUpdateRequest(Label: null, Data: JsonDocument.Parse($"\"{largeData}\"").RootElement);
         var result = await ctrl.UpdateFeature(fid, body);
-        Assert.IsType<BadRequestObjectResult>(result);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     [Fact(Skip = "InMemory provider does not support ExecuteUpdateAsync")]
@@ -319,7 +331,8 @@ public class FeaturesControllerTests
     {
         var (ctrl, _) = CreateController();
         var result = await ctrl.DeleteFeature(Guid.NewGuid());
-        Assert.IsType<NotFoundObjectResult>(result);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(404, objResult.StatusCode);
     }
 
     [Fact(Skip = "InMemory provider does not support ExecuteDeleteAsync")]
