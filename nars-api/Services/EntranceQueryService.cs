@@ -27,8 +27,12 @@ public class EntranceQueryService(AppDbContext db) : IEntranceQueryService
 
         using var reader = await cmd.ExecuteReaderAsync(ct);
         while (await reader.ReadAsync(ct))
+        {
             if (!await reader.IsDBNullAsync(0, ct))
+            {
                 usedNumbers.Add(reader.GetInt32(0));
+            }
+        }
 
         return usedNumbers;
     }

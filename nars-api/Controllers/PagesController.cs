@@ -101,7 +101,9 @@ public class PagesController(
         var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", fileName);
         // In development, avoid template caching so HTML updates are reflected immediately.
         if (env.IsDevelopment())
+        {
             return System.IO.File.ReadAllText(path);
+        }
 
         var cacheHours = int.TryParse(config["Cache:PageTemplateDurationHours"], out var ch) ? ch : 1;
         return cache.GetOrCreate(cacheKey, entry =>
@@ -177,7 +179,10 @@ public class PagesController(
             }
 
             var maxAge = result.RefreshExpiry!.Value - timeProvider.UtcNow;
-            logger.LogInformation("[Pages] Silent refresh SUCCESS. Issuing new cookies for {Username}", result.User!.Username);
+            if (logger.IsEnabled(LogLevel.Information))
+            {
+                logger.LogInformation("[Pages] Silent refresh SUCCESS. Issuing new cookies for {Username}", result.User!.Username);
+            }
             Response.Cookies.Append("access_token", result.NewAccessToken!, MakeCookieOptions(jwt.AccessTokenExpiresIn));
             Response.Cookies.Append("refresh_token", result.NewRawToken!, MakeCookieOptions(maxAge));
 

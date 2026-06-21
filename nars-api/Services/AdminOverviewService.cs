@@ -42,7 +42,7 @@ public class AdminOverviewService(AppDbContext db, IFeatureStatsService featureS
             .Select(g => new { CommuneId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.CommuneId, x => x.Count, cancellationToken);
 
-        return wilayas.Select(wilaya =>
+        return [.. wilayas.Select(wilaya =>
         {
             var admin = admins.GetValueOrDefault(wilaya.WilayaId);
             var wilayaDairas = dairas.Where(d => d.WilayaId == wilaya.WilayaId).ToList();
@@ -60,13 +60,16 @@ public class AdminOverviewService(AppDbContext db, IFeatureStatsService featureS
                 CommuneCount: communeIds.Length,
                 CommuneUserCount: communeIds.Sum(cid => userCountByCommune.GetValueOrDefault(cid))
             );
-        }).ToList();
+        })];
     }
 
     public async Task<WilayaReport?> GetWilayaReportAsync(int wilayaId, CancellationToken cancellationToken = default)
     {
         var wilaya = await db.Wilayas.FindAsync([wilayaId], cancellationToken);
-        if (wilaya is null) return null;
+        if (wilaya is null)
+        {
+            return null;
+        }
 
         var admin = await db.Users.FirstOrDefaultAsync(u =>
             u.Role == UserRoles.WilayaAdmin && u.WilayaId == wilayaId, cancellationToken);
@@ -111,7 +114,10 @@ public class AdminOverviewService(AppDbContext db, IFeatureStatsService featureS
     public async Task<DairaReport?> GetDairaReportAsync(int dairaId, CancellationToken cancellationToken = default)
     {
         var daira = await db.Dairas.FindAsync([dairaId], cancellationToken);
-        if (daira is null) return null;
+        if (daira is null)
+        {
+            return null;
+        }
 
         var admin = await db.Users.FirstOrDefaultAsync(u =>
             u.Role == UserRoles.DairaAdmin && u.DairaId == dairaId, cancellationToken);
@@ -148,7 +154,7 @@ public class AdminOverviewService(AppDbContext db, IFeatureStatsService featureS
         var allUserIds = users.Select(u => u.Id).ToArray();
         var featureCounts = allUserIds.Length > 0
             ? await featureStatsService.GetUserFeatureCountsAsync(allUserIds, cancellationToken)
-            : new Dictionary<Guid, UserFeatureStats>();
+            : [];
 
         var result = new Dictionary<int, List<CommuneReport>>();
         foreach (var communeGroup in communes.GroupBy(c => c.DairaId))

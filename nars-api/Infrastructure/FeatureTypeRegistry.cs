@@ -73,7 +73,9 @@ public static class FeatureTypeRegistry
     private static FeatureTypeDescriptor Descriptor<T>(string type, string tableName, Func<AppDbContext, Microsoft.EntityFrameworkCore.DbSet<T>> dbSet, Func<AppDbContext, Guid, Guid, System.Text.Json.JsonElement?, CancellationToken, Task>? postUpdateAction = null) where T : FeatureBase =>
         new()
         {
-            Type = type, TableName = tableName, EntityType = typeof(T),
+            Type = type,
+            TableName = tableName,
+            EntityType = typeof(T),
             DbSetAccessor = db => dbSet(db),
             AddToContext = (db, e) => db.Entry(dbSet(db).Add((T)e).Entity),
             PostUpdateAction = postUpdateAction,
@@ -154,7 +156,9 @@ public static class FeatureTypeRegistry
     private static async Task UpdateHouseEntranceRoadId(AppDbContext db, Guid featureId, Guid userId, JsonElement? data, CancellationToken ct)
     {
         if (data is not { ValueKind: JsonValueKind.Object } obj)
+        {
             return;
+        }
 
         if (obj.TryGetProperty("roadDbId", out var ridEl) && ridEl.ValueKind == JsonValueKind.String && Guid.TryParse(ridEl.GetString(), out var rid))
         {

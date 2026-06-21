@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 using NetTopologySuite.Geometries;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -298,7 +298,7 @@ namespace NarsApi.Migrations
             migrationBuilder.CreateIndex(
                 name: "ix_areas_user_layer",
                 table: "areas",
-                columns: new[] { "user_id", "layer" });
+                columns: ["user_id", "layer"]);
 
             migrationBuilder.CreateIndex(
                 name: "ix_city_centers_user_id",
@@ -330,7 +330,7 @@ namespace NarsApi.Migrations
             migrationBuilder.CreateIndex(
                 name: "ix_house_entrances_user_layer",
                 table: "house_entrances",
-                columns: new[] { "user_id", "layer" });
+                columns: ["user_id", "layer"]);
 
             migrationBuilder.CreateIndex(
                 name: "ix_naming_panels_user_id",
@@ -360,12 +360,12 @@ namespace NarsApi.Migrations
             migrationBuilder.CreateIndex(
                 name: "ix_roads_user_layer",
                 table: "roads",
-                columns: new[] { "user_id", "layer" });
+                columns: ["user_id", "layer"]);
 
             migrationBuilder.CreateIndex(
                 name: "ix_users_commune_role",
                 table: "users",
-                columns: new[] { "commune_id", "role" },
+                columns: ["commune_id", "role"],
                 filter: "commune_id IS NOT NULL");
 
             migrationBuilder.CreateIndex(

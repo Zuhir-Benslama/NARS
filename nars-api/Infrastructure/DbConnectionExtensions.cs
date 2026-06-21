@@ -7,7 +7,9 @@ public readonly struct ConnectionHandle(DbConnection connection, bool wasOpen) :
     public async ValueTask DisposeAsync()
     {
         if (!wasOpen && connection.State == System.Data.ConnectionState.Open)
+        {
             await connection.CloseAsync();
+        }
     }
 }
 
@@ -17,7 +19,10 @@ public static class DbConnectionExtensions
     {
         var wasOpen = connection.State == System.Data.ConnectionState.Open;
         if (!wasOpen)
+        {
             await connection.OpenAsync(cancellationToken);
+        }
+
         return new ConnectionHandle(connection, wasOpen);
     }
 }

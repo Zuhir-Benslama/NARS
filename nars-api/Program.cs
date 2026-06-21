@@ -43,14 +43,18 @@ if (hasPlaceholder && string.IsNullOrEmpty(envDbPassword))
 }
 
 if (!string.IsNullOrEmpty(envDbPassword))
+{
     connStr = connStr?.Replace("${NARS_DB_PASSWORD}", envDbPassword);
+}
 
 var jwtSecret = (builder.Configuration["NARS_JWT_SECRET"]
     ?? builder.Configuration["Jwt:SecretKey"]
     ?? throw new InvalidOperationException("Jwt:SecretKey is not configured. Set NARS_JWT_SECRET env var or Jwt:SecretKey in appsettings.Production.json.")).Trim();
 
 if (jwtSecret.Length < 32)
+{
     throw new InvalidOperationException("Jwt:SecretKey must be at least 32 characters for HMAC-SHA256 security.");
+}
 
 // ═══════════════════════════════════════════════════════════════
 // 0.5 OpenTelemetry — traces, metrics, logs via OTLP
@@ -79,7 +83,9 @@ builder.Services.AddOpenTelemetry()
 // 1. Database (EF Core + Npgsql / PostGIS)
 // ═══════════════════════════════════════════════════════════════
 if (string.IsNullOrEmpty(connStr))
+{
     throw new InvalidOperationException("DefaultConnection is not configured.");
+}
 
 builder.Services.AddNarsDatabase(connStr);
 
@@ -212,7 +218,9 @@ var app = builder.Build();
 var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
 
 if (logJwtWarning)
+{
     startupLogger.LogWarning("JWT Issuer/Audience validation is disabled. Set Jwt:Issuer and Jwt:Audience for defense-in-depth.");
+}
 
 // ── Database initialisation ───────────────────────────────────
 using (var scope = app.Services.CreateScope())
@@ -332,7 +340,7 @@ app.Use(async (ctx, next) =>
         // Content-Security-Policy: 'unsafe-inline' removed from script-src.
         // 'nonce-{value}' allows only scripts with the matching nonce attribute.
         // 'unsafe-inline' is still required on style-src for maplibre/geoman dynamic styles.
-        ctx.Response.Headers["Content-Security-Policy"] =
+        ctx.Response.Headers.ContentSecurityPolicy =
             "default-src 'self'; " +
             $"script-src 'self' 'nonce-{nonce}' blob:; " +
             "worker-src 'self' blob:; " +
@@ -344,8 +352,8 @@ app.Use(async (ctx, next) =>
             "base-uri 'self'; " +
             "form-action 'self'";
 
-        ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
-        ctx.Response.Headers["X-Frame-Options"] = "DENY";
+        ctx.Response.Headers.XContentTypeOptions = "nosniff";
+        ctx.Response.Headers.XFrameOptions = "DENY";
         ctx.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
         ctx.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)";
     }
@@ -398,10 +406,13 @@ app.MapHealthChecks("/api/health");
 
 app.Lifetime.ApplicationStarted.Register(() =>
 {
-    var addresses = app.Urls.Any()
+    var addresses = app.Urls.Count != 0
         ? string.Join(", ", app.Urls)
         : builder.Configuration["ASPNETCORE_URLS"] ?? "http://localhost:5000";
-    startupLogger.LogInformation("Startup complete — {Addresses}", addresses);
+    if (startupLogger.IsEnabled(LogLevel.Information))
+    {
+        startupLogger.LogInformation("Startup complete — {Addresses}", addresses);
+    }
 });
 
 await app.RunAsync();

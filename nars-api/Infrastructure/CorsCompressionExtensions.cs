@@ -38,8 +38,8 @@ public static class CorsCompressionExtensions
         services.AddResponseCompression(options =>
         {
             options.EnableForHttps = true;
-            options.MimeTypes = new[]
-            {
+            options.MimeTypes =
+            [
                 "text/plain",
                 "text/html",
                 "text/css",
@@ -50,7 +50,7 @@ public static class CorsCompressionExtensions
                 "application/vnd.geo+json",
                 "application/xml",
                 "text/xml",
-            };
+            ];
         });
 
         return services;

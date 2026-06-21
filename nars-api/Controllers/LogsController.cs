@@ -26,12 +26,20 @@ public class LogsController(AppDbContext db, IConfiguration config, IDateTimePro
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> SubmitLogs([FromBody] LogBatch body, CancellationToken cancellationToken = default)
     {
-        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
+        if (body is null)
+        {
+            return Problem(detail: "Request body is required.", statusCode: 400);
+        }
+
         if (body.Logs is null || body.Logs.Count == 0)
+        {
             return Problem(detail: "No log entries provided.", statusCode: 400);
+        }
 
         if (body.Logs.Count > MaxBatchSize)
+        {
             return Problem(detail: $"Batch size exceeds maximum of {MaxBatchSize}.", statusCode: 400);
+        }
 
         var userId = User.Identity?.IsAuthenticated == true
             ? GetUserId()
@@ -45,11 +53,21 @@ public class LogsController(AppDbContext db, IConfiguration config, IDateTimePro
 
         foreach (var entry in body.Logs)
         {
-            if (string.IsNullOrEmpty(entry.Message)) continue;
-            if (entry.Message.Length > MaxEntryLength) continue;
+            if (string.IsNullOrEmpty(entry.Message))
+            {
+                continue;
+            }
+
+            if (entry.Message.Length > MaxEntryLength)
+            {
+                continue;
+            }
 
             var level = (entry.Level ?? "error").ToLowerInvariant();
-            if (!AllowedLevels.Contains(level)) continue;
+            if (!AllowedLevels.Contains(level))
+            {
+                continue;
+            }
 
             entries.Add(new ErrorLog
             {
@@ -68,7 +86,9 @@ public class LogsController(AppDbContext db, IConfiguration config, IDateTimePro
         }
 
         if (entries.Count == 0)
+        {
             return NoContent();
+        }
 
         db.ErrorLogs.AddRange(entries);
         await db.SaveChangesAsync(cancellationToken);

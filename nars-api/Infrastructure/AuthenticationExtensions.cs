@@ -38,10 +38,14 @@ public static class AuthenticationExtensions
                 };
 
                 if (!string.IsNullOrEmpty(issuer))
+                {
                     validationParams.ValidIssuer = issuer;
+                }
 
                 if (!string.IsNullOrEmpty(audience))
+                {
                     validationParams.ValidAudience = audience;
+                }
 
                 options.TokenValidationParameters = validationParams;
 
@@ -67,7 +71,10 @@ public static class AuthenticationExtensions
                     OnChallenge = ctx =>
                     {
                         var logger = ctx.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("NarsApi.Auth");
-                        logger.LogInformation("[Auth] Challenging {Path} (401)", ctx.Request.Path);
+                        if (logger.IsEnabled(LogLevel.Information))
+                        {
+                            logger.LogInformation("[Auth] Challenging {Path} (401)", ctx.Request.Path);
+                        }
                         return Task.CompletedTask;
                     }
                 };

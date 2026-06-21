@@ -32,14 +32,11 @@ public class LocationsController(
     private TimeSpan ReferenceDataCacheDuration => TimeSpan.FromHours(
         int.TryParse(config["Cache:ReferenceDataDurationHours"], out var h) ? h : 1);
 
-    private async Task<List<T>> CacheOrFetchAsync<T>(string key, Func<Task<List<T>>> fetch)
-    {
-        return (await cache.GetOrCreateAsync(key, async entry =>
-        {
-            entry.AbsoluteExpirationRelativeToNow = ReferenceDataCacheDuration;
-            return await fetch();
-        }))!;
-    }
+    private async Task<List<T>> CacheOrFetchAsync<T>(string key, Func<Task<List<T>>> fetch) => (await cache.GetOrCreateAsync(key, async entry =>
+                                                                                                    {
+                                                                                                        entry.AbsoluteExpirationRelativeToNow = ReferenceDataCacheDuration;
+                                                                                                        return await fetch();
+                                                                                                    }))!;
 
     private async Task<IActionResult> PaginateAsync<TEntity, TDto>(
         string search, int skip, int take,
@@ -54,7 +51,9 @@ public class LocationsController(
 
         var maxSearchLength = int.TryParse(config["Locations:MaxSearchLength"], out var msl) ? msl : 200;
         if (search.Length > maxSearchLength)
+        {
             return Problem(detail: $"Search query is too long (max {maxSearchLength} characters).", statusCode: 400);
+        }
 
         if (string.IsNullOrEmpty(search) && skip == 0 && take >= 500)
         {
@@ -68,7 +67,9 @@ public class LocationsController(
 
         var q = baseQuery();
         if (!string.IsNullOrEmpty(search) && searchFilter is not null)
+        {
             q = searchFilter(q);
+        }
 
         var total = await q.CountAsync(cancellationToken);
         var result = await orderBy(q).Skip(skip).Take(take).ToListAsync(cancellationToken);
@@ -86,9 +87,7 @@ public class LocationsController(
         [FromQuery] string search = "",
         [FromQuery] int skip = 0,
         [FromQuery] int take = 100,
-        CancellationToken cancellationToken = default)
-    {
-        return await PaginateAsync(
+        CancellationToken cancellationToken = default) => await PaginateAsync(
             search, skip, take,
             WilayaCacheKey,
             () => db.Wilayas.AsQueryable(),
@@ -97,7 +96,6 @@ public class LocationsController(
             q => q.OrderBy(w => w.WilayaFr),
             w => new WilayaItem(w.WilayaId, w.WilayaFr ?? "", w.WilayaAr ?? "", w.WilayaLatitude, w.WilayaLongitude),
             cancellationToken);
-    }
 
     // ── GET /api/dairas ───────────────────────────────────────
 
@@ -112,7 +110,10 @@ public class LocationsController(
         CancellationToken cancellationToken = default)
     {
         if (wilaya_id <= 0)
+        {
             return Problem(detail: "wilaya_id is required.", statusCode: 400);
+        }
+
         return await PaginateAsync(
             search, skip, take,
             $"{DairaCacheKeyPrefix}{wilaya_id}",
@@ -137,7 +138,10 @@ public class LocationsController(
         CancellationToken cancellationToken = default)
     {
         if (daira_id is null or <= 0)
+        {
             return Problem(detail: "daira_id is required.", statusCode: 400);
+        }
+
         return await PaginateAsync(
             search, skip, take,
             $"{CommuneCacheKeyPrefix}{daira_id}",
@@ -165,9 +169,13 @@ public class LocationsController(
         if (geoJson is null)
         {
             if (commune?.CommuneLatitude is not null && commune.CommuneLongitude is not null)
+            {
                 geoJson = $"{{\"type\":\"Point\",\"coordinates\":[{commune.CommuneLongitude.Value},{commune.CommuneLatitude.Value}]}}";
+            }
             else
+            {
                 return Problem(detail: "Boundary not found for this commune", statusCode: 404);
+            }
         }
 
         return Ok(new
@@ -188,11 +196,15 @@ public class LocationsController(
     public async Task<IActionResult> DebugCommuneBoundary(int communeId, IHostEnvironment env, CancellationToken cancellationToken = default)
     {
         if (!env.IsDevelopment())
+        {
             return NotFound();
+        }
 
         var boundary = await db.CommuneBoundaries.FirstOrDefaultAsync(b => b.CommuneId == communeId, cancellationToken);
         if (boundary is null)
+        {
             return Ok(new { error = "Boundary not found" });
+        }
 
         return Ok(new
         {

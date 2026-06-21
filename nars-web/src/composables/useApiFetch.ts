@@ -84,7 +84,11 @@ export async function apiRequest<T = unknown>(
   try {
     const response = await apiFetch(path, options)
     if (!response.ok) {
-      return { success: false, error: new Error(`HTTP ${response.status}`), status: response.status }
+      return {
+        success: false,
+        error: new Error(`HTTP ${response.status}`),
+        status: response.status,
+      }
     }
     const data = (await response.json()) as T
     return { success: true, data }

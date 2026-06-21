@@ -41,9 +41,13 @@ public static class FeatureQueryHelper
     {
         var sb = new StringBuilder();
         var descriptors = FeatureTypeRegistry.GetAllDescriptors();
-        for (int i = 0; i < descriptors.Count; i++)
+        for (var i = 0; i < descriptors.Count; i++)
         {
-            if (i > 0) sb.AppendLine().Append("UNION ALL ");
+            if (i > 0)
+            {
+                sb.AppendLine().Append("UNION ALL ");
+            }
+
             sb.Append($"SELECT id, user_id, label, data, created_at, layer, '{descriptors[i].Type}' AS feature_type FROM {descriptors[i].TableName}");
         }
         return sb.ToString();
@@ -58,10 +62,7 @@ public static class FeatureQueryHelper
         Guid userId,
         int skip,
         int take,
-        CancellationToken ct = default)
-    {
-        return await ExecuteQueryAsync(conn, _loadFeaturesSql, userId, layer: null, skip, take, ct);
-    }
+        CancellationToken ct = default) => await ExecuteQueryAsync(conn, _loadFeaturesSql, userId, layer: null, skip, take, ct);
 
     /// <summary>
     /// Loads features for a specific layer with pagination.
@@ -73,10 +74,7 @@ public static class FeatureQueryHelper
         string layer,
         int skip,
         int take,
-        CancellationToken ct = default)
-    {
-        return await ExecuteQueryAsync(conn, _loadByLayerSql, userId, layer, skip, take, ct);
-    }
+        CancellationToken ct = default) => await ExecuteQueryAsync(conn, _loadByLayerSql, userId, layer, skip, take, ct);
 
     private static async Task<(List<object> features, int totalCount)> ExecuteQueryAsync(
         DbConnection conn,
@@ -95,12 +93,15 @@ public static class FeatureQueryHelper
 
         SqlFragments.AddParam(cmd, "@uid", userId);
         if (layer is not null)
+        {
             SqlFragments.AddParam(cmd, "@layer", layer);
+        }
+
         SqlFragments.AddParam(cmd, "@skip", skip);
         SqlFragments.AddParam(cmd, "@take", take);
 
         var rows = new List<object>();
-        int totalCount = 0;
+        var totalCount = 0;
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         while (await reader.ReadAsync(ct))
@@ -112,10 +113,10 @@ public static class FeatureQueryHelper
                 string s => Guid.Parse(s),
                 _ => throw new InvalidOperationException($"Unexpected ID type: {idValue?.GetType().Name}")
             };
-            var label = await reader.IsDBNullAsync(1) ? null : reader.GetString(1);
-            var dataJson = await reader.IsDBNullAsync(2) ? "{}" : reader.GetString(2);
+            var label = await reader.IsDBNullAsync(1, ct) ? null : reader.GetString(1);
+            var dataJson = await reader.IsDBNullAsync(2, ct) ? "{}" : reader.GetString(2);
             var createdAt = reader.GetDateTime(3);
-            var layerVal = await reader.IsDBNullAsync(4) ? null : reader.GetString(4);
+            var layerVal = await reader.IsDBNullAsync(4, ct) ? null : reader.GetString(4);
             var type = reader.GetString(5);
             totalCount = (int)reader.GetInt64(6);
 

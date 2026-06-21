@@ -28,15 +28,15 @@ public class FeatureCatalogController(
         var types = new List<FeatureTypeDefinition>
         {
             new(Key: FeatureTypes.Area, Label: "Area", Icon: IconArea,
-                Layers: new[]
-                {
+                Layers:
+                [
                     new LayerOption(FeatureTypes.AreaLayers.CentralUrban,   "Central Urban Area"),
                     new LayerOption(FeatureTypes.AreaLayers.SecondaryUrban, "Secondary Urban Area"),
                     new LayerOption(FeatureTypes.AreaLayers.Scattered,      "Scattered Area"),
-                }),
+                ]),
             new(Key: FeatureTypes.Road, Label: "Road", Icon: IconRoad,
-                Layers: new[]
-                {
+                Layers:
+                [
                     new LayerOption(FeatureTypes.RoadLayers.Boulevard, "Boulevard", "primary"),
                     new LayerOption(FeatureTypes.RoadLayers.Avenue,    "Avenue",    "primary"),
                     new LayerOption(FeatureTypes.RoadLayers.Street,    "Street",    "secondary"),
@@ -44,30 +44,30 @@ public class FeatureCatalogController(
                     new LayerOption(FeatureTypes.RoadLayers.Lane,      "Lane",      "tertiary"),
                     new LayerOption(FeatureTypes.RoadLayers.CulDeSac,  "Cul-de-sac","tertiary"),
                     new LayerOption(FeatureTypes.RoadLayers.Way,       "Way",       "tertiary"),
-                }),
+                ]),
             new(Key: FeatureTypes.District, Label: "District", Icon: IconDistrict,
-                Layers: new[]
-                {
+                Layers:
+                [
                     new LayerOption(FeatureTypes.DistrictLayers.HousingEstate,      "Housing Estate"),
                     new LayerOption(FeatureTypes.DistrictLayers.UrbanPole,          "Urban Pole"),
                     new LayerOption(FeatureTypes.DistrictLayers.DistrictLayer,      "District"),
                     new LayerOption(FeatureTypes.DistrictLayers.TradActivitiesZone, "Trad. Activities Zone"),
                     new LayerOption(FeatureTypes.DistrictLayers.IndustryZone,       "Industry Zone"),
-                }),
+                ]),
             new(Key: FeatureTypes.HouseEntrance, Label: "House Entrance", Icon: IconHouseEntrance,
-                Layers: new[]
-                {
+                Layers:
+                [
                     new LayerOption(FeatureTypes.HouseEntranceLayers.Main,      "Main Entrance"),
                     new LayerOption(FeatureTypes.HouseEntranceLayers.Secondary, "Secondary Entrance"),
-                }),
+                ]),
             new(Key: FeatureTypes.PublicBuilding, Label: "Public Building", Icon: IconPublicBuilding,
-                Layers: new[] { new LayerOption(FeatureTypes.PublicBuildingLayers.Default, "Public Building") }),
+                Layers: [new LayerOption(FeatureTypes.PublicBuildingLayers.Default, "Public Building")]),
             new(Key: FeatureTypes.PublicSpace, Label: "Public Space", Icon: IconPublicSpace,
-                Layers: new[]
-                {
+                Layers:
+                [
                     new LayerOption(FeatureTypes.PublicSpaceLayers.Garden, "Garden"),
                     new LayerOption(FeatureTypes.PublicSpaceLayers.Square, "Square"),
-                }),
+                ]),
         };
         return Ok(types);
     }
