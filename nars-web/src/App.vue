@@ -8,17 +8,16 @@
   </template>
 
   <template v-else-if="isFieldWorker">
-    <TileControl />
     <FieldPanel />
-    <FeatureModal />
   </template>
 
   <template v-else>
     <PhaseBar />
     <InfoPanel />
-    <TileControl />
-    <FeatureModal />
   </template>
+
+  <TileControl />
+  <FeatureModal />
 
   <div v-if="appStore.loadError" class="load-error-banner">
     <span>⚠ Could not load saved features. Check your connection and refresh the page.</span>
@@ -36,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, onUnmounted } from "vue"
 import PhaseBar from "./components/PhaseBar.vue"
 import InfoPanel from "./components/InfoPanel.vue"
 import ProfileMenu from "./components/ProfileMenu.vue"
@@ -46,11 +45,16 @@ import FieldPanel from "./components/FieldPanel.vue"
 import EditSaveButton from "./components/EditSaveButton.vue"
 import ContextMenu from "./components/ContextMenu.vue"
 import { useAppStore } from "./stores/appStore"
+import { destroyMap } from "./map"
 
 const appStore = useAppStore()
 
 const isAdminUser = computed(() => appStore.isAdminUser)
 const isFieldWorker = computed(() => appStore.user?.role === "field_worker")
+
+onUnmounted(() => {
+  destroyMap()
+})
 </script>
 
 <style scoped>

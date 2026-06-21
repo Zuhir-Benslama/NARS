@@ -3,6 +3,9 @@
 //
 // Usage:
 //   import { useAppStore, useModalStore, useLayerStore } from './stores'
+//
+// Modal helpers (awaitModalResult, openModal, openEditModal, resolveModal) are
+// re-exported from modalStore for convenience, not Pinia stores themselves.
 
 export { useAppStore } from "./appStore"
 export {

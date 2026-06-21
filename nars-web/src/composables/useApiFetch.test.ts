@@ -98,21 +98,27 @@ describe("apiRequest", () => {
     vi.mocked(apiModule.apiFetch).mockResolvedValue(mockResponse as unknown as Response)
 
     const result = await apiRequest<typeof mockData>("/api/test")
-    expect(result).toEqual(mockData)
+    expect(result).toEqual({ success: true, data: mockData })
   })
 
-  it("returns null on failed response", async () => {
+  it("returns error result on failed response", async () => {
     const mockResponse = { ok: false, status: 404 }
     vi.mocked(apiModule.apiFetch).mockResolvedValue(mockResponse as unknown as Response)
 
     const result = await apiRequest("/api/test")
-    expect(result).toBeNull()
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.status).toBe(404)
+    }
   })
 
-  it("returns null on network error", async () => {
+  it("returns error result on network error", async () => {
     vi.mocked(apiModule.apiFetch).mockRejectedValue(new TypeError("Network error"))
 
     const result = await apiRequest("/api/test")
-    expect(result).toBeNull()
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toBeInstanceOf(Error)
+    }
   })
 })

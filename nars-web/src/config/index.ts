@@ -48,6 +48,28 @@ export const MAP_CONFIG = {
 
   /** Default map pitch (tilt) in degrees */
   defaultPitch: 0,
+
+  /** Base tile URLs per style key */
+  tileUrls: {
+    satellite: [
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    ],
+    street: [
+      "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    ],
+    light: [
+      "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+      "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+      "https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    ],
+    dark: [
+      "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+      "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+      "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    ],
+  } as const,
 } as const
 
 // ─── SNAPPING CONFIGURATION ───────────────────────────────────────────────────
@@ -93,6 +115,13 @@ export const VALIDATION_CONFIG = {
 export const UI_CONFIG = {
   /** Toast notification duration in milliseconds */
   toastDuration: 3500,
+
+  /** Toast background colors by type */
+  toastColors: {
+    success: "#22c55e",
+    error: "#ef4444",
+    info: "#3b82f6",
+  } as const,
 
   /** Default text color for labels */
   defaultTextColor: "#333333",

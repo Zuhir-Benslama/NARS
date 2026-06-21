@@ -77,13 +77,25 @@ spec:
                   memory: 512Mi
               env:
                 - name: PGHOST
-                  value: postgis
+                  valueFrom:
+                    configMapKeyRef:
+                      name: nars-config
+                      key: PGHOST
                 - name: PGPORT
-                  value: "5432"
+                  valueFrom:
+                    configMapKeyRef:
+                      name: nars-config
+                      key: PGPORT
                 - name: PGUSER
-                  value: postgres
+                  valueFrom:
+                    configMapKeyRef:
+                      name: nars-config
+                      key: PGUSER
                 - name: PGDATABASE
-                  value: nars_db
+                  valueFrom:
+                    configMapKeyRef:
+                      name: nars-config
+                      key: PGDATABASE
                 - name: PGPASSWORD
                   valueFrom:
                     secretKeyRef:

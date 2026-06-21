@@ -13,7 +13,7 @@ import { refreshLayerVisibility } from "../rendering/labels"
 import { getFeatureType } from "../house-numbering"
 import { debugError, debugLog } from "../../utils/debug"
 import { updateEndpointMarkers } from "../roads/road-directions"
-import { loadPhase } from "../phases/phase-storage"
+import { loadPhase } from "../../phases-nav/storage"
 import type { FeatureData, LayerEntry, DbFeature } from "../../types"
 import { buildGeoJsonFeature } from "./loader-build"
 

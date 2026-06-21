@@ -5,7 +5,7 @@
     </div>
     <div class="info-item">
       ⬟ {{ t("info_areas") }}:
-      <span>{{ c.areas }}</span>
+      <span>{{ counts.areas }}</span>
     </div>
     <div class="info-item">
       📍 {{ t("info_city_center") }}:
@@ -13,27 +13,27 @@
     </div>
     <div class="info-item">
       🏘️ {{ t("info_districts") }}:
-      <span>{{ c.districts }}</span>
+      <span>{{ counts.districts }}</span>
     </div>
     <div class="info-item">
       🛣️ {{ t("info_roads") }}:
-      <span>{{ c.roads }}</span>
+      <span>{{ counts.roads }}</span>
     </div>
     <div class="info-item">
       🚪 {{ t("info_main_entrances") }}:
-      <span>{{ c.mainEntrances }}</span>
+      <span>{{ counts.mainEntrances }}</span>
     </div>
     <div class="info-item">
       🔢 {{ t("info_secondary_entrances") }}:
-      <span>{{ c.secondaryEntrances }}</span>
+      <span>{{ counts.secondaryEntrances }}</span>
     </div>
     <div class="info-item">
       🏛️ {{ t("info_public_buildings") }}:
-      <span>{{ c.publicBuildings }}</span>
+      <span>{{ counts.publicBuildings }}</span>
     </div>
     <div class="info-item">
       🌳 {{ t("info_public_spaces") }}:
-      <span>{{ c.publicSpaces }}</span>
+      <span>{{ counts.publicSpaces }}</span>
     </div>
   </div>
 </template>
@@ -46,10 +46,10 @@ import { useAppStore } from "../stores/appStore"
 const { t } = useI18n()
 const appStore = useAppStore()
 
-const c = computed(() => appStore.counts)
+const counts = computed(() => appStore.counts)
 
 const cityCenterStatus = computed(() => {
-  if (c.value.cityCenter > 0) return t("info_status_placed")
+  if (counts.value.cityCenter > 0) return t("info_status_placed")
   if (appStore.cityCenterMode === "auto") return t("info_status_skipped")
   return "—"
 })

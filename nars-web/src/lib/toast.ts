@@ -35,15 +35,9 @@ export function showToast(message: string, type: ToastType = "info"): void {
     return
   }
 
-  const bg: Record<ToastType, string> = {
-    success: "#22c55e",
-    error: "#ef4444",
-    info: "#3b82f6",
-  }
-
   const el = document.createElement("div")
   el.style.cssText = [
-    `background:${bg[type]}`,
+    `background:${UI_CONFIG.toastColors[type]}`,
     "color:#fff",
     "padding:10px 18px",
     "border-radius:8px",

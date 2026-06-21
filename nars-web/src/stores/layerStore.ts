@@ -25,7 +25,7 @@ function createInitialState(): LayerState {
   }
 }
 
-export const useLayerStore = defineStore("layers", {
+export const useLayerStore = defineStore("layer", {
   state: (): LayerState => createInitialState(),
 
   getters: {

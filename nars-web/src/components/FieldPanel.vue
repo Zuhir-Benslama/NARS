@@ -78,6 +78,29 @@ interface ApiFeature {
   label: string
 }
 
+export interface FieldPanelProps {
+  /**
+   * Optional async function to fetch features for a given API type string.
+   * Defaults to a fetch from `/api/field/features?type=...`.
+   * Inject this prop in tests or when the API contract differs.
+   */
+  fetchFeaturesFn?: (apiType: string) => Promise<ApiFeature[]>
+}
+
+const props = withDefaults(defineProps<FieldPanelProps>(), {
+  fetchFeaturesFn: async (apiType: string) => {
+    const res = await apiFetch(`/api/field/features?type=${apiType}`)
+    if (res.ok) {
+      const data = await res.json()
+      return (data.features ?? []).map((f: ApiFeature) => ({
+        id: f.id,
+        label: f.label || `Unnamed ${apiType}`,
+      }))
+    }
+    return []
+  },
+})
+
 const activeTab = ref<InspectionType>("road")
 const features = ref<ApiFeature[]>([])
 const loading = ref(false)
@@ -96,14 +119,7 @@ async function fetchFeatures() {
   loading.value = true
   features.value = []
   try {
-    const res = await apiFetch(`/api/field/features?type=${tab.apiType}`)
-    if (res.ok) {
-      const data = await res.json()
-      features.value = (data.features ?? []).map((f: ApiFeature) => ({
-        id: f.id,
-        label: f.label || `Unnamed ${tab.label.toLowerCase()}`,
-      }))
-    }
+    features.value = await props.fetchFeaturesFn(tab.apiType)
   } catch (err) {
     logError(createNetworkError("Failed to load field features", { action: "fetchFeatures" }, err))
   } finally {

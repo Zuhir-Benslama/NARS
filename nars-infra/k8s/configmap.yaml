@@ -11,3 +11,8 @@ data:
   # Localhost entries are NOT included — they are set by the local dev env.
   Cors__AllowedOrigins__0: "https://nars.dz"
   Cors__AllowedOrigins__1: "https://api.nars.dz"
+  # Shared between backup-cronjob and any other DB-consuming pods.
+  PGHOST: "postgis"
+  PGPORT: "5432"
+  PGUSER: "postgres"
+  PGDATABASE: "nars_db"
