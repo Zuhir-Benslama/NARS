@@ -50,7 +50,7 @@ public abstract class NarsControllerBase : ControllerBase
     /// a commune_id don't need to catch exceptions.
     /// </summary>
     protected int? CurrentCommuneId =>
-        int.TryParse(User.FindFirstValue(ClaimNames.CommuneId), out int id) && id > 0
+        int.TryParse(User.FindFirstValue(ClaimNames.CommuneId), out var id) && id > 0
             ? id
             : null;
 
@@ -64,13 +64,13 @@ public abstract class NarsControllerBase : ControllerBase
 
     /// <summary>The daira ID for daira_admin accounts, or null for other roles.</summary>
     protected int? CurrentDairaId =>
-        int.TryParse(User.FindFirstValue(ClaimNames.DairaId), out int id) && id > 0
+        int.TryParse(User.FindFirstValue(ClaimNames.DairaId), out var id) && id > 0
             ? id
             : null;
 
     /// <summary>The wilaya ID for wilaya_admin accounts, or null for other roles.</summary>
     protected int? CurrentWilayaId =>
-        int.TryParse(User.FindFirstValue(ClaimNames.WilayaId), out int id) && id > 0
+        int.TryParse(User.FindFirstValue(ClaimNames.WilayaId), out var id) && id > 0
             ? id
             : null;
 
@@ -84,18 +84,15 @@ public abstract class NarsControllerBase : ControllerBase
     /// <summary>
     /// Creates a consistent CookieOptions with secure defaults for auth cookies.
     /// </summary>
-    protected CookieOptions MakeCookieOptions(TimeSpan maxAge)
+    protected CookieOptions MakeCookieOptions(TimeSpan maxAge) => new()
     {
-        return new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = Request.IsHttps,
-            SameSite = SameSiteMode.Lax,
-            MaxAge = maxAge,
-            Path = "/",
-            IsEssential = true,
-        };
-    }
+        HttpOnly = true,
+        Secure = Request.IsHttps,
+        SameSite = SameSiteMode.Lax,
+        MaxAge = maxAge,
+        Path = "/",
+        IsEssential = true,
+    };
 
     /// <summary>
     /// Validates that the required geographic fields are present for a given role.

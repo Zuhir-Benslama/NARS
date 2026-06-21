@@ -77,10 +77,7 @@ internal static class SqlFragments
     /// Safely parse an integer configuration value, falling back to a default.
     /// Shared by JwtService and AuthController to avoid duplication.
     /// </summary>
-    internal static int ParseIntConfig(string? value, int defaultValue)
-    {
-        return int.TryParse(value, out var result) ? result : defaultValue;
-    }
+    internal static int ParseIntConfig(string? value, int defaultValue) => int.TryParse(value, out var result) ? result : defaultValue;
 
     /// <summary>
     /// Returns the polygon SQL fragment with the given table alias substituted.

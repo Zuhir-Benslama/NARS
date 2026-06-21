@@ -36,7 +36,8 @@ public class BackgroundTaskQueue : IBackgroundTaskQueue
 
     public ValueTask QueueBackgroundWorkItemAsync(Func<IServiceProvider, CancellationToken, Task> workItem)
     {
-        if (workItem is null) throw new ArgumentNullException(nameof(workItem));
+        ArgumentNullException.ThrowIfNull(workItem);
+
         return _queue.Writer.WriteAsync(workItem);
     }
 
@@ -63,7 +64,10 @@ public class BackgroundQueueProcessor(
     {
         _executingTask = ProcessQueueAsync(_shutdown.Token);
         if (_executingTask.IsCompleted)
+        {
             return _executingTask;
+        }
+
         return Task.CompletedTask;
     }
 
@@ -71,14 +75,19 @@ public class BackgroundQueueProcessor(
     {
         await _shutdown.CancelAsync();
         if (_executingTask != null)
+        {
             await Task.WhenAny(_executingTask, Task.Delay(Timeout.Infinite, cancellationToken));
+        }
     }
 
     public async ValueTask DisposeAsync()
     {
         _shutdown.Dispose();
         if (_executingTask is not null)
+        {
             await _executingTask;
+        }
+        GC.SuppressFinalize(this);
     }
 
     private async Task ProcessQueueAsync(CancellationToken ct)

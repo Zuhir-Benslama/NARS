@@ -40,9 +40,20 @@ public class JwtService(string secret, string? issuer, string? audience, IConfig
         // Only include geographic claims that are relevant to this role.
         // This keeps tokens minimal and avoids confusion when a claim is present
         // but meaningless for the role.
-        if (communeId.HasValue) claims.Add(new Claim(ClaimNames.CommuneId, communeId.Value.ToString()));
-        if (dairaId.HasValue) claims.Add(new Claim(ClaimNames.DairaId, dairaId.Value.ToString()));
-        if (wilayaId.HasValue) claims.Add(new Claim(ClaimNames.WilayaId, wilayaId.Value.ToString()));
+        if (communeId.HasValue)
+        {
+            claims.Add(new Claim(ClaimNames.CommuneId, communeId.Value.ToString()));
+        }
+
+        if (dairaId.HasValue)
+        {
+            claims.Add(new Claim(ClaimNames.DairaId, dairaId.Value.ToString()));
+        }
+
+        if (wilayaId.HasValue)
+        {
+            claims.Add(new Claim(ClaimNames.WilayaId, wilayaId.Value.ToString()));
+        }
 
         var token = new JwtSecurityToken(
             issuer: _issuer,
@@ -92,7 +103,10 @@ public class JwtService(string secret, string? issuer, string? audience, IConfig
         }
         catch (SecurityTokenException ex)
         {
-            logger.LogDebug(ex, "JWT validation failed: {Message}", ex.Message);
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug(ex, "JWT validation failed: {Message}", ex.Message);
+            }
             return null;
         }
         catch (Exception ex)

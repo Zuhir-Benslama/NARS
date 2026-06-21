@@ -3,9 +3,8 @@ using NarsApi.Models;
 
 namespace NarsApi.Data;
 
-public class AppDbContext : DbContext
+public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     // ── Feature tables ────────────────────────────────────────────────────────
     public DbSet<FeatureRegistry> FeatureRegistry { get; set; }

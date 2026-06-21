@@ -26,7 +26,10 @@ public class AdminController(
     public async Task<IActionResult> Overview(CancellationToken cancellationToken = default)
     {
         var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
-        if (user is null) return Unauthorized(new { detail = "User not found." });
+        if (user is null)
+        {
+            return Unauthorized(new { detail = "User not found." });
+        }
 
         return user.Role switch
         {
@@ -50,8 +53,15 @@ public class AdminController(
     public async Task<IActionResult> GetWilaya(int wilayaId, CancellationToken cancellationToken = default)
     {
         var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
-        if (user is null) return Unauthorized(new { detail = "User not found." });
-        if (user.Role != UserRoles.NationalAdmin) return Forbid();
+        if (user is null)
+        {
+            return Unauthorized(new { detail = "User not found." });
+        }
+
+        if (user.Role != UserRoles.NationalAdmin)
+        {
+            return Forbid();
+        }
 
         var result = await overviewService.GetWilayaReportAsync(wilayaId, cancellationToken);
         return result is null ? Problem(detail: "Wilaya not found.", statusCode: 404) : Ok(result);
@@ -66,15 +76,21 @@ public class AdminController(
     public async Task<IActionResult> GetDaira(int dairaId, CancellationToken cancellationToken = default)
     {
         var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
-        if (user is null) return Unauthorized(new { detail = "User not found." });
+        if (user is null)
+        {
+            return Unauthorized(new { detail = "User not found." });
+        }
 
         switch (user.Role)
         {
             case UserRoles.WilayaAdmin:
                 {
-                    var daira = await db.Dairas.FindAsync(dairaId, cancellationToken);
+                    var daira = await db.Dairas.FindAsync([dairaId, cancellationToken], cancellationToken: cancellationToken);
                     if (daira is null || daira.WilayaId != user.WilayaId)
+                    {
                         return Forbid();
+                    }
+
                     break;
                 }
             case UserRoles.NationalAdmin:
@@ -95,13 +111,23 @@ public class AdminController(
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateAdmin([FromBody] CreateAdminRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
+        if (body is null)
+        {
+            return Problem(detail: "Request body is required.", statusCode: 400);
+        }
+
         var creator = await db.Users.FindAsync([CurrentUserId], cancellationToken);
-        if (creator is null) return Unauthorized();
+        if (creator is null)
+        {
+            return Unauthorized();
+        }
+
         var callerRole = creator.Role;
 
         if (!CanCreateRole(callerRole, body.Role))
+        {
             return Forbid();
+        }
 
         switch (callerRole, body.Role)
         {
@@ -110,30 +136,47 @@ public class AdminController(
             case (UserRoles.DairaAdmin, UserRoles.CommuneUser):
                 {
                     if (!body.CommuneId.HasValue)
+                    {
                         return Problem(detail: "commune_id is required.", statusCode: 400);
-                    var commune = await db.Communes.FindAsync(body.CommuneId.Value, cancellationToken);
+                    }
+
+                    var commune = await db.Communes.FindAsync([body.CommuneId.Value, cancellationToken], cancellationToken: cancellationToken);
                     if (commune is null || commune.DairaId != creator.DairaId)
+                    {
                         return Forbid();
+                    }
+
                     break;
                 }
             case (UserRoles.WilayaAdmin, UserRoles.DairaAdmin):
                 {
                     if (!body.DairaId.HasValue)
+                    {
                         return Problem(detail: "daira_id is required.", statusCode: 400);
-                    var daira = await db.Dairas.FindAsync(body.DairaId.Value, cancellationToken);
+                    }
+
+                    var daira = await db.Dairas.FindAsync([body.DairaId.Value, cancellationToken], cancellationToken: cancellationToken);
                     if (daira is null || daira.WilayaId != creator.WilayaId)
+                    {
                         return Forbid();
+                    }
+
                     break;
                 }
             case (UserRoles.NationalAdmin, UserRoles.WilayaAdmin):
                 if (!body.WilayaId.HasValue)
+                {
                     return Problem(detail: "wilaya_id is required.", statusCode: 400);
+                }
+
                 break;
         }
 
         var geoError = ValidateGeographicFields(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
         if (geoError is not null)
+        {
             return Problem(detail: geoError, statusCode: 400);
+        }
 
         var existing = await db.Users.FirstOrDefaultAsync(u =>
             u.Username == body.Username || u.Email == body.Email, cancellationToken);
@@ -145,7 +188,9 @@ public class AdminController(
 
         var pwdErr = PasswordValidator.Validate(body.Password);
         if (pwdErr is not null)
+        {
             return Problem(detail: pwdErr, statusCode: 400);
+        }
 
         var communeId = body.Role == UserRoles.FieldWorker
             ? creator.CommuneId
@@ -167,8 +212,11 @@ public class AdminController(
         db.Users.Add(newUser);
         await db.SaveChangesAsync(cancellationToken);
 
-        logger.LogInformation("[Admin] {CallerRole} {CallerId} created {Role} {UserId}",
-            callerRole, CurrentUserId, body.Role, newUser.Id);
+        if (logger.IsEnabled(LogLevel.Information))
+        {
+            logger.LogInformation("[Admin] {CallerRole} {CallerId} created {Role} {UserId}",
+                callerRole, CurrentUserId, body.Role, newUser.Id);
+        }
 
         return StatusCode(201, new CreateAdminResponse(
             Success: true,
@@ -186,7 +234,10 @@ public class AdminController(
     public async Task<IActionResult> GetManageableUsers(CancellationToken cancellationToken = default)
     {
         var creator = await db.Users.FindAsync([CurrentUserId], cancellationToken);
-        if (creator is null) return Unauthorized();
+        if (creator is null)
+        {
+            return Unauthorized();
+        }
 
         List<AdminUserSummary> users = creator.Role switch
         {
@@ -231,44 +282,87 @@ public class AdminController(
         Guid userId, [FromBody] UpdateAdminRequest body,
         CancellationToken cancellationToken = default)
     {
-        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
+        if (body is null)
+        {
+            return Problem(detail: "Request body is required.", statusCode: 400);
+        }
+
         var creator = await db.Users.FindAsync([CurrentUserId], cancellationToken);
-        if (creator is null) return Unauthorized();
+        if (creator is null)
+        {
+            return Unauthorized();
+        }
 
         var target = await db.Users.FindAsync([userId], cancellationToken);
-        if (target is null) return Problem(detail: "User not found.", statusCode: 404);
+        if (target is null)
+        {
+            return Problem(detail: "User not found.", statusCode: 404);
+        }
 
         if (!CanCreateRole(creator.Role, target.Role))
+        {
             return Forbid();
+        }
 
         if (body.Role is not null && !CanCreateRole(creator.Role, body.Role))
+        {
             return Forbid();
+        }
 
-        if (body.Name is not null) target.Name = body.Name;
+        if (body.Name is not null)
+        {
+            target.Name = body.Name;
+        }
+
         if (body.Email is not null)
         {
             var emailConflict = await db.Users.AnyAsync(
                 u => u.Email == body.Email && u.Id != userId, cancellationToken);
-            if (emailConflict) return Conflict(new { detail = "Email already exists." });
+            if (emailConflict)
+            {
+                return Conflict(new { detail = "Email already exists." });
+            }
+
             target.Email = body.Email;
         }
-        if (body.Phone is not null) target.Phone = body.Phone;
+        if (body.Phone is not null)
+        {
+            target.Phone = body.Phone;
+        }
 
         if (body.Role is not null)
         {
             var geoCheck = ValidateGeographicFields(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
-            if (geoCheck is not null) return Problem(detail: geoCheck, statusCode: 400);
+            if (geoCheck is not null)
+            {
+                return Problem(detail: geoCheck, statusCode: 400);
+            }
+
             target.Role = body.Role;
         }
 
-        if (body.WilayaId is not null) target.WilayaId = body.WilayaId;
-        if (body.DairaId is not null) target.DairaId = body.DairaId;
-        if (body.CommuneId is not null) target.CommuneId = body.CommuneId;
+        if (body.WilayaId is not null)
+        {
+            target.WilayaId = body.WilayaId;
+        }
+
+        if (body.DairaId is not null)
+        {
+            target.DairaId = body.DairaId;
+        }
+
+        if (body.CommuneId is not null)
+        {
+            target.CommuneId = body.CommuneId;
+        }
 
         await db.SaveChangesAsync(cancellationToken);
 
-        logger.LogInformation("[Admin] {CallerRole} {CallerId} updated user {UserId}",
-            creator.Role, CurrentUserId, userId);
+        if (logger.IsEnabled(LogLevel.Information))
+        {
+            logger.LogInformation("[Admin] {CallerRole} {CallerId} updated user {UserId}",
+                creator.Role, CurrentUserId, userId);
+        }
 
         return Ok(new ActionResponse(Success: true));
     }
@@ -282,19 +376,30 @@ public class AdminController(
         Guid userId, CancellationToken cancellationToken = default)
     {
         var creator = await db.Users.FindAsync([CurrentUserId], cancellationToken);
-        if (creator is null) return Unauthorized();
+        if (creator is null)
+        {
+            return Unauthorized();
+        }
 
         var target = await db.Users.FindAsync([userId], cancellationToken);
-        if (target is null) return Problem(detail: "User not found.", statusCode: 404);
+        if (target is null)
+        {
+            return Problem(detail: "User not found.", statusCode: 404);
+        }
 
         if (!CanCreateRole(creator.Role, target.Role))
+        {
             return Forbid();
+        }
 
         db.Users.Remove(target);
         await db.SaveChangesAsync(cancellationToken);
 
-        logger.LogInformation("[Admin] {CallerRole} {CallerId} deleted user {UserId} ({Username})",
-            creator.Role, CurrentUserId, userId, target.Username);
+        if (logger.IsEnabled(LogLevel.Information))
+        {
+            logger.LogInformation("[Admin] {CallerRole} {CallerId} deleted user {UserId} ({Username})",
+                creator.Role, CurrentUserId, userId, target.Username);
+        }
 
         return Ok(new ActionResponse(Success: true));
     }
@@ -325,6 +430,6 @@ public class AdminController(
     private async Task<IActionResult> DairaOverview(int dairaId, CancellationToken cancellationToken)
     {
         var report = await overviewService.GetDairaReportAsync(dairaId, cancellationToken);
-        return Ok(report ?? new DairaReport(dairaId, "", "", null, Array.Empty<CommuneReport>()));
+        return Ok(report ?? new DairaReport(dairaId, "", "", null, []));
     }
 }

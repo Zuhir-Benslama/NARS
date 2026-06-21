@@ -37,9 +37,12 @@ public partial class AuthController(
     [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status410Gone)]
     public IActionResult SignUp() =>
-        StatusCode(410, new { detail = "Self-registration is disabled. " +
+        StatusCode(410, new
+        {
+            detail = "Self-registration is disabled. " +
             "Contact your daira admin to create a commune user account, " +
-            "or use POST /api/admin/authorized-signup for admin accounts." });
+            "or use POST /api/admin/authorized-signup for admin accounts."
+        });
 
     // ── POST /api/signin ──────────────────────────────────────
 
@@ -50,10 +53,16 @@ public partial class AuthController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> SignIn([FromBody] SignInRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
+        if (body is null)
+        {
+            return Problem(detail: "Request body is required.", statusCode: 400);
+        }
+
         var user = await db.Users.FirstOrDefaultAsync(u => u.Username == body.Username, cancellationToken);
         if (user is null)
+        {
             return Unauthorized(new { detail = "Invalid username or password" });
+        }
 
         // Check if account is locked
         if (user.LockedUntil.HasValue && user.LockedUntil.Value > timeProvider.UtcNow)
@@ -84,7 +93,10 @@ public partial class AuthController(
         var refreshExpiry = timeProvider.UtcNow.AddDays(
             ParseIntConfig(config["Jwt:RefreshExpiresInDays"], 30));
 
-        logger.LogDebug("Setting auth cookies, Secure={IsHttps}", Request.IsHttps);
+        if (logger.IsEnabled(LogLevel.Debug))
+        {
+            logger.LogDebug("Setting auth cookies, Secure={IsHttps}", Request.IsHttps);
+        }
 
         db.RefreshTokens.Add(new RefreshToken
         {
@@ -164,7 +176,9 @@ public partial class AuthController(
     {
         var result = await refreshService.RotateRefreshTokenAsync(Request.Cookies["refresh_token"], cancellationToken);
         if (!result.Success)
+        {
             return Unauthorized(new { detail = result.Detail });
+        }
 
         var cookieMaxAge = result.RefreshExpiry!.Value - timeProvider.UtcNow;
         Response.Cookies.Append("access_token", result.NewAccessToken!, MakeCookieOptions(jwt.AccessTokenExpiresIn));
@@ -193,10 +207,14 @@ public partial class AuthController(
         // potentially stale JWT claims (user profile may have changed).
         var user = await db.Users.FindAsync([userId], cancellationToken);
         if (user is null)
+        {
             return Unauthorized(new { detail = "User no longer exists." });
+        }
 
-        if (!int.TryParse(User.FindFirstValue("commune_id"), out int communeId))
+        if (!int.TryParse(User.FindFirstValue("commune_id"), out var communeId))
+        {
             communeId = user.CommuneId ?? 0;
+        }
 
         // Load location chain only if we have a commune to look up.
         LocationChain loc;
@@ -247,7 +265,9 @@ public partial class AuthController(
     {
         user.FailedLoginAttempts = (user.FailedLoginAttempts ?? 0) + 1;
         if (user.FailedLoginAttempts >= MaxFailedAttempts)
+        {
             user.LockedUntil = timeProvider.UtcNow.AddMinutes(LockoutMinutes);
+        }
 
         await db.SaveChangesAsync(cancellationToken);
     }

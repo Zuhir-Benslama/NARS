@@ -164,7 +164,9 @@ import BuildingTypeSelector from "./modals/BuildingTypeSelector.vue"
 const { t } = useI18n()
 const appStore = useAppStore()
 const modalStore = useModalStore()
-const phase = computed(() => (modalStore.phaseIndex !== null ? (PHASES[modalStore.phaseIndex] ?? null) : null))
+const phase = computed(() =>
+  modalStore.phaseIndex !== null ? (PHASES[modalStore.phaseIndex] ?? null) : null,
+)
 
 // ── Computed display helpers ──────────────────────────────────────────────────
 
@@ -180,10 +182,13 @@ const isMainUrban = computed(
 const isZoneWithTypeName = computed(
   () =>
     phase.value?.key === "districts" &&
-    (modalStore.districtTypeKey === "trad_activities_zone" || modalStore.districtTypeKey === "industry_zone"),
+    (modalStore.districtTypeKey === "trad_activities_zone" ||
+      modalStore.districtTypeKey === "industry_zone"),
 )
 const isCityCenter = computed(() => phase.value?.key === "cityCenter")
-const isHouseEntranceEdit = computed(() => phase.value?.key === "houseEntrances" && modalStore.isEdit)
+const isHouseEntranceEdit = computed(
+  () => phase.value?.key === "houseEntrances" && modalStore.isEdit,
+)
 
 // ── Watchers ──────────────────────────────────────────────────────────────────
 
@@ -240,7 +245,8 @@ function validate() {
     const labelRequired =
       !(
         key === "districts" &&
-        (modalStore.districtTypeKey === "trad_activities_zone" || modalStore.districtTypeKey === "industry_zone")
+        (modalStore.districtTypeKey === "trad_activities_zone" ||
+          modalStore.districtTypeKey === "industry_zone")
       ) && !(key === "areas" && modalStore.areaTypeKey === "central_urban")
     if (labelRequired && !modalStore.label.trim()) errors.label = "Required"
     if (!modalStore.decisionNumber.trim()) errors.decisionNumber = "Required"
@@ -281,9 +287,7 @@ function onSave() {
   if (!validate()) return
   const key = phase.value?.key
   const result: Partial<FeatureData> = {
-    label: isMainUrban.value
-      ? appStore.communeName
-      : modalStore.label.trim(),
+    label: isMainUrban.value ? appStore.communeName : modalStore.label.trim(),
     decisionNumber: modalStore.decisionNumber.trim(),
     decisionDate: modalStore.decisionDate.trim(),
   }

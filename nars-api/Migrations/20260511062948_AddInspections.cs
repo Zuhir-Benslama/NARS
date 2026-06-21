@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -32,8 +32,8 @@ namespace NarsApi.Migrations
             migrationBuilder.CreateIndex(
                 name: "ix_inspections_feature_created",
                 table: "inspections",
-                columns: new[] { "feature_id", "created_at" },
-                descending: new[] { false, true });
+                columns: ["feature_id", "created_at"],
+                descending: [false, true]);
 
             migrationBuilder.CreateIndex(
                 name: "ix_inspections_feature_id",
@@ -47,10 +47,7 @@ namespace NarsApi.Migrations
         }
 
         /// <inheritdoc />
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.DropTable(
+        protected override void Down(MigrationBuilder migrationBuilder) => migrationBuilder.DropTable(
                 name: "inspections");
-        }
     }
 }

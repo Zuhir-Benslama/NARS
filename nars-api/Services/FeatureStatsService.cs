@@ -19,9 +19,13 @@ public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
         await using var cmd = conn.CreateCommand();
         var sql = new StringBuilder();
         var descriptors = FeatureTypeRegistry.GetAllDescriptors();
-        for (int i = 0; i < descriptors.Count; i++)
+        for (var i = 0; i < descriptors.Count; i++)
         {
-            if (i > 0) sql.Append(" UNION ALL ");
+            if (i > 0)
+            {
+                sql.Append(" UNION ALL ");
+            }
+
             sql.Append($"SELECT '{descriptors[i].Type}' AS type, COUNT(*) FROM {descriptors[i].TableName} WHERE user_id = @uid");
         }
         cmd.CommandText = sql.ToString();
@@ -30,14 +34,19 @@ public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
         var counts = new Dictionary<string, long>(descriptors.Count);
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         while (await reader.ReadAsync(ct))
+        {
             counts[reader.GetString(0)] = reader.GetInt64(1);
+        }
 
         return counts;
     }
 
     public async Task<Dictionary<Guid, UserFeatureStats>> GetUserFeatureCountsAsync(Guid[] userIds, CancellationToken ct = default)
     {
-        if (userIds.Length == 0) return new Dictionary<Guid, UserFeatureStats>();
+        if (userIds.Length == 0)
+        {
+            return [];
+        }
 
         var conn = db.Database.GetDbConnection();
         await using var handle = await conn.EnsureOpenAsync(ct);
@@ -45,15 +54,21 @@ public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
         await using var cmd = conn.CreateCommand();
         var unionBuilder = new StringBuilder();
         var descriptors = FeatureTypeRegistry.GetAllDescriptors();
-        for (int i = 0; i < descriptors.Count; i++)
+        for (var i = 0; i < descriptors.Count; i++)
         {
-            if (i > 0) unionBuilder.Append(" UNION ALL ");
+            if (i > 0)
+            {
+                unionBuilder.Append(" UNION ALL ");
+            }
+
             unionBuilder.Append($"SELECT id, user_id, '{descriptors[i].Type}' AS ft FROM {descriptors[i].TableName}");
         }
 
         var caseBuilder = new StringBuilder();
-        for (int i = 0; i < descriptors.Count; i++)
+        for (var i = 0; i < descriptors.Count; i++)
+        {
             caseBuilder.AppendLine($"                    COALESCE(SUM(CASE WHEN f.ft = '{descriptors[i].Type}' THEN 1 ELSE 0 END), 0),");
+        }
 
         cmd.CommandText = $"""
             SELECT
@@ -74,8 +89,11 @@ public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
         FeatureQueryHelper.AddParameter(cmd, "@ids", userIds);
 
         var typeColIndex = new Dictionary<string, int>(descriptors.Count);
-        for (int i = 0; i < descriptors.Count; i++)
+        for (var i = 0; i < descriptors.Count; i++)
+        {
             typeColIndex[descriptors[i].Type] = 5 + i;
+        }
+
         var totalCol = 5 + descriptors.Count;
 
         var result = new Dictionary<Guid, UserFeatureStats>();

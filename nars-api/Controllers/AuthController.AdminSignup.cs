@@ -42,7 +42,10 @@ public partial class AuthController
         [FromBody] AuthorizedAdminSignupRequest body,
         CancellationToken cancellationToken = default)
     {
-        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
+        if (body is null)
+        {
+            return Problem(detail: "Request body is required.", statusCode: 400);
+        }
         // 1. Verify the authorizing admin's credentials.
         // IMPORTANT: always run BCrypt.Verify even when the user is not found.
         // Short-circuiting on "admin is null" leaks whether a username exists
@@ -56,31 +59,43 @@ public partial class AuthController
         var passwordValid = BCrypt.Net.BCrypt.Verify(body.AdminPassword, hashToCheck);
 
         if (admin is null || !passwordValid)
+        {
             return Unauthorized(new { detail = "Admin credentials are invalid." });
+        }
 
         if (!UserRoles.IsAdmin(admin.Role))
+        {
             return Forbid();
+        }
 
         // 2. Lockout check.
         if (admin.LockedUntil.HasValue && admin.LockedUntil > timeProvider.UtcNow)
+        {
             return StatusCode(423, new { detail = "Admin account is temporarily locked." });
+        }
 
         // 3. Role hierarchy.
         if (!AdminController.CanCreateRole(admin.Role, body.Role))
+        {
             return StatusCode(403, new
             {
                 detail = $"A {admin.Role} cannot create a {body.Role} account."
             });
+        }
 
         // 4. Geographic scope per role.
         var scopeError = await ValidateScopeAsync(admin, body, cancellationToken);
         if (scopeError is not null)
+        {
             return StatusCode(403, new { detail = scopeError });
+        }
 
         // 5. Geographic fields present.
         var geoError = ValidateGeographicFields(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
         if (geoError is not null)
+        {
             return Problem(detail: geoError, statusCode: 400);
+        }
 
         // 6. Uniqueness.
         var existing = await db.Users
@@ -94,7 +109,9 @@ public partial class AuthController
         // 7. Password strength.
         var pwdErr = PasswordValidator.Validate(body.Password);
         if (pwdErr is not null)
+        {
             return Problem(detail: pwdErr, statusCode: 400);
+        }
 
         // 8. Create.
         var newUser = new User
@@ -125,9 +142,12 @@ public partial class AuthController
             return Conflict(new { detail = $"{field} already exists." });
         }
 
-        logger.LogInformation(
-            "[Auth] {AdminUser} ({AdminRole}) created {NewRole} account {NewUser} via login page",
-            admin.Username, admin.Role, newUser.Role, newUser.Username);
+        if (logger.IsEnabled(LogLevel.Information))
+        {
+            logger.LogInformation(
+                "[Auth] {AdminUser} ({AdminRole}) created {NewRole} account {NewUser} via login page",
+                admin.Username, admin.Role, newUser.Role, newUser.Username);
+        }
 
         return StatusCode(201, new ActionResponse(
             Success: true,
@@ -148,30 +168,51 @@ public partial class AuthController
             case (UserRoles.DairaAdmin, UserRoles.CommuneUser):
                 {
                     if (!body.CommuneId.HasValue)
+                    {
                         return "commune_id is required when creating a commune_user.";
+                    }
+
                     var commune = await db.Communes.FindAsync([body.CommuneId.Value], cancellationToken);
                     if (commune is null)
+                    {
                         return "Commune not found.";
+                    }
+
                     if (commune.DairaId != admin.DairaId)
+                    {
                         return "That commune does not belong to your daira.";
+                    }
+
                     return null;
                 }
             // wilaya_admin creates daira_admin: daira must belong to admin's wilaya.
             case (UserRoles.WilayaAdmin, UserRoles.DairaAdmin):
                 {
                     if (!body.DairaId.HasValue)
+                    {
                         return "daira_id is required when creating a daira_admin.";
+                    }
+
                     var daira = await db.Dairas.FindAsync([body.DairaId.Value], cancellationToken);
                     if (daira is null)
+                    {
                         return "Daira not found.";
+                    }
+
                     if (daira.WilayaId != admin.WilayaId)
+                    {
                         return "That daira does not belong to your wilaya.";
+                    }
+
                     return null;
                 }
             // national_admin creates wilaya_admin: any wilaya is valid.
             case (UserRoles.NationalAdmin, UserRoles.WilayaAdmin):
                 if (body.WilayaId.HasValue && await db.Wilayas.FindAsync([body.WilayaId.Value], cancellationToken) is null)
+                {
                     return "Wilaya not found.";
+                }
+
                 return null;
 
             default:

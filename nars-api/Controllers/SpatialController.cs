@@ -31,16 +31,24 @@ public class SpatialController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetRoadSide([FromBody] RoadSideRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
+        if (body is null)
+        {
+            return Problem(detail: "Request body is required.", statusCode: 400);
+        }
+
         var road = await db.Roads.FirstOrDefaultAsync(f =>
             f.Id == body.RoadId && f.UserId == CurrentUserId, cancellationToken);
 
         if (road is null)
+        {
             return Problem(detail: "Road not found.", statusCode: 404);
+        }
 
         var roadData = JsonSerializer.Deserialize<JsonElement>(road.Data);
         if (!roadData.TryGetProperty("coordinates", out var coordsEl))
+        {
             return Problem(detail: "Road data is missing coordinates.", statusCode: 400);
+        }
 
         var roadCoords = coordsEl.EnumerateArray()
             .Select(c => (Lat: c.GetProperty("lat").GetDouble(),
@@ -48,34 +56,36 @@ public class SpatialController(
             .ToList();
 
         if (roadCoords.Count < 2)
+        {
             return Problem(detail: "Road has insufficient coordinates.", statusCode: 400);
+        }
 
         // Find the nearest segment midpoint to the marker.
         // Apply cosine correction so the Δlng component is in the same
         // unit scale as Δlat (important at Algeria's latitudes ~28–37°N).
         double markerLat = body.Lat, markerLng = body.Lng;
-        double cosLat = Math.Cos(markerLat * Math.PI / 180.0);
-        double minDist = double.MaxValue;
-        int nearestIdx = 0;
+        var cosLat = Math.Cos(markerLat * Math.PI / 180.0);
+        var minDist = double.MaxValue;
+        var nearestIdx = 0;
 
-        for (int i = 0; i < roadCoords.Count - 1; i++)
+        for (var i = 0; i < roadCoords.Count - 1; i++)
         {
             var mid = ((roadCoords[i].Lat + roadCoords[i + 1].Lat) / 2,
                        (roadCoords[i].Lng + roadCoords[i + 1].Lng) / 2);
-            double dLat = markerLat - mid.Item1;
-            double dLng = (markerLng - mid.Item2) * cosLat;
-            double d = Math.Sqrt(dLat * dLat + dLng * dLng);
+            var dLat = markerLat - mid.Item1;
+            var dLng = (markerLng - mid.Item2) * cosLat;
+            var d = Math.Sqrt(dLat * dLat + dLng * dLng);
             if (d < minDist) { minDist = d; nearestIdx = i; }
         }
 
-        var p1 = roadCoords[nearestIdx];
+        var (Lat, Lng) = roadCoords[nearestIdx];
         var p2 = roadCoords[nearestIdx + 1];
 
         // Cross product: positive -> left, negative -> right
-        double cross = (p2.Lng - p1.Lng) * (markerLat - p1.Lat)
-                     - (p2.Lat - p1.Lat) * (markerLng - p1.Lng);
+        var cross = (p2.Lng - Lng) * (markerLat - Lat)
+                  - (p2.Lat - Lat) * (markerLng - Lng);
 
-        string side = cross >= 0 ? "left" : "right";
+        var side = cross >= 0 ? "left" : "right";
 
         // Query used entrance numbers via dedicated service (raw ADO.NET
         // is required for JSONB field extraction that EF Core doesn't handle).
@@ -83,9 +93,11 @@ public class SpatialController(
             RequiredCurrentUserId, body.RoadId, cancellationToken);
 
         // Next available odd (left) or even (right) number
-        int suggested = side == "left" ? 1 : 2;
+        var suggested = side == "left" ? 1 : 2;
         while (usedNumbers.Contains(suggested))
+        {
             suggested += 2;
+        }
 
         return Ok(new RoadSideResponse(side, suggested));
     }
@@ -98,7 +110,10 @@ public class SpatialController(
     {
         var communeId = CurrentCommuneId;
         if (communeId is null)
+        {
             return Problem(detail: "This endpoint requires a commune-level account.", statusCode: 400);
+        }
+
         await scatteredService.RefreshAsync(RequiredCurrentUserId, communeId.Value, cancellationToken);
         return Ok(new ScatteredRefreshResponse(true, null, "Scattered area recomputed."));
     }

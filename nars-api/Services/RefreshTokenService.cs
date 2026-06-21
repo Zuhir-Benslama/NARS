@@ -22,7 +22,9 @@ public class RefreshTokenService(
     public async Task<RefreshTokenResult> RotateRefreshTokenAsync(string? rawRefreshToken, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(rawRefreshToken))
+        {
             return new RefreshTokenResult(false, "No refresh token.", null, null, null, null);
+        }
 
         var hash = Convert.ToBase64String(
             System.Security.Cryptography.SHA256.HashData(

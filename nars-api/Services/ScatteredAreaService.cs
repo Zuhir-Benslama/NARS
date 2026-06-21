@@ -39,13 +39,25 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
     : IScatteredAreaService
 {
     private const string DefaultLabel = "Scattered Area";
-    private readonly object _errorLock = new();
+    private readonly Lock _errorLock = new();
     private (DateTimeOffset Timestamp, string Message)? _lastError;
 
     public (DateTimeOffset Timestamp, string Message)? LastError
     {
-        get { lock (_errorLock) return _lastError; }
-        private set { lock (_errorLock) _lastError = value; }
+        get
+        {
+            lock (_errorLock)
+            {
+                return _lastError;
+            }
+        }
+        private set
+        {
+            lock (_errorLock)
+            {
+                _lastError = value;
+            }
+        }
     }
 
     public async Task RefreshAsync(Guid userId, int communeId, CancellationToken cancellationToken = default)
@@ -90,9 +102,14 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
             // instead of buffering it in Npgsql's internal buffer.
             using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken);
             if (await reader.ReadAsync(cancellationToken) && !await reader.IsDBNullAsync(0, cancellationToken))
+            {
                 scatteredGeoJson = await reader.GetTextReader(0).ReadToEndAsync(cancellationToken);
+            }
 
-            if (scatteredGeoJson is null) return;
+            if (scatteredGeoJson is null)
+            {
+                return;
+            }
 
             await db.Areas
                 .Where(f => f.UserId == userId &&
@@ -121,7 +138,7 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
                     label = DefaultLabel,
                     layer = "scattered",
                     geometry = scatteredGeoJson,
-                    coordinates = coordinates,
+                    coordinates,
                 }),
             });
             await db.SaveChangesAsync(cancellationToken);
@@ -146,7 +163,10 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
     private static List<List<object>> ExtractAllRings(JsonElement geo)
     {
         var result = new List<List<object>>();
-        if (!geo.TryGetProperty("type", out var typeProp)) return result;
+        if (!geo.TryGetProperty("type", out var typeProp))
+        {
+            return result;
+        }
 
         var geomType = typeProp.GetString();
 
@@ -157,7 +177,9 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
         else if (geomType == "MultiPolygon" && geo.TryGetProperty("coordinates", out var multiCoords))
         {
             foreach (var polygon in multiCoords.EnumerateArray())
+            {
                 result.Add(RingToLatLngList(polygon.EnumerateArray().FirstOrDefault()));
+            }
         }
 
         return result;
@@ -170,7 +192,9 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
         {
             var arr = point.EnumerateArray().ToArray();
             if (arr.Length >= 2)
+            {
                 points.Add(new { lng = arr[0].GetDouble(), lat = arr[1].GetDouble() });
+            }
         }
         return points;
     }

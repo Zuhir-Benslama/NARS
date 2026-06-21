@@ -66,7 +66,9 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
         }
 
         if (descriptor.PostUpdateAction is not null)
+        {
             await descriptor.PostUpdateAction(db, featureId, userId, body.Data, ct);
+        }
 
         await tx.CommitAsync(ct);
         return true;
@@ -83,7 +85,7 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
             return false;
         }
 
-        int deleted = await dbSet.Where(f => f.Id == featureId && f.UserId == userId).ExecuteDeleteAsync(ct);
+        var deleted = await dbSet.Where(f => f.Id == featureId && f.UserId == userId).ExecuteDeleteAsync(ct);
         if (deleted == 0)
         {
             await tx.RollbackAsync(ct);
@@ -108,17 +110,25 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
         var sb = new StringBuilder();
         sb.Append("WITH ");
 
-        for (int i = 0; i < descriptors.Count; i++)
+        for (var i = 0; i < descriptors.Count; i++)
         {
-            if (i > 0) sb.Append(", ");
+            if (i > 0)
+            {
+                sb.Append(", ");
+            }
+
             sb.Append($"d{i} AS (DELETE FROM {descriptors[i].TableName} WHERE user_id = @uid RETURNING id)");
         }
 
         sb.AppendLine(",");
         sb.Append("all_deleted AS (");
-        for (int i = 0; i < descriptors.Count; i++)
+        for (var i = 0; i < descriptors.Count; i++)
         {
-            if (i > 0) sb.Append(" UNION ALL ");
+            if (i > 0)
+            {
+                sb.Append(" UNION ALL ");
+            }
+
             sb.Append($"SELECT id FROM d{i}");
         }
         sb.AppendLine("),");

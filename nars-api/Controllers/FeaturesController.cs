@@ -28,42 +28,65 @@ public class FeaturesController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> SaveFeature([FromBody] FeatureSaveRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
+        if (body is null)
+        {
+            return Problem(detail: "Request body is required.", statusCode: 400);
+        }
+
         if (!FeatureTypes.AllTypes.Contains(body.Type))
+        {
             return Problem(detail: $"Unknown feature type '{body.Type}'.", statusCode: 400);
+        }
+
         if (!FeatureTypes.IsValidLayer(body.Type, body.Layer))
+        {
             return Problem(detail: $"Layer '{body.Layer}' is not valid for type '{body.Type}'.", statusCode: 400);
+        }
 
         if (body.Type == FeatureTypes.Area && body.Layer == FeatureTypes.AreaLayers.Scattered)
+        {
             return Problem(detail: "Scattered areas are auto-computed and cannot be saved manually.", statusCode: 400);
+        }
 
         var rawJson = body.Data.GetRawText();
         if (rawJson.Length > _maxFeatureDataSize)
+        {
             return Problem(detail: "Feature data is too large (max 512 KB).", statusCode: 400);
+        }
 
         var dataJson = rawJson;
 
         Guid? roadId = null;
         if (body.Type == FeatureTypes.HouseEntrance && body.Layer == FeatureTypes.HouseEntranceLayers.Main
             && body.Data.TryGetProperty("roadDbId", out var ridEl) && ridEl.ValueKind == JsonValueKind.String && Guid.TryParse(ridEl.GetString(), out var rid))
+        {
             roadId = rid;
+        }
 
         if (roadId.HasValue && !await featureRepo.RoadExistsAsync(roadId.Value, RequiredCurrentUserId, cancellationToken))
+        {
             return Problem(detail: "Referenced road not found.", statusCode: 400);
+        }
 
-        Guid newId = Guid.CreateVersion7();
+        var newId = Guid.CreateVersion7();
 
         var entity = FeatureTypeRegistry.CreateEntity(body.Type, newId, RequiredCurrentUserId, body.Layer, body.Label, dataJson);
         if (entity is null)
+        {
             return Problem(detail: $"Unknown feature type '{body.Type}'.", statusCode: 400);
+        }
 
         if (entity is HouseEntrance entrance)
+        {
             entrance.RoadId = roadId;
+        }
 
         await featureRepo.SaveFeatureAsync(entity, body.Type, cancellationToken);
 
         if (body.Type == FeatureTypes.Area)
+        {
             await QueueScatteredRefresh();
+        }
 
         return StatusCode(201, new SaveFeatureResponse(Success: true, Id: newId.ToString(), Message: "Feature saved successfully"));
     }
@@ -92,9 +115,15 @@ public class FeaturesController(
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ClearFeatures([FromBody] ClearFeaturesRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
+        if (body is null)
+        {
+            return Problem(detail: "Request body is required.", statusCode: 400);
+        }
+
         if (!body.Confirm)
+        {
             return Problem(detail: "Set \"confirm\": true to delete all features.", statusCode: 400);
+        }
 
         var (total, _) = await featureRepo.ClearAllFeaturesAsync(RequiredCurrentUserId, cancellationToken);
 
@@ -141,31 +170,47 @@ public class FeaturesController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateFeature(Guid featureId, [FromBody] FeatureUpdateRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
+        if (body is null)
+        {
+            return Problem(detail: "Request body is required.", statusCode: 400);
+        }
 
         var featureType = await featureRepo.GetFeatureTypeAsync(featureId, cancellationToken);
-        if (featureType is null) return Problem(detail: "Feature not found", statusCode: 404);
+        if (featureType is null)
+        {
+            return Problem(detail: "Feature not found", statusCode: 404);
+        }
 
         if (!await featureRepo.OwnsFeatureAsync(featureId, featureType, RequiredCurrentUserId, cancellationToken))
+        {
             return Problem(detail: "Feature not found", statusCode: 404);
+        }
 
         if (body.Data is JsonElement dataElement)
         {
             var rawJson = dataElement.GetRawText();
             if (rawJson.Length > _maxFeatureDataSize)
+            {
                 return Problem(detail: "Feature data is too large (max 512 KB).", statusCode: 400);
+            }
         }
 
         var descriptor = FeatureTypeRegistry.GetDescriptor(featureType);
         if (descriptor is null)
+        {
             return Problem(detail: $"Unknown feature type in registry: {featureType}", statusCode: 400);
+        }
 
         var updatedAt = timeProvider.UtcNow;
         if (!await featureRepo.UpdateFeatureAsync(descriptor, featureId, RequiredCurrentUserId, body, updatedAt, cancellationToken))
+        {
             return Problem(detail: "Feature not found", statusCode: 404);
+        }
 
         if (featureType == FeatureTypes.Area)
+        {
             await QueueScatteredRefresh();
+        }
 
         return Ok(new UpdateFeatureResponse(Success: true, Id: featureId.ToString(), UpdatedAt: updatedAt));
     }
@@ -177,13 +222,20 @@ public class FeaturesController(
     public async Task<IActionResult> DeleteFeature(Guid featureId, CancellationToken cancellationToken = default)
     {
         var featureType = await featureRepo.GetFeatureTypeAsync(featureId, cancellationToken);
-        if (featureType is null) return Problem(detail: "Feature not found", statusCode: 404);
+        if (featureType is null)
+        {
+            return Problem(detail: "Feature not found", statusCode: 404);
+        }
 
         if (!await featureRepo.DeleteFeatureAsync(featureId, RequiredCurrentUserId, featureType, cancellationToken))
+        {
             return Problem(detail: "Feature not found", statusCode: 404);
+        }
 
         if (featureType == FeatureTypes.Area)
+        {
             await QueueScatteredRefresh();
+        }
 
         return Ok(new ActionResponse(Success: true, Message: "Feature deleted successfully"));
     }
@@ -197,7 +249,7 @@ public class FeaturesController(
             try
             {
                 var svc = sp.GetRequiredService<IScatteredAreaService>();
-                await svc.RefreshAsync(currentUserId, currentCommuneId);
+                await svc.RefreshAsync(currentUserId, currentCommuneId, ct);
             }
             catch (Exception ex)
             {
