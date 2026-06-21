@@ -1,17 +1,17 @@
 // ─── PHASE NAVIGATION ─────────────────────────────────────────────────────────
 
-import { t } from "../../i18n"
-import { PHASES } from "../../phases"
-import { useAppStore } from "../../stores/appStore"
-import { useLayerStore } from "../../stores/layerStore"
-import type { LayerState } from "../../stores/layerStore"
-import { showToast } from "../../lib/toast"
-import { checkDistrictCoverage } from "../../lib/validation"
-import { buildDrawControl } from "../draw/draw-control"
-import { setDrawingPhase } from "../draw/draw-complete"
-import { refreshLayerVisibility } from "../rendering/labels"
-import { computeAndApplyRoadDirections } from "../roads/road-directions"
-import { savePhase } from "./phase-storage"
+import { t } from "../i18n"
+import { PHASES } from "../phases"
+import { useAppStore } from "../stores/appStore"
+import { useLayerStore } from "../stores/layerStore"
+import type { LayerState } from "../stores/layerStore"
+import { showToast } from "../lib/toast"
+import { checkDistrictCoverage } from "../lib/validation"
+import { buildDrawControl } from "../map/draw/draw-control"
+import { setDrawingPhase } from "../map/draw/draw-complete"
+import { refreshLayerVisibility } from "../map/rendering/labels"
+import { computeAndApplyRoadDirections } from "../map/roads/road-directions"
+import { savePhase } from "./storage"
 
 export async function navigatePhase(direction: number): Promise<void> {
   const appStore = useAppStore()

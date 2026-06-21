@@ -59,27 +59,39 @@ export function useApiFetch<T = unknown>(): UseApiFetchReturn<T> {
   return { data, error, isLoading, execute, reset }
 }
 
+export type ApiRequestResult<T> =
+  | { success: true; data: T }
+  | { success: false; error: Error; status?: number }
+
 /**
- * Execute a one-off API request and return the result.
- * This is a convenience wrapper for simple calls where you don't
- * need to track loading/error state reactively.
+ * Execute a one-off API request and return a result object that
+ * distinguishes success from failure.
  *
  * @example
  * ```ts
- * const user = await apiRequest<UserInfo>('/api/current_user')
+ * const result = await apiRequest<UserInfo>('/api/current_user')
+ * if (result.success) {
+ *   console.log(result.data.name)
+ * } else {
+ *   console.error(result.error)
+ * }
  * ```
  */
 export async function apiRequest<T = unknown>(
   path: string,
   options?: ApiFetchOptions,
-): Promise<T | null> {
+): Promise<ApiRequestResult<T>> {
   try {
     const response = await apiFetch(path, options)
-    if (!response.ok) return null
-    return (await response.json()) as T
+    if (!response.ok) {
+      return { success: false, error: new Error(`HTTP ${response.status}`), status: response.status }
+    }
+    const data = (await response.json()) as T
+    return { success: true, data }
   } catch (err) {
-    logError(createNetworkError(`apiRequest failed: ${path}`, { url: path }, err))
-    return null
+    const error = err instanceof Error ? err : new Error(String(err))
+    logError(createNetworkError(`apiRequest failed: ${path}`, { url: path }, error))
+    return { success: false, error }
   }
 }
 

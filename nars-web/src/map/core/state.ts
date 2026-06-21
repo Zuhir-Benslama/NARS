@@ -104,8 +104,7 @@ export const featuresStore: {
   },
 
   // Load all at once — single setData instead of N individual setData calls.
-  // Multiple rapid setData calls each trigger Geoman's sourcedata handler,
-  // causing it to try to re-register already-known features.
+  // After clear() + batchAdd, only ONE updateSource fires here.
   batchAdd(incoming: MaplibreFeature[]) {
     debugLog("[STORE] batchAdd incoming count:", incoming.length)
     this.features.push(...incoming)
@@ -114,9 +113,9 @@ export const featuresStore: {
 
   // Reset in-memory store and clear the map source.
   // Call this before every loadFromDatabase() to prevent stale duplicates.
+  // Does NOT call updateSource() — the caller (batchAdd) will trigger it once.
   clear() {
     this.features = []
-    this.updateSource()
   },
 
   remove(id: string) {

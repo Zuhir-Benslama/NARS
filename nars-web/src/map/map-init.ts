@@ -28,9 +28,7 @@ export async function initMap(): Promise<void> {
     sources: {
       satellite: {
         type: "raster",
-        tiles: [
-          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        ],
+        tiles: [...MAP_CONFIG.tileUrls.satellite],
         tileSize: 256,
         maxzoom: 17,
       },
@@ -61,11 +59,7 @@ export async function initMap(): Promise<void> {
     sources: {
       osm: {
         type: "raster",
-        tiles: [
-          "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
-          "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
-          "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        ],
+        tiles: [...MAP_CONFIG.tileUrls.street],
         tileSize: 256,
         maxzoom: 19,
         attribution:
@@ -79,11 +73,7 @@ export async function initMap(): Promise<void> {
     sources: {
       carto: {
         type: "raster",
-        tiles: [
-          "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-          "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-          "https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-        ],
+        tiles: [...MAP_CONFIG.tileUrls.light],
         tileSize: 256,
         maxzoom: 19,
       },
@@ -95,11 +85,7 @@ export async function initMap(): Promise<void> {
     sources: {
       "carto-dark": {
         type: "raster",
-        tiles: [
-          "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-          "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-          "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-        ],
+        tiles: [...MAP_CONFIG.tileUrls.dark],
         tileSize: 256,
         maxzoom: 19,
       },

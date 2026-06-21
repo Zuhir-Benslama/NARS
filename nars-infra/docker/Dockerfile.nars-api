@@ -11,8 +11,10 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # curl is needed for Docker HEALTHCHECK. The ~5MB is a deliberate trade-off
 # for non-K8s deployments (docker-compose, local runs) that rely on HEALTHCHECK.
+# Pinned to the 8.5.0-2ubuntu10 series (wildcard) for hadolint DL3008 compliance,
+# while tolerating security patch bumps within the same series.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        curl=8.5.0-2ubuntu10.9 \
+        curl=8.5.0-2ubuntu10* \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 USER ubuntu

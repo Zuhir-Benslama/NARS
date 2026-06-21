@@ -7,9 +7,16 @@ import { FetchInstrumentation } from "@opentelemetry/instrumentation-fetch"
 import { DocumentLoadInstrumentation } from "@opentelemetry/instrumentation-document-load"
 import { registerInstrumentations } from "@opentelemetry/instrumentation"
 
-const otelEndpoint = import.meta.env.VITE_OTEL_ENDPOINT || "/v1/traces"
+const otelEndpoint = import.meta.env.VITE_OTEL_ENDPOINT
 
 export function initTelemetry() {
+  if (!otelEndpoint) {
+    if (import.meta.env.PROD) {
+      console.warn("[Telemetry] VITE_OTEL_ENDPOINT not set — telemetry disabled")
+    }
+    return
+  }
+
   const exporter = new OTLPTraceExporter({
     url: otelEndpoint,
   })

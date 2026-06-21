@@ -12,14 +12,16 @@ import { registerFieldWorkerClick } from "./field-click"
 export { setBaseLayer } from "./map-init"
 export { displayCommuneBoundary } from "./rendering/geometry"
 export { bindContextMenu } from "./context-menu/context-menu"
-export { fetchRoadSide, computeBisNumber } from "./features/features"
+export { buildFeatureData, toApiSaveShape } from "./features/feature-data"
+export { saveToDatabase } from "./features/feature-persistence"
+export { fetchRoadSide, computeBisNumber, prepareModalExtras } from "./features/feature-modal"
 export { createEntranceIconHtml, areaStyle } from "./rendering/styles"
 export { loadFromDatabase, loadUserAndCommune } from "./features/loader"
-export { navigatePhase, goToPhase, setPhase } from "./phases/phase-nav"
+export { navigatePhase, goToPhase, setPhase } from "../phases-nav/navigation"
 export { setHouseNumbers, getFeatureType } from "./house-numbering"
 export { updateDrawingPreview } from "./map-layers"
 
-// ─── FULL INITIALIZATION ──────────────────────────────────────────────────────
+// ─── FULL INITIALIZATION / CLEANUP ────────────────────────────────────────────
 
 export async function initMap(): Promise<void> {
   await initMapInstance()
@@ -28,4 +30,10 @@ export async function initMap(): Promise<void> {
   registerDrawEvents()
   registerGeomanEvents()
   registerFieldWorkerClick()
+}
+
+import { destroyDrawEvents } from "./draw/draw-events"
+
+export function destroyMap(): void {
+  destroyDrawEvents()
 }

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DEPRECATED — Prefer render-mermaid-playwright.mjs (more robust, no JSDOM globals).
 import { readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
