@@ -1,7 +1,17 @@
 import type { LatLng } from "./coordinates"
 
+export type FeatureTypeKey =
+  | "areas"
+  | "districts"
+  | "cityCenter"
+  | "roads"
+  | "houseEntrances"
+  | "publicBuildings"
+  | "publicSpaces"
+  | "namingPanels"
+
 export interface FeatureData {
-  type: string
+  type: FeatureTypeKey
   label: string
   decisionNumber: string
   decisionDate: string

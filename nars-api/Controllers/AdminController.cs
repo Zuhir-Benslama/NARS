@@ -1,4 +1,3 @@
-using System.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -85,7 +84,7 @@ public class AdminController(
         {
             case UserRoles.WilayaAdmin:
                 {
-                    var daira = await db.Dairas.FindAsync([dairaId, cancellationToken], cancellationToken: cancellationToken);
+                    var daira = await db.Dairas.FindAsync([dairaId], cancellationToken);
                     if (daira is null || daira.WilayaId != user.WilayaId)
                     {
                         return Forbid();
@@ -140,7 +139,7 @@ public class AdminController(
                         return Problem(detail: "commune_id is required.", statusCode: 400);
                     }
 
-                    var commune = await db.Communes.FindAsync([body.CommuneId.Value, cancellationToken], cancellationToken: cancellationToken);
+                    var commune = await db.Communes.FindAsync([body.CommuneId.Value], cancellationToken);
                     if (commune is null || commune.DairaId != creator.DairaId)
                     {
                         return Forbid();
@@ -155,7 +154,7 @@ public class AdminController(
                         return Problem(detail: "daira_id is required.", statusCode: 400);
                     }
 
-                    var daira = await db.Dairas.FindAsync([body.DairaId.Value, cancellationToken], cancellationToken: cancellationToken);
+                    var daira = await db.Dairas.FindAsync([body.DairaId.Value], cancellationToken);
                     if (daira is null || daira.WilayaId != creator.WilayaId)
                     {
                         return Forbid();

@@ -73,7 +73,7 @@ public class FieldController(
             return Problem(detail: "Invalid or missing type. Use: road, house_entrance, or naming_panel.", statusCode: 400);
         }
 
-        var (Items, Total) = await fieldService.QueryFeaturesAsync(descriptor.TableName, userIds, skip, take, cancellationToken);
+        var (Items, Total) = await fieldService.QueryFeaturesAsync(descriptor, userIds, skip, take, cancellationToken);
         return Ok(new LoadFeaturesResponse(Features: Items, Count: Total, Skip: skip, Take: take));
     }
 

@@ -39,11 +39,12 @@ export async function validateRoad(coordinates: LatLng[]): Promise<ValidateRoadR
   }
 
   try {
-    return (await apiFetch("/api/validate/road", {
+    const res = await apiFetch("/api/validate/road", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ coordinates }),
-    }).then((r) => r.json())) as Promise<ValidateRoadResponse>
+    })
+    return (await res.json()) as ValidateRoadResponse
   } catch (err) {
     if (err instanceof NarsError) {
       logError(err, { action: "validateRoad" })
@@ -73,11 +74,12 @@ export async function validateDistrict(
     }
   }
   try {
-    return (await apiFetch("/api/validate/district", {
+    const res = await apiFetch("/api/validate/district", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ coordinates: coords, districtTypeKey }),
-    }).then((r) => r.json())) as Promise<ValidateDistrictResponse>
+    })
+    return (await res.json()) as ValidateDistrictResponse
   } catch (err) {
     if (err instanceof NarsError) {
       logError(err, { action: "validateDistrict" })
@@ -91,9 +93,8 @@ export async function validateDistrict(
 // GET /api/validate/districts/coverage
 export async function checkDistrictCoverage(): Promise<DistrictCoverageResponse> {
   try {
-    return (await apiFetch("/api/validate/districts/coverage").then((r) =>
-      r.json(),
-    )) as Promise<DistrictCoverageResponse>
+    const res = await apiFetch("/api/validate/districts/coverage")
+    return (await res.json()) as DistrictCoverageResponse
   } catch (err) {
     if (err instanceof NarsError) {
       logError(err, { action: "checkDistrictCoverage" })
@@ -107,9 +108,8 @@ export async function checkDistrictCoverage(): Promise<DistrictCoverageResponse>
 // GET /api/validate/area/main-urban-exists
 export async function checkMainUrbanExists(): Promise<boolean> {
   try {
-    const d = (await apiFetch("/api/validate/area/main-urban-exists").then((r) => r.json())) as {
-      exists: boolean
-    }
+    const res = await apiFetch("/api/validate/area/main-urban-exists")
+    const d = (await res.json()) as { exists: boolean }
     return d.exists
   } catch (err) {
     debugError("checkMainUrbanExists failed:", err)
@@ -124,11 +124,12 @@ export async function getRoadSide(
   lng: number,
 ): Promise<RoadSideResponse | null> {
   try {
-    return (await apiFetch("/api/road-side", {
+    const res = await apiFetch("/api/road-side", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ roadId: roadDbId, lat, lng }),
-    }).then((r) => r.json())) as Promise<RoadSideResponse>
+    })
+    return (await res.json()) as RoadSideResponse
   } catch (err) {
     debugError("getRoadSide failed:", err)
     return null

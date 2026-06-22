@@ -200,17 +200,6 @@ describe("toApiSaveShape", () => {
     expect(result).toEqual({ type: "public_space", layer: "garden" })
   })
 
-  it("returns null for unknown type", () => {
-    const result = toApiSaveShape({
-      type: "unknown_type",
-      label: "Unknown",
-      decisionNumber: "001",
-      decisionDate: "2024-01-01",
-    })
-
-    expect(result).toBeNull()
-  })
-
   it("uses default layer when type key is missing", () => {
     const result = toApiSaveShape({
       type: "areas",

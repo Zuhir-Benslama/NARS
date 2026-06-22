@@ -10,8 +10,9 @@ public class FieldService(
     ILogger<FieldService> logger) : IFieldService
 {
     public async Task<(List<object> Items, int Total)> QueryFeaturesAsync(
-        string tableName, Guid[] userIds, int skip, int take, CancellationToken ct = default)
+        FeatureTypeDescriptor descriptor, Guid[] userIds, int skip, int take, CancellationToken ct = default)
     {
+        var tableName = descriptor.TableName;
         var conn = db.Database.GetDbConnection();
         await using var handle = await conn.EnsureOpenAsync(ct);
 
