@@ -76,6 +76,7 @@
   },
   "overrides": {
     "glob": "^11.0.0",
+    "js-yaml": "^4.2.0",
     "openapi-typescript": {
       "typescript": "^6.0.3"
     }

@@ -3,3 +3,6 @@ docs/pdf/
 
 # Generated Mermaid SVG output
 docs/uml/*.svg
+
+# Python bytecode
+scripts/__pycache__/
