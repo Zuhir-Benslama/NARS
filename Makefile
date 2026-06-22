@@ -125,48 +125,37 @@ cluster-logs: ## Tail logs from all pods in the namespace
 	@$(KUBECTL) logs -n "$(NAMESPACE)" --all-containers --tail=50 --follow 2>/dev/null \
 		|| echo "No pods found in namespace '$(NAMESPACE)'"
 
-PROXY_DIR        ?= /tmp/kind-proxy
-KUBECTL_INSIDE    = docker exec -i nars-control-plane kubectl
-PROXY_IMAGE      ?= alpine/socat
-
 .PHONY: cluster-port-forward
-cluster-port-forward: proxy-up ## Port-forward + proxy (rootless Docker). Use proxy-up directly if already running.
+cluster-port-forward: proxy-up ## Port-forward + Docker bridge (rootless Docker). Use proxy-up directly if already running.
+
+PROXY_CONTAINER ?= kind-proxy
 
 .PHONY: port-forward-start
-port-forward-start: ## Start kubectl port-forward INSIDE the kind container (background)
+port-forward-start: ## Start kubectl port-forward inside the kind container (background)
 	@echo "→ Starting port-forward inside kind container..."
-	@-docker exec nars-control-plane sh -c 'pkill -f "port-forward.*ingress-nginx" 2>/dev/null; true' || true
+	@docker exec nars-control-plane sh -c 'pkill -f "port-forward.*ingress-nginx" 2>/dev/null; true' 2>/dev/null || true
 	@sleep 0.5
 	@docker exec -d nars-control-plane kubectl port-forward --address 0.0.0.0 \
 		-n ingress-nginx service/ingress-nginx-controller 8080:80 > /dev/null 2>&1
-	@sleep 1
+	@sleep 2
 	@echo "✓ Port-forward started inside kind container"
 
 .PHONY: port-forward-stop
 port-forward-stop: ## Stop port-forward inside the kind container
-	@docker exec nars-control-plane sh -c 'pkill -f "port-forward.*ingress-nginx" 2>/dev/null; true' || true
+	@docker exec nars-control-plane sh -c 'pkill -f "port-forward.*ingress-nginx" 2>/dev/null; true' 2>/dev/null || true
 	@echo "✓ Port-forward stopped"
 
 .PHONY: proxy-up
-proxy-up: port-forward-start ## Start socat bridge from host:8080 → kind container (requires port-forward)
-	@echo "→ Setting up Unix socket proxy bridge..."
-	@mkdir -p "$(PROXY_DIR)"
-	@-docker rm -f kind-proxy 2>/dev/null || true
-	@rm -f "$(PROXY_DIR)/proxy.sock" 2>/dev/null || true
-	@echo "  Starting socat in kind network namespace..."
-	@docker run -d --name kind-proxy --rm \
-		--network container:nars-control-plane \
-		-v "$(PROXY_DIR):/tmp/kind-proxy" \
-		$(PROXY_IMAGE) \
-		UNIX-LISTEN:/tmp/kind-proxy/proxy.sock,fork,reuseaddr TCP:localhost:8080 > /dev/null
-	@sleep 1
-	@echo "  Starting host-side socat listener on :8080..."
-	@-kill $(lsof -tiTCP:8080 2>/dev/null) 2>/dev/null || true
-	@sleep 0.3
-	@nohup socat TCP-LISTEN:8080,reuseaddr,fork \
-		UNIX-CONNECT:"$(PROXY_DIR)/proxy.sock" \
-		> /tmp/kind-proxy-socat.log 2>&1 &
-	@sleep 1
+proxy-up: port-forward-start ## Start Docker socat bridge: host:8080 → kind:8080
+	@echo "→ Setting up socat bridge container..."
+	@-docker rm -f "$(PROXY_CONTAINER)" 2>/dev/null || true
+	@sleep 0.5
+	@docker run -d --name "$(PROXY_CONTAINER)" --rm \
+		-p 8080:8080 \
+		--network kind \
+		alpine/socat \
+		tcp-l:8080,fork,reuseaddr tcp:nars-control-plane:8080 > /dev/null
+	@sleep 2
 	@echo ""
 	@echo "✓ App accessible at http://localhost:8080/"
 	@echo "  Health:      http://localhost:8080/health"
@@ -174,23 +163,18 @@ proxy-up: port-forward-start ## Start socat bridge from host:8080 → kind conta
 	@echo "  Stop proxy:  make proxy-down"
 
 .PHONY: proxy-down
-proxy-down: port-forward-stop ## Stop the socat proxy bridge and port-forward
-	@echo "→ Stopping socat proxy..."
-	@-docker rm -f kind-proxy 2>/dev/null || true
-	@-kill $(lsof -tiTCP:8080 2>/dev/null) 2>/dev/null || true
-	@-rm -f "$(PROXY_DIR)/proxy.sock" 2>/dev/null || true
+proxy-down: port-forward-stop ## Stop the socat bridge and port-forward
+	@echo "→ Stopping socat bridge..."
+	@-docker rm -f "$(PROXY_CONTAINER)" 2>/dev/null || true
 	@echo "✓ Proxy stopped"
 
 .PHONY: proxy-status
-proxy-status: ## Show proxy bridge status
+proxy-status: ## Show proxy status
 	@echo "=== Port-forward (kind container) ==="
 	@docker exec nars-control-plane ss -tlnp 2>/dev/null | grep 8080 || echo "  NOT RUNNING"
 	@echo ""
-	@echo "=== kind-proxy container ==="
-	@docker ps --filter name=kind-proxy --format '  {{.ID}} {{.Status}} {{.Image}}' 2>/dev/null || echo "  NOT RUNNING"
-	@echo ""
-	@echo "=== Host socat listener ==="
-	@lsof -tiTCP:8080 2>/dev/null | head -1 | xargs -r ps -p 2>/dev/null | tail -1 || echo "  NOT RUNNING"
+	@echo "=== socat bridge container ==="
+	@docker ps --filter name=$(PROXY_CONTAINER) --format '  {{.ID}} {{.Status}} {{.Image}}' 2>/dev/null || echo "  NOT RUNNING"
 	@echo ""
 	@echo "=== App health ==="
 	@curl -s -o /dev/null -w "  HTTP %{http_code}\n" --connect-timeout 3 http://localhost:8080/ 2>/dev/null || echo "  UNREACHABLE"
@@ -772,8 +756,8 @@ observability-otel-collector: ## Install OpenTelemetry Collector
 .PHONY: observability-servicemonitor
 observability-servicemonitor: ## Apply OTel metrics Service + ServiceMonitor (requires prometheus CRDs)
 	@echo "→ Applying OTel metrics Service and ServiceMonitor..."
-	@$(KUBECTL) apply -f $(K8S_DIR)/otel-metrics-service.yaml
-	@$(KUBECTL) apply -f $(K8S_DIR)/servicemonitor.yaml
+	@cat $(K8S_DIR)/otel-metrics-service.yaml | $(KUBECTL) apply -f -
+	@cat $(K8S_DIR)/servicemonitor.yaml | $(KUBECTL) apply -f -
 	@echo "✓ OTel metrics Service + ServiceMonitor applied"
 
 .PHONY: observability-port-forward
@@ -784,7 +768,7 @@ observability-port-forward: ## Port-forward Grafana, Loki, Tempo (background)
 	@-pkill -f "port-forward.*observability.*tempo" 2>/dev/null || true
 	@sleep 0.5
 	@nohup $(KUBECTL) port-forward -n $(OBSERVABILITY_NAMESPACE) \
-		service/prometheus-stack-grafana 3000:80 \
+		service/prometheus-stack-grafana 3000:3000 \
 		> /tmp/port-forward-grafana.log 2>&1 &
 	@nohup $(KUBECTL) port-forward -n $(OBSERVABILITY_NAMESPACE) \
 		service/loki-gateway 3100:80 \
