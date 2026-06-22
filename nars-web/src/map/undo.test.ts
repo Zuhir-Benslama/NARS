@@ -148,7 +148,12 @@ describe("undo", () => {
       const oldDbId = "db-old-main"
       const entry = makeEntry({
         dbId: oldDbId,
-        data: { type: "houseEntrances", label: "Main Entrance", decisionNumber: "", decisionDate: "" },
+        data: {
+          type: "houseEntrances",
+          label: "Main Entrance",
+          decisionNumber: "",
+          decisionDate: "",
+        },
       })
 
       const secondaryEntry = makeEntry({
