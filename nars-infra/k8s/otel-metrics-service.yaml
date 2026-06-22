@@ -6,12 +6,16 @@ metadata:
   namespace: observability
   labels:
     app.kubernetes.io/name: opentelemetry-collector
+    app.kubernetes.io/instance: otel-collector
     app.kubernetes.io/component: metrics
 spec:
-  selector:
-    app.kubernetes.io/name: opentelemetry-collector
+  type: ClusterIP
   ports:
-    - name: prometheus
+    - name: prometheus-exporter
       port: 8889
       targetPort: 8889
       protocol: TCP
+  selector:
+    app.kubernetes.io/instance: otel-collector
+    app.kubernetes.io/name: opentelemetry-collector
+    component: standalone-collector
