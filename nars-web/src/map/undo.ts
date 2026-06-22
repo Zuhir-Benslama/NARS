@@ -60,7 +60,6 @@ export async function undo(): Promise<void> {
 
     // Re-create the feature via the API — it gets a new dbId
     const shape = toApiSaveShape(entry.data)
-    if (!shape) throw new Error("Could not determine feature type")
 
     const json = await apiFetch("/api/features", {
       method: "POST",

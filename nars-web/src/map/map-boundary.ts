@@ -79,7 +79,7 @@ function showBoundaryContextMenu(x: number, y: number, communeName: string): voi
     menu.remove()
     document.removeEventListener("click", hide)
   }
-  setTimeout(() => document.addEventListener("click", hide), 100)
+  requestAnimationFrame(() => document.addEventListener("click", hide))
 
   copyItem.onclick = (e) => {
     e.stopPropagation()

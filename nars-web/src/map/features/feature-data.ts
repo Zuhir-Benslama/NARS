@@ -1,6 +1,6 @@
 import { PHASES } from "../../phases"
 import { debugLog, debugError } from "../../utils/debug"
-import type { FeatureData, ModalResult } from "../../types"
+import type { FeatureData, FeatureTypeKey, ModalResult } from "../../types"
 
 function extractCoords(geometry: GeoJSON.Geometry): { lat: number; lng: number }[] | null {
   switch (geometry.type) {
@@ -24,7 +24,7 @@ export function buildFeatureData(
   modalResult: ModalResult,
 ): FeatureData {
   const base: FeatureData = {
-    type: phase.key,
+    type: phase.key as FeatureTypeKey,
     label: modalResult.label,
     decisionNumber: modalResult.decisionNumber,
     decisionDate: modalResult.decisionDate,
@@ -80,7 +80,7 @@ export function buildFeatureData(
   return result
 }
 
-export function toApiSaveShape(fd: FeatureData): { type: string; layer: string } | null {
+export function toApiSaveShape(fd: FeatureData): { type: string; layer: string } {
   switch (fd.type) {
     case "areas":
       return { type: "area", layer: fd.areaTypeKey ?? "central_urban" }
@@ -104,7 +104,5 @@ export function toApiSaveShape(fd: FeatureData): { type: string; layer: string }
       return { type: "public_space", layer: fd.spaceTypeKey ?? "garden" }
     case "namingPanels":
       return { type: "naming_panel", layer: "naming_panel" }
-    default:
-      return null
   }
 }

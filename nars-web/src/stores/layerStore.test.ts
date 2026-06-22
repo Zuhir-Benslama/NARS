@@ -100,7 +100,7 @@ describe("layerStore", () => {
       makeEntry({
         dbId,
         data: {
-          type: "entrance",
+          type: "houseEntrances",
           label: `Main ${dbId}`,
           entranceTypeKey: "main_entrance",
           decisionNumber: "",
@@ -111,7 +111,7 @@ describe("layerStore", () => {
       makeEntry({
         dbId,
         data: {
-          type: "entrance",
+          type: "houseEntrances",
           label: `Sec ${dbId}`,
           entranceTypeKey: "secondary_entrance",
           decisionNumber: "",
@@ -139,7 +139,7 @@ describe("layerStore", () => {
         "houseEntrances",
         makeEntry({
           data: {
-            type: "entrance",
+            type: "houseEntrances",
             label: "M",
             entranceTypeKey: "main_entrance",
             decisionNumber: "",

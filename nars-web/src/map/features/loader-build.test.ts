@@ -20,7 +20,7 @@ const roadPhase = PHASES.find((p: Phase) => p.key === "roads")!
 
 function data(overrides: Partial<FeatureData> = {}): FeatureData {
   return {
-    type: "test",
+    type: "areas",
     label: "Test Feature",
     decisionNumber: "123",
     decisionDate: "2024-01-01",

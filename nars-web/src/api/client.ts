@@ -266,6 +266,12 @@ export async function createCustomFeatureType(
 }
 
 // ─── LOGS (raw fetch — no retry, no CSRF) ────────────────────────────────
+//
+// Intentionally bypasses apiFetch because:
+//   - Log sending is fire-and-forget; we don't want retry loops when the
+//     app itself is in a broken state (the failure is the signal).
+//   - The log ingest endpoint does not require CSRF protection.
+//   - Avoids cascading failures where error → log → retry → more errors.
 
 export async function sendLogs(body: components["schemas"]["LogBatch"]): Promise<void> {
   await fetch("/api/logs", {

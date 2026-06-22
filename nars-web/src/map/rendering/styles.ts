@@ -3,7 +3,7 @@
 import { AREA_TYPES, PHASES } from "../../phases"
 import type { FeatureData } from "../../types"
 import { t } from "../../i18n"
-import { sanitizeText } from "../../utils/sanitize"
+import { escapeHtml } from "../../utils/sanitize"
 
 // ─── POLYGON STYLES ───────────────────────────────────────────────────────────
 
@@ -55,7 +55,7 @@ export const polygonStyles: Record<
 
 export function createEntranceIconHtml(label: string | number, color = "#27ae60"): string {
   const text =
-    sanitizeText(
+    escapeHtml(
       String(label ?? "")
         .trim()
         .slice(0, 6),

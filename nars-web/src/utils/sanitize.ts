@@ -39,11 +39,6 @@ export function escapeHtml(dirty: string): string {
 }
 
 /**
- * @deprecated Use `escapeHtml` instead — this name was misleading.
- */
-export const sanitizeText = escapeHtml
-
-/**
  * Sanitize attribute value for safe use in HTML attributes.
  *
  * ⚠️ WARNING: This is a character-encoding function, NOT an HTML sanitizer.
@@ -90,6 +85,6 @@ export function createSafeTextElement(tag: string, text: string, className?: str
 export function sanitizeApiText(dirty: string | null | undefined): string {
   if (!dirty) return ""
   // First escape HTML entities, then strip any remaining tags
-  const escaped = sanitizeText(dirty)
+  const escaped = escapeHtml(dirty)
   return DOMPurifyInstance.sanitize(escaped, { ALLOWED_TAGS: [] })
 }

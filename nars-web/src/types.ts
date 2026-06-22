@@ -8,7 +8,7 @@ export type { DrawType, Phase } from "./types/phases"
 
 export type { AreaType, DistrictType, RoadType, PublicSpaceType } from "./types/feature-types"
 
-export type { FeatureData, LayerEntry } from "./types/features"
+export type { FeatureTypeKey, FeatureData, LayerEntry } from "./types/features"
 
 export type { RoadOption, EntranceOption, ModalState, ModalResult } from "./types/modal"
 

@@ -21,6 +21,13 @@ spec:
     spec:
       serviceAccountName: nars-api
       terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: nars-api
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:

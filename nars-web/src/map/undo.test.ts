@@ -141,18 +141,6 @@ describe("undo", () => {
       expect(mockToast).toHaveBeenCalledWith(expect.stringContaining("Failed to restore"), "error")
     })
 
-    it("shows error when toApiSaveShape returns null", async () => {
-      mockToApiSaveShape.mockReturnValue(null)
-      recordDelete(makeEntry(), "areas")
-
-      const mockFetch = vi.mocked(await import("../api")).apiFetch as ReturnType<typeof vi.fn>
-      mockFetch.mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue({ id: "new-1" }) })
-
-      await undo()
-
-      expect(mockToast).toHaveBeenCalledWith(expect.stringContaining("Failed to restore"), "error")
-    })
-
     it("repairs cross-references for houseEntrances", async () => {
       const { useLayerStore } = await import("../stores/layerStore")
       const layerStore = useLayerStore()
@@ -160,14 +148,14 @@ describe("undo", () => {
       const oldDbId = "db-old-main"
       const entry = makeEntry({
         dbId: oldDbId,
-        data: { type: "entrance", label: "Main Entrance", decisionNumber: "", decisionDate: "" },
+        data: { type: "houseEntrances", label: "Main Entrance", decisionNumber: "", decisionDate: "" },
       })
 
       const secondaryEntry = makeEntry({
         id: "sec-1",
         dbId: "db-sec-1",
         data: {
-          type: "entrance",
+          type: "houseEntrances",
           label: "Secondary",
           decisionNumber: "",
           decisionDate: "",
@@ -199,7 +187,7 @@ describe("undo", () => {
         makeEntry({
           type: "marker",
           data: {
-            type: "markers",
+            type: "namingPanels",
             label: "Marker",
             lat: 5,
             lng: 10,

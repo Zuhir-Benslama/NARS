@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest"
 import {
   sanitizeHtml,
   escapeHtml,
-  sanitizeText,
   sanitizeAttr,
   sanitizeApiText,
   createSafeTextElement,
@@ -30,12 +29,6 @@ describe("sanitize", () => {
 
     it("handles empty string", () => {
       expect(escapeHtml("")).toBe("")
-    })
-  })
-
-  describe("sanitizeText", () => {
-    it("is an alias for escapeHtml", () => {
-      expect(sanitizeText).toBe(escapeHtml)
     })
   })
 

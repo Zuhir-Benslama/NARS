@@ -11,6 +11,8 @@
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint . --ext .ts,.vue --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint . --ext .ts,.vue --fix",
+    "lint:css": "stylelint \"src/**/*.css\"",
+    "lint:css:fix": "stylelint --fix \"src/**/*.css\"",
     "format": "prettier --write \"src/**/*.{ts,vue,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,vue,css}\"",
     "test": "vitest",
@@ -60,6 +62,8 @@
     "lint-staged": "^17.0.7",
     "openapi-typescript": "^7.13.0",
     "prettier": "^3.8.4",
+    "stylelint": "^17.13.0",
+    "stylelint-config-standard": "^40.0.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
     "vitest": "^4.1.9",
@@ -70,7 +74,11 @@
       "eslint --fix",
       "prettier --write"
     ],
-    "*.{css,json}": [
+    "*.css": [
+      "stylelint --fix",
+      "prettier --write"
+    ],
+    "*.json": [
       "prettier --write"
     ]
   },

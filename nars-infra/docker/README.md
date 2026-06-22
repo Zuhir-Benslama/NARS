@@ -26,7 +26,9 @@ docker push zuhirbenslama/nars-postgis:latest
 This matches `nars-infra/k8s/postgis.yaml`. On first startup the schema from `nars-infra/docs/nars_db.sql` is automatically loaded into the `nars_db` database. The database schema is also managed by EF Core migrations — the init script provides a baseline for fresh deployments.
 
 ## Kubernetes pull secret
-To pull images from your private Docker Hub repo, create a `regcred` secret in the `nars` namespace:
+The images are hosted on Docker Hub as public repositories, so no pull secret is
+required for standard deployments. If you switch to a private repository, create a
+`regcred` secret in the `nars` namespace:
 ```bash
 kubectl create secret docker-registry regcred \
   --docker-server=https://index.docker.io/v1/ \
@@ -34,3 +36,4 @@ kubectl create secret docker-registry regcred \
   --docker-password=<your-token-or-password> \
   --namespace=nars
 ```
+Then add `imagePullSecrets: [{ name: regcred }]` to each deployment's `spec.template.spec`.

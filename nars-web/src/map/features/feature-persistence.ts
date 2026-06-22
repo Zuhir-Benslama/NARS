@@ -7,7 +7,6 @@ import { toApiSaveShape } from "./feature-data"
 export async function saveToDatabase(featureData: FeatureData): Promise<SaveResult> {
   try {
     const shape = toApiSaveShape(featureData)
-    if (!shape) return { ok: false, error: `Unknown type '${featureData.type}'.` }
 
     const data = (await apiFetch("/api/features", {
       method: "POST",
