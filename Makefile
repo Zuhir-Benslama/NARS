@@ -81,6 +81,15 @@ cluster-up: prerequisites ## Full bootstrap: create cluster, build images, deplo
 	@echo "  Tear down:     make cluster-down (data preserved)"
 	@echo "  Destroy data:  make cluster-clean"
 
+.PHONY: cluster-up-full
+cluster-up-full: ## Full bootstrap including observability stack
+	$(MAKE) cluster-up
+	$(MAKE) observability-install
+	@echo ""
+	@echo "✓ Cluster '$(CLUSTER_NAME)' with observability is ready!"
+	@echo "  Port-forward:  make observability-port-forward"
+	@echo "  Visit:         http://localhost:8080/"
+
 .PHONY: namespace-ensure
 namespace-ensure: ## Ensure $(NAMESPACE) namespace exists (idempotent)
 	@$(KUBECTL) create namespace "$(NAMESPACE)" --dry-run=client -o yaml | $(KUBECTL) apply -f -
@@ -93,7 +102,13 @@ cluster-down: proxy-down ## Delete the kind cluster (preserves postgis data)
 	@echo "✓ Cluster deleted (postgis data preserved at $(POSTGRES_DATA_DIR))"
 
 .PHONY: cluster-rebuild
-cluster-rebuild: cluster-down cluster-up ## Delete and recreate the cluster
+cluster-rebuild: cluster-down cluster-up ## Delete and recreate the cluster (preserves data)
+
+.PHONY: cluster-rebuild-full
+cluster-rebuild-full: cluster-down cluster-up-full ## Delete and recreate the cluster with observability (preserves data)
+
+.PHONY: cluster-reset
+cluster-reset: cluster-clean cluster-up-full ## Wipe data, recreate cluster with observability
 
 .PHONY: cluster-clean
 cluster-clean: ## Delete cluster AND wipe postgis data (irreversible!)

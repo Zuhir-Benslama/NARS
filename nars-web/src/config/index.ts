@@ -19,7 +19,7 @@ validateEnvVars()
 
 export const API_CONFIG = {
   /** Base URL for API requests (from environment variable) */
-  baseUrl: (import.meta.env.VITE_API_BASE as string) ?? "",
+  baseUrl: import.meta.env.VITE_API_BASE ?? "",
 
   /** Default timeout for API requests in milliseconds */
   defaultTimeout: 10000,

@@ -134,7 +134,7 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
                 Label = DefaultLabel,
                 Data = JsonSerializer.Serialize(new
                 {
-                    type = "areas",
+                    type = FeatureTypes.Area,
                     label = DefaultLabel,
                     layer = "scattered",
                     geometry = scatteredGeoJson,

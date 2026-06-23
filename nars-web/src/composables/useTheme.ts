@@ -10,8 +10,14 @@ export type ThemeMode = "light" | "dark" | "auto"
 
 const STORAGE_KEY = "nars_theme"
 
+const VALID_THEMES: readonly ThemeMode[] = ["light", "dark", "auto"]
+
+function parseTheme(raw: string | null): ThemeMode {
+  return raw != null && VALID_THEMES.includes(raw as ThemeMode) ? (raw as ThemeMode) : "dark"
+}
+
 // Read persisted value, default to dark.
-const stored = (localStorage.getItem(STORAGE_KEY) ?? "dark") as ThemeMode
+const stored = parseTheme(localStorage.getItem(STORAGE_KEY))
 export const theme = ref<ThemeMode>(stored)
 
 function applyTheme(mode: ThemeMode): void {

@@ -24,7 +24,7 @@ export type {
   NationalOverview,
 } from "./types/admin"
 
-export type { FeatureCounts, AppStoreState, AppStore } from "./types/store"
+export type { FeatureCounts, AppStoreState } from "./types/store"
 
 export type {
   SaveResult,

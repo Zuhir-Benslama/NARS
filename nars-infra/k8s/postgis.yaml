@@ -44,7 +44,7 @@ spec:
       containers:
         - name: postgis
           image: zuhirbenslama/nars-postgis:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5432
           env:

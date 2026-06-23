@@ -42,7 +42,9 @@ export function getCtx(): MapContext {
   return _ctx
 }
 
-// Proxy target object — stores the actual data.
+// Proxy target object — stores the actual data after initMap() populates it.
+// The type assertion is safe because ctx is guarded by a Proxy that throws
+// on any property access before _setCtx() is called.
 const _ctxTarget: MapContext = {} as MapContext
 
 // Reactive proxy for accessing the map context. Guards against access before initMap().
@@ -53,7 +55,7 @@ export const ctx: MapContext = new Proxy(_ctxTarget, {
     return target[prop]
   },
   set(target, prop: keyof MapContext, value) {
-    target[prop as keyof MapContext] = value as never
+    target[prop] = value as never
     return true
   },
 })
