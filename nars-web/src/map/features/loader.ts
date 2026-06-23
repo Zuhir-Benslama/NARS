@@ -9,7 +9,7 @@ export { loadFromDatabase } from "./loader-db"
 
 export async function loadUserAndCommune(): Promise<void> {
   try {
-    const user = await apiFetch("/api/current_user").then((r) => r.json())
+    const user = await (await apiFetch("/api/current_user")).json()
     useAppStore().setUser(user)
   } catch (err) {
     debugError("Commune nav error:", err)

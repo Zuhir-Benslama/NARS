@@ -116,7 +116,7 @@ public class FieldController(
             return Forbid();
         }
 
-        var validTypes = new[] { "road", "house_entrance", "naming_panel" };
+        var validTypes = new[] { FeatureTypes.Road, FeatureTypes.HouseEntrance, FeatureTypes.NamingPanel };
         if (!validTypes.Contains(body.Type))
         {
             return Problem(detail: $"Invalid inspection type. Must be one of: {string.Join(", ", validTypes)}", statusCode: 400);

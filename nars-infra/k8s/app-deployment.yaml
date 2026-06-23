@@ -47,10 +47,9 @@ spec:
       containers:
         - name: nars-api
           # Dev default — override the tag via kustomize in CI/CD (e.g.
-          # with --edit-image or a patch). The :latest + Always combo
-          # ensures dev clusters always pull fresh.
+          # with --edit-image or a patch).
           image: zuhirbenslama/nars-api:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           envFrom:

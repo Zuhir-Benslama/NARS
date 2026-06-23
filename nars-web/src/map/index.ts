@@ -6,6 +6,7 @@ import { registerDrawEvents } from "./draw/draw-events"
 import { registerGeomanEvents } from "./core/geoman-events"
 import { initMap as initMapInstance } from "./map-init"
 import { registerFieldWorkerClick } from "./field-click"
+import { destroyDrawEvents } from "./draw/draw-events"
 
 // ─── RE-EXPORTS ───────────────────────────────────────────────────────
 
@@ -31,8 +32,6 @@ export async function initMap(): Promise<void> {
   registerGeomanEvents()
   registerFieldWorkerClick()
 }
-
-import { destroyDrawEvents } from "./draw/draw-events"
 
 export function destroyMap(): void {
   destroyDrawEvents()

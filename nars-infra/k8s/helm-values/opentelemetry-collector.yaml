@@ -53,6 +53,7 @@ config:
   exporters:
     otlp:
       endpoint: tempo:4317
+      # TODO: set insecure: false and configure proper TLS certs for production
       tls:
         insecure: true
     loki:

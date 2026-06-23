@@ -25,16 +25,3 @@ export interface AppStoreState {
   referenceRoadDbId: string | null
   referenceEntranceDbId: string | null
 }
-
-export interface AppStore {
-  currentPhase: number
-  counts: FeatureCounts
-  cityCenterMode: "city_center" | "auto" | null
-  cityCenterLatLng: LatLng | null
-  user: UserInfo | null
-  municipalityName: string
-  loadError: boolean
-  isLoading: boolean
-  referenceRoadDbId: string | null
-  referenceEntranceDbId: string | null
-}

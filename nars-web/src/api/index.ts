@@ -155,13 +155,14 @@ export async function apiFetch(path: string, options: ApiFetchOptions = {}): Pro
       }
     }
 
+    const hasBody = method === "POST" || method === "PUT" || method === "PATCH"
     try {
       const response = await fetch(url, {
         ...fetchOptions,
         credentials: "include",
         signal: controller.signal,
         headers: {
-          "Content-Type": "application/json",
+          ...(hasBody ? { "Content-Type": "application/json" } : {}),
           ...csrfHeaders,
           ...fetchOptions.headers,
         },

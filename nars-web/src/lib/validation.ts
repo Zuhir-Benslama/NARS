@@ -16,26 +16,22 @@ const MIN_ROAD_LENGTH_M = VALIDATION_CONFIG.minRoadLengthMeters
 export async function validateRoad(coordinates: LatLng[]): Promise<ValidateRoadResponse> {
   // Client-side minimum length check
   if (coordinates.length >= 2) {
-    let turfHelpers: typeof import("@turf/helpers")
-    let turfLength: typeof import("@turf/length")
     try {
-      ;[turfHelpers, turfLength] = await Promise.all([
+      const [turfHelpers, turfLength] = await Promise.all([
         import("@turf/helpers"),
         import("@turf/length"),
       ])
+      const line = turfHelpers.lineString(coordinates.map((c) => [c.lng, c.lat]))
+      const metres = turfLength.length(line, { units: "meters" })
+      if (metres < MIN_ROAD_LENGTH_M) {
+        return {
+          valid: false,
+          error: `Road is too short (${metres.toFixed(1)} m). Minimum length is ${MIN_ROAD_LENGTH_M} m.`,
+        }
+      }
     } catch {
-      return {
-        valid: false,
-        error: "Local validation library failed to load.",
-      }
+      // Turf import failed — skip client-side check, let server validate
     }
-    const line = turfHelpers.lineString(coordinates.map((c) => [c.lng, c.lat]))
-    const metres = turfLength.length(line, { units: "meters" })
-    if (metres < MIN_ROAD_LENGTH_M)
-      return {
-        valid: false,
-        error: `Road is too short (${metres.toFixed(1)} m). Minimum length is ${MIN_ROAD_LENGTH_M} m.`,
-      }
   }
 
   try {

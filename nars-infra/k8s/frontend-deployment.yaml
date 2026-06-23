@@ -47,7 +47,7 @@ spec:
       containers:
         - name: nginx
           image: zuhirbenslama/nars-vite:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
           startupProbe:
