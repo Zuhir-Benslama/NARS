@@ -37,14 +37,30 @@ export interface FeatureData {
 }
 
 // Per-type discriminated unions for narrowing by `type` in new code.
-export interface AreaFeatureData extends FeatureData { type: "areas" }
-export interface DistrictFeatureData extends FeatureData { type: "districts" }
-export interface CityCenterFeatureData extends FeatureData { type: "cityCenter" }
-export interface RoadFeatureData extends FeatureData { type: "roads" }
-export interface HouseEntranceFeatureData extends FeatureData { type: "houseEntrances" }
-export interface PublicBuildingFeatureData extends FeatureData { type: "publicBuildings" }
-export interface PublicSpaceFeatureData extends FeatureData { type: "publicSpaces" }
-export interface NamingPanelFeatureData extends FeatureData { type: "namingPanels" }
+export interface AreaFeatureData extends FeatureData {
+  type: "areas"
+}
+export interface DistrictFeatureData extends FeatureData {
+  type: "districts"
+}
+export interface CityCenterFeatureData extends FeatureData {
+  type: "cityCenter"
+}
+export interface RoadFeatureData extends FeatureData {
+  type: "roads"
+}
+export interface HouseEntranceFeatureData extends FeatureData {
+  type: "houseEntrances"
+}
+export interface PublicBuildingFeatureData extends FeatureData {
+  type: "publicBuildings"
+}
+export interface PublicSpaceFeatureData extends FeatureData {
+  type: "publicSpaces"
+}
+export interface NamingPanelFeatureData extends FeatureData {
+  type: "namingPanels"
+}
 
 export type FeatureDataByType =
   | AreaFeatureData
