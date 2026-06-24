@@ -1,17 +1,12 @@
-# Code Quality Issues
-
-All items from the initial code quality check have been resolved.
+# Code Quality Improvements — Complete
 
 ## Fixed
 
-- **`k8s/app-deployment.yaml`, `k8s/frontend-deployment.yaml`, `k8s/postgis.yaml`** — Removed `imagePullPolicy: Always` from deployment YAMLs. `kustomization.yaml` now uses `newPullPolicy: IfNotPresent` for all three images, and CI/CD can override `newTag` to a pinned SHA. Local dev still works with `:latest`.
-- **`k8s/network-policy.yaml`** — Added `allow-backup-egress-to-postgis` NetworkPolicy for the backup CronJob pod (was previously relying on namespace-wide default policies alone).
-- **`k8s/helm-values/opentelemetry-collector.yaml`** — Added `TODO` comment documenting that `insecure: true` should be replaced with proper TLS certs for production.
+- **`scripts/png-to-pdf.py`** — Added argument validation, usage message (`-h`/`--help`), error handling for non-existent directories, type hints, and `if __name__ == "__main__"` guard.
 
-## Not Addressed (no action needed)
+- **`k8s/helm-values/opentelemetry-collector.yaml:56-58`** — Improved `insecure: true` TODO comment with specific TLS cert field names and mount guidance.
 
-- **`k8s/postgis.yaml`** — PostGIS runs as root with `allowPrivilegeEscalation: true` and `readOnlyRootFilesystem: false`. Well-documented as a PostGIS entrypoint requirement; should be revisited if a rootless PostGIS image becomes available.
-- **`k8s/postgis.yaml`** — Single replica. Acceptable for many deployments; HA requires a more complex PostGIS HA setup (e.g. Patroni, repmgr).
+- **`k8s/kustomization.yaml:32-46`** — Expanded image tag comments with concrete `kustomize edit set image` examples for CI/CD SHA pinning.
 
 ## Verified
 

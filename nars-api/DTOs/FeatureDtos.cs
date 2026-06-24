@@ -41,6 +41,19 @@ public record LayerOption(
 );
 
 /// <summary>
+/// Result row returned by <see cref="Infrastructure.FeatureQueryHelper"/>.
+/// Used instead of anonymous types to preserve type safety.
+/// </summary>
+public record FeatureResult(
+    string Id,
+    string Type,
+    string? Layer,
+    string? Label,
+    JsonElement Data,
+    string CreatedAt
+);
+
+/// <summary>
 /// Complete feature type definition (e.g. "area" with its layers).
 /// </summary>
 public record FeatureTypeDefinition(

@@ -13,6 +13,7 @@ import { featuresStore } from "./core/state"
 import { showToast } from "../lib/toast"
 import { t } from "../i18n"
 import { apiFetch } from "../api"
+import { debugError } from "../utils/debug"
 
 export async function setHouseNumbers(options?: { syncCounts?: boolean }): Promise<void> {
   const appStore = useAppStore()
@@ -94,7 +95,7 @@ export async function setHouseNumbers(options?: { syncCounts?: boolean }): Promi
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ data: entry.data }),
       }).catch((err) =>
-        console.error(`setHouseNumbers save error (id=${entry.dbId}):`, err),
+        debugError(`setHouseNumbers save error (id=${entry.dbId}):`, err),
       ) as Promise<void>,
     )
   }

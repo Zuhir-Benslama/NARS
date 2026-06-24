@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Controllers;
+using NarsApi.Infrastructure;
 using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Models;
@@ -26,14 +27,7 @@ public class ValidationControllerIntegrationTests : IAsyncLifetime
     {
         _fixture = fixture;
         _db = fixture.CreateDbContext();
-        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["Validation:MaxCoordinateCount"] = "10000",
-            ["Validation:RoadTurnAngleDegrees"] = "90",
-            ["Validation:RoadConnectivityMeters"] = "20",
-            ["Validation:DistrictBoundaryToleranceMeters"] = "10",
-        }).Build();
-        _controller = new ValidationController(_db, config, new ValidationService(_db));
+        _controller = new ValidationController(_db, Options.Create(new ValidationOptions()), new ValidationService(_db));
     }
 
     public async Task InitializeAsync()

@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Controllers;
 using NarsApi.Data;
@@ -47,14 +47,12 @@ public class FieldControllerTests
         context.SaveChanges();
 
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedNow);
-        var config = new Mock<IConfiguration>();
-        config.Setup(c => c["FeatureDefaults:MaxFeatureDataSize"]).Returns("524288");
         var fieldSvc = fieldService ?? Mock.Of<IFieldService>();
 
         var ctrl = new FieldController(
             context,
             Mock.Of<ILogger<FieldController>>(),
-            config.Object,
+            Options.Create(new FeatureDefaultsOptions()),
             timeProvider,
             fieldSvc);
 

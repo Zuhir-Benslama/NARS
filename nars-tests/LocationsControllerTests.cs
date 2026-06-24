@@ -1,9 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Controllers;
+using NarsApi.Infrastructure;
 using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Services;
@@ -16,23 +17,14 @@ public class LocationsControllerTests
     private static LocationsController CreateController(
         AppDbContext db,
         IMemoryCache? cache = null,
-        IConfiguration? config = null,
         IBoundaryService? boundaryService = null)
     {
-        var cfg = config ?? CreateConfig().Object;
         return new LocationsController(
             db,
             cache ?? new MemoryCache(new MemoryCacheOptions()),
-            cfg,
+            Options.Create(new CacheOptions()),
+            Options.Create(new LocationsOptions()),
             boundaryService ?? Mock.Of<IBoundaryService>());
-    }
-
-    private static Mock<IConfiguration> CreateConfig()
-    {
-        var config = new Mock<IConfiguration>();
-        config.Setup(c => c["Cache:ReferenceDataDurationHours"]).Returns("1");
-        config.Setup(c => c["Locations:MaxSearchLength"]).Returns("200");
-        return config;
     }
 
     private static AppDbContext CreateDb(string name)

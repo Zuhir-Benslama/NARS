@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Controllers;
 using NarsApi.Data;
@@ -20,7 +20,6 @@ public class ValidationControllerTests
 
     private static (ValidationController, AppDbContext) CreateController(
         AppDbContext? db = null,
-        IConfiguration? config = null,
         IValidationService? validationService = null)
     {
         var opts = new DbContextOptionsBuilder<AppDbContext>()
@@ -28,9 +27,8 @@ public class ValidationControllerTests
             .Options;
         var context = db ?? new AppDbContext(opts);
 
-        var cfg = config ?? CreateConfig().Object;
         var ctrl = new ValidationController(
-            context, cfg,
+            context, Options.Create(new ValidationOptions()),
             validationService ?? Mock.Of<IValidationService>());
 
         ctrl.ControllerContext = new ControllerContext
@@ -42,16 +40,6 @@ public class ValidationControllerTests
         };
 
         return (ctrl, context);
-    }
-
-    private static Mock<IConfiguration> CreateConfig()
-    {
-        var config = new Mock<IConfiguration>();
-        config.Setup(c => c["Validation:DistrictBoundaryToleranceMeters"]).Returns("10");
-        config.Setup(c => c["Validation:RoadTurnAngleDegrees"]).Returns("90");
-        config.Setup(c => c["Validation:RoadConnectivityMeters"]).Returns("20");
-        config.Setup(c => c["Validation:MaxCoordinateCount"]).Returns("10000");
-        return config;
     }
 
     // ── GET /api/validate/area/main-urban-exists ──────────────────────────
@@ -162,10 +150,8 @@ public class ValidationControllerTests
                 It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<double>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        var config = CreateConfig();
-        config.Setup(c => c["Validation:RoadTurnAngleDegrees"]).Returns("45");
-
-        var (ctrl2, _) = CreateController(db: db, config: config.Object, validationService: validationMock.Object);
+        var ctrl2 = new ValidationController(db, Options.Create(new ValidationOptions { RoadTurnAngleDegrees = 45 }), validationMock.Object);
+        ctrl2.ControllerContext = ctrl.ControllerContext;
 
         var body = new ValidateRoadRequest([
             new CoordDto(36.0, 3.0),
@@ -197,7 +183,8 @@ public class ValidationControllerTests
                 It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<double>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
-        var (ctrl2, _) = CreateController(db: db, config: CreateConfig().Object, validationService: validationMock.Object);
+        var ctrl2 = new ValidationController(db, Options.Create(new ValidationOptions()), validationMock.Object);
+        ctrl2.ControllerContext = ctrl.ControllerContext;
 
         var body = new ValidateRoadRequest([
             new CoordDto(36.0, 3.0),

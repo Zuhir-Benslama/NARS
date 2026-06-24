@@ -17,6 +17,15 @@ public static class ServiceRegistrationExtensions
         string? jwtIssuer,
         string? jwtAudience)
     {
+        // ── Register typed options ────────────────────────────────
+        services.Configure<CacheOptions>(config.GetSection("Cache"));
+        services.Configure<LocationsOptions>(config.GetSection("Locations"));
+        services.Configure<JwtOptions>(config.GetSection("Jwt"));
+        services.Configure<FeatureDefaultsOptions>(config.GetSection("FeatureDefaults"));
+        services.Configure<LoggingOptions>(config.GetSection("Logging"));
+        services.Configure<ValidationOptions>(config.GetSection("Validation"));
+        services.Configure<AccountLockoutOptions>(config.GetSection("AccountLockout"));
+
         var otelEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")
             ?? "http://otel-collector.observability:4317";
 
@@ -59,17 +68,16 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IEntranceQueryService, EntranceQueryService>();
         services.AddScoped<IAdminOverviewService, AdminOverviewService>();
 
-        var tileTimeout = int.TryParse(config["HttpClient:TileProxyTimeoutSeconds"], out var tts) ? tts : 15;
+        var httpOpts = config.GetSection("HttpClient").Get<HttpClientOptions>() ?? new HttpClientOptions();
         services.AddHttpClient("tile-proxy", client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(tileTimeout);
+            client.Timeout = TimeSpan.FromSeconds(httpOpts.TileProxyTimeoutSeconds);
             client.DefaultRequestHeaders.Add("User-Agent", "NARS-TileProxy/1.0");
         });
 
-        var satTimeout = int.TryParse(config["HttpClient:SatelliteTimeoutSeconds"], out var sts) ? sts : 30;
         services.AddHttpClient("satellite", client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(satTimeout);
+            client.Timeout = TimeSpan.FromSeconds(httpOpts.SatelliteTimeoutSeconds);
             client.DefaultRequestHeaders.Add("User-Agent", "NARS-Satellite/1.0");
         });
 
@@ -108,12 +116,11 @@ public static class ServiceRegistrationExtensions
             options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
         });
 
-        var multipartLimit = int.TryParse(config["FeatureDefaults:MultipartBodyLengthLimit"], out var mll) ? mll : 10_485_760;
-        var valueLimit = int.TryParse(config["FeatureDefaults:ValueLengthLimit"], out var vl) ? vl : 1_048_576;
+        var featureOpts = config.GetSection("FeatureDefaults").Get<FeatureDefaultsOptions>() ?? new FeatureDefaultsOptions();
         services.Configure<FormOptions>(options =>
         {
-            options.MultipartBodyLengthLimit = multipartLimit;
-            options.ValueLengthLimit = valueLimit;
+            options.MultipartBodyLengthLimit = featureOpts.MultipartBodyLengthLimit;
+            options.ValueLengthLimit = featureOpts.ValueLengthLimit;
         });
 
         return services;

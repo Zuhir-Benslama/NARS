@@ -3,10 +3,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
-using static NarsApi.Infrastructure.SqlFragments;
 using NarsApi.Models;
 using NarsApi.Services;
 
@@ -18,9 +18,8 @@ namespace NarsApi.Controllers;
 public partial class AuthController(
     AppDbContext db,
     IJwtService jwt,
-    // config: read by SignIn + Refresh for Jwt:RefreshExpiresInDays.
-    // Accessed in the main AuthController.cs file; in scope for all partials.
-    IConfiguration config,
+    IOptions<JwtOptions> jwtOptions,
+    IOptions<AccountLockoutOptions> lockoutOptions,
     ILogger<AuthController> logger,
     IDateTimeProvider timeProvider
 ) : NarsControllerBase
@@ -90,8 +89,7 @@ public partial class AuthController(
 
         // Issue a refresh token for silent re-authentication before the access token expires.
         var (refreshRaw, refreshHash) = jwt.CreateRefreshToken();
-        var refreshExpiry = timeProvider.UtcNow.AddDays(
-            ParseIntConfig(config["Jwt:RefreshExpiresInDays"], 30));
+        var refreshExpiry = timeProvider.UtcNow.AddDays(jwtOptions.Value.RefreshExpiresInDays);
 
         if (logger.IsEnabled(LogLevel.Debug))
         {
@@ -258,8 +256,8 @@ public partial class AuthController(
 
     // ── Account lockout helpers ───────────────────────────────
 
-    private int MaxFailedAttempts => ParseIntConfig(config["AccountLockout:MaxFailedAttempts"], 5);
-    private int LockoutMinutes => ParseIntConfig(config["AccountLockout:LockoutMinutes"], 30);
+    private int MaxFailedAttempts => lockoutOptions.Value.MaxFailedAttempts;
+    private int LockoutMinutes => lockoutOptions.Value.LockoutMinutes;
 
     private async Task RecordFailedLogin(User user, CancellationToken cancellationToken = default)
     {

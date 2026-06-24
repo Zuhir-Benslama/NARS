@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
@@ -23,14 +24,14 @@ namespace NarsApi.Controllers;
 public class LocationsController(
     AppDbContext db,
     IMemoryCache cache,
-    IConfiguration config,
+    IOptions<CacheOptions> cacheOptions,
+    IOptions<LocationsOptions> locationsOptions,
     IBoundaryService boundaryService) : ControllerBase
 {
     private const string WilayaCacheKey = "wilayas_all";
     private const string DairaCacheKeyPrefix = "dairas_wilaya_";
     private const string CommuneCacheKeyPrefix = "communes_daira_";
-    private TimeSpan ReferenceDataCacheDuration => TimeSpan.FromHours(
-        int.TryParse(config["Cache:ReferenceDataDurationHours"], out var h) ? h : 1);
+    private TimeSpan ReferenceDataCacheDuration => TimeSpan.FromHours(cacheOptions.Value.ReferenceDataDurationHours);
 
     private async Task<List<T>> CacheOrFetchAsync<T>(string key, Func<Task<List<T>>> fetch) => (await cache.GetOrCreateAsync(key, async entry =>
                                                                                                     {
@@ -49,7 +50,7 @@ public class LocationsController(
     {
         take = Math.Clamp(take, 1, 500);
 
-        var maxSearchLength = int.TryParse(config["Locations:MaxSearchLength"], out var msl) ? msl : 200;
+        var maxSearchLength = locationsOptions.Value.MaxSearchLength;
         if (search.Length > maxSearchLength)
         {
             return Problem(detail: $"Search query is too long (max {maxSearchLength} characters).", statusCode: 400);

@@ -2,8 +2,8 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Controllers;
 using NarsApi.Data;
@@ -25,35 +25,29 @@ public class AuthControllerTests
         return new AppDbContext(options);
     }
 
-    private static Mock<IConfiguration> CreateConfigMock(
-        string secret = "test-secret-key-that-is-at-least-32-chars-long!!")
-    {
-        var config = new Mock<IConfiguration>();
-        config.Setup(c => c["Jwt:SecretKey"]).Returns(secret);
-        config.Setup(c => c["Jwt:ExpiresInMinutes"]).Returns("60");
-        config.Setup(c => c["Jwt:RefreshExpiresInDays"]).Returns("30");
-        return config;
-    }
-
-    private static JwtService CreateJwtService(IConfiguration config, IDateTimeProvider? timeProvider = null)
+    private static JwtService CreateJwtService(IDateTimeProvider? timeProvider = null)
     {
         timeProvider ??= Mock.Of<IDateTimeProvider>(x => x.UtcNow == DateTime.UtcNow);
+        var jwtOptions = Options.Create(new JwtOptions { ExpiresInMinutes = 60, RefreshExpiresInDays = 30 });
         return new JwtService(
             "test-secret-key-that-is-at-least-32-chars-long!!",
             null,
             null,
-            config,
+            jwtOptions,
             Mock.Of<ILogger<JwtService>>(),
             timeProvider);
     }
 
-    private static AuthController CreateController(AppDbContext db, IConfiguration config)
+    private static AuthController CreateController(AppDbContext db)
     {
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == DateTime.UtcNow);
+        var jwtOptions = Options.Create(new JwtOptions());
+        var lockoutOptions = Options.Create(new AccountLockoutOptions());
         return new AuthController(
             db,
-            CreateJwtService(config, timeProvider),
-            config,
+            CreateJwtService(timeProvider),
+            jwtOptions,
+            lockoutOptions,
             Mock.Of<ILogger<AuthController>>(),
             timeProvider);
     }
@@ -62,8 +56,7 @@ public class AuthControllerTests
     public void SignUp_PublicEndpointIsDisabled_Returns410()
     {
         var db = CreateInMemoryDbContext();
-        var configMock = CreateConfigMock();
-        var controller = CreateController(db, configMock.Object);
+        var controller = CreateController(db);
 
         var result = controller.SignUp();
 
@@ -78,8 +71,8 @@ public class AuthControllerTests
         await SeedLocationDataAsync(db);
         await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
 
-        var configMock = CreateConfigMock();
-        var controller = CreateController(db, configMock.Object);
+        
+        var controller = CreateController(db);
 
         var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "admin",
@@ -106,8 +99,8 @@ public class AuthControllerTests
         await SeedLocationDataAsync(db);
         await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
 
-        var configMock = CreateConfigMock();
-        var controller = CreateController(db, configMock.Object);
+        
+        var controller = CreateController(db);
 
         var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "admin",
@@ -146,8 +139,8 @@ public class AuthControllerTests
         });
         await db.SaveChangesAsync();
 
-        var configMock = CreateConfigMock();
-        var controller = CreateController(db, configMock.Object);
+        
+        var controller = CreateController(db);
 
         var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "admin",
@@ -173,8 +166,8 @@ public class AuthControllerTests
         await SeedLocationDataAsync(db);
         await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
 
-        var configMock = CreateConfigMock();
-        var controller = CreateController(db, configMock.Object);
+        
+        var controller = CreateController(db);
 
         var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "admin",
@@ -212,8 +205,8 @@ public class AuthControllerTests
         });
         await db.SaveChangesAsync();
 
-        var configMock = CreateConfigMock();
-        var controller = CreateController(db, configMock.Object);
+        
+        var controller = CreateController(db);
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
@@ -231,8 +224,7 @@ public class AuthControllerTests
     public async Task SignIn_UserNotFound_Returns401()
     {
         var db = CreateInMemoryDbContext();
-        var configMock = CreateConfigMock();
-        var controller = CreateController(db, configMock.Object);
+        var controller = CreateController(db);
 
         var result = await controller.SignIn(new SignInRequest(
             Username: "nonexistent",

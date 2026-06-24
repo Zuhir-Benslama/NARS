@@ -1,6 +1,7 @@
 using System.Data.Common;
 using System.Text;
 using System.Text.Json;
+using NarsApi.DTOs;
 
 namespace NarsApi.Infrastructure;
 
@@ -57,7 +58,7 @@ public static class FeatureQueryHelper
     /// Loads features across all tables for a given user with pagination.
     /// Returns the feature rows and the total count (for pagination UI).
     /// </summary>
-    public static async Task<(List<object> features, int totalCount)> LoadAllFeaturesAsync(
+    public static async Task<(List<FeatureResult> features, int totalCount)> LoadAllFeaturesAsync(
         DbConnection conn,
         Guid userId,
         int skip,
@@ -68,7 +69,7 @@ public static class FeatureQueryHelper
     /// Loads features for a specific layer with pagination.
     /// Returns the feature rows and the total count (for pagination UI).
     /// </summary>
-    public static async Task<(List<object> features, int totalCount)> LoadByLayerAsync(
+    public static async Task<(List<FeatureResult> features, int totalCount)> LoadByLayerAsync(
         DbConnection conn,
         Guid userId,
         string layer,
@@ -76,7 +77,7 @@ public static class FeatureQueryHelper
         int take,
         CancellationToken ct = default) => await ExecuteQueryAsync(conn, _loadByLayerSql, userId, layer, skip, take, ct);
 
-    private static async Task<(List<object> features, int totalCount)> ExecuteQueryAsync(
+    private static async Task<(List<FeatureResult> features, int totalCount)> ExecuteQueryAsync(
         DbConnection conn,
         string sql,
         Guid userId,
@@ -100,7 +101,7 @@ public static class FeatureQueryHelper
         SqlFragments.AddParam(cmd, "@skip", skip);
         SqlFragments.AddParam(cmd, "@take", take);
 
-        var rows = new List<object>();
+        var rows = new List<FeatureResult>();
         var totalCount = 0;
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
@@ -120,17 +121,16 @@ public static class FeatureQueryHelper
             var type = reader.GetString(5);
             totalCount = (int)reader.GetInt64(6);
 
-            rows.Add(new
-            {
-                id = id.ToString(),
-                type,
-                layer = layerVal,
-                label,
-                data = string.IsNullOrWhiteSpace(dataJson)
+            rows.Add(new FeatureResult(
+                Id: id.ToString(),
+                Type: type,
+                Layer: layerVal,
+                Label: label,
+                Data: string.IsNullOrWhiteSpace(dataJson)
                     ? JsonDocument.Parse("{}").RootElement
                     : JsonSerializer.Deserialize<JsonElement>(dataJson),
-                created_at = createdAt.ToString("o"),
-            });
+                CreatedAt: createdAt.ToString("o")
+            ));
         }
 
         return (rows, totalCount);

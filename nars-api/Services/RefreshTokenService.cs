@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using NarsApi.Data;
+using NarsApi.Infrastructure;
 using NarsApi.Models;
 
 namespace NarsApi.Services;
@@ -16,7 +18,7 @@ public record RefreshTokenResult(
 public class RefreshTokenService(
     AppDbContext db,
     IJwtService jwt,
-    IConfiguration config,
+    IOptions<JwtOptions> jwtOptions,
     IDateTimeProvider timeProvider) : IRefreshTokenService
 {
     public async Task<RefreshTokenResult> RotateRefreshTokenAsync(string? rawRefreshToken, CancellationToken cancellationToken = default)
@@ -53,7 +55,7 @@ public class RefreshTokenService(
 
         stored.Revoked = true;
         var (newRaw, newHash) = jwt.CreateRefreshToken();
-        var refreshDays = int.TryParse(config["Jwt:RefreshExpiresInDays"], out var d) ? d : 30;
+        var refreshDays = jwtOptions.Value.RefreshExpiresInDays;
         var refreshExpiry = timeProvider.UtcNow.AddDays(refreshDays);
 
         db.RefreshTokens.Add(new RefreshToken

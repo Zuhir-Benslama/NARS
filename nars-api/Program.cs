@@ -25,9 +25,7 @@ if (!string.IsNullOrEmpty(envDbPassword))
     connStr = connStr?.Replace("${NARS_DB_PASSWORD}", envDbPassword);
 }
 
-var jwtSecret = (builder.Configuration["NARS_JWT_SECRET"]
-    ?? builder.Configuration["Jwt:SecretKey"]
-    ?? throw new InvalidOperationException("Jwt:SecretKey is not configured. Set NARS_JWT_SECRET env var or Jwt:SecretKey in appsettings.Production.json.")).Trim();
+var jwtSecret = GetRequiredConfig(builder.Configuration, "Jwt:SecretKey", ["NARS_JWT_SECRET", "Jwt:SecretKey"]);
 
 if (jwtSecret.Length < 32)
 {
@@ -53,3 +51,18 @@ builder.Services.AddNarsServices(builder.Configuration, connStr!, jwtSecret, jwt
 var app = builder.Build();
 await app.ConfigureNarsPipelineAsync(builder.Configuration, logJwtWarning);
 await app.RunAsync();
+
+// ── Helpers ─────────────────────────────────────────────────────
+static string GetRequiredConfig(IConfiguration config, string primaryKey, string[] fallbackKeys)
+{
+    foreach (var key in fallbackKeys)
+    {
+        var val = config[key];
+        if (!string.IsNullOrWhiteSpace(val))
+            return val.Trim();
+    }
+
+    throw new InvalidOperationException(
+        $"{primaryKey} is not configured. Set one of: {string.Join(", ", fallbackKeys)} " +
+        $"in appsettings.Production.json or via environment variables.");
+}

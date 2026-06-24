@@ -2,8 +2,8 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Controllers;
 using NarsApi.Data;
@@ -249,19 +249,20 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
 
     private static AuthController CreateController(AppDbContext db)
     {
-        var config = CreateConfigMock();
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == DateTime.UtcNow);
+        var jwtOpts = Options.Create(new JwtOptions { ExpiresInMinutes = 60, RefreshExpiresInDays = 30 });
         var jwt = new JwtService(
             "integration-test-secret-key-that-is-32chars!!",
             null,
             null,
-            config.Object,
+            jwtOpts,
             Mock.Of<ILogger<JwtService>>(),
             timeProvider);
         return new AuthController(
             db,
             jwt,
-            config.Object,
+            jwtOpts,
+            Options.Create(new AccountLockoutOptions()),
             Mock.Of<ILogger<AuthController>>(),
             timeProvider);
     }
@@ -363,14 +364,6 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
         return user;
     }
 
-    private static Mock<IConfiguration> CreateConfigMock()
-    {
-        var config = new Mock<IConfiguration>();
-        config.Setup(c => c["Jwt:SecretKey"]).Returns("integration-test-secret-key-that-is-32chars!!");
-        config.Setup(c => c["Jwt:ExpiresInMinutes"]).Returns("60");
-        config.Setup(c => c["Jwt:RefreshExpiresInDays"]).Returns("30");
-        return config;
-    }
 
     private static DefaultHttpContext CreateHttpContext(List<Claim> claims)
     {

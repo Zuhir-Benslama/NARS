@@ -1,5 +1,3 @@
-using System.Linq;
-
 namespace NarsApi.Infrastructure;
 
 /// <summary>
