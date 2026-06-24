@@ -18,11 +18,7 @@ export const useDrawStore = defineStore("draw", {
   }),
 
   actions: {
-    registerGeomanMarker(
-      mp: GeomanMarkerPointer,
-      _marker: unknown,
-      orig: SetLngLatFn,
-    ): void {
+    registerGeomanMarker(mp: GeomanMarkerPointer, _marker: unknown, orig: SetLngLatFn): void {
       this.geomanMarkerPointer = mp
       this.originalGeomanMarkerSetLngLat = orig
     },
