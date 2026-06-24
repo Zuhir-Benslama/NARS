@@ -118,7 +118,9 @@ cluster-clean: ## Delete cluster AND wipe postgis data (irreversible!)
 	$(MAKE) cluster-down
 	@echo "→ Wiping postgis data..."
 	@if echo "$(POSTGRES_DATA_DIR)" | grep -q '^/'; then
-		sudo rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null || rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null || true
+		rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null \
+			|| sudo -n rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null \
+			|| true
 	else
 		rm -rf "$(POSTGRES_DATA_DIR)"
 	fi
@@ -396,7 +398,10 @@ cluster-create: ## Create the kind cluster with host-mounted postgis data (idemp
 cluster-wait: ## Wait for API server and nodes to be ready
 	@echo "→ Waiting for API server and nodes..."
 	@$(KUBECTL) wait --for=condition=Ready node --all --timeout=120s 2>/dev/null || \
-		until $(KUBECTL) get nodes 2>/dev/null; do sleep 2; done && \
+		i=0; until $(KUBECTL) get nodes 2>/dev/null; do \
+			sleep 2; i=$$((i + 1)); \
+			[ "$$i" -ge 60 ] && { echo "Timed out waiting for nodes"; exit 1; }; \
+		done && \
 		$(KUBECTL) wait --for=condition=Ready node --all --timeout=120s
 	@echo "✓ Cluster ready"
 
@@ -404,7 +409,7 @@ cluster-wait: ## Wait for API server and nodes to be ready
 ingress-install: ## Install NGINX Ingress Controller (idempotent)
 	@echo "→ Installing NGINX Ingress Controller..."
 	@$(KUBECTL) apply -f \
-		https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+		https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.0/deploy/static/provider/kind/deploy.yaml
 	@echo "✓ Ingress controller installed"
 
 .PHONY: ingress-wait
@@ -775,8 +780,8 @@ observability-otel-collector: ## Install OpenTelemetry Collector
 .PHONY: observability-servicemonitor
 observability-servicemonitor: ## Apply OTel metrics Service + ServiceMonitor (requires prometheus CRDs)
 	@echo "→ Applying OTel metrics Service and ServiceMonitor..."
-	@cat $(K8S_DIR)/otel-metrics-service.yaml | $(KUBECTL) apply -f -
-	@cat $(K8S_DIR)/servicemonitor.yaml | $(KUBECTL) apply -f -
+	@$(KUBECTL) apply -f $(K8S_DIR)/otel-metrics-service.yaml
+	@$(KUBECTL) apply -f $(K8S_DIR)/servicemonitor.yaml
 	@echo "✓ OTel metrics Service + ServiceMonitor applied"
 
 .PHONY: observability-port-forward
@@ -832,9 +837,15 @@ infra-lint-docker: ## Lint Dockerfiles with hadolint
 	@if command -v hadolint >/dev/null 2>&1; then
 		hadolint nars-infra/docker/Dockerfile.*
 	else
-		docker run --rm -i hadolint/hadolint < nars-infra/docker/Dockerfile.nars-api
-		docker run --rm -i hadolint/hadolint < nars-infra/docker/Dockerfile.nars-postgis
-		docker run --rm -i hadolint/hadolint < nars-infra/docker/Dockerfile.nars-vite
+		docker run --rm -i \
+			-v "$$(pwd)/nars-infra/.hadolint.yaml:/home/hadolint/.hadolint.yaml:ro" \
+			hadolint/hadolint < nars-infra/docker/Dockerfile.nars-api
+		docker run --rm -i \
+			-v "$$(pwd)/nars-infra/.hadolint.yaml:/home/hadolint/.hadolint.yaml:ro" \
+			hadolint/hadolint < nars-infra/docker/Dockerfile.nars-postgis
+		docker run --rm -i \
+			-v "$$(pwd)/nars-infra/.hadolint.yaml:/home/hadolint/.hadolint.yaml:ro" \
+			hadolint/hadolint < nars-infra/docker/Dockerfile.nars-vite
 	fi
 
 .PHONY: infra-lint-yaml

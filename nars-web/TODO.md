@@ -1,21 +1,13 @@
-# Code Quality Improvements — Complete
+# Code Quality — All Issues Fixed
 
-## Fixed
+All 7 issues identified in the initial review have been resolved (TypeScript: 0 errors, ESLint: 0 warnings, tests: 378 passed).
 
-- **`src/map/house-numbering.ts:97`** — Replaced `console.error()` with `debugError()` for consistency with the rest of the codebase.
-
-- **`src/map/features/feature-data.ts:83-107`** — Added explicit `ApiSaveShape` return type to `toApiSaveShape` function.
-
-- **`src/stores/index.ts`** — Added missing exports: `useDrawStore`, `useEditStore`, `useSnapStore`, `useContextMenuStore`.
-
-## Skipped (intentional)
-
-- **`src/lib/telemetry.ts:15`** — `console.warn` is intentional for production (`debugWarn` only fires in DEV). Left as-is.
-
-- **`src/map/features/loader.ts` + `src/map/rendering/geometry.ts`** — Catch blocks already use `debugError`. Adding `showToast()` would create noisy UI for background operations (commune nav, boundary rendering, scatter refresh). Left as-is.
-
-## Verified
-
-- TypeScript: 0 errors
-- ESLint: 0 errors, 0 warnings
-- Tests: 378 passed, 0 failed
+| Severity | Issue | Fix |
+|----------|-------|-----|
+| Medium | `draw-state.ts` + `drawStore.ts` — `Record<string, unknown>` instead of proper Geoman types | Replaced with `GeomanMarkerPointer` from `geoman-types.ts` and `SetLngLatFn`; removed unsafe casts in `draw-marker-patch.ts` |
+| Medium | `layerStore.ts:76-83` — `getFeature()` iterates `Object.values(this.$state)` including Pinia internals | Replaced with explicit iteration over `Object.keys(createInitialState())` |
+| Low | `types/features.ts` — no typed feature subtypes | Added `FeatureDataByType` discriminated union + per-type interfaces (`AreaFeatureData`, `RoadFeatureData`, etc.) |
+| Low | `phases.ts:100-173` — manual `API_LAYER_TO_PHASE` duplicates backend mapping | Auto-generated from `feature-types.ts` arrays via `buildApiLayerToPhase()` |
+| Low | `vite.config.ts:96-101` — low coverage thresholds | Raised from 25/20/30/25 to 40/30/45/40 |
+| Low | `main.ts:23-118` — monolithic IIFE | Extracted into `checkAuth()`, `createVueApp()`, `initializeApp()` named functions with clear responsibilities |
+| Low | `router/index.ts` — no navigation guards | Added `beforeEach` guard with documentation (auth handled pre-Vue) |

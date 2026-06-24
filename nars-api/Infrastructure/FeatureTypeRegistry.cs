@@ -94,6 +94,9 @@ public static class FeatureTypeRegistry
             [FeatureTypes.NamingPanel] = Descriptor<NamingPanel>(FeatureTypes.NamingPanel, "naming_panels", db => db.NamingPanels),
         };
 
+    private static readonly IReadOnlyDictionary<Type, FeatureTypeDescriptor> _entityTypeMap =
+        _registry.Values.ToDictionary(d => d.EntityType);
+
     private static readonly IReadOnlyList<string> _allTypes = [.. _registry.Keys];
 
     /// <summary>
@@ -151,7 +154,7 @@ public static class FeatureTypeRegistry
     }
 
     private static FeatureTypeDescriptor? GetDescriptor(FeatureBase entity) =>
-        _registry.Values.FirstOrDefault(d => d.EntityType == entity.GetType());
+        _entityTypeMap.GetValueOrDefault(entity.GetType());
 
     private static async Task UpdateHouseEntranceRoadId(AppDbContext db, Guid featureId, Guid userId, JsonElement? data, CancellationToken ct)
     {

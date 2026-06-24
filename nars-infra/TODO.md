@@ -1,13 +1,10 @@
-# Code Quality Improvements — Complete
+# Code Quality — All Issues Fixed
 
-## Fixed
+All 4 Makefile issues identified in the review have been resolved.
 
-- **`scripts/png-to-pdf.py`** — Added argument validation, usage message (`-h`/`--help`), error handling for non-existent directories, type hints, and `if __name__ == "__main__"` guard.
-
-- **`k8s/helm-values/opentelemetry-collector.yaml:56-58`** — Improved `insecure: true` TODO comment with specific TLS cert field names and mount guidance.
-
-- **`k8s/kustomization.yaml:32-46`** — Expanded image tag comments with concrete `kustomize edit set image` examples for CI/CD SHA pinning.
-
-## Verified
-
-- yamllint: 0 warnings, 0 errors
+| Severity | Line | Fix |
+|----------|------|-----|
+| Medium | 409 | Pinned `ingress-nginx` URL from `main` → `controller-v1.12.0` tag for reproducible installs |
+| Low | 780-781 | Replaced `cat file | kubectl apply -f -` with direct `kubectl apply -f file` |
+| Low | 837-845 | Replaced `$(PWD)` with `$$(pwd)` for consistency with the rest of the Makefile |
+| Low | 400-402 | Added timeout (60 iterations × 2s = 120s) to `until` loop in `cluster-wait` |

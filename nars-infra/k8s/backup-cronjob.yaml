@@ -10,6 +10,9 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
+  # local-path is the kind/local-dev default. Override for production
+  # (e.g., ebs-gp3, managed-premium, etc.) via a kustomize patch or
+  # by editing this value before applying.
   storageClassName: local-path
   resources:
     requests:

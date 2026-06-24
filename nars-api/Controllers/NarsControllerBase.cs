@@ -1,4 +1,3 @@
-using System.Data;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -75,13 +74,6 @@ public abstract class NarsControllerBase : ControllerBase
             : null;
 
     /// <summary>
-    /// Adds a named parameter to an ADO.NET command.
-    /// Delegates to <see cref="SqlFragments.AddParam"/> to avoid duplication.
-    /// </summary>
-    protected static void AddParam(IDbCommand cmd, string name, object value)
-        => SqlFragments.AddParam(cmd, name, value);
-
-    /// <summary>
     /// Creates a consistent CookieOptions with secure defaults for auth cookies.
     /// </summary>
     protected CookieOptions MakeCookieOptions(TimeSpan maxAge) => new()
@@ -94,18 +86,5 @@ public abstract class NarsControllerBase : ControllerBase
         IsEssential = true,
     };
 
-    /// <summary>
-    /// Validates that the required geographic fields are present for a given role.
-    /// Returns an error message if invalid, null if valid.
-    /// </summary>
-    internal static string? ValidateGeographicFields(string role, int? communeId, int? dairaId, int? wilayaId) =>
-        role switch
-        {
-            UserRoles.CommuneUser when !communeId.HasValue => "commune_id is required for commune_user.",
-            UserRoles.DairaAdmin when !dairaId.HasValue => "daira_id is required for daira_admin.",
-            UserRoles.WilayaAdmin when !wilayaId.HasValue => "wilaya_id is required for wilaya_admin.",
-            UserRoles.NationalAdmin => "national_admin accounts must be created directly in the database.",
-            UserRoles.FieldWorker => null,
-            _ => null,
-        };
+
 }

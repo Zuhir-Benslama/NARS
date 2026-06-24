@@ -171,7 +171,7 @@ public class AdminController(
                 break;
         }
 
-        var geoError = ValidateGeographicFields(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
+        var geoError = GeographicValidator.Validate(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
         if (geoError is not null)
         {
             return Problem(detail: geoError, statusCode: 400);
@@ -331,7 +331,7 @@ public class AdminController(
 
         if (body.Role is not null)
         {
-            var geoCheck = ValidateGeographicFields(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
+            var geoCheck = GeographicValidator.Validate(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
             if (geoCheck is not null)
             {
                 return Problem(detail: geoCheck, statusCode: 400);

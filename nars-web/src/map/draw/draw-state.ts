@@ -1,10 +1,14 @@
 import { PHASES } from "../../phases"
 import { useDrawStore } from "../../stores/drawStore"
+import type { GeomanMarkerPointer } from "../core/geoman-types"
+
+type LngLatInput = [number, number] | { lng: number; lat: number }
+type SetLngLatFn = (lngLat: LngLatInput) => void
 
 export function registerGeomanMarker(
-  mp: Record<string, unknown>,
+  mp: GeomanMarkerPointer,
   _marker: unknown,
-  orig: (...args: unknown[]) => void,
+  orig: SetLngLatFn,
 ): void {
   const store = useDrawStore()
   store.geomanMarkerPointer = mp
@@ -15,9 +19,8 @@ export function unpatchGeomanMarker(): void {
   const store = useDrawStore()
   store.snappingEnabled = false
   if (store.geomanMarkerPointer?.marker && store.originalGeomanMarkerSetLngLat) {
-    const marker = store.geomanMarkerPointer.marker as Record<string, unknown>
-    marker.setLngLat = store.originalGeomanMarkerSetLngLat
-    marker._narsSnapPatchedInstance = false
+    store.geomanMarkerPointer.marker.setLngLat = store.originalGeomanMarkerSetLngLat
+    store.geomanMarkerPointer.marker._narsSnapPatchedInstance = false
   }
 }
 

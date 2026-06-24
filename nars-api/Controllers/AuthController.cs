@@ -147,7 +147,7 @@ public partial class AuthController(
     public async Task<IActionResult> Logout(CancellationToken cancellationToken = default)
     {
         // Extract user_id from the authenticated token claims
-        var userIdStr = User.FindFirstValue("user_id");
+        var userIdStr = User.FindFirstValue(ClaimNames.UserId);
         if (!string.IsNullOrEmpty(userIdStr) && Guid.TryParse(userIdStr, out Guid userId))
         {
             // Revoke all refresh tokens for the current user
@@ -195,7 +195,7 @@ public partial class AuthController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> CurrentUser(CancellationToken cancellationToken = default)
     {
-        var userIdStr = User.FindFirstValue("user_id");
+        var userIdStr = User.FindFirstValue(ClaimNames.UserId);
         if (!Guid.TryParse(userIdStr, out Guid userId))
         {
             return Unauthorized(new { detail = "Malformed token claims." });
@@ -209,7 +209,7 @@ public partial class AuthController(
             return Unauthorized(new { detail = "User no longer exists." });
         }
 
-        if (!int.TryParse(User.FindFirstValue("commune_id"), out var communeId))
+        if (!int.TryParse(User.FindFirstValue(ClaimNames.CommuneId), out var communeId))
         {
             communeId = user.CommuneId ?? 0;
         }

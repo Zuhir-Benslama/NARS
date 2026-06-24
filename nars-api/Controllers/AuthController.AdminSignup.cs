@@ -90,7 +90,7 @@ public partial class AuthController
         }
 
         // 5. Geographic fields present.
-        var geoError = ValidateGeographicFields(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
+        var geoError = GeographicValidator.Validate(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
         if (geoError is not null)
         {
             return Problem(detail: geoError, statusCode: 400);

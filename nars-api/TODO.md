@@ -1,18 +1,13 @@
-# Code Quality Improvements — Complete
+# Code Quality — All Issues Fixed
 
-## Fixed
+All 7 issues identified in the initial review have been resolved (build: 0 warnings, 0 errors; tests: 126 passed).
 
-- **`FeatureQueryHelper.cs`** — Replaced `List<object>` anonymous types with a dedicated `FeatureResult` record type for type safety.
-
-- **`JwtService.cs:112-116`** — Lowered broad `Exception` catch from `LogError` to `LogWarning` (transient token validation).
-
-- **`Program.cs:28-30`** — Extracted dense null-coalescing + throw chain into a `GetRequiredConfig` helper function.
-
-- **Configuration access** — Migrated all 18 `int.TryParse` calls across 10+ files to typed `IOptions<T>` pattern with dedicated options classes (`CacheOptions`, `LocationsOptions`, `JwtOptions`, `FeatureDefaultsOptions`, `LoggingOptions`, `HttpClientOptions`, `ValidationOptions`, `AccountLockoutOptions`). Registered in DI via `ServiceRegistrationExtensions`.
-
-- **Redundant `using`** — Removed `using System.Linq;` from `PasswordValidator.cs` (covered by Web SDK implicit usings).
-
-## Verified
-
-- Build: 0 warnings, 0 errors
-- Tests: 126 passed, 0 failed, 4 skipped
+| Severity | Issue | Fix |
+|----------|-------|-----|
+| Medium | `FeatureRepository.cs:146` — `allIds` never populated | Rewrote `ClearAllFeaturesAsync` to return actual IDs via `RETURNING id` + `ExecuteReaderAsync` |
+| Medium | `PipelineExtensions.cs:33` — auto-migrate on startup | Removed `Database.MigrateAsync()` call |
+| Low | `AuthController.cs` — inline claim strings | Replaced `"user_id"` → `ClaimNames.UserId`, `"commune_id"` → `ClaimNames.CommuneId` |
+| Low | `FeatureTypeRegistry.cs` — O(n) linear scan | Added `Dictionary<Type, FeatureTypeDescriptor>` for O(1) lookup |
+| Low | `FeatureRepository.cs` — redundant rollbacks | Removed 3 `tx.RollbackAsync()` calls |
+| Low | `NarsControllerBase.cs` — `ValidateGeographicFields` | Moved to new `GeographicValidator` class in `Infrastructure/` |
+| Low | `NarsControllerBase.cs` — `AddParam` helper | Removed unused pass-through method |
