@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
@@ -13,10 +14,10 @@ namespace NarsApi.Controllers;
 [Route("/api")]
 [Tags("Logs")]
 [EnableRateLimiting(RateLimitPolicies.Logs)]
-public class LogsController(AppDbContext db, IConfiguration config, IDateTimeProvider timeProvider) : ControllerBase
+public class LogsController(AppDbContext db, IOptions<LoggingOptions> logOptions, IDateTimeProvider timeProvider) : ControllerBase
 {
-    private int MaxBatchSize => int.TryParse(config["Logging:MaxBatchSize"], out var v) ? v : 50;
-    private int MaxEntryLength => int.TryParse(config["Logging:MaxEntryLength"], out var v) ? v : 10_000;
+    private int MaxBatchSize => logOptions.Value.MaxBatchSize;
+    private int MaxEntryLength => logOptions.Value.MaxEntryLength;
 
     private static readonly HashSet<string> AllowedLevels = ["error", "warn", "info", "debug", "trace"];
 

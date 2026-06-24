@@ -2,6 +2,8 @@ import { PHASES } from "../../phases"
 import { debugLog, debugError } from "../../utils/debug"
 import type { FeatureData, FeatureTypeKey, ModalResult } from "../../types"
 
+export type ApiSaveShape = { type: string; layer: string }
+
 function extractCoords(geometry: GeoJSON.Geometry): { lat: number; lng: number }[] | null {
   switch (geometry.type) {
     case "Point":
@@ -80,7 +82,7 @@ export function buildFeatureData(
   return result
 }
 
-export function toApiSaveShape(fd: FeatureData): { type: string; layer: string } {
+export function toApiSaveShape(fd: FeatureData): ApiSaveShape {
   switch (fd.type) {
     case "areas":
       return { type: "area", layer: fd.areaTypeKey ?? "central_urban" }

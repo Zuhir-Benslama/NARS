@@ -114,7 +114,7 @@ cluster-reset: cluster-clean cluster-up-full ## Wipe data, recreate cluster with
 cluster-clean: ## Delete cluster AND wipe postgis data (irreversible!)
 	@echo "⚠  WARNING: This will DESTROY all postgis data at $(POSTGRES_DATA_DIR)"
 	@read -p "  Type the cluster name '$(CLUSTER_NAME)' to confirm: " confirm; \
-		if [ "$$confirm" != "$(CLUSTER_NAME)" ]; then echo "  Cancelled."; exit 0; fi
+		if [ "$$confirm" != "$(CLUSTER_NAME)" ]; then echo "  Cancelled."; exit 1; fi
 	$(MAKE) cluster-down
 	@echo "→ Wiping postgis data..."
 	@if echo "$(POSTGRES_DATA_DIR)" | grep -q '^/'; then
@@ -514,13 +514,17 @@ ca-secret: ca-generate namespace-ensure ## Create mTLS CA secret from k8s/certs/
 .PHONY: secrets-apply
 secrets-apply: .env namespace-ensure ## Create nars-secrets and regcred with generated/variable values
 	@echo "→ Creating 'nars-secrets'..."
-	@$(KUBECTL) create secret generic nars-secrets -n "$(NAMESPACE)" \
-		--from-literal=postgres_password="$(POSTGRES_PASSWORD)" \
-		--from-literal=ConnectionStrings__DefaultConnection=\
-"Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=$(POSTGRES_PASSWORD)" \
-		--from-literal=Jwt__SecretKey="$(JWT_SECRET)" \
+	@tmpdir=$$(mktemp -d); \
+	printf '%s' "$(POSTGRES_PASSWORD)" > "$$tmpdir/postgres_password"; \
+	printf '%s' "Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=$(POSTGRES_PASSWORD)" > "$$tmpdir/connection_string"; \
+	printf '%s' "$(JWT_SECRET)" > "$$tmpdir/jwt_secret"; \
+	$(KUBECTL) create secret generic nars-secrets -n "$(NAMESPACE)" \
+		--from-file=postgres_password="$$tmpdir/postgres_password" \
+		--from-file=ConnectionStrings__DefaultConnection="$$tmpdir/connection_string" \
+		--from-file=Jwt__SecretKey="$$tmpdir/jwt_secret" \
 		--dry-run=client -o yaml \
-	| $(KUBECTL) apply -f -
+	| $(KUBECTL) apply -f -; \
+	rm -rf "$$tmpdir"
 	@echo "✓ nars-secrets created"
 
 	@if [ -n "$(DOCKER_TOKEN)" ]; then

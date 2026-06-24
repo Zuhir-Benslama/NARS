@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
@@ -15,11 +16,11 @@ namespace NarsApi.Controllers;
 public class FieldController(
     AppDbContext db,
     ILogger<FieldController> logger,
-    IConfiguration config,
+    IOptions<FeatureDefaultsOptions> featureDefaults,
     IDateTimeProvider timeProvider,
     IFieldService fieldService) : NarsControllerBase
 {
-    private int MaxFeatureDataSize => int.TryParse(config["FeatureDefaults:MaxFeatureDataSize"], out var v) ? v : 524_288;
+    private int MaxFeatureDataSize => featureDefaults.Value.MaxFeatureDataSize;
 
     [HttpGet("field/features")]
     [ProducesResponseType(StatusCodes.Status200OK)]

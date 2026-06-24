@@ -121,13 +121,13 @@ public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
         return result;
     }
 
-    public async Task<(List<object> features, int totalCount)> LoadAllFeaturesAsync(Guid userId, int skip, int take, CancellationToken ct = default)
+    public async Task<(List<FeatureResult> features, int totalCount)> LoadAllFeaturesAsync(Guid userId, int skip, int take, CancellationToken ct = default)
     {
         var conn = db.Database.GetDbConnection();
         return await FeatureQueryHelper.LoadAllFeaturesAsync(conn, userId, skip, take, ct);
     }
 
-    public async Task<(List<object> features, int totalCount)> LoadByLayerAsync(Guid userId, string layer, int skip, int take, CancellationToken ct = default)
+    public async Task<(List<FeatureResult> features, int totalCount)> LoadByLayerAsync(Guid userId, string layer, int skip, int take, CancellationToken ct = default)
     {
         var conn = db.Database.GetDbConnection();
         return await FeatureQueryHelper.LoadByLayerAsync(conn, userId, layer, skip, take, ct);

@@ -3,9 +3,9 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using NarsApi.Infrastructure;
-using static NarsApi.Infrastructure.SqlFragments;
 
 namespace NarsApi.Services;
 
@@ -14,10 +14,10 @@ namespace NarsApi.Services;
 /// The configuration (secret, issuer, audience) is injected via the constructor
 /// to ensure consistency with the Authentication middleware.
 /// </summary>
-public class JwtService(string secret, string? issuer, string? audience, IConfiguration config, ILogger<JwtService> logger, IDateTimeProvider timeProvider) : IJwtService
+public class JwtService(string secret, string? issuer, string? audience, IOptions<JwtOptions> jwtOptions, ILogger<JwtService> logger, IDateTimeProvider timeProvider) : IJwtService
 {
     private readonly string _secret = secret ?? throw new ArgumentNullException(nameof(secret));
-    private readonly int _expiresMinutes = ParseIntConfig(config["Jwt:ExpiresInMinutes"], 1440);
+    private readonly int _expiresMinutes = jwtOptions.Value.ExpiresInMinutes;
     public TimeSpan AccessTokenExpiresIn => TimeSpan.FromMinutes(_expiresMinutes);
     private readonly string? _issuer = issuer;
     private readonly string? _audience = audience;
@@ -111,7 +111,7 @@ public class JwtService(string secret, string? issuer, string? audience, IConfig
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Unexpected error during JWT validation");
+            logger.LogWarning(ex, "Unexpected error during JWT validation");
             return null;
         }
     }

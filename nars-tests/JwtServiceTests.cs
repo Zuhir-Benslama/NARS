@@ -1,9 +1,10 @@
 using Xunit;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
+using NarsApi.Infrastructure;
 using NarsApi.Services;
 
 namespace NarsApi.Tests;
@@ -15,14 +16,15 @@ public class JwtServiceTests
         int expiresMinutes = 60,
         int refreshExpiresDays = 30)
     {
-        var configMock = new Mock<IConfiguration>();
-        configMock.Setup(c => c["Jwt:SecretKey"]).Returns(secret);
-        configMock.Setup(c => c["Jwt:ExpiresInMinutes"]).Returns(expiresMinutes.ToString());
-        configMock.Setup(c => c["Jwt:RefreshExpiresInDays"]).Returns(refreshExpiresDays.ToString());
+        var jwtOptions = Options.Create(new JwtOptions
+        {
+            ExpiresInMinutes = expiresMinutes,
+            RefreshExpiresInDays = refreshExpiresDays,
+        });
 
         var loggerMock = Mock.Of<ILogger<JwtService>>();
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == DateTime.UtcNow);
-        return new JwtService(secret, null, null, configMock.Object, loggerMock, timeProvider);
+        return new JwtService(secret, null, null, jwtOptions, loggerMock, timeProvider);
     }
 
     [Fact]

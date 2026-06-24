@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 using NarsApi.Data;
+using NarsApi.Infrastructure;
 using NarsApi.Models;
 using NarsApi.Services;
 
@@ -23,7 +25,7 @@ public class PagesController(
     IHostEnvironment env,
     ILogger<PagesController> logger,
     IRefreshTokenService refreshService,
-    IConfiguration config,
+    IOptions<CacheOptions> cacheOptions,
     IDateTimeProvider timeProvider) : NarsControllerBase
 {
     // GET / — redirect to map if authenticated, otherwise to login
@@ -105,10 +107,9 @@ public class PagesController(
             return System.IO.File.ReadAllText(path);
         }
 
-        var cacheHours = int.TryParse(config["Cache:PageTemplateDurationHours"], out var ch) ? ch : 1;
         return cache.GetOrCreate(cacheKey, entry =>
         {
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(cacheHours);
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(cacheOptions.Value.PageTemplateDurationHours);
             return System.IO.File.ReadAllText(path);
         }) ?? string.Empty;
     }

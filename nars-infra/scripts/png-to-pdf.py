@@ -1,14 +1,37 @@
 #!/usr/bin/env python3
-from PIL import Image
-from pathlib import Path
+"""Convert PNG files in a directory to PDF."""
+
 import sys
+from pathlib import Path
 
-input_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("nars-infra/docs/uml")
+from PIL import Image
 
-for png in sorted(input_dir.glob("*.png")):
-    pdf = png.with_suffix(".pdf")
-    print(f"Converting {png.name} -> {pdf.name}...")
-    img = Image.open(png).convert("RGB")
-    img.save(pdf, "PDF", resolution=150)
 
-print("Done.")
+def main() -> None:
+    args = sys.argv[1:]
+    if not args or args[0] in ("-h", "--help"):
+        print(f"Usage: {sys.argv[0]} <input-dir>")
+        print("Converts all PNG files in <input-dir> to PDF.")
+        sys.exit(0 if args and args[0] in ("-h", "--help") else 1)
+
+    input_dir = Path(args[0])
+    if not input_dir.is_dir():
+        print(f"Error: '{input_dir}' is not a directory", file=sys.stderr)
+        sys.exit(1)
+
+    pngs = sorted(input_dir.glob("*.png"))
+    if not pngs:
+        print(f"No PNG files found in '{input_dir}'")
+        sys.exit(0)
+
+    for png in pngs:
+        pdf = png.with_suffix(".pdf")
+        print(f"Converting {png.name} -> {pdf.name}...")
+        img = Image.open(png).convert("RGB")
+        img.save(pdf, "PDF", resolution=150)
+
+    print("Done.")
+
+
+if __name__ == "__main__":
+    main()

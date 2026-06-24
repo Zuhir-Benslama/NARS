@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NarsApi.Controllers;
 using NarsApi.Data;
 using NarsApi.DTOs;
@@ -29,14 +30,14 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
         _fixture = fixture;
         _db = fixture.CreateDbContext();
 
-        var config = CreateConfigMock();
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == DateTime.UtcNow);
-        var jwt = new JwtService("integration-test-secret-key-that-is-32chars!!", null, null, config.Object, Mock.Of<Microsoft.Extensions.Logging.ILogger<JwtService>>(), timeProvider);
+        var jwtOptions = Options.Create(new JwtOptions { ExpiresInMinutes = 60, RefreshExpiresInDays = 30 });
+        var jwt = new JwtService("integration-test-secret-key-that-is-32chars!!", null, null, jwtOptions, Mock.Of<ILogger<JwtService>>(), timeProvider);
         var scatteredMock = new Mock<IScatteredAreaService>();
         scatteredMock.Setup(s => s.RefreshAsync(It.IsAny<Guid>(), It.IsAny<int>())).Returns(Task.CompletedTask);
         var bgQueueMock = Mock.Of<IBackgroundTaskQueue>();
 
-        _controller = new FeaturesController(new FeatureRepository(_db), scatteredMock.Object, bgQueueMock, Mock.Of<Microsoft.Extensions.Logging.ILogger<FeaturesController>>(), config.Object, timeProvider, new FeatureStatsService(_db));
+        _controller = new FeaturesController(new FeatureRepository(_db), scatteredMock.Object, bgQueueMock, Mock.Of<ILogger<FeaturesController>>(), Options.Create(new FeatureDefaultsOptions()), timeProvider, new FeatureStatsService(_db));
     }
 
     public async Task InitializeAsync()
@@ -306,12 +307,4 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
         _controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext { HttpContext = httpContext };
     }
 
-    private static Mock<IConfiguration> CreateConfigMock()
-    {
-        var config = new Mock<IConfiguration>();
-        config.Setup(c => c["Jwt:SecretKey"]).Returns("test-secret-key-that-is-at-least-32-chars!!");
-        config.Setup(c => c["Jwt:ExpiresInMinutes"]).Returns("60");
-        config.Setup(c => c["Jwt:RefreshExpiresInDays"]).Returns("30");
-        return config;
-    }
 }

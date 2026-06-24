@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
@@ -14,20 +15,16 @@ namespace NarsApi.Controllers;
 [Tags("Validation")]
 public class ValidationController(
     AppDbContext db,
-    IConfiguration config,
+    IOptions<ValidationOptions> validationOptions,
     IValidationService validationService) : NarsControllerBase
 {
-    private double DistrictBoundaryToleranceMeters =>
-        double.TryParse(config["Validation:DistrictBoundaryToleranceMeters"], out var v) ? v : 10.0;
+    private double DistrictBoundaryToleranceMeters => validationOptions.Value.DistrictBoundaryToleranceMeters;
 
-    private double MaxRoadTurnAngleDegrees =>
-        double.TryParse(config["Validation:RoadTurnAngleDegrees"], out var v) ? v : 90.0;
+    private double MaxRoadTurnAngleDegrees => validationOptions.Value.RoadTurnAngleDegrees;
 
-    private double RoadConnectivityDistanceMeters =>
-        double.TryParse(config["Validation:RoadConnectivityMeters"], out var v) ? v : 20.0;
+    private double RoadConnectivityDistanceMeters => validationOptions.Value.RoadConnectivityMeters;
 
-    private int MaxCoordinateCount =>
-        int.TryParse(config["Validation:MaxCoordinateCount"], out var v) ? v : 10_000;
+    private int MaxCoordinateCount => validationOptions.Value.MaxCoordinateCount;
 
     [HttpGet("validate/area/main-urban-exists")]
     [ProducesResponseType(StatusCodes.Status200OK)]

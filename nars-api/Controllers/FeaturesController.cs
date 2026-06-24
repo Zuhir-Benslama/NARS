@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
@@ -16,11 +17,11 @@ public class FeaturesController(
     IScatteredAreaService scatteredService,
     IBackgroundTaskQueue bgQueue,
     ILogger<FeaturesController> logger,
-    IConfiguration config,
+    IOptions<FeatureDefaultsOptions> featureDefaults,
     IDateTimeProvider timeProvider,
     IFeatureStatsService featureStatsService) : NarsControllerBase
 {
-    private readonly int _maxFeatureDataSize = int.TryParse(config["FeatureDefaults:MaxFeatureDataSize"], out var v) ? v : 524_288;
+    private readonly int _maxFeatureDataSize = featureDefaults.Value.MaxFeatureDataSize;
 
     [HttpPost("")]
     [ProducesResponseType(StatusCodes.Status201Created)]

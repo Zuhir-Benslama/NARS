@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Controllers;
 using NarsApi.Data;
@@ -25,7 +25,6 @@ public class FeaturesControllerTests
         AppDbContext? db = null,
         IScatteredAreaService? scatteredService = null,
         IBackgroundTaskQueue? bgQueue = null,
-        IConfiguration? config = null,
         IDateTimeProvider? timeProvider = null,
         IFeatureStatsService? featureStatsService = null)
     {
@@ -35,13 +34,12 @@ public class FeaturesControllerTests
             .Options;
         var context = db ?? new AppDbContext(opts);
 
-        var cfg = config ?? CreateConfig().Object;
         var ctrl = new FeaturesController(
             new FeatureRepository(context),
             scatteredService ?? Mock.Of<IScatteredAreaService>(),
             bgQueue ?? Mock.Of<IBackgroundTaskQueue>(),
             Mock.Of<ILogger<FeaturesController>>(),
-            cfg,
+            Options.Create(new FeatureDefaultsOptions()),
             timeProvider ?? Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedNow),
             featureStatsService ?? Mock.Of<IFeatureStatsService>());
 
@@ -54,13 +52,6 @@ public class FeaturesControllerTests
         };
 
         return (ctrl, context);
-    }
-
-    private static Mock<IConfiguration> CreateConfig()
-    {
-        var config = new Mock<IConfiguration>();
-        config.Setup(c => c["FeatureDefaults:MaxFeatureDataSize"]).Returns("524288");
-        return config;
     }
 
     private static JsonElement Json(string raw) => JsonDocument.Parse(raw).RootElement;

@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using NarsApi.Services;
 
@@ -85,10 +86,10 @@ public static class AuthenticationExtensions
         // Register JwtService with the same secret and options used for authentication
         services.AddScoped<IJwtService, JwtService>(sp =>
         {
-            var config = sp.GetRequiredService<IConfiguration>();
+            var jwtOptions = sp.GetRequiredService<IOptions<JwtOptions>>();
             var logger = sp.GetRequiredService<ILogger<JwtService>>();
             var timeProvider = sp.GetRequiredService<IDateTimeProvider>();
-            return new JwtService(jwtSecret, issuer, audience, config, logger, timeProvider);
+            return new JwtService(jwtSecret, issuer, audience, jwtOptions, logger, timeProvider);
         });
 
         return services;
