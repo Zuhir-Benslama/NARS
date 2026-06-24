@@ -74,11 +74,10 @@ export const useLayerStore = defineStore("layer", {
     },
 
     getFeature(dbId: string): LayerEntry | null {
-      for (const features of Object.values(this.$state)) {
-        if (Array.isArray(features)) {
-          const found = features.find((e: LayerEntry) => e.dbId === dbId)
-          if (found) return found
-        }
+      const layerKeys = Object.keys(createInitialState()) as (keyof LayerState)[]
+      for (const key of layerKeys) {
+        const found = this[key].find((e: LayerEntry) => e.dbId === dbId)
+        if (found) return found
       }
       return null
     },

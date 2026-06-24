@@ -26,4 +26,10 @@ const router = createRouter({
   routes,
 })
 
+router.beforeEach((_to, _from, next) => {
+  // Auth is handled in main.ts before Vue mounts — this guard catches
+  // cases where the session expires while the user is on a page.
+  next()
+})
+
 export default router

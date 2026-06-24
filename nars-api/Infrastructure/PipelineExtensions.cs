@@ -29,9 +29,6 @@ public static class PipelineExtensions
 
             await dbCtx.Database.CanConnectAsync();
             startupLogger.LogInformation("Database connection verified");
-
-            await dbCtx.Database.MigrateAsync();
-            startupLogger.LogInformation("Database migrations applied");
         }
 
         app.UseExceptionHandler(errApp =>

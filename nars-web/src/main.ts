@@ -17,51 +17,39 @@ import { initTelemetry } from "./lib/telemetry"
 import { vClickOutside } from "./directives/clickOutside"
 
 initTelemetry()
-
-// Apply the saved theme before anything renders — prevents flash of wrong theme.
 initTheme()
-;(async () => {
-  // ── Auth guard ─────────────────────────────────────────────────────────
-  try {
-    let authCheck = await fetch(apiUrl("/api/current_user"), {
+
+// ─── Auth guard (before Vue mounts) ──────────────────────────────────────────
+
+async function checkAuth(): Promise<void> {
+  let authCheck = await fetch(apiUrl("/api/current_user"), {
+    credentials: "include",
+  })
+
+  if (authCheck.status === 401) {
+    debugLog("[Auth] Access token expired, attempting silent refresh...")
+    const refreshResponse = await fetch(apiUrl("/api/refresh"), {
+      method: "POST",
       credentials: "include",
     })
 
-    // If 401, try a silent refresh once before redirecting to login
-    if (authCheck.status === 401) {
-      debugLog("[Auth] Access token expired, attempting silent refresh...")
-      const refreshResponse = await fetch(apiUrl("/api/refresh"), {
-        method: "POST",
+    if (refreshResponse.ok) {
+      debugLog("[Auth] Silent refresh successful, retrying auth check")
+      authCheck = await fetch(apiUrl("/api/current_user"), {
         credentials: "include",
       })
-
-      if (refreshResponse.ok) {
-        debugLog("[Auth] Silent refresh successful, retrying auth check")
-        authCheck = await fetch(apiUrl("/api/current_user"), {
-          credentials: "include",
-        })
-      }
     }
+  }
 
-    if (!authCheck.ok) {
-      window.location.href = "/login"
-      return
-    }
-  } catch (error) {
-    // Network error, timeout, or DNS failure — redirect to login
-    // rather than mounting the app for an unauthenticated user.
-    logError(
-      createServerError(
-        "Auth check failed during app initialization",
-        { action: "auth-guard" },
-        error as Error,
-      ),
-    )
+  if (!authCheck.ok) {
     window.location.href = "/login"
     return
   }
+}
 
-  // ── Vue application ────────────────────────────────────────────────────
+// ─── Vue bootstrap ───────────────────────────────────────────────────────────
+
+function createVueApp() {
   const app = createApp(App)
   const pinia = createPinia()
 
@@ -69,8 +57,6 @@ initTheme()
   app.use(i18n)
   app.use(router)
 
-  // ── Global Error Handler ──────────────────────────────────────────────
-  // Catches all Vue-level errors and logs them with context
   app.config.errorHandler = (err, _instance, info) => {
     const error = err instanceof Error ? err : new Error(String(err))
     const narsError = createServerError(
@@ -86,25 +72,25 @@ initTheme()
   }
 
   app.directive("click-outside", vClickOutside)
-
   app.mount("#app")
+}
 
+// ─── Post-mount init: load user, init map based on role ──────────────────────────
+
+async function initializeApp(): Promise<void> {
   try {
-    // Load user profile first — the role determines which init path we take.
     await loadUserAndCommune()
 
     const appStore = useAppStore()
     const role = appStore.user?.role ?? "commune_user"
 
     if (role === "commune_user") {
-      // Full map + feature init — not needed for admin roles.
       await initMap()
       const communeId = appStore.user?.commune?.id
       if (communeId) await displayCommuneBoundary(communeId)
       await loadFromDatabase()
       debugLog("NARS Urban Addressing — Maplibre GL initialized")
     } else {
-      // Admin users land on AdminDashboard — no map needed.
       debugLog(`NARS Admin Dashboard — role: ${role}`)
     }
   } catch (error) {
@@ -116,8 +102,39 @@ initTheme()
     logError(narsError)
     showToast("Failed to load map. Please refresh the page.", "error")
   }
+}
 
-  // Expose stores for Playwright E2E tests
+// ─── Startup sequence ────────────────────────────────────────────────────────
+
+;(async () => {
+  try {
+    await checkAuth()
+  } catch (error) {
+    logError(
+      createServerError(
+        "Auth check failed during app initialization",
+        { action: "auth-guard" },
+        error as Error,
+      ),
+    )
+    window.location.href = "/login"
+    return
+  }
+
+  createVueApp()
+
+  try {
+    await initializeApp()
+  } catch (error) {
+    logError(
+      createServerError(
+        "App initialization failed",
+        { action: "app-init" },
+        error instanceof Error ? error : new Error(String(error)),
+      ),
+    )
+  }
+
   if (import.meta.env.DEV) {
     const { useModalStore } = await import("./stores/modalStore")
     const { useLayerStore } = await import("./stores/layerStore")

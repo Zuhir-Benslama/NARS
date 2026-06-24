@@ -81,10 +81,10 @@ export function patchGeomanMarkerPointerSnap(): void {
         return
       }
 
-      const orig = mp.marker.setLngLat.bind(mp.marker) as (...args: unknown[]) => void
-      registerGeomanMarker(mp as unknown as Record<string, unknown>, mp.marker, orig)
+      const orig = mp.marker.setLngLat.bind(mp.marker)
+      registerGeomanMarker(mp, mp.marker, orig)
       mp.marker._narsSnapPatchedInstance = true
-      mp.marker.setLngLat = makeSnapSetLngLat(mp, orig as SetLngLatFn)
+      mp.marker.setLngLat = makeSnapSetLngLat(mp, orig)
 
       debugLog("[SNAP] marker setLngLat patched")
       if (rafId !== null) cancelAnimationFrame(rafId)
@@ -129,10 +129,10 @@ export function repatchMarkerPointer(): void {
     if (mp.marker && typeof mp.marker.setLngLat === "function") {
       if (mp.marker._narsSnapPatchedInstance) return
 
-      const orig = mp.marker.setLngLat.bind(mp.marker) as (...args: unknown[]) => void
-      registerGeomanMarker(mp as unknown as Record<string, unknown>, mp.marker, orig)
+      const orig = mp.marker.setLngLat.bind(mp.marker)
+      registerGeomanMarker(mp, mp.marker, orig)
       mp.marker._narsSnapPatchedInstance = true
-      mp.marker.setLngLat = makeSnapSetLngLat(mp, orig as SetLngLatFn)
+      mp.marker.setLngLat = makeSnapSetLngLat(mp, orig)
 
       debugLog("[SNAP] marker re-patched after draw reset")
       _patchRafId = null

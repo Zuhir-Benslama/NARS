@@ -1,10 +1,16 @@
 import { defineStore } from "pinia"
 import { PHASES } from "../phases"
+import type { GeomanMarkerPointer } from "../map/core/geoman-types"
+
+type LngLatInput = [number, number] | { lng: number; lat: number }
+type SetLngLatFn = (lngLat: LngLatInput) => void
 
 export const useDrawStore = defineStore("draw", {
   state: () => ({
-    geomanMarkerPointer: null as Record<string, unknown> | null,
-    originalGeomanMarkerSetLngLat: null as ((...args: unknown[]) => void) | null,
+    // Non-serializable (function/object references) — used only during an
+    // active drawing session to patch/unpatch Geoman's marker setLngLat.
+    geomanMarkerPointer: null as GeomanMarkerPointer | null,
+    originalGeomanMarkerSetLngLat: null as SetLngLatFn | null,
     snappingEnabled: true,
     repatchMarkerPointer: null as (() => void) | null,
     drawingPhase: null as (typeof PHASES)[number] | null,
@@ -13,9 +19,9 @@ export const useDrawStore = defineStore("draw", {
 
   actions: {
     registerGeomanMarker(
-      mp: Record<string, unknown>,
+      mp: GeomanMarkerPointer,
       _marker: unknown,
-      orig: (...args: unknown[]) => void,
+      orig: SetLngLatFn,
     ): void {
       this.geomanMarkerPointer = mp
       this.originalGeomanMarkerSetLngLat = orig
@@ -23,9 +29,8 @@ export const useDrawStore = defineStore("draw", {
     unpatchGeomanMarker(): void {
       this.snappingEnabled = false
       if (this.geomanMarkerPointer?.marker && this.originalGeomanMarkerSetLngLat) {
-        const marker = this.geomanMarkerPointer.marker as Record<string, unknown>
-        marker.setLngLat = this.originalGeomanMarkerSetLngLat
-        marker._narsSnapPatchedInstance = false
+        this.geomanMarkerPointer.marker.setLngLat = this.originalGeomanMarkerSetLngLat
+        this.geomanMarkerPointer.marker._narsSnapPatchedInstance = false
       }
     },
     setSnappingEnabled(v: boolean): void {

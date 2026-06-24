@@ -61,7 +61,6 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
 
         if (rows == 0)
         {
-            await tx.RollbackAsync(ct);
             return false;
         }
 
@@ -81,14 +80,12 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
         var dbSet = FeatureTypeRegistry.GetDbSet(db, featureType);
         if (dbSet is null)
         {
-            await tx.RollbackAsync(ct);
             return false;
         }
 
         var deleted = await dbSet.Where(f => f.Id == featureId && f.UserId == userId).ExecuteDeleteAsync(ct);
         if (deleted == 0)
         {
-            await tx.RollbackAsync(ct);
             return false;
         }
 
@@ -103,10 +100,7 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
         await using var handle = await conn.EnsureOpenAsync(ct);
 
         var descriptors = FeatureTypeRegistry.GetAllDescriptors();
-        var total = 0;
-        var allIds = new List<Guid>();
 
-        // Build a single CTE that deletes from all feature tables and feature_registry
         var sb = new StringBuilder();
         sb.Append("WITH ");
 
@@ -132,17 +126,21 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
             sb.Append($"SELECT id FROM d{i}");
         }
         sb.AppendLine("),");
-        sb.AppendLine("cleanup AS (DELETE FROM feature_registry WHERE id IN (SELECT id FROM all_deleted))");
-        sb.Append("SELECT COUNT(*) FROM all_deleted");
+        sb.AppendLine("cleanup AS (DELETE FROM feature_registry WHERE id IN (SELECT id FROM all_deleted) RETURNING id)");
+        sb.Append("SELECT id FROM cleanup");
 
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = sb.ToString();
         cmd.CommandTimeout = 30;
         SqlFragments.AddParam(cmd, "@uid", userId);
 
-        var result = await cmd.ExecuteScalarAsync(ct);
-        total = result is long l ? (int)l : 0;
+        var ids = new List<Guid>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            ids.Add(reader.GetGuid(0));
+        }
 
-        return (total, allIds);
+        return (ids.Count, ids);
     }
 }
