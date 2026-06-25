@@ -12,6 +12,7 @@ import { useAppStore } from "./stores/appStore"
 import { apiUrl } from "./api"
 import { logError, createServerError } from "./lib/errors"
 import { showToast } from "./lib/toast"
+import { getLoginPath } from "./config"
 import { debugLog, debugError } from "./utils/debug"
 import { initTelemetry } from "./lib/telemetry"
 import { vClickOutside } from "./directives/clickOutside"
@@ -21,7 +22,7 @@ initTheme()
 
 // ─── Auth guard (before Vue mounts) ──────────────────────────────────────────
 
-async function checkAuth(): Promise<void> {
+async function checkAuth(): Promise<boolean> {
   let authCheck = await fetch(apiUrl("/api/current_user"), {
     credentials: "include",
   })
@@ -42,9 +43,11 @@ async function checkAuth(): Promise<void> {
   }
 
   if (!authCheck.ok) {
-    window.location.href = "/login"
-    return
+    window.location.href = getLoginPath()
+    return false
   }
+
+  return true
 }
 
 // ─── Vue bootstrap ───────────────────────────────────────────────────────────
@@ -107,8 +110,9 @@ async function initializeApp(): Promise<void> {
 // ─── Startup sequence ────────────────────────────────────────────────────────
 
 ;(async () => {
+  let authenticated: boolean
   try {
-    await checkAuth()
+    authenticated = await checkAuth()
   } catch (error) {
     logError(
       createServerError(
@@ -117,9 +121,11 @@ async function initializeApp(): Promise<void> {
         error as Error,
       ),
     )
-    window.location.href = "/login"
+    window.location.href = getLoginPath()
     return
   }
+
+  if (!authenticated) return
 
   createVueApp()
 

@@ -60,6 +60,7 @@ prerequisites: ## Check that all required tools are installed
 .PHONY: cluster-up
 cluster-up: prerequisites ## Full bootstrap: create cluster, build images, deploy everything
 	$(MAKE) cluster-create
+	$(MAKE) kubeconfig-fix
 	$(MAKE) ingress-install
 	$(MAKE) ingress-wait
 	$(MAKE) metrics-install
@@ -100,6 +101,7 @@ namespace-ensure: ## Ensure $(NAMESPACE) namespace exists (idempotent)
 cluster-down: proxy-down ## Delete the kind cluster (preserves postgis data)
 	@echo "→ Deleting cluster '$(CLUSTER_NAME)'..."
 	@kind delete cluster --name "$(CLUSTER_NAME)" 2>/dev/null || true
+	@-docker rm -f kube-proxy 2>/dev/null || true
 	@rm -f /tmp/$(CLUSTER_NAME)-tls.crt /tmp/$(CLUSTER_NAME)-tls.key
 	@echo "✓ Cluster deleted (postgis data preserved at $(POSTGRES_DATA_DIR))"
 
@@ -170,14 +172,25 @@ proxy-up: port-forward-start ## Start Docker socat bridge: host:8080 → kind:80
 	@-docker rm -f "$(PROXY_CONTAINER)" 2>/dev/null || true
 	@sleep 0.5
 	@docker run -d --name "$(PROXY_CONTAINER)" --rm \
-		-p 8080:8080 \
+		-p 127.0.0.1:8080:8080 \
 		--network kind \
 		alpine/socat \
 		tcp-l:8080,fork,reuseaddr tcp:nars-control-plane:8080 > /dev/null
-	@sleep 2
+	@echo "→ Waiting for proxy to be ready..."
+	@for i in $$(seq 1 12); do \
+		if curl -s --connect-timeout 2 -o /dev/null -w "" http://localhost:8080/ 2>/dev/null; then \
+			break; \
+		fi; \
+		sleep 2; \
+	done; \
+	if curl -s --connect-timeout 2 -o /dev/null -w "" http://localhost:8080/ 2>/dev/null; then \
+		echo "✓ Proxy ready"; \
+	else \
+		echo "⚠ Proxy may not be reachable (check port-forward or rootless Docker networking)"; \
+	fi
 	@echo ""
 	@echo "✓ App accessible at http://localhost:8080/"
-	@echo "  Health:      http://localhost:8080/health"
+	@echo "  Health:      http://localhost:8080/api/health"
 	@echo "  Smoke test:  make smoke-test"
 	@echo "  Stop proxy:  make proxy-down"
 
@@ -388,24 +401,24 @@ cluster-create: ## Create the kind cluster with host-mounted postgis data (idemp
 		if echo "$$DATA_DIR" | grep -qv '^/'; then
 			DATA_DIR="$$(cd "$$DATA_DIR" && pwd)"
 		fi
-		cat > /tmp/kind-$(CLUSTER_NAME).yaml <<-KINDEOF
-			kind: Cluster
-			apiVersion: kind.x-k8s.io/v1alpha4
-			name: $(CLUSTER_NAME)
-			kubeadmConfigPatches:
-			  - |
-			    kind: ClusterConfiguration
-			    apiServer:
-			      certSANs:
-			        - localhost
-			        - 127.0.0.1
-			        - 0.0.0.0
-			nodes:
-			  - role: control-plane
-			    extraMounts:
-			      - hostPath: $${DATA_DIR}
-			        containerPath: /mnt/nars/postgis
-		KINDEOF
+		{ \
+			echo 'kind: Cluster'; \
+			echo 'apiVersion: kind.x-k8s.io/v1alpha4'; \
+			echo "name: $(CLUSTER_NAME)"; \
+			echo 'kubeadmConfigPatches:'; \
+			echo '  - |'; \
+			echo '    kind: ClusterConfiguration'; \
+			echo '    apiServer:'; \
+			echo '      certSANs:'; \
+			echo '        - localhost'; \
+			echo '        - 127.0.0.1'; \
+			echo '        - 0.0.0.0'; \
+			echo 'nodes:'; \
+			echo '  - role: control-plane'; \
+			echo '    extraMounts:'; \
+			echo "      - hostPath: $$DATA_DIR"; \
+			echo '        containerPath: /mnt/nars/postgis'; \
+		} > /tmp/kind-$(CLUSTER_NAME).yaml
 		echo "→ Creating kind cluster '$(CLUSTER_NAME)'..."
 		kind create cluster --name "$(CLUSTER_NAME)" --config /tmp/kind-$(CLUSTER_NAME).yaml
 		echo "✓ Cluster created"
@@ -423,11 +436,35 @@ cluster-wait: ## Wait for API server and nodes to be ready
 		$(KUBECTL) wait --for=condition=Ready node --all --timeout=120s
 	@echo "✓ Cluster ready"
 
+.PHONY: kubeconfig-fix
+kubeconfig-fix: ## Patch kubeconfig for rootless Docker (port 16443 via kube-proxy socat)
+	@if docker info 2>/dev/null | grep -q "rootless"; then \
+		echo "→ Rootless Docker detected — fixing kubeconfig port"; \
+		KUBE_PROXY="kube-proxy"; \
+		if ! docker ps --format "{{.Names}}" 2>/dev/null | grep -q "^$$KUBE_PROXY$$"; then \
+			echo "→ Creating socat bridge (16443 -> nars-control-plane:6443)..."; \
+			docker run -d --name "$$KUBE_PROXY" --rm \
+				-p 127.0.0.1:16443:16443 \
+				--network kind \
+				alpine/socat \
+				tcp-listen:16443,fork,reuseaddr tcp-connect:nars-control-plane:6443 > /dev/null; \
+		fi; \
+		KUBECONFIG=$$(mktemp); \
+		kind get kubeconfig --name "$(CLUSTER_NAME)" > "$$KUBECONFIG"; \
+		sed -i 's/127.0.0.1:[0-9]*/127.0.0.1:16443/' "$$KUBECONFIG"; \
+		mkdir -p "$$HOME/.kube"; \
+		cp "$$KUBECONFIG" "$$HOME/.kube/config"; \
+		echo "✓ kubeconfig patched to 127.0.0.1:16443"; \
+	else \
+		echo "→ Standard Docker — kubeconfig OK"; \
+	fi
+
 .PHONY: ingress-install
 ingress-install: ## Install NGINX Ingress Controller (idempotent)
 	@echo "→ Installing NGINX Ingress Controller..."
 	@$(KUBECTL) apply -f \
 		https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.0/deploy/static/provider/kind/deploy.yaml
+	@$(KUBECTL) label node --overwrite nars-control-plane ingress-ready=true 2>/dev/null || true
 	@echo "✓ Ingress controller installed"
 
 .PHONY: ingress-wait
@@ -537,17 +574,12 @@ ca-secret: ca-generate namespace-ensure ## Create mTLS CA secret from k8s/certs/
 .PHONY: secrets-apply
 secrets-apply: .env namespace-ensure ## Create nars-secrets and regcred with generated/variable values
 	@echo "→ Creating 'nars-secrets'..."
-	@tmpdir=$$(mktemp -d); \
-	cat > "$$tmpdir/postgres_password" <<< "$(POSTGRES_PASSWORD)"; \
-	cat > "$$tmpdir/connection_string" <<< "Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=$(POSTGRES_PASSWORD)"; \
-	cat > "$$tmpdir/jwt_secret" <<< "$(JWT_SECRET)"; \
 	$(KUBECTL) create secret generic nars-secrets -n "$(NAMESPACE)" \
-		--from-file=postgres_password="$$tmpdir/postgres_password" \
-		--from-file=ConnectionStrings__DefaultConnection="$$tmpdir/connection_string" \
-		--from-file=Jwt__SecretKey="$$tmpdir/jwt_secret" \
+		--from-literal=postgres_password="$(POSTGRES_PASSWORD)" \
+		--from-literal=ConnectionStrings__DefaultConnection="Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=$(POSTGRES_PASSWORD)" \
+		--from-literal=Jwt__SecretKey="$(JWT_SECRET)" \
 		--dry-run=client -o yaml \
-	| $(KUBECTL) apply -f -; \
-	rm -rf "$$tmpdir"
+	| $(KUBECTL) apply -f -
 	@echo "✓ nars-secrets created"
 
 	@if [ -n "$(DOCKER_TOKEN)" ]; then
@@ -801,8 +833,8 @@ observability-otel-collector: ## Install OpenTelemetry Collector
 .PHONY: observability-servicemonitor
 observability-servicemonitor: ## Apply OTel metrics Service + ServiceMonitor (requires prometheus CRDs)
 	@echo "→ Applying OTel metrics Service and ServiceMonitor..."
-	@$(KUBECTL) apply -f $(K8S_DIR)/otel-metrics-service.yaml
-	@$(KUBECTL) apply -f $(K8S_DIR)/servicemonitor.yaml
+	@$(KUBECTL) apply -f - < $(K8S_DIR)/otel-metrics-service.yaml
+	@$(KUBECTL) apply -f - < $(K8S_DIR)/servicemonitor.yaml
 	@echo "✓ OTel metrics Service + ServiceMonitor applied"
 
 .PHONY: observability-port-forward
