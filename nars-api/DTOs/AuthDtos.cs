@@ -123,3 +123,17 @@ public record CreateAdminResponse(
     [property: JsonPropertyName("user_id")] string UserId,
     [property: JsonPropertyName("message")] string Message
 );
+
+public record ActionResponse(
+    bool Success,
+    string? Message = null
+);
+
+public record RefreshTokenResult(
+    bool Success,
+    string? Detail,
+    NarsApi.Models.User? User,
+    string? NewRawToken,
+    string? NewAccessToken,
+    DateTime? RefreshExpiry
+);

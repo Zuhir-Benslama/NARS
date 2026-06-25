@@ -35,6 +35,7 @@ prometheus:
         memory: 1Gi
 
 alertmanager:
+  # Disabled — no alert routing configured. Re-enable when alerting rules are ready.
   enabled: false
 
 defaultRules:

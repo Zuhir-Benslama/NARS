@@ -4,14 +4,18 @@
 import sys
 from pathlib import Path
 
-from PIL import Image
+try:
+    from PIL import Image
+except ImportError:
+    print("Error: Pillow is not installed. Run: pip install Pillow", file=sys.stderr)
+    sys.exit(1)
 
 
 def main() -> None:
     args = sys.argv[1:]
     if not args or args[0] in ("-h", "--help"):
-        print(f"Usage: {sys.argv[0]} <input-dir>")
-        print("Converts all PNG files in <input-dir> to PDF.")
+        print(f"Usage: {sys.argv[0]} <input-dir>", file=sys.stderr)
+        print("Converts all PNG files in <input-dir> to PDF.", file=sys.stderr)
         sys.exit(0 if args and args[0] in ("-h", "--help") else 1)
 
     input_dir = Path(args[0])

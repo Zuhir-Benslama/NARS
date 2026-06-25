@@ -22,6 +22,8 @@ SCALABLE_DEPLOYS   := postgis nars-api nars-frontend
 # Auto-generate .env with stable secrets if missing.
 # Make auto-remakes missing included files and re-execs, so
 # all targets see consistent POSTGRES_PASSWORD / JWT_SECRET.
+# Mark .env as precious to avoid accidental deletion from parallel builds.
+.PRECIOUS: .env
 .env:
 	@echo "# Auto-generated — DO NOT COMMIT" > $@
 	@echo "POSTGRES_PASSWORD=$$(openssl rand -base64 32)" >> $@
@@ -117,7 +119,7 @@ cluster-clean: ## Delete cluster AND wipe postgis data (irreversible!)
 		if [ "$$confirm" != "$(CLUSTER_NAME)" ]; then echo "  Cancelled."; exit 1; fi
 	$(MAKE) cluster-down
 	@echo "→ Wiping postgis data..."
-	@if echo "$(POSTGRES_DATA_DIR)" | grep -q '^/'; then
+	@if [[ "$(POSTGRES_DATA_DIR)" == /* ]]; then
 		rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null \
 			|| sudo -n rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null \
 			|| true
@@ -386,8 +388,24 @@ cluster-create: ## Create the kind cluster with host-mounted postgis data (idemp
 		if echo "$$DATA_DIR" | grep -qv '^/'; then
 			DATA_DIR="$$(cd "$$DATA_DIR" && pwd)"
 		fi
-		printf 'kind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\nname: %s\nkubeadmConfigPatches:\n  - |\n    kind: ClusterConfiguration\n    apiServer:\n      certSANs:\n        - localhost\n        - 127.0.0.1\n        - 0.0.0.0\nnodes:\n  - role: control-plane\n    extraMounts:\n      - hostPath: %s\n        containerPath: /mnt/nars/postgis\n' \
-			"$(CLUSTER_NAME)" "$$DATA_DIR" > /tmp/kind-$(CLUSTER_NAME).yaml
+		cat > /tmp/kind-$(CLUSTER_NAME).yaml <<-KINDEOF
+			kind: Cluster
+			apiVersion: kind.x-k8s.io/v1alpha4
+			name: $(CLUSTER_NAME)
+			kubeadmConfigPatches:
+			  - |
+			    kind: ClusterConfiguration
+			    apiServer:
+			      certSANs:
+			        - localhost
+			        - 127.0.0.1
+			        - 0.0.0.0
+			nodes:
+			  - role: control-plane
+			    extraMounts:
+			      - hostPath: $${DATA_DIR}
+			        containerPath: /mnt/nars/postgis
+		KINDEOF
 		echo "→ Creating kind cluster '$(CLUSTER_NAME)'..."
 		kind create cluster --name "$(CLUSTER_NAME)" --config /tmp/kind-$(CLUSTER_NAME).yaml
 		echo "✓ Cluster created"
@@ -520,9 +538,9 @@ ca-secret: ca-generate namespace-ensure ## Create mTLS CA secret from k8s/certs/
 secrets-apply: .env namespace-ensure ## Create nars-secrets and regcred with generated/variable values
 	@echo "→ Creating 'nars-secrets'..."
 	@tmpdir=$$(mktemp -d); \
-	printf '%s' "$(POSTGRES_PASSWORD)" > "$$tmpdir/postgres_password"; \
-	printf '%s' "Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=$(POSTGRES_PASSWORD)" > "$$tmpdir/connection_string"; \
-	printf '%s' "$(JWT_SECRET)" > "$$tmpdir/jwt_secret"; \
+	cat > "$$tmpdir/postgres_password" <<< "$(POSTGRES_PASSWORD)"; \
+	cat > "$$tmpdir/connection_string" <<< "Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=$(POSTGRES_PASSWORD)"; \
+	cat > "$$tmpdir/jwt_secret" <<< "$(JWT_SECRET)"; \
 	$(KUBECTL) create secret generic nars-secrets -n "$(NAMESPACE)" \
 		--from-file=postgres_password="$$tmpdir/postgres_password" \
 		--from-file=ConnectionStrings__DefaultConnection="$$tmpdir/connection_string" \
@@ -660,6 +678,9 @@ OBSERVABILITY_NAMESPACE ?= observability
 .PHONY: observability-install
 observability-install: helm-check helm-repos ## Install LGTM stack + OpenTelemetry Collector
 	$(MAKE) observability-namespace
+	# These Helm installs are independent and could be parallelised:
+	#   $(MAKE) -j3 observability-prometheus-stack observability-loki observability-tempo
+	# Sequential is safer for debug output and avoids resource contention on small clusters.
 	$(MAKE) observability-prometheus-stack
 	$(MAKE) observability-loki
 	$(MAKE) observability-tempo
@@ -837,15 +858,13 @@ infra-lint-docker: ## Lint Dockerfiles with hadolint
 	@if command -v hadolint >/dev/null 2>&1; then
 		hadolint nars-infra/docker/Dockerfile.*
 	else
-		docker run --rm -i \
+		docker run --rm \
+			-v "$$(pwd):/mnt" \
 			-v "$$(pwd)/nars-infra/.hadolint.yaml:/home/hadolint/.hadolint.yaml:ro" \
-			hadolint/hadolint < nars-infra/docker/Dockerfile.nars-api
-		docker run --rm -i \
-			-v "$$(pwd)/nars-infra/.hadolint.yaml:/home/hadolint/.hadolint.yaml:ro" \
-			hadolint/hadolint < nars-infra/docker/Dockerfile.nars-postgis
-		docker run --rm -i \
-			-v "$$(pwd)/nars-infra/.hadolint.yaml:/home/hadolint/.hadolint.yaml:ro" \
-			hadolint/hadolint < nars-infra/docker/Dockerfile.nars-vite
+			hadolint/hadolint \
+			/mnt/nars-infra/docker/Dockerfile.nars-api \
+			/mnt/nars-infra/docker/Dockerfile.nars-postgis \
+			/mnt/nars-infra/docker/Dockerfile.nars-vite
 	fi
 
 .PHONY: infra-lint-yaml
@@ -853,11 +872,16 @@ infra-lint-yaml: ## Lint k8s YAML with yamllint (uses .yamllint.yaml config)
 	@if command -v yamllint >/dev/null 2>&1; then
 		yamllint -c nars-infra/.yamllint.yaml nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml
 	else
-		docker run --rm -v "$$(pwd):/mnt" cytopia/yamllint \
+		# cytopia/yamllint:1.36.0@sha256:... — replace with pinned SHA for CI
+		docker run --rm -v "$$(pwd):/mnt" cytopia/yamllint:1.36.0 \
 			-c nars-infra/.yamllint.yaml nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml
 	fi
 
 # ─── Docker Images ───────────────────────────────────────────
+
+# Override IMAGE_TAG to pin a specific version (e.g., IMAGE_TAG=abc1234).
+# Defaults to 'latest' for local dev. CI/CD should set this to the commit SHA.
+IMAGE_TAG ?= latest
 
 .PHONY: images-build
 images-build: ## Build all Docker images
@@ -869,21 +893,21 @@ images-build: ## Build all Docker images
 
 .PHONY: _build-nars-api
 _build-nars-api:
-	@echo "  → $(DOCKER_ORG)/nars-api:latest"
+	@echo "  → $(DOCKER_ORG)/nars-api:$(IMAGE_TAG)"
 	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-api" \
-		-t "$(DOCKER_ORG)/nars-api:latest" .
+		-t "$(DOCKER_ORG)/nars-api:$(IMAGE_TAG)" .
 
 .PHONY: _build-nars-postgis
 _build-nars-postgis:
-	@echo "  → $(DOCKER_ORG)/nars-postgis:latest"
+	@echo "  → $(DOCKER_ORG)/nars-postgis:$(IMAGE_TAG)"
 	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-postgis" \
-		-t "$(DOCKER_ORG)/nars-postgis:latest" .
+		-t "$(DOCKER_ORG)/nars-postgis:$(IMAGE_TAG)" .
 
 .PHONY: _build-nars-vite
 _build-nars-vite:
-	@echo "  → $(DOCKER_ORG)/nars-vite:latest"
+	@echo "  → $(DOCKER_ORG)/nars-vite:$(IMAGE_TAG)"
 	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-vite" \
-		-t "$(DOCKER_ORG)/nars-vite:latest" .
+		-t "$(DOCKER_ORG)/nars-vite:$(IMAGE_TAG)" .
 
 .PHONY: images-push
 images-push: ## Push all Docker images to registry

@@ -13,19 +13,26 @@ public class AdminOverviewService(AppDbContext db, IFeatureStatsService featureS
         var wilayas = await db.Wilayas.OrderBy(w => w.WilayaId).ToListAsync(cancellationToken);
         var wilayaIds = wilayas.Select(w => w.WilayaId).ToArray();
 
-        var admins = await db.Users
+        // Parallelize independent queries to reduce total latency.
+        var adminsTask = db.Users
             .Where(u => u.Role == UserRoles.WilayaAdmin && u.WilayaId.HasValue && wilayaIds.Contains(u.WilayaId.Value))
             .ToDictionaryAsync(u => u.WilayaId!.Value, cancellationToken);
 
-        var dairaCounts = await db.Dairas
+        var dairaCountsTask = db.Dairas
             .Where(d => wilayaIds.Contains(d.WilayaId))
             .GroupBy(d => d.WilayaId)
             .Select(g => new { WilayaId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.WilayaId, x => x.Count, cancellationToken);
 
-        var dairas = await db.Dairas
+        var dairasTask = db.Dairas
             .Where(d => wilayaIds.Contains(d.WilayaId))
             .ToListAsync(cancellationToken);
+
+        await Task.WhenAll(adminsTask, dairaCountsTask, dairasTask);
+
+        var admins = adminsTask.Result;
+        var dairaCounts = dairaCountsTask.Result;
+        var dairas = dairasTask.Result;
 
         var allDairaIds = dairas.Select(d => d.DairaId).ToArray();
 

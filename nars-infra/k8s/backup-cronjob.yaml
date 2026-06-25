@@ -10,7 +10,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  # local-path is the kind/local-dev default. Override for production
+  # ⚠ local-path is the kind/local-dev default. Override for production
   # (e.g., ebs-gp3, managed-premium, etc.) via a kustomize patch or
   # by editing this value before applying.
   storageClassName: local-path
@@ -63,6 +63,9 @@ spec:
                   TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
                   FILE="/backup/nars_db_${TIMESTAMP}.sql"
                   echo "→ Backing up database 'nars_db'..."
+                  # ⚠ Backup is written in plaintext (includes password hashes).
+                  # For production, pipe through gpg for encryption:
+                  #   pg_dump ... | gpg --encrypt --recipient ... > "$FILE.gpg"
                   pg_dump \
                     -h "${PGHOST}" -U "${PGUSER}" -d "${PGDATABASE}" \
                     --no-owner > "$FILE"

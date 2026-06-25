@@ -102,11 +102,6 @@ public record UpdateFeatureResponse(
     DateTime UpdatedAt
 );
 
-public record ActionResponse(
-    bool Success,
-    string? Message = null
-);
-
 public record UpdateCredentialsResponse(
     bool Success,
     string Message,

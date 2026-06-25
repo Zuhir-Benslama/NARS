@@ -44,7 +44,7 @@ public class SpatialController(
             return Problem(detail: "Road not found.", statusCode: 404);
         }
 
-        var roadData = JsonSerializer.Deserialize<JsonElement>(road.Data);
+        var roadData = JsonHelper.DeserializeSafe(road.Data);
         if (!roadData.TryGetProperty("coordinates", out var coordsEl))
         {
             return Problem(detail: "Road data is missing coordinates.", statusCode: 400);

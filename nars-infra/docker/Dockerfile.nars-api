@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl=8.5.0-2ubuntu10* \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-USER ubuntu
+USER 1654
 EXPOSE 8080
 # This ENV takes precedence over appsettings.json — config file changes are ignored.
 ENV ASPNETCORE_URLS=http://+:8080
@@ -34,7 +34,7 @@ RUN dotnet publish "nars-api/NarsApi.csproj" --configuration Release -o /app/pub
 
 FROM base AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --from=publish /app/publish /app/
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:8080/health || exit 1
 ENTRYPOINT ["dotnet", "NarsApi.dll"]

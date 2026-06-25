@@ -141,12 +141,9 @@ public partial class AuthController
             return Conflict(new { detail = $"{field} already exists." });
         }
 
-        if (logger.IsEnabled(LogLevel.Information))
-        {
-            logger.LogInformation(
-                "[Auth] {AdminUser} ({AdminRole}) created {NewRole} account {NewUser} via login page",
-                admin.Username, admin.Role, newUser.Role, newUser.Username);
-        }
+        logger.LogInformation(
+            "[Auth] {AdminUser} ({AdminRole}) created {NewRole} account {NewUser} via login page",
+            admin.Username, admin.Role, newUser.Role, newUser.Username);
 
         return StatusCode(201, new ActionResponse(
             Success: true,

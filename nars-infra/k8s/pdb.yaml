@@ -29,6 +29,9 @@ spec:
       app.kubernetes.io/name: nars-frontend
       app.kubernetes.io/component: frontend
 ---
+# PostGIS runs with 1 replica. A PDB with minAvailable: 1 would block
+# voluntary disruption (node drain, cluster upgrade). Use maxUnavailable: 0
+# for the same protection but clearer intent. Scale up before draining.
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
@@ -38,7 +41,7 @@ metadata:
     app.kubernetes.io/name: postgis
     app.kubernetes.io/component: database
 spec:
-  minAvailable: 1
+  maxUnavailable: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: postgis

@@ -20,6 +20,8 @@ public class FeatureCatalogController(
     private const string IconHouseEntrance = "\U0001F6AA";
     private const string IconPublicBuilding = "\U0001F3DB️";
     private const string IconPublicSpace = "\U0001F333";
+    private const string IconCityCenter = "\U0001F3D9️";
+    private const string IconNamingPanel = "\U0001FAB5";
 
     [HttpGet("feature-types")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -68,6 +70,10 @@ public class FeatureCatalogController(
                     new LayerOption(FeatureTypes.PublicSpaceLayers.Garden, "Garden"),
                     new LayerOption(FeatureTypes.PublicSpaceLayers.Square, "Square"),
                 ]),
+            new(Key: FeatureTypes.CityCenter, Label: "City Center", Icon: IconCityCenter,
+                Layers: [new LayerOption(FeatureTypes.CityCenterLayers.Default, "City Center")]),
+            new(Key: FeatureTypes.NamingPanel, Label: "Naming Panel", Icon: IconNamingPanel,
+                Layers: [new LayerOption(FeatureTypes.NamingPanelLayers.Default, "Naming Panel")]),
         };
         return Ok(types);
     }

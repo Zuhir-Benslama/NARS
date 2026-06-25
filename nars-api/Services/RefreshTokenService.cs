@@ -1,19 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NarsApi.Data;
+using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
 
 namespace NarsApi.Services;
-
-public record RefreshTokenResult(
-    bool Success,
-    string? Detail,
-    User? User,
-    string? NewRawToken,
-    string? NewAccessToken,
-    DateTime? RefreshExpiry
-);
 
 public class RefreshTokenService(
     AppDbContext db,

@@ -67,7 +67,7 @@ public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
         var caseBuilder = new StringBuilder();
         for (var i = 0; i < descriptors.Count; i++)
         {
-            caseBuilder.AppendLine($"                    COALESCE(SUM(CASE WHEN f.ft = '{descriptors[i].Type}' THEN 1 ELSE 0 END), 0),");
+            caseBuilder.AppendLine($"                    COALESCE(SUM(CASE WHEN f.ft = '{descriptors[i].Type}' THEN 1 ELSE 0 END), 0) AS \"{descriptors[i].Type}\",");
         }
 
         cmd.CommandText = $"""
@@ -77,7 +77,7 @@ public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
                 u.name,
                 u.email,
                 u.role,
-                {caseBuilder}                    COUNT(f.id)
+                {caseBuilder}                    COUNT(f.id) AS total
             FROM users u
             LEFT JOIN (
                 {unionBuilder}
@@ -87,14 +87,6 @@ public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
             """;
 
         FeatureQueryHelper.AddParameter(cmd, "@ids", userIds);
-
-        var typeColIndex = new Dictionary<string, int>(descriptors.Count);
-        for (var i = 0; i < descriptors.Count; i++)
-        {
-            typeColIndex[descriptors[i].Type] = 5 + i;
-        }
-
-        var totalCol = 5 + descriptors.Count;
 
         var result = new Dictionary<Guid, UserFeatureStats>();
         await using var reader = await cmd.ExecuteReaderAsync(ct);
@@ -107,15 +99,15 @@ public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
                 Name: reader.GetString(2),
                 Email: reader.GetString(3),
                 Role: reader.GetString(4),
-                Areas: reader.GetInt64(typeColIndex[FeatureTypes.Area]),
-                Districts: reader.GetInt64(typeColIndex[FeatureTypes.District]),
-                CityCenters: reader.GetInt64(typeColIndex[FeatureTypes.CityCenter]),
-                Roads: reader.GetInt64(typeColIndex[FeatureTypes.Road]),
-                HouseEntrances: reader.GetInt64(typeColIndex[FeatureTypes.HouseEntrance]),
-                PublicBuildings: reader.GetInt64(typeColIndex[FeatureTypes.PublicBuilding]),
-                PublicSpaces: reader.GetInt64(typeColIndex[FeatureTypes.PublicSpace]),
-                NamingPanels: reader.GetInt64(typeColIndex[FeatureTypes.NamingPanel]),
-                Total: reader.GetInt64(totalCol)
+                Areas: reader.GetInt64(reader.GetOrdinal(FeatureTypes.Area)),
+                Districts: reader.GetInt64(reader.GetOrdinal(FeatureTypes.District)),
+                CityCenters: reader.GetInt64(reader.GetOrdinal(FeatureTypes.CityCenter)),
+                Roads: reader.GetInt64(reader.GetOrdinal(FeatureTypes.Road)),
+                HouseEntrances: reader.GetInt64(reader.GetOrdinal(FeatureTypes.HouseEntrance)),
+                PublicBuildings: reader.GetInt64(reader.GetOrdinal(FeatureTypes.PublicBuilding)),
+                PublicSpaces: reader.GetInt64(reader.GetOrdinal(FeatureTypes.PublicSpace)),
+                NamingPanels: reader.GetInt64(reader.GetOrdinal(FeatureTypes.NamingPanel)),
+                Total: reader.GetInt64(reader.GetOrdinal("total"))
             );
         }
         return result;

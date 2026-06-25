@@ -48,6 +48,9 @@ spec:
           ports:
             - containerPort: 5432
           env:
+            # These are fixed values that don't change between environments.
+            # Keeping them here (not in ConfigMap) is intentional — they are
+            # intrinsic to the database image, not application config.
             - name: POSTGRES_DB
               value: nars_db
             - name: POSTGRES_USER

@@ -7,34 +7,6 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-/// <summary>
-/// Recomputes the scattered area geometry for a given user/commune pair and
-/// persists the result to the features table.
-///
-/// The scattered area is defined as the commune boundary minus the union of all
-/// urban area polygons drawn by the user. It is recomputed asynchronously
-/// (fire-and-forget) after any urban area is saved or deleted.
-///
-/// Uses <see cref="IDbContextFactory{TContext}"/> so each call owns an
-/// independent <see cref="AppDbContext"/> — it never borrows the request-scoped
-/// context, which may be disposed before the task completes.
-/// </summary>
-public interface IScatteredAreaService
-{
-    /// <summary>
-    /// Triggers an async recompute. The returned <see cref="Task"/> is intended
-    /// for fire-and-forget: callers should use <c>_ = service.RefreshAsync(…)</c>
-    /// and not await it on the request path.
-    /// </summary>
-    Task RefreshAsync(Guid userId, int communeId, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// The timestamp and message of the most recent refresh failure, or null
-    /// if the last refresh succeeded (or none has run yet).
-    /// </summary>
-    (DateTimeOffset Timestamp, string Message)? LastError { get; }
-}
-
 public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFactory, ILogger<ScatteredAreaService> logger)
     : IScatteredAreaService
 {

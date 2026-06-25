@@ -44,17 +44,17 @@ public class ValidationController(
     {
         if (body is null)
         {
-            return BadRequest(new ValidateRoadResponse(false, "Request body is required."));
+            return Problem(detail: "Request body is required.", statusCode: 400);
         }
 
         if (body.Coordinates.Count < 2)
         {
-            return BadRequest(new ValidateRoadResponse(false, "A road must have at least 2 points."));
+            return Problem(detail: "A road must have at least 2 points.", statusCode: 400);
         }
 
         if (!CheckCoordinateBounds(body.Coordinates, out var boundsError))
         {
-            return BadRequest(new ValidateRoadResponse(false, boundsError!));
+            return Problem(detail: boundsError, statusCode: 400);
         }
 
         for (var i = 0; i < body.Coordinates.Count - 2; i++)
@@ -111,17 +111,17 @@ public class ValidationController(
     {
         if (body is null)
         {
-            return BadRequest(new ValidateDistrictResponse(false, "Request body is required."));
+            return Problem(detail: "Request body is required.", statusCode: 400);
         }
 
         if (body.Coordinates.Count < 3)
         {
-            return BadRequest(new ValidateDistrictResponse(false, "A district must have at least 3 points."));
+            return Problem(detail: "A district must have at least 3 points.", statusCode: 400);
         }
 
         if (!CheckCoordinateBounds(body.Coordinates, out var inputError))
         {
-            return BadRequest(new ValidateDistrictResponse(false, inputError!));
+            return Problem(detail: inputError, statusCode: 400);
         }
 
         var existingCount = await db.Districts.CountAsync(f => f.UserId == CurrentUserId, cancellationToken);

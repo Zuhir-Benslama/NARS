@@ -23,7 +23,7 @@ Push:
 ```bash
 docker push zuhirbenslama/nars-postgis:latest
 ```
-This matches `nars-infra/k8s/postgis.yaml`. On first startup the schema from `nars-infra/docs/nars_db.sql` is automatically loaded into the `nars_db` database. The database schema is also managed by EF Core migrations — the init script provides a baseline for fresh deployments.
+This matches `nars-infra/k8s/postgis.yaml`. On first startup the schema from `nars-infra/scripts/create_nars_db.sql` is automatically loaded into the `nars_db` database. The database schema is also managed by EF Core migrations — the init script provides a baseline for fresh deployments.
 
 ## Kubernetes pull secret
 The images are hosted on Docker Hub as public repositories, so no pull secret is

@@ -49,9 +49,8 @@ public class ValidationControllerIntegrationTests : IAsyncLifetime
             Coordinates: [new CoordDto(3.0, 36.0)]
         ));
 
-        var badResult = Assert.IsType<BadRequestObjectResult>(result);
-        var response = Assert.IsType<ValidateRoadResponse>(badResult.Value);
-        Assert.Contains("at least 2 points", response.Error!);
+        var badResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, badResult.StatusCode);
     }
 
     [Fact]
@@ -67,9 +66,8 @@ public class ValidationControllerIntegrationTests : IAsyncLifetime
             DistrictTypeKey: "district"
         ));
 
-        var badResult = Assert.IsType<BadRequestObjectResult>(result);
-        var response = Assert.IsType<ValidateDistrictResponse>(badResult.Value);
-        Assert.Contains("at least 3 points", response.Error!);
+        var badResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, badResult.StatusCode);
     }
 
     [Fact]

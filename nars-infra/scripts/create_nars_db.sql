@@ -13,6 +13,9 @@
 -- 1.  Database
 -- ══════════════════════════════════════════════════════════════════════════════
 
+-- ⚠ \gexec is a psql meta-command — this file must be run via psql, not
+-- from application code (Npgsql, psycopg2). If run programmatically, replace
+-- with a DO block executing the SELECT result dynamically.
 SELECT 'CREATE DATABASE nars_db'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nars_db') \gexec
 
@@ -39,8 +42,8 @@ CREATE TABLE IF NOT EXISTS public."__EFMigrationsHistory"
 CREATE TABLE IF NOT EXISTS public.wilayas
 (
     wilaya_id       integer NOT NULL,
-    wilaya_ar       character varying,
-    wilaya_fr       character varying,
+    wilaya_ar       text,   -- intentional: no length limit for names/translations
+    wilaya_fr       text,
     wilaya_latitude  double precision,   -- nullable: incomplete reference data allowed
     wilaya_longitude double precision,
     CONSTRAINT wilayas_pkey PRIMARY KEY (wilaya_id)
@@ -159,7 +162,7 @@ CREATE TABLE IF NOT EXISTS public.refresh_tokens
 (
     id          uuid                     NOT NULL,
     user_id     uuid,
-    token_hash  character varying(64)    NOT NULL,
+    token_hash  text                     NOT NULL,  -- SHA-256 hex (64 chars); use TEXT to avoid overflow if algorithm changes
     expires_at  timestamp with time zone NOT NULL,
     created_at  timestamp with time zone NOT NULL DEFAULT now(),
     revoked     boolean                  NOT NULL DEFAULT false,
@@ -356,7 +359,8 @@ BEGIN
 
     SELECT COUNT(*) INTO idx_count
     FROM pg_indexes
-    WHERE schemaname = 'public';
+    WHERE schemaname = 'public'
+      AND indexname NOT LIKE '%_pkey%';
 
     RAISE NOTICE '──────────────────────────────────────────';
     RAISE NOTICE 'NARS database created successfully.';

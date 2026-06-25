@@ -180,10 +180,7 @@ public class PagesController(
             }
 
             var maxAge = result.RefreshExpiry!.Value - timeProvider.UtcNow;
-            if (logger.IsEnabled(LogLevel.Information))
-            {
-                logger.LogInformation("[Pages] Silent refresh SUCCESS. Issuing new cookies for {Username}", result.User!.Username);
-            }
+            logger.LogInformation("[Pages] Silent refresh SUCCESS. Issuing new cookies for {Username}", result.User!.Username);
             Response.Cookies.Append("access_token", result.NewAccessToken!, MakeCookieOptions(jwt.AccessTokenExpiresIn));
             Response.Cookies.Append("refresh_token", result.NewRawToken!, MakeCookieOptions(maxAge));
 
