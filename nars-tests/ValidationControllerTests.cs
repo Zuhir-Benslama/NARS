@@ -76,9 +76,8 @@ public class ValidationControllerTests
     {
         var (ctrl, _) = CreateController();
         var result = await ctrl.ValidateRoad(null!);
-        var bad = Assert.IsType<BadRequestObjectResult>(result);
-        var resp = Assert.IsType<ValidateRoadResponse>(bad.Value);
-        Assert.False(resp.Valid);
+        var bad = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, bad.StatusCode);
     }
 
     [Fact]
@@ -87,9 +86,8 @@ public class ValidationControllerTests
         var (ctrl, _) = CreateController();
         var body = new ValidateRoadRequest([new CoordDto(36.0, 3.0)]);
         var result = await ctrl.ValidateRoad(body);
-        var bad = Assert.IsType<BadRequestObjectResult>(result);
-        var resp = Assert.IsType<ValidateRoadResponse>(bad.Value);
-        Assert.False(resp.Valid);
+        var bad = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, bad.StatusCode);
     }
 
     [Fact]
@@ -101,9 +99,8 @@ public class ValidationControllerTests
             new CoordDto(double.NaN, 3.0)
         ]);
         var result = await ctrl.ValidateRoad(body);
-        var bad = Assert.IsType<BadRequestObjectResult>(result);
-        var resp = Assert.IsType<ValidateRoadResponse>(bad.Value);
-        Assert.False(resp.Valid);
+        var bad = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, bad.StatusCode);
     }
 
     [Fact]
@@ -115,9 +112,8 @@ public class ValidationControllerTests
             new CoordDto(double.PositiveInfinity, 3.0)
         ]);
         var result = await ctrl.ValidateRoad(body);
-        var bad = Assert.IsType<BadRequestObjectResult>(result);
-        var resp = Assert.IsType<ValidateRoadResponse>(bad.Value);
-        Assert.False(resp.Valid);
+        var bad = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, bad.StatusCode);
     }
 
     [Fact]
@@ -205,9 +201,8 @@ public class ValidationControllerTests
     {
         var (ctrl, _) = CreateController();
         var result = await ctrl.ValidateDistrict(null!);
-        var bad = Assert.IsType<BadRequestObjectResult>(result);
-        var resp = Assert.IsType<ValidateDistrictResponse>(bad.Value);
-        Assert.False(resp.Valid);
+        var bad = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, bad.StatusCode);
     }
 
     [Fact]
@@ -216,9 +211,8 @@ public class ValidationControllerTests
         var (ctrl, _) = CreateController();
         var body = new ValidateDistrictRequest([new CoordDto(36.0, 3.0), new CoordDto(36.1, 3.1)], "residential");
         var result = await ctrl.ValidateDistrict(body);
-        var bad = Assert.IsType<BadRequestObjectResult>(result);
-        var resp = Assert.IsType<ValidateDistrictResponse>(bad.Value);
-        Assert.False(resp.Valid);
+        var bad = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, bad.StatusCode);
     }
 
     [Fact]

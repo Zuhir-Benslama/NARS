@@ -211,11 +211,8 @@ public class AdminController(
         db.Users.Add(newUser);
         await db.SaveChangesAsync(cancellationToken);
 
-        if (logger.IsEnabled(LogLevel.Information))
-        {
-            logger.LogInformation("[Admin] {CallerRole} {CallerId} created {Role} {UserId}",
-                callerRole, CurrentUserId, body.Role, newUser.Id);
-        }
+        logger.LogInformation("[Admin] {CallerRole} {CallerId} created {Role} {UserId}",
+            callerRole, CurrentUserId, body.Role, newUser.Id);
 
         return StatusCode(201, new CreateAdminResponse(
             Success: true,
@@ -357,11 +354,8 @@ public class AdminController(
 
         await db.SaveChangesAsync(cancellationToken);
 
-        if (logger.IsEnabled(LogLevel.Information))
-        {
-            logger.LogInformation("[Admin] {CallerRole} {CallerId} updated user {UserId}",
-                creator.Role, CurrentUserId, userId);
-        }
+        logger.LogInformation("[Admin] {CallerRole} {CallerId} updated user {UserId}",
+            creator.Role, CurrentUserId, userId);
 
         return Ok(new ActionResponse(Success: true));
     }
@@ -394,11 +388,8 @@ public class AdminController(
         db.Users.Remove(target);
         await db.SaveChangesAsync(cancellationToken);
 
-        if (logger.IsEnabled(LogLevel.Information))
-        {
-            logger.LogInformation("[Admin] {CallerRole} {CallerId} deleted user {UserId} ({Username})",
-                creator.Role, CurrentUserId, userId, target.Username);
-        }
+        logger.LogInformation("[Admin] {CallerRole} {CallerId} deleted user {UserId} ({Username})",
+            creator.Role, CurrentUserId, userId, target.Username);
 
         return Ok(new ActionResponse(Success: true));
     }

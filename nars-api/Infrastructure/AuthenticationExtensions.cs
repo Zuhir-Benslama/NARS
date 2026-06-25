@@ -72,10 +72,7 @@ public static class AuthenticationExtensions
                     OnChallenge = ctx =>
                     {
                         var logger = ctx.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("NarsApi.Auth");
-                        if (logger.IsEnabled(LogLevel.Information))
-                        {
-                            logger.LogInformation("[Auth] Challenging {Path} (401)", ctx.Request.Path);
-                        }
+                        logger.LogInformation("[Auth] Challenging {Path} (401)", ctx.Request.Path);
                         return Task.CompletedTask;
                     }
                 };

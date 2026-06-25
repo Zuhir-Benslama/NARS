@@ -1,3 +1,5 @@
+using NarsApi.DTOs;
+
 namespace NarsApi.Services;
 
 public interface IRefreshTokenService

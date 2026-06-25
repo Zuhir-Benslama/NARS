@@ -10,7 +10,7 @@ public class FieldService(
     ILogger<FieldService> logger) : IFieldService
 {
     public async Task<(List<object> Items, int Total)> QueryFeaturesAsync(
-        FeatureTypeDescriptor descriptor, Guid[] userIds, int skip, int take, CancellationToken ct = default)
+        FeatureTypeDescriptor descriptor, int communeId, int skip, int take, CancellationToken ct = default)
     {
         var tableName = descriptor.TableName;
         var conn = db.Database.GetDbConnection();
@@ -18,16 +18,17 @@ public class FieldService(
 
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = $"""
-            SELECT id, user_id, layer, label, data, created_at, updated_at,
+            SELECT f.id, f.user_id, f.layer, f.label, f.data, f.created_at, f.updated_at,
                    COUNT(*) OVER() AS total
-            FROM {tableName}
-            WHERE user_id = ANY(@user_ids)
-            ORDER BY created_at DESC
+            FROM {tableName} f
+            JOIN users u ON u.id = f.user_id
+            WHERE u.commune_id = @commune_id
+            ORDER BY f.created_at DESC
             OFFSET @skip
             LIMIT @take
             """;
 
-        SqlFragments.AddParam(cmd, "@user_ids", userIds);
+        SqlFragments.AddParam(cmd, "@commune_id", communeId);
         SqlFragments.AddParam(cmd, "@skip", skip);
         SqlFragments.AddParam(cmd, "@take", take);
 

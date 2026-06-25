@@ -12,6 +12,9 @@ kubeadmConfigPatches:
         - "localhost"
         - "127.0.0.1"
         - "0.0.0.0"
+        # ⚠ Replace <YOUR_HOST_IP> with your actual host IP before using this
+        # file directly. Alternatively, run `make cluster-create` which
+        # generates this config dynamically from POSTGRES_DATA_DIR.
         - "<YOUR_HOST_IP>"
 nodes:
   - role: control-plane

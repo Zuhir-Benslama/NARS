@@ -46,8 +46,8 @@ spec:
         fsGroup: 1000
       containers:
         - name: nars-api
-          # Dev default — override the tag via kustomize in CI/CD (e.g.
-          # with --edit-image or a patch).
+          # ⚠ Dev default only — override via kustomize in CI/CD (e.g.
+          # kustomize edit set image zuhirbenslama/nars-api=ghcr.io/org/nars-api:<sha>).
           image: zuhirbenslama/nars-api:latest
           imagePullPolicy: IfNotPresent
           ports:

@@ -214,7 +214,8 @@ public partial class AuthController(
             communeId = user.CommuneId ?? 0;
         }
 
-        // Load location chain only if we have a commune to look up.
+        // Load location chain — single JOIN query for commune→daira→wilaya,
+        // or single JOIN for daira→wilaya when no commune is assigned.
         LocationChain loc;
         if (communeId > 0)
         {
@@ -222,18 +223,11 @@ public partial class AuthController(
         }
         else if (user.DairaId.HasValue)
         {
-            var daira = await db.Dairas.FindAsync([user.DairaId.Value], cancellationToken);
-            var wilaya = daira is not null ? await db.Wilayas.FindAsync([daira.WilayaId], cancellationToken) : null;
-            loc = new LocationChain(null, daira, wilaya);
-        }
-        else if (user.WilayaId.HasValue)
-        {
-            var wilaya = await db.Wilayas.FindAsync([user.WilayaId.Value], cancellationToken);
-            loc = new LocationChain(null, null, wilaya);
+            loc = await LoadDairaWithWilayaAsync(user.DairaId.Value, cancellationToken);
         }
         else
         {
-            loc = new LocationChain(null, null, null);
+            loc = await LoadWilayaOnlyAsync(user.WilayaId, cancellationToken);
         }
 
         return Ok(new UserInfoWithLocation(
@@ -311,5 +305,37 @@ public partial class AuthController(
         return row is null
             ? new CommuneWithDaira(null, null)
             : new CommuneWithDaira(row.Commune, row.Daira);
+    }
+
+    /// <summary>
+    /// Loads daira → wilaya in one JOIN (avoids N+1 from sequential FindAsync calls).
+    /// </summary>
+    private async Task<LocationChain> LoadDairaWithWilayaAsync(int dairaId, CancellationToken cancellationToken = default)
+    {
+        var row = await (
+            from d in db.Dairas
+            where d.DairaId == dairaId
+            join w in db.Wilayas on d.WilayaId equals w.WilayaId into wj
+            from w in wj.DefaultIfEmpty()
+            select new { Daira = d, Wilaya = (Wilaya?)w }
+        ).FirstOrDefaultAsync(cancellationToken);
+
+        return row is null
+            ? new LocationChain(null, null, null)
+            : new LocationChain(null, row.Daira, row.Wilaya);
+    }
+
+    /// <summary>
+    /// Single-query wilaya lookup for national-level admins with no commune/daira.
+    /// </summary>
+    private async Task<LocationChain> LoadWilayaOnlyAsync(int? wilayaId, CancellationToken cancellationToken = default)
+    {
+        if (!wilayaId.HasValue)
+        {
+            return new LocationChain(null, null, null);
+        }
+
+        var wilaya = await db.Wilayas.FindAsync([wilayaId.Value], cancellationToken);
+        return new LocationChain(null, null, wilaya);
     }
 }

@@ -44,19 +44,32 @@ echo ""
 
 command -v python3 >/dev/null 2>&1 || die "python3 not found."
 
-# Auto-install Python dependencies
+# Auto-install Python dependencies into a temporary virtualenv (avoids
+# --break-system-packages and keeps system Python clean).
+VENV_DIR=""
 for pkg in psycopg2-binary bcrypt; do
     module="${pkg%%-*}"
     if ! python3 -c "import sys; __import__(sys.argv[1])" "${module}" 2>/dev/null; then
+        if [[ -z "${VENV_DIR}" ]]; then
+            VENV_DIR=$(mktemp -d)
+            python3 -m venv "${VENV_DIR}"
+            # shellcheck disable=SC1091
+            source "${VENV_DIR}/bin/activate"
+        fi
         warn "Python package '${pkg}' not found. Installing..."
-        if pip3 install "${pkg}" --quiet 2>/dev/null \
-           || pip3 install "${pkg}" --quiet --break-system-packages 2>/dev/null; then
+        if pip install "${pkg}" --quiet; then
             success "${pkg} installed."
         else
-            die "Failed to install ${pkg}. Run: pip3 install ${pkg}"
+            die "Failed to install ${pkg}. Run: pip install ${pkg}"
         fi
     fi
 done
+# Use the venv python for all subsequent calls, even if no install was needed
+if [[ -n "${VENV_DIR}" ]]; then
+    PYTHON="${VENV_DIR}/bin/python3"
+else
+    PYTHON="python3"
+fi
 
 # ── Database connection ────────────────────────────────────────────────────────
 DB_HOST="${NARS_DB_HOST:-localhost}"
@@ -80,14 +93,17 @@ export NARS_DB_USER="$DB_USER"
 
 # ── Test connection ──────────────────────────────────────────────────────────────
 info "Testing database connection to ${DB_HOST}:${DB_PORT}/${DB_NAME}..."
-python3 - "$DB_HOST" "$DB_PORT" "$DB_NAME" "$DB_USER" <<'PYEOF' || die "Cannot connect. Check credentials and that PostgreSQL is running."
-import os, sys, psycopg2
-
-host, port, dbname, user = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4]
-password = os.environ["NARS_DB_PASSWORD_VAL"]
+"${PYTHON}" - <<'PYEOF' || die "Cannot connect. Check credentials and that PostgreSQL is running."
+import os, psycopg2
 
 try:
-    c = psycopg2.connect(host=host, port=port, dbname=dbname, user=user, password=password)
+    c = psycopg2.connect(
+        host=os.environ["NARS_DB_HOST"],
+        port=int(os.environ["NARS_DB_PORT"]),
+        dbname=os.environ["NARS_DB_NAME"],
+        user=os.environ["NARS_DB_USER"],
+        password=os.environ["NARS_DB_PASSWORD_VAL"],
+    )
     c.close()
 except Exception as e:
     print(f"Connection failed: {e}", file=sys.stderr)
@@ -97,18 +113,21 @@ success "Database connection OK."
 echo ""
 
 # ── Check for existing national_admin ─────────────────────────────────────────
-EXISTING=$(python3 - "$DB_HOST" "$DB_PORT" "$DB_NAME" "$DB_USER" <<'PYEOF'
-import os, sys, psycopg2
+EXISTING=$("${PYTHON}" - <<'PYEOF'
+import os, psycopg2
 
-host, port, dbname, user = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4]
-password = os.environ["NARS_DB_PASSWORD_VAL"]
-
-c = psycopg2.connect(host=host, port=port, dbname=dbname, user=user, password=password)
-cur = c.cursor()
+conn = psycopg2.connect(
+    host=os.environ["NARS_DB_HOST"],
+    port=int(os.environ["NARS_DB_PORT"]),
+    dbname=os.environ["NARS_DB_NAME"],
+    user=os.environ["NARS_DB_USER"],
+    password=os.environ["NARS_DB_PASSWORD_VAL"],
+)
+cur = conn.cursor()
 cur.execute("SELECT username FROM users WHERE role = 'national_admin' LIMIT 5")
 for row in cur.fetchall():
     print(row[0])
-c.close()
+conn.close()
 PYEOF
 )
 
@@ -168,23 +187,29 @@ if [[ "${NON_INTERACTIVE:-0}" != "1" ]]; then
 fi
 
 # ── Insert via Python with parameterised query ─────────────────────────────────
-# All user-supplied values are passed as positional argv[] arguments and bound
-# as psycopg2 %s parameters — they are never interpolated into the SQL string.
-# DB connection params are read from NARS_DB_* env vars (not argv).
+# All user-supplied values are bound as psycopg2 %s parameters — they are never
+# interpolated into the SQL string. DB connection params and admin details are
+# passed via env vars, scoped to a subshell to avoid leaking to /proc.
 #
 # UUID: uuid.uuid4() generates a random UUID. The application normally uses
 # Guid.CreateVersion7() (time-ordered) for new rows, but the national_admin
 # is a bootstrap account — sequential ordering is not required here.
 info "Hashing password and inserting record..."
 
-export NARS_ADMIN_PASSWORD_VAL="${ADMIN_PASSWORD}"
-
 set +e
-NEW_UUID=$(python3 - "$ADMIN_NAME" "$ADMIN_EMAIL" "$ADMIN_PHONE" \
-         "$ADMIN_USERNAME" << 'PYEOF'
-import os, sys, uuid, bcrypt, psycopg2
+NEW_UUID=$(
+    export NARS_ADMIN_PASSWORD_VAL="${ADMIN_PASSWORD}"
+    export NARS_ADMIN_NAME="${ADMIN_NAME}"
+    export NARS_ADMIN_EMAIL="${ADMIN_EMAIL}"
+    export NARS_ADMIN_PHONE="${ADMIN_PHONE}"
+    export NARS_ADMIN_USERNAME="${ADMIN_USERNAME}"
+    "${PYTHON}" - << 'PYEOF'
+import os, uuid, bcrypt, psycopg2
 
-name, email, phone, username = sys.argv[1:5]
+name    = os.environ["NARS_ADMIN_NAME"]
+email   = os.environ["NARS_ADMIN_EMAIL"]
+phone   = os.environ["NARS_ADMIN_PHONE"]
+username = os.environ["NARS_ADMIN_USERNAME"]
 password = os.environ["NARS_ADMIN_PASSWORD_VAL"]
 host    = os.environ["NARS_DB_HOST"]
 port    = int(os.environ["NARS_DB_PORT"])
@@ -226,6 +251,9 @@ PYEOF
 PYEXIT=$?
 set -e
 
+# Clear sensitive env vars used by the subshell
+unset NARS_ADMIN_PASSWORD_VAL NARS_ADMIN_NAME NARS_ADMIN_EMAIL NARS_ADMIN_PHONE NARS_ADMIN_USERNAME
+
 if   [[ ${PYEXIT} -eq 2 ]]; then
     die "Username '${ADMIN_USERNAME}' or email '${ADMIN_EMAIL}' is already in use."
 elif [[ ${PYEXIT} -ne 0 ]]; then
@@ -245,4 +273,6 @@ if [[ "${NON_INTERACTIVE:-0}" == "1" ]]; then
 fi
 echo "  Role:     national_admin"
 echo ""
+# Clear DB credentials from environment
+unset NARS_DB_PASSWORD_VAL ADMIN_PASSWORD
 echo -e "${GREEN}You can now sign in at /login and create wilaya admins.${RESET}"

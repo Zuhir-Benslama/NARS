@@ -1,5 +1,8 @@
 SET client_encoding = 'UTF8';
-SET standard_conforming_strings = on;
+-- SET standard_conforming_strings = on;  -- default since PG 9.1, commented for clarity
+
+BEGIN;
+
 COPY public.wilayas (wilaya_id, wilaya_ar, wilaya_fr, wilaya_latitude, wilaya_longitude) FROM stdin;
 1	أدرار	Adrar	26.4888155	-1.3582442
 2	الشلف	Chlef	36.20342	1.2680696
@@ -2162,3 +2165,6 @@ COPY public.communes (commune_id, daira_id, commune_code, commune_ar, commune_fr
 1538	409	3208	عين العراك	Ain El Orak	عين العراك، دائرة الأبيض سيدي الشيخ، البيض، الجزائر	33.4118119	0.7401801
 1541	411	3213	بوسمغون	Boussemghoun	بوسمغون، دائرة بوسمغون، البيض، الجزائر	32.8677385	0.0229821
 \.
+
+COMMIT;
+

@@ -179,10 +179,7 @@ public static class PipelineExtensions
             var addresses = app.Urls.Count != 0
                 ? string.Join(", ", app.Urls)
                 : config["ASPNETCORE_URLS"] ?? "http://localhost:5000";
-            if (startupLogger.IsEnabled(LogLevel.Information))
-            {
-                startupLogger.LogInformation("Startup complete — {Addresses}", addresses);
-            }
+            startupLogger.LogInformation("Startup complete — {Addresses}", addresses);
         });
 
         return app;

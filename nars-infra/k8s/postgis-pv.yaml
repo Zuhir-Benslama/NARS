@@ -10,9 +10,11 @@ spec:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
   storageClassName: manual
-  # ⚠ hostPath is for local dev (kind/minikube) only.
-  # For production, replace with a CSI-backed persistent volume
+  # ⚠ hostPath is for local dev (kind/minikube) only. Must NOT be used in
+  # production. Replace with a CSI-backed persistent volume
   # (e.g. EBS, GCE PD, Azure Disk, Longhorn, Rook/Ceph).
+  # CI/CD pipelines should validate: if .spec.hostPath exists and a production
+  # label/annotation is present, the apply should be rejected.
   hostPath:
     path: /mnt/nars/postgis/data
     type: DirectoryOrCreate

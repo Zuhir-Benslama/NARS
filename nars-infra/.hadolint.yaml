@@ -6,6 +6,7 @@ trustedRegistries:
   - docker.io
   - mcr.microsoft.com
   - ghcr.io
+  - quay.io
 
 override:
   # DL3008: Pin versions in apt-get install.

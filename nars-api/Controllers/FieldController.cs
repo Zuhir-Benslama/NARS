@@ -50,19 +50,6 @@ public class FieldController(
             return Problem(detail: "Field worker has no assigned commune.", statusCode: 400);
         }
 
-        var communeUserIds = await db.Users
-            .Where(u => u.Role == UserRoles.CommuneUser && u.CommuneId == communeId)
-            .Select(u => u.Id)
-            .ToListAsync(cancellationToken);
-
-        if (communeUserIds.Count == 0)
-        {
-            return Ok(new LoadFeaturesResponse(Features: Array.Empty<object>(), Count: 0, Skip: 0, Take: 0));
-        }
-
-        take = Math.Clamp(take, 1, 1000);
-        var userIds = communeUserIds.ToArray();
-
         if (type is null)
         {
             return Problem(detail: "type query parameter is required.", statusCode: 400);
@@ -74,7 +61,8 @@ public class FieldController(
             return Problem(detail: "Invalid or missing type. Use: road, house_entrance, or naming_panel.", statusCode: 400);
         }
 
-        var (Items, Total) = await fieldService.QueryFeaturesAsync(descriptor, userIds, skip, take, cancellationToken);
+        take = Math.Clamp(take, 1, 1000);
+        var (Items, Total) = await fieldService.QueryFeaturesAsync(descriptor, communeId.Value, skip, take, cancellationToken);
         return Ok(new LoadFeaturesResponse(Features: Items, Count: Total, Skip: skip, Take: take));
     }
 
@@ -152,11 +140,8 @@ public class FieldController(
         db.Add(inspection);
         await db.SaveChangesAsync(cancellationToken);
 
-        if (logger.IsEnabled(LogLevel.Information))
-        {
-            logger.LogInformation("[Field] Worker {WorkerId} inspected {Type} {FeatureId} — status: {Status}",
-                CurrentUserId, body.Type, featureId, body.Status);
-        }
+        logger.LogInformation("[Field] Worker {WorkerId} inspected {Type} {FeatureId} — status: {Status}",
+            CurrentUserId, body.Type, featureId, body.Status);
 
         return StatusCode(201, new FieldInspectSubmitResponse(
             Success: true,
@@ -272,12 +257,9 @@ public class FieldController(
         await db.SaveChangesAsync(cancellationToken);
         await tx.CommitAsync(cancellationToken);
 
-        if (logger.IsEnabled(LogLevel.Information))
-        {
-            logger.LogInformation(
-                "[Field] Worker {WorkerId} created entrance {EntranceId} for road {RoadId} (owner: {OwnerId})",
-                CurrentUserId, newId, roadId, road.UserId);
-        }
+        logger.LogInformation(
+            "[Field] Worker {WorkerId} created entrance {EntranceId} for road {RoadId} (owner: {OwnerId})",
+            CurrentUserId, newId, roadId, road.UserId);
 
         return StatusCode(201, new CreateEntranceResponse(
             Success: true,
@@ -286,9 +268,5 @@ public class FieldController(
         ));
     }
 
-    private static JsonElement DeserializeJsonSafe(string json)
-    {
-        try { return JsonSerializer.Deserialize<JsonElement>(json); }
-        catch (JsonException) { return JsonDocument.Parse("{}").RootElement; }
-    }
+    private static JsonElement DeserializeJsonSafe(string json) => JsonHelper.DeserializeSafe(json);
 }

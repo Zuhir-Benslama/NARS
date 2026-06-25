@@ -1,8 +1,13 @@
 # Generated PDFs
 docs/pdf/
 
-# Generated Mermaid SVG output
+# Generated Mermaid SVG/PNG output
 docs/uml/*.svg
+docs/uml/*.png
 
 # Python bytecode
 scripts/__pycache__/
+
+# Dev-only mTLS CA cert — intentionally committed for dev convenience.
+# Regenerate with `make ca-generate` if compromised.
+k8s/certs/ca.crt

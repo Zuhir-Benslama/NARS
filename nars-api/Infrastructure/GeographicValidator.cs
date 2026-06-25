@@ -2,8 +2,13 @@ namespace NarsApi.Infrastructure;
 
 public static class GeographicValidator
 {
-    public static string? Validate(string role, int? communeId, int? dairaId, int? wilayaId) =>
-        role switch
+    public static string? Validate(string role, int? communeId, int? dairaId, int? wilayaId)
+    {
+        if (communeId <= 0) return "commune_id must be a positive integer.";
+        if (dairaId <= 0) return "daira_id must be a positive integer.";
+        if (wilayaId <= 0) return "wilaya_id must be a positive integer.";
+
+        return role switch
         {
             UserRoles.CommuneUser when !communeId.HasValue => "commune_id is required for commune_user.",
             UserRoles.DairaAdmin when !dairaId.HasValue => "daira_id is required for daira_admin.",
@@ -12,4 +17,5 @@ public static class GeographicValidator
             UserRoles.FieldWorker => null,
             _ => null,
         };
+    }
 }

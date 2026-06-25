@@ -10,8 +10,8 @@ spec:
     requests.memory: 8Gi
     limits.cpu: "8"
     limits.memory: 16Gi
-    persistentvolumeclaims: 3
-    services: 8
+    persistentvolumeclaims: 5
+    services: 15
 ---
 apiVersion: v1
 kind: LimitRange

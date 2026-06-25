@@ -10,12 +10,12 @@ namespace NarsApi.DTOs;
 /// Only admin users of higher or equal level may call this endpoint.
 /// </summary>
 public record CreateAdminRequest(
-    [Required][property: JsonPropertyName("name")] string Name,
-    [Required][property: JsonPropertyName("email")] string Email,
-    [Required][property: JsonPropertyName("phone")] string Phone,
-    [Required][property: JsonPropertyName("username")] string Username,
-    [Required][property: JsonPropertyName("password")] string Password,
-    [Required][property: JsonPropertyName("role")] string Role,
+    [param: Required][property: JsonRequired][property: JsonPropertyName("name")] string Name,
+    [param: Required][property: JsonRequired][property: JsonPropertyName("email")] string Email,
+    [param: Required][property: JsonRequired][property: JsonPropertyName("phone")] string Phone,
+    [param: Required][property: JsonRequired][property: JsonPropertyName("username")] string Username,
+    [param: Required][property: JsonRequired][property: JsonPropertyName("password")] string Password,
+    [param: Required][property: JsonRequired][property: JsonPropertyName("role")] string Role,
     /// <summary>Required when role = commune_user.</summary>
     [property: JsonPropertyName("commune_id")] int? CommuneId,
     /// <summary>Required when role = daira_admin.</summary>

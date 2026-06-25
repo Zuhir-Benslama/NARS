@@ -37,6 +37,8 @@ config:
           endpoint: 0.0.0.0:4318
           cors:
             allowed_origins:
+              # ⚠ Update these if the deployed domain or port changes.
+              # For dynamic environments, consider using a configurable variable.
               - http://localhost:5173
               - http://localhost:8080
               - http://localhost:80
