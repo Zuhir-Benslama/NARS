@@ -28,6 +28,7 @@ SCALABLE_DEPLOYS   := postgis nars-api nars-frontend
 	@echo "# Auto-generated — DO NOT COMMIT" > $@
 	@echo "POSTGRES_PASSWORD=$$(openssl rand -base64 32)" >> $@
 	@echo "JWT_SECRET=$$(openssl rand -base64 32)" >> $@
+	@echo "GPG_PASSPHRASE=$$(openssl rand -base64 32)" >> $@
 	@echo "GRAFANA_PASSWORD=$$(openssl rand -base64 12)" >> $@
 	@echo "→ Created $@ with fresh secrets"
 
@@ -35,6 +36,7 @@ SCALABLE_DEPLOYS   := postgis nars-api nars-frontend
 
 POSTGRES_PASSWORD  ?= $(shell openssl rand -base64 32)
 JWT_SECRET         ?= $(shell openssl rand -base64 32)
+GPG_PASSPHRASE     ?= $(shell openssl rand -base64 32)
 GRAFANA_PASSWORD   ?= $(shell openssl rand -base64 12)
 export
 
@@ -578,6 +580,7 @@ secrets-apply: .env namespace-ensure ## Create nars-secrets and regcred with gen
 		--from-literal=postgres_password="$(POSTGRES_PASSWORD)" \
 		--from-literal=ConnectionStrings__DefaultConnection="Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=$(POSTGRES_PASSWORD)" \
 		--from-literal=Jwt__SecretKey="$(JWT_SECRET)" \
+		--from-literal=gpg-passphrase="$(GPG_PASSPHRASE)" \
 		--dry-run=client -o yaml \
 	| $(KUBECTL) apply -f -
 	@echo "✓ nars-secrets created"
@@ -598,6 +601,10 @@ secrets-apply: .env namespace-ensure ## Create nars-secrets and regcred with gen
 .PHONY: kustomize-apply
 kustomize-apply: ## Apply k8s manifests via kustomize
 	@echo "→ Applying kustomization..."
+	@if echo "$(IMAGE_TAG)" | grep -qi "latest"; then \
+		echo "  ⚠ IMAGE_TAG=$(IMAGE_TAG) — using 'latest' for non-reproducible builds."; \
+		echo "  Set IMAGE_TAG=<commit-sha> for deterministic deployments."; \
+	fi
 	@kubectl kustomize "$(K8S_DIR)" | $(KUBECTL) apply -f -
 	@echo "✓ Kustomization applied"
 

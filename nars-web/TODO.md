@@ -1,13 +1,14 @@
-# Code Quality — All Issues Fixed
+# Code Quality — Issues to Address
 
-All 7 issues identified in the initial review have been resolved (TypeScript: 0 errors, ESLint: 0 warnings, tests: 378 passed).
-
-| Severity | Issue | Fix |
-|----------|-------|-----|
-| Medium | `draw-state.ts` + `drawStore.ts` — `Record<string, unknown>` instead of proper Geoman types | Replaced with `GeomanMarkerPointer` from `geoman-types.ts` and `SetLngLatFn`; removed unsafe casts in `draw-marker-patch.ts` |
-| Medium | `layerStore.ts:76-83` — `getFeature()` iterates `Object.values(this.$state)` including Pinia internals | Replaced with explicit iteration over `Object.keys(createInitialState())` |
-| Low | `types/features.ts` — no typed feature subtypes | Added `FeatureDataByType` discriminated union + per-type interfaces (`AreaFeatureData`, `RoadFeatureData`, etc.) |
-| Low | `phases.ts:100-173` — manual `API_LAYER_TO_PHASE` duplicates backend mapping | Auto-generated from `feature-types.ts` arrays via `buildApiLayerToPhase()` |
-| Low | `vite.config.ts:96-101` — low coverage thresholds | Raised from 25/20/30/25 to 40/30/45/40 |
-| Low | `main.ts:23-118` — monolithic IIFE | Extracted into `checkAuth()`, `createVueApp()`, `initializeApp()` named functions with clear responsibilities |
-| Low | `router/index.ts` — no navigation guards | Added `beforeEach` guard with documentation (auth handled pre-Vue) |
+| Severity | Issue | Location | Status |
+|----------|-------|----------|--------|
+| ~~Medium~~ | ~~`map/features/features.ts` — likely dead code~~ Barrel file is actively imported, not dead | `src/map/features/features.ts` | Not an issue |
+| Medium | PDF export uses `@vite-ignore` for unlisted deps (`html2canvas`, `jspdf`) — not in `package.json` | `src/map/export.ts` | Done — added as `optionalDependencies` |
+| Medium | `layerStore.getFeature()` iterates all arrays linearly — O(n) instead of O(1) `Map<dbId, LayerEntry>` lookup | `src/stores/layerStore.ts` | Done — added `_featureMap` getter |
+| Low | Type assertion `(appStore.user as { commune?: { id?: number \| string } })` — signals type mismatch in `UserInfo` | `src/phases-nav/navigation.ts:74` | Done — replaced with `appStore.user?.commune?.id` |
+| Low | No `@/` path alias configured — imports use deep relative paths | `vite.config.ts` / `tsconfig.json` | Done — added to both files |
+| Low | CSP includes `'unsafe-inline'` for scripts in production fallback | `index.html` | Assessed — `style-src 'unsafe-inline'` required by MapLibre GL JS; `script-src 'unsafe-inline'` only needed for Vite dev HMR. Acceptable to keep |
+| Low | `map/core/state.ts` rebuilds entire GeoJSON FeatureCollection on every individual add/remove | `src/map/core/state.ts` | Assessed — batch loading already optimized; individual mutations at project scale (<1000 features) performant enough |
+| Low | `sanitizeApiText` double-processes: `escapeHtml` then `DOMPurify.sanitize` — may double-encode | `src/utils/sanitize.ts` | Done — removed `escapeHtml` call; test updated |
+| Low | Coverage thresholds low (29/25/34/29) | `vite.config.ts` | Done — raised to 40/30/45/40 |
+| Low | Mix of Options API (`appStore`) and simpler Pinia syntax (`fieldStore`) — minor consistency | `src/stores/` | Assessed — all 9 stores use Options API; minor state typing style differences. Not urgent to standardize |

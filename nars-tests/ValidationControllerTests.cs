@@ -50,7 +50,9 @@ public class ValidationControllerTests
         var (ctrl, _) = CreateController();
         var result = await ctrl.MainUrbanExists();
         var ok = Assert.IsType<OkObjectResult>(result);
-        Assert.NotNull(ok.Value);
+        var json = System.Text.Json.JsonSerializer.Serialize(ok.Value);
+        var doc = System.Text.Json.JsonDocument.Parse(json);
+        Assert.False(doc.RootElement.GetProperty("exists").GetBoolean());
     }
 
     [Fact]
@@ -66,7 +68,9 @@ public class ValidationControllerTests
 
         var result = await ctrl.MainUrbanExists();
         var ok = Assert.IsType<OkObjectResult>(result);
-        Assert.NotNull(ok.Value);
+        var json = System.Text.Json.JsonSerializer.Serialize(ok.Value);
+        var doc = System.Text.Json.JsonDocument.Parse(json);
+        Assert.True(doc.RootElement.GetProperty("exists").GetBoolean());
     }
 
     // ── POST /api/validate/road ───────────────────────────────────────────

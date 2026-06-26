@@ -102,7 +102,7 @@ public class FeaturesController(
         var (features, totalCount) = await featureStatsService.LoadAllFeaturesAsync(
             RequiredCurrentUserId, skip, take, cancellationToken);
 
-        return Ok(new LoadFeaturesResponse(
+        return Ok(new LoadFeaturesResponse<FeatureResult>(
             Features: features,
             Count: totalCount,
             Skip: skip,

@@ -63,6 +63,6 @@ public class RefreshTokenService(
         var newAccessToken = jwt.CreateToken(user.Id, user.Username, user.Name, user.Email,
             communeId: user.CommuneId, role: user.Role, dairaId: user.DairaId, wilayaId: user.WilayaId);
 
-        return new RefreshTokenResult(true, null, user, newRaw, newAccessToken, refreshExpiry);
+        return new RefreshTokenResult(true, null, user.Username, newRaw, newAccessToken, refreshExpiry);
     }
 }

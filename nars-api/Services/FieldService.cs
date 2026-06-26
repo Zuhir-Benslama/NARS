@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
+using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 
 namespace NarsApi.Services;
@@ -9,7 +10,7 @@ public class FieldService(
     AppDbContext db,
     ILogger<FieldService> logger) : IFieldService
 {
-    public async Task<(List<object> Items, int Total)> QueryFeaturesAsync(
+    public async Task<(List<FieldFeatureResult> Items, int Total)> QueryFeaturesAsync(
         FeatureTypeDescriptor descriptor, int communeId, int skip, int take, CancellationToken ct = default)
     {
         var tableName = descriptor.TableName;
@@ -32,7 +33,7 @@ public class FieldService(
         SqlFragments.AddParam(cmd, "@skip", skip);
         SqlFragments.AddParam(cmd, "@take", take);
 
-        var items = new List<object>();
+        var items = new List<FieldFeatureResult>();
         var total = 0;
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
@@ -49,16 +50,15 @@ public class FieldService(
             try { data = JsonSerializer.Deserialize<JsonElement>(rawData); }
             catch (JsonException ex) { logger.LogWarning(ex, "Failed to parse feature data for {Id}", id); }
 
-            items.Add(new
-            {
-                id = id.ToString(),
-                user_id = reader.GetGuid(1).ToString(),
-                layer = reader.GetString(2),
-                label = reader.GetString(3),
-                data,
-                created_at = reader.GetDateTime(5),
-                updated_at = await reader.IsDBNullAsync(6, ct) ? null : (DateTime?)reader.GetDateTime(6)
-            });
+            items.Add(new FieldFeatureResult(
+                Id: id.ToString(),
+                UserId: reader.GetGuid(1).ToString(),
+                Layer: reader.GetString(2),
+                Label: reader.GetString(3),
+                Data: data,
+                CreatedAt: reader.GetDateTime(5),
+                UpdatedAt: await reader.IsDBNullAsync(6, ct) ? null : (DateTime?)reader.GetDateTime(6)
+            ));
         }
 
         return (items, total);

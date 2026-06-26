@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -116,47 +117,74 @@ public class PagesController(
 
     private async Task<bool> IsAuthenticatedAsync(CancellationToken cancellationToken)
     {
-        // Respect the principal populated by UseAuthentication() first.
         if (User.Identity?.IsAuthenticated == true)
         {
-            logger.LogDebug("[Pages] HttpContext.User is already authenticated.");
             return true;
         }
 
-        var accessToken = Request.Cookies["access_token"];
-        if (!string.IsNullOrEmpty(accessToken))
+        var principal = ValidateAccessTokenFromCookie();
+        if (principal is null)
         {
-            logger.LogDebug("[Pages] Found access_token cookie. Validating...");
-            if (jwt.ValidateToken(accessToken) is not null)
-            {
-                logger.LogDebug("[Pages] access_token is valid.");
-                return true;
-            }
-            logger.LogInformation("[Pages] access_token is EXPIRED or INVALID.");
+            principal = ValidateAccessTokenFromBearerHeader();
+        }
+
+        if (principal is not null)
+        {
+            HttpContext.User = principal;
+            return true;
+        }
+
+        return await TryRefreshSessionAsync(cancellationToken);
+    }
+
+    private ClaimsPrincipal? ValidateAccessTokenFromCookie()
+    {
+        var accessToken = Request.Cookies["access_token"];
+        if (string.IsNullOrEmpty(accessToken))
+        {
+            return null;
+        }
+
+        var principal = jwt.ValidateToken(accessToken);
+        if (principal is not null)
+        {
+            logger.LogDebug("[Pages] access_token cookie is valid.");
         }
         else
         {
-            logger.LogInformation("[Pages] access_token cookie NOT FOUND.");
+            logger.LogInformation("[Pages] access_token cookie is EXPIRED or INVALID.");
         }
 
-        // Support authenticated clients that send a bearer token header.
-        var bearerHeader = Request.Headers.Authorization.FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(bearerHeader)
-            && bearerHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-        {
-            var bearerToken = bearerHeader["Bearer ".Length..].Trim();
-            if (!string.IsNullOrEmpty(bearerToken) && jwt.ValidateToken(bearerToken) is not null)
-            {
-                logger.LogInformation("[Pages] Valid bearer token header found. Setting access_token cookie.");
-                Response.Cookies.Append("access_token", bearerToken, MakeCookieOptions(jwt.AccessTokenExpiresIn));
-                return true;
-            }
+        return principal;
+    }
 
+    private ClaimsPrincipal? ValidateAccessTokenFromBearerHeader()
+    {
+        var bearerHeader = Request.Headers.Authorization.FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(bearerHeader)
+            || !bearerHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var bearerToken = bearerHeader["Bearer ".Length..].Trim();
+        if (string.IsNullOrEmpty(bearerToken))
+        {
+            return null;
+        }
+
+        var principal = jwt.ValidateToken(bearerToken);
+        if (principal is not null)
+        {
+            logger.LogInformation("[Pages] Valid bearer token header found. Setting access_token cookie.");
+            Response.Cookies.Append("access_token", bearerToken, MakeCookieOptions(jwt.AccessTokenExpiresIn));
+        }
+        else
+        {
             logger.LogInformation("[Pages] Bearer token header is invalid or expired.");
         }
 
-        // Access token missing or expired — try silent refresh via refresh_token
-        return await TryRefreshSessionAsync(cancellationToken);
+        return principal;
     }
 
     private async Task<bool> TryRefreshSessionAsync(CancellationToken cancellationToken)
@@ -180,7 +208,7 @@ public class PagesController(
             }
 
             var maxAge = result.RefreshExpiry!.Value - timeProvider.UtcNow;
-            logger.LogInformation("[Pages] Silent refresh SUCCESS. Issuing new cookies for {Username}", result.User!.Username);
+            logger.LogInformation("[Pages] Silent refresh SUCCESS. Issuing new cookies for {Username}", result.Username);
             Response.Cookies.Append("access_token", result.NewAccessToken!, MakeCookieOptions(jwt.AccessTokenExpiresIn));
             Response.Cookies.Append("refresh_token", result.NewRawToken!, MakeCookieOptions(maxAge));
 

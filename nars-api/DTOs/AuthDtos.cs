@@ -125,15 +125,15 @@ public record CreateAdminResponse(
 );
 
 public record ActionResponse(
-    bool Success,
-    string? Message = null
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("message")] string? Message = null
 );
 
 public record RefreshTokenResult(
-    bool Success,
-    string? Detail,
-    NarsApi.Models.User? User,
-    string? NewRawToken,
-    string? NewAccessToken,
-    DateTime? RefreshExpiry
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("detail")] string? Detail,
+    [property: JsonPropertyName("username")] string? Username,
+    [property: JsonPropertyName("new_raw_token")] string? NewRawToken,
+    [property: JsonPropertyName("new_access_token")] string? NewAccessToken,
+    [property: JsonPropertyName("refresh_expiry")] DateTime? RefreshExpiry
 );

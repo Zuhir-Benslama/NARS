@@ -55,13 +55,29 @@ config:
   exporters:
     otlp:
       endpoint: tempo:4317
-      # TODO: set insecure: false and configure proper TLS certs for production
-      #   tls:
-      #     insecure: false
-      #     cert_file: /etc/otel/certs/tls.crt
-      #     key_file: /etc/otel/certs/tls.key
-      #     ca_file: /etc/otel/certs/ca.crt
-      # Mount the cert Secret via extraVolumes/extraVolumeMounts.
+      # TLS is disabled by default for local dev. For production:
+      #   1. Generate or obtain TLS certs for the tempo service
+      #   2. Create a Secret with tls.crt, tls.key, and ca.crt:
+      #        kubectl create secret generic otel-tempo-tls \
+      #          --from-file=tls.crt=tempo.crt \
+      #          --from-file=tls.key=tempo.key \
+      #          --from-file=ca.crt=ca.crt \
+      #          -n nars
+      #   3. Set insecure: false and uncomment the tls block below
+      #   4. Mount the secret via extraVolumes/extraVolumeMounts:
+      #        extraVolumes:
+      #          - name: otel-tls
+      #            secret:
+      #              secretName: otel-tempo-tls
+      #        extraVolumeMounts:
+      #          - name: otel-tls
+      #            mountPath: /etc/otel/certs
+      #            readOnly: true
+      # tls:
+      #   insecure: false
+      #   cert_file: /etc/otel/certs/tls.crt
+      #   key_file: /etc/otel/certs/tls.key
+      #   ca_file: /etc/otel/certs/ca.crt
       tls:
         insecure: true
     loki:

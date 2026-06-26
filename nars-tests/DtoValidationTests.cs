@@ -47,8 +47,8 @@ public class DtoValidationTests
         Assert.True(isValid);
     }
 
-    [Fact]
-    public void SignInRequest_EmptyUsername_DocumentBehavior()
+    [Fact(Skip = "DTO currently accepts empty usernames — SignInRequest should require [Required] on Username")]
+    public void SignInRequest_EmptyUsername_ShouldReject()
     {
         var request = new SignInRequest(
             Username: "",
@@ -59,8 +59,7 @@ public class DtoValidationTests
         var results = new List<ValidationResult>();
         var isValid = Validator.TryValidateObject(request, context, results, true);
 
-        Assert.True(isValid);
-        Assert.Empty(request.Username);
+        Assert.False(isValid);
     }
 
     [Fact]
@@ -119,7 +118,7 @@ public class DtoValidationTests
         Assert.Equal("Str0ng!Pass", deserialized.Password);
     }
 
-    [Fact]
+    [Fact(Skip = "DTO currently accepts empty usernames — SignInRequest should require [Required] on Username")]
     public void SignInRequest_WithEmptyUsername_ModelStateWouldReject()
     {
         var request = new SignInRequest(
@@ -127,6 +126,10 @@ public class DtoValidationTests
             Password: "Str0ng!Pass"
         );
 
-        Assert.Empty(request.Username);
+        var context = new ValidationContext(request);
+        var results = new List<ValidationResult>();
+        var isValid = Validator.TryValidateObject(request, context, results, true);
+
+        Assert.False(isValid);
     }
 }

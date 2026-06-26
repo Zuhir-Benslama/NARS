@@ -127,6 +127,15 @@ public static class FeatureTypeRegistry
         _registry.GetValueOrDefault(type);
 
     /// <summary>
+    /// Tries to look up a descriptor by type. Returns false if unknown.
+    /// </summary>
+    public static bool TryGetDescriptor(string type, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out FeatureTypeDescriptor? descriptor)
+    {
+        descriptor = GetDescriptor(type);
+        return descriptor is not null;
+    }
+
+    /// <summary>
     /// Creates a new entity for the given type with common fields populated.
     /// Returns null if the type is unknown.
     /// </summary>

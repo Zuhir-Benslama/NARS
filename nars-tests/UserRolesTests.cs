@@ -6,7 +6,7 @@ namespace NarsApi.Tests;
 public class UserRolesTests
 {
     [Fact]
-    public void CommuneUser_Is_Not_Admin()
+    public void IsAdmin_CommuneUser_ReturnsFalse()
     {
         Assert.False(UserRoles.IsAdmin(UserRoles.CommuneUser));
     }
@@ -15,25 +15,25 @@ public class UserRolesTests
     [InlineData(UserRoles.DairaAdmin)]
     [InlineData(UserRoles.WilayaAdmin)]
     [InlineData(UserRoles.NationalAdmin)]
-    public void Admin_Roles_Are_Admin(string role)
+    public void IsAdmin_AdminRoles_ReturnsTrue(string role)
     {
         Assert.True(UserRoles.IsAdmin(role));
     }
 
     [Fact]
-    public void Null_Is_Not_Admin()
+    public void IsAdmin_Null_ReturnsFalse()
     {
         Assert.False(UserRoles.IsAdmin(null));
     }
 
     [Fact]
-    public void Unknown_Role_Is_Not_Admin()
+    public void IsAdmin_UnknownRole_ReturnsFalse()
     {
         Assert.False(UserRoles.IsAdmin("unknown_role"));
     }
 
     [Fact]
-    public void AllAdminRoles_Contains_Three_Roles()
+    public void AllAdminRoles_HasExpectedCount()
     {
         Assert.Equal(3, UserRoles.AllAdminRoles.Length);
         Assert.Contains(UserRoles.DairaAdmin, UserRoles.AllAdminRoles);
@@ -42,37 +42,37 @@ public class UserRolesTests
     }
 
     [Fact]
-    public void AllAdminRoles_Does_Not_Contain_CommuneUser()
+    public void AllAdminRoles_DoesNotContainCommuneUser()
     {
         Assert.DoesNotContain(UserRoles.CommuneUser, UserRoles.AllAdminRoles);
     }
 
     [Fact]
-    public void FieldWorker_Is_Not_Admin()
+    public void IsAdmin_FieldWorker_ReturnsFalse()
     {
         Assert.False(UserRoles.IsAdmin(UserRoles.FieldWorker));
     }
 
     [Fact]
-    public void FieldWorker_Is_CommuneScoped()
+    public void IsCommuneScoped_FieldWorker_ReturnsTrue()
     {
         Assert.True(UserRoles.IsCommuneScoped(UserRoles.FieldWorker));
     }
 
     [Fact]
-    public void CommuneUser_Is_CommuneScoped()
+    public void IsCommuneScoped_CommuneUser_ReturnsTrue()
     {
         Assert.True(UserRoles.IsCommuneScoped(UserRoles.CommuneUser));
     }
 
     [Fact]
-    public void DairaAdmin_Is_Not_CommuneScoped()
+    public void IsCommuneScoped_DairaAdmin_ReturnsFalse()
     {
         Assert.False(UserRoles.IsCommuneScoped(UserRoles.DairaAdmin));
     }
 
     [Fact]
-    public void Role_Constants_Have_Expected_Values()
+    public void RoleConstants_HaveExpectedValues()
     {
         Assert.Equal("commune_user", UserRoles.CommuneUser);
         Assert.Equal("field_worker", UserRoles.FieldWorker);

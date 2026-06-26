@@ -74,4 +74,23 @@ public class PasswordValidatorTests
         Assert.Equal("Password is too common. Choose a more complex password.",
             PasswordValidator.Validate(password));
     }
+
+    [Fact]
+    public void NullPassword_ThrowsArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() => PasswordValidator.Validate(null!));
+    }
+
+    [Fact]
+    public void WhitespacePassword_ReturnsError()
+    {
+        Assert.NotNull(PasswordValidator.Validate("   "));
+    }
+
+    [Fact]
+    public void VeryLongPassword_Valid()
+    {
+        var longPwd = "Aa1!" + new string('x', 200);
+        Assert.Null(PasswordValidator.Validate(longPwd));
+    }
 }

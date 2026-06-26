@@ -181,14 +181,9 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
         var result = await _controller.Overview();
 
         var okResult = Assert.IsType<OkObjectResult>(result);
-        dynamic? data = okResult.Value;
-        Assert.NotNull(data);
-
-        // Use reflection to access the anonymous type
-        var wilayasProp = data!.GetType().GetProperty("wilayas");
-        Assert.NotNull(wilayasProp);
-        var wilayas = wilayasProp.GetValue(data) as System.Collections.IList;
-        Assert.NotNull(wilayas);
+        var json = System.Text.Json.JsonSerializer.Serialize(okResult.Value);
+        var doc = System.Text.Json.JsonDocument.Parse(json);
+        var wilayas = doc.RootElement.GetProperty("wilayas").EnumerateArray().ToList();
         Assert.Equal(2, wilayas.Count);
     }
 

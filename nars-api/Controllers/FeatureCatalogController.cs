@@ -87,7 +87,7 @@ public class FeatureCatalogController(
         var (features, totalCount) = await featureStatsService.LoadByLayerAsync(
             RequiredCurrentUserId, layerType, skip, take, cancellationToken);
 
-        return Ok(new LoadFeaturesResponse(
+        return Ok(new LoadFeaturesResponse<FeatureResult>(
             Features: features,
             Count: totalCount,
             Skip: skip,

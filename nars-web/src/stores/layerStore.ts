@@ -50,6 +50,18 @@ export const useLayerStore = defineStore("layer", {
     publicBuildingCount: (state) => state.publicBuildings.length,
     publicSpaceCount: (state) => state.publicSpaces.length,
     namingPanelCount: (state) => state.namingPanels.length,
+
+    /** Map of dbId → { layer, entry } for O(1) lookups via getFeature(). */
+    _featureMap(state): Map<string, { layer: keyof LayerState; entry: LayerEntry }> {
+      const map = new Map<string, { layer: keyof LayerState; entry: LayerEntry }>()
+      const layerKeys = Object.keys(createInitialState()) as (keyof LayerState)[]
+      for (const key of layerKeys) {
+        for (const entry of state[key]) {
+          map.set(entry.dbId, { layer: key, entry })
+        }
+      }
+      return map
+    },
   },
 
   actions: {
@@ -74,12 +86,7 @@ export const useLayerStore = defineStore("layer", {
     },
 
     getFeature(dbId: string): LayerEntry | null {
-      const layerKeys = Object.keys(createInitialState()) as (keyof LayerState)[]
-      for (const key of layerKeys) {
-        const found = this[key].find((e: LayerEntry) => e.dbId === dbId)
-        if (found) return found
-      }
-      return null
+      return this._featureMap.get(dbId)?.entry ?? null
     },
 
     reset() {

@@ -32,6 +32,12 @@ export default defineConfig(({ command, mode }) => {
   return {
     publicDir: "public",
 
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "src"),
+      },
+    },
+
     plugins,
 
     build: {
@@ -94,10 +100,10 @@ export default defineConfig(({ command, mode }) => {
         include: ["src/**/*.ts", "src/**/*.vue"],
         exclude: ["src/**/*.d.ts", "src/test/**"],
         thresholds: {
-          statements: 29,
-          branches: 25,
-          functions: 34,
-          lines: 29,
+          statements: 40,
+          branches: 30,
+          functions: 45,
+          lines: 40,
         },
       },
     },
