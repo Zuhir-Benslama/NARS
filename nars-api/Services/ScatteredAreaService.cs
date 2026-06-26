@@ -11,26 +11,8 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
     : IScatteredAreaService
 {
     private const string DefaultLabel = "Scattered Area";
-    private readonly Lock _errorLock = new();
-    private (DateTimeOffset Timestamp, string Message)? _lastError;
 
-    public (DateTimeOffset Timestamp, string Message)? LastError
-    {
-        get
-        {
-            lock (_errorLock)
-            {
-                return _lastError;
-            }
-        }
-        private set
-        {
-            lock (_errorLock)
-            {
-                _lastError = value;
-            }
-        }
-    }
+    public (DateTimeOffset Timestamp, string Message)? LastError { get; private set; }
 
     public async Task RefreshAsync(Guid userId, int communeId, CancellationToken cancellationToken = default)
     {

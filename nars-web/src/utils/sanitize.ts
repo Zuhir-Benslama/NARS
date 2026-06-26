@@ -84,7 +84,6 @@ export function createSafeTextElement(tag: string, text: string, className?: str
  */
 export function sanitizeApiText(dirty: string | null | undefined): string {
   if (!dirty) return ""
-  // First escape HTML entities, then strip any remaining tags
-  const escaped = escapeHtml(dirty)
-  return DOMPurifyInstance.sanitize(escaped, { ALLOWED_TAGS: [] })
+  // DOMPurify strips all HTML tags, leaving only safe text content
+  return DOMPurifyInstance.sanitize(dirty, { ALLOWED_TAGS: [] })
 }

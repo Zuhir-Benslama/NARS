@@ -33,18 +33,12 @@ public class FieldController(
         [FromQuery] int take = 500,
         CancellationToken cancellationToken = default)
     {
-        var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
-        if (user is null)
-        {
-            return Unauthorized();
-        }
-
-        if (user.Role != UserRoles.FieldWorker)
+        if (CurrentUserRole != UserRoles.FieldWorker)
         {
             return Forbid();
         }
 
-        var communeId = user.CommuneId;
+        var communeId = CurrentCommuneId;
         if (communeId is null)
         {
             return Problem(detail: "Field worker has no assigned commune.", statusCode: 400);
@@ -63,7 +57,7 @@ public class FieldController(
 
         take = Math.Clamp(take, 1, 1000);
         var (Items, Total) = await fieldService.QueryFeaturesAsync(descriptor, communeId.Value, skip, take, cancellationToken);
-        return Ok(new LoadFeaturesResponse(Features: Items, Count: Total, Skip: skip, Take: take));
+        return Ok(new LoadFeaturesResponse<FieldFeatureResult>(Features: Items, Count: Total, Skip: skip, Take: take));
     }
 
     [HttpPost("field/inspect")]
@@ -77,8 +71,7 @@ public class FieldController(
             return Problem(detail: "Request body is required.", statusCode: 400);
         }
 
-        var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
-        if (user is null || user.Role != UserRoles.FieldWorker)
+        if (CurrentUserRole != UserRoles.FieldWorker)
         {
             return Forbid();
         }
@@ -100,7 +93,7 @@ public class FieldController(
             return Problem(detail: "Feature not found.", statusCode: 400);
         }
 
-        if (feature.Value.CommuneId != user.CommuneId)
+        if (feature.Value.CommuneId != CurrentCommuneId)
         {
             return Forbid();
         }
@@ -155,8 +148,7 @@ public class FieldController(
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetInspections(Guid featureId, CancellationToken cancellationToken = default)
     {
-        var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
-        if (user is null || user.Role != UserRoles.FieldWorker)
+        if (CurrentUserRole != UserRoles.FieldWorker)
         {
             return Forbid();
         }
@@ -177,7 +169,7 @@ public class FieldController(
         return Ok(new FieldInspectionsResponse(inspections));
     }
 
-    [HttpPost("field/entrance/create")]
+    [HttpPost("field/entrance")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -188,8 +180,7 @@ public class FieldController(
             return Problem(detail: "Request body is required.", statusCode: 400);
         }
 
-        var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
-        if (user is null || user.Role != UserRoles.FieldWorker)
+        if (CurrentUserRole != UserRoles.FieldWorker)
         {
             return Forbid();
         }
@@ -211,12 +202,7 @@ public class FieldController(
             return Forbid();
         }
 
-        if (roadOwner.LockedUntil.HasValue && roadOwner.LockedUntil > timeProvider.UtcNow)
-        {
-            return Forbid();
-        }
-
-        if (roadOwner.CommuneId.HasValue && user.CommuneId.HasValue && roadOwner.CommuneId != user.CommuneId)
+        if (roadOwner.CommuneId.HasValue && CurrentCommuneId.HasValue && roadOwner.CommuneId != CurrentCommuneId)
         {
             return Forbid();
         }

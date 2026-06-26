@@ -42,8 +42,9 @@ spec:
                 topologyKey: kubernetes.io/hostname
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1000
-        fsGroup: 1000
+        # Must match USER in docker/Dockerfile.nars-api (1654)
+        runAsUser: 1654
+        fsGroup: 1654
       containers:
         - name: nars-api
           # ⚠ Dev default only — override via kustomize in CI/CD (e.g.

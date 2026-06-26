@@ -20,6 +20,11 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     
+    /* Paths */
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
     /* Types */
     "types": ["node", "vite/client"]
   },

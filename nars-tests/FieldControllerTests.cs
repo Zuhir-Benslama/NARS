@@ -148,13 +148,12 @@ public class FieldControllerTests
     }
 
     [Fact]
-    public async Task CreateEntrance_RoadOwnerLocked_Returns403()
+    public async Task CreateEntrance_OwnerLocked_StillAllowsCreation()
     {
         var (ctrl, db, _) = CreateController(communeId: 1);
         var ownerId = Guid.NewGuid();
         var roadId = AddRoad(db, ownerId, ownerCommuneId: 1);
 
-        // Lock the road owner
         var owner = await db.Users.FindAsync(ownerId);
         owner!.LockedUntil = FixedNow.AddHours(1);
         await db.SaveChangesAsync();
@@ -165,7 +164,31 @@ public class FieldControllerTests
             Label: "new entrance"
         ));
 
-        Assert.IsType<ForbidResult>(result);
+        Assert.IsType<ObjectResult>(result);
+        Assert.Equal(201, ((ObjectResult)result).StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateEntrance_NullBody_Returns400()
+    {
+        var (ctrl, _, _) = CreateController();
+        var result = await ctrl.CreateEntranceFromInspection(null!);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateEntrance_EmptyRoadId_Returns400()
+    {
+        var (ctrl, _, _) = CreateController();
+        var result = await ctrl.CreateEntranceFromInspection(new FieldEntranceCreateRequest(
+            RoadId: "",
+            Data: Json("{}"),
+            Label: "test"
+        ));
+
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     [Fact]

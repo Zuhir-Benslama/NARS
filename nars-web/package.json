@@ -82,6 +82,10 @@
       "prettier --write"
     ]
   },
+  "optionalDependencies": {
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.2"
+  },
   "overrides": {
     "glob": "^11.0.0",
     "js-yaml": "^4.2.0",

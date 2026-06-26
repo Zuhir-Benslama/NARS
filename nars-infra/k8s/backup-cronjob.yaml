@@ -63,17 +63,26 @@ spec:
                   TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
                   FILE="/backup/nars_db_${TIMESTAMP}.sql"
                   echo "→ Backing up database 'nars_db'..."
-                  # ⚠ Backup is written in plaintext (includes password hashes).
-                  # For production, pipe through gpg for encryption:
-                  #   pg_dump ... | gpg --encrypt --recipient ... > "$FILE.gpg"
-                  pg_dump \
-                    -h "${PGHOST}" -U "${PGUSER}" -d "${PGDATABASE}" \
-                    --no-owner > "$FILE"
-                  gzip -f "$FILE"
-                  echo "✓ Backup saved: ${FILE}.gz"
-                  ls -lh "${FILE}.gz"
+                  if [ -n "${GPG_PASSPHRASE}" ]; then
+                    echo "  → Encrypting with GPG symmetric cipher..."
+                    pg_dump \
+                      -h "${PGHOST}" -U "${PGUSER}" -d "${PGDATABASE}" \
+                      --no-owner | gpg --batch --yes --passphrase "${GPG_PASSPHRASE}" \
+                        --symmetric --cipher-algo AES256 > "$FILE.gpg"
+                    gzip -f "$FILE.gpg"
+                    echo "✓ Encrypted backup saved: ${FILE}.gpg.gz"
+                  else
+                    echo "  ⚠ GPG_PASSPHRASE not set — backup is PLAINTEXT!"
+                    echo "  Set the gpg-passphrase secret for encrypted backups."
+                    pg_dump \
+                      -h "${PGHOST}" -U "${PGUSER}" -d "${PGDATABASE}" \
+                      --no-owner > "$FILE"
+                    gzip -f "$FILE"
+                    echo "✓ Backup saved: ${FILE}.gz"
+                  fi
+                  ls -lh /backup/
                   echo "→ Cleaning backups older than 30 days..."
-                  find /backup -name "nars_db_*.sql.gz" -mtime +30 -delete
+                  find /backup -name "nars_db_*.sql*" -mtime +30 -delete
               resources:
                 requests:
                   cpu: 100m
@@ -107,6 +116,12 @@ spec:
                     secretKeyRef:
                       name: nars-secrets
                       key: postgres_password
+                - name: GPG_PASSPHRASE
+                  valueFrom:
+                    secretKeyRef:
+                      name: nars-secrets
+                      key: gpg-passphrase
+                      optional: true
               volumeMounts:
                 - name: backup-storage
                   mountPath: /backup

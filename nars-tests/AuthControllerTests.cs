@@ -30,7 +30,7 @@ public class AuthControllerTests
         timeProvider ??= Mock.Of<IDateTimeProvider>(x => x.UtcNow == DateTime.UtcNow);
         var jwtOptions = Options.Create(new JwtOptions { ExpiresInMinutes = 60, RefreshExpiresInDays = 30 });
         return new JwtService(
-            "test-secret-key-that-is-at-least-32-chars-long!!",
+            AuthTestHelper.TestJwtSecret,
             null,
             null,
             jwtOptions,
@@ -76,14 +76,14 @@ public class AuthControllerTests
 
         var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "admin",
-            AdminPassword: "Str0ng!Pass",
+            AdminPassword: TestData.DefaultPassword,
             Name: "Test User",
-            Email: "test@example.com",
-            Phone: "0555123456",
+            Email: TestData.DefaultEmail,
+            Phone: TestData.AltPhone,
             Username: "testuser",
-            Password: "StrongP@ss1",
+            Password: TestData.AltPassword,
             Role: UserRoles.CommuneUser,
-            CommuneId: 1,
+            CommuneId: TestData.CommuneId1,
             DairaId: null,
             WilayaId: null
         ));
@@ -104,7 +104,7 @@ public class AuthControllerTests
 
         var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "admin",
-            AdminPassword: "Str0ng!Pass",
+            AdminPassword: TestData.DefaultPassword,
             Name: "Test User",
             Email: "test@example.com",
             Phone: "0555123456",
@@ -126,12 +126,12 @@ public class AuthControllerTests
         var db = CreateInMemoryDbContext();
         await SeedLocationDataAsync(db);
         await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
-        db.Users.Add(new User
+        await db.Users.AddAsync(new User
         {
             Id = Guid.NewGuid(),
             Name = "Existing",
             Email = "existing@example.com",
-            Phone = "0555000000",
+            Phone = TestData.DefaultPhone,
             Username = "existinguser",
             PasswordHash = BCrypt.Net.BCrypt.HashPassword("Str0ng!Pass"),
             Role = UserRoles.CommuneUser,
@@ -192,13 +192,13 @@ public class AuthControllerTests
     {
         var db = CreateInMemoryDbContext();
         await SeedLocationDataAsync(db);
-        db.Users.Add(new User
+        await db.Users.AddAsync(new User
         {
             Id = Guid.NewGuid(),
             Name = "Test User",
-            Email = "test@example.com",
+            Email = TestData.DefaultEmail,
             Username = "testuser",
-            Phone = "0555000000",
+            Phone = TestData.DefaultPhone,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword("Str0ng!Pass"),
             Role = UserRoles.CommuneUser,
             CommuneId = 1,
@@ -303,7 +303,7 @@ public class AuthControllerTests
             Id = Guid.NewGuid(),
             Name = "Admin User",
             Email = $"admin-{Guid.NewGuid():N}@test.com",
-            Phone = "0555000000",
+            Phone = TestData.DefaultPhone,
             Username = username,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword("Str0ng!Pass"),
             Role = role,

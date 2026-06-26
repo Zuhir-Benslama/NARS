@@ -327,12 +327,6 @@ public class FeaturesControllerTests
     }
 
     [Fact(Skip = "InMemory provider does not support ExecuteDeleteAsync")]
-    public async Task DeleteFeature_NotOwned_Returns404()
-    {
-        // ExecuteDeleteAsync is used in the endpoint; InMemory does not support it.
-    }
-
-    [Fact(Skip = "InMemory provider does not support ExecuteDeleteAsync")]
     public async Task DeleteFeature_Valid_Returns200()
     {
         var (ctrl, db) = CreateController();

@@ -71,8 +71,8 @@ public record SaveFeatureResponse(
     string Message
 );
 
-public record LoadFeaturesResponse(
-    object Features,
+public record LoadFeaturesResponse<T>(
+    IReadOnlyList<T> Features,
     int Count,
     int Skip,
     int Take
@@ -111,6 +111,16 @@ public record UpdateCredentialsResponse(
 public record UserCredentialsInfo(
     string? Username,
     string? Email
+);
+
+public record FieldFeatureResult(
+    string Id,
+    string UserId,
+    string Layer,
+    string Label,
+    JsonElement? Data,
+    DateTime CreatedAt,
+    DateTime? UpdatedAt
 );
 
 public record DetailResponse(

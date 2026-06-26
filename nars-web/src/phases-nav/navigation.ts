@@ -70,9 +70,7 @@ export async function goToPhase(target: number): Promise<void> {
 export function setPhase(index: number): void {
   const appStore = useAppStore()
   appStore.currentPhase = index
-  const communeId =
-    (appStore.user as { commune?: { id?: number | string } } | null | undefined)?.commune?.id ??
-    null
+  const communeId = appStore.user?.commune?.id ?? null
   savePhase(index, communeId)
   const phase = PHASES[index]
   setDrawingPhase(phase ?? null)

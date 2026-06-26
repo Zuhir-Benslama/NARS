@@ -12,7 +12,7 @@ namespace NarsApi.Tests;
 public class JwtServiceTests
 {
     private static JwtService CreateService(
-        string secret = "this-is-a-test-secret-key-that-is-long-enough-32chars!",
+        string secret = AuthTestHelper.TestJwtSecret,
         int expiresMinutes = 60,
         int refreshExpiresDays = 30)
     {

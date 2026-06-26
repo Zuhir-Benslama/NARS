@@ -24,20 +24,15 @@ public class AdminController(
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Overview(CancellationToken cancellationToken = default)
     {
-        var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
-        if (user is null)
+        var role = CurrentUserRole;
+        return role switch
         {
-            return Unauthorized(new { detail = "User not found." });
-        }
-
-        return user.Role switch
-        {
-            UserRoles.DairaAdmin when user.DairaId is null =>
+            UserRoles.DairaAdmin when CurrentDairaId is null =>
                 Forbid("daira_id missing on account. Contact your administrator."),
-            UserRoles.WilayaAdmin when user.WilayaId is null =>
+            UserRoles.WilayaAdmin when CurrentWilayaId is null =>
                 Forbid("wilaya_id missing on account. Contact your administrator."),
-            UserRoles.DairaAdmin => await DairaOverview(user.DairaId!.Value, cancellationToken),
-            UserRoles.WilayaAdmin => await WilayaOverview(user.WilayaId!.Value, cancellationToken),
+            UserRoles.DairaAdmin => await DairaOverview(CurrentDairaId!.Value, cancellationToken),
+            UserRoles.WilayaAdmin => await WilayaOverview(CurrentWilayaId!.Value, cancellationToken),
             UserRoles.NationalAdmin => await NationalOverview(cancellationToken),
             _ => Forbid(),
         };
@@ -51,13 +46,7 @@ public class AdminController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetWilaya(int wilayaId, CancellationToken cancellationToken = default)
     {
-        var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
-        if (user is null)
-        {
-            return Unauthorized(new { detail = "User not found." });
-        }
-
-        if (user.Role != UserRoles.NationalAdmin)
+        if (CurrentUserRole != UserRoles.NationalAdmin)
         {
             return Forbid();
         }
@@ -74,18 +63,12 @@ public class AdminController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetDaira(int dairaId, CancellationToken cancellationToken = default)
     {
-        var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
-        if (user is null)
-        {
-            return Unauthorized(new { detail = "User not found." });
-        }
-
-        switch (user.Role)
+        switch (CurrentUserRole)
         {
             case UserRoles.WilayaAdmin:
                 {
                     var daira = await db.Dairas.FindAsync([dairaId], cancellationToken);
-                    if (daira is null || daira.WilayaId != user.WilayaId)
+                    if (daira is null || daira.WilayaId != CurrentWilayaId)
                     {
                         return Forbid();
                     }
@@ -115,13 +98,7 @@ public class AdminController(
             return Problem(detail: "Request body is required.", statusCode: 400);
         }
 
-        var creator = await db.Users.FindAsync([CurrentUserId], cancellationToken);
-        if (creator is null)
-        {
-            return Unauthorized();
-        }
-
-        var callerRole = creator.Role;
+        var callerRole = CurrentUserRole;
 
         if (!CanCreateRole(callerRole, body.Role))
         {
@@ -140,7 +117,7 @@ public class AdminController(
                     }
 
                     var commune = await db.Communes.FindAsync([body.CommuneId.Value], cancellationToken);
-                    if (commune is null || commune.DairaId != creator.DairaId)
+                    if (commune is null || commune.DairaId != CurrentDairaId)
                     {
                         return Forbid();
                     }
@@ -155,7 +132,7 @@ public class AdminController(
                     }
 
                     var daira = await db.Dairas.FindAsync([body.DairaId.Value], cancellationToken);
-                    if (daira is null || daira.WilayaId != creator.WilayaId)
+                    if (daira is null || daira.WilayaId != CurrentWilayaId)
                     {
                         return Forbid();
                     }
@@ -192,7 +169,7 @@ public class AdminController(
         }
 
         var communeId = body.Role == UserRoles.FieldWorker
-            ? creator.CommuneId
+            ? CurrentCommuneId
             : body.CommuneId;
 
         var newUser = new User
@@ -229,35 +206,29 @@ public class AdminController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetManageableUsers(CancellationToken cancellationToken = default)
     {
-        var creator = await db.Users.FindAsync([CurrentUserId], cancellationToken);
-        if (creator is null)
-        {
-            return Unauthorized();
-        }
-
-        List<AdminUserSummary> users = creator.Role switch
+        List<AdminUserSummary> users = CurrentUserRole switch
         {
             UserRoles.NationalAdmin => await db.Users
                 .Where(u => u.Role == UserRoles.WilayaAdmin)
                 .Select(ToAdminSummary)
                 .ToListAsync(cancellationToken),
 
-            UserRoles.WilayaAdmin when creator.WilayaId.HasValue => await db.Users
+            UserRoles.WilayaAdmin when CurrentWilayaId.HasValue => await db.Users
                 .Where(u => u.Role == UserRoles.DairaAdmin && u.DairaId.HasValue)
-                .Join(db.Dairas.Where(d => d.WilayaId == creator.WilayaId.Value),
+                .Join(db.Dairas.Where(d => d.WilayaId == CurrentWilayaId.Value),
                     u => u.DairaId!.Value, d => d.DairaId, (u, _) => u)
                 .Select(ToAdminSummary)
                 .ToListAsync(cancellationToken),
 
-            UserRoles.DairaAdmin when creator.DairaId.HasValue => await db.Users
+            UserRoles.DairaAdmin when CurrentDairaId.HasValue => await db.Users
                 .Where(u => u.Role == UserRoles.CommuneUser && u.CommuneId.HasValue)
-                .Join(db.Communes.Where(c => c.DairaId == creator.DairaId.Value),
+                .Join(db.Communes.Where(c => c.DairaId == CurrentDairaId.Value),
                     u => u.CommuneId!.Value, c => c.CommuneId, (u, _) => u)
                 .Select(ToAdminSummary)
                 .ToListAsync(cancellationToken),
 
-            UserRoles.CommuneUser when creator.CommuneId.HasValue => await db.Users
-                .Where(u => u.Role == UserRoles.FieldWorker && u.CommuneId == creator.CommuneId)
+            UserRoles.CommuneUser when CurrentCommuneId.HasValue => await db.Users
+                .Where(u => u.Role == UserRoles.FieldWorker && u.CommuneId == CurrentCommuneId)
                 .Select(ToAdminSummary)
                 .ToListAsync(cancellationToken),
 
@@ -283,24 +254,18 @@ public class AdminController(
             return Problem(detail: "Request body is required.", statusCode: 400);
         }
 
-        var creator = await db.Users.FindAsync([CurrentUserId], cancellationToken);
-        if (creator is null)
-        {
-            return Unauthorized();
-        }
-
         var target = await db.Users.FindAsync([userId], cancellationToken);
         if (target is null)
         {
             return Problem(detail: "User not found.", statusCode: 404);
         }
 
-        if (!CanCreateRole(creator.Role, target.Role))
+        if (!CanCreateRole(CurrentUserRole, target.Role))
         {
             return Forbid();
         }
 
-        if (body.Role is not null && !CanCreateRole(creator.Role, body.Role))
+        if (body.Role is not null && !CanCreateRole(CurrentUserRole, body.Role))
         {
             return Forbid();
         }
@@ -355,7 +320,7 @@ public class AdminController(
         await db.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation("[Admin] {CallerRole} {CallerId} updated user {UserId}",
-            creator.Role, CurrentUserId, userId);
+            CurrentUserRole, CurrentUserId, userId);
 
         return Ok(new ActionResponse(Success: true));
     }
@@ -368,19 +333,13 @@ public class AdminController(
     public async Task<IActionResult> DeleteAdmin(
         Guid userId, CancellationToken cancellationToken = default)
     {
-        var creator = await db.Users.FindAsync([CurrentUserId], cancellationToken);
-        if (creator is null)
-        {
-            return Unauthorized();
-        }
-
         var target = await db.Users.FindAsync([userId], cancellationToken);
         if (target is null)
         {
             return Problem(detail: "User not found.", statusCode: 404);
         }
 
-        if (!CanCreateRole(creator.Role, target.Role))
+        if (!CanCreateRole(CurrentUserRole, target.Role))
         {
             return Forbid();
         }
@@ -389,7 +348,7 @@ public class AdminController(
         await db.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation("[Admin] {CallerRole} {CallerId} deleted user {UserId} ({Username})",
-            creator.Role, CurrentUserId, userId, target.Username);
+            CurrentUserRole, CurrentUserId, userId, target.Username);
 
         return Ok(new ActionResponse(Success: true));
     }

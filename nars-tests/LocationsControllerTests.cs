@@ -252,4 +252,43 @@ public class LocationsControllerTests
 
         Assert.IsType<NotFoundResult>(result);
     }
+
+    // ── Edge cases ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetWilayas_NegativeSkip_ReturnsOk()
+    {
+        var db = CreateDb(nameof(GetWilayas_NegativeSkip_ReturnsOk));
+        var ctrl = CreateController(db);
+
+        var result = await ctrl.GetWilayas(skip: -1, take: 10);
+
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task GetWilayas_SmallTake_ReturnsOk()
+    {
+        var db = CreateDb(nameof(GetWilayas_SmallTake_ReturnsOk));
+        SeedWilayas(db);
+        var ctrl = CreateController(db);
+
+        var result = await ctrl.GetWilayas(skip: 0, take: 1);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.NotNull(ok.Value);
+    }
+
+    [Fact(Skip = "InMemory provider does not support ILike")]
+    public async Task SearchWilayas_ByName_ReturnsMatches()
+    {
+        var db = CreateDb(nameof(SearchWilayas_ByName_ReturnsMatches));
+        SeedWilayas(db);
+        var ctrl = CreateController(db);
+
+        var result = await ctrl.GetWilayas(search: "Alger");
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.NotNull(ok.Value);
+    }
 }

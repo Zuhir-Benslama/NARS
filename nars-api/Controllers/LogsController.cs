@@ -20,6 +20,9 @@ public class LogsController(AppDbContext db, IOptions<LoggingOptions> logOptions
     private int MaxEntryLength => logOptions.Value.MaxEntryLength;
 
     private static readonly HashSet<string> AllowedLevels = ["error", "warn", "info", "debug", "trace"];
+    private const int MaxUrlLength = 2048;
+    private const int MaxMethodLength = 10;
+    private const int MaxUserAgentLength = 500;
 
     [HttpPost("logs")]
     [AllowAnonymous]
@@ -78,10 +81,10 @@ public class LogsController(AppDbContext db, IOptions<LoggingOptions> logOptions
                 Code = entry.Code ?? "",
                 Message = entry.Message[..Math.Min(entry.Message.Length, MaxEntryLength)],
                 Context = string.IsNullOrEmpty(entry.Context) ? null : entry.Context,
-                Url = entry.Url?[..Math.Min(entry.Url.Length, 2048)],
-                Method = entry.Method?[..Math.Min(entry.Method.Length, 10)],
+                Url = entry.Url?[..Math.Min(entry.Url.Length, MaxUrlLength)],
+                Method = entry.Method?[..Math.Min(entry.Method.Length, MaxMethodLength)],
                 IpAddress = ipAddress,
-                UserAgent = userAgent?[..Math.Min(userAgent.Length, 500)],
+                UserAgent = userAgent?[..Math.Min(userAgent.Length, MaxUserAgentLength)],
                 CreatedAt = now,
             });
         }
@@ -99,7 +102,7 @@ public class LogsController(AppDbContext db, IOptions<LoggingOptions> logOptions
 
     private Guid GetUserId()
     {
-        var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var claim = User.FindFirst(ClaimNames.UserId);
         return claim is not null && Guid.TryParse(claim.Value, out var id) ? id : Guid.Empty;
     }
 }

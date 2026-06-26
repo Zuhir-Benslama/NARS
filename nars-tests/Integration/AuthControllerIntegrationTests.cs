@@ -252,7 +252,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == DateTime.UtcNow);
         var jwtOpts = Options.Create(new JwtOptions { ExpiresInMinutes = 60, RefreshExpiresInDays = 30 });
         var jwt = new JwtService(
-            "integration-test-secret-key-that-is-32chars!!",
+            AuthTestHelper.TestJwtSecret,
             null,
             null,
             jwtOpts,

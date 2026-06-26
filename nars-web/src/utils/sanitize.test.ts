@@ -99,10 +99,10 @@ describe("sanitize", () => {
       expect(sanitizeApiText(undefined)).toBe("")
     })
 
-    it("escapes HTML in API text", () => {
+    it("strips HTML tags from API text", () => {
       const result = sanitizeApiText("<b>bold</b>")
       expect(result).not.toContain("<b>")
-      expect(result).toContain("&lt;")
+      expect(result).toBe("bold")
     })
 
     it("passes through safe text", () => {

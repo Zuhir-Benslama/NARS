@@ -32,7 +32,7 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
 
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == DateTime.UtcNow);
         var jwtOptions = Options.Create(new JwtOptions { ExpiresInMinutes = 60, RefreshExpiresInDays = 30 });
-        var jwt = new JwtService("integration-test-secret-key-that-is-32chars!!", null, null, jwtOptions, Mock.Of<ILogger<JwtService>>(), timeProvider);
+        var jwt = new JwtService(AuthTestHelper.TestJwtSecret, null, null, jwtOptions, Mock.Of<ILogger<JwtService>>(), timeProvider);
         var scatteredMock = new Mock<IScatteredAreaService>();
         scatteredMock.Setup(s => s.RefreshAsync(It.IsAny<Guid>(), It.IsAny<int>())).Returns(Task.CompletedTask);
         var bgQueueMock = Mock.Of<IBackgroundTaskQueue>();
@@ -137,7 +137,7 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
         var result = await _controller.LoadFeatures();
 
         var okResult = Assert.IsType<OkObjectResult>(result);
-        var loadResponse = Assert.IsType<LoadFeaturesResponse>(okResult.Value);
+        var loadResponse = Assert.IsType<LoadFeaturesResponse<FeatureResult>>(okResult.Value);
         Assert.True(loadResponse.Count >= 2);
     }
 

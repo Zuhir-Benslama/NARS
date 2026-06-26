@@ -17,6 +17,8 @@ public static class PasswordValidator
 
     public static string? Validate(string password)
     {
+        ArgumentNullException.ThrowIfNull(password);
+
         if (password.Length < 8)
         {
             return "Password must be at least 8 characters.";
