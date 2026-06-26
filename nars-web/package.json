@@ -84,7 +84,7 @@
   },
   "optionalDependencies": {
     "html2canvas": "^1.4.1",
-    "jspdf": "^2.5.2"
+    "jspdf": "^4.2.1"
   },
   "overrides": {
     "glob": "^11.0.0",
