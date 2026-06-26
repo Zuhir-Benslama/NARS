@@ -59,7 +59,7 @@
     "eslint-plugin-vue": "^10.9.2",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
-    "lint-staged": "^17.0.7",
+    "lint-staged": "^17.0.8",
     "openapi-typescript": "^7.13.0",
     "prettier": "^3.8.4",
     "stylelint": "^17.13.0",
