@@ -23,21 +23,32 @@ SCALABLE_DEPLOYS   := postgis nars-api nars-frontend
 # Make auto-remakes missing included files and re-execs, so
 # all targets see consistent POSTGRES_PASSWORD / JWT_SECRET.
 # Mark .env as precious to avoid accidental deletion from parallel builds.
+# Generate a random base64 string using openssl (preferred) or python3.
+# Used in recipe contexts (where $$1 is the byte count).
+_rnd_cmd = if command -v openssl >/dev/null 2>&1; then \
+	openssl rand -base64 "$$1" | tr -d '\n'; \
+else \
+	python3 -c "import base64,os; print(base64.b64encode(os.urandom(int(\"$$1\"))).decode())"; \
+fi
+
 .PRECIOUS: .env
 .env:
-	@echo "# Auto-generated — DO NOT COMMIT" > $@
-	@echo "POSTGRES_PASSWORD=$$(openssl rand -base64 32)" >> $@
-	@echo "JWT_SECRET=$$(openssl rand -base64 32)" >> $@
-	@echo "GPG_PASSPHRASE=$$(openssl rand -base64 32)" >> $@
-	@echo "GRAFANA_PASSWORD=$$(openssl rand -base64 12)" >> $@
-	@echo "→ Created $@ with fresh secrets"
+	@echo "# Auto-generated — DO NOT COMMIT" > $@; \
+	_RND() { $(_rnd_cmd); }; \
+	echo "POSTGRES_PASSWORD=$$(_RND 32)" >> $@; \
+	echo "JWT_SECRET=$$(_RND 32)" >> $@; \
+	echo "GPG_PASSPHRASE=$$(_RND 32)" >> $@; \
+	echo "GRAFANA_PASSWORD=$$(_RND 12)" >> $@; \
+	echo "→ Created $@ with fresh secrets"
 
 -include .env
 
-POSTGRES_PASSWORD  ?= $(shell openssl rand -base64 32)
-JWT_SECRET         ?= $(shell openssl rand -base64 32)
-GPG_PASSPHRASE     ?= $(shell openssl rand -base64 32)
-GRAFANA_PASSWORD   ?= $(shell openssl rand -base64 12)
+# Fallback values — only used if .env is missing and system has neither
+# openssl nor python3 (unlikely on any modern OS).
+POSTGRES_PASSWORD  ?= changeme_postgres_$(shell date +%s)
+JWT_SECRET         ?= changeme_jwt_secret_key_must_be_32_chars_long!
+GPG_PASSPHRASE     ?= changeme_gpg_passphrase_32_characters_long!
+GRAFANA_PASSWORD   ?= changeme_grafana_admin_$(shell date +%s)
 export
 
 .PHONY: help
@@ -430,7 +441,13 @@ cluster-create: ## Create the kind cluster with host-mounted postgis data (idemp
 .PHONY: cluster-wait
 cluster-wait: ## Wait for API server and nodes to be ready
 	@echo "→ Waiting for API server and nodes..."
-	@$(KUBECTL) wait --for=condition=Ready node --all --timeout=120s 2>/dev/null || \
+	@if ! $(KUBECTL) get nodes >/dev/null 2>&1; then \
+		if docker info 2>/dev/null | grep -q "rootless"; then \
+			echo "→ Rootless Docker detected — fixing kubeconfig first"; \
+			$(MAKE) kubeconfig-fix; \
+		fi; \
+	fi; \
+	$(KUBECTL) wait --for=condition=Ready node --all --timeout=120s 2>/dev/null || \
 		i=0; until $(KUBECTL) get nodes 2>/dev/null; do \
 			sleep 2; i=$$((i + 1)); \
 			[ "$$i" -ge 60 ] && { echo "Timed out waiting for nodes"; exit 1; }; \
