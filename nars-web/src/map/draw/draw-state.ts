@@ -18,9 +18,14 @@ export function registerGeomanMarker(
 export function unpatchGeomanMarker(): void {
   const store = useDrawStore()
   store.snappingEnabled = false
-  if (store.geomanMarkerPointer?.marker && store.originalGeomanMarkerSetLngLat) {
-    store.geomanMarkerPointer.marker.setLngLat = store.originalGeomanMarkerSetLngLat
-    store.geomanMarkerPointer.marker._narsSnapPatchedInstance = false
+  const marker = store.geomanMarkerPointer?.marker as Record<string, unknown> | null | undefined
+  if (marker && store.originalGeomanMarkerSetLngLat) {
+    marker.setLngLat = store.originalGeomanMarkerSetLngLat
+    const origGet = marker["_narsOrigGetLngLat"] as ((...args: unknown[]) => unknown) | undefined
+    if (origGet) {
+      marker.getLngLat = origGet
+    }
+    marker._narsSnapPatchedInstance = false
   }
 }
 
