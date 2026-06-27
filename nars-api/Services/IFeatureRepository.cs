@@ -11,7 +11,15 @@ public interface IFeatureRepository
     Task<Guid> SaveFeatureAsync(FeatureBase entity, string featureType, CancellationToken ct);
     Task<string?> GetFeatureTypeAsync(Guid featureId, CancellationToken ct);
     Task<bool> OwnsFeatureAsync(Guid featureId, string featureType, Guid userId, CancellationToken ct);
-    Task<bool> UpdateFeatureAsync(FeatureTypeDescriptor descriptor, Guid featureId, Guid userId, FeatureUpdateRequest body, DateTime updatedAt, CancellationToken ct);
+    Task<bool> UpdateFeatureAsync(UpdateFeatureCommand command, CancellationToken ct);
     Task<bool> DeleteFeatureAsync(Guid featureId, Guid userId, string featureType, CancellationToken ct);
     Task<(int total, List<Guid> ids)> ClearAllFeaturesAsync(Guid userId, CancellationToken ct);
 }
+
+public record UpdateFeatureCommand(
+    FeatureTypeDescriptor Descriptor,
+    Guid FeatureId,
+    Guid UserId,
+    FeatureUpdateRequest Body,
+    DateTime UpdatedAt
+);

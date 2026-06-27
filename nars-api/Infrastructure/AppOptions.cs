@@ -49,3 +49,8 @@ public class AccountLockoutOptions
     public int MaxFailedAttempts { get; set; } = 5;
     public int LockoutMinutes { get; set; } = 30;
 }
+
+public class OpenTelemetryOptions
+{
+    public string OtlpEndpoint { get; set; } = "http://otel-collector.observability:4317";
+}

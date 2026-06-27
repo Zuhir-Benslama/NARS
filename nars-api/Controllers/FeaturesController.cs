@@ -203,7 +203,8 @@ public class FeaturesController(
         }
 
         var updatedAt = timeProvider.UtcNow;
-        if (!await featureRepo.UpdateFeatureAsync(descriptor, featureId, RequiredCurrentUserId, body, updatedAt, cancellationToken))
+        var command = new UpdateFeatureCommand(descriptor, featureId, RequiredCurrentUserId, body, updatedAt);
+        if (!await featureRepo.UpdateFeatureAsync(command, cancellationToken))
         {
             return Problem(detail: "Feature not found", statusCode: 404);
         }

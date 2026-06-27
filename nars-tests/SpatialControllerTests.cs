@@ -91,6 +91,26 @@ public class SpatialControllerTests
         Assert.Equal(400, objResult.StatusCode);
     }
 
+    [Theory]
+    [InlineData(double.NaN, 3.0)]
+    [InlineData(double.PositiveInfinity, 3.0)]
+    [InlineData(double.NegativeInfinity, 3.0)]
+    public async Task GetRoadSide_InvalidCoordinates_Returns400(double lat, double lng)
+    {
+        var uid = Guid.NewGuid();
+        var (ctrl, db) = CreateController(
+            userId: uid,
+            entranceQuery: Mock.Of<IEntranceQueryService>(x =>
+                x.GetUsedEntranceNumbersAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())
+                == Task.FromResult(new HashSet<int>())));
+        var roadId = AddRoad(db, uid, """{"coordinates":[{"lat":36.4,"lng":2.9},{"lat":36.4,"lng":3.1}]}""");
+
+        var result = await ctrl.GetRoadSide(new RoadSideRequest(
+            RoadId: roadId, Lat: lat, Lng: lng));
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
+    }
+
     [Fact]
     public async Task GetRoadSide_MissingCoordinatesProperty_Returns400()
     {

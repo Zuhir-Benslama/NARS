@@ -16,6 +16,8 @@ using Xunit;
 
 namespace NarsApi.Tests;
 
+using static TestData;
+
 public class FieldControllerTests
 {
     private static readonly Guid UserId = Guid.NewGuid();
@@ -37,8 +39,8 @@ public class FieldControllerTests
         {
             Id = UserId,
             Name = "Field Worker",
-            Email = "field@test.com",
-            Phone = "0555000000",
+            Email = UniqueEmail("field"),
+            Phone = DefaultPhone,
             Username = "fieldworker",
             PasswordHash = "hash",
             Role = UserRoles.FieldWorker,
@@ -85,7 +87,7 @@ public class FieldControllerTests
         {
             Id = ownerId,
             Name = "Owner",
-            Email = "owner@test.com",
+            Email = UniqueEmail("owner"),
             Username = "owner",
             PasswordHash = "hash",
             Role = UserRoles.CommuneUser,
