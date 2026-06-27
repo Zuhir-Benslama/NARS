@@ -28,10 +28,7 @@ import type { GeomanMarkerPointer } from "../core/geoman-types"
 type LngLatInput = [number, number] | { lng: number; lat: number; toArray?(): [number, number] }
 type SetLngLatFn = (lngLat: LngLatInput) => void
 
-export function makeSnapSetLngLat(
-  mp: GeomanMarkerPointer,
-  orig: SetLngLatFn,
-): SetLngLatFn {
+export function makeSnapSetLngLat(mp: GeomanMarkerPointer, orig: SetLngLatFn): SetLngLatFn {
   const SNAP_KEY = "_narsLastSnap"
   return function (lngLat) {
     const rawPair = Array.isArray(lngLat)
@@ -43,7 +40,7 @@ export function makeSnapSetLngLat(
 
     const frozen = getFrozenSnapPos()
     if (frozen) {
-      ;((mp.marker as Record<string, unknown>)[SNAP_KEY]) = { lng: frozen.lng, lat: frozen.lat }
+      ;(mp.marker as Record<string, unknown>)[SNAP_KEY] = { lng: frozen.lng, lat: frozen.lat }
       orig.call(mp.marker!, [frozen.lng, frozen.lat])
       return
     }
@@ -53,10 +50,10 @@ export function makeSnapSetLngLat(
     const external = phases.length > 0 ? findNearestSnap(rawPx.x, rawPx.y, phases, true) : null
     const snap = mergeExternalSnapWithDrawFirstVertex(rawPx.x, rawPx.y, external, project)
     if (snap) {
-      ;((mp.marker as Record<string, unknown>)[SNAP_KEY]) = { lng: snap.lng, lat: snap.lat }
+      ;(mp.marker as Record<string, unknown>)[SNAP_KEY] = { lng: snap.lng, lat: snap.lat }
       orig.call(mp.marker!, [snap.lng, snap.lat])
     } else {
-      ;((mp.marker as Record<string, unknown>)[SNAP_KEY]) = null
+      ;(mp.marker as Record<string, unknown>)[SNAP_KEY] = null
       orig.call(mp.marker!, lngLat)
     }
   }
@@ -96,7 +93,10 @@ export function patchGeomanMarkerPointerSnap(): void {
       ;(mp.marker as Record<string, unknown>)["_narsOrigGetLngLat"] = origGet
       mp.marker.setLngLat = makeSnapSetLngLat(mp, orig)
       mp.marker.getLngLat = () => {
-        const snap = (mp.marker as Record<string, unknown>)[SNAP_KEY] as { lng: number; lat: number } | null
+        const snap = (mp.marker as Record<string, unknown>)[SNAP_KEY] as {
+          lng: number
+          lat: number
+        } | null
         return snap ?? origGet.call(mp.marker!)
       }
 
@@ -151,7 +151,10 @@ export function repatchMarkerPointer(): void {
       ;(mp.marker as Record<string, unknown>)["_narsOrigGetLngLat"] = origGet
       mp.marker.setLngLat = makeSnapSetLngLat(mp, orig)
       mp.marker.getLngLat = () => {
-        const snap = (mp.marker as Record<string, unknown>)[SNAP_KEY] as { lng: number; lat: number } | null
+        const snap = (mp.marker as Record<string, unknown>)[SNAP_KEY] as {
+          lng: number
+          lat: number
+        } | null
         return snap ?? origGet.call(mp.marker!)
       }
 
