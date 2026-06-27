@@ -82,6 +82,7 @@ function handleClick(item: { onClick?: () => void }) {
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.12s;
+  color: var(--dropdown-item);
 }
 .ctx-item:hover {
   background: var(--dropdown-hover, #f3f4f6);
