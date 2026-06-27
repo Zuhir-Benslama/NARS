@@ -38,24 +38,24 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
             && await dbSet.AnyAsync(f => f.Id == featureId && f.UserId == userId, ct);
     }
 
-    public async Task<bool> UpdateFeatureAsync(FeatureTypeDescriptor descriptor, Guid featureId, Guid userId, FeatureUpdateRequest body, DateTime updatedAt, CancellationToken ct)
+    public async Task<bool> UpdateFeatureAsync(UpdateFeatureCommand command, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
-        var query = descriptor.GetDbSet(db);
+        var query = command.Descriptor.GetDbSet(db);
         string? dataStr = null;
-        if (body.Data is not null)
+        if (command.Body.Data is not null)
         {
-            dataStr = body.Data.Value.ValueKind == JsonValueKind.String
-                ? body.Data.Value.GetString()!
-                : body.Data.Value.GetRawText();
+            dataStr = command.Body.Data.Value.ValueKind == JsonValueKind.String
+                ? command.Body.Data.Value.GetString()!
+                : command.Body.Data.Value.GetRawText();
         }
 
         var rows = await query
-            .Where(f => f.Id == featureId && f.UserId == userId)
+            .Where(f => f.Id == command.FeatureId && f.UserId == command.UserId)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(f => f.UpdatedAt, updatedAt)
-                .SetProperty(f => f.Label, f => body.Label ?? f.Label)
+                .SetProperty(f => f.UpdatedAt, command.UpdatedAt)
+                .SetProperty(f => f.Label, f => command.Body.Label ?? f.Label)
                 .SetProperty(f => f.Data, f => dataStr ?? f.Data)
             , ct);
 
@@ -64,9 +64,9 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
             return false;
         }
 
-        if (descriptor.PostUpdateAction is not null)
+        if (command.Descriptor.PostUpdateAction is not null)
         {
-            await descriptor.PostUpdateAction(db, featureId, userId, body.Data, ct);
+            await command.Descriptor.PostUpdateAction(db, command.FeatureId, command.UserId, command.Body.Data, ct);
         }
 
         await tx.CommitAsync(ct);

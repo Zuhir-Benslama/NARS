@@ -25,9 +25,11 @@ public static class ServiceRegistrationExtensions
         services.Configure<LoggingOptions>(config.GetSection("Logging"));
         services.Configure<ValidationOptions>(config.GetSection("Validation"));
         services.Configure<AccountLockoutOptions>(config.GetSection("AccountLockout"));
+        services.Configure<OpenTelemetryOptions>(config.GetSection("OpenTelemetry"));
 
+        var otelOpts = config.GetSection("OpenTelemetry").Get<OpenTelemetryOptions>() ?? new OpenTelemetryOptions();
         var otelEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")
-            ?? "http://otel-collector.observability:4317";
+            ?? otelOpts.OtlpEndpoint;
 
         services.AddOpenTelemetry()
             .ConfigureResource(r => r

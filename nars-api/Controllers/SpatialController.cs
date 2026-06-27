@@ -60,6 +60,12 @@ public class SpatialController(
             return Problem(detail: "Road has insufficient coordinates.", statusCode: 400);
         }
 
+        if (double.IsNaN(body.Lat) || double.IsInfinity(body.Lat) ||
+            double.IsNaN(body.Lng) || double.IsInfinity(body.Lng))
+        {
+            return Problem(detail: "Invalid coordinate values.", statusCode: 400);
+        }
+
         // Find the nearest segment midpoint to the marker.
         // Apply cosine correction so the Δlng component is in the same
         // unit scale as Δlat (important at Algeria's latitudes ~28–37°N).

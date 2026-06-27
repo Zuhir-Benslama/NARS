@@ -75,7 +75,8 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
     }
 
     /// <summary>
-    /// Truncates all feature tables (but keeps reference data if seeded).
+    /// Truncates all feature and auth tables.
+    /// Callers must reseed reference data and auth users afterwards.
     /// </summary>
     public async Task CleanTablesAsync()
     {
@@ -85,6 +86,22 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
                 naming_panels, public_spaces, public_buildings,
                 house_entrances, roads, city_centers, districts, areas,
                 feature_registry, refresh_tokens, users
+            RESTART IDENTITY CASCADE;
+        ");
+    }
+
+    /// <summary>
+    /// Truncates only feature tables, preserving auth state (users, refresh_tokens).
+    /// Use when you need to clean feature data without losing logged-in users.
+    /// </summary>
+    public async Task CleanFeatureTablesAsync()
+    {
+        await using var db = CreateDbContext();
+        await db.Database.ExecuteSqlRawAsync(@"
+            TRUNCATE TABLE
+                naming_panels, public_spaces, public_buildings,
+                house_entrances, roads, city_centers, districts, areas,
+                feature_registry
             RESTART IDENTITY CASCADE;
         ");
     }

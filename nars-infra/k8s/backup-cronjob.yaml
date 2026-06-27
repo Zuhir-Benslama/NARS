@@ -65,9 +65,9 @@ spec:
                   echo "→ Backing up database 'nars_db'..."
                   if [ -n "${GPG_PASSPHRASE}" ]; then
                     echo "  → Encrypting with GPG symmetric cipher..."
-                    pg_dump \
+                    echo "${GPG_PASSPHRASE}" | pg_dump \
                       -h "${PGHOST}" -U "${PGUSER}" -d "${PGDATABASE}" \
-                      --no-owner | gpg --batch --yes --passphrase "${GPG_PASSPHRASE}" \
+                      --no-owner | gpg --batch --yes --passphrase-fd 0 \
                         --symmetric --cipher-algo AES256 > "$FILE.gpg"
                     gzip -f "$FILE.gpg"
                     echo "✓ Encrypted backup saved: ${FILE}.gpg.gz"

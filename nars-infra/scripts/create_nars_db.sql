@@ -345,6 +345,29 @@ CREATE TABLE IF NOT EXISTS public.naming_panels
 CREATE INDEX IF NOT EXISTS ix_naming_panels_user_id ON public.naming_panels (user_id);
 
 -- ══════════════════════════════════════════════════════════════════════════════
+-- 8.  Error logs (written by NarsApi.LogsController on unhandled exceptions)
+-- ══════════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.error_logs
+(
+    id          uuid                     NOT NULL,
+    user_id     uuid,
+    level       character varying(20)    NOT NULL,
+    code        character varying(50)    NOT NULL,
+    message     text                     NOT NULL,
+    context     text,
+    url         character varying(2048),
+    method      character varying(10),
+    ip_address  character varying(45),
+    user_agent  character varying(500),
+    created_at  timestamp with time zone NOT NULL,
+    CONSTRAINT error_logs_pkey PRIMARY KEY (id),
+    CONSTRAINT error_logs_user_fk FOREIGN KEY (user_id)
+        REFERENCES public.users (id)
+        ON UPDATE NO ACTION ON DELETE SET NULL
+);
+
+-- ══════════════════════════════════════════════════════════════════════════════
 -- Verification
 -- ══════════════════════════════════════════════════════════════════════════════
 DO $$

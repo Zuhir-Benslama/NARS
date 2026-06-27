@@ -8,7 +8,7 @@ public class PasswordValidatorTests
     [Fact]
     public void ValidPassword_ReturnsNull()
     {
-        Assert.Null(PasswordValidator.Validate("Str0ng!Pass"));
+        Assert.Null(PasswordValidator.Validate(TestData.DefaultPassword));
     }
 
     [Theory]
@@ -45,7 +45,7 @@ public class PasswordValidatorTests
     [InlineData("Aa1!aaaaa")]       // exactly 9 chars
     [InlineData("Test1234!")]       // typical valid password
     [InlineData("P@ssw0rdLong")]    // with @ symbol
-    public void EdgeCases_ValidPasswords(string password)
+    public void ValidPassword_EdgeCases_ReturnsNull(string password)
     {
         Assert.Null(PasswordValidator.Validate(password));
     }

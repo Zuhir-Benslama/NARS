@@ -4,6 +4,8 @@ using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using Xunit;
 
+using static NarsApi.Tests.TestData;
+
 namespace NarsApi.Tests;
 
 public class DtoValidationTests
@@ -13,12 +15,12 @@ public class DtoValidationTests
     {
         var request = new AuthorizedAdminSignupRequest(
             AdminUsername: "admin1",
-            AdminPassword: "Str0ng!Pass",
+            AdminPassword: DefaultPassword,
             Name: "Test User",
-            Email: "test@example.com",
-            Phone: "0555123456",
+            Email: DefaultEmail,
+            Phone: AltPhone,
             Username: "testuser",
-            Password: "Str0ng!Pass",
+            Password: DefaultPassword,
             Role: UserRoles.CommuneUser,
             CommuneId: 1,
             DairaId: null,
@@ -37,7 +39,7 @@ public class DtoValidationTests
     {
         var request = new SignInRequest(
             Username: "testuser",
-            Password: "Str0ng!Pass"
+            Password: DefaultPassword
         );
 
         var context = new ValidationContext(request);
@@ -48,11 +50,11 @@ public class DtoValidationTests
     }
 
     [Fact(Skip = "DTO currently accepts empty usernames — SignInRequest should require [Required] on Username")]
-    public void SignInRequest_EmptyUsername_ShouldReject()
+    public void SignInRequest_EmptyUsername_ReturnsValidationError()
     {
         var request = new SignInRequest(
             Username: "",
-            Password: "Str0ng!Pass"
+            Password: DefaultPassword
         );
 
         var context = new ValidationContext(request);
@@ -83,12 +85,12 @@ public class DtoValidationTests
     {
         var request = new AuthorizedAdminSignupRequest(
             AdminUsername: "admin1",
-            AdminPassword: "Str0ng!Pass",
+            AdminPassword: DefaultPassword,
             Name: "Test User",
-            Email: "test@example.com",
-            Phone: "0555123456",
+            Email: DefaultEmail,
+            Phone: AltPhone,
             Username: "testuser",
-            Password: "Str0ng!Pass",
+            Password: DefaultPassword,
             Role: UserRoles.CommuneUser,
             CommuneId: 1,
             DairaId: null,
@@ -99,7 +101,7 @@ public class DtoValidationTests
         var deserialized = JsonSerializer.Deserialize<AuthorizedAdminSignupRequest>(json);
 
         Assert.Equal("admin1", deserialized!.AdminUsername);
-        Assert.Equal("test@example.com", deserialized.Email);
+        Assert.Equal(DefaultEmail, deserialized.Email);
         Assert.Equal(1, deserialized.CommuneId);
     }
 
@@ -108,28 +110,13 @@ public class DtoValidationTests
     {
         var request = new SignInRequest(
             Username: "testuser",
-            Password: "Str0ng!Pass"
+            Password: DefaultPassword
         );
 
         var json = JsonSerializer.Serialize(request);
         var deserialized = JsonSerializer.Deserialize<SignInRequest>(json);
 
         Assert.Equal("testuser", deserialized!.Username);
-        Assert.Equal("Str0ng!Pass", deserialized.Password);
-    }
-
-    [Fact(Skip = "DTO currently accepts empty usernames — SignInRequest should require [Required] on Username")]
-    public void SignInRequest_WithEmptyUsername_ModelStateWouldReject()
-    {
-        var request = new SignInRequest(
-            Username: "",
-            Password: "Str0ng!Pass"
-        );
-
-        var context = new ValidationContext(request);
-        var results = new List<ValidationResult>();
-        var isValid = Validator.TryValidateObject(request, context, results, true);
-
-        Assert.False(isValid);
+        Assert.Equal(DefaultPassword, deserialized.Password);
     }
 }
