@@ -61,8 +61,12 @@ public class ValidationControllerTests
         var (ctrl, db) = CreateController();
         db.Areas.Add(new Area
         {
-            Id = Guid.NewGuid(), UserId = UserId, Layer = FeatureTypes.AreaLayers.CentralUrban,
-            Data = "{}", Label = "urban", UpdatedAt = DateTime.UtcNow
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            Layer = FeatureTypes.AreaLayers.CentralUrban,
+            Data = "{}",
+            Label = "urban",
+            UpdatedAt = DateTime.UtcNow
         });
         await db.SaveChangesAsync();
 
@@ -140,8 +144,12 @@ public class ValidationControllerTests
         var (ctrl, db) = CreateController();
         db.Roads.Add(new Road
         {
-            Id = Guid.NewGuid(), UserId = UserId, Layer = FeatureTypes.RoadLayers.Street,
-            Data = "{}", Label = "r", UpdatedAt = DateTime.UtcNow
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            Layer = FeatureTypes.RoadLayers.Street,
+            Data = "{}",
+            Label = "r",
+            UpdatedAt = DateTime.UtcNow
         });
         await db.SaveChangesAsync();
 
@@ -173,8 +181,12 @@ public class ValidationControllerTests
 
         db.Roads.Add(new Road
         {
-            Id = Guid.NewGuid(), UserId = UserId, Layer = FeatureTypes.RoadLayers.Street,
-            Data = "{}", Label = "r", UpdatedAt = DateTime.UtcNow
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            Layer = FeatureTypes.RoadLayers.Street,
+            Data = "{}",
+            Label = "r",
+            UpdatedAt = DateTime.UtcNow
         });
         await db.SaveChangesAsync();
 
@@ -240,8 +252,12 @@ public class ValidationControllerTests
         var (ctrl, db) = CreateController();
         db.Districts.Add(new District
         {
-            Id = Guid.NewGuid(), UserId = UserId, Layer = "residential",
-            Data = "{}", Label = "d", UpdatedAt = DateTime.UtcNow
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            Layer = "residential",
+            Data = "{}",
+            Label = "d",
+            UpdatedAt = DateTime.UtcNow
         });
         await db.SaveChangesAsync();
 
@@ -283,8 +299,12 @@ public class ValidationControllerTests
         var (ctrl, db) = CreateController();
         db.Areas.Add(new Area
         {
-            Id = Guid.NewGuid(), UserId = UserId, Layer = FeatureTypes.AreaLayers.CentralUrban,
-            Data = "{}", Label = "urban", UpdatedAt = DateTime.UtcNow
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            Layer = FeatureTypes.AreaLayers.CentralUrban,
+            Data = "{}",
+            Label = "urban",
+            UpdatedAt = DateTime.UtcNow
         });
         await db.SaveChangesAsync();
 

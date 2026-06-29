@@ -127,8 +127,12 @@ public class FeaturesControllerTests
         var roadId = Guid.NewGuid();
         db.Roads.Add(new Road
         {
-            Id = roadId, UserId = UserId, Layer = FeatureTypes.RoadLayers.Street,
-            Data = "{}", Label = "road", UpdatedAt = FixedNow
+            Id = roadId,
+            UserId = UserId,
+            Layer = FeatureTypes.RoadLayers.Street,
+            Data = "{}",
+            Label = "road",
+            UpdatedAt = FixedNow
         });
         await db.SaveChangesAsync();
 
@@ -219,8 +223,12 @@ public class FeaturesControllerTests
         var areaId = Guid.NewGuid();
         db.Areas.Add(new Area
         {
-            Id = areaId, UserId = UserId, Layer = FeatureTypes.AreaLayers.CentralUrban,
-            Data = "{}", Label = "a", UpdatedAt = FixedNow
+            Id = areaId,
+            UserId = UserId,
+            Layer = FeatureTypes.AreaLayers.CentralUrban,
+            Data = "{}",
+            Label = "a",
+            UpdatedAt = FixedNow
         });
         db.FeatureRegistry.Add(new FeatureRegistry { Id = areaId, FeatureType = FeatureTypes.Area });
         await db.SaveChangesAsync();
@@ -262,8 +270,12 @@ public class FeaturesControllerTests
         var otherId = Guid.NewGuid();
         db.Roads.Add(new Road
         {
-            Id = otherId, UserId = Guid.NewGuid(), Layer = FeatureTypes.RoadLayers.Street,
-            Data = "{}", Label = "other", UpdatedAt = FixedNow
+            Id = otherId,
+            UserId = Guid.NewGuid(),
+            Layer = FeatureTypes.RoadLayers.Street,
+            Data = "{}",
+            Label = "other",
+            UpdatedAt = FixedNow
         });
         db.FeatureRegistry.Add(new FeatureRegistry { Id = otherId, FeatureType = FeatureTypes.Road });
         await db.SaveChangesAsync();
@@ -281,8 +293,12 @@ public class FeaturesControllerTests
         var fid = Guid.NewGuid();
         db.Roads.Add(new Road
         {
-            Id = fid, UserId = UserId, Layer = FeatureTypes.RoadLayers.Street,
-            Data = "{}", Label = "road", UpdatedAt = FixedNow
+            Id = fid,
+            UserId = UserId,
+            Layer = FeatureTypes.RoadLayers.Street,
+            Data = "{}",
+            Label = "road",
+            UpdatedAt = FixedNow
         });
         db.FeatureRegistry.Add(new FeatureRegistry { Id = fid, FeatureType = FeatureTypes.Road });
         await db.SaveChangesAsync();
@@ -301,8 +317,12 @@ public class FeaturesControllerTests
         var fid = Guid.NewGuid();
         db.Roads.Add(new Road
         {
-            Id = fid, UserId = UserId, Layer = FeatureTypes.RoadLayers.Street,
-            Data = "{}", Label = "old", UpdatedAt = FixedNow
+            Id = fid,
+            UserId = UserId,
+            Layer = FeatureTypes.RoadLayers.Street,
+            Data = "{}",
+            Label = "old",
+            UpdatedAt = FixedNow
         });
         db.FeatureRegistry.Add(new FeatureRegistry { Id = fid, FeatureType = FeatureTypes.Road });
         await db.SaveChangesAsync();
@@ -333,8 +353,12 @@ public class FeaturesControllerTests
         var fid = Guid.NewGuid();
         db.Roads.Add(new Road
         {
-            Id = fid, UserId = UserId, Layer = FeatureTypes.RoadLayers.Street,
-            Data = "{}", Label = "road", UpdatedAt = FixedNow
+            Id = fid,
+            UserId = UserId,
+            Layer = FeatureTypes.RoadLayers.Street,
+            Data = "{}",
+            Label = "road",
+            UpdatedAt = FixedNow
         });
         db.FeatureRegistry.Add(new FeatureRegistry { Id = fid, FeatureType = FeatureTypes.Road });
         await db.SaveChangesAsync();

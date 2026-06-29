@@ -93,15 +93,15 @@ public class FeatureTypeRegistryTests
 
         var expectedType = type switch
         {
-            FeatureTypes.Area           => typeof(Area),
-            FeatureTypes.District       => typeof(District),
-            FeatureTypes.CityCenter     => typeof(CityCenter),
-            FeatureTypes.Road           => typeof(Road),
-            FeatureTypes.HouseEntrance  => typeof(HouseEntrance),
+            FeatureTypes.Area => typeof(Area),
+            FeatureTypes.District => typeof(District),
+            FeatureTypes.CityCenter => typeof(CityCenter),
+            FeatureTypes.Road => typeof(Road),
+            FeatureTypes.HouseEntrance => typeof(HouseEntrance),
             FeatureTypes.PublicBuilding => typeof(PublicBuilding),
-            FeatureTypes.PublicSpace    => typeof(PublicSpace),
-            FeatureTypes.NamingPanel    => typeof(NamingPanel),
-            _                           => throw new InvalidOperationException(),
+            FeatureTypes.PublicSpace => typeof(PublicSpace),
+            FeatureTypes.NamingPanel => typeof(NamingPanel),
+            _ => throw new InvalidOperationException(),
         };
 
         Assert.Equal(expectedType, entity.GetType());
