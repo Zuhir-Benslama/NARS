@@ -26,7 +26,7 @@
     "codegen": "npm run codegen:fetch-spec && npm run codegen:types"
   },
   "dependencies": {
-    "@geoman-io/maplibre-geoman-free": "^0.8.3",
+    "@geoman-io/maplibre-geoman-free": "^0.8.4",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
     "@opentelemetry/instrumentation-document-load": "^0.64.0",
