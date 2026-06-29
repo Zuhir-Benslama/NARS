@@ -71,7 +71,7 @@ public class AuthControllerTests
         await SeedLocationDataAsync(db);
         await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
 
-        
+
         var controller = CreateController(db);
 
         var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
@@ -99,7 +99,7 @@ public class AuthControllerTests
         await SeedLocationDataAsync(db);
         await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
 
-        
+
         var controller = CreateController(db);
 
         var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
@@ -139,7 +139,7 @@ public class AuthControllerTests
         });
         await db.SaveChangesAsync();
 
-        
+
         var controller = CreateController(db);
 
         var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
@@ -166,7 +166,7 @@ public class AuthControllerTests
         await SeedLocationDataAsync(db);
         await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
 
-        
+
         var controller = CreateController(db);
 
         var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
@@ -205,7 +205,7 @@ public class AuthControllerTests
         });
         await db.SaveChangesAsync();
 
-        
+
         var controller = CreateController(db);
         controller.ControllerContext = new ControllerContext
         {
