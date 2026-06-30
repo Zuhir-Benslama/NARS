@@ -4,7 +4,7 @@
 
 import { PHASES } from "../../phases"
 import { useAppStore } from "../../stores/appStore"
-import { openModal } from "../../stores"
+import { openModal } from "../../stores/modalStore"
 import { useLayerStore } from "../../stores/layerStore"
 import type { LayerState } from "../../stores/layerStore"
 import { showToast } from "../../lib/toast"

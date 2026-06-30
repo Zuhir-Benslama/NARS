@@ -44,6 +44,22 @@ public static class PipelineExtensions
                 if (ex is not null)
                 {
                     var logger = ctx.RequestServices.GetRequiredService<ILogger<Program>>();
+
+                    if (ex is UnauthorizedAccessException)
+                    {
+                        logger.LogWarning(ex, "Unauthorized access");
+                        ctx.Response.StatusCode = 401;
+                        var authProblem = new Microsoft.AspNetCore.Mvc.ProblemDetails
+                        {
+                            Detail = app.Environment.IsDevelopment() ? ex.Message : "Authentication required.",
+                            Status = 401,
+                            Title = "Unauthorized",
+                        };
+                        await ctx.Response.WriteAsync(
+                            JsonSerializer.Serialize(authProblem, new JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+                        return;
+                    }
+
                     logger.LogError(ex, "Unhandled exception");
                 }
 

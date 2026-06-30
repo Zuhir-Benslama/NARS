@@ -57,12 +57,7 @@ public class FeaturesController(
 
         var dataJson = rawJson;
 
-        Guid? roadId = null;
-        if (body.Type == FeatureTypes.HouseEntrance && body.Layer == FeatureTypes.HouseEntranceLayers.Main
-            && body.Data.TryGetProperty("roadDbId", out var ridEl) && ridEl.ValueKind == JsonValueKind.String && Guid.TryParse(ridEl.GetString(), out var rid))
-        {
-            roadId = rid;
-        }
+        var roadId = TryExtractRoadId(body);
 
         if (roadId.HasValue && !await featureRepo.RoadExistsAsync(roadId.Value, RequiredCurrentUserId, cancellationToken))
         {
@@ -71,7 +66,7 @@ public class FeaturesController(
 
         var newId = Guid.CreateVersion7();
 
-        var entity = FeatureTypeRegistry.CreateEntity(body.Type, newId, RequiredCurrentUserId, body.Layer, body.Label, dataJson);
+        var entity = FeatureTypeRegistry.CreateEntity(body.Type, newId, RequiredCurrentUserId, body.Layer, body.Label, dataJson, timeProvider.UtcNow);
         if (entity is null)
         {
             return Problem(detail: $"Unknown feature type '{body.Type}'.", statusCode: 400);
@@ -240,6 +235,21 @@ public class FeaturesController(
         }
 
         return Ok(new ActionResponse(Success: true, Message: "Feature deleted successfully"));
+    }
+
+    private static Guid? TryExtractRoadId(FeatureSaveRequest body)
+    {
+        if (body.Type != FeatureTypes.HouseEntrance || body.Layer != FeatureTypes.HouseEntranceLayers.Main)
+        {
+            return null;
+        }
+
+        if (!body.Data.TryGetProperty("roadDbId", out var ridEl) || ridEl.ValueKind != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        return Guid.TryParse(ridEl.GetString(), out var rid) ? rid : null;
     }
 
     private async ValueTask QueueScatteredRefresh()

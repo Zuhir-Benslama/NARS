@@ -63,23 +63,13 @@ spec:
                   TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
                   FILE="/backup/nars_db_${TIMESTAMP}.sql"
                   echo "→ Backing up database 'nars_db'..."
-                  if [ -n "${GPG_PASSPHRASE}" ]; then
-                    echo "  → Encrypting with GPG symmetric cipher..."
-                    echo "${GPG_PASSPHRASE}" | pg_dump \
-                      -h "${PGHOST}" -U "${PGUSER}" -d "${PGDATABASE}" \
-                      --no-owner | gpg --batch --yes --passphrase-fd 0 \
-                        --symmetric --cipher-algo AES256 > "$FILE.gpg"
-                    gzip -f "$FILE.gpg"
-                    echo "✓ Encrypted backup saved: ${FILE}.gpg.gz"
-                  else
-                    echo "  ⚠ GPG_PASSPHRASE not set — backup is PLAINTEXT!"
-                    echo "  Set the gpg-passphrase secret for encrypted backups."
-                    pg_dump \
-                      -h "${PGHOST}" -U "${PGUSER}" -d "${PGDATABASE}" \
-                      --no-owner > "$FILE"
-                    gzip -f "$FILE"
-                    echo "✓ Backup saved: ${FILE}.gz"
-                  fi
+                  echo "  → Encrypting with GPG symmetric cipher..."
+                  echo "${GPG_PASSPHRASE}" | pg_dump \
+                    -h "${PGHOST}" -U "${PGUSER}" -d "${PGDATABASE}" \
+                    --no-owner | gpg --batch --yes --passphrase-fd 0 \
+                      --symmetric --cipher-algo AES256 > "$FILE.gpg"
+                  gzip -f "$FILE.gpg"
+                  echo "✓ Encrypted backup saved: ${FILE}.gpg.gz"
                   ls -lh /backup/
                   echo "→ Cleaning backups older than 30 days..."
                   find /backup -name "nars_db_*.sql*" -mtime +30 -delete
@@ -121,7 +111,6 @@ spec:
                     secretKeyRef:
                       name: nars-secrets
                       key: gpg-passphrase
-                      optional: true
               volumeMounts:
                 - name: backup-storage
                   mountPath: /backup

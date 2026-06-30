@@ -90,7 +90,7 @@ async function onFeatureCreated(e: GeomanCreateEvent): Promise<void> {
       geometry = {
         type: "Polygon",
         coordinates: mp.coordinates[0],
-      } as unknown as GeoJSON.Polygon
+      } as GeoJSON.Polygon
     }
   }
 

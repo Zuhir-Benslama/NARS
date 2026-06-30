@@ -47,7 +47,7 @@ public sealed class FeatureTypeDescriptor
     /// <summary>
     /// Creates a new entity instance with common fields populated.
     /// </summary>
-    public FeatureBase CreateEntity(Guid id, Guid userId, string layer, string label, string data)
+    public FeatureBase CreateEntity(Guid id, Guid userId, string layer, string label, string data, DateTime createdAt)
     {
         var entity = (FeatureBase)Activator.CreateInstance(EntityType)!;
         entity.Id = id;
@@ -55,7 +55,7 @@ public sealed class FeatureTypeDescriptor
         entity.Layer = layer;
         entity.Label = label;
         entity.Data = data;
-        entity.CreatedAt = DateTime.UtcNow;
+        entity.CreatedAt = createdAt;
         return entity;
     }
 
@@ -139,10 +139,10 @@ public static class FeatureTypeRegistry
     /// Creates a new entity for the given type with common fields populated.
     /// Returns null if the type is unknown.
     /// </summary>
-    public static FeatureBase? CreateEntity(string type, Guid id, Guid userId, string layer, string label, string data)
+    public static FeatureBase? CreateEntity(string type, Guid id, Guid userId, string layer, string label, string data, DateTime createdAt)
     {
         var descriptor = GetDescriptor(type);
-        return descriptor?.CreateEntity(id, userId, layer, label, data);
+        return descriptor?.CreateEntity(id, userId, layer, label, data, createdAt);
     }
 
     /// <summary>

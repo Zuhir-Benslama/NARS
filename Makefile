@@ -590,6 +590,20 @@ ca-secret: ca-generate namespace-ensure ## Create mTLS CA secret from k8s/certs/
 		echo "✓ CA secret created"
 	fi
 
+.PHONY: secrets-validate
+secrets-validate: ## Fail if kustomize output contains placeholder values (REPLACE_ME)
+	@echo "→ Validating kustomize output for placeholder values..."
+	@output=$$(kubectl kustomize "$(K8S_DIR)" 2>/dev/null); \
+	if echo "$$output" | grep -q "REPLACE_ME"; then \
+		echo "✖ ERROR: kustomize output contains REPLACE_ME placeholder values!"; \
+		echo "  Run 'make secrets-apply' to generate real secrets from .env."; \
+		echo "  Or edit the file directly to replace placeholders."; \
+		echo ""; \
+		echo "$$output" | grep -n "REPLACE_ME"; \
+		exit 1; \
+	fi; \
+	echo "✓ No placeholder values found"
+
 .PHONY: secrets-apply
 secrets-apply: .env namespace-ensure ## Create nars-secrets and regcred with generated/variable values
 	@echo "→ Creating 'nars-secrets'..."
@@ -616,7 +630,7 @@ secrets-apply: .env namespace-ensure ## Create nars-secrets and regcred with gen
 	fi
 
 .PHONY: kustomize-apply
-kustomize-apply: ## Apply k8s manifests via kustomize
+kustomize-apply: secrets-validate ## Apply k8s manifests via kustomize
 	@echo "→ Applying kustomization..."
 	@if echo "$(IMAGE_TAG)" | grep -qi "latest"; then \
 		echo "  ⚠ IMAGE_TAG=$(IMAGE_TAG) — using 'latest' for non-reproducible builds."; \

@@ -206,11 +206,7 @@ export function registerGeomanEvents(): void {
 
       if (removed) {
         featuresStore.remove(removed.id)
-        const entries = state[phaseKey as keyof LayerState]
-        if (entries) {
-          const filtered = entries.filter((f) => f.dbId !== dbId)
-          ;(state as unknown as Record<string, LayerEntry[]>)[phaseKey] = filtered
-        }
+        layerStore.removeFeature(phaseKey as keyof LayerState, dbId)
         useAppStore().syncCounts()
         refreshLayerVisibility()
       }

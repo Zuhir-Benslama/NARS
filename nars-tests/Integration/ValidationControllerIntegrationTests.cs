@@ -8,6 +8,7 @@ using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Models;
 using NarsApi.Services;
+using static NarsApi.Tests.TestData;
 using Xunit;
 
 namespace NarsApi.Tests.Integration;
@@ -123,9 +124,9 @@ public class ValidationControllerIntegrationTests : IAsyncLifetime
             Id = userId,
             Name = "Validation Test User",
             Email = $"validation-{userId:N}@test.com",
-            Phone = "0555000000",
+            Phone = DefaultPhone,
             Username = $"validation_{userId:N}",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Str0ng!Pass"),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
             CommuneId = 1,
         });
         await _db.SaveChangesAsync();
@@ -134,22 +135,7 @@ public class ValidationControllerIntegrationTests : IAsyncLifetime
 
     private async Task SeedReferenceDataAsync()
     {
-        if (await _db.Communes.AnyAsync()) return;
-
-        await _db.Wilayas.AddAsync(new Wilaya { WilayaId = 1, WilayaFr = "Alger" });
-        await _db.Dairas.AddAsync(new Daira { DairaId = 1, WilayaId = 1, DairaFr = "Draria" });
-        await _db.Communes.AddAsync(new Commune { CommuneId = 1, DairaId = 1, CommuneFr = "Draria Centre" });
-
-        var factory = NetTopologySuite.NtsGeometryServices.Instance.CreateGeometryFactory(4326);
-        var boundary = factory.CreatePolygon(new[] {
-            new NetTopologySuite.Geometries.Coordinate(2.90, 36.70),
-            new NetTopologySuite.Geometries.Coordinate(3.00, 36.70),
-            new NetTopologySuite.Geometries.Coordinate(3.00, 36.80),
-            new NetTopologySuite.Geometries.Coordinate(2.90, 36.80),
-            new NetTopologySuite.Geometries.Coordinate(2.90, 36.70),
-        });
-        await _db.CommuneBoundaries.AddAsync(new CommuneBoundary { CommuneId = 1, Geometry = boundary });
-        await _db.SaveChangesAsync();
+        await SeedData.SeedBasicLocationsAsync(_db);
     }
 
     private void SetUserId(Guid userId)

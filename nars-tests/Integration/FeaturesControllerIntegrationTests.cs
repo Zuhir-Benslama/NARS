@@ -9,6 +9,7 @@ using NarsApi.Infrastructure;
 using NarsApi.Models;
 using NarsApi.Services;
 using Moq;
+using static NarsApi.Tests.TestData;
 using Xunit;
 
 namespace NarsApi.Tests.Integration;
@@ -268,29 +269,13 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
             Id = userId,
             Name = "Features Test User",
             Email = $"features-{userId:N}@test.com",
-            Phone = "0555000000",
+            Phone = DefaultPhone,
             Username = $"features_{userId:N}",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Str0ng!Pass"),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
             CommuneId = 1,
         });
 
-        // Seed reference data
-        if (!await _db.Communes.AnyAsync())
-        {
-            await _db.Wilayas.AddAsync(new Wilaya { WilayaId = 1, WilayaFr = "Alger" });
-            await _db.Dairas.AddAsync(new Daira { DairaId = 1, WilayaId = 1, DairaFr = "Draria" });
-            await _db.Communes.AddAsync(new Commune { CommuneId = 1, DairaId = 1, CommuneFr = "Draria Centre" });
-
-            var factory = NetTopologySuite.NtsGeometryServices.Instance.CreateGeometryFactory(4326);
-            var boundary = factory.CreatePolygon(new[] {
-                new NetTopologySuite.Geometries.Coordinate(2.95, 36.71),
-                new NetTopologySuite.Geometries.Coordinate(2.97, 36.71),
-                new NetTopologySuite.Geometries.Coordinate(2.97, 36.73),
-                new NetTopologySuite.Geometries.Coordinate(2.95, 36.73),
-                new NetTopologySuite.Geometries.Coordinate(2.95, 36.71),
-            });
-            await _db.CommuneBoundaries.AddAsync(new CommuneBoundary { CommuneId = 1, Geometry = boundary });
-        }
+        await SeedData.SeedBasicLocationsAsync(_db);
 
         await _db.SaveChangesAsync();
         return userId;

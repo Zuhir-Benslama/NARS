@@ -1,30 +1,10 @@
-// ─── DRAW COMPLETE (BARREL) ───────────────────────────────────────────────────
+// ─── DRAW COMPLETE ───────────────────────────────────────────────────────────
 // Re-exports from split modules for backward compatibility.
 // Contains removeLastVertex (not moved — tightly coupled to Geoman internals).
 
 import { ctx } from "../core/state"
-
-// ─── GEOMAN INTERNAL TYPES ─────────────────────────────────────────────────────
-// Geoman's public API types are incomplete — these internal shapes document
-// the properties we access at runtime. Defined here to avoid `as unknown as`
-// casts throughout removeLastVertex.
-
-interface GeomanInternalActionInstance {
-  lineDrawer?: {
-    featureData?: Record<string, unknown>
-    shapeLngLats?: [number, number][]
-    getFeatureGeoJson?: Function
-    snappingHelper?: Record<string, unknown>
-    snappingKey?: unknown
-    setSnapping?: Function
-    gm?: Record<string, unknown>
-  }
-}
-
-interface GeomanInternal {
-  actionInstances?: Record<string, GeomanInternalActionInstance | undefined>
-  disableDraw?: Function
-}
+import { asGeomanInternal } from "../core/geoman-types"
+import type { GeomanActionInstance } from "../core/geoman-types"
 
 // ─── RE-EXPORTS ───────────────────────────────────────────────────────────────
 
@@ -45,8 +25,8 @@ export { normalizeGeometry, completeDrawingWithGeometry, getFeatureStyle } from 
 
 // ─── REMOVE LAST VERTEX ───────────────────────────────────────────────────────
 
-function geomanActionInstance(name: string): GeomanInternalActionInstance | undefined {
-  return (ctx.geoman as unknown as GeomanInternal | null)?.actionInstances?.[name]
+function geomanActionInstance(name: string): GeomanActionInstance | undefined {
+  return asGeomanInternal(ctx.geoman)?.actionInstances?.[name]
 }
 
 export async function removeLastVertex(): Promise<void> {
@@ -58,9 +38,9 @@ export async function removeLastVertex(): Promise<void> {
 
   const coords: [number, number][] = lineDrawer.shapeLngLats ?? []
   if (coords.length <= 1) {
-    const gm = ctx.geoman as unknown as GeomanInternal | null
+    const gm = asGeomanInternal(ctx.geoman)
     try {
-      await (gm?.disableDraw as Function | undefined)?.()
+      await gm?.disableDraw?.()
     } catch {
       /* ignore */
     }
@@ -69,24 +49,17 @@ export async function removeLastVertex(): Promise<void> {
   coords.pop()
 
   const isPolygon = !!polygonInst
-  const markersMap = lineDrawer.featureData?.markers as
-    | Map<string, Record<string, unknown>>
-    | undefined
+  const markersMap = lineDrawer.featureData?.markers
   if (markersMap) {
     const entries = Array.from(markersMap.entries())
     if (entries.length > 0) {
       const [key, markerData] = entries[entries.length - 1]
-      const instance = markerData?.instance as Record<string, unknown> | undefined
-      const removeFn = instance?.remove as unknown as (() => void) | undefined
-      removeFn?.()
+      markerData?.instance?.remove?.()
       markersMap.delete(key)
     }
   }
 
-  const markerPointer = (lineDrawer?.gm as Record<string, unknown> | undefined)?.markerPointer as
-    | Record<string, unknown>
-    | undefined
-  const markerControl = markerPointer?.marker as maplibregl.Marker | undefined
+  const markerControl = lineDrawer.gm?.markerPointer?.marker ?? undefined
 
   if (isPolygon) {
     const ring: [number, number][] = [...coords]
@@ -98,52 +71,40 @@ export async function removeLastVertex(): Promise<void> {
       ring.push([ring[0][0], ring[0][1]])
     }
 
-    const fd = lineDrawer.featureData as Record<string, unknown>
-    await (fd.updateGeometry as Function)({
+    await lineDrawer.featureData?.updateGeometry?.({
       type: "Polygon",
       coordinates: [ring],
     })
 
-    if (fd.convertToPolygon) {
-      await (fd.convertToPolygon as Function)()
-    }
+    await lineDrawer.featureData?.convertToPolygon?.()
 
     if (markerControl) {
-      const fireEvent = fd.fireUpdateEvent as Function | undefined
-      if (fireEvent) {
-        await fireEvent(fd, {
-          type: "dom",
-          instance: markerControl,
-          position: {
-            coordinate: [markerControl.getLngLat().lng, markerControl.getLngLat().lat],
-            path: ["geometry", "coordinates", coords.length],
-          },
-        })
-      }
+      await lineDrawer.featureData?.fireUpdateEvent?.(lineDrawer.featureData, {
+        type: "dom",
+        instance: markerControl,
+        position: {
+          coordinate: [markerControl.getLngLat().lng, markerControl.getLngLat().lat],
+          path: ["geometry", "coordinates", String(coords.length)],
+        },
+      })
     }
   } else {
-    const fd = lineDrawer.featureData as Record<string, unknown>
-    const getGeoJson = lineDrawer.getFeatureGeoJson as Function
-    await (fd.updateGeometry as Function)(getGeoJson({ withControlMarker: true }).geometry)
+    const geoJson = lineDrawer.getFeatureGeoJson?.({ withControlMarker: true })
+    if (geoJson) {
+      await lineDrawer.featureData?.updateGeometry?.(geoJson.geometry)
+    }
     if (markerControl) {
-      const fireEvent = fd.fireUpdateEvent as Function | undefined
-      if (fireEvent) {
-        await fireEvent(fd, {
-          type: "dom",
-          instance: markerControl,
-          position: {
-            coordinate: [markerControl.getLngLat().lng, markerControl.getLngLat().lat],
-            path: ["geometry", "coordinates", coords.length],
-          },
-        })
-      }
+      await lineDrawer.featureData?.fireUpdateEvent?.(lineDrawer.featureData, {
+        type: "dom",
+        instance: markerControl,
+        position: {
+          coordinate: [markerControl.getLngLat().lng, markerControl.getLngLat().lat],
+          path: ["geometry", "coordinates", String(coords.length)],
+        },
+      })
     }
   }
 
-  const snapHelper = lineDrawer.snappingHelper as Record<string, unknown> | undefined
-  const setCustomSnap = snapHelper?.setCustomSnappingCoordinates as Function | undefined
-  setCustomSnap?.(lineDrawer.snappingKey, coords)
-  if (typeof lineDrawer.setSnapping === "function") {
-    ;(lineDrawer.setSnapping as Function)()
-  }
+  lineDrawer.snappingHelper?.setCustomSnappingCoordinates?.(lineDrawer.snappingKey, coords)
+  lineDrawer.setSnapping?.()
 }

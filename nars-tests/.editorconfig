@@ -1,0 +1,51 @@
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.cs]
+indent_size = 4
+
+csharp_prefer_braces = true:suggestion
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_prefer_pattern_matching = true:suggestion
+csharp_style_prefer_is_null_check = true:suggestion
+csharp_style_prefer_switch_expression = true:suggestion
+csharp_style_prefer_null_check_over_type_check = true:suggestion
+csharp_style_expression_bodied_methods = true:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+csharp_style_inlined_variable_declaration = true:suggestion
+csharp_style_prefer_simple_default_expression = true:suggestion
+csharp_style_prefer_local_over_anonymous_function = true:suggestion
+csharp_style_prefer_index_operator = true:suggestion
+csharp_style_prefer_range_operator = true:suggestion
+csharp_style_prefer_null_coalescing_expression = true:suggestion
+csharp_style_prefer_null_coalescing_assignment = true:suggestion
+csharp_style_prefer_compound_assignment = true:suggestion
+csharp_style_prefer_simplified_boolean_checks = true:suggestion
+csharp_style_prefer_extended_properties = true:suggestion
+
+dotnet_naming_rule.interface_starts_with_i.severity = suggestion
+dotnet_naming_rule.interface_starts_with_i.symbols = interface_symbols
+dotnet_naming_rule.interface_starts_with_i.style = begins_with_i
+dotnet_naming_symbols.interface_symbols.applicable_kinds = interface
+dotnet_naming_style.begins_with_i.required_prefix = I
+
+dotnet_naming_rule.async_methods_end_with_async.severity = suggestion
+dotnet_naming_rule.async_methods_end_with_async.symbols = async_methods
+dotnet_naming_rule.async_methods_end_with_async.style = ends_with_async
+dotnet_naming_symbols.async_methods.applicable_kinds = method
+dotnet_naming_symbols.async_methods.required_modifiers = async
+dotnet_naming_style.ends_with_async.required_suffix = Async
+
+[*.json]
+indent_size = 2
+
+[{*.md,*.txt}]
+trim_trailing_whitespace = false
