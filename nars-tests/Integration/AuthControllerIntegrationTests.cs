@@ -11,6 +11,7 @@ using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
 using NarsApi.Services;
+using static NarsApi.Tests.TestData;
 using Xunit;
 
 namespace NarsApi.Tests.Integration;
@@ -45,17 +46,17 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
         await CreateAdminAsync(
             username: "daira_admin_1",
             role: UserRoles.DairaAdmin,
-            password: "Str0ng!Pass",
+            password: DefaultPassword,
             dairaId: 1);
 
         var result = await _controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "daira_admin_1",
-            AdminPassword: "Str0ng!Pass",
+            AdminPassword: DefaultPassword,
             Name: "Integration Test User",
             Email: "integration@test.com",
             Phone: "0555999888",
             Username: "integration_user",
-            Password: "Str0ng!Pass",
+            Password: DefaultPassword,
             Role: UserRoles.CommuneUser,
             CommuneId: 1,
             DairaId: null,
@@ -77,17 +78,17 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
         await CreateAdminAsync(
             username: "daira_admin_1",
             role: UserRoles.DairaAdmin,
-            password: "Str0ng!Pass",
+            password: DefaultPassword,
             dairaId: 1);
 
         await _controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "daira_admin_1",
-            AdminPassword: "Str0ng!Pass",
+            AdminPassword: DefaultPassword,
             Name: "User One",
             Email: "one@test.com",
             Phone: "0555111222",
             Username: "duplicate_user",
-            Password: "Str0ng!Pass",
+            Password: DefaultPassword,
             Role: UserRoles.CommuneUser,
             CommuneId: 1,
             DairaId: null,
@@ -96,12 +97,12 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
 
         var result = await _controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "daira_admin_1",
-            AdminPassword: "Str0ng!Pass",
+            AdminPassword: DefaultPassword,
             Name: "User Two",
             Email: "two@test.com",
             Phone: "0555333444",
             Username: "duplicate_user",
-            Password: "Str0ng!Pass",
+            Password: DefaultPassword,
             Role: UserRoles.CommuneUser,
             CommuneId: 1,
             DairaId: null,
@@ -118,7 +119,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
         await CreateAdminAsync(
             username: "race_admin",
             role: UserRoles.DairaAdmin,
-            password: "Str0ng!Pass",
+            password: DefaultPassword,
             dairaId: 1);
 
         // Two independent contexts + controllers simulating concurrent requests
@@ -129,12 +130,12 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
 
         var request = new AuthorizedAdminSignupRequest(
             AdminUsername: "race_admin",
-            AdminPassword: "Str0ng!Pass",
+            AdminPassword: DefaultPassword,
             Name: "Race User",
             Email: "race@test.com",
             Phone: "0555999888",
             Username: "race_user",
-            Password: "Str0ng!Pass",
+            Password: DefaultPassword,
             Role: UserRoles.CommuneUser,
             CommuneId: 1,
             DairaId: null,
@@ -167,13 +168,13 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
     {
         await CreateCommuneUserAsync(
             username: "signin_user",
-            password: "Str0ng!Pass",
+            password: DefaultPassword,
             communeId: 1);
 
         var controller = CreateSignInController();
         var result = await controller.SignIn(new SignInRequest(
             Username: "signin_user",
-            Password: "Str0ng!Pass"
+            Password: DefaultPassword
         ));
 
         var okResult = Assert.IsType<OkObjectResult>(result);
@@ -185,7 +186,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
     {
         await CreateCommuneUserAsync(
             username: "wrong_pass",
-            password: "Str0ng!Pass",
+            password: DefaultPassword,
             communeId: 1);
 
         var controller = CreateSignInController();
@@ -202,13 +203,13 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
     {
         var user = await CreateCommuneUserAsync(
             username: "logout_user",
-            password: "Str0ng!Pass",
+            password: DefaultPassword,
             communeId: 1);
 
         var signInController = CreateSignInController();
         await signInController.SignIn(new SignInRequest(
             Username: "logout_user",
-            Password: "Str0ng!Pass"
+            Password: DefaultPassword
         ));
 
         var tokenCount = await _db.RefreshTokens.CountAsync(rt => rt.UserId == user.Id && !rt.Revoked);
@@ -231,7 +232,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
     {
         var user = await CreateCommuneUserAsync(
             username: "current_user",
-            password: "Str0ng!Pass",
+            password: DefaultPassword,
             communeId: 1);
 
         var claims = new List<Claim>
@@ -269,55 +270,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
 
     private async Task SeedReferenceDataAsync()
     {
-        if (await _db.Communes.AnyAsync()) return;
-
-        await _db.Wilayas.AddAsync(new Wilaya
-        {
-            WilayaId = 1,
-            WilayaFr = "Alger",
-            WilayaAr = "الجزائر",
-            WilayaLatitude = 36.75,
-            WilayaLongitude = 3.05,
-        });
-
-        await _db.Dairas.AddAsync(new Daira
-        {
-            DairaId = 1,
-            WilayaId = 1,
-            DairaFr = "Draria",
-            DairaAr = "درارية",
-            DairaLatitude = 36.72,
-            DairaLongitude = 2.96,
-        });
-
-        await _db.Communes.AddAsync(new Commune
-        {
-            CommuneId = 1,
-            DairaId = 1,
-            CommuneCode = 1001,
-            CommuneFr = "Draria Centre",
-            CommuneAr = "درارية الوسطى",
-            CommuneLatitude = 36.72,
-            CommuneLongitude = 2.96,
-        });
-
-        var factory = NetTopologySuite.NtsGeometryServices.Instance.CreateGeometryFactory(4326);
-        var boundary = factory.CreatePolygon(new[]
-        {
-            new NetTopologySuite.Geometries.Coordinate(2.95, 36.71),
-            new NetTopologySuite.Geometries.Coordinate(2.97, 36.71),
-            new NetTopologySuite.Geometries.Coordinate(2.97, 36.73),
-            new NetTopologySuite.Geometries.Coordinate(2.95, 36.73),
-            new NetTopologySuite.Geometries.Coordinate(2.95, 36.71),
-        });
-
-        await _db.CommuneBoundaries.AddAsync(new CommuneBoundary
-        {
-            CommuneId = 1,
-            Geometry = boundary,
-        });
-
-        await _db.SaveChangesAsync();
+        await SeedData.SeedBasicLocationsAsync(_db);
     }
 
     private async Task<User> CreateAdminAsync(
@@ -332,7 +285,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             Id = Guid.NewGuid(),
             Name = $"Admin {username}",
             Email = $"{username}@test.com",
-            Phone = "0555000000",
+            Phone = DefaultPhone,
             Username = username,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
             Role = role,
@@ -352,7 +305,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             Id = Guid.NewGuid(),
             Name = $"User {username}",
             Email = $"{username}@test.com",
-            Phone = "0555000000",
+            Phone = DefaultPhone,
             Username = username,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
             Role = UserRoles.CommuneUser,

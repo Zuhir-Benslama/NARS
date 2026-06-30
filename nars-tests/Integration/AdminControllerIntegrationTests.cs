@@ -9,6 +9,7 @@ using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
 using NarsApi.Services;
+using static NarsApi.Tests.TestData;
 using Xunit;
 
 namespace NarsApi.Tests.Integration;
@@ -333,7 +334,7 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
             Email: $"role-{suffix}@test.com",
             Phone: "0555001234",
             Username: $"role_{suffix[..12]}",
-            Password: "Str0ng!Pass",
+            Password: DefaultPassword,
             Role: role,
             CommuneId: communeId,
             DairaId: dairaId,
@@ -352,9 +353,9 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
             Id = Guid.NewGuid(),
             Name = $"Creator {suffix[..8]}",
             Email = $"creator-{suffix}@test.com",
-            Phone = "0555000000",
+            Phone = DefaultPhone,
             Username = $"creator_{suffix[..12]}",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Str0ng!Pass"),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
             Role = role,
             CommuneId = communeId,
             DairaId = dairaId,
@@ -388,84 +389,6 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
 
     private async Task SeedReferenceDataAsync()
     {
-        if (!await _db.Wilayas.AnyAsync(w => w.WilayaId == 1))
-        {
-            await _db.Wilayas.AddAsync(new Wilaya
-            {
-                WilayaId = 1,
-                WilayaFr = "Alger",
-                WilayaAr = "Alger",
-                WilayaLatitude = 36.75,
-                WilayaLongitude = 3.05,
-            });
-        }
-
-        if (!await _db.Wilayas.AnyAsync(w => w.WilayaId == 2))
-        {
-            await _db.Wilayas.AddAsync(new Wilaya
-            {
-                WilayaId = 2,
-                WilayaFr = "Blida",
-                WilayaAr = "Blida",
-                WilayaLatitude = 36.47,
-                WilayaLongitude = 2.83,
-            });
-        }
-
-        if (!await _db.Dairas.AnyAsync(d => d.DairaId == 10))
-        {
-            await _db.Dairas.AddAsync(new Daira
-            {
-                DairaId = 10,
-                WilayaId = 1,
-                DairaFr = "Draria",
-                DairaAr = "Draria",
-                DairaLatitude = 36.72,
-                DairaLongitude = 2.96,
-            });
-        }
-
-        if (!await _db.Dairas.AnyAsync(d => d.DairaId == 11))
-        {
-            await _db.Dairas.AddAsync(new Daira
-            {
-                DairaId = 11,
-                WilayaId = 2,
-                DairaFr = "Blida Centre",
-                DairaAr = "Blida Centre",
-                DairaLatitude = 36.47,
-                DairaLongitude = 2.82,
-            });
-        }
-
-        if (!await _db.Communes.AnyAsync(c => c.CommuneId == 100))
-        {
-            await _db.Communes.AddAsync(new Commune
-            {
-                CommuneId = 100,
-                DairaId = 10,
-                CommuneCode = 1001,
-                CommuneFr = "Draria Centre",
-                CommuneAr = "Draria Centre",
-                CommuneLatitude = 36.72,
-                CommuneLongitude = 2.96,
-            });
-        }
-
-        if (!await _db.Communes.AnyAsync(c => c.CommuneId == 101))
-        {
-            await _db.Communes.AddAsync(new Commune
-            {
-                CommuneId = 101,
-                DairaId = 11,
-                CommuneCode = 2001,
-                CommuneFr = "Blida Centre",
-                CommuneAr = "Blida Centre",
-                CommuneLatitude = 36.47,
-                CommuneLongitude = 2.82,
-            });
-        }
-
-        await _db.SaveChangesAsync();
+        await SeedData.SeedAdminLocationsAsync(_db);
     }
 }

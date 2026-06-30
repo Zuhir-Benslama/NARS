@@ -44,7 +44,7 @@ public class FeatureTypeRegistryTests
         var id = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var entity = FeatureTypeRegistry.CreateEntity(
-            FeatureTypes.Road, id, userId, "street", "Test Road", "{}");
+            FeatureTypes.Road, id, userId, "street", "Test Road", "{}", DateTime.UtcNow);
 
         Assert.NotNull(entity);
         Assert.IsType<Road>(entity);
@@ -61,7 +61,7 @@ public class FeatureTypeRegistryTests
     {
         var entity = FeatureTypeRegistry.CreateEntity(
             FeatureTypes.HouseEntrance, Guid.NewGuid(), Guid.NewGuid(),
-            "main_entrance", "Test Entrance", "{}");
+            "main_entrance", "Test Entrance", "{}", DateTime.UtcNow);
 
         Assert.NotNull(entity);
         Assert.IsType<HouseEntrance>(entity);
@@ -71,7 +71,7 @@ public class FeatureTypeRegistryTests
     public void CreateEntity_UnknownType_ReturnsNull()
     {
         var entity = FeatureTypeRegistry.CreateEntity(
-            "unknown", Guid.NewGuid(), Guid.NewGuid(), "default", "Test", "{}");
+            "unknown", Guid.NewGuid(), Guid.NewGuid(), "default", "Test", "{}", DateTime.UtcNow);
         Assert.Null(entity);
     }
 
@@ -87,7 +87,7 @@ public class FeatureTypeRegistryTests
     public void CreateEntity_AllTypes_ReturnCorrectEntityType(string type)
     {
         var entity = FeatureTypeRegistry.CreateEntity(
-            type, Guid.NewGuid(), Guid.NewGuid(), "default", "Test", "{}");
+            type, Guid.NewGuid(), Guid.NewGuid(), "default", "Test", "{}", DateTime.UtcNow);
 
         Assert.NotNull(entity);
 

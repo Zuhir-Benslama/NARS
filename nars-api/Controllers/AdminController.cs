@@ -38,8 +38,6 @@ public class AdminController(
         };
     }
 
-    // Used indirectly by callers; keep for compilation until diagnostics complete.
-
     [HttpGet("admin/wilaya/{wilayaId:int}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

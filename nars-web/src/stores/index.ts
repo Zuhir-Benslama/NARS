@@ -1,25 +1,13 @@
-// ─── STORE INDEX ──────────────────────────────────────────────────────────────
-// Centralized exports for all Pinia stores.
+// ─── STORES INDEX ──────────────────────────────────────────────────────────────
+// Barrel file removed to avoid circular dependency risk.
 //
-// Usage:
-//   import { useAppStore, useModalStore, useLayerStore } from './stores'
-//
-// Modal helpers (awaitModalResult, openModal, openEditModal, resolveModal) are
-// re-exported from modalStore for convenience, not Pinia stores themselves.
-
-export { useAppStore } from "./appStore"
-export {
-  useModalStore,
-  awaitModalResult,
-  openModal,
-  openEditModal,
-  resolveModal,
-} from "./modalStore"
-export { useLayerStore } from "./layerStore"
-export { useSelectionStore } from "./selectionStore"
-export { useFieldStore } from "./fieldStore"
-export { useDrawStore } from "./drawStore"
-export { useEditStore } from "./editStore"
-export { useSnapStore } from "./snapStore"
-export { useContextMenuStore } from "./contextMenuStore"
-export type { LayerState } from "./layerStore"
+// Import directly from individual store files:
+//   import { useAppStore } from "./stores/appStore"
+//   import { useLayerStore } from "./stores/layerStore"
+//   import { useModalStore, openModal, openEditModal } from "./stores/modalStore"
+//   import { useSelectionStore } from "./stores/selectionStore"
+//   import { useFieldStore } from "./stores/fieldStore"
+//   import { useDrawStore } from "./stores/drawStore"
+//   import { useEditStore } from "./stores/editStore"
+//   import { useSnapStore } from "./stores/snapStore"
+//   import { useContextMenuStore } from "./stores/contextMenuStore"

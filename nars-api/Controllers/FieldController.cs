@@ -190,19 +190,19 @@ public class FieldController(
             return Problem(detail: "Invalid road_id.", statusCode: 400);
         }
 
-        var road = await db.Roads.FindAsync([roadId], cancellationToken);
-        if (road is null)
+        var roadData = await (
+            from r in db.Roads
+            join u in db.Users on r.UserId equals u.Id
+            where r.Id == roadId
+            select new { Road = r, CommuneId = u.CommuneId }
+        ).FirstOrDefaultAsync(cancellationToken);
+
+        if (roadData is null)
         {
             return Problem(detail: "Road not found.", statusCode: 400);
         }
 
-        var roadOwner = await db.Users.FindAsync([road.UserId], cancellationToken);
-        if (roadOwner is null)
-        {
-            return Forbid();
-        }
-
-        if (roadOwner.CommuneId.HasValue && CurrentCommuneId.HasValue && roadOwner.CommuneId != CurrentCommuneId)
+        if (roadData.CommuneId.HasValue && CurrentCommuneId.HasValue && roadData.CommuneId != CurrentCommuneId)
         {
             return Forbid();
         }
@@ -222,7 +222,7 @@ public class FieldController(
         var entrance = new HouseEntrance
         {
             Id = newId,
-            UserId = road.UserId,
+            UserId = roadData.Road.UserId,
             Layer = FeatureTypes.HouseEntranceLayers.Main,
             Label = label,
             Data = rawData,
@@ -245,7 +245,7 @@ public class FieldController(
 
         logger.LogInformation(
             "[Field] Worker {WorkerId} created entrance {EntranceId} for road {RoadId} (owner: {OwnerId})",
-            CurrentUserId, newId, roadId, road.UserId);
+            CurrentUserId, newId, roadId, roadData.Road.UserId);
 
         return StatusCode(201, new CreateEntranceResponse(
             Success: true,

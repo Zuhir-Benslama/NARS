@@ -4,7 +4,7 @@
 import { apiFetch } from "../../api"
 import { useAppStore } from "../../stores/appStore"
 import { useSelectionStore } from "../../stores/selectionStore"
-import { openEditModal } from "../../stores"
+import { openEditModal } from "../../stores/modalStore"
 import { PHASES } from "../../phases"
 import { featuresStore, ctx } from "../core/state"
 import { showToast, showConfirm } from "../../lib/toast"
@@ -156,14 +156,7 @@ export async function removeFeature(dbId: string): Promise<void> {
     await apiFetch(`/api/features/${dbId}`, { method: "DELETE" })
 
     featuresStore.remove(entry.id)
-    const currentState = layerStore.$state as LayerState
-    for (const key of Object.keys(currentState)) {
-      const entries = currentState[key as keyof LayerState]
-      if (entries) {
-        const filtered = entries.filter((f) => f.dbId !== dbId)
-        ;(currentState as unknown as Record<string, LayerEntry[]>)[key] = filtered
-      }
-    }
+    layerStore.removeFeature(phaseKey as keyof LayerState, dbId)
 
     if (phaseKey === "cityCenter") {
       const appStore = useAppStore()

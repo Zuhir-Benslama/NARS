@@ -11,6 +11,7 @@ using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
 using NarsApi.Services;
+using static NarsApi.Tests.TestData;
 using Xunit;
 
 namespace NarsApi.Tests;
@@ -107,7 +108,7 @@ public class AuthControllerTests
             AdminPassword: TestData.DefaultPassword,
             Name: "Test User",
             Email: "test@example.com",
-            Phone: "0555123456",
+            Phone: AltPhone,
             Username: "testuser",
             Password: "weak",
             Role: UserRoles.CommuneUser,
@@ -133,7 +134,7 @@ public class AuthControllerTests
             Email = "existing@example.com",
             Phone = TestData.DefaultPhone,
             Username = "existinguser",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Str0ng!Pass"),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
             Role = UserRoles.CommuneUser,
             CommuneId = 1,
         });
@@ -144,12 +145,12 @@ public class AuthControllerTests
 
         var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "admin",
-            AdminPassword: "Str0ng!Pass",
+            AdminPassword: DefaultPassword,
             Name: "New User",
             Email: "new@example.com",
-            Phone: "0555123456",
+            Phone: AltPhone,
             Username: "existinguser",
-            Password: "StrongP@ss1",
+            Password: AltPassword,
             Role: UserRoles.CommuneUser,
             CommuneId: 1,
             DairaId: null,
@@ -171,12 +172,12 @@ public class AuthControllerTests
 
         var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "admin",
-            AdminPassword: "Str0ng!Pass",
+            AdminPassword: DefaultPassword,
             Name: "Test User",
             Email: "test@example.com",
-            Phone: "0555123456",
+            Phone: AltPhone,
             Username: "testuser",
-            Password: "StrongP@ss1",
+            Password: AltPassword,
             Role: UserRoles.CommuneUser,
             CommuneId: 2,
             DairaId: null,
@@ -199,7 +200,7 @@ public class AuthControllerTests
             Email = TestData.DefaultEmail,
             Username = "testuser",
             Phone = TestData.DefaultPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Str0ng!Pass"),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
             Role = UserRoles.CommuneUser,
             CommuneId = 1,
         });
@@ -228,7 +229,7 @@ public class AuthControllerTests
 
         var result = await controller.SignIn(new SignInRequest(
             Username: "nonexistent",
-            Password: "Str0ng!Pass"
+            Password: DefaultPassword
         ));
 
         Assert.IsType<UnauthorizedObjectResult>(result);
@@ -239,61 +240,7 @@ public class AuthControllerTests
 
     private static async Task SeedLocationDataAsync(AppDbContext db)
     {
-        db.Wilayas.Add(new Wilaya
-        {
-            WilayaId = 1,
-            WilayaFr = "Alger",
-            WilayaAr = "Alger",
-            WilayaLatitude = 36.75,
-            WilayaLongitude = 3.05,
-        });
-        db.Wilayas.Add(new Wilaya
-        {
-            WilayaId = 2,
-            WilayaFr = "Blida",
-            WilayaAr = "Blida",
-            WilayaLatitude = 36.47,
-            WilayaLongitude = 2.83,
-        });
-        db.Dairas.Add(new Daira
-        {
-            DairaId = 1,
-            WilayaId = 1,
-            DairaFr = "Draria",
-            DairaAr = "Draria",
-            DairaLatitude = 36.72,
-            DairaLongitude = 2.96,
-        });
-        db.Dairas.Add(new Daira
-        {
-            DairaId = 2,
-            WilayaId = 2,
-            DairaFr = "Blida Centre",
-            DairaAr = "Blida Centre",
-            DairaLatitude = 36.47,
-            DairaLongitude = 2.82,
-        });
-        db.Communes.Add(new Commune
-        {
-            CommuneId = 1,
-            DairaId = 1,
-            CommuneCode = 1001,
-            CommuneFr = "Draria Centre",
-            CommuneAr = "Draria Centre",
-            CommuneLatitude = 36.72,
-            CommuneLongitude = 2.96,
-        });
-        db.Communes.Add(new Commune
-        {
-            CommuneId = 2,
-            DairaId = 2,
-            CommuneCode = 2001,
-            CommuneFr = "Blida Centre",
-            CommuneAr = "Blida Centre",
-            CommuneLatitude = 36.47,
-            CommuneLongitude = 2.82,
-        });
-        await db.SaveChangesAsync();
+        await SeedData.SeedExtendedLocationsAsync(db);
     }
 
     private static async Task SeedAdminAsync(AppDbContext db, string username, string role, int? dairaId = null, int? wilayaId = null)
@@ -305,7 +252,7 @@ public class AuthControllerTests
             Email = $"admin-{Guid.NewGuid():N}@test.com",
             Phone = TestData.DefaultPhone,
             Username = username,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Str0ng!Pass"),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
             Role = role,
             DairaId = dairaId,
             WilayaId = wilayaId,

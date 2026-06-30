@@ -4,7 +4,6 @@ import { t } from "../i18n"
 import { PHASES } from "../phases"
 import { useAppStore } from "../stores/appStore"
 import { useLayerStore } from "../stores/layerStore"
-import type { LayerState } from "../stores/layerStore"
 import { showToast } from "../lib/toast"
 import { checkDistrictCoverage } from "../lib/validation"
 import { buildDrawControl } from "../map/draw/draw-control"
@@ -19,7 +18,7 @@ export async function navigatePhase(direction: number): Promise<void> {
   if (target < 0 || target >= PHASES.length) return
 
   const layerStore = useLayerStore()
-  const state = layerStore.$state as LayerState
+  const state = layerStore.$state
 
   if (direction > 0) {
     const from = PHASES[appStore.currentPhase]

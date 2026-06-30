@@ -131,6 +131,61 @@ export interface GeomanMapMouseEvent extends MouseEvent {
   originalEvent: MouseEvent
 }
 
+// ─── GEOMAN INTERNAL LINE DRAWER ──────────────────────────────────────────────
+// Extended LineDrawer type covering all properties accessed by removeLastVertex
+// and the draw-control modules. These are Geoman internals, not public API.
+
+export interface GeomanDrawMarkerEntry {
+  instance?: {
+    remove?: () => void
+  }
+}
+
+export interface GeomanDrawFeatureData {
+  markers?: Map<string, GeomanDrawMarkerEntry>
+  updateGeometry?: (geometry: GeoJSON.Geometry) => Promise<void> | void
+  convertToPolygon?: () => Promise<void> | void
+  fireUpdateEvent?: (
+    fd: unknown,
+    event: {
+      type: string
+      instance: maplibregl.Marker
+      position: {
+        coordinate: [number, number]
+        path: string[]
+      }
+    },
+  ) => Promise<void> | void
+}
+
+export interface GeomanLineDrawer extends LineDrawer {
+  featureData?: GeomanDrawFeatureData
+  getFeatureGeoJson?: (options?: { withControlMarker?: boolean }) => GeoJSON.Feature
+  snappingHelper?: {
+    setCustomSnappingCoordinates?: (key: unknown, coords: [number, number][]) => void
+  }
+  snappingKey?: unknown
+  setSnapping?: () => void
+  gm?: {
+    markerPointer?: {
+      marker?: maplibregl.Marker | null
+    } | null
+  } | null
+}
+
+export interface GeomanActionInstance {
+  lineDrawer?: GeomanLineDrawer
+}
+
+/**
+ * Cast a Geoman instance to access internal properties not exposed by the
+ * library's public types. Centralizes the single `as unknown as` cast
+ * so other modules don't need to repeat it.
+ */
+export function asGeomanInternal(geoman: unknown): GeomanInstance | null {
+  return geoman as unknown as GeomanInstance | null
+}
+
 // ─── TYPE GUARD HELPERS ──────────────────────────────────────────────────────
 
 /** Narrow an unknown event to GeomanCreateEvent */
