@@ -1,5 +1,5 @@
 <template>
-  <div v-show="modalStore.visible" class="modal" @keyup="onKeyup">
+  <div v-show="modalStore.visible" class="modal">
     <div class="modal-content">
       <div class="modal-header">
         {{ headerText }}
@@ -150,13 +150,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from "vue"
+import { computed, watch, onMounted, onUnmounted } from "vue"
 import { useI18n } from "vue-i18n"
 import { PHASES, DISTRICT_TYPES, ROAD_TYPES, PUBLIC_SPACE_TYPES } from "../phases"
-import type { FeatureData } from "../types"
 import { useAppStore } from "../stores/appStore"
 import { useModalStore } from "../stores/modalStore"
 import { fetchRoadSide, computeBisNumber } from "../map"
+import { useFeatureValidation } from "../composables/useFeatureValidation"
 import AreaTypeSelector from "./modals/AreaTypeSelector.vue"
 import RoadAssignmentSelector from "./modals/RoadAssignmentSelector.vue"
 import BuildingTypeSelector from "./modals/BuildingTypeSelector.vue"
@@ -168,6 +168,9 @@ const phase = computed(() =>
   modalStore.phaseIndex !== null ? (PHASES[modalStore.phaseIndex] ?? null) : null,
 )
 
+const { validate, buildModalResult, isMainUrban, isCityCenter, isHouseEntranceEdit } =
+  useFeatureValidation(modalStore)
+
 // ── Computed display helpers ──────────────────────────────────────────────────
 
 const headerText = computed(() => {
@@ -176,18 +179,11 @@ const headerText = computed(() => {
   return modalStore.isEdit ? `Edit ${name} Info` : `Add ${name} Details`
 })
 
-const isMainUrban = computed(
-  () => phase.value?.key === "areas" && modalStore.areaTypeKey === "central_urban",
-)
 const isZoneWithTypeName = computed(
   () =>
     phase.value?.key === "districts" &&
     (modalStore.districtTypeKey === "trad_activities_zone" ||
       modalStore.districtTypeKey === "industry_zone"),
-)
-const isCityCenter = computed(() => phase.value?.key === "cityCenter")
-const isHouseEntranceEdit = computed(
-  () => phase.value?.key === "houseEntrances" && modalStore.isEdit,
 )
 
 // ── Watchers ──────────────────────────────────────────────────────────────────
@@ -235,92 +231,9 @@ watch(
 
 // ── Validation + submit ───────────────────────────────────────────────────────
 
-function validate() {
-  const errors: Record<string, string> = {}
-  const key = phase.value?.key
-
-  // Name, decision number and date are hidden when editing a house entrance or city center —
-  // skip their validation entirely in that case.
-  if (!isHouseEntranceEdit.value && !isCityCenter.value) {
-    const labelRequired =
-      !(
-        key === "districts" &&
-        (modalStore.districtTypeKey === "trad_activities_zone" ||
-          modalStore.districtTypeKey === "industry_zone")
-      ) && !(key === "areas" && modalStore.areaTypeKey === "central_urban")
-    if (labelRequired && !modalStore.label.trim()) errors.label = "Required"
-    if (!modalStore.decisionNumber.trim()) errors.decisionNumber = "Required"
-    if (!modalStore.decisionDate.trim()) errors.decisionDate = "Required"
-  }
-
-  // City center radius validation
-  if (key === "cityCenter") {
-    const radius = modalStore.radius
-    if (!radius || Number.isNaN(radius) || radius < 5) {
-      errors.radius = "Must be at least 5 meters"
-    } else if (radius > 50000) {
-      errors.radius = "Must not exceed 50 km"
-    }
-  }
-
-  // Road / main-entrance selectors are also hidden in edit mode — skip them too.
-  if (!modalStore.isEdit) {
-    if (
-      key === "houseEntrances" &&
-      modalStore.entranceTypeKey === "main_entrance" &&
-      modalStore.selectedRoadIdx === ""
-    )
-      errors.road = "Required"
-    if (
-      key === "houseEntrances" &&
-      modalStore.entranceTypeKey === "secondary_entrance" &&
-      modalStore.selectedMainIdx === ""
-    )
-      errors.mainEntrance = "Required"
-  }
-
-  modalStore.errors = errors
-  return Object.keys(errors).length === 0
-}
-
 function onSave() {
   if (!validate()) return
-  const key = phase.value?.key
-  const result: Partial<FeatureData> = {
-    label: isMainUrban.value ? appStore.communeName : modalStore.label.trim(),
-    decisionNumber: modalStore.decisionNumber.trim(),
-    decisionDate: modalStore.decisionDate.trim(),
-  }
-
-  if (key === "areas") {
-    result.areaTypeKey = modalStore.areaTypeKey
-  } else if (key === "districts") {
-    result.districtTypeKey = modalStore.districtTypeKey
-  } else if (key === "roads") {
-    result.roadTypeKey = modalStore.roadTypeKey
-  } else if (key === "houseEntrances") {
-    result.entranceTypeKey = modalStore.entranceTypeKey
-    if (modalStore.entranceTypeKey === "main_entrance") {
-      const roadOption = modalStore.roadOptions[Number(modalStore.selectedRoadIdx)]
-      result.roadDbId = roadOption?.dbId
-      result.roadLabel = roadOption?.label
-      result.side = modalStore.entranceSide ?? undefined
-      result.entranceNumber = modalStore.entranceNumber ?? undefined
-    } else {
-      const mainOption = modalStore.mainEntranceOptions[Number(modalStore.selectedMainIdx)]
-      result.mainEntranceDbId = mainOption?.dbId
-      result.mainEntranceLabel = mainOption?.label
-      result.bisNumber = modalStore.bisNumber ?? undefined
-    }
-  } else if (key === "publicBuildings") {
-    result.sectorKey = modalStore.sectorKey
-    result.buildingTypeKey = modalStore.buildingTypeKey
-  } else if (key === "publicSpaces") {
-    result.spaceTypeKey = modalStore.spaceTypeKey
-  } else if (key === "cityCenter") {
-    result.radius = modalStore.radius ?? undefined
-  }
-
+  const result = buildModalResult(appStore.communeName)
   modalStore.close(result as import("../types").ModalResult)
 }
 
@@ -328,10 +241,12 @@ function onCancel() {
   modalStore.close(null)
 }
 
-// Keyboard shortcuts
+// Keyboard shortcuts — listen on window so focus is not required
 function onKeyup(e: KeyboardEvent) {
   if (!modalStore.visible) return
   if (e.key === "Enter") onSave()
   if (e.key === "Escape") onCancel()
 }
+onMounted(() => window.addEventListener("keyup", onKeyup))
+onUnmounted(() => window.removeEventListener("keyup", onKeyup))
 </script>

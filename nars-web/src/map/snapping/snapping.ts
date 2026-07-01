@@ -162,6 +162,11 @@ export function toggleSnapping(): boolean {
   }
 }
 
+export function resetSnapping(): void {
+  disableSnapping()
+  enableSnapping()
+}
+
 export function isSnappingActive(): boolean {
   return useSnapStore().snapActive
 }

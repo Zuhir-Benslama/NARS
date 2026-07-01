@@ -10,6 +10,8 @@ export type FeatureTypeKey =
   | "publicSpaces"
   | "namingPanels"
 
+// ── Permissive bag-of-optional-fields (backward compat for stores / generic code) ──
+
 export interface FeatureData {
   type: FeatureTypeKey
   label: string
@@ -36,29 +38,66 @@ export interface FeatureData {
   geometry?: string
 }
 
-// Per-type discriminated unions for narrowing by `type` in new code.
-export interface AreaFeatureData extends FeatureData {
+// ── Strict per-type interfaces (only relevant fields per type) ─────────────────
+
+interface CommonFields {
+  type: FeatureTypeKey
+  label: string
+  coordinates?: LatLng[]
+  geometry?: string
+}
+
+export interface AreaFeatureData extends CommonFields {
   type: "areas"
+  decisionNumber: string
+  decisionDate: string
+  areaTypeKey: string
 }
-export interface DistrictFeatureData extends FeatureData {
+export interface DistrictFeatureData extends CommonFields {
   type: "districts"
+  decisionNumber: string
+  decisionDate: string
+  districtTypeKey: string
 }
-export interface CityCenterFeatureData extends FeatureData {
+export interface CityCenterFeatureData extends CommonFields {
   type: "cityCenter"
+  decisionNumber: string
+  decisionDate: string
+  radius?: number
+  lat?: number
+  lng?: number
 }
-export interface RoadFeatureData extends FeatureData {
+export interface RoadFeatureData extends CommonFields {
   type: "roads"
+  decisionNumber: string
+  decisionDate: string
+  roadTypeKey: string
 }
-export interface HouseEntranceFeatureData extends FeatureData {
+export interface HouseEntranceFeatureData extends CommonFields {
   type: "houseEntrances"
+  entranceTypeKey: "main_entrance" | "secondary_entrance"
+  roadDbId?: string
+  roadLabel?: string
+  side?: "left" | "right"
+  entranceNumber?: number
+  mainEntranceDbId?: string
+  mainEntranceLabel?: string
+  bisNumber?: number
 }
-export interface PublicBuildingFeatureData extends FeatureData {
+export interface PublicBuildingFeatureData extends CommonFields {
   type: "publicBuildings"
+  decisionNumber: string
+  decisionDate: string
+  sectorKey: string
+  buildingTypeKey: string
 }
-export interface PublicSpaceFeatureData extends FeatureData {
+export interface PublicSpaceFeatureData extends CommonFields {
   type: "publicSpaces"
+  decisionNumber: string
+  decisionDate: string
+  spaceTypeKey: string
 }
-export interface NamingPanelFeatureData extends FeatureData {
+export interface NamingPanelFeatureData extends CommonFields {
   type: "namingPanels"
 }
 

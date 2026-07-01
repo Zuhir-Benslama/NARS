@@ -43,7 +43,9 @@ export function useApiFetch<T = unknown>(): UseApiFetchReturn<T> {
       data.value = (await response.json()) as T
       return data.value
     } catch (err) {
-      error.value = err instanceof Error ? err : new Error(String(err))
+      const e = err instanceof Error ? err : new Error(String(err))
+      error.value = e
+      logError(createNetworkError(`apiRequest failed: ${path}`, { url: path }, e))
       return null
     } finally {
       isLoading.value = false

@@ -87,8 +87,6 @@ export const useModalStore = defineStore("modal", {
     close(result: ModalResult | null = null): void {
       // Resolves the pending modal promise externally
       resolveModalPromise(result)
-      // Clear any stale queued promises (prevents orphaned entries)
-      _modalQueue.length = 0
       this.visible = false
     },
 
@@ -112,27 +110,21 @@ export const useModalStore = defineStore("modal", {
 
 // ─── MODAL PROMISE BRIDGE ────────────────────────────────────────────────────
 // Allows callers to await the modal result.
-// Uses a queue to prevent race conditions when multiple modals are opened
-// in rapid succession — each caller gets its own Promise.
+// Since the modal is a singleton, a single pending promise is sufficient.
 
-const _modalQueue: Array<{
-  resolve: (result: ModalResult | null) => void
-}> = []
+let _modalResolver: ((result: ModalResult | null) => void) | null = null
 
 export function awaitModalResult(): Promise<ModalResult | null> {
   return new Promise((resolve) => {
-    _modalQueue.push({ resolve })
+    _modalResolver = resolve
   })
 }
 
 function resolveModalPromise(result: ModalResult | null): void {
   const modalStore = useModalStore()
   modalStore.currentModalFeatureId = null
-  // Drain all pending promises — prevents orphaned entries from stale modals
-  while (_modalQueue.length > 0) {
-    const pending = _modalQueue.shift()!
-    pending.resolve(result)
-  }
+  _modalResolver?.(result)
+  _modalResolver = null
 }
 
 // ─── LEGACY HELPER FUNCTIONS ───────────────────────────────────────────────────

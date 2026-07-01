@@ -129,9 +129,12 @@ export async function initMap(): Promise<void> {
     const styleLoaded = new Promise<void>((resolve) => {
       ctx.map!.once("style.load", () => resolve())
     })
+    const styleTimeout = new Promise<void>((_, reject) =>
+      setTimeout(() => reject(new Error("Style load timeout")), 10000),
+    )
 
     ctx.map.setStyle(next)
-    await styleLoaded
+    await Promise.race([styleLoaded, styleTimeout])
 
     initSources()
     featuresStore.updateSource()

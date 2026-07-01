@@ -25,7 +25,8 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
             string? scatteredGeoJson = null;
             await using var handle = await conn.EnsureOpenAsync(cancellationToken);
 
-            var areaTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.Area)?.TableName ?? "areas";
+            var areaTable = FeatureTypeRegistry.ValidateTableName(
+                FeatureTypeRegistry.GetDescriptor(FeatureTypes.Area)?.TableName ?? "areas");
             using var cmd = conn.CreateCommand();
             cmd.CommandText = $@"
                 WITH

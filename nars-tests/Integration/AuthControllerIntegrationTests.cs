@@ -215,7 +215,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
         var tokenCount = await _db.RefreshTokens.CountAsync(rt => rt.UserId == user.Id && !rt.Revoked);
         Assert.True(tokenCount > 0);
 
-        var claims = new List<Claim> { new("user_id", user.Id.ToString()) };
+        var claims = new List<Claim> { new(ClaimNames.UserId, user.Id.ToString()) };
         var httpContext = CreateHttpContext(claims);
         _controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
@@ -237,8 +237,8 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
 
         var claims = new List<Claim>
         {
-            new("user_id", user.Id.ToString()),
-            new("commune_id", "1"),
+            new(ClaimNames.UserId, user.Id.ToString()),
+            new(ClaimNames.CommuneId, "1"),
         };
         var httpContext = CreateHttpContext(claims);
         _controller.ControllerContext = new ControllerContext { HttpContext = httpContext };

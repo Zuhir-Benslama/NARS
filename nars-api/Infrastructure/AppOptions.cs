@@ -54,3 +54,8 @@ public class OpenTelemetryOptions
 {
     public string OtlpEndpoint { get; set; } = "http://otel-collector.observability:4317";
 }
+
+public class BackgroundTaskOptions
+{
+    public int Capacity { get; set; } = 100;
+}

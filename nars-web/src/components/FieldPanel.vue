@@ -21,7 +21,8 @@
     <div v-if="!selectedFeature" class="fp-list-wrap">
       <div v-if="loading" class="fp-loading">Loading features...</div>
       <div v-else-if="features.length === 0" class="fp-empty">
-        No {{ activeTab }} features found in your commune.
+        No {{ tabs.find((t) => t.key === activeTab)?.label ?? activeTab }} features found in your
+        commune.
       </div>
       <div v-else class="fp-list">
         <button v-for="f in features" :key="f.id" class="fp-item" @click="selectFeature(f)">
@@ -52,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue"
+import { ref, watch, onMounted } from "vue"
 import { useFieldStore } from "../stores/fieldStore"
 import { apiFetch } from "../api"
 import { logError, createNetworkError } from "../lib/errors"
@@ -138,7 +139,7 @@ function clearSelection() {
   fetchFeatures()
 }
 
-fetchFeatures()
+onMounted(() => fetchFeatures())
 </script>
 
 <style scoped>

@@ -37,7 +37,8 @@ public record UpdateAdminRequest(
     [property: JsonPropertyName("role")] string? Role,
     [property: JsonPropertyName("commune_id")] int? CommuneId,
     [property: JsonPropertyName("daira_id")] int? DairaId,
-    [property: JsonPropertyName("wilaya_id")] int? WilayaId
+    [property: JsonPropertyName("wilaya_id")] int? WilayaId,
+    [property: JsonPropertyName("password")] string? Password
 );
 
 // ─── ADMIN USER SUMMARY ──────────────────────────────────────────────────────

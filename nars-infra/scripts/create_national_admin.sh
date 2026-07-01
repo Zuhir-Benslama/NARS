@@ -91,38 +91,36 @@ export NARS_DB_PORT="$DB_PORT"
 export NARS_DB_NAME="$DB_NAME"
 export NARS_DB_USER="$DB_USER"
 
-# ── Test connection ──────────────────────────────────────────────────────────────
-info "Testing database connection to ${DB_HOST}:${DB_PORT}/${DB_NAME}..."
-"${PYTHON}" - <<'PYEOF' || die "Cannot connect. Check credentials and that PostgreSQL is running."
+# ── Shared Python database helper ─────────────────────────────────────────────
+# Temp module with connect_db() so we don't duplicate the connection logic.
+DB_HELPER_DIR=$(mktemp -d)
+trap 'rm -rf "${DB_HELPER_DIR}"' EXIT
+
+cat > "${DB_HELPER_DIR}/db_helper.py" << 'PYHELP'
 import os, psycopg2
 
-try:
-    c = psycopg2.connect(
+def connect_db():
+    return psycopg2.connect(
         host=os.environ["NARS_DB_HOST"],
         port=int(os.environ["NARS_DB_PORT"]),
         dbname=os.environ["NARS_DB_NAME"],
         user=os.environ["NARS_DB_USER"],
         password=os.environ["NARS_DB_PASSWORD_VAL"],
     )
-    c.close()
-except Exception as e:
-    print(f"Connection failed: {e}", file=sys.stderr)
-    sys.exit(1)
-PYEOF
+PYHELP
+
+# ── Test connection ──────────────────────────────────────────────────────────────
+info "Testing database connection to ${DB_HOST}:${DB_PORT}/${DB_NAME}..."
+PYTHONPATH="${DB_HELPER_DIR}" "${PYTHON}" -c "from db_helper import connect_db; connect_db().close()" \
+    || die "Cannot connect. Check credentials and that PostgreSQL is running."
 success "Database connection OK."
 echo ""
 
 # ── Check for existing national_admin ─────────────────────────────────────────
-EXISTING=$("${PYTHON}" - <<'PYEOF'
-import os, psycopg2
+EXISTING=$(PYTHONPATH="${DB_HELPER_DIR}" "${PYTHON}" - <<'PYEOF'
+from db_helper import connect_db
 
-conn = psycopg2.connect(
-    host=os.environ["NARS_DB_HOST"],
-    port=int(os.environ["NARS_DB_PORT"]),
-    dbname=os.environ["NARS_DB_NAME"],
-    user=os.environ["NARS_DB_USER"],
-    password=os.environ["NARS_DB_PASSWORD_VAL"],
-)
+conn = connect_db()
 cur = conn.cursor()
 cur.execute("SELECT username FROM users WHERE role = 'national_admin' LIMIT 5")
 for row in cur.fetchall():
@@ -203,25 +201,21 @@ NEW_UUID=$(
     export NARS_ADMIN_EMAIL="${ADMIN_EMAIL}"
     export NARS_ADMIN_PHONE="${ADMIN_PHONE}"
     export NARS_ADMIN_USERNAME="${ADMIN_USERNAME}"
-    "${PYTHON}" - << 'PYEOF'
-import os, uuid, bcrypt, psycopg2
+    PYTHONPATH="${DB_HELPER_DIR}" "${PYTHON}" - << 'PYEOF'
+import os, uuid, bcrypt
+from db_helper import connect_db
 
 name    = os.environ["NARS_ADMIN_NAME"]
 email   = os.environ["NARS_ADMIN_EMAIL"]
 phone   = os.environ["NARS_ADMIN_PHONE"]
 username = os.environ["NARS_ADMIN_USERNAME"]
 password = os.environ["NARS_ADMIN_PASSWORD_VAL"]
-host    = os.environ["NARS_DB_HOST"]
-port    = int(os.environ["NARS_DB_PORT"])
-dbname  = os.environ["NARS_DB_NAME"]
-user    = os.environ["NARS_DB_USER"]
-pw      = os.environ["NARS_DB_PASSWORD_VAL"]
 
 new_id   = str(uuid.uuid4())
 pwd_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=11)).decode()
 
 try:
-    conn = psycopg2.connect(host=host, port=port, dbname=dbname, user=user, password=pw)
+    conn = connect_db()
     cur  = conn.cursor()
 
     cur.execute("SELECT 1 FROM users WHERE username = %s OR email = %s LIMIT 1", (username, email))

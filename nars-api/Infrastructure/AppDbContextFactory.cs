@@ -14,7 +14,7 @@ public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
             var host = Environment.GetEnvironmentVariable("NARS_DB_HOST") ?? "localhost";
             var db = Environment.GetEnvironmentVariable("NARS_DB_NAME") ?? "nars_db";
             var user = Environment.GetEnvironmentVariable("NARS_DB_USER") ?? "postgres";
-            var pass = Environment.GetEnvironmentVariable("NARS_DB_PASSWORD") ?? "postgres";
+            var pass = Environment.GetEnvironmentVariable("NARS_DB_PASSWORD") ?? string.Empty;
             connStr = $"Host={host};Database={db};Username={user};Password={pass}";
         }
 

@@ -111,7 +111,7 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
                 sb.Append(", ");
             }
 
-            sb.Append($"d{i} AS (DELETE FROM {descriptors[i].TableName} WHERE user_id = @uid RETURNING id)");
+            sb.Append($"d{i} AS (DELETE FROM {FeatureTypeRegistry.ValidateTableName(descriptors[i].TableName)} WHERE user_id = @uid RETURNING id)");
         }
 
         sb.AppendLine(",");

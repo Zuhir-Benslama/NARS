@@ -8,6 +8,9 @@ docs/uml/*.png
 # Python bytecode
 scripts/__pycache__/
 
-# Dev-only mTLS CA cert — intentionally committed for dev convenience.
+# Dev-only mTLS CA cert (public) — intentionally committed for dev convenience.
 # Regenerate with `make ca-generate` if compromised.
 k8s/certs/ca.crt
+
+# CA private key — must NEVER be committed. Only ca.crt (public) is tracked.
+k8s/certs/ca.key

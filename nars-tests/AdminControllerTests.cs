@@ -43,13 +43,13 @@ public class AdminControllerTests
     {
         var claims = new List<Claim>
         {
-            new("user_id", (userId ?? Guid.NewGuid()).ToString()),
-            new("username", "testuser"),
-            new("role", role),
+            new(ClaimNames.UserId, (userId ?? Guid.NewGuid()).ToString()),
+            new(ClaimNames.Username, "testuser"),
+            new(ClaimNames.Role, role),
         };
-        if (communeId.HasValue) claims.Add(new("commune_id", communeId.Value.ToString()));
-        if (dairaId.HasValue) claims.Add(new("daira_id", dairaId.Value.ToString()));
-        if (wilayaId.HasValue) claims.Add(new("wilaya_id", wilayaId.Value.ToString()));
+        if (communeId.HasValue) claims.Add(new(ClaimNames.CommuneId, communeId.Value.ToString()));
+        if (dairaId.HasValue) claims.Add(new(ClaimNames.DairaId, dairaId.Value.ToString()));
+        if (wilayaId.HasValue) claims.Add(new(ClaimNames.WilayaId, wilayaId.Value.ToString()));
 
         ctrl.ControllerContext.HttpContext.User =
             new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth"));
@@ -74,7 +74,7 @@ public class AdminControllerTests
     }
 
     [Fact]
-    public async Task Overview_WilayaAdmin_MissingWilayaId_ReturnsForbid()
+    public async Task Overview_WilayaAdmin_MissingWilayaId_Returns403()
     {
         var db = CreateDb();
         var ctrl = CreateController(db);
@@ -82,11 +82,12 @@ public class AdminControllerTests
 
         var result = await ctrl.Overview(default);
 
-        Assert.IsType<ForbidResult>(result);
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(403, problem.StatusCode);
     }
 
     [Fact]
-    public async Task Overview_DairaAdmin_MissingDairaId_ReturnsForbid()
+    public async Task Overview_DairaAdmin_MissingDairaId_Returns403()
     {
         var db = CreateDb();
         var ctrl = CreateController(db);
@@ -94,7 +95,8 @@ public class AdminControllerTests
 
         var result = await ctrl.Overview(default);
 
-        Assert.IsType<ForbidResult>(result);
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(403, problem.StatusCode);
     }
 
     [Fact]
@@ -383,7 +385,7 @@ public class AdminControllerTests
         var result = await ctrl.UpdateAdmin(
             Guid.NewGuid(),
             new UpdateAdminRequest(Name: "Updated", Email: null, Phone: null,
-                Role: null, CommuneId: null, DairaId: null, WilayaId: null),
+                Role: null, CommuneId: null, DairaId: null, WilayaId: null, Password: null),
             default);
 
         var problem = Assert.IsType<ObjectResult>(result);
@@ -426,7 +428,7 @@ public class AdminControllerTests
         var result = await ctrl.UpdateAdmin(
             userId,
             new UpdateAdminRequest(Name: "Updated", Email: null, Phone: null,
-                Role: null, CommuneId: null, DairaId: null, WilayaId: null),
+                Role: null, CommuneId: null, DairaId: null, WilayaId: null, Password: null),
             default);
 
         var ok = Assert.IsType<OkObjectResult>(result);

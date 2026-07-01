@@ -371,14 +371,14 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     {
         var claims = new List<Claim>
         {
-            new("user_id", user.Id.ToString()),
-            new("username", user.Username),
-            new("role", user.Role),
+            new(ClaimNames.UserId, user.Id.ToString()),
+            new(ClaimNames.Username, user.Username),
+            new(ClaimNames.Role, user.Role),
         };
 
-        if (user.CommuneId.HasValue) claims.Add(new Claim("commune_id", user.CommuneId.Value.ToString()));
-        if (user.DairaId.HasValue) claims.Add(new Claim("daira_id", user.DairaId.Value.ToString()));
-        if (user.WilayaId.HasValue) claims.Add(new Claim("wilaya_id", user.WilayaId.Value.ToString()));
+        if (user.CommuneId.HasValue) claims.Add(new Claim(ClaimNames.CommuneId, user.CommuneId.Value.ToString()));
+        if (user.DairaId.HasValue) claims.Add(new Claim(ClaimNames.DairaId, user.DairaId.Value.ToString()));
+        if (user.WilayaId.HasValue) claims.Add(new Claim(ClaimNames.WilayaId, user.WilayaId.Value.ToString()));
 
         var httpContext = new DefaultHttpContext
         {

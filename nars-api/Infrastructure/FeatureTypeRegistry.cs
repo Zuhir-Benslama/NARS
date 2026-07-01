@@ -121,6 +121,20 @@ public static class FeatureTypeRegistry
     public static IReadOnlyList<string> GetAllTableNames() => _allTableNames;
 
     /// <summary>
+    /// Validates a table name against the known allowlist to prevent SQL injection
+    /// from any future dynamic table name sources.
+    /// </summary>
+    public static bool IsValidTableName(string tableName) => _allTableNames.Contains(tableName);
+
+    /// <summary>
+    /// Validates a table name and throws if not in the allowlist.
+    /// </summary>
+    public static string ValidateTableName(string tableName) =>
+        IsValidTableName(tableName)
+            ? tableName
+            : throw new InvalidOperationException($"Unknown table name '{tableName}'. Table must be a registered feature type.");
+
+    /// <summary>
     /// Looks up a descriptor by type. Returns null if unknown.
     /// </summary>
     public static FeatureTypeDescriptor? GetDescriptor(string type) =>

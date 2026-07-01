@@ -117,12 +117,12 @@ describe("modalStore", () => {
       await expect(promise).resolves.toBeNull()
     })
 
-    it("multiple awaitModalResult calls all resolve on close", async () => {
+    it("second awaitModalResult replaces the first pending promise", async () => {
       const store = useModalStore()
-      const promises = [awaitModalResult(), awaitModalResult()]
+      awaitModalResult() // first is replaced
+      const secondPromise = awaitModalResult()
       store.close(emptyResult)
-      const results = await Promise.all(promises)
-      expect(results).toEqual([emptyResult, emptyResult])
+      await expect(secondPromise).resolves.toEqual(emptyResult)
     })
   })
 

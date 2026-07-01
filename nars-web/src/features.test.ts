@@ -2,7 +2,7 @@
 // Tests for map/features.ts functions.
 
 import { describe, it, expect } from "vitest"
-import { buildFeatureData, toApiSaveShape } from "./map/features"
+import { buildFeatureData, toApiSaveShape } from "./map/features/feature-data"
 import { PHASES } from "./phases"
 
 describe("buildFeatureData", () => {

@@ -109,10 +109,5 @@ public class JwtService(string secret, string? issuer, string? audience, IOption
             }
             return null;
         }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Unexpected error during JWT validation");
-            return null;
-        }
     }
 }
