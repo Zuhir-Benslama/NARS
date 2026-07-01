@@ -1,3 +1,4 @@
+using BCrypt.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -28,9 +29,9 @@ public class AdminController(
         return role switch
         {
             UserRoles.DairaAdmin when dairaId is null =>
-                Forbid("daira_id missing on account. Contact your administrator."),
+                Problem(detail: "daira_id missing on account. Contact your administrator.", statusCode: 403),
             UserRoles.WilayaAdmin when CurrentWilayaId is null =>
-                Forbid("wilaya_id missing on account. Contact your administrator."),
+                Problem(detail: "wilaya_id missing on account. Contact your administrator.", statusCode: 403),
             UserRoles.DairaAdmin => await DairaOverview(dairaId!.Value, cancellationToken),
             UserRoles.WilayaAdmin => await WilayaOverview(CurrentWilayaId!.Value, cancellationToken),
             UserRoles.NationalAdmin => await NationalOverview(cancellationToken),
@@ -266,6 +267,24 @@ public class AdminController(
         if (body.Role is not null && !CanCreateRole(CurrentUserRole, body.Role))
         {
             return Forbid();
+        }
+
+        var sensitiveChange = body.Role is not null
+            || body.WilayaId is not null
+            || body.DairaId is not null
+            || body.CommuneId is not null;
+        if (sensitiveChange)
+        {
+            if (string.IsNullOrEmpty(body.Password))
+            {
+                return Problem(detail: "Password is required to change role or geographic scope.", statusCode: 400);
+            }
+
+            var caller = await db.Users.FindAsync([CurrentUserId], cancellationToken);
+            if (caller is null || !BCrypt.Net.BCrypt.Verify(body.Password, caller.PasswordHash))
+            {
+                return Problem(detail: "Password is incorrect.", statusCode: 403);
+            }
         }
 
         if (body.Name is not null)

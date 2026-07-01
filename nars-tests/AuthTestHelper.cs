@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using NarsApi.Infrastructure;
 
 namespace NarsApi.Tests;
 
@@ -13,14 +14,14 @@ public static class AuthTestHelper
     {
         var claims = new List<Claim>
         {
-            new("user_id", userId.ToString()),
-            new("username", username),
-            new("role", role),
+            new(ClaimNames.UserId, userId.ToString()),
+            new(ClaimNames.Username, username),
+            new(ClaimNames.Role, role),
         };
 
-        if (communeId.HasValue) claims.Add(new Claim("commune_id", communeId.Value.ToString()));
-        if (dairaId.HasValue) claims.Add(new Claim("daira_id", dairaId.Value.ToString()));
-        if (wilayaId.HasValue) claims.Add(new Claim("wilaya_id", wilayaId.Value.ToString()));
+        if (communeId.HasValue) claims.Add(new Claim(ClaimNames.CommuneId, communeId.Value.ToString()));
+        if (dairaId.HasValue) claims.Add(new Claim(ClaimNames.DairaId, dairaId.Value.ToString()));
+        if (wilayaId.HasValue) claims.Add(new Claim(ClaimNames.WilayaId, wilayaId.Value.ToString()));
 
         return new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth"));
     }

@@ -13,7 +13,7 @@ public class FieldService(
     public async Task<(List<FieldFeatureResult> Items, int Total)> QueryFeaturesAsync(
         FeatureTypeDescriptor descriptor, int communeId, int skip, int take, CancellationToken ct = default)
     {
-        var tableName = descriptor.TableName;
+        var tableName = FeatureTypeRegistry.ValidateTableName(descriptor.TableName);
         var conn = db.Database.GetDbConnection();
         await using var handle = await conn.EnsureOpenAsync(ct);
 
@@ -66,27 +66,33 @@ public class FieldService(
 
     public async Task<(Guid UserId, int? CommuneId)?> GetFeatureOwnerAsync(string featureType, Guid featureId, CancellationToken ct = default)
     {
-        var tableName = FeatureTypeRegistry.GetDescriptor(featureType)?.TableName;
-        if (tableName is null)
+        var descriptor = FeatureTypeRegistry.GetDescriptor(featureType);
+        if (descriptor is null)
         {
             return null;
         }
 
+        var tableName = FeatureTypeRegistry.ValidateTableName(descriptor.TableName);
         var conn = db.Database.GetDbConnection();
         await using var handle = await conn.EnsureOpenAsync(ct);
 
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = $"SELECT user_id FROM {tableName} WHERE id = @id";
+        cmd.CommandText = $"""
+            SELECT f.user_id, u.commune_id
+            FROM {tableName} f
+            JOIN users u ON u.id = f.user_id
+            WHERE f.id = @id
+            """;
         SqlFragments.AddParam(cmd, "@id", featureId);
 
-        var result = await cmd.ExecuteScalarAsync(ct);
-        if (result is null || result == DBNull.Value)
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        if (!await reader.ReadAsync(ct))
         {
             return null;
         }
 
-        var userId = (Guid)result;
-        var owner = await db.Users.FindAsync([userId], ct);
-        return owner is null ? null : (owner.Id, owner.CommuneId);
+        var ownerId = reader.GetGuid(0);
+        var communeId = await reader.IsDBNullAsync(1, ct) ? null : (int?)reader.GetInt32(1);
+        return (ownerId, communeId);
     }
 }

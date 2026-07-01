@@ -129,7 +129,12 @@ export interface ApiFetchOptions extends RequestInit {
 }
 
 export async function apiFetch(path: string, options: ApiFetchOptions = {}): Promise<Response> {
-  const { timeout = DEFAULT_TIMEOUT, skipRetry = false, ...fetchOptions } = options
+  const {
+    timeout = DEFAULT_TIMEOUT,
+    skipRetry = false,
+    signal: externalSignal,
+    ...fetchOptions
+  } = options
 
   const url = apiUrl(path)
   const method = (options.method ?? "GET").toUpperCase()
@@ -139,6 +144,11 @@ export async function apiFetch(path: string, options: ApiFetchOptions = {}): Pro
   const executeRequest = async (): Promise<Response> => {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), timeout)
+
+    // Merge timeout signal with external signal (e.g. for AbortController from callers)
+    const combinedSignal = externalSignal
+      ? AbortSignal.any([controller.signal, externalSignal])
+      : controller.signal
 
     // Build headers — add CSRF token for state-changing requests
     const csrfToken = getCsrfToken()
@@ -160,7 +170,7 @@ export async function apiFetch(path: string, options: ApiFetchOptions = {}): Pro
       const response = await fetch(url, {
         ...fetchOptions,
         credentials: "include",
-        signal: controller.signal,
+        signal: combinedSignal,
         headers: {
           ...(hasBody ? { "Content-Type": "application/json" } : {}),
           ...csrfHeaders,

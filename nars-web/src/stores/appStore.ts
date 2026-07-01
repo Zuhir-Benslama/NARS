@@ -33,8 +33,7 @@ export const useAppStore = defineStore("app", {
     isAuthenticated: (state) => state.user !== null,
     isAdminUser: (state) =>
       state.user !== null &&
-      state.user.role !== "commune_user" &&
-      state.user.role !== "field_worker",
+      ["national_admin", "wilaya_admin", "daira_admin"].includes(state.user.role),
     communeName: (state) =>
       state.municipalityName || state.user?.commune?.name_fr || state.user?.commune?.name_ar || "",
   },

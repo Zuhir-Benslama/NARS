@@ -11,26 +11,49 @@ namespace NarsApi.Infrastructure;
 
 public static class PipelineExtensions
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+
     public static async Task<WebApplication> ConfigureNarsPipelineAsync(this WebApplication app, IConfiguration config, bool logJwtWarning)
     {
         var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
 
+        LogJwtWarning(startupLogger, logJwtWarning);
+        await VerifyDatabaseConnectionAsync(app, startupLogger);
+        UseExceptionHandling(app);
+        UseStaticFilesWithCaching(app);
+        UseSecurityMiddleware(app);
+        UseCsrfValidation(app);
+        UseApiEndpoints(app);
+        LogStartupComplete(app, config, startupLogger);
+
+        return app;
+    }
+
+    private static void LogJwtWarning(ILogger<Program> logger, bool logJwtWarning)
+    {
         if (logJwtWarning)
         {
-            startupLogger.LogWarning("JWT Issuer/Audience validation is disabled. Set Jwt:Issuer and Jwt:Audience for defense-in-depth.");
+            logger.LogWarning("JWT Issuer/Audience validation is disabled. Set Jwt:Issuer and Jwt:Audience for defense-in-depth.");
         }
+    }
 
-        using (var scope = app.Services.CreateScope())
-        {
-            var dbCtx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            startupLogger.LogInformation("==================================================");
-            startupLogger.LogInformation("NARS - ASP.NET Core + PostgreSQL/PostGIS");
-            startupLogger.LogInformation("==================================================");
+    private static async Task VerifyDatabaseConnectionAsync(WebApplication app, ILogger<Program> logger)
+    {
+        await using var scope = app.Services.CreateAsyncScope();
+        var dbCtx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        logger.LogInformation("==================================================");
+        logger.LogInformation("NARS - ASP.NET Core + PostgreSQL/PostGIS");
+        logger.LogInformation("==================================================");
 
-            await dbCtx.Database.CanConnectAsync();
-            startupLogger.LogInformation("Database connection verified");
-        }
+        await dbCtx.Database.CanConnectAsync();
+        logger.LogInformation("Database connection verified");
+    }
 
+    private static void UseExceptionHandling(WebApplication app)
+    {
         app.UseExceptionHandler(errApp =>
         {
             errApp.Run(async ctx =>
@@ -56,7 +79,7 @@ public static class PipelineExtensions
                             Title = "Unauthorized",
                         };
                         await ctx.Response.WriteAsync(
-                            JsonSerializer.Serialize(authProblem, new JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+                            JsonSerializer.Serialize(authProblem, JsonOptions));
                         return;
                     }
 
@@ -75,20 +98,18 @@ public static class PipelineExtensions
                     Type = "https://tools.ietf.org/html/rfc7231#section-6.6.1",
                 };
                 await ctx.Response.WriteAsync(
-                    JsonSerializer.Serialize(problem, new JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+                    JsonSerializer.Serialize(problem, JsonOptions));
             });
         });
+    }
 
+    private static void UseStaticFilesWithCaching(WebApplication app)
+    {
         app.UseDefaultFiles();
 
         var contentTypeProvider = new FileExtensionContentTypeProvider();
-        contentTypeProvider.Mappings[".js"] = "text/javascript";
         contentTypeProvider.Mappings[".mjs"] = "text/javascript";
-        contentTypeProvider.Mappings[".css"] = "text/css";
         contentTypeProvider.Mappings[".woff2"] = "font/woff2";
-        contentTypeProvider.Mappings[".woff"] = "font/woff";
-        contentTypeProvider.Mappings[".ico"] = "image/x-icon";
-        contentTypeProvider.Mappings[".svg"] = "image/svg+xml";
         contentTypeProvider.Mappings[".map"] = "application/json";
 
         app.UseStaticFiles(new StaticFileOptions
@@ -109,7 +130,10 @@ public static class PipelineExtensions
                 }
             }
         });
+    }
 
+    private static void UseSecurityMiddleware(WebApplication app)
+    {
         app.UseRouting();
 
         app.UseForwardedHeaders(new ForwardedHeadersOptions
@@ -151,7 +175,10 @@ public static class PipelineExtensions
             }
             await next();
         });
+    }
 
+    private static void UseCsrfValidation(WebApplication app)
+    {
         app.Use(async (ctx, next) =>
         {
             var method = ctx.Request.Method.ToUpperInvariant();
@@ -173,13 +200,16 @@ public static class PipelineExtensions
                         Title = "Forbidden",
                         Type = "https://tools.ietf.org/html/rfc7231#section-6.5.3",
                     };
-                    await ctx.Response.WriteAsJsonAsync(problem, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+                    await ctx.Response.WriteAsJsonAsync(problem, JsonOptions);
                     return;
                 }
             }
             await next();
         });
+    }
 
+    private static void UseApiEndpoints(WebApplication app)
+    {
         app.MapOpenApi();
         app.MapScalarApiReference(options =>
         {
@@ -189,15 +219,16 @@ public static class PipelineExtensions
         app.MapControllers();
         app.MapHealthChecks("/health");
         app.MapHealthChecks("/api/health");
+    }
 
+    private static void LogStartupComplete(WebApplication app, IConfiguration config, ILogger<Program> logger)
+    {
         app.Lifetime.ApplicationStarted.Register(() =>
         {
             var addresses = app.Urls.Count != 0
                 ? string.Join(", ", app.Urls)
                 : config["ASPNETCORE_URLS"] ?? "http://localhost:5000";
-            startupLogger.LogInformation("Startup complete — {Addresses}", addresses);
+            logger.LogInformation("Startup complete — {Addresses}", addresses);
         });
-
-        return app;
     }
 }

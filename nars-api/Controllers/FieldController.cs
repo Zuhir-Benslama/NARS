@@ -81,6 +81,12 @@ public class FieldController(
             return Problem(detail: "Invalid feature_id.", statusCode: 400);
         }
 
+        var validTypes = new[] { FeatureTypes.Road, FeatureTypes.HouseEntrance, FeatureTypes.NamingPanel };
+        if (!validTypes.Contains(body.Type))
+        {
+            return Problem(detail: $"Invalid inspection type. Must be one of: {string.Join(", ", validTypes)}", statusCode: 400);
+        }
+
         var registryEntry = await db.FeatureRegistry.FindAsync([featureId], cancellationToken);
         if (registryEntry is null)
         {
@@ -96,12 +102,6 @@ public class FieldController(
         if (feature.Value.CommuneId != CurrentCommuneId)
         {
             return Forbid();
-        }
-
-        var validTypes = new[] { FeatureTypes.Road, FeatureTypes.HouseEntrance, FeatureTypes.NamingPanel };
-        if (!validTypes.Contains(body.Type))
-        {
-            return Problem(detail: $"Invalid inspection type. Must be one of: {string.Join(", ", validTypes)}", statusCode: 400);
         }
 
         var rawData = body.Data.ValueKind == JsonValueKind.String

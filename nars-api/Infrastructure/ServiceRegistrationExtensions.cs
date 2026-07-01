@@ -26,14 +26,16 @@ public static class ServiceRegistrationExtensions
         services.Configure<ValidationOptions>(config.GetSection("Validation"));
         services.Configure<AccountLockoutOptions>(config.GetSection("AccountLockout"));
         services.Configure<OpenTelemetryOptions>(config.GetSection("OpenTelemetry"));
+        services.Configure<BackgroundTaskOptions>(config.GetSection("BackgroundTask"));
 
         var otelOpts = config.GetSection("OpenTelemetry").Get<OpenTelemetryOptions>() ?? new OpenTelemetryOptions();
         var otelEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")
             ?? otelOpts.OtlpEndpoint;
 
+        var assemblyVersion = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "2.0.0";
         services.AddOpenTelemetry()
             .ConfigureResource(r => r
-                .AddService("nars-api", serviceVersion: "2.0.0")
+                .AddService("nars-api", serviceVersion: assemblyVersion)
                 .AddEnvironmentVariableDetector())
             .WithTracing(t => t
                 .AddAspNetCoreInstrumentation()
@@ -100,7 +102,7 @@ public static class ServiceRegistrationExtensions
             {
                 doc.Info.Title = "NARS - National Addressing Reference System";
                 doc.Info.Description = "Geographic data management API";
-                doc.Info.Version = "2.0.0";
+                doc.Info.Version = assemblyVersion;
                 return Task.CompletedTask;
             });
         });

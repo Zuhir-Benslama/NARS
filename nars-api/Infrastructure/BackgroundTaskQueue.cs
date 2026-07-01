@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using Microsoft.Extensions.Options;
 using NarsApi.Services;
 
 namespace NarsApi.Infrastructure;
@@ -10,15 +11,16 @@ public class BackgroundTaskQueue : IBackgroundTaskQueue
 {
     private readonly Channel<Func<IServiceProvider, CancellationToken, Task>> _queue;
 
-    public BackgroundTaskQueue(int capacity = 100)
+    public BackgroundTaskQueue(IOptions<BackgroundTaskOptions> options)
     {
-        var options = new BoundedChannelOptions(capacity)
+        var capacity = options.Value.Capacity;
+        var channelOptions = new BoundedChannelOptions(capacity)
         {
             FullMode = BoundedChannelFullMode.Wait,
             SingleWriter = false,
             SingleReader = true,
         };
-        _queue = Channel.CreateBounded<Func<IServiceProvider, CancellationToken, Task>>(options);
+        _queue = Channel.CreateBounded<Func<IServiceProvider, CancellationToken, Task>>(channelOptions);
     }
 
     public ValueTask QueueBackgroundWorkItemAsync(Func<IServiceProvider, CancellationToken, Task> workItem)

@@ -63,11 +63,9 @@ public partial class AuthController(
             return Unauthorized(new { detail = "Invalid username or password" });
         }
 
-        // Check if account is locked
         if (user.LockedUntil.HasValue && user.LockedUntil.Value > timeProvider.UtcNow)
         {
-            var remaining = (int)(user.LockedUntil.Value - timeProvider.UtcNow).TotalMinutes + 1;
-            return Unauthorized(new { detail = $"Account locked due to too many failed attempts. Try again in {remaining} minute{(remaining == 1 ? "" : "s")}." });
+            return Unauthorized(new { detail = "Invalid username or password" });
         }
 
         if (!BCrypt.Net.BCrypt.Verify(body.Password, user.PasswordHash))

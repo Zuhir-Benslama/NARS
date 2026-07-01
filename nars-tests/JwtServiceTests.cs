@@ -52,15 +52,15 @@ public class JwtServiceTests
         var jwt = handler.ReadJwtToken(token);
 
         Assert.Equal(userId.ToString(),
-            jwt.Claims.First(c => c.Type == "user_id").Value);
+            jwt.Claims.First(c => c.Type == ClaimNames.UserId).Value);
         Assert.Equal("testuser",
-            jwt.Claims.First(c => c.Type == "username").Value);
+            jwt.Claims.First(c => c.Type == ClaimNames.Username).Value);
         Assert.Equal("Test User",
-            jwt.Claims.First(c => c.Type == "name").Value);
+            jwt.Claims.First(c => c.Type == NarsApi.Infrastructure.ClaimNames.Name).Value);
         Assert.Equal("test@example.com",
-            jwt.Claims.First(c => c.Type == "email").Value);
+            jwt.Claims.First(c => c.Type == ClaimNames.Email).Value);
         Assert.Equal("42",
-            jwt.Claims.First(c => c.Type == "commune_id").Value);
+            jwt.Claims.First(c => c.Type == ClaimNames.CommuneId).Value);
     }
 
     [Fact]
@@ -73,7 +73,7 @@ public class JwtServiceTests
         var principal = service.ValidateToken(token);
 
         Assert.NotNull(principal);
-        Assert.Equal("testuser", principal.FindFirst("username")?.Value);
+        Assert.Equal("testuser", principal.FindFirst(ClaimNames.Username)?.Value);
     }
 
     [Fact]
@@ -90,10 +90,10 @@ public class JwtServiceTests
     }
 
     [Fact]
-    public void ValidateToken_EmptyToken_ReturnsNull()
+    public void ValidateToken_EmptyToken_ThrowsArgumentNullException()
     {
         var service = CreateService();
-        Assert.Null(service.ValidateToken(""));
+        Assert.Throws<ArgumentNullException>(() => service.ValidateToken(""));
     }
 
     [Fact]

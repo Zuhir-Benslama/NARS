@@ -8,7 +8,7 @@ export async function saveToDatabase(featureData: FeatureData): Promise<SaveResu
   try {
     const shape = toApiSaveShape(featureData)
 
-    const data = (await apiFetch("/api/features", {
+    const response = await apiFetch("/api/features", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -17,7 +17,8 @@ export async function saveToDatabase(featureData: FeatureData): Promise<SaveResu
         label: featureData.label,
         data: featureData,
       }),
-    }).then((r) => r.json())) as { id: string }
+    })
+    const data = (await response.json()) as { id: string }
     return { ok: true, data }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error"

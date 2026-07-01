@@ -285,8 +285,8 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
     {
         var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext();
         var identity = new System.Security.Claims.ClaimsIdentity(
-            [new System.Security.Claims.Claim("user_id", userId.ToString()),
-             new System.Security.Claims.Claim("commune_id", communeId.ToString())],
+            [new System.Security.Claims.Claim(ClaimNames.UserId, userId.ToString()),
+             new System.Security.Claims.Claim(ClaimNames.CommuneId, communeId.ToString())],
             "TestAuth");
         httpContext.User = new System.Security.Claims.ClaimsPrincipal(identity);
         _controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext { HttpContext = httpContext };

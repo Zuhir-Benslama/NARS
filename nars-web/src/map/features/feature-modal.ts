@@ -38,21 +38,20 @@ export async function prepareModalExtras(phase: (typeof PHASES)[number]): Promis
   }
 }
 
-export async function fetchRoadSide(roadDbId: string): Promise<void> {
+export async function fetchRoadSide(
+  roadDbId: string,
+  geometry?: [number, number][] | null,
+): Promise<void> {
   const modalStore = useModalStore()
   modalStore.entranceSideLoading = true
   modalStore.entranceSide = null
   modalStore.entranceNumber = null
 
-  const narsWindow = window as Window & {
-    __narsCurrentGeometry?: [number, number][] | null
-  }
-  const currentGeometry = import.meta.env.DEV ? narsWindow.__narsCurrentGeometry : undefined
   let lat: number | undefined
   let lng: number | undefined
 
-  if (currentGeometry && currentGeometry.length > 0) {
-    ;[lng, lat] = currentGeometry[currentGeometry.length - 1]
+  if (geometry && geometry.length > 0) {
+    ;[lng, lat] = geometry[geometry.length - 1]
   }
 
   if (lat && lng) {

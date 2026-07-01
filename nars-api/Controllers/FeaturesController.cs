@@ -66,11 +66,7 @@ public class FeaturesController(
 
         var newId = Guid.CreateVersion7();
 
-        var entity = FeatureTypeRegistry.CreateEntity(body.Type, newId, RequiredCurrentUserId, body.Layer, body.Label, dataJson, timeProvider.UtcNow);
-        if (entity is null)
-        {
-            return Problem(detail: $"Unknown feature type '{body.Type}'.", statusCode: 400);
-        }
+        var entity = FeatureTypeRegistry.CreateEntity(body.Type, newId, RequiredCurrentUserId, body.Layer, body.Label, dataJson, timeProvider.UtcNow)!;
 
         if (entity is HouseEntrance entrance)
         {

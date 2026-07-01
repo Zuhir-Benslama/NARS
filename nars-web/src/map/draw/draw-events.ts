@@ -26,7 +26,7 @@ import { patchGeomanMarkerPointerSnap } from "./draw-marker-patch"
 import { installSnapInterceptors } from "../snapping/snapping"
 import { setDrawingPhase } from "./draw-state"
 import { buildDrawControl } from "./draw-control"
-import { enableCrosshair, disableSnapping, enableSnapping } from "../snapping/snapping"
+import { enableCrosshair, resetSnapping } from "../snapping/snapping"
 import { isEditMode } from "../edit/edit-mode"
 
 // ─── REGISTRATION ─────────────────────────────────────────────────────
@@ -90,8 +90,7 @@ function watchDrawType() {
 
       if (!isEditMode()) {
         enableCrosshair()
-        disableSnapping()
-        enableSnapping()
+        resetSnapping()
       }
     },
     { immediate: true },

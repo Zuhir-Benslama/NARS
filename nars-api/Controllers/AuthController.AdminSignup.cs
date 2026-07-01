@@ -53,7 +53,7 @@ public partial class AuthController
             .FirstOrDefaultAsync(u => u.Username == body.AdminUsername, cancellationToken);
 
         // Use a stable dummy hash so BCrypt always does the full work.
-        const string _dummyHash = "$2a$11$dummy.constant.time.hash.padding.abcdefghijklmnop";
+        const string _dummyHash = "$2a$11$BCfJgwy.hTY703/9RBjPo.8UjBrTHh/95zFznkYLiapLvWdf5ISbO";
         var hashToCheck = admin?.PasswordHash ?? _dummyHash;
         var passwordValid = BCrypt.Net.BCrypt.Verify(body.AdminPassword, hashToCheck);
 

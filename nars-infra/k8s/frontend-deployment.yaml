@@ -42,6 +42,9 @@ spec:
                 topologyKey: kubernetes.io/hostname
       securityContext:
         runAsNonRoot: true
+        # On OpenShift / SCC-managed platforms these are overridden by the
+        # Security Context Constraint which assigns a random UID. Set to
+        # null or omit if deploying on OpenShift.
         runAsUser: 101
         fsGroup: 101
       containers:

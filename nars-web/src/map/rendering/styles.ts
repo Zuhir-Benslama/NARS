@@ -82,16 +82,17 @@ export function createEntranceIconHtml(label: string | number, color = "#27ae60"
 // ─── POPUP BUILDER ────────────────────────────────────────────────────────────
 
 export function buildPopupContent(data: FeatureData, phase: (typeof PHASES)[number]): string {
-  const lines = [`<b>${data.label}</b>`, `<small>${t(phase.label)}</small>`]
+  const esc = escapeHtml
+  const lines = [`<b>${esc(data.label ?? "")}</b>`, `<small>${t(phase.label)}</small>`]
   if (data.decisionNumber)
-    lines.push(`<small>${t("popup_decision")}: ${data.decisionNumber}</small>`)
-  if (data.decisionDate) lines.push(`<small>${t("popup_date")}: ${data.decisionDate}</small>`)
-  if (data.roadLabel) lines.push(`<small>${t("popup_road")}: ${data.roadLabel}</small>`)
+    lines.push(`<small>${t("popup_decision")}: ${esc(data.decisionNumber)}</small>`)
+  if (data.decisionDate) lines.push(`<small>${t("popup_date")}: ${esc(data.decisionDate)}</small>`)
+  if (data.roadLabel) lines.push(`<small>${t("popup_road")}: ${esc(data.roadLabel)}</small>`)
   if (data.side)
     lines.push(
-      `<small>${t("popup_side")}: ${data.side} (${t(data.side === "left" ? "popup_side_odd" : "popup_side_even")})</small>`,
+      `<small>${t("popup_side")}: ${esc(data.side)} (${t(data.side === "left" ? "popup_side_odd" : "popup_side_even")})</small>`,
     )
   if (data.mainEntranceLabel)
-    lines.push(`<small>${t("popup_main_entrance")}: ${data.mainEntranceLabel}</small>`)
+    lines.push(`<small>${t("popup_main_entrance")}: ${esc(data.mainEntranceLabel)}</small>`)
   return lines.join("<br>")
 }

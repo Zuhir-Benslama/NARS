@@ -102,7 +102,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         })
         {
             modelBuilder.Entity(entityType)
-                .HasIndex("UserId")
+                .HasIndex(nameof(FeatureBase.UserId))
                 .HasDatabaseName(indexName);
         }
 

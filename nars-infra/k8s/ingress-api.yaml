@@ -47,9 +47,9 @@ metadata:
   name: nars-api-health
   namespace: nars
   annotations:
-    # ⚠ ssl-redirect forces HTTPS. If your monitoring system does not support
-    # HTTPS, set this to "false" or remove this annotation.
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # No ssl-redirect — health checks must work over plain HTTP for monitoring
+    # systems that don't support HTTPS. The /health endpoint exposes no
+    # sensitive data.
 spec:
   ingressClassName: nginx
   tls:

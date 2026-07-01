@@ -354,10 +354,10 @@ describe("FeatureModal", () => {
     mockModalStore.decisionNumber = "001"
     mockModalStore.decisionDate = "2024-01-01"
 
-    const wrapper = mount(FeatureModal)
+    mount(FeatureModal)
     await nextTick()
 
-    await wrapper.trigger("keyup", { key: "Enter" })
+    window.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter" }))
     await nextTick()
 
     expect(mockModalStore.close).toHaveBeenCalled()
@@ -367,10 +367,10 @@ describe("FeatureModal", () => {
     mockModalStore.visible = true
     mockModalStore.phaseIndex = 0
 
-    const wrapper = mount(FeatureModal)
+    mount(FeatureModal)
     await nextTick()
 
-    await wrapper.trigger("keyup", { key: "Escape" })
+    window.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape" }))
     await nextTick()
 
     expect(mockModalStore.close).toHaveBeenCalledWith(null)

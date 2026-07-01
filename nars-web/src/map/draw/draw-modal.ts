@@ -11,7 +11,7 @@ import { showToast } from "../../lib/toast"
 import { getRoadSide } from "../../lib/validation"
 import { t } from "../../i18n"
 import type { ModalResult } from "../../types"
-import { prepareModalExtras } from "../features/features"
+import { prepareModalExtras } from "../features/feature-modal"
 
 export async function openModalForFeature(
   phase: (typeof PHASES)[number],
