@@ -103,10 +103,7 @@ export function suppressGeomanFill(): void {
 }
 
 export function ensureGeomanDrawEdgesVisible(): void {
-  for (const layerId of [
-    "gm_temporary-polygon__line-layer-0",
-    "gm_temporary-line__line-layer-0",
-  ]) {
+  for (const layerId of ["gm_temporary-polygon__line-layer-0", "gm_temporary-line__line-layer-0"]) {
     try {
       if (ctx.map.getLayer(layerId)) {
         ctx.map.setPaintProperty(layerId, "line-opacity", 0.8)
@@ -118,10 +115,7 @@ export function ensureGeomanDrawEdgesVisible(): void {
     }
   }
 
-  for (const layerId of [
-    "gm_main-polygon__line-layer-0",
-    "gm_main-line__line-layer-0",
-  ]) {
+  for (const layerId of ["gm_main-polygon__line-layer-0", "gm_main-line__line-layer-0"]) {
     try {
       if (ctx.map.getLayer(layerId)) {
         ctx.map.setPaintProperty(layerId, "line-opacity", 0.8)

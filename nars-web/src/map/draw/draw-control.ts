@@ -83,7 +83,10 @@ export function buildDrawControl(phase: PhaseConfig): void {
           ensureGeomanDrawEdgesVisible()
           let retries = 0
           const poll = setInterval(() => {
-            if (++retries > 10) { clearInterval(poll); return }
+            if (++retries > 10) {
+              clearInterval(poll)
+              return
+            }
             ensureGeomanDrawEdgesVisible()
           }, 200)
           setTimeout(() => clearInterval(poll), 2500)
