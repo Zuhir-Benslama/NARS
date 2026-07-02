@@ -6,6 +6,7 @@ import { useAppStore } from "../../stores/appStore"
 import { useModalStore } from "../../stores/modalStore"
 import { useSelectionStore } from "../../stores/selectionStore"
 import { debugError } from "../../utils/debug"
+import { repatchMarker } from "./draw-state"
 import type { GeomanCreateEvent, ActionInstances } from "../core/geoman-types"
 import type { MapMouseEvent as MapLibreMapMouseEvent } from "maplibre-gl"
 
@@ -179,7 +180,10 @@ function onContextMenu(e: MouseEvent): void {
       ctx
         .geoman!.disableDraw()
         .then(() => {
-          if (phase && phase.key !== "namingPanels") buildDrawControl(phase)
+          if (phase && phase.key !== "namingPanels") {
+            buildDrawControl(phase)
+            repatchMarker()
+          }
         })
         .catch((err) => debugError("[CONTEXT] disableDraw:", err))
       return
@@ -271,7 +275,10 @@ function onKeyDown(e: KeyboardEvent): void {
       ctx
         .geoman!.disableDraw()
         .then(() => {
-          if (phase && phase.key !== "namingPanels") buildDrawControl(phase)
+          if (phase && phase.key !== "namingPanels") {
+            buildDrawControl(phase)
+            repatchMarker()
+          }
         })
         .catch((err) => debugError("[KEYDOWN] disableDraw:", err))
       return

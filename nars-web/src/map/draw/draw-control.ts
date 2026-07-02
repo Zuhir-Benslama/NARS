@@ -4,6 +4,7 @@
 
 import { ctx } from "../core/state"
 import { debugLog, debugError } from "../../utils/debug"
+import { ensureGeomanDrawEdgesVisible } from "../edit/edit-state"
 import type { DrawModeName } from "@geoman-io/maplibre-geoman-free"
 
 type PhaseConfig = { key: string; drawType: string; color: string }
@@ -76,7 +77,18 @@ export function buildDrawControl(phase: PhaseConfig): void {
     debugLog("[DRAW CONTROL] Enabling draw mode:", shapeName)
     currentGm
       .enableDraw(shapeName)
-      .then(() => debugLog("[DRAW CONTROL] Enabled draw mode:", shapeName))
+      .then(() => {
+        debugLog("[DRAW CONTROL] Enabled draw mode:", shapeName)
+        if (shapeName === "polygon" || shapeName === "line") {
+          ensureGeomanDrawEdgesVisible()
+          let retries = 0
+          const poll = setInterval(() => {
+            if (++retries > 10) { clearInterval(poll); return }
+            ensureGeomanDrawEdgesVisible()
+          }, 200)
+          setTimeout(() => clearInterval(poll), 2500)
+        }
+      })
       .catch((err) => debugError("[DRAW CONTROL] Failed to enable draw mode:", shapeName, err))
   })()
 }

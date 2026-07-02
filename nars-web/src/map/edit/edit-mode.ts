@@ -25,6 +25,7 @@ export {
   getActiveEditEntry,
   findLayerEntryByFeatureId,
   suppressGeomanFill,
+  ensureGeomanDrawEdgesVisible,
   disableEditMode,
 } from "./edit-state"
 export { commitEditMode, cancelEditMode } from "./edit-commit"

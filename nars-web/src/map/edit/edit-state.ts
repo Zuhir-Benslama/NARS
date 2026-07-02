@@ -101,3 +101,55 @@ export function suppressGeomanFill(): void {
     }
   }
 }
+
+export function ensureGeomanDrawEdgesVisible(): void {
+  for (const layerId of [
+    "gm_temporary-polygon__line-layer-0",
+    "gm_temporary-line__line-layer-0",
+  ]) {
+    try {
+      if (ctx.map.getLayer(layerId)) {
+        ctx.map.setPaintProperty(layerId, "line-opacity", 0.8)
+        ctx.map.setPaintProperty(layerId, "line-color", "#3498db")
+        ctx.map.setPaintProperty(layerId, "line-width", 3)
+      }
+    } catch {
+      /* layer may not exist yet */
+    }
+  }
+
+  for (const layerId of [
+    "gm_main-polygon__line-layer-0",
+    "gm_main-line__line-layer-0",
+  ]) {
+    try {
+      if (ctx.map.getLayer(layerId)) {
+        ctx.map.setPaintProperty(layerId, "line-opacity", 0.8)
+        ctx.map.setPaintProperty(layerId, "line-color", "#3498db")
+        ctx.map.setPaintProperty(layerId, "line-width", 3)
+      }
+    } catch {
+      /* layer may not exist yet */
+    }
+  }
+
+  // Add a NARS fallback edge layer that reads from gm_temporary source
+  // to ensure edges are visible during draw regardless of Geoman's own layers.
+  if (!ctx.map.getLayer("nars-temp-edge") && !!ctx.map.getSource("gm_temporary")) {
+    try {
+      ctx.map.addLayer({
+        id: "nars-temp-edge",
+        type: "line",
+        source: "gm_temporary",
+        filter: ["in", ["get", "__gm_shape"], ["literal", ["line", "polygon"]]],
+        paint: {
+          "line-color": "#3498db",
+          "line-width": 3,
+          "line-opacity": 0.8,
+        },
+      })
+    } catch {
+      /* nars-temp-edge may already exist */
+    }
+  }
+}

@@ -97,7 +97,13 @@ export function patchGeomanMarkerPointerSnap(): void {
           lng: number
           lat: number
         } | null
-        return snap ?? origGet.call(mp.marker!)
+        return snap ? [snap.lng, snap.lat] : origGet.call(mp.marker!)
+      }
+
+      const markerEl = (mp.marker as unknown as { markerInstance?: { getElement(): HTMLElement } })
+        .markerInstance?.getElement?.()
+      if (markerEl) {
+        markerEl.style.pointerEvents = "none"
       }
 
       debugLog("[SNAP] marker setLngLat + getLngLat patched")
@@ -155,7 +161,13 @@ export function repatchMarkerPointer(): void {
           lng: number
           lat: number
         } | null
-        return snap ?? origGet.call(mp.marker!)
+        return snap ? [snap.lng, snap.lat] : origGet.call(mp.marker!)
+      }
+
+      const markerEl = (mp.marker as unknown as { markerInstance?: { getElement(): HTMLElement } })
+        .markerInstance?.getElement?.()
+      if (markerEl) {
+        markerEl.style.pointerEvents = "none"
       }
 
       debugLog("[SNAP] marker re-patched after draw reset")
