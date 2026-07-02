@@ -9,20 +9,22 @@ trustedRegistries:
   - quay.io
 
 override:
-  # DL3008: Pin versions in apt-get install.
-  # We intentionally use wildcard suffixes (e.g., `curl=8.5.0-2ubuntu10*`)
-  # to allow security patches within the same series. This is safer than
-  # an unpinned install and more practical than updating the Dockerfile
-  # for every patch bump.
-  - dl3008: warning
+  warning:
+    # DL3008: Pin versions in apt-get install.
+    # We intentionally use wildcard suffixes (e.g., `curl=8.5.0-2ubuntu10*`)
+    # to allow security patches within the same series. This is safer than
+    # an unpinned install and more practical than updating the Dockerfile
+    # for every patch bump.
+    - dl3008
 
-  # DL3045: COPY to a non-root user directory without chown.
-  # The nars-postgis Dockerfile copies init SQL to
-  # /docker-entrypoint-initdb.d/ which is handled by the official
-  # postgis entrypoint as root before dropping privileges.
-  - dl3045: warning
+    # DL3045: COPY to a non-root user directory without chown.
+    # The nars-postgis Dockerfile copies init SQL to
+    # /docker-entrypoint-initdb.d/ which is handled by the official
+    # postgis entrypoint as root before dropping privileges.
+    - dl3045
 
-  # DL3059: Multiple consecutive RUN instructions.
-  # Each Dockerfile aims for layer count vs. readability balance;
-  # separate RUNs are acceptable where they improve cache efficiency.
-  - dl3059: style
+  style:
+    # DL3059: Multiple consecutive RUN instructions.
+    # Each Dockerfile aims for layer count vs. readability balance;
+    # separate RUNs are acceptable where they improve cache efficiency.
+    - dl3059

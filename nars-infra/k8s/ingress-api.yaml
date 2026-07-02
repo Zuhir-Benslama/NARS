@@ -46,10 +46,9 @@ kind: Ingress
 metadata:
   name: nars-api-health
   namespace: nars
-  annotations:
-    # No ssl-redirect — health checks must work over plain HTTP for monitoring
-    # systems that don't support HTTPS. The /health endpoint exposes no
-    # sensitive data.
+  # No ssl-redirect — health checks must work over plain HTTP for monitoring
+  # systems that don't support HTTPS. The /health endpoint exposes no
+  # sensitive data.
 spec:
   ingressClassName: nginx
   tls:
