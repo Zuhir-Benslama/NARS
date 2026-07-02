@@ -100,8 +100,9 @@ export function patchGeomanMarkerPointerSnap(): void {
         return snap ? [snap.lng, snap.lat] : origGet.call(mp.marker!)
       }
 
-      const markerEl = (mp.marker as unknown as { markerInstance?: { getElement(): HTMLElement } })
-        .markerInstance?.getElement?.()
+      const markerEl = (
+        mp.marker as unknown as { markerInstance?: { getElement(): HTMLElement } }
+      ).markerInstance?.getElement?.()
       if (markerEl) {
         markerEl.style.pointerEvents = "none"
       }
@@ -164,8 +165,9 @@ export function repatchMarkerPointer(): void {
         return snap ? [snap.lng, snap.lat] : origGet.call(mp.marker!)
       }
 
-      const markerEl = (mp.marker as unknown as { markerInstance?: { getElement(): HTMLElement } })
-        .markerInstance?.getElement?.()
+      const markerEl = (
+        mp.marker as unknown as { markerInstance?: { getElement(): HTMLElement } }
+      ).markerInstance?.getElement?.()
       if (markerEl) {
         markerEl.style.pointerEvents = "none"
       }
