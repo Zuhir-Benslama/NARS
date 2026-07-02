@@ -6,7 +6,7 @@ import maplibregl from "maplibre-gl"
 import { createGeomanInstance } from "@geoman-io/maplibre-geoman-free"
 import { ctx, featuresStore, _setCtx } from "./core/state"
 import { initSources } from "./map-layers"
-import { suppressGeomanFill } from "./edit/edit-mode"
+import { suppressGeomanFill, ensureGeomanDrawEdgesVisible } from "./edit/edit-mode"
 import { updateEndpointMarkers } from "./roads/road-directions"
 import { refreshLayerVisibility } from "./rendering/labels"
 import { MAP_CONFIG } from "../config"
@@ -146,6 +146,7 @@ export async function initMap(): Promise<void> {
 
     ctx.geoman = await createGeomanInstance(ctx.map, geomanOptions)
     suppressGeomanFill()
+    ensureGeomanDrawEdgesVisible()
     ctx.map.doubleClickZoom.disable()
   }
 
@@ -153,6 +154,7 @@ export async function initMap(): Promise<void> {
 
   ctx.geoman = await createGeomanInstance(ctx.map, geomanOptions)
   suppressGeomanFill()
+  ensureGeomanDrawEdgesVisible()
 
   ctx.map.doubleClickZoom.disable()
 

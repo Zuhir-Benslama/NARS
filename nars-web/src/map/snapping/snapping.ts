@@ -216,7 +216,7 @@ function processSnapMove(): void {
   const x = e.clientX - rect.left
   const y = e.clientY - rect.top
 
-  const snap = findNearestSnap(x, y, activePhases, false)
+  const snap = findNearestSnap(x, y, activePhases, true)
   if (snap) {
     store.snapActive = true
     store.snapLatLng = { lat: snap.lat, lng: snap.lng }

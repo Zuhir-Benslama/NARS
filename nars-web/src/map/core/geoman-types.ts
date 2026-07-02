@@ -26,7 +26,7 @@ export type GeomanGeometry =
 
 export interface GeomanMarker {
   setLngLat(lngLat: [number, number] | { lng: number; lat: number } | maplibregl.LngLat): void
-  getLngLat(): { lng: number; lat: number } | maplibregl.LngLat
+  getLngLat(): { lng: number; lat: number } | maplibregl.LngLat | [number, number]
   toArray?(): [number, number]
   _narsSnapPatchedInstance?: boolean
 }
@@ -34,7 +34,7 @@ export interface GeomanMarker {
 export interface GeomanMarkerPointer {
   marker: {
     setLngLat: (lngLat: [number, number] | { lng: number; lat: number }) => void
-    getLngLat: () => { lng: number; lat: number }
+    getLngLat: () => { lng: number; lat: number } | [number, number]
     _narsSnapPatchedInstance?: boolean
   } | null
   _narsSnapPatched?: boolean
