@@ -17,15 +17,13 @@ public class LocationsControllerTests
     private static LocationsController CreateController(
         AppDbContext db,
         IMemoryCache? cache = null,
-        IBoundaryService? boundaryService = null)
-    {
-        return new LocationsController(
+        IBoundaryService? boundaryService = null) =>
+        new(
             db,
             cache ?? new MemoryCache(new MemoryCacheOptions()),
             Options.Create(new CacheOptions()),
             Options.Create(new LocationsOptions()),
             boundaryService ?? Mock.Of<IBoundaryService>());
-    }
 
     private static AppDbContext CreateDb(string name)
     {

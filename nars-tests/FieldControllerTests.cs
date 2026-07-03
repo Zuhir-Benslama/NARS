@@ -56,13 +56,14 @@ public class FieldControllerTests
             Mock.Of<ILogger<FieldController>>(),
             Options.Create(new FeatureDefaultsOptions()),
             timeProvider,
-            fieldSvc);
-
-        ctrl.ControllerContext = new ControllerContext
+            fieldSvc)
         {
-            HttpContext = new DefaultHttpContext
+            ControllerContext = new ControllerContext
             {
-                User = AuthTestHelper.CreateClaimsPrincipal(UserId, UserRoles.FieldWorker, communeId: communeId)
+                HttpContext = new DefaultHttpContext
+                {
+                    User = AuthTestHelper.CreateClaimsPrincipal(UserId, UserRoles.FieldWorker, communeId: communeId)
+                }
             }
         };
 

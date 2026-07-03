@@ -194,7 +194,7 @@ public class FieldController(
             from r in db.Roads
             join u in db.Users on r.UserId equals u.Id
             where r.Id == roadId
-            select new { Road = r, CommuneId = u.CommuneId }
+            select new { Road = r, u.CommuneId }
         ).FirstOrDefaultAsync(cancellationToken);
 
         if (roadData is null)

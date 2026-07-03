@@ -238,10 +238,8 @@ public class AuthControllerTests
     // Logout is tested in AuthControllerIntegrationTests.Logout_RevokesRefreshTokens
     // (real PostgreSQL supports ExecuteUpdateAsync; InMemory does not).
 
-    private static async Task SeedLocationDataAsync(AppDbContext db)
-    {
+    private static async Task SeedLocationDataAsync(AppDbContext db) =>
         await SeedData.SeedExtendedLocationsAsync(db);
-    }
 
     private static async Task SeedAdminAsync(AppDbContext db, string username, string role, int? dairaId = null, int? wilayaId = null)
     {

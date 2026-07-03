@@ -4,9 +4,20 @@ public static class GeographicValidator
 {
     public static string? Validate(string role, int? communeId, int? dairaId, int? wilayaId)
     {
-        if (communeId.HasValue && communeId <= 0) return "commune_id must be a positive integer.";
-        if (dairaId.HasValue && dairaId <= 0) return "daira_id must be a positive integer.";
-        if (wilayaId.HasValue && wilayaId <= 0) return "wilaya_id must be a positive integer.";
+        if (communeId.HasValue && communeId <= 0)
+        {
+            return "commune_id must be a positive integer.";
+        }
+
+        if (dairaId.HasValue && dairaId <= 0)
+        {
+            return "daira_id must be a positive integer.";
+        }
+
+        if (wilayaId.HasValue && wilayaId <= 0)
+        {
+            return "wilaya_id must be a positive integer.";
+        }
 
         return role switch
         {

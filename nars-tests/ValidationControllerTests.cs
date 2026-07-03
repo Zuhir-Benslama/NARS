@@ -29,13 +29,14 @@ public class ValidationControllerTests
 
         var ctrl = new ValidationController(
             context, Options.Create(new ValidationOptions()),
-            validationService ?? Mock.Of<IValidationService>());
-
-        ctrl.ControllerContext = new ControllerContext
+            validationService ?? Mock.Of<IValidationService>())
         {
-            HttpContext = new DefaultHttpContext
+            ControllerContext = new ControllerContext
             {
-                User = AuthTestHelper.CreateClaimsPrincipal(UserId, "field_worker", communeId: 1)
+                HttpContext = new DefaultHttpContext
+                {
+                    User = AuthTestHelper.CreateClaimsPrincipal(UserId, "field_worker", communeId: 1)
+                }
             }
         };
 
@@ -158,8 +159,10 @@ public class ValidationControllerTests
                 It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<double>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        var ctrl2 = new ValidationController(db, Options.Create(new ValidationOptions { RoadTurnAngleDegrees = 45 }), validationMock.Object);
-        ctrl2.ControllerContext = ctrl.ControllerContext;
+        var ctrl2 = new ValidationController(db, Options.Create(new ValidationOptions { RoadTurnAngleDegrees = 45 }), validationMock.Object)
+        {
+            ControllerContext = ctrl.ControllerContext
+        };
 
         var body = new ValidateRoadRequest([
             new CoordDto(36.0, 3.0),
@@ -195,8 +198,10 @@ public class ValidationControllerTests
                 It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<double>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
-        var ctrl2 = new ValidationController(db, Options.Create(new ValidationOptions()), validationMock.Object);
-        ctrl2.ControllerContext = ctrl.ControllerContext;
+        var ctrl2 = new ValidationController(db, Options.Create(new ValidationOptions()), validationMock.Object)
+        {
+            ControllerContext = ctrl.ControllerContext
+        };
 
         var body = new ValidateRoadRequest([
             new CoordDto(36.0, 3.0),

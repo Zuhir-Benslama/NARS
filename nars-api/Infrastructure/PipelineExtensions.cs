@@ -53,8 +53,7 @@ public static class PipelineExtensions
     }
 
     private static void UseExceptionHandling(WebApplication app)
-    {
-        app.UseExceptionHandler(errApp =>
+        => app.UseExceptionHandler(errApp =>
         {
             errApp.Run(async ctx =>
             {
@@ -101,7 +100,6 @@ public static class PipelineExtensions
                     JsonSerializer.Serialize(problem, JsonOptions));
             });
         });
-    }
 
     private static void UseStaticFilesWithCaching(WebApplication app)
     {
@@ -178,8 +176,7 @@ public static class PipelineExtensions
     }
 
     private static void UseCsrfValidation(WebApplication app)
-    {
-        app.Use(async (ctx, next) =>
+        => app.Use(async (ctx, next) =>
         {
             var method = ctx.Request.Method.ToUpperInvariant();
             var isAuthenticated = ctx.User.Identity?.IsAuthenticated == true;
@@ -206,7 +203,6 @@ public static class PipelineExtensions
             }
             await next();
         });
-    }
 
     private static void UseApiEndpoints(WebApplication app)
     {
@@ -222,13 +218,11 @@ public static class PipelineExtensions
     }
 
     private static void LogStartupComplete(WebApplication app, IConfiguration config, ILogger<Program> logger)
-    {
-        app.Lifetime.ApplicationStarted.Register(() =>
+        => app.Lifetime.ApplicationStarted.Register(() =>
         {
             var addresses = app.Urls.Count != 0
                 ? string.Join(", ", app.Urls)
                 : config["ASPNETCORE_URLS"] ?? "http://localhost:5000";
             logger.LogInformation("Startup complete — {Addresses}", addresses);
         });
-    }
 }

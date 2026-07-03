@@ -84,7 +84,7 @@ public class JwtServiceTests
             Guid.NewGuid(), "testuser", "Test User", "test@example.com", 1);
 
         // Tamper with the token
-        var tampered = token.Substring(0, token.Length - 5) + "XXXXX";
+        var tampered = token[..^5] + "XXXXX";
 
         Assert.Null(service.ValidateToken(tampered));
     }

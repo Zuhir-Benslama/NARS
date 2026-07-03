@@ -31,15 +31,9 @@ public class ValidationControllerIntegrationTests : IAsyncLifetime
         _controller = new ValidationController(_db, Options.Create(new ValidationOptions()), new ValidationService(_db));
     }
 
-    public async Task InitializeAsync()
-    {
-        await SeedReferenceDataAsync();
-    }
+    public async Task InitializeAsync() => await SeedReferenceDataAsync();
 
-    public async Task DisposeAsync()
-    {
-        await _fixture.CleanTablesAsync();
-    }
+    public async Task DisposeAsync() => await _fixture.CleanTablesAsync();
 
     [Fact]
     public async Task ValidateRoad_MustHaveAtLeast2Points()
@@ -133,10 +127,7 @@ public class ValidationControllerIntegrationTests : IAsyncLifetime
         return userId;
     }
 
-    private async Task SeedReferenceDataAsync()
-    {
-        await SeedData.SeedBasicLocationsAsync(_db);
-    }
+    private async Task SeedReferenceDataAsync() => await SeedData.SeedBasicLocationsAsync(_db);
 
     private void SetUserId(Guid userId)
     {
