@@ -1,18 +1,15 @@
 ---
 # ─── Frontend Ingress ──────────────────────────────────────────────────
-# Serves nars.dz (SPA) with TLS but NO mTLS (browser-facing).
-# HTTP redirected to HTTPS automatically.
+# Serves nars.dz (SPA + API) with TLS but NO mTLS (browser-facing).
+# /api/* routes to the API service; /(.*) routes to the SPA.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: nars-frontend
   namespace: nars
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/use-regex: "true"
-    nginx.ingress.kubernetes.io/hsts: "true"
-    nginx.ingress.kubernetes.io/hsts-max-age: "31536000"
-    nginx.ingress.kubernetes.io/hsts-include-subdomains: "true"
 spec:
   ingressClassName: nginx
   tls:
@@ -23,6 +20,20 @@ spec:
     - host: nars.dz
       http:
         paths:
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: nars-api
+                port:
+                  number: 80
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: nars-api
+                port:
+                  number: 80
           - path: /(.*)
             pathType: ImplementationSpecific
             backend:
