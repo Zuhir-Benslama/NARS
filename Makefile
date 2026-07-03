@@ -90,6 +90,7 @@ cluster-up: prerequisites ## Full bootstrap: create cluster, build images, deplo
 	@echo "✓ Cluster '$(CLUSTER_NAME)' is ready!"
 	@echo ""
 	@echo "  Proxy:         make proxy-up"
+	@echo "  Mobile app:    make adb-reverse"
 	@echo "  Smoke test:    make smoke-test"
 	@echo "  Visit:         http://localhost:8080/"
 	@echo "  Stop proxy:    make proxy-down"
@@ -171,6 +172,8 @@ port-forward-start: ## Start kubectl port-forward inside the kind container (bac
 	@sleep 0.5
 	@docker exec -d nars-control-plane kubectl port-forward --address 0.0.0.0 \
 		-n ingress-nginx service/ingress-nginx-controller 8080:80 > /dev/null 2>&1
+	@docker exec -d nars-control-plane kubectl port-forward --address 0.0.0.0 \
+		-n ingress-nginx service/ingress-nginx-controller 8443:443 > /dev/null 2>&1
 	@sleep 2
 	@echo "✓ Port-forward started inside kind container"
 
@@ -185,10 +188,12 @@ proxy-up: port-forward-start ## Start Docker socat bridge: host:8080 → kind:80
 	@-docker rm -f "$(PROXY_CONTAINER)" 2>/dev/null || true
 	@sleep 0.5
 	@docker run -d --name "$(PROXY_CONTAINER)" --rm \
-		-p 127.0.0.1:8080:8080 \
+		-p 0.0.0.0:8080:8080 \
+		-p 0.0.0.0:8443:8443 \
 		--network kind \
+		--entrypoint sh \
 		alpine/socat \
-		tcp-l:8080,fork,reuseaddr tcp:nars-control-plane:8080 > /dev/null
+		-c "socat tcp-l:8080,fork,reuseaddr tcp:nars-control-plane:8080 & socat tcp-l:8443,fork,reuseaddr tcp:nars-control-plane:8443 & wait" > /dev/null
 	@echo "→ Waiting for proxy to be ready..."
 	@for i in $$(seq 1 12); do \
 		if curl -s --connect-timeout 2 -o /dev/null -w "" http://localhost:8080/ 2>/dev/null; then \
@@ -204,6 +209,7 @@ proxy-up: port-forward-start ## Start Docker socat bridge: host:8080 → kind:80
 	@echo ""
 	@echo "✓ App accessible at http://localhost:8080/"
 	@echo "  Health:      http://localhost:8080/api/health"
+	@echo "  Mobile app:  make adb-reverse    (if connected via USB)"
 	@echo "  Smoke test:  make smoke-test"
 	@echo "  Stop proxy:  make proxy-down"
 
@@ -213,10 +219,17 @@ proxy-down: port-forward-stop ## Stop the socat bridge and port-forward
 	@-docker rm -f "$(PROXY_CONTAINER)" 2>/dev/null || true
 	@echo "✓ Proxy stopped"
 
+.PHONY: adb-reverse
+adb-reverse: ## Forward phone:8080 → host:8080 via USB (for mobile dev)
+	@echo "→ Setting up adb reverse proxy..."
+	@adb reverse tcp:8080 tcp:8080 2>&1
+	@echo "✓ Phone can now reach the API at http://localhost:8080/"
+	@echo "  (Lasts while USB is connected; re-run after USB disconnect/reconnect)"
+
 .PHONY: proxy-status
 proxy-status: ## Show proxy status
 	@echo "=== Port-forward (kind container) ==="
-	@docker exec nars-control-plane ss -tlnp 2>/dev/null | grep 8080 || echo "  NOT RUNNING"
+	@docker exec nars-control-plane ss -tlnp 2>/dev/null | grep -E '8080|8443' || echo "  NOT RUNNING"
 	@echo ""
 	@echo "=== socat bridge container ==="
 	@docker ps --filter name=$(PROXY_CONTAINER) --format '  {{.ID}} {{.Status}} {{.Image}}' 2>/dev/null || echo "  NOT RUNNING"
