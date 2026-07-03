@@ -29,15 +29,9 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
         _controller = new AdminController(_db, Mock.Of<Microsoft.Extensions.Logging.ILogger<AdminController>>(), new AdminOverviewService(_db, featureStats));
     }
 
-    public async Task InitializeAsync()
-    {
-        await SeedReferenceDataAsync();
-    }
+    public async Task InitializeAsync() => await SeedReferenceDataAsync();
 
-    public async Task DisposeAsync()
-    {
-        await _fixture.CleanTablesAsync();
-    }
+    public async Task DisposeAsync() => await _fixture.CleanTablesAsync();
 
     [Fact]
     public async Task CreateAdmin_DairaAdminToCommuneUser_InOwnDaira_Returns201()
@@ -376,9 +370,20 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
             new(ClaimNames.Role, user.Role),
         };
 
-        if (user.CommuneId.HasValue) claims.Add(new Claim(ClaimNames.CommuneId, user.CommuneId.Value.ToString()));
-        if (user.DairaId.HasValue) claims.Add(new Claim(ClaimNames.DairaId, user.DairaId.Value.ToString()));
-        if (user.WilayaId.HasValue) claims.Add(new Claim(ClaimNames.WilayaId, user.WilayaId.Value.ToString()));
+        if (user.CommuneId.HasValue)
+        {
+            claims.Add(new Claim(ClaimNames.CommuneId, user.CommuneId.Value.ToString()));
+        }
+
+        if (user.DairaId.HasValue)
+        {
+            claims.Add(new Claim(ClaimNames.DairaId, user.DairaId.Value.ToString()));
+        }
+
+        if (user.WilayaId.HasValue)
+        {
+            claims.Add(new Claim(ClaimNames.WilayaId, user.WilayaId.Value.ToString()));
+        }
 
         var httpContext = new DefaultHttpContext
         {
@@ -387,8 +392,5 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
         _controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
     }
 
-    private async Task SeedReferenceDataAsync()
-    {
-        await SeedData.SeedAdminLocationsAsync(_db);
-    }
+    private async Task SeedReferenceDataAsync() => await SeedData.SeedAdminLocationsAsync(_db);
 }

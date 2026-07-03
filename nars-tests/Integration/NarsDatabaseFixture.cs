@@ -55,7 +55,11 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
     /// </summary>
     public AppDbContext CreateDbContext()
     {
-        if (!_initialized) throw new InvalidOperationException("Database not initialized");
+        if (!_initialized)
+        {
+            throw new InvalidOperationException("Database not initialized");
+        }
+
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(ConnectionString, o => o.UseNetTopologySuite())
             .Options;
@@ -67,7 +71,11 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
     /// </summary>
     public IDbContextFactory<AppDbContext> CreateDbContextFactory()
     {
-        if (!_initialized) throw new InvalidOperationException("Database not initialized");
+        if (!_initialized)
+        {
+            throw new InvalidOperationException("Database not initialized");
+        }
+
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(ConnectionString, o => o.UseNetTopologySuite())
             .Options;

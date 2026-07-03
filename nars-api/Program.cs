@@ -59,7 +59,9 @@ static string GetRequiredConfig(IConfiguration config, string primaryKey, string
     {
         var val = config[key];
         if (!string.IsNullOrWhiteSpace(val))
+        {
             return val.Trim();
+        }
     }
 
     throw new InvalidOperationException(

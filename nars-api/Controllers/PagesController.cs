@@ -123,10 +123,7 @@ public class PagesController(
         }
 
         var principal = ValidateAccessTokenFromCookie();
-        if (principal is null)
-        {
-            principal = ValidateAccessTokenFromBearerHeader();
-        }
+        principal ??= ValidateAccessTokenFromBearerHeader();
 
         if (principal is not null)
         {

@@ -41,13 +41,14 @@ public class FeaturesControllerTests
             Mock.Of<ILogger<FeaturesController>>(),
             Options.Create(new FeatureDefaultsOptions()),
             timeProvider ?? Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedNow),
-            featureStatsService ?? Mock.Of<IFeatureStatsService>());
-
-        ctrl.ControllerContext = new ControllerContext
+            featureStatsService ?? Mock.Of<IFeatureStatsService>())
         {
-            HttpContext = new DefaultHttpContext
+            ControllerContext = new ControllerContext
             {
-                User = AuthTestHelper.CreateClaimsPrincipal(UserId, "field_worker", communeId: 1)
+                HttpContext = new DefaultHttpContext
+                {
+                    User = AuthTestHelper.CreateClaimsPrincipal(UserId, "field_worker", communeId: 1)
+                }
             }
         };
 

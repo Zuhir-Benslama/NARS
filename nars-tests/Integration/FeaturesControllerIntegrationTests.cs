@@ -47,10 +47,7 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
         SetUserId(_userId, 1);
     }
 
-    public async Task DisposeAsync()
-    {
-        await _fixture.CleanTablesAsync();
-    }
+    public async Task DisposeAsync() => await _fixture.CleanTablesAsync();
 
     [Fact]
     public async Task SaveFeature_ValidArea_Returns201()

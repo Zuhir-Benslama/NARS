@@ -30,15 +30,9 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
         _controller = CreateController(_db);
     }
 
-    public async Task InitializeAsync()
-    {
-        await SeedReferenceDataAsync();
-    }
+    public async Task InitializeAsync() => await SeedReferenceDataAsync();
 
-    public async Task DisposeAsync()
-    {
-        await _fixture.CleanTablesAsync();
-    }
+    public async Task DisposeAsync() => await _fixture.CleanTablesAsync();
 
     [Fact]
     public async Task AuthorizedAdminSignup_ValidRequest_CreatesUser()
@@ -268,10 +262,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             timeProvider);
     }
 
-    private async Task SeedReferenceDataAsync()
-    {
-        await SeedData.SeedBasicLocationsAsync(_db);
-    }
+    private async Task SeedReferenceDataAsync() => await SeedData.SeedBasicLocationsAsync(_db);
 
     private async Task<User> CreateAdminAsync(
         string username,

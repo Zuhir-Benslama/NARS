@@ -19,9 +19,20 @@ public static class AuthTestHelper
             new(ClaimNames.Role, role),
         };
 
-        if (communeId.HasValue) claims.Add(new Claim(ClaimNames.CommuneId, communeId.Value.ToString()));
-        if (dairaId.HasValue) claims.Add(new Claim(ClaimNames.DairaId, dairaId.Value.ToString()));
-        if (wilayaId.HasValue) claims.Add(new Claim(ClaimNames.WilayaId, wilayaId.Value.ToString()));
+        if (communeId.HasValue)
+        {
+            claims.Add(new Claim(ClaimNames.CommuneId, communeId.Value.ToString()));
+        }
+
+        if (dairaId.HasValue)
+        {
+            claims.Add(new Claim(ClaimNames.DairaId, dairaId.Value.ToString()));
+        }
+
+        if (wilayaId.HasValue)
+        {
+            claims.Add(new Claim(ClaimNames.WilayaId, wilayaId.Value.ToString()));
+        }
 
         return new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth"));
     }
