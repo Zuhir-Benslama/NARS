@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router"
 
+// Routes are used only for admin views. Commune_user and field_worker
+// UIs are rendered by App.vue based on role, outside <router-view>.
 const routes = [
   {
     path: "/",
@@ -7,7 +9,7 @@ const routes = [
   },
   {
     path: "/map",
-    redirect: "/admin",
+    redirect: "/",
   },
   {
     path: "/admin",

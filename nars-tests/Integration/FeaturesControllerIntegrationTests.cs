@@ -148,7 +148,7 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
             Type: "area", Layer: "central_urban", Label: "To Delete",
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(data)).RootElement));
 
-        // The response is an anonymous type — extract the ID via reflection
+        // Extract the ID from the response
         var saveOk = Assert.IsType<ObjectResult>(saveResult);
         Assert.Equal(201, saveOk.StatusCode);
         var saveResponse = Assert.IsType<SaveFeatureResponse>(saveOk.Value);

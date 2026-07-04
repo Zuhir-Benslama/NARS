@@ -63,8 +63,8 @@ vi.mock("maplibre-gl", () => ({
       this.sources.set(id, source)
     })
     getSource = vi.fn((id: string) => this.sources.get(id))
-    addLayer = vi.fn((layer: unknown) => {
-      this.layers.set((layer as any).id, layer)
+    addLayer = vi.fn((layer: { id: string }) => {
+      this.layers.set(layer.id, layer)
     })
     getStyle = vi.fn(() => ({ layers: [] }))
     queryRenderedFeatures = vi.fn(() => [])

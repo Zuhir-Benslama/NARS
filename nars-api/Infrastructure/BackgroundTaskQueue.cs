@@ -65,7 +65,14 @@ public class BackgroundQueueProcessor(
         await _shutdown.CancelAsync();
         if (_executingTask != null)
         {
-            await Task.WhenAny(_executingTask, Task.Delay(Timeout.Infinite, cancellationToken));
+            try
+            {
+                await _executingTask.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // Shutdown timeout elapsed — runtime will force-stop.
+            }
         }
     }
 
