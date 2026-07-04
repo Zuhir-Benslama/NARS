@@ -145,6 +145,16 @@ public class AdminController(
                 }
 
                 break;
+            // Unreachable — CanCreateRole above already blocks these,
+            // but we keep them for safety and switch exhaustiveness.
+            case (UserRoles.NationalAdmin, UserRoles.NationalAdmin):
+            case (UserRoles.NationalAdmin, UserRoles.FieldWorker):
+            case (UserRoles.NationalAdmin, UserRoles.CommuneUser):
+            case (UserRoles.NationalAdmin, UserRoles.DairaAdmin):
+            case (UserRoles.WilayaAdmin, not UserRoles.DairaAdmin):
+            case (UserRoles.DairaAdmin, not UserRoles.CommuneUser):
+            case (UserRoles.CommuneUser, not UserRoles.FieldWorker):
+                return Forbid();
         }
 
         var geoError = GeographicValidator.Validate(body.Role, body.CommuneId, body.DairaId, body.WilayaId);

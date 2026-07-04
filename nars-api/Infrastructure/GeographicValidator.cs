@@ -24,7 +24,8 @@ public static class GeographicValidator
             UserRoles.CommuneUser when !communeId.HasValue => "commune_id is required for commune_user.",
             UserRoles.DairaAdmin when !dairaId.HasValue => "daira_id is required for daira_admin.",
             UserRoles.WilayaAdmin when !wilayaId.HasValue => "wilaya_id is required for wilaya_admin.",
-            UserRoles.NationalAdmin => "national_admin accounts must be created directly in the database.",
+            // NationalAdmin is intentionally absent — those accounts are created
+            // directly in the database and cannot be created via the API.
             UserRoles.FieldWorker => null,
             _ => null,
         };
