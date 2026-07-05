@@ -1,5 +1,4 @@
 using System.Data;
-using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
@@ -37,7 +36,7 @@ public class SpatialController(
         }
 
         var road = await db.Roads.FirstOrDefaultAsync(f =>
-            f.Id == body.RoadId && f.UserId == CurrentUserId, cancellationToken);
+            f.Id == body.RoadId && f.UserId == RequiredCurrentUserId, cancellationToken);
 
         if (road is null)
         {
@@ -70,7 +69,7 @@ public class SpatialController(
         // Apply cosine correction so the Δlng component is in the same
         // unit scale as Δlat (important at Algeria's latitudes ~28–37°N).
         double markerLat = body.Lat, markerLng = body.Lng;
-        var cosLat = Math.Cos(markerLat * Math.PI / 180.0);
+        var cosLat = Math.Cos(markerLat * DegToRad);
         var minDist = double.MaxValue;
         var nearestIdx = 0;
 
@@ -106,6 +105,22 @@ public class SpatialController(
         }
 
         return Ok(new RoadSideResponse(side, suggested));
+    }
+
+    private const double DegToRad = Math.PI / 180.0;
+
+    // ── GET /api/areas/scattered-status ─────────────────────────────────────
+
+    [HttpGet("areas/scattered-status")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public IActionResult GetScatteredStatus()
+    {
+        var error = scatteredService.LastError;
+        return Ok(new ScatteredStatusResponse(
+            LastErrorTime: error?.Timestamp.ToString(FeatureDtoConverter.IsoDateFormat),
+            LastErrorMessage: error?.Message,
+            HasError: error.HasValue
+        ));
     }
 
     // ── POST /api/areas/refresh-scattered ────────────────────────────────────

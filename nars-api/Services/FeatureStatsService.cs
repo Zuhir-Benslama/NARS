@@ -67,7 +67,7 @@ public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
         var caseBuilder = new StringBuilder();
         for (var i = 0; i < descriptors.Count; i++)
         {
-            caseBuilder.AppendLine($"                    COALESCE(SUM(CASE WHEN f.ft = '{descriptors[i].Type}' THEN 1 ELSE 0 END), 0) AS \"{descriptors[i].Type}\",");
+            caseBuilder.AppendLine($"                    COALESCE(SUM(CASE WHEN f.ft = @t{i} THEN 1 ELSE 0 END), 0) AS c{i},");
         }
 
         cmd.CommandText = $"""
@@ -86,6 +86,11 @@ public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
             GROUP BY u.id, u.username, u.name, u.email, u.role
             """;
 
+        for (var i = 0; i < descriptors.Count; i++)
+        {
+            SqlFragments.AddParam(cmd, $"@t{i}", descriptors[i].Type);
+        }
+
         FeatureQueryHelper.AddParameter(cmd, "@ids", userIds);
 
         var result = new Dictionary<Guid, UserFeatureStats>();
@@ -99,15 +104,15 @@ public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
                 Name: reader.GetString(2),
                 Email: reader.GetString(3),
                 Role: reader.GetString(4),
-                Areas: reader.GetInt64(reader.GetOrdinal(FeatureTypes.Area)),
-                Districts: reader.GetInt64(reader.GetOrdinal(FeatureTypes.District)),
-                CityCenters: reader.GetInt64(reader.GetOrdinal(FeatureTypes.CityCenter)),
-                Roads: reader.GetInt64(reader.GetOrdinal(FeatureTypes.Road)),
-                HouseEntrances: reader.GetInt64(reader.GetOrdinal(FeatureTypes.HouseEntrance)),
-                PublicBuildings: reader.GetInt64(reader.GetOrdinal(FeatureTypes.PublicBuilding)),
-                PublicSpaces: reader.GetInt64(reader.GetOrdinal(FeatureTypes.PublicSpace)),
-                NamingPanels: reader.GetInt64(reader.GetOrdinal(FeatureTypes.NamingPanel)),
-                Total: reader.GetInt64(reader.GetOrdinal("total"))
+                Areas: reader.GetInt64(5),
+                Districts: reader.GetInt64(6),
+                CityCenters: reader.GetInt64(7),
+                Roads: reader.GetInt64(8),
+                HouseEntrances: reader.GetInt64(9),
+                PublicBuildings: reader.GetInt64(10),
+                PublicSpaces: reader.GetInt64(11),
+                NamingPanels: reader.GetInt64(12),
+                Total: reader.GetInt64(13)
             );
         }
         return result;

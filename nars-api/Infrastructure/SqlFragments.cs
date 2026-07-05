@@ -53,24 +53,26 @@ internal static class SqlFragments
     /// Adds a named parameter to an ADO.NET command.
     /// Shared by NarsControllerBase and ScatteredAreaService to avoid duplication.
     /// </summary>
-    internal static void AddParam(IDbCommand cmd, string name, object value)
+    internal static IDbDataParameter AddParam(IDbCommand cmd, string name, object value)
     {
         var p = cmd.CreateParameter();
         p.ParameterName = name;
         p.Value = value;
         cmd.Parameters.Add(p);
+        return p;
     }
 
     /// <summary>
     /// Adds a GUID array parameter for use with PostgreSQL ANY(@ids).
     /// Avoids boxing each GUID individually.
     /// </summary>
-    internal static void AddParam(IDbCommand cmd, string name, Guid[] values)
+    internal static IDbDataParameter AddParam(IDbCommand cmd, string name, Guid[] values)
     {
         var p = cmd.CreateParameter();
         p.ParameterName = name;
         p.Value = values;
         cmd.Parameters.Add(p);
+        return p;
     }
 
     /// <summary>

@@ -11,11 +11,9 @@ data:
   # Localhost entries are NOT included — they are set by the local dev env.
   Cors__AllowedOrigins__0: "https://nars.dz"
   Cors__AllowedOrigins__1: "https://api.nars.dz"
-  # Allow any Host header — required because K8s probes (startup/readiness/liveness)
-  # send requests with the pod IP as the Host header, which would be rejected if
-  # AllowedHosts were restricted.
-  # Note: This env var overrides the "AllowedHosts: localhost" in appsettings.json.
-  AllowedHosts: "*"
+  # Restricted to known domains. The httpGet probes in app-deployment.yaml
+  # set a Host header matching one of these values via httpHeaders.
+  AllowedHosts: "nars.dz;api.nars.dz;localhost"
   # Shared between backup-cronjob and any other DB-consuming pods.
   PGHOST: "postgis"
   PGPORT: "5432"

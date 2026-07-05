@@ -290,7 +290,7 @@ public class AdminController(
                 return Problem(detail: "Password is required to change role or geographic scope.", statusCode: 400);
             }
 
-            var caller = await db.Users.FindAsync([CurrentUserId], cancellationToken);
+            var caller = await db.Users.FindAsync([RequiredCurrentUserId], cancellationToken);
             if (caller is null || !BCrypt.Net.BCrypt.Verify(body.Password, caller.PasswordHash))
             {
                 return Problem(detail: "Password is incorrect.", statusCode: 403);

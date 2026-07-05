@@ -33,11 +33,12 @@ public class LocationsController(
     private const string CommuneCacheKeyPrefix = "communes_daira_";
     private TimeSpan ReferenceDataCacheDuration => TimeSpan.FromHours(cacheOptions.Value.ReferenceDataDurationHours);
 
-    private async Task<List<T>> CacheOrFetchAsync<T>(string key, Func<Task<List<T>>> fetch) => (await cache.GetOrCreateAsync(key, async entry =>
-                                                                                                    {
-                                                                                                        entry.AbsoluteExpirationRelativeToNow = ReferenceDataCacheDuration;
-                                                                                                        return await fetch();
-                                                                                                    }))!;
+    private async Task<List<T>> CacheOrFetchAsync<T>(string key, Func<Task<List<T>>> fetch) =>
+        (await cache.GetOrCreateAsync(key, async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = ReferenceDataCacheDuration;
+            return await fetch();
+        })) ?? [];
 
     private async Task<IActionResult> PaginateAsync<TEntity, TDto>(
         string search, int skip, int take,

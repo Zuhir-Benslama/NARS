@@ -1,11 +1,5 @@
 using NarsApi.Infrastructure;
 
-// Npgsql 6+ maps DateTime to timestamptz by default. Our DB uses
-// 'timestamp without time zone', so we restore the legacy behaviour that
-// reads/writes both types as unspecified-timezone DateTime.
-// Remove this line once the DB columns are migrated to timestamptz.
-AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
-
 var builder = WebApplication.CreateBuilder(args);
 
 // ── Secrets — env vars override appsettings.json ───────────────

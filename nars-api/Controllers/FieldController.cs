@@ -20,7 +20,7 @@ public class FieldController(
     IDateTimeProvider timeProvider,
     IFieldService fieldService) : NarsControllerBase
 {
-    private int MaxFeatureDataSize => featureDefaults.Value.MaxFeatureDataSize;
+    private readonly int MaxFeatureDataSize = featureDefaults.Value.MaxFeatureDataSize;
 
     [HttpGet("field/features")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -81,7 +81,7 @@ public class FieldController(
             return Problem(detail: "Invalid feature_id.", statusCode: 400);
         }
 
-        var validTypes = new[] { FeatureTypes.Road, FeatureTypes.HouseEntrance, FeatureTypes.NamingPanel };
+        var validTypes = ValidInspectionTypes;
         if (!validTypes.Contains(body.Type))
         {
             return Problem(detail: $"Invalid inspection type. Must be one of: {string.Join(", ", validTypes)}", statusCode: 400);
@@ -233,8 +233,6 @@ public class FieldController(
         await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
 
         db.HouseEntrances.Add(entrance);
-        await db.SaveChangesAsync(cancellationToken);
-
         db.FeatureRegistry.Add(new FeatureRegistry
         {
             Id = newId,
@@ -253,6 +251,8 @@ public class FieldController(
             Message: "Entrance created from inspection."
         ));
     }
+
+    private static readonly string[] ValidInspectionTypes = [FeatureTypes.Road, FeatureTypes.HouseEntrance, FeatureTypes.NamingPanel];
 
     private static JsonElement DeserializeJsonSafe(string json) => JsonHelper.DeserializeSafe(json);
 }

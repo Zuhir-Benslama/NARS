@@ -14,7 +14,6 @@ namespace NarsApi.Controllers;
 [Tags("Features")]
 public class FeaturesController(
     IFeatureRepository featureRepo,
-    IScatteredAreaService scatteredService,
     IBackgroundTaskQueue bgQueue,
     ILogger<FeaturesController> logger,
     IOptions<FeatureDefaultsOptions> featureDefaults,
@@ -49,13 +48,11 @@ public class FeaturesController(
             return Problem(detail: "Scattered areas are auto-computed and cannot be saved manually.", statusCode: 400);
         }
 
-        var rawJson = body.Data.GetRawText();
-        if (rawJson.Length > _maxFeatureDataSize)
+        var dataJson = body.Data.GetRawText();
+        if (dataJson.Length > _maxFeatureDataSize)
         {
             return Problem(detail: "Feature data is too large (max 512 KB).", statusCode: 400);
         }
-
-        var dataJson = rawJson;
 
         var roadId = TryExtractRoadId(body);
 
@@ -141,18 +138,6 @@ public class FeaturesController(
             PublicSpace: GetCount(FeatureTypes.PublicSpace),
             NamingPanel: GetCount(FeatureTypes.NamingPanel),
             Total: total
-        ));
-    }
-
-    [HttpGet("scattered-status")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    public IActionResult GetScatteredStatus()
-    {
-        var error = scatteredService.LastError;
-        return Ok(new ScatteredStatusResponse(
-            LastErrorTime: error?.Timestamp.ToString("o"),
-            LastErrorMessage: error?.Message,
-            HasError: error.HasValue
         ));
     }
 

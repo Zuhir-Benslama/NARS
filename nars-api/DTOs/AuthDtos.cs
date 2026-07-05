@@ -45,15 +45,15 @@ public record PagedResponse<T>(
 /// </summary>
 public record AuthorizedAdminSignupRequest(
     // ── Authorizing admin ────────────────────────────────────────────────────
-    [Required] string AdminUsername,
-    [Required] string AdminPassword,
+    [property: Required(AllowEmptyStrings = false)] string AdminUsername,
+    [property: Required(AllowEmptyStrings = false)] string AdminPassword,
     // ── New account details ──────────────────────────────────────────────────
-    [Required] string Name,
-    [Required, EmailAddress] string Email,
-    [Required] string Phone,
-    [Required] string Username,
-    [Required] string Password,
-    [Required] string Role,
+    [property: Required(AllowEmptyStrings = false)] string Name,
+    [property: Required(AllowEmptyStrings = false), EmailAddress] string Email,
+    [property: Required(AllowEmptyStrings = false)] string Phone,
+    [property: Required(AllowEmptyStrings = false)] string Username,
+    [property: Required(AllowEmptyStrings = false)] string Password,
+    [property: Required(AllowEmptyStrings = false)] string Role,
     // ── Geographic anchor (one required depending on role) ───────────────────
     int? CommuneId,
     int? DairaId,
@@ -63,8 +63,8 @@ public record AuthorizedAdminSignupRequest(
 /// Request body for user login.
 /// </summary>
 public record SignInRequest(
-    [Required] string Username,
-    [Required] string Password
+    [property: Required(AllowEmptyStrings = false)] string Username,
+    [property: Required(AllowEmptyStrings = false)] string Password
 );
 
 /// <summary>
