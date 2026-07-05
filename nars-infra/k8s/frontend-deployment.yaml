@@ -51,7 +51,7 @@ spec:
         - name: nginx
           # ⚠ Dev default only — override via kustomize in CI/CD.
           image: zuhirbenslama/nars-vite:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
           startupProbe:
