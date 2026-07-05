@@ -22,7 +22,6 @@ SCALABLE_DEPLOYS   := postgis nars-api nars-frontend
 # Auto-generate .env with stable secrets if missing.
 # Make auto-remakes missing included files and re-execs, so
 # all targets see consistent POSTGRES_PASSWORD / JWT_SECRET.
-# Mark .env as precious to avoid accidental deletion from parallel builds.
 # Generate a random base64 string using openssl (preferred) or python3.
 # Used in recipe contexts (where $$1 is the byte count).
 _rnd_cmd = if command -v openssl >/dev/null 2>&1; then \
@@ -31,7 +30,7 @@ else \
 	python3 -c "import base64,os; print(base64.b64encode(os.urandom(int(\"$$1\"))).decode())"; \
 fi
 
-# .env is not an intermediate file — .PRECIOUS has no effect here.
+# _RND shell function + $$(_RND) expansion rely on .ONESHELL (line 18).
 .env:
 	@echo "# Auto-generated — DO NOT COMMIT" > $@; \
 	_RND() { $(_rnd_cmd); }; \
@@ -115,7 +114,7 @@ namespace-ensure: ## Ensure $(NAMESPACE) namespace exists (idempotent)
 cluster-down: proxy-down ## Delete the kind cluster (preserves postgis data)
 	@echo "→ Deleting cluster '$(CLUSTER_NAME)'..."
 	@kind delete cluster --name "$(CLUSTER_NAME)" 2>/dev/null || true
-	@-docker rm -f kube-proxy 2>/dev/null || true
+	@docker rm -f kube-proxy 2>/dev/null || true
 	@rm -f /tmp/$(CLUSTER_NAME)-tls.crt /tmp/$(CLUSTER_NAME)-tls.key
 	@echo "✓ Cluster deleted (postgis data preserved at $(POSTGRES_DATA_DIR))"
 
@@ -158,7 +157,7 @@ cluster-status: ## Show cluster resources
 .PHONY: cluster-logs
 cluster-logs: ## Tail logs from all pods in the namespace
 	@$(KUBECTL) logs -n "$(NAMESPACE)" --all-containers --tail=50 --follow 2>/dev/null \
-		|| echo "No pods found in namespace '$(NAMESPACE)'"
+		|| echo "! Failed to tail logs — no running pods in '$(NAMESPACE)' or kubectl error"
 
 .PHONY: cluster-port-forward
 cluster-port-forward: proxy-up ## Port-forward + Docker bridge (rootless Docker). Use proxy-up directly if already running.
@@ -185,7 +184,7 @@ port-forward-stop: ## Stop port-forward inside the kind container
 .PHONY: proxy-up
 proxy-up: port-forward-start ## Start Docker socat bridge: host:8080 → kind:8080
 	@echo "→ Setting up socat bridge container..."
-	@-docker rm -f "$(PROXY_CONTAINER)" 2>/dev/null || true
+	@docker rm -f "$(PROXY_CONTAINER)" 2>/dev/null || true
 	@sleep 0.5
 	@docker run -d --name "$(PROXY_CONTAINER)" --rm \
 		-p 0.0.0.0:8080:8080 \
@@ -216,7 +215,7 @@ proxy-up: port-forward-start ## Start Docker socat bridge: host:8080 → kind:80
 .PHONY: proxy-down
 proxy-down: port-forward-stop ## Stop the socat bridge and port-forward
 	@echo "→ Stopping socat bridge..."
-	@-docker rm -f "$(PROXY_CONTAINER)" 2>/dev/null || true
+	@docker rm -f "$(PROXY_CONTAINER)" 2>/dev/null || true
 	@echo "✓ Proxy stopped"
 
 .PHONY: adb-reverse
@@ -686,15 +685,19 @@ kustomize-apply: secrets-validate ## Apply k8s manifests via kustomize
 
 .PHONY: postgis-password-sync
 postgis-password-sync: ## Align postgres user password with POSTGRES_PASSWORD (for persisted volumes)
+# PGPASSWORD is visible in the host process table (kubectl CLI limitation),
+# but within the pod it's an env var — not in psql's argv.
 	@echo "→ Syncing postgres password..."
-	@$(KUBECTL) exec -n "$(NAMESPACE)" deployment/postgis -- \
-		psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
-		-c "ALTER USER postgres WITH PASSWORD '$(POSTGRES_PASSWORD)';" >/dev/null
+	@$(KUBECTL) exec -i -n "$(NAMESPACE)" deployment/postgis -- \
+		env PGPASSWORD="$(POSTGRES_PASSWORD)" \
+		bash -c 'printf "ALTER USER postgres WITH PASSWORD '\''%s'\'';\n" "$$PGPASSWORD" | psql -U postgres -d postgres -v ON_ERROR_STOP=1' >/dev/null
 	@echo "✓ Postgres password synced"
 
 .PHONY: postgis-migration-baseline
 postgis-migration-baseline: ## Backfill EF migration history for pre-existing schemas
 	@echo "→ Ensuring EF migration history baseline..."
+# Make expands $$$$ → $$, then the single-quoted heredoc 'SQL' prevents
+# shell expansion, so psql receives $$ as PL/pgSQL dollar-quoting.
 	@cat <<'SQL' | $(KUBECTL) exec -i -n "$(NAMESPACE)" deployment/postgis -- \
 		psql -U postgres -d nars_db -v ON_ERROR_STOP=1 >/dev/null
 	CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
@@ -891,9 +894,9 @@ observability-servicemonitor: ## Apply OTel metrics Service + ServiceMonitor (re
 .PHONY: observability-port-forward
 observability-port-forward: ## Port-forward Grafana, Loki, Tempo (background)
 	@echo "→ Starting observability port-forwards (background)..."
-	@-pkill -f "port-forward.*observability.*grafana" 2>/dev/null || true
-	@-pkill -f "port-forward.*observability.*loki-gateway" 2>/dev/null || true
-	@-pkill -f "port-forward.*observability.*tempo" 2>/dev/null || true
+	@pkill -f "port-forward.*observability.*grafana" 2>/dev/null || true
+	@pkill -f "port-forward.*observability.*loki-gateway" 2>/dev/null || true
+	@pkill -f "port-forward.*observability.*tempo" 2>/dev/null || true
 	@sleep 0.5
 	@nohup $(KUBECTL) port-forward -n $(OBSERVABILITY_NAMESPACE) \
 		service/prometheus-stack-grafana 3000:3000 \
@@ -912,7 +915,7 @@ observability-port-forward: ## Port-forward Grafana, Loki, Tempo (background)
 
 .PHONY: observability-stop
 observability-stop: ## Stop observability port-forwards
-	@-pkill -f "port-forward.*observability" 2>/dev/null || true
+	@pkill -f "port-forward.*observability" 2>/dev/null || true
 	@echo "✓ Port-forwards stopped"
 
 .PHONY: grafana-password
