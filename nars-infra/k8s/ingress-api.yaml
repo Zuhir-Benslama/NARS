@@ -71,6 +71,7 @@ spec:
 # Serves localhost without TLS/mTLS for local development access.
 # Port-forward ingress-nginx to localhost, then:
 #   curl http://localhost:8080/api/feature-types
+# Also serves /login (server-rendered login page) and /health.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -87,6 +88,13 @@ spec:
   rules:
     - http:
         paths:
+          - path: /login
+            pathType: Exact
+            backend:
+              service:
+                name: nars-api
+                port:
+                  number: 80
           - path: /api(/|$)(.*)
             pathType: ImplementationSpecific
             backend:
