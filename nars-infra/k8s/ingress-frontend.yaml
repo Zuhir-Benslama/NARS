@@ -27,6 +27,13 @@ spec:
                 name: nars-api
                 port:
                   number: 80
+          - path: /login
+            pathType: Exact
+            backend:
+              service:
+                name: nars-api
+                port:
+                  number: 80
           - path: /api(/|$)(.*)
             pathType: ImplementationSpecific
             backend:
@@ -44,6 +51,8 @@ spec:
 ---
 # ─── Frontend Ingress (local dev) ──────────────────────────────────────
 # Serves localhost without TLS for local development access.
+# No host restriction — catches any host (192.168.x.x, etc.) so
+# LAN devices and ADB-reversed ports reach the SPA.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -58,6 +67,57 @@ spec:
     - host: localhost
       http:
         paths:
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: nars-api
+                port:
+                  number: 80
+          - path: /login
+            pathType: Exact
+            backend:
+              service:
+                name: nars-api
+                port:
+                  number: 80
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: nars-api
+                port:
+                  number: 80
+          - path: /(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: nars-frontend
+                port:
+                  number: 80
+    - http:
+        paths:
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: nars-api
+                port:
+                  number: 80
+          - path: /login
+            pathType: Exact
+            backend:
+              service:
+                name: nars-api
+                port:
+                  number: 80
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: nars-api
+                port:
+                  number: 80
           - path: /(.*)
             pathType: ImplementationSpecific
             backend:

@@ -57,7 +57,7 @@ spec:
                   drop:
                     - ALL
               command:
-                - /bin/sh
+                - /bin/bash
                 - -ec
                 - |
                   TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
