@@ -34,11 +34,9 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == DateTime.UtcNow);
         var jwtOptions = Options.Create(new JwtOptions { ExpiresInMinutes = 60, RefreshExpiresInDays = 30 });
         var jwt = new JwtService(AuthTestHelper.TestJwtSecret, null, null, jwtOptions, Mock.Of<ILogger<JwtService>>(), timeProvider);
-        var scatteredMock = new Mock<IScatteredAreaService>();
-        scatteredMock.Setup(s => s.RefreshAsync(It.IsAny<Guid>(), It.IsAny<int>())).Returns(Task.CompletedTask);
         var bgQueueMock = Mock.Of<IBackgroundTaskQueue>();
 
-        _controller = new FeaturesController(new FeatureRepository(_db), scatteredMock.Object, bgQueueMock, Mock.Of<ILogger<FeaturesController>>(), Options.Create(new FeatureDefaultsOptions()), timeProvider, new FeatureStatsService(_db));
+        _controller = new FeaturesController(new FeatureRepository(_db), bgQueueMock, Mock.Of<ILogger<FeaturesController>>(), Options.Create(new FeatureDefaultsOptions()), timeProvider, new FeatureStatsService(_db));
     }
 
     public async Task InitializeAsync()
@@ -281,11 +279,7 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
     private void SetUserId(Guid userId, int communeId)
     {
         var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext();
-        var identity = new System.Security.Claims.ClaimsIdentity(
-            [new System.Security.Claims.Claim(ClaimNames.UserId, userId.ToString()),
-             new System.Security.Claims.Claim(ClaimNames.CommuneId, communeId.ToString())],
-            "TestAuth");
-        httpContext.User = new System.Security.Claims.ClaimsPrincipal(identity);
+        httpContext.User = AuthTestHelper.CreateClaimsPrincipal(userId, "commune_user", communeId: communeId);
         _controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext { HttpContext = httpContext };
     }
 

@@ -132,10 +132,7 @@ public class ValidationControllerIntegrationTests : IAsyncLifetime
     private void SetUserId(Guid userId)
     {
         var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext();
-        var identity = new System.Security.Claims.ClaimsIdentity(
-            [new System.Security.Claims.Claim(ClaimNames.UserId, userId.ToString())],
-            "TestAuth");
-        httpContext.User = new System.Security.Claims.ClaimsPrincipal(identity);
+        httpContext.User = AuthTestHelper.CreateClaimsPrincipal(userId, "field_worker");
         _controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext { HttpContext = httpContext };
     }
 }

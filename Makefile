@@ -31,7 +31,7 @@ else \
 	python3 -c "import base64,os; print(base64.b64encode(os.urandom(int(\"$$1\"))).decode())"; \
 fi
 
-.PRECIOUS: .env
+# .env is not an intermediate file — .PRECIOUS has no effect here.
 .env:
 	@echo "# Auto-generated — DO NOT COMMIT" > $@; \
 	_RND() { $(_rnd_cmd); }; \

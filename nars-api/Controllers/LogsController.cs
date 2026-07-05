@@ -14,7 +14,7 @@ namespace NarsApi.Controllers;
 [Route("/api")]
 [Tags("Logs")]
 [EnableRateLimiting(RateLimitPolicies.Logs)]
-public class LogsController(AppDbContext db, IOptions<LoggingOptions> logOptions, IDateTimeProvider timeProvider) : ControllerBase
+public class LogsController(AppDbContext db, ILogger<LogsController> logger, IOptions<LoggingOptions> logOptions, IDateTimeProvider timeProvider) : ControllerBase
 {
     private int MaxBatchSize => logOptions.Value.MaxBatchSize;
     private int MaxEntryLength => logOptions.Value.MaxEntryLength;
@@ -46,8 +46,8 @@ public class LogsController(AppDbContext db, IOptions<LoggingOptions> logOptions
         }
 
         var userId = User.Identity?.IsAuthenticated == true
-            ? GetUserId()
-            : (Guid?)null;
+            ? GetUserIdOrNull()
+            : null;
 
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
         var userAgent = Request.Headers.UserAgent.FirstOrDefault();
@@ -55,21 +55,25 @@ public class LogsController(AppDbContext db, IOptions<LoggingOptions> logOptions
         var now = timeProvider.UtcNow;
         var entries = new List<ErrorLog>(body.Logs.Count);
 
+        var skipped = 0;
         foreach (var entry in body.Logs)
         {
             if (string.IsNullOrEmpty(entry.Message))
             {
+                skipped++;
                 continue;
             }
 
             if (entry.Message.Length > MaxEntryLength)
             {
+                skipped++;
                 continue;
             }
 
             var level = (entry.Level ?? "error").ToLowerInvariant();
             if (!AllowedLevels.Contains(level))
             {
+                skipped++;
                 continue;
             }
 
@@ -91,7 +95,12 @@ public class LogsController(AppDbContext db, IOptions<LoggingOptions> logOptions
 
         if (entries.Count == 0)
         {
-            return NoContent();
+            return Problem(detail: $"All {body.Logs.Count} log entries were invalid.", statusCode: 400);
+        }
+
+        if (skipped > 0)
+        {
+            logger.LogWarning("Skipped {Skipped}/{Total} invalid log entries", skipped, body.Logs.Count);
         }
 
         db.ErrorLogs.AddRange(entries);
@@ -100,9 +109,9 @@ public class LogsController(AppDbContext db, IOptions<LoggingOptions> logOptions
         return NoContent();
     }
 
-    private Guid GetUserId()
+    private Guid? GetUserIdOrNull()
     {
         var claim = User.FindFirst(ClaimNames.UserId);
-        return claim is not null && Guid.TryParse(claim.Value, out var id) ? id : Guid.Empty;
+        return claim is not null && Guid.TryParse(claim.Value, out var id) ? id : null;
     }
 }

@@ -23,7 +23,6 @@ public class FeaturesControllerTests
 
     private static (FeaturesController, AppDbContext) CreateController(
         AppDbContext? db = null,
-        IScatteredAreaService? scatteredService = null,
         IBackgroundTaskQueue? bgQueue = null,
         IDateTimeProvider? timeProvider = null,
         IFeatureStatsService? featureStatsService = null)
@@ -36,7 +35,6 @@ public class FeaturesControllerTests
 
         var ctrl = new FeaturesController(
             new FeatureRepository(context),
-            scatteredService ?? Mock.Of<IScatteredAreaService>(),
             bgQueue ?? Mock.Of<IBackgroundTaskQueue>(),
             Mock.Of<ILogger<FeaturesController>>(),
             Options.Create(new FeatureDefaultsOptions()),
@@ -395,19 +393,4 @@ public class FeaturesControllerTests
         Assert.Equal(5, stats.Total);
     }
 
-    // ── GET /api/scattered-status ─────────────────────────────────────────
-
-    [Fact]
-    public async Task GetScatteredStatus_NoError_ReturnsOk()
-    {
-        var scatteredMock = new Mock<IScatteredAreaService>();
-        scatteredMock.SetupGet(s => s.LastError).Returns(((DateTimeOffset Timestamp, string Message)?)null);
-
-        var (ctrl, _) = CreateController(scatteredService: scatteredMock.Object);
-        var result = ctrl.GetScatteredStatus();
-
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var status = Assert.IsType<ScatteredStatusResponse>(ok.Value);
-        Assert.False(status.HasError);
-    }
 }

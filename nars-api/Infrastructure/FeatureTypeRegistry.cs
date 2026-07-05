@@ -6,6 +6,10 @@ using NarsApi.Models;
 
 namespace NarsApi.Infrastructure;
 
+public sealed record IndexDefinition(string PropertyName, string IndexName, string? Filter = null);
+
+public sealed record CompositeIndexDefinition(string[] PropertyNames, string IndexName, string? Filter = null);
+
 /// <summary>
 /// Maps a feature type string (e.g. "area") to its concrete entity type
 /// and creates new instances with common fields pre-populated.
@@ -45,6 +49,16 @@ public sealed class FeatureTypeDescriptor
     public Func<AppDbContext, Guid, Guid, System.Text.Json.JsonElement?, CancellationToken, Task>? PostUpdateAction { get; init; }
 
     /// <summary>
+    /// Index definitions applied during OnModelCreating.
+    /// </summary>
+    public IReadOnlyList<IndexDefinition> Indexes { get; init; } = [];
+
+    /// <summary>
+    /// Composite index definitions applied during OnModelCreating.
+    /// </summary>
+    public IReadOnlyList<CompositeIndexDefinition> CompositeIndexes { get; init; } = [];
+
+    /// <summary>
     /// Creates a new entity instance with common fields populated.
     /// </summary>
     public FeatureBase CreateEntity(Guid id, Guid userId, string layer, string label, string data, DateTime createdAt)
@@ -70,7 +84,7 @@ public sealed class FeatureTypeDescriptor
 /// </summary>
 public static class FeatureTypeRegistry
 {
-    private static FeatureTypeDescriptor Descriptor<T>(string type, string tableName, Func<AppDbContext, Microsoft.EntityFrameworkCore.DbSet<T>> dbSet, Func<AppDbContext, Guid, Guid, System.Text.Json.JsonElement?, CancellationToken, Task>? postUpdateAction = null) where T : FeatureBase =>
+    private static FeatureTypeDescriptor Descriptor<T>(string type, string tableName, Func<AppDbContext, Microsoft.EntityFrameworkCore.DbSet<T>> dbSet, Func<AppDbContext, Guid, Guid, System.Text.Json.JsonElement?, CancellationToken, Task>? postUpdateAction = null, IReadOnlyList<IndexDefinition>? indexes = null, IReadOnlyList<CompositeIndexDefinition>? compositeIndexes = null) where T : FeatureBase =>
         new()
         {
             Type = type,
@@ -79,19 +93,37 @@ public static class FeatureTypeRegistry
             DbSetAccessor = db => dbSet(db),
             AddToContext = (db, e) => db.Entry(dbSet(db).Add((T)e).Entity),
             PostUpdateAction = postUpdateAction,
+            Indexes = indexes ?? [],
+            CompositeIndexes = compositeIndexes ?? [],
         };
 
     private static readonly IReadOnlyDictionary<string, FeatureTypeDescriptor> _registry =
         new Dictionary<string, FeatureTypeDescriptor>
         {
-            [FeatureTypes.Area] = Descriptor<Area>(FeatureTypes.Area, "areas", db => db.Areas),
-            [FeatureTypes.District] = Descriptor<District>(FeatureTypes.District, "districts", db => db.Districts),
-            [FeatureTypes.CityCenter] = Descriptor<CityCenter>(FeatureTypes.CityCenter, "city_centers", db => db.CityCenters),
-            [FeatureTypes.Road] = Descriptor<Road>(FeatureTypes.Road, "roads", db => db.Roads),
-            [FeatureTypes.HouseEntrance] = Descriptor<HouseEntrance>(FeatureTypes.HouseEntrance, "house_entrances", db => db.HouseEntrances, postUpdateAction: UpdateHouseEntranceRoadId),
-            [FeatureTypes.PublicBuilding] = Descriptor<PublicBuilding>(FeatureTypes.PublicBuilding, "public_buildings", db => db.PublicBuildings),
-            [FeatureTypes.PublicSpace] = Descriptor<PublicSpace>(FeatureTypes.PublicSpace, "public_spaces", db => db.PublicSpaces),
-            [FeatureTypes.NamingPanel] = Descriptor<NamingPanel>(FeatureTypes.NamingPanel, "naming_panels", db => db.NamingPanels),
+            [FeatureTypes.Area] = Descriptor<Area>(FeatureTypes.Area, "areas", db => db.Areas,
+                indexes: [new("UserId", "ix_areas_user_id")],
+                compositeIndexes: [new(["UserId", "Layer"], "ix_areas_user_layer")]),
+            [FeatureTypes.District] = Descriptor<District>(FeatureTypes.District, "districts", db => db.Districts,
+                indexes: [new("UserId", "ix_districts_user_id")]),
+            [FeatureTypes.CityCenter] = Descriptor<CityCenter>(FeatureTypes.CityCenter, "city_centers", db => db.CityCenters,
+                indexes: [new("UserId", "ix_city_centers_user_id")]),
+            [FeatureTypes.Road] = Descriptor<Road>(FeatureTypes.Road, "roads", db => db.Roads,
+                indexes: [new("UserId", "ix_roads_user_id")],
+                compositeIndexes: [new(["UserId", "Layer"], "ix_roads_user_layer")]),
+            [FeatureTypes.HouseEntrance] = Descriptor<HouseEntrance>(FeatureTypes.HouseEntrance, "house_entrances", db => db.HouseEntrances,
+                postUpdateAction: UpdateHouseEntranceRoadId,
+                indexes: [new("UserId", "ix_house_entrances_user_id")],
+                compositeIndexes:
+                [
+                    new(["UserId", "Layer"], "ix_house_entrances_user_layer"),
+                    new(["RoadId"], "ix_house_entrances_road_id", "road_id IS NOT NULL"),
+                ]),
+            [FeatureTypes.PublicBuilding] = Descriptor<PublicBuilding>(FeatureTypes.PublicBuilding, "public_buildings", db => db.PublicBuildings,
+                indexes: [new("UserId", "ix_public_buildings_user_id")]),
+            [FeatureTypes.PublicSpace] = Descriptor<PublicSpace>(FeatureTypes.PublicSpace, "public_spaces", db => db.PublicSpaces,
+                indexes: [new("UserId", "ix_public_spaces_user_id")]),
+            [FeatureTypes.NamingPanel] = Descriptor<NamingPanel>(FeatureTypes.NamingPanel, "naming_panels", db => db.NamingPanels,
+                indexes: [new("UserId", "ix_naming_panels_user_id")]),
         };
 
     private static readonly IReadOnlyDictionary<Type, FeatureTypeDescriptor> _entityTypeMap =

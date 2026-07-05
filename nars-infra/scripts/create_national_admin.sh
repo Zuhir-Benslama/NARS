@@ -143,6 +143,8 @@ if [[ "${NON_INTERACTIVE:-0}" == "1" ]]; then
     ADMIN_NAME="${ADMIN_NAME:-National Admin}"
     ADMIN_EMAIL="${ADMIN_EMAIL:-admin@nars.dz}"
     ADMIN_PHONE="${ADMIN_PHONE:-+213000000000}"
+    ADMIN_USERNAME="${ADMIN_USERNAME:-admin_$(openssl rand -hex 4)}"
+    ADMIN_PASSWORD="${ADMIN_PASSWORD:-$(openssl rand -base64 12)}"
     echo -e "${CYAN}[INFO]${RESET}  Non-interactive mode — generating one-time credentials"
 else
     echo -e "${BOLD}Enter details for the new national admin account:${RESET}"

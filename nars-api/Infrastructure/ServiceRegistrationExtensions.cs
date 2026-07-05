@@ -9,6 +9,12 @@ namespace NarsApi.Infrastructure;
 
 public static class ServiceRegistrationExtensions
 {
+    /// <summary>
+    /// Registers all NARS application services, EF Core DbContext, authentication,
+    /// OpenTelemetry, health checks, CORS, compression, rate limiting, and
+    /// background task infrastructure.
+    /// Call this from <c>Program.cs</c> during the application's service collection phase.
+    /// </summary>
     public static IServiceCollection AddNarsServices(
         this IServiceCollection services,
         IConfiguration config,

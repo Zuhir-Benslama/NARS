@@ -27,10 +27,7 @@ public static class SeedData
             return;
         }
 
-        db.Wilayas.Add(new Wilaya { WilayaId = 1, WilayaFr = "Alger", WilayaAr = "الجزائر", WilayaLatitude = 36.75, WilayaLongitude = 3.05 });
-        db.Dairas.Add(new Daira { DairaId = 1, WilayaId = 1, DairaFr = "Draria", DairaAr = "درارية", DairaLatitude = 36.72, DairaLongitude = 2.96 });
-        db.Communes.Add(new Commune { CommuneId = 1, DairaId = 1, CommuneCode = 1001, CommuneFr = "Draria Centre", CommuneAr = "درارية الوسطى", CommuneLatitude = 36.72, CommuneLongitude = 2.96 });
-        db.CommuneBoundaries.Add(new CommuneBoundary { CommuneId = 1, Geometry = Rectangle(2.90, 36.70, 3.00, 36.80) });
+        AddAlgerLocations(db, includeBoundary: true);
         await db.SaveChangesAsync();
     }
 
@@ -41,13 +38,22 @@ public static class SeedData
             return;
         }
 
-        db.Wilayas.Add(new Wilaya { WilayaId = 1, WilayaFr = "Alger", WilayaAr = "الجزائر", WilayaLatitude = 36.75, WilayaLongitude = 3.05 });
+        AddAlgerLocations(db);
         db.Wilayas.Add(new Wilaya { WilayaId = 2, WilayaFr = "Blida", WilayaAr = "البليدة", WilayaLatitude = 36.47, WilayaLongitude = 2.83 });
-        db.Dairas.Add(new Daira { DairaId = 1, WilayaId = 1, DairaFr = "Draria", DairaAr = "درارية", DairaLatitude = 36.72, DairaLongitude = 2.96 });
         db.Dairas.Add(new Daira { DairaId = 2, WilayaId = 2, DairaFr = "Blida Centre", DairaAr = "وسط البليدة", DairaLatitude = 36.47, DairaLongitude = 2.82 });
-        db.Communes.Add(new Commune { CommuneId = 1, DairaId = 1, CommuneCode = 1001, CommuneFr = "Draria Centre", CommuneAr = "درارية الوسطى", CommuneLatitude = 36.72, CommuneLongitude = 2.96 });
         db.Communes.Add(new Commune { CommuneId = 2, DairaId = 2, CommuneCode = 2001, CommuneFr = "Blida Centre", CommuneAr = "وسط البليدة", CommuneLatitude = 36.47, CommuneLongitude = 2.82 });
         await db.SaveChangesAsync();
+    }
+
+    private static void AddAlgerLocations(AppDbContext db, bool includeBoundary = false)
+    {
+        db.Wilayas.Add(new Wilaya { WilayaId = 1, WilayaFr = "Alger", WilayaAr = "الجزائر", WilayaLatitude = 36.75, WilayaLongitude = 3.05 });
+        db.Dairas.Add(new Daira { DairaId = 1, WilayaId = 1, DairaFr = "Draria", DairaAr = "درارية", DairaLatitude = 36.72, DairaLongitude = 2.96 });
+        db.Communes.Add(new Commune { CommuneId = 1, DairaId = 1, CommuneCode = 1001, CommuneFr = "Draria Centre", CommuneAr = "درارية الوسطى", CommuneLatitude = 36.72, CommuneLongitude = 2.96 });
+        if (includeBoundary)
+        {
+            db.CommuneBoundaries.Add(new CommuneBoundary { CommuneId = 1, Geometry = Rectangle(2.90, 36.70, 3.00, 36.80) });
+        }
     }
 
     public static async Task SeedAdminLocationsAsync(AppDbContext db)

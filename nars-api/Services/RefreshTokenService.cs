@@ -26,22 +26,23 @@ public class RefreshTokenService(
 
         await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
 
+        var tableName = db.Model.FindEntityType(typeof(RefreshToken))?.GetTableName() ?? "refresh_tokens";
+#pragma warning disable EF1002 // tableName is from EF Core metadata, not user input
         var stored = await db.RefreshTokens
             .FromSqlRaw(
-                "SELECT * FROM refresh_tokens WHERE token_hash = {0} AND revoked = false AND expires_at > NOW() FOR UPDATE SKIP LOCKED",
+                $"SELECT * FROM {tableName} WHERE token_hash = {{0}} AND revoked = false AND expires_at > NOW() FOR UPDATE SKIP LOCKED",
                 hash)
             .FirstOrDefaultAsync(cancellationToken);
+#pragma warning restore EF1002
 
         if (stored is null)
         {
-            await tx.RollbackAsync(cancellationToken);
             return new RefreshTokenResult(false, "Invalid or expired refresh token.", null, null, null, null);
         }
 
         var user = await db.Users.FindAsync([stored.UserId], cancellationToken);
         if (user is null)
         {
-            await tx.RollbackAsync(cancellationToken);
             return new RefreshTokenResult(false, "User no longer exists.", null, null, null, null);
         }
 

@@ -49,7 +49,7 @@ public class DtoValidationTests
         Assert.True(isValid);
     }
 
-    [Fact(Skip = "Validator.TryValidateObject does not reject empty strings for [Required] on record primary constructor params; model binding catches empty body but not empty fields")]
+    [Fact]
     public void SignInRequest_EmptyUsername_ReturnsValidationError()
     {
         var request = new SignInRequest(

@@ -35,7 +35,7 @@ public class PagesController(
     public async Task<IActionResult> Root(CancellationToken cancellationToken = default)
     {
         logger.LogInformation("[Pages] Root request. Checking auth...");
-        if (await IsAuthenticatedAsync(cancellationToken))
+        if (await TryAuthenticateAsync(cancellationToken))
         {
             logger.LogInformation("[Pages] Root authenticated, redirecting to /map");
             return Redirect("/map");
@@ -74,7 +74,7 @@ public class PagesController(
     public async Task<IActionResult> MapPage(CancellationToken cancellationToken = default)
     {
         logger.LogInformation("[Pages] Map page request. Checking auth...");
-        if (!await IsAuthenticatedAsync(cancellationToken))
+        if (!await TryAuthenticateAsync(cancellationToken))
         {
             logger.LogWarning("[Pages] Map page NOT authenticated. Redirecting to /login");
             return Redirect("/login");
@@ -115,7 +115,7 @@ public class PagesController(
         }) ?? string.Empty;
     }
 
-    private async Task<bool> IsAuthenticatedAsync(CancellationToken cancellationToken)
+    private async Task<bool> TryAuthenticateAsync(CancellationToken cancellationToken)
     {
         if (User.Identity?.IsAuthenticated == true)
         {

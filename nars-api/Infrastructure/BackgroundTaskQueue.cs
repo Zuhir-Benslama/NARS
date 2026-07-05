@@ -93,11 +93,11 @@ public class BackgroundQueueProcessor(
             try
             {
                 var workItem = await queue.DequeueAsync(ct);
-                await workItem(services, ct);
+                await using var scope = services.CreateAsyncScope();
+                await workItem(scope.ServiceProvider, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                // Graceful shutdown — stop processing
                 break;
             }
             catch (Exception ex)

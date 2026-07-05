@@ -363,31 +363,10 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
 
     private void SetAuthenticatedUser(User user)
     {
-        var claims = new List<Claim>
-        {
-            new(ClaimNames.UserId, user.Id.ToString()),
-            new(ClaimNames.Username, user.Username),
-            new(ClaimNames.Role, user.Role),
-        };
-
-        if (user.CommuneId.HasValue)
-        {
-            claims.Add(new Claim(ClaimNames.CommuneId, user.CommuneId.Value.ToString()));
-        }
-
-        if (user.DairaId.HasValue)
-        {
-            claims.Add(new Claim(ClaimNames.DairaId, user.DairaId.Value.ToString()));
-        }
-
-        if (user.WilayaId.HasValue)
-        {
-            claims.Add(new Claim(ClaimNames.WilayaId, user.WilayaId.Value.ToString()));
-        }
-
         var httpContext = new DefaultHttpContext
         {
-            User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth"))
+            User = AuthTestHelper.CreateClaimsPrincipal(
+                user.Id, user.Role, user.CommuneId, user.DairaId, user.WilayaId, user.Username)
         };
         _controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
     }

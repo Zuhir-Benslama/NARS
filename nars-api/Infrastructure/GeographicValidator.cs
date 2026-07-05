@@ -26,6 +26,9 @@ public static class GeographicValidator
             UserRoles.WilayaAdmin when !wilayaId.HasValue => "wilaya_id is required for wilaya_admin.",
             // NationalAdmin is intentionally absent — those accounts are created
             // directly in the database and cannot be created via the API.
+            // FieldWorker inherits the creator's commune_id — validated implicitly
+            // by the requirement that the creator (CommuneUser) already belongs to
+            // the commune. No separate commune_id validation needed.
             UserRoles.FieldWorker => null,
             _ => null,
         };

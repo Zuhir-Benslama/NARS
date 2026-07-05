@@ -129,7 +129,7 @@ public static class FeatureQueryHelper
                 Data: string.IsNullOrWhiteSpace(dataJson)
                     ? JsonDocument.Parse("{}").RootElement
                     : JsonSerializer.Deserialize<JsonElement>(dataJson),
-                CreatedAt: createdAt.ToString("o")
+                CreatedAt: createdAt.ToString(FeatureDtoConverter.IsoDateFormat)
             ));
         }
 

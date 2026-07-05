@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NarsApi.Infrastructure;
 using NarsApi.Models;
 
 namespace NarsApi.Data;
@@ -59,51 +60,27 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         // ── feature_registry ───────────────────────────────────────────────────
         // UUID primary keys — no sequence needed, generated client-side.
 
-        // ── areas ──────────────────────────────────────────────────────────────
-        modelBuilder.Entity<Area>()
-            .HasIndex(a => a.UserId)
-            .HasDatabaseName("ix_areas_user_id");
-        modelBuilder.Entity<Area>()
-            .HasIndex(a => new { a.UserId, a.Layer })
-            .HasDatabaseName("ix_areas_user_layer");
-
-        // ── districts ──────────────────────────────────────────────────────────
-        modelBuilder.Entity<District>()
-            .HasIndex(d => d.UserId)
-            .HasDatabaseName("ix_districts_user_id");
-
-        // ── roads ──────────────────────────────────────────────────────────────
-        modelBuilder.Entity<Road>()
-            .HasIndex(r => r.UserId)
-            .HasDatabaseName("ix_roads_user_id");
-        modelBuilder.Entity<Road>()
-            .HasIndex(r => new { r.UserId, r.Layer })
-            .HasDatabaseName("ix_roads_user_layer");
-
-        // ── house_entrances ────────────────────────────────────────────────────
-        modelBuilder.Entity<HouseEntrance>()
-            .HasIndex(e => e.UserId)
-            .HasDatabaseName("ix_house_entrances_user_id");
-        modelBuilder.Entity<HouseEntrance>()
-            .HasIndex(e => new { e.UserId, e.Layer })
-            .HasDatabaseName("ix_house_entrances_user_layer");
-        modelBuilder.Entity<HouseEntrance>()
-            .HasIndex(e => e.RoadId)
-            .HasDatabaseName("ix_house_entrances_road_id")
-            .HasFilter("road_id IS NOT NULL");
-
-        // ── public_buildings / public_spaces / naming_panels / city_centers ───
-        foreach (var (entityType, indexName) in new[]
+        // ── Feature type indexes — driven by FeatureTypeDescriptor registry ──
+        foreach (var descriptor in FeatureTypeRegistry.GetAllDescriptors())
         {
-            (typeof(PublicBuilding), "ix_public_buildings_user_id"),
-            (typeof(PublicSpace),    "ix_public_spaces_user_id"),
-            (typeof(NamingPanel),    "ix_naming_panels_user_id"),
-            (typeof(CityCenter),     "ix_city_centers_user_id"),
-        })
-        {
-            modelBuilder.Entity(entityType)
-                .HasIndex(nameof(FeatureBase.UserId))
-                .HasDatabaseName(indexName);
+            foreach (var idx in descriptor.Indexes)
+            {
+                modelBuilder.Entity(descriptor.EntityType)
+                    .HasIndex(idx.PropertyName)
+                    .HasDatabaseName(idx.IndexName);
+            }
+
+            foreach (var idx in descriptor.CompositeIndexes)
+            {
+                var builder = modelBuilder.Entity(descriptor.EntityType)
+                    .HasIndex(idx.PropertyNames)
+                    .HasDatabaseName(idx.IndexName);
+
+                if (idx.Filter is not null)
+                {
+                    builder.HasFilter(idx.Filter);
+                }
+            }
         }
 
         // ── communes_boundaries: spatial index ─────────────────────────────────

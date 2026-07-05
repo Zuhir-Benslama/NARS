@@ -5,6 +5,8 @@ namespace NarsApi.Infrastructure;
 
 public static class FeatureDtoConverter
 {
+    internal const string IsoDateFormat = "o";
+
     private static readonly JsonElement EmptyObject = JsonDocument.Parse("{}").RootElement;
 
     public static FeatureDto ToDto(FeatureBase f, string type) => new(
@@ -15,8 +17,8 @@ public static class FeatureDtoConverter
         Data: string.IsNullOrWhiteSpace(f.Data)
             ? EmptyObject
             : JsonSerializer.Deserialize<JsonElement>(f.Data),
-        CreatedAt: f.CreatedAt.ToString("o"),
-        UpdatedAt: f.UpdatedAt?.ToString("o")
+        CreatedAt: f.CreatedAt.ToString(IsoDateFormat),
+        UpdatedAt: f.UpdatedAt?.ToString(IsoDateFormat)
     );
 }
 

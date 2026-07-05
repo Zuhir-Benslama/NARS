@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -202,17 +203,38 @@ public class ValidationController(
 
     private static string FormatDouble(double v) => v.ToString(CultureInfo.InvariantCulture);
 
-    private static string BuildLineStringWkt(List<CoordDto> coords) =>
-        $"LINESTRING({string.Join(",", coords.Select(c => $"{FormatDouble(c.Lng)} {FormatDouble(c.Lat)}"))})";
+    private static string BuildLineStringWkt(List<CoordDto> coords)
+    {
+        var sb = new StringBuilder("LINESTRING(");
+        for (var i = 0; i < coords.Count; i++)
+        {
+            if (i > 0) sb.Append(',');
+            sb.Append(FormatDouble(coords[i].Lng));
+            sb.Append(' ');
+            sb.Append(FormatDouble(coords[i].Lat));
+        }
+        sb.Append(')');
+        return sb.ToString();
+    }
 
     private static string BuildPolygonWkt(List<CoordDto> coords)
     {
-        var pts = coords.Select(c => $"{FormatDouble(c.Lng)} {FormatDouble(c.Lat)}").ToList();
-        if (pts[0] != pts[^1])
+        var sb = new StringBuilder("POLYGON((");
+        for (var i = 0; i < coords.Count; i++)
         {
-            pts.Add(pts[0]);
+            if (i > 0) sb.Append(',');
+            sb.Append(FormatDouble(coords[i].Lng));
+            sb.Append(' ');
+            sb.Append(FormatDouble(coords[i].Lat));
         }
-
-        return $"POLYGON(({string.Join(",", pts)}))";
+        var first = $"{FormatDouble(coords[0].Lng)} {FormatDouble(coords[0].Lat)}";
+        var last = $"{FormatDouble(coords[^1].Lng)} {FormatDouble(coords[^1].Lat)}";
+        if (first != last)
+        {
+            sb.Append(',');
+            sb.Append(first);
+        }
+        sb.Append("))");
+        return sb.ToString();
     }
 }

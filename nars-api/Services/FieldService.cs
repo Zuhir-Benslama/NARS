@@ -41,7 +41,7 @@ public class FieldService(
         {
             if (total == 0)
             {
-                total = reader.GetInt32(6);
+                total = reader.GetInt32(7);
             }
 
             var id = reader.GetGuid(0);
