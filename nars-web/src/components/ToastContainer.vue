@@ -52,10 +52,14 @@ function toastBg(type: string): string {
 }
 
 .toast-enter-active {
-  transition: opacity 0.2s, transform 0.2s;
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
 }
 .toast-leave-active {
-  transition: opacity 0.2s, transform 0.2s;
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
 }
 .toast-enter-from {
   opacity: 0;
