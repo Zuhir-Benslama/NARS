@@ -52,12 +52,12 @@ describe("logger", () => {
     it("includes context when provided", async () => {
       const logger = await freshLogger()
       const error = new NarsError(ErrorCode.UNKNOWN, "err")
-      logger.captureError(error, { extra: "info" })
+      logger.captureError(error, { action: "info" })
       await logger.flushLogs()
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body)
       const context = JSON.parse(body.logs[0].context)
-      expect(context).toMatchObject({ extra: "info" })
+      expect(context).toMatchObject({ action: "info" })
     })
   })
 

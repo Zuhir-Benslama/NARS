@@ -16,7 +16,8 @@ namespace NarsApi.Controllers;
 public class AdminController(
     AppDbContext db,
     ILogger<AdminController> logger,
-    IAdminOverviewService overviewService) : NarsControllerBase
+    IAdminOverviewService overviewService,
+    IUserAuthorizationService authorizationService) : NarsControllerBase
 {
     [HttpGet("admin/overview")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -99,62 +100,20 @@ public class AdminController(
 
         var callerRole = CurrentUserRole;
 
-        if (!CanCreateRole(callerRole, body.Role))
+        if (!authorizationService.CanCreateRole(callerRole, body.Role))
         {
             return Forbid();
         }
 
-        switch (callerRole, body.Role)
+        var scopeResult = await authorizationService.ValidateCreateUserScopeAsync(
+            callerRole, CurrentDairaId, CurrentWilayaId,
+            body.Role, body.CommuneId, body.DairaId, body.WilayaId,
+            cancellationToken);
+        if (scopeResult.Error is not null)
         {
-            case (UserRoles.CommuneUser, UserRoles.FieldWorker):
-                break;
-            case (UserRoles.DairaAdmin, UserRoles.CommuneUser):
-                {
-                    if (!body.CommuneId.HasValue)
-                    {
-                        return Problem(detail: "commune_id is required.", statusCode: 400);
-                    }
-
-                    var commune = await db.Communes.FindAsync([body.CommuneId.Value], cancellationToken);
-                    if (commune is null || commune.DairaId != CurrentDairaId)
-                    {
-                        return Forbid();
-                    }
-
-                    break;
-                }
-            case (UserRoles.WilayaAdmin, UserRoles.DairaAdmin):
-                {
-                    if (!body.DairaId.HasValue)
-                    {
-                        return Problem(detail: "daira_id is required.", statusCode: 400);
-                    }
-
-                    var daira = await db.Dairas.FindAsync([body.DairaId.Value], cancellationToken);
-                    if (daira is null || daira.WilayaId != CurrentWilayaId)
-                    {
-                        return Forbid();
-                    }
-
-                    break;
-                }
-            case (UserRoles.NationalAdmin, UserRoles.WilayaAdmin):
-                if (!body.WilayaId.HasValue)
-                {
-                    return Problem(detail: "wilaya_id is required.", statusCode: 400);
-                }
-
-                break;
-            // Unreachable — CanCreateRole above already blocks these,
-            // but we keep them for safety and switch exhaustiveness.
-            case (UserRoles.NationalAdmin, UserRoles.NationalAdmin):
-            case (UserRoles.NationalAdmin, UserRoles.FieldWorker):
-            case (UserRoles.NationalAdmin, UserRoles.CommuneUser):
-            case (UserRoles.NationalAdmin, UserRoles.DairaAdmin):
-            case (UserRoles.WilayaAdmin, not UserRoles.DairaAdmin):
-            case (UserRoles.DairaAdmin, not UserRoles.CommuneUser):
-            case (UserRoles.CommuneUser, not UserRoles.FieldWorker):
-                return Forbid();
+            return scopeResult.IsAuthorizationFailure
+                ? Forbid()
+                : Problem(detail: scopeResult.Error, statusCode: 400);
         }
 
         var geoError = GeographicValidator.Validate(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
@@ -269,12 +228,12 @@ public class AdminController(
             return Problem(detail: "User not found.", statusCode: 404);
         }
 
-        if (!CanCreateRole(CurrentUserRole, target.Role))
+        if (!authorizationService.CanCreateRole(CurrentUserRole, target.Role))
         {
             return Forbid();
         }
 
-        if (body.Role is not null && !CanCreateRole(CurrentUserRole, body.Role))
+        if (body.Role is not null && !authorizationService.CanCreateRole(CurrentUserRole, body.Role))
         {
             return Forbid();
         }
@@ -366,7 +325,7 @@ public class AdminController(
             return Problem(detail: "User not found.", statusCode: 404);
         }
 
-        if (!CanCreateRole(CurrentUserRole, target.Role))
+        if (!authorizationService.CanCreateRole(CurrentUserRole, target.Role))
         {
             return Forbid();
         }
@@ -379,17 +338,6 @@ public class AdminController(
 
         return Ok(new ActionResponse(Success: true));
     }
-
-    // ── Permission helpers ──────────────────────────────────────────────────
-
-    internal static bool CanCreateRole(string callerRole, string targetRole) => (callerRole, targetRole) switch
-    {
-        (UserRoles.NationalAdmin, UserRoles.WilayaAdmin) => true,
-        (UserRoles.WilayaAdmin, UserRoles.DairaAdmin) => true,
-        (UserRoles.DairaAdmin, UserRoles.CommuneUser) => true,
-        (UserRoles.CommuneUser, UserRoles.FieldWorker) => true,
-        _ => false,
-    };
 
     private async Task<IActionResult> NationalOverview(CancellationToken cancellationToken)
     {

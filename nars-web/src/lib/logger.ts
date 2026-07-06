@@ -74,8 +74,8 @@ export function captureError(error: NarsError, additionalContext?: ErrorContext)
     code: error.code,
     message: error.message,
     context: Object.keys(fullContext).length > 0 ? JSON.stringify(fullContext) : null,
-    url: (fullContext.url as string | null) ?? null,
-    method: (fullContext.method as string | null) ?? null,
+    url: fullContext.url ?? null,
+    method: fullContext.method ?? null,
   })
 }
 

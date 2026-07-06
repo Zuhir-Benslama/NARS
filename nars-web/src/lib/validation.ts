@@ -118,15 +118,18 @@ export async function getRoadSide(
   roadDbId: string,
   lat: number,
   lng: number,
+  signal?: AbortSignal,
 ): Promise<RoadSideResponse | null> {
   try {
     const res = await apiFetch("/api/road-side", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ roadId: roadDbId, lat, lng }),
+      signal,
     })
     return (await res.json()) as RoadSideResponse
   } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") return null
     debugError("getRoadSide failed:", err)
     return null
   }

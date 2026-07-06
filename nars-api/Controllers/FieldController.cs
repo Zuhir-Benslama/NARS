@@ -20,7 +20,7 @@ public class FieldController(
     IDateTimeProvider timeProvider,
     IFieldService fieldService) : NarsControllerBase
 {
-    private readonly int MaxFeatureDataSize = featureDefaults.Value.MaxFeatureDataSize;
+    private readonly int _maxFeatureDataSize = featureDefaults.Value.MaxFeatureDataSize;
 
     [HttpGet("field/features")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -99,7 +99,7 @@ public class FieldController(
             return Problem(detail: "Feature not found.", statusCode: 400);
         }
 
-        if (feature.Value.CommuneId != CurrentCommuneId)
+        if (!feature.Value.CommuneId.HasValue || feature.Value.CommuneId != CurrentCommuneId)
         {
             return Forbid();
         }
@@ -108,7 +108,7 @@ public class FieldController(
             ? body.Data.GetString()!
             : body.Data.GetRawText();
 
-        if (rawData.Length > MaxFeatureDataSize)
+        if (rawData.Length > _maxFeatureDataSize)
         {
             return Problem(detail: "Inspection data is too large (max 512 KB).", statusCode: 400);
         }
@@ -211,7 +211,7 @@ public class FieldController(
             ? body.Data.GetString()!
             : body.Data.GetRawText();
 
-        if (rawData.Length > MaxFeatureDataSize)
+        if (rawData.Length > _maxFeatureDataSize)
         {
             return Problem(detail: "Feature data is too large (max 512 KB).", statusCode: 400);
         }

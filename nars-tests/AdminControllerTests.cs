@@ -28,7 +28,8 @@ public class AdminControllerTests
         IAdminOverviewService? overview = null) =>
         new(db,
             Mock.Of<ILogger<AdminController>>(),
-            overview ?? Mock.Of<IAdminOverviewService>())
+            overview ?? Mock.Of<IAdminOverviewService>(),
+            new UserAuthorizationService(db))
         {
             ControllerContext = new ControllerContext
             {
@@ -37,32 +38,10 @@ public class AdminControllerTests
         };
 
     private static void SetUser(AdminController ctrl, string role,
-        Guid? userId = null, int? communeId = null,
-        int? dairaId = null, int? wilayaId = null)
+        int? communeId = null, int? dairaId = null, int? wilayaId = null)
     {
-        var claims = new List<Claim>
-        {
-            new(ClaimNames.UserId, (userId ?? Guid.NewGuid()).ToString()),
-            new(ClaimNames.Username, "testuser"),
-            new(ClaimNames.Role, role),
-        };
-        if (communeId.HasValue)
-        {
-            claims.Add(new(ClaimNames.CommuneId, communeId.Value.ToString()));
-        }
-
-        if (dairaId.HasValue)
-        {
-            claims.Add(new(ClaimNames.DairaId, dairaId.Value.ToString()));
-        }
-
-        if (wilayaId.HasValue)
-        {
-            claims.Add(new(ClaimNames.WilayaId, wilayaId.Value.ToString()));
-        }
-
         ctrl.ControllerContext.HttpContext.User =
-            new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth"));
+            AuthTestHelper.CreateClaimsPrincipal(Guid.NewGuid(), role, communeId, dairaId, wilayaId);
     }
 
     // ─── Overview ───────────────────────────────────────────────────────
@@ -525,6 +504,9 @@ public class AdminControllerTests
     [InlineData(UserRoles.NationalAdmin, UserRoles.NationalAdmin, false)]
     [InlineData(UserRoles.FieldWorker, UserRoles.CommuneUser, false)]
     [InlineData(UserRoles.DairaAdmin, UserRoles.WilayaAdmin, false)]
-    public void CanCreateRole_ValidatesCorrectly(string caller, string target, bool expected) =>
-        Assert.Equal(expected, AdminController.CanCreateRole(caller, target));
+    public void CanCreateRole_ValidatesCorrectly(string caller, string target, bool expected)
+    {
+        var svc = new UserAuthorizationService(CreateDb());
+        Assert.Equal(expected, svc.CanCreateRole(caller, target));
+    }
 }

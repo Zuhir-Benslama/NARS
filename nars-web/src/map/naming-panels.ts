@@ -10,24 +10,24 @@
 
 import distance from "@turf/distance"
 import { useLayerStore } from "../stores/layerStore"
-import type { LayerState } from "../stores/layerStore"
 import { featuresStore } from "./core/state"
 import { debugError } from "../utils/debug"
 import type { FeatureData, LayerEntry, LatLng } from "../types"
+import { PHASES } from "../phases"
 
 const DEDUPE_METERS = 3
 const ROAD_STEP_METERS = 100
 
-const PANEL_COLORS = {
-  districts: "#f39c12",
-  roads: "#3498db",
-  publicBuildings: "#e67e22",
-  publicSpaces: "#2ecc71",
+const PANEL_COLORS: Record<string, string> = {}
+for (const p of PHASES) {
+  if (["districts", "roads", "publicBuildings", "publicSpaces"].includes(p.key)) {
+    PANEL_COLORS[p.key] = p.color
+  }
 }
 
 function nearExisting(from: LatLng): boolean {
   const layerStore = useLayerStore()
-  const state = layerStore.$state as LayerState
+  const state = layerStore.$state
   const existing = state.namingPanels || []
   for (const e of existing) {
     if (e.data.lat && e.data.lng) {
@@ -109,7 +109,7 @@ async function addPanelIfMissing(
 
   const layerEntry: LayerEntry = {
     id: `panel_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-    dbId: "0" as string,
+    dbId: "0",
     data,
     type: "marker",
   }
@@ -133,7 +133,7 @@ async function addPanelIfMissing(
 
 export async function generateNamingPanels(): Promise<void> {
   const layerStore = useLayerStore()
-  const state = layerStore.$state as LayerState
+  const state = layerStore.$state
   const tasks: Promise<void>[] = []
 
   for (const e of state.districts || []) {

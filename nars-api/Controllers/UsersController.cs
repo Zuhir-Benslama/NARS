@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
+using NarsApi.Services;
 
 namespace NarsApi.Controllers;
 
@@ -12,7 +12,7 @@ namespace NarsApi.Controllers;
 [ApiController]
 [Route("/api")]
 [Tags("Users")]
-public class UsersController(AppDbContext db) : NarsControllerBase
+public class UsersController(IUserProfileService userProfile, ILogger<UsersController> logger) : NarsControllerBase
 {
     [HttpPut("user/update")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -26,7 +26,12 @@ public class UsersController(AppDbContext db) : NarsControllerBase
             return Problem(detail: "Request body is required.", statusCode: 400);
         }
 
-        var user = await db.Users.FindAsync([CurrentUserId], cancellationToken);
+        if (CurrentUserId is null)
+        {
+            return Problem(detail: "Authentication required.", statusCode: 401);
+        }
+
+        var user = await userProfile.GetUserByIdAsync(CurrentUserId.Value, cancellationToken);
         if (user is null)
         {
             return Problem(detail: "User not found.", statusCode: 404);
@@ -35,7 +40,7 @@ public class UsersController(AppDbContext db) : NarsControllerBase
         // Validate username uniqueness if changed
         if (!string.IsNullOrWhiteSpace(body.Username) && body.Username != user.Username)
         {
-            if (await db.Users.AnyAsync(u => u.Username == body.Username, cancellationToken))
+            if (await userProfile.IsUsernameTakenAsync(body.Username, cancellationToken))
             {
                 return Conflict(new { detail = "Username already exists." });
             }
@@ -46,7 +51,7 @@ public class UsersController(AppDbContext db) : NarsControllerBase
         // Validate email uniqueness if changed
         if (!string.IsNullOrWhiteSpace(body.Email) && body.Email != user.Email)
         {
-            if (await db.Users.AnyAsync(u => u.Email == body.Email, cancellationToken))
+            if (await userProfile.IsEmailTakenAsync(body.Email, cancellationToken))
             {
                 return Conflict(new { detail = "Email already exists." });
             }
@@ -69,10 +74,11 @@ public class UsersController(AppDbContext db) : NarsControllerBase
 
         try
         {
-            await db.SaveChangesAsync(cancellationToken);
+            await userProfile.UpdateUserAsync(user, cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex)
         {
+            logger.LogWarning(ex, "Duplicate username/email on profile update (userId={UserId})", CurrentUserId);
             // TOCTOU race: concurrent request claimed the username/email first.
             return Conflict(new { detail = "Username or email already exists." });
         }

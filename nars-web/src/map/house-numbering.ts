@@ -8,7 +8,6 @@
 
 import { useAppStore } from "../stores/appStore"
 import { useLayerStore } from "../stores/layerStore"
-import type { LayerState } from "../stores/layerStore"
 import { featuresStore } from "./core/state"
 import { showToast } from "../lib/toast"
 import { t } from "../i18n"
@@ -23,7 +22,7 @@ export async function setHouseNumbers(options?: { syncCounts?: boolean }): Promi
   }
 
   const layerStore = useLayerStore()
-  const state = layerStore.$state as LayerState
+  const state = layerStore.$state
   const roadEntry = (state.roads || []).find((r) => r.dbId === appStore.referenceRoadDbId)
   if (!roadEntry?.data.coordinates?.length) {
     showToast(t("alert_ref_road_no_coords"), "error")

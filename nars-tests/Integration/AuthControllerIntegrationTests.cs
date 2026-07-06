@@ -259,7 +259,8 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             jwtOpts,
             Options.Create(new AccountLockoutOptions()),
             Mock.Of<ILogger<AuthController>>(),
-            timeProvider);
+            timeProvider,
+            new UserAuthorizationService(db));
     }
 
     private async Task SeedReferenceDataAsync() => await SeedData.SeedBasicLocationsAsync(_db);

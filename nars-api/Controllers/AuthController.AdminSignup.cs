@@ -52,9 +52,7 @@ public partial class AuthController
         var admin = await db.Users
             .FirstOrDefaultAsync(u => u.Username == body.AdminUsername, cancellationToken);
 
-        // Use a stable dummy hash so BCrypt always does the full work.
-        const string _dummyHash = "$2a$11$BCfJgwy.hTY703/9RBjPo.8UjBrTHh/95zFznkYLiapLvWdf5ISbO";
-        var hashToCheck = admin?.PasswordHash ?? _dummyHash;
+        var hashToCheck = admin?.PasswordHash ?? DummyHash;
         var passwordValid = BCrypt.Net.BCrypt.Verify(body.AdminPassword, hashToCheck);
 
         if (admin is null || !passwordValid)
@@ -74,7 +72,7 @@ public partial class AuthController
         }
 
         // 3. Role hierarchy.
-        if (!AdminController.CanCreateRole(admin.Role, body.Role))
+        if (!authorizationService.CanCreateRole(admin.Role, body.Role))
         {
             return StatusCode(403, new
             {
@@ -83,10 +81,13 @@ public partial class AuthController
         }
 
         // 4. Geographic scope per role.
-        var scopeError = await ValidateScopeAsync(admin, body, cancellationToken);
-        if (scopeError is not null)
+        var scopeResult = await authorizationService.ValidateCreateUserScopeAsync(
+            admin.Role, admin.DairaId, admin.WilayaId,
+            body.Role, body.CommuneId, body.DairaId, body.WilayaId,
+            cancellationToken);
+        if (scopeResult.Error is not null)
         {
-            return StatusCode(403, new { detail = scopeError });
+            return StatusCode(403, new { detail = scopeResult.Error });
         }
 
         // 5. Geographic fields present.
@@ -133,12 +134,11 @@ public partial class AuthController
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex)
         {
-            var field = await db.Users.AnyAsync(u => u.Username == body.Username, cancellationToken)
-                ? "Username"
-                : "Email";
-            return Conflict(new { detail = $"{field} already exists." });
+            logger.LogWarning(ex, "Duplicate user during authorized signup (username={Username}, email={Email})",
+                body.Username, body.Email);
+            return Conflict(new { detail = "Username or email already exists." });
         }
 
         logger.LogInformation(
@@ -149,71 +149,6 @@ public partial class AuthController
             Success: true,
             Message: $"{body.Role} account created successfully."
         ));
-    }
-
-    // ─── Scope validation ─────────────────────────────────────────────────────
-
-    private async Task<string?> ValidateScopeAsync(User admin, AuthorizedAdminSignupRequest body, CancellationToken cancellationToken = default)
-    {
-        switch (admin.Role, body.Role)
-        {
-            // commune_user creates field_worker: inherits creator's commune_id, no extra scope needed
-            case (UserRoles.CommuneUser, UserRoles.FieldWorker):
-                return null;
-            // daira_admin creates commune_user: commune must belong to admin's daira.
-            case (UserRoles.DairaAdmin, UserRoles.CommuneUser):
-                {
-                    if (!body.CommuneId.HasValue)
-                    {
-                        return "commune_id is required when creating a commune_user.";
-                    }
-
-                    var commune = await db.Communes.FindAsync([body.CommuneId.Value], cancellationToken);
-                    if (commune is null)
-                    {
-                        return "Commune not found.";
-                    }
-
-                    if (commune.DairaId != admin.DairaId)
-                    {
-                        return "That commune does not belong to your daira.";
-                    }
-
-                    return null;
-                }
-            // wilaya_admin creates daira_admin: daira must belong to admin's wilaya.
-            case (UserRoles.WilayaAdmin, UserRoles.DairaAdmin):
-                {
-                    if (!body.DairaId.HasValue)
-                    {
-                        return "daira_id is required when creating a daira_admin.";
-                    }
-
-                    var daira = await db.Dairas.FindAsync([body.DairaId.Value], cancellationToken);
-                    if (daira is null)
-                    {
-                        return "Daira not found.";
-                    }
-
-                    if (daira.WilayaId != admin.WilayaId)
-                    {
-                        return "That daira does not belong to your wilaya.";
-                    }
-
-                    return null;
-                }
-            // national_admin creates wilaya_admin: any wilaya is valid.
-            case (UserRoles.NationalAdmin, UserRoles.WilayaAdmin):
-                if (body.WilayaId.HasValue && await db.Wilayas.FindAsync([body.WilayaId.Value], cancellationToken) is null)
-                {
-                    return "Wilaya not found.";
-                }
-
-                return null;
-
-            default:
-                return null;
-        }
     }
 
 }

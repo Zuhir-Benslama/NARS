@@ -118,7 +118,7 @@ async function initializeApp(): Promise<void> {
       createServerError(
         "Auth check failed during app initialization",
         { action: "auth-guard" },
-        error as Error,
+        error,
       ),
     )
     window.location.href = getLoginPath()

@@ -1,82 +1,59 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { createPinia, setActivePinia } from "pinia"
 import { showToast, showConfirm } from "./toast"
+import { useToastStore } from "../stores/toastStore"
 
 beforeEach(() => {
+  setActivePinia(createPinia())
   vi.useFakeTimers()
   document.querySelectorAll(".nars-confirm-backdrop").forEach((el) => el.remove())
-  const tc = document.getElementById("nars-toast-container")
-  if (tc) tc.innerHTML = ""
 })
 
 afterEach(() => {
   vi.useRealTimers()
 })
 
-function triggerTransitionEnd(el: HTMLElement): void {
-  el.dispatchEvent(new Event("transitionend"))
-}
-
 describe("showToast", () => {
-  it("creates a toast element in the container", () => {
+  it("adds a toast to the store", () => {
     showToast("Hello, world!", "info")
-    vi.advanceTimersByTime(100)
-    const container = document.getElementById("nars-toast-container")
-    expect(container).not.toBeNull()
-    expect(container!.childElementCount).toBe(1)
-    expect(container!.textContent).toContain("Hello, world!")
+    const store = useToastStore()
+    expect(store.toasts).toHaveLength(1)
+    expect(store.toasts[0].message).toBe("Hello, world!")
+    expect(store.toasts[0].type).toBe("info")
   })
 
-  it("applies the correct background color per type", () => {
+  it("applies the correct type", () => {
     showToast("Success!", "success")
-    vi.advanceTimersByTime(100)
-    const container = document.getElementById("nars-toast-container")!
-    const toast = container.firstElementChild as HTMLElement
-    expect(toast.style.background).toBe("rgb(34, 197, 94)")
-  })
-
-  it("applies error background", () => {
     showToast("Error!", "error")
-    vi.advanceTimersByTime(100)
-    const container = document.getElementById("nars-toast-container")!
-    const toast = container.firstElementChild as HTMLElement
-    expect(toast.style.background).toBe("rgb(239, 68, 68)")
-  })
-
-  it("applies info background", () => {
     showToast("Info!", "info")
-    vi.advanceTimersByTime(100)
-    const container = document.getElementById("nars-toast-container")!
-    const toast = container.firstElementChild as HTMLElement
-    expect(toast.style.background).toBe("rgb(59, 130, 246)")
+    const store = useToastStore()
+    expect(store.toasts).toHaveLength(3)
+    expect(store.toasts[0].type).toBe("success")
+    expect(store.toasts[1].type).toBe("error")
+    expect(store.toasts[2].type).toBe("info")
   })
 
   it("auto-dismisses after duration", () => {
     showToast("Test", "info")
-    vi.advanceTimersByTime(100)
-    const container = document.getElementById("nars-toast-container")!
-    expect(container.childElementCount).toBe(1)
+    const store = useToastStore()
+    expect(store.toasts).toHaveLength(1)
     vi.advanceTimersByTime(3500)
-    const toast = container.firstElementChild as HTMLElement
-    triggerTransitionEnd(toast)
-    expect(container.childElementCount).toBe(0)
+    expect(store.toasts).toHaveLength(0)
   })
 
-  it("dismisses on click", () => {
-    showToast("Click me", "info")
-    vi.advanceTimersByTime(100)
-    const container = document.getElementById("nars-toast-container")!
-    const toast = container.firstElementChild as HTMLElement
-    toast.click()
-    triggerTransitionEnd(toast)
-    expect(container.childElementCount).toBe(0)
+  it("dismisses on removeToast", () => {
+    const id = showToast("Click me", "info")
+    const store = useToastStore()
+    expect(store.toasts).toHaveLength(1)
+    store.removeToast(id)
+    expect(store.toasts).toHaveLength(0)
   })
 
-  it("queue multiple toasts", () => {
+  it("queues multiple toasts", () => {
     showToast("First", "info")
     showToast("Second", "success")
-    vi.advanceTimersByTime(100)
-    const container = document.getElementById("nars-toast-container")!
-    expect(container.childElementCount).toBe(2)
+    const store = useToastStore()
+    expect(store.toasts).toHaveLength(2)
   })
 })
 

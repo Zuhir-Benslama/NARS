@@ -26,7 +26,7 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
         _fixture = fixture;
         _db = fixture.CreateDbContext();
         var featureStats = new FeatureStatsService(_db);
-        _controller = new AdminController(_db, Mock.Of<Microsoft.Extensions.Logging.ILogger<AdminController>>(), new AdminOverviewService(_db, featureStats));
+        _controller = new AdminController(_db, Mock.Of<Microsoft.Extensions.Logging.ILogger<AdminController>>(), new AdminOverviewService(_db, featureStats), new UserAuthorizationService(_db));
     }
 
     public async Task InitializeAsync() => await SeedReferenceDataAsync();

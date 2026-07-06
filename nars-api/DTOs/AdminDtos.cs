@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
 namespace NarsApi.DTOs;
@@ -10,12 +9,12 @@ namespace NarsApi.DTOs;
 /// Only admin users of higher or equal level may call this endpoint.
 /// </summary>
 public record CreateAdminRequest(
-    [param: Required][property: JsonRequired][property: JsonPropertyName("name")] string Name,
-    [param: Required][property: JsonRequired][property: JsonPropertyName("email")] string Email,
-    [param: Required][property: JsonRequired][property: JsonPropertyName("phone")] string Phone,
-    [param: Required][property: JsonRequired][property: JsonPropertyName("username")] string Username,
-    [param: Required][property: JsonRequired][property: JsonPropertyName("password")] string Password,
-    [param: Required][property: JsonRequired][property: JsonPropertyName("role")] string Role,
+    [property: JsonRequired][property: JsonPropertyName("name")] string Name,
+    [property: JsonRequired][property: JsonPropertyName("email")] string Email,
+    [property: JsonRequired][property: JsonPropertyName("phone")] string Phone,
+    [property: JsonRequired][property: JsonPropertyName("username")] string Username,
+    [property: JsonRequired][property: JsonPropertyName("password")] string Password,
+    [property: JsonRequired][property: JsonPropertyName("role")] string Role,
     /// <summary>Required when role = commune_user.</summary>
     [property: JsonPropertyName("commune_id")] int? CommuneId,
     /// <summary>Required when role = daira_admin.</summary>

@@ -24,4 +24,5 @@ export interface AppStoreState {
   isLoading: boolean
   referenceRoadDbId: string | null
   referenceEntranceDbId: string | null
+  boundaryEventsRegistered: boolean
 }

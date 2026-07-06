@@ -14,7 +14,7 @@ namespace NarsApi.Controllers;
 [Route("/api")]
 [Tags("Logs")]
 [EnableRateLimiting(RateLimitPolicies.Logs)]
-public class LogsController(AppDbContext db, ILogger<LogsController> logger, IOptions<LoggingOptions> logOptions, IDateTimeProvider timeProvider) : ControllerBase
+public class LogsController(IErrorLogService errorLogService, ILogger<LogsController> logger, IOptions<LoggingOptions> logOptions, IDateTimeProvider timeProvider) : ControllerBase
 {
     private int MaxBatchSize => logOptions.Value.MaxBatchSize;
     private int MaxEntryLength => logOptions.Value.MaxEntryLength;
@@ -103,9 +103,7 @@ public class LogsController(AppDbContext db, ILogger<LogsController> logger, IOp
             logger.LogWarning("Skipped {Skipped}/{Total} invalid log entries", skipped, body.Logs.Count);
         }
 
-        db.ErrorLogs.AddRange(entries);
-        await db.SaveChangesAsync(cancellationToken);
-
+        await errorLogService.LogBatchAsync(entries, cancellationToken);
         return NoContent();
     }
 

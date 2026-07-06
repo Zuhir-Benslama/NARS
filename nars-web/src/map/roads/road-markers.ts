@@ -5,7 +5,6 @@
 // Start marker suppressed if road starts at city center location.
 
 import { useLayerStore } from "../../stores/layerStore"
-import type { LayerState } from "../../stores/layerStore"
 import { ctx } from "../core/state"
 import { PHASES } from "../../phases"
 import { debugLog, debugWarn } from "../../utils/debug"
@@ -19,7 +18,7 @@ export function updateEndpointMarkers(): void {
     return
   }
   const layerStore = useLayerStore()
-  const state = layerStore.$state as LayerState
+  const state = layerStore.$state
   const roads = state.roads || []
 
   const roadsPhase = PHASES.find((p) => p.key === "roads")

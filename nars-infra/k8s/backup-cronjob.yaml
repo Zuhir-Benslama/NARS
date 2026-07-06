@@ -44,7 +44,7 @@ spec:
           activeDeadlineSeconds: 600
           containers:
             - name: pg-dump
-              image: postgis/postgis:17-3.5
+              image: postgres:17-alpine
               imagePullPolicy: IfNotPresent
               securityContext:
                 allowPrivilegeEscalation: false

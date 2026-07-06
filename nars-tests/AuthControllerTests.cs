@@ -50,7 +50,8 @@ public class AuthControllerTests
             jwtOptions,
             lockoutOptions,
             Mock.Of<ILogger<AuthController>>(),
-            timeProvider);
+            timeProvider,
+            new UserAuthorizationService(db));
     }
 
     [Fact]

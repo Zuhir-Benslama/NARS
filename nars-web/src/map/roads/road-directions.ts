@@ -7,7 +7,6 @@
 
 import { apiFetch } from "../../api"
 import { useLayerStore } from "../../stores/layerStore"
-import type { LayerState } from "../../stores/layerStore"
 import { featuresStore } from "../core/state"
 import { showToast } from "../../lib/toast"
 import { debugError } from "../../utils/debug"
@@ -21,7 +20,7 @@ import { updateEndpointMarkers } from "./road-markers"
 
 export async function computeAndApplyRoadDirections(): Promise<void> {
   const layerStore = useLayerStore()
-  const state = layerStore.$state as LayerState
+  const state = layerStore.$state
   const roads = state.roads || []
   if (!roads.length) return
 

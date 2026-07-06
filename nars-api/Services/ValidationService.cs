@@ -133,4 +133,16 @@ public class ValidationService(AppDbContext db) : IValidationService
         var result = await ExecuteScalarAsync(sql, [("@uid", (object)userId), ("@wkt", wkt)], ct);
         return result is bool b && b;
     }
+
+    public async Task<bool> UserHasCentralUrbanAreaAsync(Guid userId, CancellationToken ct = default) =>
+        await db.Set<Area>().AnyAsync(a => a.UserId == userId && a.Layer == FeatureTypes.AreaLayers.CentralUrban, ct);
+
+    public Task<int> CountUserRoadsAsync(Guid userId, CancellationToken ct = default) =>
+        db.Set<Road>().CountAsync(r => r.UserId == userId, ct);
+
+    public Task<int> CountUserDistrictsAsync(Guid userId, CancellationToken ct = default) =>
+        db.Set<District>().CountAsync(d => d.UserId == userId, ct);
+
+    public Task<int> CountUserUrbanAreasAsync(Guid userId, CancellationToken ct = default) =>
+        db.Set<Area>().CountAsync(a => a.UserId == userId && (a.Layer == FeatureTypes.AreaLayers.CentralUrban || a.Layer == FeatureTypes.AreaLayers.SecondaryUrban), ct);
 }

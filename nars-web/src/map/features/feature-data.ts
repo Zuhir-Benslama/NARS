@@ -47,7 +47,7 @@ export function buildFeatureData(
   }
 
   if (phase.key === "cityCenter") {
-    base.radius = modalResult.radius as number | undefined
+    base.radius = modalResult.radius
   }
 
   const coords = extractCoords(geometry)

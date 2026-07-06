@@ -56,7 +56,7 @@ public class JwtServiceTests
         Assert.Equal("testuser",
             jwt.Claims.First(c => c.Type == ClaimNames.Username).Value);
         Assert.Equal("Test User",
-            jwt.Claims.First(c => c.Type == NarsApi.Infrastructure.ClaimNames.Name).Value);
+            jwt.Claims.First(c => c.Type == ClaimNames.Name).Value);
         Assert.Equal("test@example.com",
             jwt.Claims.First(c => c.Type == ClaimNames.Email).Value);
         Assert.Equal("42",

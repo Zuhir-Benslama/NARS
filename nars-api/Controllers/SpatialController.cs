@@ -1,10 +1,6 @@
-using System.Data;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
-using NarsApi.Models;
 using NarsApi.Services;
 
 namespace NarsApi.Controllers;
@@ -18,7 +14,7 @@ namespace NarsApi.Controllers;
 [Route("/api")]
 [Tags("Spatial")]
 public class SpatialController(
-    AppDbContext db,
+    IRoadQueryService roadQuery,
     IScatteredAreaService scatteredService,
     IEntranceQueryService entranceQuery) : NarsControllerBase
 {
@@ -35,8 +31,7 @@ public class SpatialController(
             return Problem(detail: "Request body is required.", statusCode: 400);
         }
 
-        var road = await db.Roads.FirstOrDefaultAsync(f =>
-            f.Id == body.RoadId && f.UserId == RequiredCurrentUserId, cancellationToken);
+        var road = await roadQuery.GetUserRoadByIdAsync(body.RoadId, RequiredCurrentUserId, cancellationToken);
 
         if (road is null)
         {

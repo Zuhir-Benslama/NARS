@@ -29,6 +29,9 @@ jobs:
       - name: Build
         run: dotnet build Workspace.sln --no-restore --configuration Release
 
+      - name: Check formatting
+        run: dotnet format Workspace.sln --verify-no-changes --no-restore
+
       - name: Run tests
         run: dotnet test Workspace.sln --no-build --configuration Release --verbosity normal --filter "FullyQualifiedName!~Integration"
 

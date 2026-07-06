@@ -36,7 +36,7 @@ describe("resetAllState", () => {
 
   it("calls every reset function", async () => {
     const { resetAllState } = await import("./reset-all-state")
-    resetAllState()
+    await resetAllState()
 
     expect(mockResetDrawState).toHaveBeenCalledOnce()
     expect(mockResetEditState).toHaveBeenCalledOnce()

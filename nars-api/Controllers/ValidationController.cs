@@ -1,9 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
@@ -15,7 +13,6 @@ namespace NarsApi.Controllers;
 [Route("/api")]
 [Tags("Validation")]
 public class ValidationController(
-    AppDbContext db,
     IOptions<ValidationOptions> validationOptions,
     IValidationService validationService) : NarsControllerBase
 {
@@ -31,10 +28,8 @@ public class ValidationController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> MainUrbanExists(CancellationToken cancellationToken = default)
     {
-        var exists = await db.Areas.AnyAsync(f =>
-            f.UserId == CurrentUserId &&
-            f.Layer == FeatureTypes.AreaLayers.CentralUrban, cancellationToken);
-
+        var exists = CurrentUserId.HasValue &&
+            await validationService.UserHasCentralUrbanAreaAsync(CurrentUserId.Value, cancellationToken);
         return Ok(new { exists });
     }
 
@@ -85,9 +80,7 @@ public class ValidationController(
             }
         }
 
-        var existingCount = await db.Roads.CountAsync(f => f.UserId == CurrentUserId, cancellationToken);
-
-        if (existingCount == 0)
+        if (CurrentUserId is null || await validationService.CountUserRoadsAsync(CurrentUserId.Value, cancellationToken) == 0)
         {
             return Ok(new ValidateRoadResponse(true, null));
         }
@@ -125,9 +118,7 @@ public class ValidationController(
             return Problem(detail: inputError, statusCode: 400);
         }
 
-        var existingCount = await db.Districts.CountAsync(f => f.UserId == CurrentUserId, cancellationToken);
-
-        if (existingCount == 0)
+        if (CurrentUserId is null || await validationService.CountUserDistrictsAsync(CurrentUserId.Value, cancellationToken) == 0)
         {
             return Ok(new ValidateDistrictResponse(true, null));
         }
@@ -160,17 +151,18 @@ public class ValidationController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> DistrictsCoverage(CancellationToken cancellationToken = default)
     {
-        var urbanCount = await db.Areas.CountAsync(f =>
-            f.UserId == CurrentUserId &&
-            (f.Layer == FeatureTypes.AreaLayers.CentralUrban ||
-             f.Layer == FeatureTypes.AreaLayers.SecondaryUrban), cancellationToken);
+        if (CurrentUserId is null)
+        {
+            return Ok(new DistrictCoverageResponse(true, "No urban areas to cover."));
+        }
 
+        var urbanCount = await validationService.CountUserUrbanAreasAsync(CurrentUserId.Value, cancellationToken);
         if (urbanCount == 0)
         {
             return Ok(new DistrictCoverageResponse(true, "No urban areas to cover."));
         }
 
-        var districtCount = await db.Districts.CountAsync(f => f.UserId == CurrentUserId, cancellationToken);
+        var districtCount = await validationService.CountUserDistrictsAsync(CurrentUserId.Value, cancellationToken);
 
         if (districtCount == 0)
         {
@@ -203,9 +195,8 @@ public class ValidationController(
 
     private static string FormatDouble(double v) => v.ToString(CultureInfo.InvariantCulture);
 
-    private static string BuildLineStringWkt(List<CoordDto> coords)
+    private static void AppendWktCoords(StringBuilder sb, List<CoordDto> coords)
     {
-        var sb = new StringBuilder("LINESTRING(");
         for (var i = 0; i < coords.Count; i++)
         {
             if (i > 0) sb.Append(',');
@@ -213,6 +204,12 @@ public class ValidationController(
             sb.Append(' ');
             sb.Append(FormatDouble(coords[i].Lat));
         }
+    }
+
+    private static string BuildLineStringWkt(List<CoordDto> coords)
+    {
+        var sb = new StringBuilder("LINESTRING(");
+        AppendWktCoords(sb, coords);
         sb.Append(')');
         return sb.ToString();
     }
@@ -220,13 +217,7 @@ public class ValidationController(
     private static string BuildPolygonWkt(List<CoordDto> coords)
     {
         var sb = new StringBuilder("POLYGON((");
-        for (var i = 0; i < coords.Count; i++)
-        {
-            if (i > 0) sb.Append(',');
-            sb.Append(FormatDouble(coords[i].Lng));
-            sb.Append(' ');
-            sb.Append(FormatDouble(coords[i].Lat));
-        }
+        AppendWktCoords(sb, coords);
         var first = $"{FormatDouble(coords[0].Lng)} {FormatDouble(coords[0].Lat)}";
         var last = $"{FormatDouble(coords[^1].Lng)} {FormatDouble(coords[^1].Lat)}";
         if (first != last)

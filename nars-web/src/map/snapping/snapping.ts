@@ -67,7 +67,7 @@ export function getActiveSnapPhases(): string[] {
   const store = useSnapStore()
   if (store.editModeActive) {
     const layerStore = useLayerStore()
-    const state = layerStore.$state as LayerState
+    const state = layerStore.$state
     return Object.keys(state).filter((key) => {
       const entries = state[key as keyof LayerState]
       return entries && entries.length > 0
@@ -83,7 +83,7 @@ export function getActiveSnapPhases(): string[] {
     completedPhaseKeys.add(PHASES[i].key)
   }
 
-  return ([...allowedTargets] as string[]).filter((key) => completedPhaseKeys.has(key))
+  return [...allowedTargets].filter((key) => completedPhaseKeys.has(key))
 }
 
 export function enableCrosshair(): void {

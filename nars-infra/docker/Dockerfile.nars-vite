@@ -1,14 +1,14 @@
 # ─── Frontend (Vue 3 + Vite) ─────────────────────────────────────────────────
 # Build from repo root:
 #   docker build -f nars-infra/docker/Dockerfile.nars-vite -t nars-vite:latest .
-FROM node:22-alpine AS build
+FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS build
 WORKDIR /app
 COPY nars-web/package.json nars-web/package-lock.json ./
 RUN npm ci --ignore-scripts
 COPY nars-web/ .
 RUN npm run build
 
-FROM nginx:1.27-alpine AS final
+FROM nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10 AS final
 
 LABEL org.opencontainers.image.title="NARS Vite Frontend" \
       org.opencontainers.image.description="NARS Vue 3 + Vite frontend" \

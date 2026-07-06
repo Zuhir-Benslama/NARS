@@ -94,7 +94,7 @@ export NARS_DB_USER="$DB_USER"
 # ── Shared Python database helper ─────────────────────────────────────────────
 # Temp module with connect_db() so we don't duplicate the connection logic.
 DB_HELPER_DIR=$(mktemp -d)
-trap 'rm -rf "${DB_HELPER_DIR}"' EXIT
+trap 'rm -rf "${DB_HELPER_DIR}"' EXIT INT TERM HUP
 
 cat > "${DB_HELPER_DIR}/db_helper.py" << 'PYHELP'
 import os, psycopg2

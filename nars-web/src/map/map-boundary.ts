@@ -4,18 +4,18 @@
 import maplibregl from "maplibre-gl"
 import { showToast } from "../lib/toast"
 import { escapeHtml } from "../utils/sanitize"
-
-let boundaryEventsRegistered = false
+import { useAppStore } from "../stores/appStore"
 
 // ─── STATE RESET (for testing & HMR) ──────────────────────────────────────────
 
 export function resetBoundaryEvents(): void {
-  boundaryEventsRegistered = false
+  useAppStore().boundaryEventsRegistered = false
 }
 
 export function addBoundaryClickEvents(map: maplibregl.Map): void {
-  if (boundaryEventsRegistered) return
-  boundaryEventsRegistered = true
+  const store = useAppStore()
+  if (store.boundaryEventsRegistered) return
+  store.boundaryEventsRegistered = true
 
   map.on("click", "nars-boundaries", (e: maplibregl.MapLayerMouseEvent) => {
     const name = escapeHtml(e.features?.[0]?.properties?.communeName || "Commune")

@@ -42,7 +42,7 @@ export function setActiveEditEntry(entry: LayerEntry | null): void {
 }
 
 export function resetEditState(): void {
-  useEditStore().resetEdit()
+  useEditStore().$reset()
 }
 
 export function disableEditMode(): void {
@@ -70,7 +70,7 @@ function reEnableSnapping(): void {
 export function findLayerEntryByFeatureId(featureId: string | undefined): LayerEntry | null {
   if (!featureId) return null
   const layerStore = useLayerStore()
-  const state = layerStore.$state as LayerState
+  const state = layerStore.$state
   for (const key of Object.keys(state)) {
     const entries = state[key as keyof LayerState]
     const entry = entries?.find((e) => e.id === featureId)

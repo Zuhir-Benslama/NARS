@@ -9,7 +9,6 @@ import { isSnappingEnabled } from "../draw/draw-complete"
 import { toggleSnapping } from "../snapping/snapping"
 import { showToast } from "../../lib/toast"
 import { useLayerStore } from "../../stores/layerStore"
-import type { LayerState } from "../../stores/layerStore"
 import { setHouseNumbers } from "../house-numbering"
 import { setReferenceRoad, clearReferenceRoad, setReferenceEntrance } from "../house-entrances"
 import { generateNamingPanels } from "../naming-panels"
@@ -38,7 +37,7 @@ interface DrawContextEvent {
 
 export function showContextMenu(x: number, y: number, dbId: string, phaseKey: string): void {
   const layerStore = useLayerStore()
-  const state = layerStore.$state as LayerState
+  const state = layerStore.$state
   const currentPhase = PHASES[useAppStore().currentPhase]
   const currentPhaseKey = currentPhase?.key ?? ""
   const isRoad = phaseKey === "roads"

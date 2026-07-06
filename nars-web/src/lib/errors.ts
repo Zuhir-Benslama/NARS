@@ -28,7 +28,7 @@ export interface ErrorContext {
   url?: string
   method?: string
   status?: number
-  [key: string]: unknown
+  code?: string
 }
 
 // ─── NARS ERROR CLASS ─────────────────────────────────────────────────────────
@@ -265,6 +265,19 @@ export function logError(error: NarsError, additionalContext?: ErrorContext): vo
     captureError(error, additionalContext)
   }
   /* eslint-enable no-console */
+}
+
+// ─── ERROR HELPERS ────────────────────────────────────────────────────────────
+
+/** Safely extract error message from any thrown value. Prevents `(err as Error).message` casts. */
+export function getErrorMessage(err: unknown, fallback = "Unknown error"): string {
+  if (err instanceof Error) return err.message
+  if (typeof err === "string") return err
+  try {
+    return JSON.stringify(err) || fallback
+  } catch {
+    return fallback
+  }
 }
 
 // ─── ERROR TYPE GUARDS ────────────────────────────────────────────────────────

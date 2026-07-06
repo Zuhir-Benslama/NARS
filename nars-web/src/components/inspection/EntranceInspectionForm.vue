@@ -87,12 +87,14 @@
 <script setup lang="ts">
 import { ref } from "vue"
 import { apiFetch } from "../../api"
+import { getErrorMessage } from "../../lib/errors"
 import { showToast } from "../../lib/toast"
+import type { EntranceStep, InspectionStatus } from "../../types/inspection"
 
 const props = defineProps<{ feature: { id: string; label: string } | null }>()
 const emit = defineEmits<{ done: [] }>()
 
-const step = ref<number | string>(1)
+const step = ref<EntranceStep>(1)
 const submitting = ref(false)
 const creating = ref(false)
 
@@ -138,7 +140,7 @@ function getInspectionData() {
   }
 }
 
-async function submitInspection(status: "good" | "issue") {
+async function submitInspection(status: InspectionStatus) {
   if (!props.feature) return
   submitting.value = true
   try {
@@ -163,7 +165,7 @@ async function submitInspection(status: "good" | "issue") {
       showToast(body.detail ?? "Failed to save", "error")
     }
   } catch (e) {
-    showToast("Network error: " + (e as Error).message, "error")
+    showToast("Network error: " + getErrorMessage(e), "error")
   } finally {
     submitting.value = false
   }
@@ -190,7 +192,7 @@ async function createEntrance() {
       showToast(body.detail ?? "Failed to create entrance", "error")
     }
   } catch (e) {
-    showToast("Network error: " + (e as Error).message, "error")
+    showToast("Network error: " + getErrorMessage(e), "error")
   } finally {
     creating.value = false
   }

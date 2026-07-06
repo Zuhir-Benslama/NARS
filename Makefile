@@ -38,7 +38,8 @@ fi
 	echo "JWT_SECRET=$$(_RND 32)" >> $@; \
 	echo "GPG_PASSPHRASE=$$(_RND 32)" >> $@; \
 	echo "GRAFANA_PASSWORD=$$(_RND 12)" >> $@; \
-	echo "→ Created $@ with fresh secrets"
+	chmod 600 $@; \
+	echo "→ Created $@ with fresh secrets (permissions: 600)"
 
 -include .env
 
@@ -50,7 +51,7 @@ GPG_PASSPHRASE     ?= changeme_gpg_passphrase_32_characters_long!
 GRAFANA_PASSWORD   ?= changeme_grafana_admin_$(shell date +%s)
 export
 
-.PHONY: help
+.PHONY: help _build-nars-api _build-nars-postgis _build-nars-vite db-get-pod db-get-password
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| sort \
@@ -458,13 +459,12 @@ cluster-wait: ## Wait for API server and nodes to be ready
 			echo "→ Rootless Docker detected — fixing kubeconfig first"; \
 			$(MAKE) kubeconfig-fix; \
 		fi; \
-	fi; \
-	$(KUBECTL) wait --for=condition=Ready node --all --timeout=120s 2>/dev/null || \
 		i=0; until $(KUBECTL) get nodes 2>/dev/null; do \
 			sleep 2; i=$$((i + 1)); \
 			[ "$$i" -ge 60 ] && { echo "Timed out waiting for nodes"; exit 1; }; \
-		done && \
-		$(KUBECTL) wait --for=condition=Ready node --all --timeout=120s
+		done; \
+	fi; \
+	$(KUBECTL) wait --for=condition=Ready node --all --timeout=120s
 	@echo "✓ Cluster ready"
 
 .PHONY: kubeconfig-fix
@@ -618,6 +618,8 @@ secrets-validate: ## Fail if kustomize output contains placeholder values (REPLA
 
 .PHONY: secrets-apply
 secrets-apply: .env namespace-ensure ## Create nars-secrets and regcred with generated/variable values
+# SECURITY: --from-literal passes secrets via CLI args, visible in `ps aux`.
+# This is a kubectl limitation. Acceptable for local dev kind clusters.
 	@echo "→ Creating 'nars-secrets'..."
 	$(KUBECTL) create secret generic nars-secrets -n "$(NAMESPACE)" \
 		--from-literal=postgres_password="$(POSTGRES_PASSWORD)" \

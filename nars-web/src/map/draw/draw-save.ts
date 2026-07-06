@@ -12,6 +12,7 @@ import { buildDrawControl } from "./draw-control"
 import { refreshLayerVisibility } from "../rendering/labels"
 import { computeCircleRing, computeCircleRadius, closeRing } from "../rendering/geometry"
 import { getFeatureType } from "../house-numbering"
+import { getErrorMessage } from "../../lib/errors"
 import { showToast } from "../../lib/toast"
 import { debugError } from "../../utils/debug"
 import type { ModalResult } from "../../types"
@@ -86,19 +87,19 @@ export function getFeatureStyle(
     style.lineColor = s.lineColor
     style.lineWidth = s.lineWidth
   } else if (phase.key === "districts") {
-    style.fillColor = "#f39c12"
+    style.fillColor = phase.color
     style.fillOpacity = 0
-    style.lineColor = "#f39c12"
+    style.lineColor = phase.color
     style.lineWidth = 3
   } else if (phase.key === "publicBuildings") {
-    style.fillColor = "#e67e22"
+    style.fillColor = phase.color
     style.fillOpacity = 0.25
-    style.lineColor = "#e67e22"
+    style.lineColor = phase.color
     style.lineWidth = 3
   } else if (phase.key === "publicSpaces") {
-    style.fillColor = "#2ecc71"
+    style.fillColor = phase.color
     style.fillOpacity = 0.2
-    style.lineColor = "#2ecc71"
+    style.lineColor = phase.color
     style.lineWidth = 3
   } else if (phase.drawType === "polyline") {
     style.lineColor = phase.color
@@ -121,7 +122,7 @@ async function checkExistingCityCenter(
 ): Promise<boolean> {
   if (getDrawingPhase()?.key !== "cityCenter") return true
   const layerStore = useLayerStore()
-  const state = layerStore.$state as LayerState
+  const state = layerStore.$state
   if ((state.cityCenter?.length ?? 0) === 0) return true
 
   showToast("A city center already exists. Delete it first to create a new one.", "error")
@@ -149,6 +150,66 @@ function applyCityCenterOverride(
   }
 }
 
+// ─── STORE PAYLOAD BUILDER ──────────────────────────────────────────
+
+interface StorePayload {
+  dbId: string
+  style: Record<string, unknown>
+  storeGeometry: GeoJSON.Geometry
+}
+
+function buildStorePayload(
+  saveId: string,
+  geometry: GeoJSON.Geometry,
+  drawingPhase: (typeof PHASES)[number],
+  modalResult: ModalResult,
+  featureData: FeatureData,
+): StorePayload {
+  const style = getFeatureStyle(drawingPhase, modalResult)
+  const storeGeometry = normalizeGeometry(geometry, drawingPhase.drawType)
+
+  if (drawingPhase.key !== "cityCenter") return { dbId: saveId, style, storeGeometry }
+
+  const overridden = applyCityCenterOverride(featureData, style, storeGeometry)
+  return { dbId: saveId, style: overridden.style, storeGeometry: overridden.storeGeometry }
+}
+
+// ─── STORE & UI UPDATE ──────────────────────────────────────────────
+
+async function updateStoresAfterSave(
+  featureId: string,
+  payload: StorePayload,
+  drawingPhase: (typeof PHASES)[number],
+  featureData: FeatureData,
+  narsDrawType: string,
+): Promise<void> {
+  featuresStore.add({
+    id: featureId,
+    geometry: payload.storeGeometry,
+    properties: {
+      dbId: payload.dbId,
+      phaseKey: drawingPhase.key,
+      label: featureData.label,
+      geomType: payload.storeGeometry.type,
+      ...payload.style,
+    },
+  })
+
+  const layerStore = useLayerStore()
+  const phaseKey = drawingPhase.key as keyof LayerState
+  ;(layerStore.$state[phaseKey] as LayerEntry[]).push({
+    id: featureId,
+    dbId: payload.dbId,
+    data: featureData,
+    type: getFeatureType(narsDrawType),
+  })
+
+  useAppStore().syncCounts()
+  refreshLayerVisibility()
+  if (drawingPhase.key === "roads") updateEndpointMarkers()
+  showToast("Feature saved.", "success")
+}
+
 // ─── SAVE & UPDATE STORE ──────────────────────────────────────────
 
 async function saveAndUpdateStore(
@@ -168,47 +229,20 @@ async function saveAndUpdateStore(
       return
     }
 
-    const dbId = saveResult.data.id
-    let style: Record<string, unknown> = getFeatureStyle(drawingPhase, modalResult)
-    let storeGeometry: GeoJSON.Geometry = normalizeGeometry(geometry, drawingPhase.drawType)
-
-    if (drawingPhase.key === "cityCenter") {
-      const overridden = applyCityCenterOverride(featureData, style, storeGeometry)
-      style = overridden.style
-      storeGeometry = overridden.storeGeometry
-    }
-
-    featuresStore.add({
-      id: featureId,
-      geometry: storeGeometry,
-      properties: {
-        dbId,
-        phaseKey: drawingPhase.key,
-        label: featureData.label,
-        geomType: storeGeometry.type,
-        ...style,
-      },
-    })
-
-    const layerStore = useLayerStore()
-    const phaseKey = drawingPhase.key as keyof LayerState
-    ;(layerStore.$state[phaseKey] as LayerEntry[]).push({
-      id: featureId,
-      dbId,
-      data: featureData,
-      type: getFeatureType(narsDrawType),
-    })
-
-    useAppStore().syncCounts()
-    refreshLayerVisibility()
-    if (drawingPhase.key === "roads") updateEndpointMarkers()
-    showToast("Feature saved.", "success")
+    const payload = buildStorePayload(
+      saveResult.data.id,
+      geometry,
+      drawingPhase,
+      modalResult,
+      featureData,
+    )
+    await updateStoresAfterSave(featureId, payload, drawingPhase, featureData, narsDrawType)
 
     await delay(100)
     deleteGeomanFeature(geomanFeatureData)
   } catch (err) {
     debugError("[COMPLETE] Save error:", err)
-    showToast("Save failed: " + (err as Error).message, "error")
+    showToast("Save failed: " + getErrorMessage(err), "error")
   } finally {
     setSavingFeature(false)
     await delay(200)
