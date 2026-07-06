@@ -39,7 +39,7 @@
     <!-- OpenAPI (built-in .NET 10 — replaces Swashbuckle) -->
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
     <!-- Pin transitive Microsoft.OpenApi to patched version (CVE-2026-49451) -->
-    <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
+    <PackageReference Include="Microsoft.OpenApi" Version="3.8.0" />
 
     <!-- Health Checks -->
     <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
