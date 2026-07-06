@@ -22,38 +22,11 @@ export function areaStyle(areaTypeKey: string): {
   }
 }
 
-export const polygonStyles: Record<
-  string,
-  {
-    fillColor: string
-    fillOpacity: number
-    lineColor: string
-    lineWidth: number
-  }
-> = {
-  districts: {
-    lineColor: "#f39c12",
-    lineWidth: 3,
-    fillColor: "#f39c12",
-    fillOpacity: 0,
-  },
-  publicBuildings: {
-    lineColor: "#e67e22",
-    lineWidth: 3,
-    fillColor: "#e67e22",
-    fillOpacity: 0.25,
-  },
-  publicSpaces: {
-    lineColor: "#2ecc71",
-    lineWidth: 3,
-    fillColor: "#2ecc71",
-    fillOpacity: 0.2,
-  },
-}
-
 // ─── ICONS ────────────────────────────────────────────────────────────────────
 
-export function createEntranceIconHtml(label: string | number, color = "#27ae60"): string {
+const ENTRANCE_COLOR = PHASES.find((p) => p.key === "houseEntrances")?.color ?? "#27ae60"
+
+export function createEntranceIconHtml(label: string | number, color = ENTRANCE_COLOR): string {
   const text =
     escapeHtml(
       String(label ?? "")

@@ -24,6 +24,30 @@ export interface NamingPanelInspectionData {
 
 export type InspectionType = "road" | "house_entrance" | "naming_panel"
 
+export type EntranceStep =
+  | 1
+  | 2
+  | 3
+  | 4
+  | "no_entrance"
+  | "no_panel"
+  | "wrong_number"
+  | "wrong_position"
+  | "good"
+
+export type NamingPanelStep =
+  | 1
+  | 2
+  | 3
+  | 4
+  | "no_location"
+  | "no_panel"
+  | "wrong_naming"
+  | "wrong_position"
+  | "good"
+
+export type InspectionStatus = "good" | "issue"
+
 export interface InspectionResult {
   id: string
   feature_id: string

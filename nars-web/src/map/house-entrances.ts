@@ -14,7 +14,7 @@ const DEFAULT_ENTRANCE_COLOR = "#27ae60"
 
 function highlightFeature(phaseKey: string, dbId: string, active: boolean): void {
   const layerStore = useLayerStore()
-  const state = layerStore.$state as LayerState
+  const state = layerStore.$state
   const entries = state[phaseKey as keyof LayerState] || []
   const entry = entries.find((e) => e.dbId === dbId)
   if (!entry) return

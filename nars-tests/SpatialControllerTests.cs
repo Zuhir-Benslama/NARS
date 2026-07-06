@@ -25,7 +25,7 @@ public class SpatialControllerTests
         var db = new AppDbContext(opts);
 
         var ctrl = new SpatialController(
-            db,
+            new RoadQueryService(db),
             scatteredService ?? Mock.Of<IScatteredAreaService>(),
             entranceQuery ?? Mock.Of<IEntranceQueryService>());
 

@@ -1,78 +1,21 @@
 // ─── TOAST NOTIFICATIONS ──────────────────────────────────────────────────────
 // Lightweight non-blocking replacement for alert().
+// Push notifications into a Pinia store that a Vue component (ToastContainer)
+// renders reactively.  Works from both .vue components and imperative .ts files.
 
-import { UI_CONFIG } from "../config"
+import { useToastStore } from "../stores/toastStore"
+import type { ToastType } from "../stores/toastStore"
 
-type ToastType = "success" | "error" | "info"
+export type { ToastType }
 
-const DURATION = UI_CONFIG.toastDuration
-
-let container: HTMLElement | null = null
-
-function getContainer(): HTMLElement {
-  if (!container) {
-    container = document.createElement("div")
-    container.id = "nars-toast-container"
-    container.style.cssText = [
-      "position:fixed",
-      "bottom:24px",
-      "right:24px",
-      "z-index:9999",
-      "display:flex",
-      "flex-direction:column",
-      "gap:8px",
-      "pointer-events:none",
-    ].join(";")
-    document.body.appendChild(container)
+export function showToast(message: string, type: ToastType = "info"): number {
+  try {
+    return useToastStore().addToast(message, type)
+  } catch {
+    // Pinia not ready (e.g. during app bootstrap) — silently ignore;
+    // the component will pick up toasts once mounted.
+    return 0
   }
-  return container
-}
-
-export function showToast(message: string, type: ToastType = "info"): void {
-  // Guard: defer if DOM is not yet ready — use once listener to prevent leak
-  if (!document.body) {
-    document.addEventListener("DOMContentLoaded", () => showToast(message, type), { once: true })
-    return
-  }
-
-  const el = document.createElement("div")
-  el.style.cssText = [
-    `background:${UI_CONFIG.toastColors[type]}`,
-    "color:#fff",
-    "padding:10px 18px",
-    "border-radius:8px",
-    "font-size:14px",
-    "line-height:1.4",
-    "max-width:340px",
-    "box-shadow:0 4px 12px rgba(0,0,0,0.25)",
-    "opacity:0",
-    "transform:translateY(8px)",
-    "transition:opacity 0.2s,transform 0.2s",
-    "pointer-events:auto",
-    "cursor:default",
-  ].join(";")
-  el.textContent = message
-
-  getContainer().appendChild(el)
-
-  // Trigger enter animation
-  requestAnimationFrame(() => {
-    el.style.opacity = "1"
-    el.style.transform = "translateY(0)"
-  })
-
-  // Auto-dismiss
-  const dismiss = () => {
-    el.style.opacity = "0"
-    el.style.transform = "translateY(8px)"
-    el.addEventListener("transitionend", () => el.remove(), { once: true })
-  }
-
-  const timer = setTimeout(dismiss, DURATION)
-  el.addEventListener("click", () => {
-    clearTimeout(timer)
-    dismiss()
-  })
 }
 
 // ─── CONFIRM DIALOG ──────────────────────────────────────────────────────────

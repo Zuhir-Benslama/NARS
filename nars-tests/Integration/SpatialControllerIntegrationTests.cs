@@ -29,7 +29,7 @@ public class SpatialControllerIntegrationTests : IAsyncLifetime
         var entranceQuery = new EntranceQueryService(_db);
 
         _controller = new SpatialController(
-            _db,
+            new RoadQueryService(_db),
             Mock.Of<IScatteredAreaService>(),
             entranceQuery);
     }

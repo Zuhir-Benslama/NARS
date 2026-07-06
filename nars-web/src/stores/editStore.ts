@@ -19,8 +19,5 @@ export const useEditStore = defineStore("edit", {
     setActiveEditCoordsSnapshot(snapshot: LatLng[] | null): void {
       this.activeEditCoordsSnapshot = snapshot
     },
-    resetEdit(): void {
-      this.$reset()
-    },
   },
 })

@@ -77,6 +77,11 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IBoundaryService, BoundaryService>();
         services.AddScoped<IEntranceQueryService, EntranceQueryService>();
         services.AddScoped<IAdminOverviewService, AdminOverviewService>();
+        services.AddScoped<IUserAuthorizationService, UserAuthorizationService>();
+        services.AddScoped<IErrorLogService, ErrorLogService>();
+        services.AddScoped<ILocationQueryService, LocationQueryService>();
+        services.AddScoped<IRoadQueryService, RoadQueryService>();
+        services.AddScoped<IUserProfileService, UserProfileService>();
 
         var httpOpts = config.GetSection("HttpClient").Get<HttpClientOptions>() ?? new HttpClientOptions();
         services.AddHttpClient("tile-proxy", client =>

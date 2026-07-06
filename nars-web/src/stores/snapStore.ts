@@ -10,6 +10,7 @@ export const useSnapStore = defineStore("snap", {
     snapPendingEvent: null as MouseEvent | null,
     editModeActive: false,
     editDragActive: false,
+    snapExclude: null as string | null,
   }),
 
   getters: {

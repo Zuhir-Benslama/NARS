@@ -12,6 +12,7 @@ import { getActiveSnapPhases, snapPointForEdit, setEditDragActive } from "../sna
 import { disableEditMode, getActiveEditEntry, isEditMode } from "../edit/edit-mode"
 import { recordDelete } from "../undo"
 import { refreshLayerVisibility } from "../rendering/labels"
+import { getErrorMessage } from "../../lib/errors"
 import { showToast } from "../../lib/toast"
 import { debugError } from "../../utils/debug"
 import type { LayerEntry } from "../../types"
@@ -183,7 +184,7 @@ export function registerGeomanEvents(): void {
     let removed: LayerEntry | null = null
     let phaseKey = ""
     const layerStore = useLayerStore()
-    const state = layerStore.$state as LayerState
+    const state = layerStore.$state
     for (const key of Object.keys(state)) {
       const entries = state[key as keyof LayerState]
       const entry = entries?.find((f) => f.dbId === dbId)
@@ -213,7 +214,7 @@ export function registerGeomanEvents(): void {
 
       showToast("Feature deleted.", "success")
     } catch (err) {
-      showToast("Delete failed: " + (err as Error).message, "error")
+      showToast("Delete failed: " + getErrorMessage(err), "error")
     }
   })
 }

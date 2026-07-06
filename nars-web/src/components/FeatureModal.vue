@@ -155,7 +155,7 @@ import { useI18n } from "vue-i18n"
 import { PHASES, DISTRICT_TYPES, ROAD_TYPES, PUBLIC_SPACE_TYPES } from "../phases"
 import { useAppStore } from "../stores/appStore"
 import { useModalStore } from "../stores/modalStore"
-import { fetchRoadSide, computeBisNumber } from "../map"
+import { fetchRoadSide, computeBisNumber, prepareModalExtras } from "../map"
 import { useFeatureValidation } from "../composables/useFeatureValidation"
 import AreaTypeSelector from "./modals/AreaTypeSelector.vue"
 import RoadAssignmentSelector from "./modals/RoadAssignmentSelector.vue"
@@ -175,8 +175,8 @@ const { validate, buildModalResult, isMainUrban, isCityCenter, isHouseEntranceEd
 
 const headerText = computed(() => {
   if (!phase.value) return ""
-  const name = phase.value.label.replace(/s$/, "")
-  return modalStore.isEdit ? `Edit ${name} Info` : `Add ${name} Details`
+  const name = t(phase.value.label)
+  return modalStore.isEdit ? `Edit ${name}` : `Add ${name}`
 })
 
 const isZoneWithTypeName = computed(
@@ -188,25 +188,37 @@ const isZoneWithTypeName = computed(
 
 // ── Watchers ──────────────────────────────────────────────────────────────────
 
+let _roadSideController: AbortController | null = null
+
 // When road selection changes → fetch side + suggested number.
 // In edit mode the side/number are already populated from existing data — skip
 // the API call so we don't overwrite them when the selector is pre-selected.
 watch(
   () => modalStore.selectedRoadIdx,
   async (val) => {
-    if (val === "" || val === null) return
+    _roadSideController?.abort()
+    _roadSideController = null
+    if (val === "" || val === null) {
+      modalStore.entranceSide = null
+      modalStore.entranceNumber = null
+      modalStore.entranceSideLoading = false
+      return
+    }
     if (modalStore.isEdit) return
     const roadOption = modalStore.roadOptions[Number(val)]
     if (!roadOption) return
-    await fetchRoadSide(roadOption.dbId)
+    _roadSideController = new AbortController()
+    await fetchRoadSide(roadOption.dbId, undefined, _roadSideController.signal)
   },
 )
 
 // When main entrance selection changes → compute BIS number
+// Only fires in create mode — edit mode pre-populates existing data.
 watch(
   () => modalStore.selectedMainIdx,
   (val) => {
     if (val === "" || val === null) return
+    if (modalStore.isEdit) return
     const option = modalStore.mainEntranceOptions[Number(val)]
     if (!option) return
     computeBisNumber(option.dbId)
@@ -247,6 +259,17 @@ function onKeyup(e: KeyboardEvent) {
   if (e.key === "Enter") onSave()
   if (e.key === "Escape") onCancel()
 }
-onMounted(() => window.addEventListener("keyup", onKeyup))
+onMounted(async () => {
+  window.addEventListener("keyup", onKeyup)
+  // Populate phase-specific extras (e.g. mainUrbanExists, roadOptions) after
+  // the modal store is initialized by openCreate/openEdit.
+  if (modalStore.phaseIndex !== null) {
+    try {
+      await prepareModalExtras(PHASES[modalStore.phaseIndex])
+    } catch {
+      /* module may not be ready in tests */
+    }
+  }
+})
 onUnmounted(() => window.removeEventListener("keyup", onKeyup))
 </script>

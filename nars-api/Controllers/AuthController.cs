@@ -21,9 +21,13 @@ public partial class AuthController(
     IOptions<JwtOptions> jwtOptions,
     IOptions<AccountLockoutOptions> lockoutOptions,
     ILogger<AuthController> logger,
-    IDateTimeProvider timeProvider
+    IDateTimeProvider timeProvider,
+    IUserAuthorizationService authorizationService
 ) : NarsControllerBase
 {
+    // Stable dummy hash so BCrypt always does the full work, even for unknown users.
+    // Prevents username enumeration via response-time side-channel.
+    private const string DummyHash = "$2a$11$BCfJgwy.hTY703/9RBjPo.8UjBrTHh/95zFznkYLiapLvWdf5ISbO";
     // ── POST /api/signup — DISABLED ────────────────────────────────────────
     // Self-registration is not allowed. All accounts must be created by an
     // admin of the appropriate level:
@@ -58,19 +62,30 @@ public partial class AuthController(
         }
 
         var user = await db.Users.FirstOrDefaultAsync(u => u.Username == body.Username, cancellationToken);
+
+        // Always run BCrypt.Verify (even for unknown/locked users) to prevent
+        // username enumeration via response-time side-channel (~0 µs vs ~300 ms).
+        var hashToCheck = user?.PasswordHash ?? DummyHash;
+        var passwordValid = BCrypt.Net.BCrypt.Verify(body.Password, hashToCheck);
+
+        // Lockout check is after BCrypt so the timing is indistinguishable
+        // from a wrong-password response.
+        if (user is not null && user.LockedUntil.HasValue && user.LockedUntil.Value > timeProvider.UtcNow)
+        {
+            return Unauthorized(new { detail = "Invalid username or password" });
+        }
+
+        if (!passwordValid)
+        {
+            if (user is not null)
+            {
+                await RecordFailedLogin(user, cancellationToken);
+            }
+            return Unauthorized(new { detail = "Invalid username or password" });
+        }
+
         if (user is null)
         {
-            return Unauthorized(new { detail = "Invalid username or password" });
-        }
-
-        if (user.LockedUntil.HasValue && user.LockedUntil.Value > timeProvider.UtcNow)
-        {
-            return Unauthorized(new { detail = "Invalid username or password" });
-        }
-
-        if (!BCrypt.Net.BCrypt.Verify(body.Password, user.PasswordHash))
-        {
-            await RecordFailedLogin(user, cancellationToken);
             return Unauthorized(new { detail = "Invalid username or password" });
         }
 

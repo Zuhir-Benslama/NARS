@@ -1,4 +1,4 @@
-FROM postgis/postgis:17-3.5
+FROM postgis/postgis:17-3.5@sha256:efbd2cb72d4067c6973ed8ac1c35741ae2d54cc1f927516d67ce0a11be55aef3
 
 LABEL org.opencontainers.image.title="NARS PostGIS" \
       org.opencontainers.image.description="NARS PostgreSQL + PostGIS database" \
@@ -12,4 +12,4 @@ COPY nars-infra/docs/seed_reference_data.sql /docker-entrypoint-initdb.d/02-seed
 EXPOSE 5432
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 \
-  CMD pg_isready -U postgres -d nars_db -h localhost || exit 1
+  CMD pg_isready -U postgres -d nars_db -h localhost

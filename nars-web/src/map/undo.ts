@@ -3,9 +3,11 @@
 // During drawing, right-click removes the last vertex (handled by Geoman).
 
 import { apiFetch } from "../api"
+import { getErrorMessage } from "../lib/errors"
 import { showToast } from "../lib/toast"
 import { useAppStore } from "../stores/appStore"
 import { useLayerStore } from "../stores/layerStore"
+import { useUndoStore } from "../stores/undoStore"
 import type { LayerState } from "../stores/layerStore"
 import { featuresStore } from "./core/state"
 import { toApiSaveShape } from "./features/feature-data"
@@ -14,42 +16,31 @@ import { computeCircleRing, closeRing } from "./rendering/geometry"
 import { debugLog, debugError, debugWarn } from "../utils/debug"
 import type { LayerEntry } from "../types"
 
-// ─── UNDO STACK ───────────────────────────────────────────────────────────────
-
-interface DeletedFeature {
-  entry: LayerEntry
-  phaseKey: string
-}
-
-const undoStack: DeletedFeature[] = []
-
 // ─── STATE RESET (for testing & HMR) ──────────────────────────────────────────
 
 export function resetUndoStack(): void {
-  undoStack.length = 0
+  useUndoStore().$reset()
 }
 
 export function hasUndo(): boolean {
-  return undoStack.length > 0
+  return useUndoStore().hasUndo
 }
 
 export function getUndoLabel(): string | null {
-  const last = undoStack[undoStack.length - 1]
-  if (!last) return null
-  return `Restore "${last.entry.data.label}"`
+  return useUndoStore().undoLabel
 }
 
 // ─── RECORD ───────────────────────────────────────────────────────────────────
 
 /** Call BEFORE a feature is deleted. Captures the entry for Ctrl+Z restore. */
 export function recordDelete(entry: LayerEntry, phaseKey: string): void {
-  undoStack.push({ entry, phaseKey })
+  useUndoStore().recordDelete(entry, phaseKey)
 }
 
 // ─── UNDO (Ctrl+Z) ───────────────────────────────────────────────────────────
 
 export async function undo(): Promise<void> {
-  const action = undoStack.pop()
+  const action = useUndoStore().popUndo()
   if (!action) {
     showToast("Nothing to restore.", "info")
     return
@@ -89,7 +80,7 @@ export async function undo(): Promise<void> {
     )
 
     const layerStore = useLayerStore()
-    const state = layerStore.$state as LayerState
+    const state = layerStore.$state
 
     if (state[phaseKey as keyof LayerState]) {
       ;(state[phaseKey as keyof LayerState] as LayerEntry[]).push(restoredEntry)
@@ -138,7 +129,7 @@ export async function undo(): Promise<void> {
     showToast(`Restored "${entry.data.label}".`, "success")
   } catch (err) {
     debugError("[UNDO] Restore failed:", err)
-    showToast("Failed to restore feature: " + (err as Error).message, "error")
+    showToast("Failed to restore feature: " + getErrorMessage(err), "error")
   }
 }
 

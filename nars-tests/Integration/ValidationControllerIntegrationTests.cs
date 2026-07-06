@@ -28,7 +28,7 @@ public class ValidationControllerIntegrationTests : IAsyncLifetime
     {
         _fixture = fixture;
         _db = fixture.CreateDbContext();
-        _controller = new ValidationController(_db, Options.Create(new ValidationOptions()), new ValidationService(_db));
+        _controller = new ValidationController(Options.Create(new ValidationOptions()), new ValidationService(_db));
     }
 
     public async Task InitializeAsync() => await SeedReferenceDataAsync();

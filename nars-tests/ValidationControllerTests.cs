@@ -28,8 +28,8 @@ public class ValidationControllerTests
         var context = db ?? new AppDbContext(opts);
 
         var ctrl = new ValidationController(
-            context, Options.Create(new ValidationOptions()),
-            validationService ?? Mock.Of<IValidationService>())
+            Options.Create(new ValidationOptions()),
+            validationService ?? new ValidationService(context))
         {
             ControllerContext = new ControllerContext
             {
@@ -159,7 +159,7 @@ public class ValidationControllerTests
                 It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<double>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        var ctrl2 = new ValidationController(db, Options.Create(new ValidationOptions { RoadTurnAngleDegrees = 45 }), validationMock.Object)
+        var ctrl2 = new ValidationController(Options.Create(new ValidationOptions { RoadTurnAngleDegrees = 45 }), validationMock.Object)
         {
             ControllerContext = ctrl.ControllerContext
         };
@@ -194,11 +194,13 @@ public class ValidationControllerTests
         await db.SaveChangesAsync();
 
         var validationMock = new Mock<IValidationService>();
+        validationMock.Setup(v => v.CountUserRoadsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
         validationMock.Setup(v => v.CheckRoadConnectivityAsync(
                 It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<double>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
-        var ctrl2 = new ValidationController(db, Options.Create(new ValidationOptions()), validationMock.Object)
+        var ctrl2 = new ValidationController(Options.Create(new ValidationOptions()), validationMock.Object)
         {
             ControllerContext = ctrl.ControllerContext
         };
@@ -267,6 +269,8 @@ public class ValidationControllerTests
         await db.SaveChangesAsync();
 
         var validationMock = new Mock<IValidationService>();
+        validationMock.Setup(v => v.CountUserDistrictsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
         validationMock.Setup(v => v.CheckDistrictOverlapAsync(
                 It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);

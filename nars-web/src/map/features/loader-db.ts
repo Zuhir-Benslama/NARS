@@ -50,7 +50,7 @@ function processFeature(
       typeof feature.data === "string" ? JSON.parse(feature.data) : feature.data
 
     if (feature.layer === "scattered") {
-      if (data.geometry) renderScatteredAreas(data.geometry as string)
+      if (data.geometry) renderScatteredAreas(data.geometry)
       return "scattered"
     }
 
@@ -114,7 +114,7 @@ export async function loadFromDatabase(): Promise<void> {
     }
 
     const layerStore = useLayerStore()
-    const state = layerStore.$state as LayerState
+    const state = layerStore.$state
     const phaseKeys = Object.keys(state) as (keyof LayerState)[]
 
     for (const key of phaseKeys) {

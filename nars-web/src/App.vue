@@ -18,6 +18,7 @@
 
   <TileControl />
   <FeatureModal />
+  <ToastContainer />
 
   <div v-if="appStore.loadError" class="load-error-banner">
     <span>⚠ Could not load saved features. Check your connection and refresh the page.</span>
@@ -44,6 +45,7 @@ import FeatureModal from "./components/FeatureModal.vue"
 import FieldPanel from "./components/FieldPanel.vue"
 import EditSaveButton from "./components/EditSaveButton.vue"
 import ContextMenu from "./components/ContextMenu.vue"
+import ToastContainer from "./components/ToastContainer.vue"
 import { useAppStore } from "./stores/appStore"
 import { destroyMap } from "./map"
 

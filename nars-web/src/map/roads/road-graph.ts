@@ -59,7 +59,7 @@ export function buildConnectionGraph(roads: LayerEntry[]): {
   for (const road of roads) {
     const coords = road.data.coordinates
     if (!coords?.length) continue
-    const dbId = road.dbId as string
+    const dbId = road.dbId
     const line = toLn(coords)
 
     const junctions: Array<{ segIdx: number; pt: Coord }> = []

@@ -107,7 +107,7 @@ public class LocationsControllerTests
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<PagedResponse<WilayaItem>>(ok.Value);
         Assert.Equal(3, resp.Items.Count);
-        Assert.Equal(3, resp.Take); // cache path sets take = cached.Count
+        Assert.Equal(500, resp.Take); // clamped to max page size
     }
 
     [Fact]

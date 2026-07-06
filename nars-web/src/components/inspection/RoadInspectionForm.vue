@@ -77,6 +77,7 @@
 <script setup lang="ts">
 import { reactive, ref } from "vue"
 import { apiFetch } from "../../api"
+import { getErrorMessage } from "../../lib/errors"
 import { showToast } from "../../lib/toast"
 import type { RoadInspectionData } from "../../types/inspection"
 
@@ -132,7 +133,7 @@ async function submit() {
       showToast(body.detail ?? "Failed to save", "error")
     }
   } catch (e) {
-    showToast("Network error: " + (e as Error).message, "error")
+    showToast("Network error: " + getErrorMessage(e), "error")
   } finally {
     submitting.value = false
   }

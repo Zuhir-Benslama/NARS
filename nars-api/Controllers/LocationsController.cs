@@ -57,22 +57,18 @@ public class LocationsController(
             return Problem(detail: $"Search query is too long (max {maxSearchLength} characters).", statusCode: 400);
         }
 
-        if (string.IsNullOrEmpty(search) && skip == 0 && take >= 500)
+        if (string.IsNullOrEmpty(search))
         {
             var cached = await CacheOrFetchAsync(cacheKey, async () =>
             {
                 var all = await orderBy(baseQuery()).ToListAsync(cancellationToken);
                 return all.Select(mapper).ToList();
             });
-            return Ok(new PagedResponse<TDto>(cached, cached.Count, 0, cached.Count));
+            var paged = cached.Skip(skip).Take(take).ToList();
+            return Ok(new PagedResponse<TDto>(paged, cached.Count, skip, take));
         }
 
-        var q = baseQuery();
-        if (!string.IsNullOrEmpty(search) && searchFilter is not null)
-        {
-            q = searchFilter(q);
-        }
-
+        var q = searchFilter is not null ? searchFilter(baseQuery()) : baseQuery();
         var total = await q.CountAsync(cancellationToken);
         var result = await orderBy(q).Skip(skip).Take(take).ToListAsync(cancellationToken);
         var items = result.Select(mapper).ToList();

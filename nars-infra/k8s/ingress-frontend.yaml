@@ -2,13 +2,16 @@
 # ─── Frontend Ingress ──────────────────────────────────────────────────
 # Serves nars.dz (SPA + API) with TLS but NO mTLS (browser-facing).
 # /api/* routes to the API service; /(.*) routes to the SPA.
+# HSTS is served by the ingress controller via
+# nginx.ingress.kubernetes.io/configuration-snippet or the global
+# controller --enable-hsts flag. ssl-redirect ensures HTTP → HTTPS.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: nars-frontend
   namespace: nars
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/use-regex: "true"
 spec:
   ingressClassName: nginx

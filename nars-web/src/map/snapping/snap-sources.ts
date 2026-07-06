@@ -5,22 +5,16 @@
 
 import { ctx } from "../core/state"
 import { useLayerStore } from "../../stores/layerStore"
+import { useSnapStore } from "../../stores/snapStore"
 import type { LayerState } from "../../stores/layerStore"
-
-let _snapExclude: string | null = null
-if (import.meta.hot) {
-  import.meta.hot.dispose(() => {
-    _snapExclude = null
-  })
-}
 
 /** Called by snapping.ts when the exclude target changes. */
 export function setSnapSourceExclude(id: string | null): void {
-  _snapExclude = id
+  useSnapStore().snapExclude = id
 }
 
 function resolveExclude(excludeId?: string | null): string | null {
-  return excludeId ?? _snapExclude
+  return excludeId ?? useSnapStore().snapExclude
 }
 
 /** Rings from polygon feature layers (areas, districts, publicBuildings, publicSpaces) */
@@ -31,7 +25,7 @@ export function getSnapRings(
   const exclude = resolveExclude(excludeId)
   const rings: Array<{ lat: number; lng: number }[]> = []
   const layerStore = useLayerStore()
-  const state = layerStore.$state as LayerState
+  const state = layerStore.$state
   for (const key of phaseKeys) {
     const entries = state[key as keyof LayerState]
     if (!entries) continue
@@ -88,7 +82,7 @@ export function getRoadChains(
   const chains: Array<{ lat: number; lng: number }>[] = []
   if (!phaseKeys.includes("roads")) return chains
   const layerStore = useLayerStore()
-  const state = layerStore.$state as LayerState
+  const state = layerStore.$state
   const entries = state.roads
   if (!entries) return chains
   for (const entry of entries) {
@@ -110,14 +104,14 @@ export function getCityCenterCircles(
   const circles: Array<{ lat: number; lng: number; radius: number }> = []
   if (!phaseKeys.includes("cityCenter")) return circles
   const layerStore = useLayerStore()
-  const state = layerStore.$state as LayerState
+  const state = layerStore.$state
   const entries = state.cityCenter
   if (!entries) return circles
   for (const entry of entries) {
     if (entry.id === exclude) continue
     const d = entry.data
     if (d.lat != null && d.lng != null && d.radius != null && d.radius > 0) {
-      circles.push({ lat: d.lat, lng: d.lng, radius: d.radius as number })
+      circles.push({ lat: d.lat, lng: d.lng, radius: d.radius })
     }
   }
   return circles
@@ -131,7 +125,7 @@ export function getSnapPoints(
   const exclude = resolveExclude(excludeId)
   const points: Array<{ lat: number; lng: number }> = []
   const layerStore = useLayerStore()
-  const state = layerStore.$state as LayerState
+  const state = layerStore.$state
   for (const key of phaseKeys) {
     const entries = state[key as keyof LayerState]
     if (!entries) continue

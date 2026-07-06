@@ -12,6 +12,14 @@ beforeEach(() => {
   setActivePinia(createPinia())
 })
 
+// Reset all module-level mutable state before each test to prevent state leakage
+// across tests (draw-state, edit-state, snapping, undo, boundary, rotation, map).
+// Uses dynamic import to avoid hoisting conflicts with vi.mock factories.
+beforeEach(async () => {
+  const { resetAllState } = await import("../map/reset-all-state")
+  await resetAllState()
+})
+
 // ─── MOCK API FETCH ───────────────────────────────────────────────────────────
 
 // Mock implementation of apiFetch for tests

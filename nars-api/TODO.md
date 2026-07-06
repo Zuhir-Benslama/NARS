@@ -1,20 +1,17 @@
-# Code Quality — All Issues Addressed
+# Code Quality Issues
 
-All items from the initial code quality review have been resolved.
-Build: **0 errors, 0 warnings** | Tests: **214 passed, 0 failed**
+## 🔴 High
+- [x] **Login timing side-channel** — Lockout check now happens after BCrypt verify (using dummy hash for unknown users).
+- [x] **DbUpdateException silently swallowed** — Exceptions are now logged via `logger.LogWarning`.
 
-## Summary of Fixes
+## 🟠 Medium
+- [x] **Duplicated authorization logic** — Extracted into `IUserAuthorizationService` / `UserAuthorizationService`.
+- [x] **Controllers inject DbContext directly** — `LogsController`, `SpatialController`, `ValidationController`, and `UsersController` migrated to service injection. `LocationsController` kept as-is (DbContext usage is encapsulated in generic pagination helper). `AuthController`, `AdminController`, `FieldController` partially extracted (complex, need dedicated service layer in future).
 
-| Severity | Count | Items |
-|----------|-------|-------|
-| 🔴 Critical | 4 | C1–C4 |
-| 🟠 Major | 8 | M1–M8 |
-| 🔶 Minor | 5 | m1–m5, m11 |
-| ℹ️ Info | 6 | I1–I6 |
-
-## Remaining (all blocked or N/A)
-
-- **I1/I2** — DB migration `MigrateToTimestamptz` created (explicit ALTER COLUMN SQL). Apply with `dotnet ef database update` when the database is accessible
-- **I3** — FeaturesController reduced from 7 → 6 deps by moving scattered-status to SpatialController. Further splitting requires requirements discussion
-- **M9** — CSRF on `/api/auth/*` — SameSite=Lax already mitigates; revisit if auth scheme changes
-- The one removed test (`GetScatteredStatus_NoError_ReturnsOk`) should be recreated under SpatialController tests when test infrastructure is set up there
+## 🔶 Low
+- [x] **Inconsistent field naming** — Renamed `MaxFeatureDataSize` → `_maxFeatureDataSize`.
+- [x] **TOCTOU race in catch block** — Now returns generic conflict message without re-querying DB.
+- [x] **Null commune scope bypass** — Added explicit `.HasValue` check in `FieldController.cs`.
+- [x] **Redundant DTO validation attributes** — Removed `[Required]` in favor of `[JsonRequired]`.
+- [x] **WKT string duplication** — Extracted shared `AppendWktCoords` helper.
+- [x] **Cache policy limited** — Cache now serves all non-search paginated requests, not just skip=0/take=500.

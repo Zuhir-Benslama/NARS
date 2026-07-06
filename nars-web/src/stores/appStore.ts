@@ -27,6 +27,7 @@ export const useAppStore = defineStore("app", {
     isLoading: false,
     referenceRoadDbId: null,
     referenceEntranceDbId: null,
+    boundaryEventsRegistered: false,
   }),
 
   getters: {

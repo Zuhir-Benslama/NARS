@@ -8,6 +8,7 @@ import { openEditModal } from "../../stores/modalStore"
 import { PHASES } from "../../phases"
 import { featuresStore, ctx } from "../core/state"
 import { showToast, showConfirm } from "../../lib/toast"
+import { getErrorMessage } from "../../lib/errors"
 import { recordDelete } from "../undo"
 import { enableEditMode } from "../draw/draw-events"
 import { useLayerStore } from "../../stores/layerStore"
@@ -21,9 +22,9 @@ import { updateEndpointMarkers } from "../roads/road-directions"
 
 export function findLayerEntryByDbId(dbId: string): LayerEntry | null {
   const layerStore = useLayerStore()
-  const state = layerStore.$state as LayerState
-  for (const key of Object.keys(state)) {
-    const entries = state[key as keyof LayerState]
+  const state = layerStore.$state
+  for (const key of Object.keys(state) as (keyof LayerState)[]) {
+    const entries = state[key]
     const entry = entries?.find((e) => e.dbId === dbId)
     if (entry) return entry
   }
@@ -101,29 +102,22 @@ export async function editFeatureInfo(dbId: string): Promise<void> {
           phaseKey: "cityCenter",
           label: entry.data.label,
           geomType: "LineString",
-          lineColor: "#e74c3c",
+          lineColor: PHASES.find((p) => p.key === "cityCenter")?.color ?? "#e74c3c",
           lineWidth: 6,
-        } as {
-          dbId?: string
-          phaseKey: string
-          label: string
-          geomType?: string
-          lineColor: string
-          lineWidth: number
-        } satisfies Record<string, unknown>,
+        },
       })
     } else {
       featuresStore.update(entry.id, {
         properties: {
           phaseKey: entry.data.type,
-          label: result.label as string,
+          label: result.label,
         },
       })
     }
 
     showToast("Feature updated.", "success")
   } catch (err) {
-    showToast("Save failed: " + (err as Error).message, "error")
+    showToast("Save failed: " + getErrorMessage(err), "error")
   }
 }
 
@@ -140,10 +134,10 @@ export async function removeFeature(dbId: string): Promise<void> {
   if (!confirmed) return
 
   const layerStore = useLayerStore()
-  const state = layerStore.$state as LayerState
+  const state = layerStore.$state
   let phaseKey = ""
-  for (const key of Object.keys(state)) {
-    const entries = state[key as keyof LayerState]
+  for (const key of Object.keys(state) as (keyof LayerState)[]) {
+    const entries = state[key]
     if (entries?.some((f) => f.dbId === dbId)) {
       phaseKey = key
       break
@@ -170,6 +164,6 @@ export async function removeFeature(dbId: string): Promise<void> {
 
     showToast("Feature deleted.", "success")
   } catch (err) {
-    showToast("Delete failed: " + (err as Error).message, "error")
+    showToast("Delete failed: " + getErrorMessage(err), "error")
   }
 }
