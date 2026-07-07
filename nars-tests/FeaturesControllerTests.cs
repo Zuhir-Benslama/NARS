@@ -235,7 +235,7 @@ public class FeaturesControllerTests
         var result = await ctrl.ClearFeatures(new ClearFeaturesRequest(Confirm: true));
 
         var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<ActionResponse>(ok.Value);
+        var resp = Assert.IsType<ApiResponse>(ok.Value);
         Assert.True(resp.Success);
         Assert.Equal(0, await db.Areas.CountAsync());
         Assert.Equal(0, await db.FeatureRegistry.CountAsync());
@@ -365,7 +365,7 @@ public class FeaturesControllerTests
         var result = await ctrl.DeleteFeature(fid);
 
         var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<ActionResponse>(ok.Value);
+        var resp = Assert.IsType<ApiResponse>(ok.Value);
         Assert.True(resp.Success);
     }
 

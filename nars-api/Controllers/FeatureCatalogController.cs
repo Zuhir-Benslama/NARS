@@ -23,6 +23,7 @@ public class FeatureCatalogController(
     private const string IconCityCenter = "\U0001F3D9️";
     private const string IconNamingPanel = "\U0001FAB5";
 
+    /// <summary>Returns the full catalog of feature types with their available layers.</summary>
     [HttpGet("feature-types")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public IActionResult GetFeatureTypes()
@@ -78,6 +79,7 @@ public class FeatureCatalogController(
         return Ok(types);
     }
 
+    /// <summary>Loads features filtered by layer type with pagination.</summary>
     [HttpGet("load/layer/{layerType}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> LoadByLayer(string layerType, [FromQuery] int skip = 0, [FromQuery] int take = 100, CancellationToken cancellationToken = default)

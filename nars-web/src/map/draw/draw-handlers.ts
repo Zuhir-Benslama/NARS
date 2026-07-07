@@ -20,7 +20,7 @@ import {
   removeLastVertex,
 } from "./draw-complete"
 import { isEditMode, commitEditMode, cancelEditMode } from "../edit/edit-mode"
-import { computeCircleRadius } from "../rendering/geometry"
+import { computeCircleRadius, computeCircleCenter } from "../rendering/geometry"
 import { undo } from "../undo"
 
 // ─── GEOMETRY HELPER ──────────────────────────────────────────────────────────
@@ -72,35 +72,24 @@ async function onFeatureCreated(e: GeomanCreateEvent): Promise<void> {
     const coords = geoJson.geometry.coordinates[0] as [number, number][]
 
     if (coords.length >= 3) {
-      let sumLat = 0,
-        sumLng = 0
-      for (const [lng, lat] of coords) {
-        sumLat += lat
-        sumLng += lng
-      }
-      const centerLat = sumLat / coords.length
-      const centerLng = sumLng / coords.length
+      const { lat: centerLat, lng: centerLng } = computeCircleCenter(coords)
       const radius = computeCircleRadius(centerLat, centerLng, coords)
 
-      geometry = { type: "Point", coordinates: [centerLng, centerLat] } as GeoJSON.Point
+      geometry = { type: "Point" as const, coordinates: [centerLng, centerLat] }
       ;(geometry as GeoJSON.Point & { radius: number }).radius = radius
     }
   } else if (shape === "polygon" && geoJson.geometry.type === "MultiPolygon") {
-    const mp = geoJson.geometry as GeoJSON.MultiPolygon
+    const mp = geoJson.geometry
     if (mp.coordinates.length > 0 && mp.coordinates[0].length > 0) {
       geometry = {
-        type: "Polygon",
+        type: "Polygon" as const,
         coordinates: mp.coordinates[0],
-      } as GeoJSON.Polygon
+      }
     }
   }
 
   try {
-    await completeDrawingWithGeometry(
-      geometry as GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon,
-      narsDrawType,
-      featureData,
-    )
+    await completeDrawingWithGeometry(geometry, narsDrawType, featureData)
   } catch (err) {
     debugError("[GM:CREATE] Error:", err)
   }

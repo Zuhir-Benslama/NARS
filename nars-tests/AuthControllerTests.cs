@@ -155,7 +155,7 @@ public class AuthControllerTests
             WilayaId: null
         ));
 
-        Assert.IsType<ConflictObjectResult>(result);
+        Assert.IsType<ObjectResult>(result);
     }
 
     [Fact]
@@ -215,7 +215,7 @@ public class AuthControllerTests
             Password: "WrongP@ss1"
         ));
 
-        Assert.IsType<UnauthorizedObjectResult>(result);
+        Assert.IsType<ObjectResult>(result);
     }
 
     [Fact]
@@ -229,7 +229,7 @@ public class AuthControllerTests
             Password: DefaultPassword
         ));
 
-        Assert.IsType<UnauthorizedObjectResult>(result);
+        Assert.IsType<ObjectResult>(result);
     }
 
     // Logout is tested in AuthControllerIntegrationTests.Logout_RevokesRefreshTokens

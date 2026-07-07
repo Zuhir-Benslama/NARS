@@ -11,7 +11,7 @@ namespace NarsApi.Models;
 [Table("house_entrances")]
 public class HouseEntrance : FeatureBase
 {
-    [Column("road_id")] public Guid? RoadId { get; set; }
+    [Column("road_id"), ForeignKey(nameof(Road))] public Guid? RoadId { get; set; }
 }
 
 [Table("public_buildings")] public class PublicBuilding : FeatureBase { }

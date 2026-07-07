@@ -22,6 +22,7 @@ public class FeaturesController(
 {
     private readonly int _maxFeatureDataSize = featureDefaults.Value.MaxFeatureDataSize;
 
+    /// <summary>Creates a new geographic feature (road, area, district, building, etc.).</summary>
     [HttpPost("")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -80,6 +81,7 @@ public class FeaturesController(
         return StatusCode(201, new SaveFeatureResponse(Success: true, Id: newId.ToString(), Message: "Feature saved successfully"));
     }
 
+    /// <summary>Loads the authenticated user's features with pagination.</summary>
     [HttpGet("")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> LoadFeatures([FromQuery] int skip = 0, [FromQuery] int take = 1000, CancellationToken cancellationToken = default)
@@ -98,6 +100,7 @@ public class FeaturesController(
         ));
     }
 
+    /// <summary>Deletes all features owned by the authenticated user.</summary>
     [HttpDelete("")]
     [EnableRateLimiting(RateLimitPolicies.Clear)]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -116,9 +119,10 @@ public class FeaturesController(
 
         var (total, _) = await featureRepo.ClearAllFeaturesAsync(RequiredCurrentUserId, cancellationToken);
 
-        return Ok(new ActionResponse(Success: true, Message: $"Deleted {total} features"));
+        return Ok(ApiResponse.Ok($"Deleted {total} features"));
     }
 
+    /// <summary>Returns feature count breakdown by type for the authenticated user.</summary>
     [HttpGet("stats")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetStats(CancellationToken cancellationToken = default)
@@ -141,6 +145,7 @@ public class FeaturesController(
         ));
     }
 
+    /// <summary>Updates an existing feature's label and/or data payload.</summary>
     [HttpPut("{featureId:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -193,6 +198,7 @@ public class FeaturesController(
         return Ok(new UpdateFeatureResponse(Success: true, Id: featureId.ToString(), UpdatedAt: updatedAt));
     }
 
+    /// <summary>Deletes a single feature owned by the authenticated user.</summary>
     [HttpDelete("{featureId:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -215,7 +221,7 @@ public class FeaturesController(
             await QueueScatteredRefresh();
         }
 
-        return Ok(new ActionResponse(Success: true, Message: "Feature deleted successfully"));
+        return Ok(ApiResponse.Ok("Feature deleted successfully"));
     }
 
     private static Guid? TryExtractRoadId(FeatureSaveRequest body)

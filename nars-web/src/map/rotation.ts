@@ -2,20 +2,19 @@
 // Adds rotation controls to the Maplibre GL JS map.
 
 import { ctx } from "./core/state"
+import { useRotationStore } from "../stores/rotationStore"
 import { t } from "../i18n"
 
-let currentBearing = 0
 const STEP = 5
 
-// ─── STATE RESET (for testing & HMR) ──────────────────────────────────────────
-
 export function resetRotation(): void {
-  currentBearing = 0
+  useRotationStore().resetRotation()
 }
 
 export function setBearing(deg: number): void {
-  currentBearing = ((deg % 360) + 360) % 360
-  ctx.map.easeTo({ bearing: currentBearing, duration: 300 })
+  const store = useRotationStore()
+  store.setBearing(deg)
+  ctx.map.easeTo({ bearing: store.currentBearing, duration: 300 })
 }
 
 export function initRotationControls(): void {
@@ -30,14 +29,14 @@ export function initRotationControls(): void {
   ccw.title = t("rotate_ccw")
   ccw.className = "nars-map-btn"
   ccw.style.cssText = "width:30px;height:30px;cursor:pointer;"
-  ccw.onclick = () => setBearing(currentBearing - STEP)
+  ccw.onclick = () => setBearing(useRotationStore().currentBearing - STEP)
 
   const cw = document.createElement("button")
   cw.textContent = "↻"
   cw.title = t("rotate_cw")
   cw.className = "nars-map-btn"
   cw.style.cssText = "width:30px;height:30px;cursor:pointer;"
-  cw.onclick = () => setBearing(currentBearing + STEP)
+  cw.onclick = () => setBearing(useRotationStore().currentBearing + STEP)
 
   wrap.appendChild(ccw)
   wrap.appendChild(cw)

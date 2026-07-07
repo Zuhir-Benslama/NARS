@@ -35,6 +35,17 @@ interface DrawContextEvent {
   point: { x: number; y: number }
 }
 
+function buildSnapToggleItem(): CtxMenuItem {
+  const snapOn = isSnappingEnabled()
+  return {
+    label: snapOn ? "\u2298 Disable Snapping" : "\u229E Enable Snapping",
+    onClick: () => {
+      const e = toggleSnapping()
+      showToast(`Snapping ${e ? "enabled" : "disabled"}`, "info")
+    },
+  }
+}
+
 export function showContextMenu(x: number, y: number, dbId: string, phaseKey: string): void {
   const layerStore = useLayerStore()
   const state = layerStore.$state
@@ -114,14 +125,7 @@ export function showContextMenu(x: number, y: number, dbId: string, phaseKey: st
     })
   }
 
-  const snapOn = isSnappingEnabled()
-  items.push({
-    label: snapOn ? "\u2298 Disable Snapping" : "\u229E Enable Snapping",
-    onClick: () => {
-      const e = toggleSnapping()
-      showToast(`Snapping ${e ? "enabled" : "disabled"}`, "info")
-    },
-  })
+  items.push(buildSnapToggleItem())
 
   useContextMenuStore().show(x, y, items)
 }
@@ -161,14 +165,7 @@ export async function showMapContextMenu(
   if (items.length > 0) {
     items.push({ separator: true })
   }
-  const snapOn = isSnappingEnabled()
-  items.push({
-    label: snapOn ? "\u2298 Disable Snapping" : "\u229E Enable Snapping",
-    onClick: () => {
-      const e = toggleSnapping()
-      showToast(`Snapping ${e ? "enabled" : "disabled"}`, "info")
-    },
-  })
+  items.push(buildSnapToggleItem())
 
   useContextMenuStore().show(x, y, items)
 }

@@ -36,7 +36,10 @@ function createDefaultModalState(): ModalState {
 }
 
 export const useModalStore = defineStore("modal", {
-  state: (): ModalState => createDefaultModalState(),
+  state: (): ModalState & { roadSideToken: number } => ({
+    ...createDefaultModalState(),
+    roadSideToken: 0,
+  }),
 
   getters: {
     isModalVisible: (state) => state.visible,

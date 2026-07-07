@@ -49,11 +49,20 @@ export const MAP_CONFIG = {
   /** Default map zoom level */
   defaultZoom: 5,
 
+  /** Minimum allowed zoom level */
+  minZoom: 4,
+
+  /** Maximum allowed zoom level */
+  maxZoom: 18,
+
   /** Default map bearing (rotation) in degrees */
   defaultBearing: 0,
 
   /** Default map pitch (tilt) in degrees */
   defaultPitch: 0,
+
+  /** Timeout for style loading in milliseconds */
+  styleLoadTimeout: 10000,
 
   /** Base tile URLs per style key — configurable via env vars */
   tileUrls: {
@@ -104,6 +113,35 @@ export const SNAP_CONFIG = {
     publicSpaces: ["areas", "publicBuildings", "publicSpaces"],
     namingPanels: [],
   } as const,
+} as const
+
+// ─── DRAW TIMING CONFIGURATION ───────────────────────────────────────────────
+
+export const DRAW_CONFIG = {
+  modeSwitchSettleMs: 50,
+  edgeRetryMax: 10,
+  edgeRetryIntervalMs: 200,
+  edgeRetryTimeoutMs: 2500,
+  geomanCleanupDelayMs: 100,
+  drawModeResetDelayMs: 200,
+} as const
+
+// ─── EXPORT CONFIGURATION ────────────────────────────────────────────────────
+
+export const EXPORT_CONFIG = {
+  a0Scale: 3,
+  a3Scale: 2,
+  jpegQuality: 0.92,
+  imageTimeoutMs: 15000,
+  titleBarOffsetMm: 14,
+} as const
+
+// ─── EDIT VISUAL CONFIGURATION ───────────────────────────────────────────────
+
+export const EDIT_CONFIG = {
+  edgeLineOpacity: 0.8,
+  edgeLineColor: "#3498db",
+  edgeLineWidth: 3,
 } as const
 
 // ─── VALIDATION CONFIGURATION ─────────────────────────────────────────────────

@@ -19,6 +19,7 @@ export { getFeatureStyle } from "./draw-save"
 // ─── IMPORTS FOR REGISTRATION ───────────────────────────────────────
 
 import { ctx } from "../core/state"
+import { useDrawStore } from "../../stores/drawStore"
 import { setRepatchMarkerPointer } from "./draw-state"
 import { repatchMarkerPointer } from "./draw-marker-patch"
 import { registerDrawHandlers } from "./draw-handlers"
@@ -29,10 +30,6 @@ import { buildDrawControl } from "./draw-control"
 import { enableCrosshair, resetSnapping } from "../snapping/snapping"
 import { isEditMode } from "../edit/edit-mode"
 
-// ─── REGISTRATION ─────────────────────────────────────────────────────
-
-let _cleanupDrawWatcher: (() => void) | null = null
-
 export function registerDrawEvents(): void {
   setRepatchMarkerPointer(repatchMarkerPointer)
   watchDrawType()
@@ -41,17 +38,17 @@ export function registerDrawEvents(): void {
   installSnapInterceptors()
 }
 
-/** Cleanup watchers and handlers registered by registerDrawEvents(). */
 export function destroyDrawEvents(): void {
-  _cleanupDrawWatcher?.()
-  _cleanupDrawWatcher = null
+  const store = useDrawStore()
+  store.cleanupDrawWatcher?.()
+  store.cleanupDrawWatcher = null
 }
-
-// ─── FIX #4: REACTIVE DRAW TYPE ───────────────────────────────────────
 
 function watchDrawType() {
   const appStore = useAppStore()
-  _cleanupDrawWatcher = watch(
+  const store = useDrawStore()
+
+  store.cleanupDrawWatcher = watch(
     () => appStore.currentPhase,
     (phaseIdx) => {
       const activeDrawModes = ctx.geoman?.getActiveDrawModes?.() || []

@@ -57,7 +57,7 @@ public partial class AuthController
 
         if (admin is null || !passwordValid)
         {
-            return Unauthorized(new { detail = "Admin credentials are invalid." });
+            return Problem(detail: "Admin credentials are invalid.", statusCode: 401);
         }
 
         if (!UserRoles.IsAdmin(admin.Role))
@@ -68,16 +68,15 @@ public partial class AuthController
         // 2. Lockout check.
         if (admin.LockedUntil.HasValue && admin.LockedUntil > timeProvider.UtcNow)
         {
-            return StatusCode(423, new { detail = "Admin account is temporarily locked." });
+            return Problem(detail: "Admin account is temporarily locked.", statusCode: 423);
         }
 
         // 3. Role hierarchy.
         if (!authorizationService.CanCreateRole(admin.Role, body.Role))
         {
-            return StatusCode(403, new
-            {
-                detail = $"A {admin.Role} cannot create a {body.Role} account."
-            });
+            return Problem(
+                detail: $"A {admin.Role} cannot create a {body.Role} account.",
+                statusCode: 403);
         }
 
         // 4. Geographic scope per role.
@@ -87,7 +86,7 @@ public partial class AuthController
             cancellationToken);
         if (scopeResult.Error is not null)
         {
-            return StatusCode(403, new { detail = scopeResult.Error });
+            return Problem(detail: scopeResult.Error, statusCode: 403);
         }
 
         // 5. Geographic fields present.
@@ -103,7 +102,7 @@ public partial class AuthController
         if (existing is not null)
         {
             var field = existing.Username == body.Username ? "Username" : "Email";
-            return Conflict(new { detail = $"{field} already exists." });
+            return Problem(detail: $"{field} already exists.", statusCode: 409);
         }
 
         // 7. Password strength.
@@ -138,17 +137,14 @@ public partial class AuthController
         {
             logger.LogWarning(ex, "Duplicate user during authorized signup (username={Username}, email={Email})",
                 body.Username, body.Email);
-            return Conflict(new { detail = "Username or email already exists." });
+            return Problem(detail: "Username or email already exists.", statusCode: 409);
         }
 
         logger.LogInformation(
             "[Auth] {AdminUser} ({AdminRole}) created {NewRole} account {NewUser} via login page",
             admin.Username, admin.Role, newUser.Role, newUser.Username);
 
-        return StatusCode(201, new ActionResponse(
-            Success: true,
-            Message: $"{body.Role} account created successfully."
-        ));
+        return StatusCode(201, ApiResponse.Ok($"{body.Role} account created successfully."));
     }
 
 }

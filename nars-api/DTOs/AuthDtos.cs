@@ -124,10 +124,7 @@ public record CreateAdminResponse(
     [property: JsonPropertyName("message")] string Message
 );
 
-public record ActionResponse(
-    [property: JsonPropertyName("success")] bool Success,
-    [property: JsonPropertyName("message")] string? Message = null
-);
+
 
 public record RefreshTokenResult(
     [property: JsonPropertyName("success")] bool Success,

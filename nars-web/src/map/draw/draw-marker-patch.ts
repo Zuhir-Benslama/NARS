@@ -17,6 +17,7 @@
 // directly, bypassing the snapping helper entirely.
 
 import { ctx } from "../core/state"
+import { useDrawStore } from "../../stores/drawStore"
 import { findNearestSnap, mergeExternalSnapWithDrawFirstVertex } from "../snapping/snap-search"
 import { getFrozenSnapPos, getActiveSnapPhases } from "../snapping/snapping"
 import { registerGeomanMarker } from "./draw-complete"
@@ -59,6 +60,71 @@ export function makeSnapSetLngLat(mp: GeomanMarkerPointer, orig: SetLngLatFn): S
   }
 }
 
+// ─── SHARED PATCH LOGIC ───────────────────────────────────────────────────────
+
+function applyMarkerPatch(mp: GeomanMarkerPointer): void {
+  const orig = mp.marker!.setLngLat.bind(mp.marker)
+  const origGet = mp.marker!.getLngLat.bind(mp.marker)
+  registerGeomanMarker(mp, mp.marker!, orig)
+  mp.marker!._narsSnapPatchedInstance = true
+  const SNAP_KEY = "_narsLastSnap"
+  ;(mp.marker as Record<string, unknown>)["_narsOrigGetLngLat"] = origGet
+  mp.marker!.setLngLat = makeSnapSetLngLat(mp, orig)
+  mp.marker!.getLngLat = () => {
+    const snap = (mp.marker as Record<string, unknown>)[SNAP_KEY] as {
+      lng: number
+      lat: number
+    } | null
+    return snap ? [snap.lng, snap.lat] : origGet.call(mp.marker!)
+  }
+
+  const markerEl = (
+    mp.marker as unknown as { markerInstance?: { getElement(): HTMLElement } }
+  ).markerInstance?.getElement?.()
+  if (markerEl) {
+    markerEl.style.pointerEvents = "none"
+  }
+}
+
+type RafRef = { current: number | null }
+
+function startPolling(
+  mp: GeomanMarkerPointer,
+  timeoutMs: number,
+  rafRef: RafRef,
+  onPatched: () => void,
+  onTimeout: () => void,
+): void {
+  const startTime = performance.now()
+
+  const tryPatch = () => {
+    if (mp.marker && typeof mp.marker.setLngLat === "function") {
+      if (mp.marker._narsSnapPatchedInstance) {
+        if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+        return
+      }
+
+      applyMarkerPatch(mp)
+      onPatched()
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+      return
+    }
+
+    if (performance.now() - startTime > timeoutMs) {
+      onTimeout()
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+      return
+    }
+
+    rafRef.current = requestAnimationFrame(tryPatch)
+  }
+
+  rafRef.current = requestAnimationFrame(tryPatch)
+}
+
 // ─── PATCH REGISTRATION ───────────────────────────────────────────────────────
 
 export function patchGeomanMarkerPointerSnap(): void {
@@ -69,133 +135,51 @@ export function patchGeomanMarkerPointerSnap(): void {
   }
 
   const mp = gm.markerPointer as GeomanMarkerPointer
-
   if (mp._narsSnapPatched) return
   mp._narsSnapPatched = true
 
-  const PATCH_TIMEOUT_MS = 15_000
-  const startTime = performance.now()
-  let rafId: number | null = null
-
-  const tryPatch = () => {
-    if (mp.marker && typeof mp.marker.setLngLat === "function") {
-      if (mp.marker._narsSnapPatchedInstance) {
-        if (rafId !== null) cancelAnimationFrame(rafId)
-        rafId = null
-        return
-      }
-
-      const orig = mp.marker.setLngLat.bind(mp.marker)
-      const origGet = mp.marker.getLngLat.bind(mp.marker)
-      registerGeomanMarker(mp, mp.marker, orig)
-      mp.marker._narsSnapPatchedInstance = true
-      const SNAP_KEY = "_narsLastSnap"
-      ;(mp.marker as Record<string, unknown>)["_narsOrigGetLngLat"] = origGet
-      mp.marker.setLngLat = makeSnapSetLngLat(mp, orig)
-      mp.marker.getLngLat = () => {
-        const snap = (mp.marker as Record<string, unknown>)[SNAP_KEY] as {
-          lng: number
-          lat: number
-        } | null
-        return snap ? [snap.lng, snap.lat] : origGet.call(mp.marker!)
-      }
-
-      const markerEl = (
-        mp.marker as unknown as { markerInstance?: { getElement(): HTMLElement } }
-      ).markerInstance?.getElement?.()
-      if (markerEl) {
-        markerEl.style.pointerEvents = "none"
-      }
-
-      debugLog("[SNAP] marker setLngLat + getLngLat patched")
-      if (rafId !== null) cancelAnimationFrame(rafId)
-      rafId = null
-      return
-    }
-
-    if (performance.now() - startTime > PATCH_TIMEOUT_MS) {
-      debugWarn("[SNAP] Timed out waiting for Geoman marker — snapping disabled")
-      if (rafId !== null) cancelAnimationFrame(rafId)
-      rafId = null
-      return
-    }
-
-    rafId = requestAnimationFrame(tryPatch)
-  }
-
-  rafId = requestAnimationFrame(tryPatch)
-
+  const rafRef: RafRef = { current: null }
+  startPolling(
+    mp,
+    15_000,
+    rafRef,
+    () => debugLog("[SNAP] marker setLngLat + getLngLat patched"),
+    () => debugWarn("[SNAP] Timed out waiting for Geoman marker — snapping disabled"),
+  )
   debugLog("[SNAP] Snap patching started (rAF polling for marker)")
 }
 
 // ─── RE-PATCH MARKER AFTER DRAW RESET ─────────────────────────────────────────
-
-let _patchRafId: number | null = null
 
 export function repatchMarkerPointer(): void {
   const gm = ctx.geoman
   if (!gm?.markerPointer) return
   const mp = gm.markerPointer as GeomanMarkerPointer
   if (!mp) return
+  const store = useDrawStore()
 
-  if (_patchRafId !== null) {
-    cancelAnimationFrame(_patchRafId)
-    _patchRafId = null
+  if (store.patchRafRef.current !== null) {
+    cancelAnimationFrame(store.patchRafRef.current)
+    store.patchRafRef.current = null
   }
 
-  const PATCH_TIMEOUT_MS = 5_000
-  const startTime = performance.now()
-
-  const tryPatch = () => {
-    if (mp.marker && typeof mp.marker.setLngLat === "function") {
-      if (mp.marker._narsSnapPatchedInstance) return
-
-      const orig = mp.marker.setLngLat.bind(mp.marker)
-      const origGet = mp.marker.getLngLat.bind(mp.marker)
-      registerGeomanMarker(mp, mp.marker, orig)
-      mp.marker._narsSnapPatchedInstance = true
-      const SNAP_KEY = "_narsLastSnap"
-      ;(mp.marker as Record<string, unknown>)["_narsOrigGetLngLat"] = origGet
-      mp.marker.setLngLat = makeSnapSetLngLat(mp, orig)
-      mp.marker.getLngLat = () => {
-        const snap = (mp.marker as Record<string, unknown>)[SNAP_KEY] as {
-          lng: number
-          lat: number
-        } | null
-        return snap ? [snap.lng, snap.lat] : origGet.call(mp.marker!)
-      }
-
-      const markerEl = (
-        mp.marker as unknown as { markerInstance?: { getElement(): HTMLElement } }
-      ).markerInstance?.getElement?.()
-      if (markerEl) {
-        markerEl.style.pointerEvents = "none"
-      }
-
-      debugLog("[SNAP] marker re-patched after draw reset")
-      _patchRafId = null
-      return
-    }
-
-    if (performance.now() - startTime > PATCH_TIMEOUT_MS) {
-      debugWarn("[SNAP] Timed out waiting for marker after draw reset")
-      _patchRafId = null
-      return
-    }
-
-    _patchRafId = requestAnimationFrame(tryPatch)
-  }
-
-  _patchRafId = requestAnimationFrame(tryPatch)
+  startPolling(
+    mp,
+    5_000,
+    store.patchRafRef,
+    () => debugLog("[SNAP] marker re-patched after draw reset"),
+    () => debugWarn("[SNAP] Timed out waiting for marker after draw reset"),
+  )
 }
 
 // ─── HMR CLEANUP ─────────────────────────────────────────────────────────────
 
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
-    if (_patchRafId !== null) {
-      cancelAnimationFrame(_patchRafId)
-      _patchRafId = null
+    const store = useDrawStore()
+    if (store.patchRafRef.current !== null) {
+      cancelAnimationFrame(store.patchRafRef.current)
+      store.patchRafRef.current = null
     }
   })
 }

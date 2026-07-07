@@ -24,6 +24,7 @@ public class ValidationController(
 
     private int MaxCoordinateCount => validationOptions.Value.MaxCoordinateCount;
 
+    /// <summary>Checks whether the user has already created a main urban area.</summary>
     [HttpGet("validate/area/main-urban-exists")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> MainUrbanExists(CancellationToken cancellationToken = default)
@@ -33,6 +34,7 @@ public class ValidationController(
         return Ok(new { exists });
     }
 
+    /// <summary>Validates road geometry (turn angles, connectivity to existing roads).</summary>
     [HttpPost("validate/road")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -98,6 +100,7 @@ public class ValidationController(
         return Ok(new ValidateRoadResponse(true, null));
     }
 
+    /// <summary>Validates district geometry (overlap, adjacency, coverage).</summary>
     [HttpPost("validate/district")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -147,6 +150,7 @@ public class ValidationController(
         return Ok(new ValidateDistrictResponse(true, null));
     }
 
+    /// <summary>Checks whether the user's districts fully cover all urban areas.</summary>
     [HttpGet("validate/districts/coverage")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> DistrictsCoverage(CancellationToken cancellationToken = default)

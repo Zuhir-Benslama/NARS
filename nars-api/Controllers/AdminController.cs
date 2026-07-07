@@ -19,6 +19,7 @@ public class AdminController(
     IAdminOverviewService overviewService,
     IUserAuthorizationService authorizationService) : NarsControllerBase
 {
+    /// <summary>Returns a role-scoped administrative overview of the hierarchy.</summary>
     [HttpGet("admin/overview")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -40,6 +41,7 @@ public class AdminController(
         };
     }
 
+    /// <summary>Returns a detailed report for a specific wilaya (national admin only).</summary>
     [HttpGet("admin/wilaya/{wilayaId:int}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -56,6 +58,7 @@ public class AdminController(
         return result is null ? Problem(detail: "Wilaya not found.", statusCode: 404) : Ok(result);
     }
 
+    /// <summary>Returns a detailed report for a specific daira (wilaya/national admin).</summary>
     [HttpGet("admin/daira/{dairaId:int}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -85,6 +88,7 @@ public class AdminController(
         return result is null ? Problem(detail: "Daira not found.", statusCode: 404) : Ok(result);
     }
 
+    /// <summary>Creates a lower-tier admin account (e.g. commune_user, daira_admin).</summary>
     [HttpPost("admin/users")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -127,7 +131,7 @@ public class AdminController(
         if (existing is not null)
         {
             var field = existing.Username == body.Username ? "Username" : "Email";
-            return Conflict(new { detail = $"{field} already exists." });
+            return Problem(detail: $"{field} already exists.", statusCode: 409);
         }
 
         var pwdErr = PasswordValidator.Validate(body.Password);
@@ -169,6 +173,7 @@ public class AdminController(
     private static readonly System.Linq.Expressions.Expression<Func<User, AdminUserSummary>> ToAdminSummary =
         u => new AdminUserSummary(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role, u.Phone ?? "", u.CommuneId, u.DairaId, u.WilayaId);
 
+    /// <summary>Lists users that the caller has authority to manage.</summary>
     [HttpGet("admin/users")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -206,6 +211,7 @@ public class AdminController(
         return Ok(users);
     }
 
+    /// <summary>Updates a managed user's profile, role, or geographic scope.</summary>
     [HttpPut("admin/users/{userId:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -267,7 +273,7 @@ public class AdminController(
                 u => u.Email == body.Email && u.Id != userId, cancellationToken);
             if (emailConflict)
             {
-                return Conflict(new { detail = "Email already exists." });
+                return Problem(detail: "Email already exists.", statusCode: 409);
             }
 
             target.Email = body.Email;
@@ -308,9 +314,10 @@ public class AdminController(
         logger.LogInformation("[Admin] {CallerRole} {CallerId} updated user {UserId}",
             CurrentUserRole, CurrentUserId, userId);
 
-        return Ok(new ActionResponse(Success: true));
+        return Ok(ApiResponse.Ok());
     }
 
+    /// <summary>Deletes a managed user account.</summary>
     [HttpDelete("admin/users/{userId:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -336,7 +343,7 @@ public class AdminController(
         logger.LogInformation("[Admin] {CallerRole} {CallerId} deleted user {UserId} ({Username})",
             CurrentUserRole, CurrentUserId, userId, target.Username);
 
-        return Ok(new ActionResponse(Success: true));
+        return Ok(ApiResponse.Ok());
     }
 
     private async Task<IActionResult> NationalOverview(CancellationToken cancellationToken)

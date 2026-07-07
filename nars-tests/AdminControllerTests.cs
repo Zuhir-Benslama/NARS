@@ -275,7 +275,7 @@ public class AdminControllerTests
             DairaId: null,
             WilayaId: 1), default);
 
-        Assert.IsType<ConflictObjectResult>(result);
+        Assert.IsType<ObjectResult>(result);
     }
 
     [Fact]
@@ -421,7 +421,7 @@ public class AdminControllerTests
             default);
 
         var ok = Assert.IsType<OkObjectResult>(result);
-        var response = Assert.IsType<ActionResponse>(ok.Value);
+        var response = Assert.IsType<ApiResponse>(ok.Value);
         Assert.True(response.Success);
         Assert.Equal("Updated", (await db.Users.FindAsync(userId))!.Name);
     }
@@ -464,7 +464,7 @@ public class AdminControllerTests
         var result = await ctrl.DeleteAdmin(userId, default);
 
         var ok = Assert.IsType<OkObjectResult>(result);
-        var response = Assert.IsType<ActionResponse>(ok.Value);
+        var response = Assert.IsType<ApiResponse>(ok.Value);
         Assert.True(response.Success);
         Assert.Null(await db.Users.FindAsync(userId));
     }

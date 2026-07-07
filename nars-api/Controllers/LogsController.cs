@@ -24,6 +24,7 @@ public class LogsController(IErrorLogService errorLogService, ILogger<LogsContro
     private const int MaxMethodLength = 10;
     private const int MaxUserAgentLength = 500;
 
+    /// <summary>Accepts client-side error logs for server-side storage and analysis.</summary>
     [HttpPost("logs")]
     [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

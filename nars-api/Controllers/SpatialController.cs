@@ -20,6 +20,7 @@ public class SpatialController(
 {
     // ── POST /api/road-side ───────────────────────────────────────────────────
 
+    /// <summary>Determines which side of a road a marker is on and suggests the next entrance number.</summary>
     [HttpPost("road-side")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -106,6 +107,7 @@ public class SpatialController(
 
     // ── GET /api/areas/scattered-status ─────────────────────────────────────
 
+    /// <summary>Returns the last error encountered during scattered area computation.</summary>
     [HttpGet("areas/scattered-status")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public IActionResult GetScatteredStatus()
@@ -120,6 +122,7 @@ public class SpatialController(
 
     // ── POST /api/areas/refresh-scattered ────────────────────────────────────
 
+    /// <summary>Triggers a recomputation of scattered areas for the user's commune.</summary>
     [HttpPost("areas/refresh-scattered")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> RefreshScattered(CancellationToken cancellationToken = default)

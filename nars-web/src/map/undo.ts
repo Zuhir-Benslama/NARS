@@ -141,25 +141,23 @@ function entryDataToGeometry(
 ): GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon {
   if (type === "marker") {
     return {
-      type: "Point",
+      type: "Point" as const,
       coordinates: [data.lng ?? 0, data.lat ?? 0],
-    } as GeoJSON.Point
+    }
   }
-  // City center: restore as LineString circle ring (simple outline)
   if (type === "circle" && data.lat != null && data.lng != null && data.radius) {
     const ring = closeRing(computeCircleRing(data.lat, data.lng, data.radius))
-    return { type: "LineString", coordinates: ring } as GeoJSON.LineString
+    return { type: "LineString" as const, coordinates: ring }
   }
   if (data.coordinates && data.coordinates.length > 0) {
     const coords = data.coordinates.map((c) => [c.lng, c.lat] as [number, number])
     if (type === "line") {
-      return { type: "LineString", coordinates: coords } as GeoJSON.LineString
+      return { type: "LineString" as const, coordinates: coords }
     }
-    return { type: "Polygon", coordinates: [closeRing(coords)] } as GeoJSON.Polygon
+    return { type: "Polygon" as const, coordinates: [closeRing(coords)] }
   }
-  // Fallback for points (including circles without radius data)
   return {
-    type: "Point",
+    type: "Point" as const,
     coordinates: [data.lng ?? 0, data.lat ?? 0],
-  } as GeoJSON.Point
+  }
 }

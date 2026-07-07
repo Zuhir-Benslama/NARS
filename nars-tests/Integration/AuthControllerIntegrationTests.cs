@@ -103,7 +103,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             WilayaId: null
         ));
 
-        Assert.IsType<ConflictObjectResult>(result);
+        Assert.IsType<ObjectResult>(result);
     }
 
     [Fact]
@@ -189,7 +189,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             Password: "WrongPass1!"
         ));
 
-        Assert.IsType<UnauthorizedObjectResult>(result);
+        Assert.IsType<ObjectResult>(result);
     }
 
     [Fact]

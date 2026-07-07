@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { createPinia, setActivePinia } from "pinia"
 import { showToast, showConfirm } from "./toast"
 import { useToastStore } from "../stores/toastStore"
+import { useConfirmStore } from "../stores/confirmStore"
 
 beforeEach(() => {
   setActivePinia(createPinia())
   vi.useFakeTimers()
-  document.querySelectorAll(".nars-confirm-backdrop").forEach((el) => el.remove())
 })
 
 afterEach(() => {
@@ -58,56 +58,49 @@ describe("showToast", () => {
 })
 
 describe("showConfirm", () => {
-  it("creates a dialog with message and buttons", () => {
+  it("opens the confirm store with message and okText", () => {
     showConfirm("Are you sure?")
-    vi.advanceTimersByTime(100)
-    expect(document.querySelector(".nars-confirm-backdrop")).not.toBeNull()
-    expect(document.querySelector(".nars-confirm-dialog")).not.toBeNull()
-    expect(document.body.textContent).toContain("Are you sure?")
-    expect(document.body.textContent).toContain("Cancel")
-    expect(document.body.textContent).toContain("Confirm")
+    const store = useConfirmStore()
+    expect(store.visible).toBe(true)
+    expect(store.message).toBe("Are you sure?")
+    expect(store.okText).toBe("Confirm")
   })
 
   it("uses custom ok button text", () => {
     showConfirm("Proceed?", "Yes, delete")
-    vi.advanceTimersByTime(100)
-    expect(document.body.textContent).toContain("Yes, delete")
+    const store = useConfirmStore()
+    expect(store.okText).toBe("Yes, delete")
   })
 
-  it("resolves true on OK button click", async () => {
+  it("resolves true on confirm", async () => {
     const promise = showConfirm("Go?")
-    vi.advanceTimersByTime(100)
-    const okBtn = document.querySelector(".nars-confirm-dialog button:last-child") as HTMLElement
-    okBtn.click()
+    const store = useConfirmStore()
+    store.confirm()
     const result = await promise
     expect(result).toBe(true)
+    expect(store.visible).toBe(false)
   })
 
-  it("resolves false on Cancel button click", async () => {
+  it("resolves false on cancel", async () => {
     const promise = showConfirm("Go?")
-    vi.advanceTimersByTime(100)
-    const cancelBtn = document.querySelector(
-      ".nars-confirm-dialog button:first-child",
-    ) as HTMLElement
-    cancelBtn.click()
+    const store = useConfirmStore()
+    store.cancel()
     const result = await promise
     expect(result).toBe(false)
+    expect(store.visible).toBe(false)
   })
 
-  it("resolves false on Escape key", async () => {
-    const promise = showConfirm("Go?")
-    vi.advanceTimersByTime(100)
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))
-    const result = await promise
-    expect(result).toBe(false)
-  })
+  it("handles multiple confirm calls sequentially", async () => {
+    const p1 = showConfirm("First?")
+    const store = useConfirmStore()
+    store.confirm()
+    expect(await p1).toBe(true)
 
-  it("resolves false on backdrop click", async () => {
-    const promise = showConfirm("Go?")
-    vi.advanceTimersByTime(100)
-    const backdrop = document.querySelector(".nars-confirm-backdrop") as HTMLElement
-    backdrop.click()
-    const result = await promise
-    expect(result).toBe(false)
+    const p2 = showConfirm("Second?")
+    expect(store.visible).toBe(true)
+    expect(store.message).toBe("Second?")
+    store.cancel()
+    expect(await p2).toBe(false)
+    expect(store.visible).toBe(false)
   })
 })

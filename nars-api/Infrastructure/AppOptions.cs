@@ -59,3 +59,17 @@ public class BackgroundTaskOptions
 {
     public int Capacity { get; set; } = 100;
 }
+
+public class CspOptions
+{
+    public string DefaultSrc { get; set; } = "'self'";
+    public string ScriptSrc { get; set; } = "'self' blob:";
+    public string WorkerSrc { get; set; } = "'self' blob:";
+    public string StyleSrc { get; set; } = "'self' https://cdn.jsdelivr.net https://unpkg.com 'unsafe-inline' https://fonts.googleapis.com";
+    public string ImgSrc { get; set; } = "'self' data: blob: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.arcgisonline.com";
+    public string FontSrc { get; set; } = "'self' https://cdn.jsdelivr.net https://fonts.gstatic.com";
+    public string ConnectSrc { get; set; } = "'self' https: data: ws://127.0.0.1:* http://127.0.0.1:* https://*.arcgisonline.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com";
+    public string FrameAncestors { get; set; } = "'none'";
+    public string BaseUri { get; set; } = "'self'";
+    public string FormAction { get; set; } = "'self'";
+}

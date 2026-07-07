@@ -78,6 +78,7 @@ public class LocationsController(
 
     // ── GET /api/wilayas ──────────────────────────────────────
 
+    /// <summary>Lists wilayas with optional search and pagination.</summary>
     [HttpGet("wilayas")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -97,6 +98,7 @@ public class LocationsController(
 
     // ── GET /api/dairas ───────────────────────────────────────
 
+    /// <summary>Lists dairas within a wilaya with optional search and pagination.</summary>
     [HttpGet("dairas")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -125,6 +127,7 @@ public class LocationsController(
 
     // ── GET /api/communes ─────────────────────────────────────
 
+    /// <summary>Lists communes within a daira with optional search and pagination.</summary>
     [HttpGet("communes")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -153,6 +156,7 @@ public class LocationsController(
 
     // ── GET /api/commune/{id}/boundary ────────────────────────
 
+    /// <summary>Returns the GeoJSON boundary geometry for a commune.</summary>
     [HttpGet("commune/{communeId:int}/boundary")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -188,6 +192,7 @@ public class LocationsController(
     // Development-only endpoint for inspecting commune boundary geometry.
     // Returns internal details (geometry type, point count, validity, envelope).
 
+    /// <summary>Development-only endpoint for inspecting commune boundary geometry details.</summary>
     [HttpGet("commune/{communeId:int}/boundary-debug")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -201,7 +206,7 @@ public class LocationsController(
         var boundary = await db.CommuneBoundaries.FirstOrDefaultAsync(b => b.CommuneId == communeId, cancellationToken);
         if (boundary is null)
         {
-            return Ok(new { error = "Boundary not found" });
+            return Problem(detail: "Boundary not found", statusCode: 404);
         }
 
         return Ok(new

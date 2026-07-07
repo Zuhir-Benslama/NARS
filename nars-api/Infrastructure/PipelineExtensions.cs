@@ -145,6 +145,8 @@ public static class PipelineExtensions
         app.UseAuthentication();
         app.UseAuthorization();
 
+        var cspOptions = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<CspOptions>>().Value;
+
         app.Use(async (ctx, next) =>
         {
             if (!ctx.Request.Path.StartsWithSegments("/api") && !ctx.Response.HasStarted)
@@ -154,17 +156,21 @@ public static class PipelineExtensions
                 var nonce = Convert.ToBase64String(nonceBytes);
                 ctx.Items["csp-nonce"] = nonce;
 
+                var scriptSrc = cspOptions.ScriptSrc.Contains("'nonce-'")
+                    ? cspOptions.ScriptSrc.Replace("'nonce-'", $"'nonce-{nonce}'")
+                    : $"{cspOptions.ScriptSrc} 'nonce-{nonce}'";
+
                 ctx.Response.Headers.ContentSecurityPolicy =
-                    "default-src 'self'; " +
-                    $"script-src 'self' 'nonce-{nonce}' blob:; " +
-                    "worker-src 'self' blob:; " +
-                    "style-src 'self' https://cdn.jsdelivr.net https://unpkg.com 'unsafe-inline' https://fonts.googleapis.com; " +
-                    "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.arcgisonline.com; " +
-                    "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; " +
-                    "connect-src 'self' https: data: ws://127.0.0.1:* http://127.0.0.1:* https://*.arcgisonline.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com; " +
-                    "frame-ancestors 'none'; " +
-                    "base-uri 'self'; " +
-                    "form-action 'self'";
+                    $"default-src {cspOptions.DefaultSrc}; " +
+                    $"script-src {scriptSrc}; " +
+                    $"worker-src {cspOptions.WorkerSrc}; " +
+                    $"style-src {cspOptions.StyleSrc}; " +
+                    $"img-src {cspOptions.ImgSrc}; " +
+                    $"font-src {cspOptions.FontSrc}; " +
+                    $"connect-src {cspOptions.ConnectSrc}; " +
+                    $"frame-ancestors {cspOptions.FrameAncestors}; " +
+                    $"base-uri {cspOptions.BaseUri}; " +
+                    $"form-action {cspOptions.FormAction}";
 
                 ctx.Response.Headers.XContentTypeOptions = "nosniff";
                 ctx.Response.Headers.XFrameOptions = "DENY";

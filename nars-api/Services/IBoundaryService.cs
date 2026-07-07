@@ -7,5 +7,6 @@ namespace NarsApi.Services;
 /// </summary>
 public interface IBoundaryService
 {
+    /// <summary>Returns the GeoJSON string for a commune boundary, or null if not found.</summary>
     Task<string?> GetBoundaryGeoJsonAsync(int communeId, CancellationToken ct = default);
 }

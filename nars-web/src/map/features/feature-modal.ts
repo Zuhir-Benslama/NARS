@@ -37,8 +37,6 @@ export async function prepareModalExtras(phase: (typeof PHASES)[number]): Promis
   }
 }
 
-let _roadSideToken = 0
-
 export async function fetchRoadSide(
   roadDbId: string,
   geometry?: [number, number][] | null,
@@ -49,7 +47,7 @@ export async function fetchRoadSide(
   modalStore.entranceSide = null
   modalStore.entranceNumber = null
 
-  const token = ++_roadSideToken
+  const token = ++modalStore.roadSideToken
 
   let lat: number | undefined
   let lng: number | undefined
@@ -60,14 +58,14 @@ export async function fetchRoadSide(
 
   if (lat && lng) {
     const result = await getRoadSide(roadDbId, lat, lng, signal)
-    if (token !== _roadSideToken) return
+    if (token !== modalStore.roadSideToken) return
     if (result) {
       modalStore.entranceSide = result.side
       modalStore.entranceNumber = result.suggestedNumber
     }
   }
 
-  if (token !== _roadSideToken) return
+  if (token !== modalStore.roadSideToken) return
   modalStore.entranceSideLoading = false
 }
 

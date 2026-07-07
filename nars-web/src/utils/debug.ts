@@ -34,21 +34,3 @@ export function debugWarn(...args: unknown[]): void {
     console.warn(...args)
   }
 }
-
-/**
- * Debug info logging - only logs in development mode.
- * Use this instead of console.info for application info messages.
- */
-export function debugInfo(...args: unknown[]): void {
-  if (DEBUG) {
-    console.info(...args)
-  }
-}
-
-/**
- * Check if debug mode is enabled.
- * Useful for conditional debug behavior.
- */
-export function isDebugEnabled(): boolean {
-  return DEBUG
-}

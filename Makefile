@@ -30,7 +30,7 @@ else \
 	python3 -c "import base64,os; print(base64.b64encode(os.urandom(int(\"$$1\"))).decode())"; \
 fi
 
-# _RND shell function + $$(_RND) expansion rely on .ONESHELL (line 18).
+# _RND shell function + $$(_RND N) expansion rely on .ONESHELL.
 .env:
 	@echo "# Auto-generated — DO NOT COMMIT" > $@; \
 	_RND() { $(_rnd_cmd); }; \
@@ -136,12 +136,12 @@ cluster-clean: ## Delete cluster AND wipe postgis data (irreversible!)
 	$(MAKE) cluster-down
 	@echo "→ Wiping postgis data..."
 	@if [[ "$(POSTGRES_DATA_DIR)" == /* ]]; then
-		rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null \
-			|| sudo -n rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null \
-			|| true
-	else
-		rm -rf "$(POSTGRES_DATA_DIR)"
-	fi
+	@	rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null \
+		|| sudo -n rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null \
+		|| true
+	@else
+	@	rm -rf "$(POSTGRES_DATA_DIR)"
+	@fi
 	@echo "✓ Data wiped"
 
 .PHONY: cluster-status
@@ -295,34 +295,34 @@ smoke-test: ## Post-deploy smoke test: verify /health, frontend, and API auth
 cluster-stop: ## Scale all deployments to 0 (stop pods, keep cluster)
 	@echo "→ Stopping all pods..."
 	@for deploy in $(SCALABLE_DEPLOYS); do
-		saved="$(BACKUP_DIR)/replicas/$$deploy.txt"
-		replicas=$$($(KUBECTL) get deployment $$deploy -n "$(NAMESPACE)" \
-			-o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
-		mkdir -p "$(BACKUP_DIR)/replicas"
-		echo "$$replicas" > "$$saved"
-		$(KUBECTL) scale deployment $$deploy -n "$(NAMESPACE)" --replicas=0
-		echo "  ✓ $$deploy → 0 (was $$replicas)"
-	done
+	@	saved="$(BACKUP_DIR)/replicas/$$deploy.txt"
+	@	replicas=$$($(KUBECTL) get deployment $$deploy -n "$(NAMESPACE)" \
+		-o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
+	@	mkdir -p "$(BACKUP_DIR)/replicas"
+	@	echo "$$replicas" > "$$saved"
+	@	$(KUBECTL) scale deployment $$deploy -n "$(NAMESPACE)" --replicas=0
+	@	echo "  ✓ $$deploy → 0 (was $$replicas)"
+	@done
 	@echo "✓ All pods stopped. Run 'make cluster-start' to resume."
 
 .PHONY: cluster-start
 cluster-start: ## Scale all deployments back to their original replica count
 	@echo "→ Starting pods..."
 	@for deploy in $(SCALABLE_DEPLOYS); do
-		saved="$(BACKUP_DIR)/replicas/$$deploy.txt"
-		if [ -f "$$saved" ]; then
-			replicas=$$(cat "$$saved")
-		else
-			replicas=1
-		fi
-		$(KUBECTL) scale deployment $$deploy -n "$(NAMESPACE)" --replicas=$$replicas
-		echo "  ✓ $$deploy → $$replicas"
-	done
+	@	saved="$(BACKUP_DIR)/replicas/$$deploy.txt"
+	@	if [ -f "$$saved" ]; then
+	@		replicas=$$(cat "$$saved")
+	@	else
+	@		replicas=1
+	@	fi
+	@	$(KUBECTL) scale deployment $$deploy -n "$(NAMESPACE)" --replicas=$$replicas
+	@	echo "  ✓ $$deploy → $$replicas"
+	@done
 	@echo "→ Waiting for deployments..."
 	@for deploy in $(SCALABLE_DEPLOYS); do
-		$(KUBECTL) wait --namespace "$(NAMESPACE)" \
-			--for=condition=Available deployment/$$deploy --timeout=180s 2>/dev/null || true
-	done
+	@	$(KUBECTL) wait --namespace "$(NAMESPACE)" \
+		--for=condition=Available deployment/$$deploy --timeout=180s 2>/dev/null || true
+	@done
 	@echo "✓ All pods running"
 
 .PHONY: cluster-restart
@@ -405,8 +405,8 @@ db-admin: .env ## Create national admin with one-time generated credentials
 	ADMIN_USERNAME="admin_$$(openssl rand -hex 4)"
 	ADMIN_PASSWORD="$$(openssl rand -base64 12)"
 	export ADMIN_USERNAME ADMIN_PASSWORD
-	echo "  Username: $${ADMIN_USERNAME}"
-	echo "  Password: $${ADMIN_PASSWORD}"
+	@echo "  Username: $${ADMIN_USERNAME}"
+	@echo "  Password: $${ADMIN_PASSWORD}"
 	echo ""
 	bash nars-infra/scripts/create_national_admin.sh
 	@echo ""
@@ -999,16 +999,16 @@ _build-nars-vite:
 
 .PHONY: images-push
 images-push: ## Push all Docker images to registry
-	@for img in $(REGISTRY_IMAGES); do
-		echo "→ Pushing $(DOCKER_ORG)/$$img:latest..."
-		docker push "$(DOCKER_ORG)/$$img:latest"
+	@	for img in $(REGISTRY_IMAGES); do
+		echo "→ Pushing $(DOCKER_ORG)/$$img:$(IMAGE_TAG)..."
+		docker push "$(DOCKER_ORG)/$$img:$(IMAGE_TAG)"
 	done
 	@echo "✓ All images pushed"
 
 .PHONY: images-load
 images-load: ## Load locally built Docker images into the kind cluster
 	@for img in $(REGISTRY_IMAGES); do
-		full="$(DOCKER_ORG)/$$img:latest"
+		full="$(DOCKER_ORG)/$$img:$(IMAGE_TAG)"
 		if docker image inspect "$$full" >/dev/null 2>&1; then
 			echo "→ Loading $$full into cluster..."
 			kind load docker-image "$$full" --name "$(CLUSTER_NAME)"
@@ -1021,7 +1021,7 @@ images-load: ## Load locally built Docker images into the kind cluster
 .PHONY: frontend-update
 frontend-update: ## Rebuild nars-vite, load into kind, and rollout restart
 	$(MAKE) _build-nars-vite
-	@kind load docker-image "$(DOCKER_ORG)/nars-vite:latest" --name "$(CLUSTER_NAME)"
+	@kind load docker-image "$(DOCKER_ORG)/nars-vite:$(IMAGE_TAG)" --name "$(CLUSTER_NAME)"
 	@$(KUBECTL) rollout restart deployment nars-frontend -n "$(NAMESPACE)"
 	@$(KUBECTL) rollout status deployment nars-frontend -n "$(NAMESPACE)" --timeout=120s
 	@echo "✓ nars-vite rebuilt and deployed"

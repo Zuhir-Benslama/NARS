@@ -21,9 +21,10 @@ if (!string.IsNullOrEmpty(envDbPassword))
 
 var jwtSecret = GetRequiredConfig(builder.Configuration, "Jwt:SecretKey", ["NARS_JWT_SECRET", "Jwt:SecretKey"]);
 
-if (jwtSecret.Length < 32)
+const int minJwtSecretLength = 32;
+if (jwtSecret.Length < minJwtSecretLength)
 {
-    throw new InvalidOperationException("Jwt:SecretKey must be at least 32 characters for HMAC-SHA256 security.");
+    throw new InvalidOperationException($"Jwt:SecretKey must be at least {minJwtSecretLength} characters for HMAC-SHA256 security.");
 }
 
 var jwtIssuer = builder.Configuration["Jwt:Issuer"];

@@ -41,26 +41,26 @@ export function updateEndpointMarkers(): void {
     const onCityCenter = ccLatLngs.some((cc) => haversineMeters(startLL, cc) < 2)
     if (!onCityCenter) {
       features.push({
-        type: "Feature",
-        geometry: { type: "Point", coordinates: [startLL.lng, startLL.lat] },
+        type: "Feature" as const,
+        geometry: { type: "Point" as const, coordinates: [startLL.lng, startLL.lat] },
         properties: {
           endpointType: "start",
           color: roadColor,
           angle: startAngle,
         },
-      } as GeoJSON.Feature)
+      })
     }
 
     const endPt = coords[coords.length - 1]
     features.push({
-      type: "Feature",
-      geometry: { type: "Point", coordinates: [endPt.lng, endPt.lat] },
+      type: "Feature" as const,
+      geometry: { type: "Point" as const, coordinates: [endPt.lng, endPt.lat] },
       properties: {
         endpointType: "end",
         color: roadColor,
         angle: endAngle,
       },
-    } as GeoJSON.Feature)
+    })
   }
 
   endpointsSource.setData({

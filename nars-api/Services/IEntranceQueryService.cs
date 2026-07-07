@@ -7,5 +7,6 @@ namespace NarsApi.Services;
 /// </summary>
 public interface IEntranceQueryService
 {
+    /// <summary>Returns the set of entrance numbers already used on a given road.</summary>
     Task<HashSet<int>> GetUsedEntranceNumbersAsync(Guid userId, Guid roadId, CancellationToken ct = default);
 }

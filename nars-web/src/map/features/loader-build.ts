@@ -40,7 +40,7 @@ export function buildGeoJsonFeature(
         const ring = closeRing(computeCircleRing(data.lat, data.lng, radius))
         return {
           type: "Feature" as const,
-          geometry: { type: "LineString", coordinates: ring },
+          geometry: { type: "LineString" as const, coordinates: ring },
           properties: {
             dbId,
             phaseKey: phase.key,
@@ -54,7 +54,7 @@ export function buildGeoJsonFeature(
       }
       return {
         type: "Feature" as const,
-        geometry: { type: "Point", coordinates: [data.lng, data.lat] },
+        geometry: { type: "Point" as const, coordinates: [data.lng, data.lat] },
         properties: {
           dbId,
           phaseKey: phase.key,
@@ -71,7 +71,7 @@ export function buildGeoJsonFeature(
     return {
       type: "Feature" as const,
       geometry: {
-        type: "Point",
+        type: "Point" as const,
         coordinates: [data.lng, data.lat],
       },
       properties: {
@@ -87,7 +87,7 @@ export function buildGeoJsonFeature(
       return {
         type: "Feature" as const,
         geometry: {
-          type: "LineString",
+          type: "LineString" as const,
           coordinates: data.coordinates.map((c) => [c.lng, c.lat]),
         },
         properties: {
@@ -103,7 +103,7 @@ export function buildGeoJsonFeature(
       return {
         type: "Feature" as const,
         geometry: {
-          type: "Polygon",
+          type: "Polygon" as const,
           coordinates: [closeRing(ring as [number, number][])],
         },
         properties: {

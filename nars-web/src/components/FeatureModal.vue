@@ -1,7 +1,13 @@
 <template>
-  <div v-show="modalStore.visible" class="modal">
+  <div
+    v-show="modalStore.visible"
+    class="modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="modalHeader"
+  >
     <div class="modal-content">
-      <div class="modal-header">
+      <div id="modalHeader" class="modal-header">
         {{ headerText }}
       </div>
 

@@ -51,7 +51,7 @@ public class UserAuthorizationService(AppDbContext db) : IUserAuthorizationServi
                 return Valid();
 
             default:
-                return Valid();
+                return Error($"Unsupported role transition ({callerRole} → {targetRole}).");
         }
     }
 
