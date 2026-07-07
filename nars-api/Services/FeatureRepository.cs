@@ -1,8 +1,7 @@
-using System.Text;
+using System.Data;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
-using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
 
@@ -15,7 +14,7 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
 
     public async Task<Guid> SaveFeatureAsync(FeatureBase entity, string featureType, CancellationToken ct)
     {
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
 
         FeatureTypeRegistry.AddToDbContext(db, entity);
         db.FeatureRegistry.Add(new FeatureRegistry { Id = entity.Id, FeatureType = featureType });
@@ -40,7 +39,7 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
 
     public async Task<bool> UpdateFeatureAsync(UpdateFeatureCommand command, CancellationToken ct)
     {
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
 
         var query = command.Descriptor.GetDbSet(db);
         string? dataStr = null;
@@ -75,7 +74,7 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
 
     public async Task<bool> DeleteFeatureAsync(Guid featureId, Guid userId, string featureType, CancellationToken ct)
     {
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
 
         var dbSet = FeatureTypeRegistry.GetDbSet(db, featureType);
         if (dbSet is null)
@@ -94,55 +93,39 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
         return true;
     }
 
-    private const int DeleteCommandTimeoutSeconds = 30;
-
     public async Task<(int total, List<Guid> ids)> ClearAllFeaturesAsync(Guid userId, CancellationToken ct)
     {
-        var conn = db.Database.GetDbConnection();
-        await using var handle = await conn.EnsureOpenAsync(ct);
+        var deletedIds = new List<Guid>();
 
-        var descriptors = FeatureTypeRegistry.GetAllDescriptors();
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
 
-        var sb = new StringBuilder();
-        sb.Append("WITH ");
-
-        for (var i = 0; i < descriptors.Count; i++)
+        foreach (var descriptor in FeatureTypeRegistry.GetAllDescriptors())
         {
-            if (i > 0)
+            var ids = await descriptor.GetDbSet(db)
+                .Where(f => f.UserId == userId)
+                .Select(f => f.Id)
+                .ToListAsync(ct);
+
+            if (ids.Count == 0)
             {
-                sb.Append(", ");
+                continue;
             }
 
-            sb.Append($"d{i} AS (DELETE FROM {FeatureTypeRegistry.ValidateTableName(descriptors[i].TableName)} WHERE user_id = @uid RETURNING id)");
+            await descriptor.GetDbSet(db)
+                .Where(f => f.UserId == userId)
+                .ExecuteDeleteAsync(ct);
+
+            deletedIds.AddRange(ids);
         }
 
-        sb.AppendLine(",");
-        sb.Append("all_deleted AS (");
-        for (var i = 0; i < descriptors.Count; i++)
+        if (deletedIds.Count > 0)
         {
-            if (i > 0)
-            {
-                sb.Append(" UNION ALL ");
-            }
-
-            sb.Append($"SELECT id FROM d{i}");
-        }
-        sb.AppendLine("),");
-        sb.AppendLine("cleanup AS (DELETE FROM feature_registry WHERE id IN (SELECT id FROM all_deleted) RETURNING id)");
-        sb.Append("SELECT id FROM cleanup");
-
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText = sb.ToString();
-        cmd.CommandTimeout = DeleteCommandTimeoutSeconds;
-        SqlFragments.AddParam(cmd, "@uid", userId);
-
-        var ids = new List<Guid>();
-        await using var reader = await cmd.ExecuteReaderAsync(ct);
-        while (await reader.ReadAsync(ct))
-        {
-            ids.Add(reader.GetGuid(0));
+            await db.FeatureRegistry
+                .Where(r => deletedIds.Contains(r.Id))
+                .ExecuteDeleteAsync(ct);
         }
 
-        return (ids.Count, ids);
+        await tx.CommitAsync(ct);
+        return (deletedIds.Count, deletedIds);
     }
 }

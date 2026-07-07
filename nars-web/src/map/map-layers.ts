@@ -3,16 +3,11 @@ import { ctx } from "./core/state"
 import { debugLog } from "../utils/debug"
 import { addBoundaryClickEvents } from "./map-boundary"
 
-interface LayerConfig {
-  id: string
-  type: "fill" | "line" | "symbol" | "circle"
-  source: string
-  filter?: unknown[]
-  layout?: Record<string, unknown>
-  paint?: Record<string, unknown>
+function getGeoJSON(map: maplibregl.Map, id: string): maplibregl.GeoJSONSource {
+  return map.getSource(id) as maplibregl.GeoJSONSource
 }
 
-const FEATURE_LAYERS: LayerConfig[] = [
+const FEATURE_LAYERS: maplibregl.LayerSpecification[] = [
   {
     id: "nars-selection",
     type: "line",
@@ -135,7 +130,7 @@ const FEATURE_LAYERS: LayerConfig[] = [
   },
 ]
 
-const ENDPOINT_LAYERS: Array<{ type: "start" | "end"; layers: LayerConfig[] }> = [
+const ENDPOINT_LAYERS: Array<{ type: "start" | "end"; layers: maplibregl.LayerSpecification[] }> = [
   {
     type: "start",
     layers: [
@@ -231,10 +226,10 @@ export function initSources(): void {
     }
   }
 
-  ctx.boundariesSource = map.getSource("boundaries") as maplibregl.GeoJSONSource
-  ctx.scatteredSource = map.getSource("scattered") as maplibregl.GeoJSONSource
-  ctx.featuresSource = map.getSource("features") as maplibregl.GeoJSONSource
-  ctx.endpointsSource = map.getSource("endpoints") as maplibregl.GeoJSONSource
+  ctx.boundariesSource = getGeoJSON(map, "boundaries")
+  ctx.scatteredSource = getGeoJSON(map, "scattered")
+  ctx.featuresSource = getGeoJSON(map, "features")
+  ctx.endpointsSource = getGeoJSON(map, "endpoints")
 
   debugLog("[initSources] ctx.featuresSource set:", !!ctx.featuresSource)
 
@@ -248,7 +243,7 @@ export function addEndpointLayers(map: maplibregl.Map): void {
   const firstSymbolId = layers.find((l) => l.type === "symbol")?.id
   for (const group of ENDPOINT_LAYERS) {
     for (const layer of group.layers) {
-      map.addLayer(layer as maplibregl.LayerSpecification, firstSymbolId)
+      map.addLayer(layer, firstSymbolId)
     }
   }
 }
@@ -258,7 +253,7 @@ export function addFeatureLayers(map: maplibregl.Map): void {
   const firstSymbolId = layers.find((l) => l.type === "symbol")?.id
 
   for (const layer of FEATURE_LAYERS) {
-    map.addLayer(layer as maplibregl.LayerSpecification, firstSymbolId)
+    map.addLayer(layer, firstSymbolId)
   }
 
   addBoundaryClickEvents(map)
@@ -284,7 +279,7 @@ export function addDrawingPreviewLayer(map: maplibregl.Map): void {
 }
 
 export function updateDrawingPreview(geometry: [number, number][] | null): void {
-  const source = ctx.map.getSource("drawing-preview") as maplibregl.GeoJSONSource
+  const source = getGeoJSON(ctx.map, "drawing-preview")
   if (!source) return
   const features: GeoJSON.Feature[] =
     geometry && geometry.length > 0

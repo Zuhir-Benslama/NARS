@@ -42,9 +42,6 @@ public record UpdateAdminRequest(
 
 // ─── ADMIN USER SUMMARY ──────────────────────────────────────────────────────
 
-/// <summary>
-/// Slim user record returned in GET /api/admin/users list.
-/// </summary>
 public record AdminUserSummary(
     [property: JsonPropertyName("user_id")] string UserId,
     [property: JsonPropertyName("username")] string Username,

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { createPinia, setActivePinia } from "pinia"
-import type { LayerEntry } from "../types/features"
+import type { FeatureTypeKey, LayerEntry } from "../types/features"
 
 const mockFeaturesStoreAdd = vi.fn()
 const mockToast = vi.fn()
@@ -23,7 +23,7 @@ vi.mock("./features/features", () => ({
 let resetUndoStack: () => void
 let hasUndo: () => boolean
 let getUndoLabel: () => string | null
-let recordDelete: (entry: LayerEntry, phaseKey: string) => void
+let recordDelete: (entry: LayerEntry, phaseKey: FeatureTypeKey) => void
 let undo: () => Promise<void>
 
 async function loadModule() {

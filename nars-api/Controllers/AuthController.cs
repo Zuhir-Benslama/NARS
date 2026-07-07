@@ -63,93 +63,24 @@ public partial class AuthController(
 
         var user = await db.Users.FirstOrDefaultAsync(u => u.Username == body.Username, cancellationToken);
 
-        // Always run BCrypt.Verify (even for unknown/locked users) to prevent
-        // username enumeration via response-time side-channel (~0 µs vs ~300 ms).
         var hashToCheck = user?.PasswordHash ?? DummyHash;
         var passwordValid = BCrypt.Net.BCrypt.Verify(body.Password, hashToCheck);
 
-        // Lockout check is after BCrypt so the timing is indistinguishable
-        // from a wrong-password response.
-        if (user is not null && user.LockedUntil.HasValue && user.LockedUntil.Value > timeProvider.UtcNow)
-        {
-            return Problem(detail: "Invalid username or password", statusCode: 401);
-        }
+        var isLocked = user?.LockedUntil.HasValue == true && user.LockedUntil.Value > timeProvider.UtcNow;
 
-        if (!passwordValid)
+        if (isLocked || !passwordValid || user is null)
         {
-            if (user is not null)
+            if (!passwordValid && user is not null)
             {
                 await RecordFailedLogin(user, cancellationToken);
             }
+
             return Problem(detail: "Invalid username or password", statusCode: 401);
         }
 
-        if (user is null)
-        {
-            return Problem(detail: "Invalid username or password", statusCode: 401);
-        }
+        await ResetFailedAttemptsIfNeededAsync(user, cancellationToken);
 
-        // Successful login — reset failed attempts
-        if (user.FailedLoginAttempts > 0 || user.LockedUntil.HasValue)
-        {
-            user.FailedLoginAttempts = 0;
-            user.LockedUntil = null;
-            await db.SaveChangesAsync(cancellationToken);
-        }
-
-        var token = jwt.CreateToken(user.Id, user.Username, user.Name, user.Email,
-            communeId: user.CommuneId, role: user.Role, dairaId: user.DairaId, wilayaId: user.WilayaId);
-
-        // Issue a refresh token for silent re-authentication before the access token expires.
-        var (refreshRaw, refreshHash) = jwt.CreateRefreshToken();
-        var refreshExpiry = timeProvider.UtcNow.AddDays(jwtOptions.Value.RefreshExpiresInDays);
-
-        if (logger.IsEnabled(LogLevel.Debug))
-        {
-            logger.LogDebug("Setting auth cookies, Secure={IsHttps}", Request.IsHttps);
-        }
-
-        db.RefreshTokens.Add(new RefreshToken
-        {
-            UserId = user.Id,
-            TokenHash = refreshHash,
-            ExpiresAt = refreshExpiry,
-        });
-        await db.SaveChangesAsync(cancellationToken);
-
-        // fix #5: Secure = true only when the request itself is HTTPS.
-        // Using Request.IsHttps instead of IsDevelopment() avoids the
-        // "cookie silently dropped on HTTP because Secure is true" trap
-        // when ASPNETCORE_ENVIRONMENT is unset but the server is running
-        // behind a local HTTP dev server.
-        var refreshMaxAge = refreshExpiry - timeProvider.UtcNow;
-
-        Response.Cookies.Append("access_token", token, MakeCookieOptions(jwt.AccessTokenExpiresIn));
-        Response.Cookies.Append("refresh_token", refreshRaw, MakeCookieOptions(refreshMaxAge));
-
-        // fix #7: single joined query instead of 3 sequential round-trips.
-        // fix #11: wilaya is not part of the SignIn response — not loaded here.
-        var loc = await LoadCommuneWithDairaAsync(user.CommuneId ?? 0, cancellationToken);
-
-        return Ok(new SignInResponse(
-            Success: true,
-            Token: token,
-            TokenType: "bearer",
-            User: new UserInfo(
-                Id: user.Id.ToString(),
-                Username: user.Username,
-                Name: user.Name,
-                Email: user.Email,
-                Role: user.Role,
-                Commune: new CommuneInfo(
-                    Id: user.CommuneId,
-                    NameFr: loc.Commune?.CommuneFr,
-                    NameAr: loc.Commune?.CommuneAr,
-                    Latitude: loc.Commune?.CommuneLatitude,
-                    Longitude: loc.Commune?.CommuneLongitude
-                )
-            )
-        ));
+        return await BuildSignInResponseAsync(user, cancellationToken);
     }
 
     // ── POST /api/logout ──────────────────────────────────────
@@ -278,6 +209,64 @@ public partial class AuthController(
         }
 
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task ResetFailedAttemptsIfNeededAsync(User user, CancellationToken ct)
+    {
+        if (user.FailedLoginAttempts > 0 || user.LockedUntil.HasValue)
+        {
+            user.FailedLoginAttempts = 0;
+            user.LockedUntil = null;
+            await db.SaveChangesAsync(ct);
+        }
+    }
+
+    private async Task<IActionResult> BuildSignInResponseAsync(User user, CancellationToken ct)
+    {
+        var token = jwt.CreateToken(user.Id, user.Username, user.Name, user.Email,
+            communeId: user.CommuneId, role: user.Role, dairaId: user.DairaId, wilayaId: user.WilayaId);
+
+        var (refreshRaw, refreshHash) = jwt.CreateRefreshToken();
+        var refreshExpiry = timeProvider.UtcNow.AddDays(jwtOptions.Value.RefreshExpiresInDays);
+
+        db.RefreshTokens.Add(new RefreshToken
+        {
+            UserId = user.Id,
+            TokenHash = refreshHash,
+            ExpiresAt = refreshExpiry,
+        });
+        await db.SaveChangesAsync(ct);
+
+        if (logger.IsEnabled(LogLevel.Debug))
+        {
+            logger.LogDebug("Setting auth cookies, Secure={IsHttps}", Request.IsHttps);
+        }
+
+        var refreshMaxAge = refreshExpiry - timeProvider.UtcNow;
+        Response.Cookies.Append("access_token", token, MakeCookieOptions(jwt.AccessTokenExpiresIn));
+        Response.Cookies.Append("refresh_token", refreshRaw, MakeCookieOptions(refreshMaxAge));
+
+        var loc = await LoadCommuneWithDairaAsync(user.CommuneId ?? 0, ct);
+
+        return Ok(new SignInResponse(
+            Success: true,
+            Token: token,
+            TokenType: "bearer",
+            User: new UserInfo(
+                Id: user.Id.ToString(),
+                Username: user.Username,
+                Name: user.Name,
+                Email: user.Email,
+                Role: user.Role,
+                Commune: new CommuneInfo(
+                    Id: user.CommuneId,
+                    NameFr: loc.Commune?.CommuneFr,
+                    NameAr: loc.Commune?.CommuneAr,
+                    Latitude: loc.Commune?.CommuneLatitude,
+                    Longitude: loc.Commune?.CommuneLongitude
+                )
+            )
+        ));
     }
 
     // ── Private helpers ───────────────────────────────────────

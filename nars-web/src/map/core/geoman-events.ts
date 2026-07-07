@@ -16,7 +16,7 @@ import { refreshLayerVisibility } from "../rendering/labels"
 import { getErrorMessage } from "../../lib/errors"
 import { showToast } from "../../lib/toast"
 import { debugError } from "../../utils/debug"
-import type { LayerEntry } from "../../types"
+import type { FeatureTypeKey, LayerEntry } from "../../types"
 import type {
   GeomanEditEvent,
   GeomanRemoveEvent,
@@ -153,7 +153,7 @@ async function onRemove(e: GeomanRemoveEvent): Promise<void> {
   }
 
   let removed: LayerEntry | null = null
-  let phaseKey = ""
+  let phaseKey: FeatureTypeKey | "" = ""
   const layerStore = useLayerStore()
   const state = layerStore.$state
   for (const key of Object.keys(state)) {
@@ -161,11 +161,12 @@ async function onRemove(e: GeomanRemoveEvent): Promise<void> {
     const entry = entries?.find((f) => f.dbId === dbId)
     if (entry) {
       removed = entry
-      phaseKey = key
+      phaseKey = key as keyof LayerState
       break
     }
   }
-  if (removed) recordDelete(removed, phaseKey)
+  if (removed && phaseKey) recordDelete(removed, phaseKey)
+  if (!removed || !phaseKey) return
 
   try {
     const response = await apiFetch(`/api/features/${dbId}`, {
@@ -176,12 +177,10 @@ async function onRemove(e: GeomanRemoveEvent): Promise<void> {
       return
     }
 
-    if (removed) {
-      featuresStore.remove(removed.id)
-      layerStore.removeFeature(phaseKey as keyof LayerState, dbId)
-      useAppStore().syncCounts()
-      refreshLayerVisibility()
-    }
+    featuresStore.remove(removed.id)
+    layerStore.removeFeature(phaseKey, dbId)
+    useAppStore().syncCounts()
+    refreshLayerVisibility()
 
     showToast("Feature deleted.", "success")
   } catch (err) {

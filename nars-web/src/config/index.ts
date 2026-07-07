@@ -64,6 +64,12 @@ export const MAP_CONFIG = {
   /** Timeout for style loading in milliseconds */
   styleLoadTimeout: 10000,
 
+  /** Max zoom for raster tile sources */
+  tileMaxZoomSatellite: 17,
+  tileMaxZoomStreet: 19,
+  tileMaxZoomLight: 19,
+  tileMaxZoomDark: 19,
+
   /** Base tile URLs per style key — configurable via env vars */
   tileUrls: {
     satellite: [

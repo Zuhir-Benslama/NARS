@@ -234,79 +234,22 @@ public class AdminController(
             return Problem(detail: "User not found.", statusCode: 404);
         }
 
-        if (!authorizationService.CanCreateRole(CurrentUserRole, target.Role))
+        var authError = await ValidateAdminUpdatePermissionAsync(target, body, cancellationToken);
+        if (authError is not null)
         {
-            return Forbid();
+            return authError;
         }
 
-        if (body.Role is not null && !authorizationService.CanCreateRole(CurrentUserRole, body.Role))
+        var fieldError = await ApplyUpdateFieldsAsync(target, body, cancellationToken);
+        if (fieldError is not null)
         {
-            return Forbid();
+            return fieldError;
         }
 
-        var sensitiveChange = body.Role is not null
-            || body.WilayaId is not null
-            || body.DairaId is not null
-            || body.CommuneId is not null;
-        if (sensitiveChange)
+        var geoError = ApplyRoleAndGeography(target, body);
+        if (geoError is not null)
         {
-            if (string.IsNullOrEmpty(body.Password))
-            {
-                return Problem(detail: "Password is required to change role or geographic scope.", statusCode: 400);
-            }
-
-            var caller = await db.Users.FindAsync([RequiredCurrentUserId], cancellationToken);
-            if (caller is null || !BCrypt.Net.BCrypt.Verify(body.Password, caller.PasswordHash))
-            {
-                return Problem(detail: "Password is incorrect.", statusCode: 403);
-            }
-        }
-
-        if (body.Name is not null)
-        {
-            target.Name = body.Name;
-        }
-
-        if (body.Email is not null)
-        {
-            var emailConflict = await db.Users.AnyAsync(
-                u => u.Email == body.Email && u.Id != userId, cancellationToken);
-            if (emailConflict)
-            {
-                return Problem(detail: "Email already exists.", statusCode: 409);
-            }
-
-            target.Email = body.Email;
-        }
-        if (body.Phone is not null)
-        {
-            target.Phone = body.Phone;
-        }
-
-        if (body.Role is not null)
-        {
-            var geoCheck = GeographicValidator.Validate(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
-            if (geoCheck is not null)
-            {
-                return Problem(detail: geoCheck, statusCode: 400);
-            }
-
-            target.Role = body.Role;
-        }
-
-        if (body.WilayaId is not null)
-        {
-            target.WilayaId = body.WilayaId;
-        }
-
-        if (body.DairaId is not null)
-        {
-            target.DairaId = body.DairaId;
-        }
-
-        if (body.CommuneId is not null)
-        {
-            target.CommuneId = body.CommuneId;
+            return geoError;
         }
 
         await db.SaveChangesAsync(cancellationToken);
@@ -344,6 +287,98 @@ public class AdminController(
             CurrentUserRole, CurrentUserId, userId, target.Username);
 
         return Ok(ApiResponse.Ok());
+    }
+
+    private async Task<IActionResult?> ValidateAdminUpdatePermissionAsync(
+        User target, UpdateAdminRequest body, CancellationToken ct)
+    {
+        if (!authorizationService.CanCreateRole(CurrentUserRole, target.Role))
+        {
+            return Forbid();
+        }
+
+        if (body.Role is not null && !authorizationService.CanCreateRole(CurrentUserRole, body.Role))
+        {
+            return Forbid();
+        }
+
+        var sensitiveChange = body.Role is not null
+            || body.WilayaId is not null
+            || body.DairaId is not null
+            || body.CommuneId is not null;
+        if (sensitiveChange)
+        {
+            if (string.IsNullOrEmpty(body.Password))
+            {
+                return Problem(detail: "Password is required to change role or geographic scope.", statusCode: 400);
+            }
+
+            var caller = await db.Users.FindAsync([RequiredCurrentUserId], ct);
+            if (caller is null || !BCrypt.Net.BCrypt.Verify(body.Password, caller.PasswordHash))
+            {
+                return Problem(detail: "Password is incorrect.", statusCode: 403);
+            }
+        }
+
+        return null;
+    }
+
+    private async Task<IActionResult?> ApplyUpdateFieldsAsync(User target, UpdateAdminRequest body, CancellationToken ct)
+    {
+        if (body.Name is not null)
+        {
+            target.Name = body.Name;
+        }
+
+        if (body.Email is not null)
+        {
+            var emailConflict = await db.Users.AnyAsync(
+                u => u.Email == body.Email && u.Id != target.Id, ct);
+            if (emailConflict)
+            {
+                return Problem(detail: "Email already exists.", statusCode: 409);
+            }
+
+            target.Email = body.Email;
+        }
+
+        if (body.Phone is not null)
+        {
+            target.Phone = body.Phone;
+        }
+
+        return null;
+    }
+
+    private IActionResult? ApplyRoleAndGeography(User target, UpdateAdminRequest body)
+    {
+        if (body.Role is not null)
+        {
+            var geoCheck = GeographicValidator.Validate(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
+            if (geoCheck is not null)
+            {
+                return Problem(detail: geoCheck, statusCode: 400);
+            }
+
+            target.Role = body.Role;
+        }
+
+        if (body.WilayaId is not null)
+        {
+            target.WilayaId = body.WilayaId;
+        }
+
+        if (body.DairaId is not null)
+        {
+            target.DairaId = body.DairaId;
+        }
+
+        if (body.CommuneId is not null)
+        {
+            target.CommuneId = body.CommuneId;
+        }
+
+        return null;
     }
 
     private async Task<IActionResult> NationalOverview(CancellationToken cancellationToken)

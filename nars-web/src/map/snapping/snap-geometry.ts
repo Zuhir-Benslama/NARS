@@ -5,9 +5,6 @@
 
 import type maplibregl from "maplibre-gl"
 
-/** The result of map.project() — pixel coordinates with .x and .y */
-type PixelPoint = { x: number; y: number }
-
 // ─── PRIMITIVES ───────────────────────────────────────────────────────────────
 
 /**
@@ -21,12 +18,12 @@ export function closestOnSegment(
   aLat: number,
   bLng: number,
   bLat: number,
-  project: (ll: [number, number]) => PixelPoint,
+  project: (ll: [number, number]) => { x: number; y: number },
   unproject: (pt: [number, number]) => maplibregl.LngLat,
 ): { x: number; y: number; lng: number; lat: number } | null {
   try {
-    const pa = project([aLng, aLat]) as PixelPoint
-    const pb = project([bLng, bLat]) as PixelPoint
+    const pa = project([aLng, aLat])
+    const pb = project([bLng, bLat])
     const dx = pb.x - pa.x,
       dy = pb.y - pa.y
     const lenSq = dx * dx + dy * dy
@@ -51,17 +48,12 @@ export function closestOnCirclePerimeter(
   centerLng: number,
   centerLat: number,
   radiusMeters: number,
-  project: (ll: [number, number]) => PixelPoint,
+  project: (ll: [number, number]) => { x: number; y: number },
   unproject: (pt: [number, number]) => maplibregl.LngLat,
 ): { x: number; y: number; lng: number; lat: number; dist: number } | null {
   try {
-    const centerPx = project([centerLng, centerLat]) as PixelPoint
-    // Approximate radius in pixels by projecting a 0.001° offset east.
-    // 111320 = meters per degree of longitude at the equator (Earth circumference / 360).
-    // The cosine factor scales this for the current latitude (Mercator projection).
-    // Note: This is an approximation. At extreme latitudes (>75°) or very high zoom
-    // levels the distortion may cause slight inaccuracies in circle perimeter snapping.
-    const offsetPt = project([centerLng + 0.001, centerLat]) as PixelPoint
+    const centerPx = project([centerLng, centerLat])
+    const offsetPt = project([centerLng + 0.001, centerLat])
     const metersPerPixelX =
       (0.001 * 111320 * Math.cos((centerLat * Math.PI) / 180)) / (offsetPt.x - centerPx.x)
     const radiusPx = radiusMeters / metersPerPixelX
@@ -92,10 +84,10 @@ export function pixelDist(
   cursorY: number,
   lng: number,
   lat: number,
-  project: (ll: [number, number]) => PixelPoint,
+  project: (ll: [number, number]) => { x: number; y: number },
 ): number | null {
   try {
-    const p = project([lng, lat]) as PixelPoint
+    const p = project([lng, lat])
     return Math.hypot(p.x - cursorX, p.y - cursorY)
   } catch {
     return null

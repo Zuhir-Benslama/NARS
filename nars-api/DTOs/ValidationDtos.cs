@@ -3,7 +3,6 @@ using System.Text.Json.Serialization;
 
 namespace NarsApi.DTOs;
 
-/// <summary>A single lat/lng coordinate pair.</summary>
 public record CoordDto(
     [property: JsonPropertyName("lat")] double Lat,
     [property: JsonPropertyName("lng")] double Lng

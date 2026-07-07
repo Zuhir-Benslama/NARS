@@ -16,16 +16,13 @@ namespace NarsApi.Services;
 /// </summary>
 public class JwtService(string secret, string? issuer, string? audience, IOptions<JwtOptions> jwtOptions, ILogger<JwtService> logger, IDateTimeProvider timeProvider) : IJwtService
 {
-    private readonly string _secret = secret ?? throw new ArgumentNullException(nameof(secret));
     private readonly int _expiresMinutes = jwtOptions.Value.ExpiresInMinutes;
     public TimeSpan AccessTokenExpiresIn => TimeSpan.FromMinutes(_expiresMinutes);
-    private readonly string? _issuer = issuer;
-    private readonly string? _audience = audience;
 
     public string CreateToken(Guid userId, string username, string name, string email, int? communeId,
         string role = "commune_user", int? dairaId = null, int? wilayaId = null)
     {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var claims = new List<Claim>
@@ -37,9 +34,6 @@ public class JwtService(string secret, string? issuer, string? audience, IOption
             new(ClaimNames.Role,    role),
         };
 
-        // Only include geographic claims that are relevant to this role.
-        // This keeps tokens minimal and avoids confusion when a claim is present
-        // but meaningless for the role.
         if (communeId.HasValue)
         {
             claims.Add(new Claim(ClaimNames.CommuneId, communeId.Value.ToString()));
@@ -56,8 +50,8 @@ public class JwtService(string secret, string? issuer, string? audience, IOption
         }
 
         var token = new JwtSecurityToken(
-            issuer: _issuer,
-            audience: _audience,
+            issuer: issuer,
+            audience: audience,
             claims: claims,
             expires: timeProvider.UtcNow.AddMinutes(_expiresMinutes),
             signingCredentials: creds
@@ -66,10 +60,6 @@ public class JwtService(string secret, string? issuer, string? audience, IOption
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    /// <summary>
-    /// Creates a refresh token — a cryptographically random string.
-    /// The server stores the hash; the client stores the raw token in an HttpOnly cookie.
-    /// </summary>
     public (string rawToken, string hash) CreateRefreshToken()
     {
         var raw = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
@@ -78,15 +68,9 @@ public class JwtService(string secret, string? issuer, string? audience, IOption
         return (raw, hash);
     }
 
-    /// <summary>
-    /// Validates a raw JWT string and returns the principal on success, or null
-    /// if the token is missing, expired, or tampered with.
-    /// Used by <see cref="NarsApi.Controllers.PagesController"/> to guard
-    /// server-rendered HTML page routes before the SPA boots.
-    /// </summary>
     public ClaimsPrincipal? ValidateToken(string token)
     {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
         try
         {
             return new JwtSecurityTokenHandler().ValidateToken(token,
@@ -94,10 +78,10 @@ public class JwtService(string secret, string? issuer, string? audience, IOption
                 {
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = key,
-                    ValidateIssuer = !string.IsNullOrEmpty(_issuer),
-                    ValidateAudience = !string.IsNullOrEmpty(_audience),
-                    ValidIssuer = _issuer,
-                    ValidAudience = _audience,
+                    ValidateIssuer = !string.IsNullOrEmpty(issuer),
+                    ValidateAudience = !string.IsNullOrEmpty(audience),
+                    ValidIssuer = issuer,
+                    ValidAudience = audience,
                     ClockSkew = TimeSpan.Zero,
                 }, out _);
         }

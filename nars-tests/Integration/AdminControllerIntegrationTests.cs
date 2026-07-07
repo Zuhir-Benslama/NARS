@@ -326,7 +326,7 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
         return new CreateAdminRequest(
             Name: $"Role Test {suffix[..8]}",
             Email: $"role-{suffix}@test.com",
-            Phone: "0555001234",
+            Phone: DefaultPhone,
             Username: $"role_{suffix[..12]}",
             Password: DefaultPassword,
             Role: role,
@@ -341,24 +341,7 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
         int? dairaId = null,
         int? wilayaId = null)
     {
-        var suffix = Guid.NewGuid().ToString("N");
-        var user = new User
-        {
-            Id = Guid.NewGuid(),
-            Name = $"Creator {suffix[..8]}",
-            Email = $"creator-{suffix}@test.com",
-            Phone = DefaultPhone,
-            Username = $"creator_{suffix[..12]}",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
-            Role = role,
-            CommuneId = communeId,
-            DairaId = dairaId,
-            WilayaId = wilayaId,
-        };
-
-        await _db.Users.AddAsync(user);
-        await _db.SaveChangesAsync();
-        return user;
+        return await SeedData.CreateUserAsync(_db, role, communeId, dairaId, wilayaId, name: $"Creator {Guid.NewGuid().ToString("N")[..8]}");
     }
 
     private void SetAuthenticatedUser(User user)

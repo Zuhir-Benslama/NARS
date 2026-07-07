@@ -402,13 +402,13 @@ db-admin: export ADMIN_PHONE := +213000000000
 db-admin: .env ## Create national admin with one-time generated credentials
 	@echo ""
 	@echo "→ Generating one-time national admin credentials..."
-	ADMIN_USERNAME="admin_$$(openssl rand -hex 4)"
-	ADMIN_PASSWORD="$$(openssl rand -base64 12)"
-	export ADMIN_USERNAME ADMIN_PASSWORD
+	@ADMIN_USERNAME="admin_$$(openssl rand -hex 4)"
+	@ADMIN_PASSWORD="$$(openssl rand -base64 12)"
+	@export ADMIN_USERNAME ADMIN_PASSWORD
 	@echo "  Username: $${ADMIN_USERNAME}"
 	@echo "  Password: $${ADMIN_PASSWORD}"
-	echo ""
-	bash nars-infra/scripts/create_national_admin.sh
+	@echo ""
+	@bash nars-infra/scripts/create_national_admin.sh
 	@echo ""
 	@echo "→ Done. Save the credentials above — they will not be shown again."
 

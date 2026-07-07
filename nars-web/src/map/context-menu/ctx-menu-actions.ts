@@ -8,6 +8,7 @@ import { openEditModal } from "../../stores/modalStore"
 import { PHASES } from "../../phases"
 import { featuresStore, ctx } from "../core/state"
 import { showToast, showConfirm } from "../../lib/toast"
+import type { FeatureTypeKey } from "../../types"
 import { getErrorMessage } from "../../lib/errors"
 import { recordDelete } from "../undo"
 import { enableEditMode } from "../draw/draw-events"
@@ -135,7 +136,7 @@ export async function removeFeature(dbId: string): Promise<void> {
 
   const layerStore = useLayerStore()
   const state = layerStore.$state
-  let phaseKey = ""
+  let phaseKey: FeatureTypeKey | "" = ""
   for (const key of Object.keys(state) as (keyof LayerState)[]) {
     const entries = state[key]
     if (entries?.some((f) => f.dbId === dbId)) {
@@ -144,13 +145,14 @@ export async function removeFeature(dbId: string): Promise<void> {
     }
   }
 
-  if (phaseKey) recordDelete(entry, phaseKey)
+  if (!phaseKey) return
+  recordDelete(entry, phaseKey)
 
   try {
     await apiFetch(`/api/features/${dbId}`, { method: "DELETE" })
 
     featuresStore.remove(entry.id)
-    layerStore.removeFeature(phaseKey as keyof LayerState, dbId)
+    layerStore.removeFeature(phaseKey, dbId)
 
     if (phaseKey === "cityCenter") {
       const appStore = useAppStore()

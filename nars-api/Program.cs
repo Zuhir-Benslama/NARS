@@ -63,3 +63,9 @@ static string GetRequiredConfig(IConfiguration config, string primaryKey, string
         $"{primaryKey} is not configured. Set one of: {string.Join(", ", fallbackKeys)} " +
         $"in appsettings.Production.json or via environment variables.");
 }
+
+// Exposed for integration/contract tests via WebApplicationFactory.
+public partial class Program
+{
+    private Program() { }
+}

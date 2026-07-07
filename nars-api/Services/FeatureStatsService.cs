@@ -1,6 +1,3 @@
-using System.Data.Common;
-using System.Text;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
 using NarsApi.DTOs;
@@ -13,31 +10,15 @@ public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
 {
     public async Task<Dictionary<string, long>> GetFeatureCountsAsync(Guid userId, CancellationToken ct = default)
     {
-        var conn = db.Database.GetDbConnection();
-        await using var handle = await conn.EnsureOpenAsync(ct);
-
-        await using var cmd = conn.CreateCommand();
-        var sql = new StringBuilder();
         var descriptors = FeatureTypeRegistry.GetAllDescriptors();
-        for (var i = 0; i < descriptors.Count; i++)
-        {
-            if (i > 0)
-            {
-                sql.Append(" UNION ALL ");
-            }
-
-            sql.Append($"SELECT '{descriptors[i].Type}' AS type, COUNT(*) FROM {descriptors[i].TableName} WHERE user_id = @uid");
-        }
-        cmd.CommandText = sql.ToString();
-        SqlFragments.AddParam(cmd, "@uid", userId);
-
         var counts = new Dictionary<string, long>(descriptors.Count);
-        await using var reader = await cmd.ExecuteReaderAsync(ct);
-        while (await reader.ReadAsync(ct))
+        foreach (var descriptor in descriptors)
         {
-            counts[reader.GetString(0)] = reader.GetInt64(1);
+            var count = await descriptor.GetDbSet(db)
+                .Where(f => f.UserId == userId)
+                .LongCountAsync(ct);
+            counts[descriptor.Type] = count;
         }
-
         return counts;
     }
 
@@ -48,71 +29,56 @@ public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
             return [];
         }
 
-        var conn = db.Database.GetDbConnection();
-        await using var handle = await conn.EnsureOpenAsync(ct);
+        var users = await db.Users
+            .Where(u => userIds.Contains(u.Id))
+            .ToListAsync(ct);
 
-        await using var cmd = conn.CreateCommand();
-        var unionBuilder = new StringBuilder();
         var descriptors = FeatureTypeRegistry.GetAllDescriptors();
-        for (var i = 0; i < descriptors.Count; i++)
+        var featureCounts = new Dictionary<Guid, Dictionary<string, long>>();
+        foreach (var user in users)
         {
-            if (i > 0)
+            featureCounts[user.Id] = descriptors.ToDictionary(d => d.Type, _ => 0L);
+        }
+
+        foreach (var descriptor in descriptors)
+        {
+            var perUser = await descriptor.GetDbSet(db)
+                .Where(f => userIds.Contains(f.UserId))
+                .GroupBy(f => f.UserId)
+                .Select(g => new { UserId = g.Key, Count = g.LongCount() })
+                .ToListAsync(ct);
+
+            foreach (var item in perUser)
             {
-                unionBuilder.Append(" UNION ALL ");
+                if (featureCounts.TryGetValue(item.UserId, out var counts))
+                {
+                    counts[descriptor.Type] = item.Count;
+                }
             }
-
-            unionBuilder.Append($"SELECT id, user_id, '{descriptors[i].Type}' AS ft FROM {descriptors[i].TableName}");
         }
 
-        var caseBuilder = new StringBuilder();
-        for (var i = 0; i < descriptors.Count; i++)
+        var result = new Dictionary<Guid, UserFeatureStats>(users.Count);
+        foreach (var user in users)
         {
-            caseBuilder.AppendLine($"                    COALESCE(SUM(CASE WHEN f.ft = @t{i} THEN 1 ELSE 0 END), 0) AS c{i},");
-        }
+            var counts = featureCounts[user.Id];
+            long GetCount(string type) => counts.GetValueOrDefault(type, 0);
+            var total = counts.Values.Sum();
 
-        cmd.CommandText = $"""
-            SELECT
-                u.id,
-                u.username,
-                u.name,
-                u.email,
-                u.role,
-                {caseBuilder}                    COUNT(f.id) AS total
-            FROM users u
-            LEFT JOIN (
-                {unionBuilder}
-            ) f ON f.user_id = u.id
-            WHERE u.id = ANY(@ids)
-            GROUP BY u.id, u.username, u.name, u.email, u.role
-            """;
-
-        for (var i = 0; i < descriptors.Count; i++)
-        {
-            SqlFragments.AddParam(cmd, $"@t{i}", descriptors[i].Type);
-        }
-
-        FeatureQueryHelper.AddParameter(cmd, "@ids", userIds);
-
-        var result = new Dictionary<Guid, UserFeatureStats>();
-        await using var reader = await cmd.ExecuteReaderAsync(ct);
-        while (await reader.ReadAsync(ct))
-        {
-            var id = reader.GetGuid(0);
-            result[id] = new UserFeatureStats(
-                UserId: id.ToString(),
-                Username: reader.GetString(1),
-                Name: reader.GetString(2),
-                Email: reader.GetString(3),
-                Role: reader.GetString(4),
-                Areas: reader.GetInt64(5),
-                Districts: reader.GetInt64(6),
-                CityCenters: reader.GetInt64(7),
-                Roads: reader.GetInt64(8),
-                HouseEntrances: reader.GetInt64(9),
-                PublicBuildings: reader.GetInt64(10),
-                PublicSpaces: reader.GetInt64(11),
-                NamingPanels: reader.GetInt64(12),
-                Total: reader.GetInt64(13)
+            result[user.Id] = new UserFeatureStats(
+                UserId: user.Id.ToString(),
+                Username: user.Username,
+                Name: user.Name,
+                Email: user.Email,
+                Role: user.Role,
+                Areas: GetCount(FeatureTypes.Area),
+                Districts: GetCount(FeatureTypes.District),
+                CityCenters: GetCount(FeatureTypes.CityCenter),
+                Roads: GetCount(FeatureTypes.Road),
+                HouseEntrances: GetCount(FeatureTypes.HouseEntrance),
+                PublicBuildings: GetCount(FeatureTypes.PublicBuilding),
+                PublicSpaces: GetCount(FeatureTypes.PublicSpace),
+                NamingPanels: GetCount(FeatureTypes.NamingPanel),
+                Total: total
             );
         }
         return result;

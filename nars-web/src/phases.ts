@@ -6,6 +6,7 @@
 // so existing imports don't need updating.
 
 import type { Phase } from "./types"
+import type { FeatureTypeKey } from "./types/features"
 
 import {
   AREA_TYPES,
@@ -99,8 +100,8 @@ export const PHASES: Phase[] = [
 // Auto-generated from feature-types.ts — no manual sync needed when
 // adding new sub-types. Maps every DB layer value to its phase key.
 
-function buildApiLayerToPhase(): Record<string, string> {
-  const map: Record<string, string> = {}
+function buildApiLayerToPhase(): Record<string, FeatureTypeKey> {
+  const map: Record<string, FeatureTypeKey> = {}
 
   for (const t of AREA_TYPES) map[t.key] = "areas"
   map.city_center = "cityCenter"
@@ -118,4 +119,4 @@ function buildApiLayerToPhase(): Record<string, string> {
   return map
 }
 
-export const API_LAYER_TO_PHASE: Record<string, string> = buildApiLayerToPhase()
+export const API_LAYER_TO_PHASE: Record<string, FeatureTypeKey> = buildApiLayerToPhase()

@@ -214,33 +214,6 @@ public class FeaturesControllerTests
         Assert.Equal(400, objResult.StatusCode);
     }
 
-    [Fact(Skip = "InMemory provider does not support ExecuteDeleteAsync")]
-    public async Task ClearFeatures_Confirmed_DeletesUserFeatures()
-    {
-        var (ctrl, db) = CreateController();
-
-        var areaId = Guid.NewGuid();
-        db.Areas.Add(new Area
-        {
-            Id = areaId,
-            UserId = UserId,
-            Layer = FeatureTypes.AreaLayers.CentralUrban,
-            Data = "{}",
-            Label = "a",
-            UpdatedAt = FixedNow
-        });
-        db.FeatureRegistry.Add(new FeatureRegistry { Id = areaId, FeatureType = FeatureTypes.Area });
-        await db.SaveChangesAsync();
-
-        var result = await ctrl.ClearFeatures(new ClearFeaturesRequest(Confirm: true));
-
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<ApiResponse>(ok.Value);
-        Assert.True(resp.Success);
-        Assert.Equal(0, await db.Areas.CountAsync());
-        Assert.Equal(0, await db.FeatureRegistry.CountAsync());
-    }
-
     // ── POST /api/update/{id} ─────────────────────────────────────────────
 
     [Fact]
@@ -309,31 +282,6 @@ public class FeaturesControllerTests
         Assert.Equal(400, objResult.StatusCode);
     }
 
-    [Fact(Skip = "InMemory provider does not support ExecuteUpdateAsync")]
-    public async Task UpdateFeature_Valid_Returns200()
-    {
-        var (ctrl, db) = CreateController();
-        var fid = Guid.NewGuid();
-        db.Roads.Add(new Road
-        {
-            Id = fid,
-            UserId = UserId,
-            Layer = FeatureTypes.RoadLayers.Street,
-            Data = "{}",
-            Label = "old",
-            UpdatedAt = FixedNow
-        });
-        db.FeatureRegistry.Add(new FeatureRegistry { Id = fid, FeatureType = FeatureTypes.Road });
-        await db.SaveChangesAsync();
-
-        var body = new FeatureUpdateRequest(Label: "updated", Data: null);
-        var result = await ctrl.UpdateFeature(fid, body);
-
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<UpdateFeatureResponse>(ok.Value);
-        Assert.True(resp.Success);
-    }
-
     // ── DELETE /api/delete/{id} ───────────────────────────────────────────
 
     [Fact]
@@ -343,30 +291,6 @@ public class FeaturesControllerTests
         var result = await ctrl.DeleteFeature(Guid.NewGuid());
         var objResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(404, objResult.StatusCode);
-    }
-
-    [Fact(Skip = "InMemory provider does not support ExecuteDeleteAsync")]
-    public async Task DeleteFeature_Valid_Returns200()
-    {
-        var (ctrl, db) = CreateController();
-        var fid = Guid.NewGuid();
-        db.Roads.Add(new Road
-        {
-            Id = fid,
-            UserId = UserId,
-            Layer = FeatureTypes.RoadLayers.Street,
-            Data = "{}",
-            Label = "road",
-            UpdatedAt = FixedNow
-        });
-        db.FeatureRegistry.Add(new FeatureRegistry { Id = fid, FeatureType = FeatureTypes.Road });
-        await db.SaveChangesAsync();
-
-        var result = await ctrl.DeleteFeature(fid);
-
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<ApiResponse>(ok.Value);
-        Assert.True(resp.Success);
     }
 
     // ── GET /api/stats ────────────────────────────────────────────────────
