@@ -1,6 +1,15 @@
 <template>
   <div v-click-outside="closeDropdown" class="profile-menu">
-    <div class="profile-button" @click="toggleDropdown">
+    <div
+      :class="['profile-button', { open: dropdownOpen }]"
+      role="button"
+      tabindex="0"
+      :aria-expanded="dropdownOpen"
+      aria-haspopup="true"
+      @click="toggleDropdown"
+      @keydown.enter="toggleDropdown"
+      @keydown.space.prevent="toggleDropdown"
+    >
       <div class="profile-icon">
         {{ initials }}
       </div>
@@ -14,12 +23,12 @@
       </div>
       <span :class="['dropdown-arrow', { open: dropdownOpen }]">▼</span>
     </div>
-    <div :class="['profile-dropdown', { show: dropdownOpen }]">
-      <div class="dropdown-item" @click="onSettings">
+    <div :class="['profile-dropdown', { show: dropdownOpen }]" role="menu">
+      <div class="dropdown-item" role="menuitem" @click="onSettings">
         <span>⚙️</span>
         <span>{{ t("menu_settings") }}</span>
       </div>
-      <div class="dropdown-item logout" @click="onLogout">
+      <div class="dropdown-item logout" role="menuitem" @click="onLogout">
         <span>🚪</span>
         <span>{{ t("menu_logout") }}</span>
       </div>

@@ -19,6 +19,7 @@
   <TileControl />
   <FeatureModal />
   <ToastContainer />
+  <ConfirmDialog />
 
   <div v-if="appStore.loadError" class="load-error-banner">
     <span>⚠ Could not load saved features. Check your connection and refresh the page.</span>
@@ -26,7 +27,12 @@
   </div>
 
   <Teleport to="body">
-    <div v-if="appStore.isLoading" class="loading-overlay">
+    <div
+      v-if="appStore.isLoading"
+      class="loading-overlay"
+      role="alert"
+      aria-label="Loading map data"
+    >
       <div class="loading-spinner">
         <div class="spinner" />
         <p>Loading map data…</p>
@@ -46,6 +52,7 @@ import FieldPanel from "./components/FieldPanel.vue"
 import EditSaveButton from "./components/EditSaveButton.vue"
 import ContextMenu from "./components/ContextMenu.vue"
 import ToastContainer from "./components/ToastContainer.vue"
+import ConfirmDialog from "./components/ConfirmDialog.vue"
 import { useAppStore } from "./stores/appStore"
 import { destroyMap } from "./map"
 

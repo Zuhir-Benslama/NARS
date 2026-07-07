@@ -14,6 +14,7 @@ namespace NarsApi.Controllers;
 [Tags("Users")]
 public class UsersController(IUserProfileService userProfile, ILogger<UsersController> logger) : NarsControllerBase
 {
+    /// <summary>Updates the authenticated user's username, email, and/or password.</summary>
     [HttpPut("user/update")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -42,7 +43,7 @@ public class UsersController(IUserProfileService userProfile, ILogger<UsersContr
         {
             if (await userProfile.IsUsernameTakenAsync(body.Username, cancellationToken))
             {
-                return Conflict(new { detail = "Username already exists." });
+                return Problem(detail: "Username already exists.", statusCode: 409);
             }
 
             user.Username = body.Username;
@@ -53,7 +54,7 @@ public class UsersController(IUserProfileService userProfile, ILogger<UsersContr
         {
             if (await userProfile.IsEmailTakenAsync(body.Email, cancellationToken))
             {
-                return Conflict(new { detail = "Email already exists." });
+                return Problem(detail: "Email already exists.", statusCode: 409);
             }
 
             user.Email = body.Email;
@@ -80,7 +81,7 @@ public class UsersController(IUserProfileService userProfile, ILogger<UsersContr
         {
             logger.LogWarning(ex, "Duplicate username/email on profile update (userId={UserId})", CurrentUserId);
             // TOCTOU race: concurrent request claimed the username/email first.
-            return Conflict(new { detail = "Username or email already exists." });
+            return Problem(detail: "Username or email already exists.", statusCode: 409);
         }
 
         return Ok(new UpdateCredentialsResponse(

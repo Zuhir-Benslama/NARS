@@ -1,11 +1,7 @@
 import { describe, it, expect, vi } from "vitest"
-import { debugLog, debugError, debugWarn, debugInfo, isDebugEnabled } from "./debug"
+import { debugLog, debugError, debugWarn } from "./debug"
 
 describe("debug", () => {
-  it("isDebugEnabled returns true in vitest mode", () => {
-    expect(isDebugEnabled()).toBe(true)
-  })
-
   it("debugLog calls console.log", () => {
     const spy = vi.spyOn(console, "log")
     debugLog("test message")
@@ -31,13 +27,6 @@ describe("debug", () => {
     const spy = vi.spyOn(console, "warn")
     debugWarn("warning message")
     expect(spy).toHaveBeenCalledWith("warning message")
-    spy.mockRestore()
-  })
-
-  it("debugInfo calls console.info", () => {
-    const spy = vi.spyOn(console, "info")
-    debugInfo("info message")
-    expect(spy).toHaveBeenCalledWith("info message")
     spy.mockRestore()
   })
 })

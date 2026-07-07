@@ -5,33 +5,36 @@
 
 import type { LngLatTuple } from "@geoman-io/maplibre-geoman-free"
 import { ctx } from "../core/state"
+import { useEditStore } from "../../stores/editStore"
 import { snapPointForEdit } from "../snapping/snapping"
-
-let _origSetLngLat: ((lngLat: LngLatTuple) => void) | null = null
-if (import.meta.hot) {
-  import.meta.hot.dispose(() => {
-    _origSetLngLat = null
-  })
-}
 
 export function patchMarkerPointerSnap(editEntryId: string | null): void {
   const mp = ctx.geoman?.markerPointer?.marker
-  if (!mp || _origSetLngLat) return
+  if (!mp) return
+  const store = useEditStore()
+  if (store.origSetLngLat) return
 
-  _origSetLngLat = mp.setLngLat.bind(mp)
+  store.origSetLngLat = mp.setLngLat.bind(mp)
 
   mp.setLngLat = (lngLat: LngLatTuple) => {
     const [lng, lat] = lngLat
     const px = ctx.map.project([lng, lat])
     const snapped = snapPointForEdit(px.x, px.y, editEntryId ?? null)
-    _origSetLngLat!(snapped ? [snapped.lng, snapped.lat] : [lng, lat])
+    store.origSetLngLat!(snapped ? [snapped.lng, snapped.lat] : [lng, lat])
   }
 }
 
 export function unpatchMarkerPointerSnap(): void {
   const mp = ctx.geoman?.markerPointer?.marker
-  if (mp && _origSetLngLat) {
-    mp.setLngLat = _origSetLngLat
+  const store = useEditStore()
+  if (mp && store.origSetLngLat) {
+    mp.setLngLat = store.origSetLngLat
   }
-  _origSetLngLat = null
+  store.origSetLngLat = null
+}
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    useEditStore().origSetLngLat = null
+  })
 }

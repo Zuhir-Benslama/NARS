@@ -67,6 +67,23 @@ if (typeof window !== "undefined") {
   })
 }
 
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    if (timer) clearTimeout(timer)
+    timer = null
+    batch.length = 0
+  })
+}
+
+export function resetLoggerState(): void {
+  if (timer) {
+    clearTimeout(timer)
+    timer = null
+  }
+  batch.length = 0
+  flushing = false
+}
+
 export function captureError(error: NarsError, additionalContext?: ErrorContext): void {
   const fullContext = { ...error.context, ...additionalContext }
   push({

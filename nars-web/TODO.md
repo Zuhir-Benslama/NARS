@@ -1,34 +1,27 @@
 # Code Quality Issues
 
+## 🔴 High
+- [ ] **Module-level mutable state** — 8 files export `let` vars with manual `reset*()` fns: `snapping/snapping.ts`, `rendering/geometry.ts`, `map-init.ts`, `draw/draw-control.ts`, `draw/draw-events.ts`, `draw/draw-marker-patch.ts`, `rotation.ts`, `lib/logger.ts`. Persist across HMR; `resetAllState()` barrel must be manually maintained.
+- [ ] **50+ `as` type assertions** across 25+ files — `snap-geometry.ts`, `draw-handlers.ts`, `draw-marker-patch.ts`, `geometry.ts`, `geoman-events.ts`, `edit-commit.ts`, `undo.ts`, `loader-db.ts`, etc. Replace with type guards, Zod schemas, or branded types.
+- [ ] **Toast `showConfirm()` uses imperative DOM** — `lib/toast.ts` creates elements via `document.createElement`, bypassing Vue. No ARIA, no focus trap, inline styles.
+
 ## 🟠 Medium
-- [ ] **Module-level mutable state with manual reset functions** — `draw/draw-state.ts`, `edit/edit-state.ts`, `snapping/snapping.ts`, `snapping/snap-sources.ts`, `undo.ts`, `map-boundary.ts` export `let` vars + `reset*()` fns. All 33 test files depend on correct teardown; missed reset = state leakage. Convert to Pinia stores or composables.
-- [ ] **~50+ `as` type assertions** — weak typing masks real errors. Replace with proper type guards across codebase. (~38 removed: 20 `as LayerState`, 11 `as Error` → `getErrorMessage()`, 6 `as string`/`as number`, 1 `as string[]`)
-- [ ] **Toast creates DOM elements directly** — `lib/toast.ts` uses `document.createElement` and `classList`, bypassing Vue's reactivity system. Hardcoded 3s timeout.
+- [ ] **Magic numbers** — `draw-save.ts` (100/200ms delays), `draw-control.ts` (50/200/2500ms), `map-init.ts` (zoom 4/18 hardcoded, 10s timeout), `export.ts` (0.92, 15000). Extract to named constants.
+- [ ] **Accessibility gaps** — 10+ components: `ToastContainer` (no `aria-live`), `ContextMenu` (no `role="menu"`), `FeatureModal`/`SettingsModal` (no `role="dialog"`, no focus trap), `FieldPanel` tabs (no `role="tab"`), `ProfileMenu` dropdown (no `aria-expanded`).
+- [ ] **Duplicated code** — `draw-marker-patch.ts` (2 near-identical patching fns), `edit-commit.ts` (duplicated geometry update), `draw-handlers.ts` (duplicated circle-center calc).
+- [ ] **Large functions** — `geoman-events.ts:registerGeomanEvents` (188 lines, 4 untestable handlers), `map-init.ts:initMap` (137 lines), `context-menu.ts:showContextMenu` (89 lines), `map-layers.ts` (309 lines).
 
 ## 🔶 Low
+- [ ] **Dead exports** — `utils/debug.ts:debugInfo()`, `isDebugEnabled()` — only used in test files, unreferenced in production.
+- [ ] **HMR guard inconsistency** — `lib/logger.ts` `batch` array has no `import.meta.hot.dispose` handler.
 - [ ] **No integration tests** — no test simulates a multi-step user workflow (e.g., draw → save → verify layer).
 
-## ✅ Fixed
-- [x] **Race condition in feature modal** — 4 bugs fixed: `prepareModalExtras` ordering, abort on empty-reset, house entrance edit dropdowns, `isEdit` guard.
-- [x] **`NarsError` context typed `Record<string, unknown>`** — Removed `[key: string]: unknown` index signature, added `code?: string`.
-- [x] **String-typed inspection step values** — Typed as `EntranceStep` / `NamingPanelStep` unions.
-- [x] **Magic color strings** — `draw-save.ts` hardcoded hex colors replaced with `phase.color`; `naming-panels.ts` `PANEL_COLORS` derived from `PHASES`; `styles.ts` `polygonStyles` (dead code) removed; `createEntranceIconHtml` default color references `PHASES`; `ctx-menu-actions.ts` cityCenter `lineColor` hardcoded kept (unrelated to phase colors).
-- [x] **Unsafe `as Error` catch-block casts** — Added `getErrorMessage()` helper to `lib/errors.ts`; replaced 11 `(err as Error).message` patterns across 7 files.
-
-## ✅ Verified Clean (false positives)
-- [x] **Tests reference `ctx.map` with incomplete mocking** — `draw.test.ts` and `snap-geometry.test.ts` don't use `ctx` at all; `undo.test.ts` properly mocks `./core/state`. None require maplibre-gl mocking.
-- [x] **`ctx` proxy pattern breaks Vue 3 reactivity** — Intentional design. All consumers are non-Vue `.ts` files holding imperative map references (maplibre Map, Geoman, GeoJSON sources). No Vue reactivity depends on `ctx`.
-- [x] **Barrel file circular dependency risk** — Verified: none of the 15 re-exported modules import back through the barrel. Only consumer is `main.ts`.
-- [x] **Config soup** — Already well-organized with 6 cleanly separated `*_CONFIG` objects (API, MAP, SNAP, VALIDATION, UI, GEOMETRY).
-- [x] **`useFeatureValidation` tightly coupled to `modalStore` shape** — Intentional by design. The `modalStore` parameter is explicitly typed as `ModalState & { phaseIndex: number | null }`, which IS the visible contract.
-- [x] **`selectedFeature` type missing `dbId`** — Verified: `f.id` from `/api/field/features` IS the database UUID. The field is confusingly named `id` but is semantically `dbId`.
-- [x] **I18n `currentLang` dual-path mutation** — Only one mutation path (`setLang`). No watcher on `currentLang` exists.
-- [x] **Monolithic `commitSave` (300+ lines)** — `map/draw/draw-save.ts` extracted into `buildStorePayload`, `updateStoresAfterSave`, `buildStorePayload`.
-- [x] **Monolithic `saveToDatabase` (250+ lines)** — already clean at 37 lines; monolithic concern was in `saveAndUpdateStore` which has been refactored.
-- [x] **`name.replace(/s$/, "")`** — `components/FeatureModal.vue:178` now uses `t()` to translate the i18n key, removing fragile singularization.
-- [x] **`editStore.ts` defines redundant `reset` action** — removed `resetEdit()` action; callers use `$reset()` directly.
-- [x] **`localStorage` not wrapped in try/catch** — `phases-nav/storage.ts` already had try/catch; not an issue.
-- [x] **Arrow function in `removeEventListener`** — not present in codebase; all listeners use named functions (false positive).
-- [x] **`LayerState` uses `[key: string]`** — already properly typed with all 8 specific keys (false positive).
-- [x] **Hardcoded `open` on `<details>`** — intentional UX design for admin dashboard; reasonable for typical 10-20 dairas per wilaya.
-- [x] **`map/rotation.ts` has commented-out code** — no dead code present (false positive).
+## ✅ Clean (passing lint/typecheck/test)
+- [x] ESLint `no-console` — 0 violations (debug utility properly exempted)
+- [x] ESLint `@typescript-eslint/no-explicit-any` — 0 violations
+- [x] ESLint `vue/no-v-html` — 0 violations (DOMPurify used everywhere)
+- [x] Prettier — all files formatted
+- [x] vue-tsc — 0 type errors
+- [x] Stylelint — 0 violations
+- [x] Tests — 384 passed, 0 failed
+- [x] Build — clean

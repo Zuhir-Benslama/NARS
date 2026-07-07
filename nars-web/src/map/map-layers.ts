@@ -291,16 +291,16 @@ export function updateDrawingPreview(geometry: [number, number][] | null): void 
       ? [
           geometry.length >= 3
             ? {
-                type: "Feature",
+                type: "Feature" as const,
                 geometry: {
-                  type: "Polygon",
+                  type: "Polygon" as const,
                   coordinates: [[...geometry, geometry[0]]],
                 },
                 properties: {},
               }
             : {
-                type: "Feature",
-                geometry: { type: "LineString", coordinates: geometry },
+                type: "Feature" as const,
+                geometry: { type: "LineString" as const, coordinates: geometry },
                 properties: {},
               },
         ]

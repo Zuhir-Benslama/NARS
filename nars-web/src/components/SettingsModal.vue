@@ -1,7 +1,13 @@
 <template>
-  <div v-if="visible" class="modal">
+  <div
+    v-if="visible"
+    class="modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="settingsHeader"
+  >
     <div class="modal-content settings-modal">
-      <div class="modal-header">
+      <div id="settingsHeader" class="modal-header">
         {{ t("settings_title") }}
       </div>
 

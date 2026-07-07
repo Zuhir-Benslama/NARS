@@ -4,7 +4,12 @@
 
 import { apiFetch } from "../../api"
 import { featuresStore, ctx } from "../core/state"
-import { computeCircleRing, computeCircleRadius, closeRing } from "../rendering/geometry"
+import {
+  computeCircleRing,
+  computeCircleRadius,
+  closeRing,
+  computeCircleCenter,
+} from "../rendering/geometry"
 import { showToast } from "../../lib/toast"
 import { debugError } from "../../utils/debug"
 import { PHASES } from "../../phases"
@@ -73,14 +78,9 @@ async function readGeomanGeometry(entry: LayerEntry): Promise<boolean> {
       const coords = (geometry.coordinates as [number, number][][])[0]
       entry.data.coordinates = coords.map((c) => ({ lat: c[1], lng: c[0] }))
       if (entry.type === "circle" && coords.length >= 3) {
-        let sumLat = 0,
-          sumLng = 0
-        for (const [lng, lat] of coords) {
-          sumLat += lat
-          sumLng += lng
-        }
-        entry.data.lat = sumLat / coords.length
-        entry.data.lng = sumLng / coords.length
+        const { lat, lng } = computeCircleCenter(coords)
+        entry.data.lat = lat
+        entry.data.lng = lng
         entry.data.radius = computeCircleRadius(entry.data.lat, entry.data.lng, coords)
       }
     } else {
@@ -116,23 +116,7 @@ async function saveGeometry(entry: LayerEntry): Promise<boolean> {
 
 // ─── COMMIT EDIT MODE ────────────────────────────────────────────────────────
 
-export async function commitEditMode(): Promise<void> {
-  const entry = getActiveEditEntry()
-  if (!entry) {
-    disableEditMode()
-    return
-  }
-
-  if (getActiveGeomanFeatureId() && ctx.geoman) {
-    const ok = await readGeomanGeometry(entry)
-    if (!ok) return
-  }
-
-  const saved = await saveGeometry(entry)
-  if (!saved) return
-
-  // Update the NARS visual source so the change shows immediately
-  // (without requiring a hard refresh to reload from the API)
+function updateFeatureGeometry(entry: LayerEntry): void {
   if (entry.data.lat != null && entry.data.lng != null) {
     if (entry.type === "circle" && entry.data.radius) {
       const ring = closeRing(computeCircleRing(entry.data.lat, entry.data.lng, entry.data.radius))
@@ -150,24 +134,44 @@ export async function commitEditMode(): Promise<void> {
     const coords = entry.data.coordinates.map((c) => [c.lng, c.lat])
     if (entry.type === "line") {
       featuresStore.update(entry.id, {
-        geometry: { type: "LineString", coordinates: coords } as GeoJSON.LineString,
+        geometry: { type: "LineString" as const, coordinates: coords },
       })
     } else if (entry.type === "circle") {
       featuresStore.update(entry.id, {
         geometry: {
-          type: "LineString",
+          type: "LineString" as const,
           coordinates: closeRing(coords as [number, number][]),
-        } as GeoJSON.LineString,
+        },
       })
     } else {
       featuresStore.update(entry.id, {
         geometry: {
-          type: "Polygon",
+          type: "Polygon" as const,
           coordinates: [closeRing(coords as [number, number][])],
-        } as GeoJSON.Polygon,
+        },
       })
     }
   }
+}
+
+export async function commitEditMode(): Promise<void> {
+  const entry = getActiveEditEntry()
+  if (!entry) {
+    disableEditMode()
+    return
+  }
+
+  if (getActiveGeomanFeatureId() && ctx.geoman) {
+    const ok = await readGeomanGeometry(entry)
+    if (!ok) return
+  }
+
+  const saved = await saveGeometry(entry)
+  if (!saved) return
+
+  // Update the NARS visual source so the change shows immediately
+  // (without requiring a hard refresh to reload from the API)
+  updateFeatureGeometry(entry)
 
   await removeGeomanFeature()
   disableEditMode()
@@ -191,41 +195,7 @@ export async function cancelEditMode(): Promise<void> {
   const snapshot = getActiveEditCoordsSnapshot()
   if (snapshot) {
     entry.data.coordinates = snapshot
-    if (entry.data.lat != null && entry.data.lng != null) {
-      if (entry.type === "circle" && entry.data.radius) {
-        const ring = computeCircleRing(entry.data.lat, entry.data.lng, entry.data.radius)
-        featuresStore.update(entry.id, {
-          geometry: { type: "LineString", coordinates: closeRing(ring) },
-        })
-      } else {
-        const geom: GeoJSON.Point = {
-          type: "Point",
-          coordinates: [entry.data.lng, entry.data.lat],
-        }
-        featuresStore.update(entry.id, { geometry: geom })
-      }
-    } else if (entry.data.coordinates && entry.data.coordinates.length > 0) {
-      const coords = entry.data.coordinates.map((c) => [c.lng, c.lat])
-      if (entry.type === "line") {
-        const geom: GeoJSON.LineString = {
-          type: "LineString",
-          coordinates: coords,
-        }
-        featuresStore.update(entry.id, { geometry: geom })
-      } else if (entry.type === "circle") {
-        const geom: GeoJSON.LineString = {
-          type: "LineString",
-          coordinates: closeRing(coords as [number, number][]),
-        }
-        featuresStore.update(entry.id, { geometry: geom })
-      } else {
-        const geom: GeoJSON.Polygon = {
-          type: "Polygon",
-          coordinates: [closeRing(coords as [number, number][])],
-        }
-        featuresStore.update(entry.id, { geometry: geom })
-      }
-    }
+    updateFeatureGeometry(entry)
   }
 
   await removeGeomanFeature()

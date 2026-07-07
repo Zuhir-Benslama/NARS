@@ -123,6 +123,3 @@ public record FieldFeatureResult(
     DateTime? UpdatedAt
 );
 
-public record DetailResponse(
-    string Detail
-);

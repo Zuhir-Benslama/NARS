@@ -22,19 +22,29 @@ export function setBaseLayer(key: string): void | Promise<void> {
   return _setBaseLayer(key)
 }
 
-export async function initMap(): Promise<void> {
-  const satelliteStyle: maplibregl.StyleSpecification = {
+function buildRasterStyle(
+  tiles: readonly string[],
+  sourceId: string,
+  maxzoom: number,
+  extra?: Partial<maplibregl.RasterSourceSpecification>,
+): maplibregl.StyleSpecification {
+  return {
     version: 8,
     sources: {
-      satellite: {
+      [sourceId]: {
         type: "raster",
-        tiles: [...MAP_CONFIG.tileUrls.satellite],
+        tiles: [...tiles],
         tileSize: 256,
-        maxzoom: 17,
+        maxzoom,
+        ...extra,
       },
     },
-    layers: [{ id: "satellite", type: "raster", source: "satellite" }],
+    layers: [{ id: sourceId, type: "raster", source: sourceId }],
   }
+}
+
+export async function initMap(): Promise<void> {
+  const satelliteStyle = buildRasterStyle(MAP_CONFIG.tileUrls.satellite, "satellite", 17)
 
   _setCtx(ctx)
 
@@ -45,8 +55,8 @@ export async function initMap(): Promise<void> {
     zoom: MAP_CONFIG.defaultZoom,
     bearing: MAP_CONFIG.defaultBearing,
     pitch: MAP_CONFIG.defaultPitch,
-    minZoom: 4,
-    maxZoom: 18,
+    minZoom: MAP_CONFIG.minZoom,
+    maxZoom: MAP_CONFIG.maxZoom,
   })
 
   if (import.meta.env.DEV) {
@@ -54,48 +64,27 @@ export async function initMap(): Promise<void> {
   }
 
   ctx.satelliteStyle = satelliteStyle
-  ctx.streetStyle = {
-    version: 8,
-    sources: {
-      osm: {
-        type: "raster",
-        tiles: [...MAP_CONFIG.tileUrls.street],
-        tileSize: 256,
-        maxzoom: 19,
-        attribution:
-          '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      },
-    },
-    layers: [{ id: "osm", type: "raster", source: "osm" }],
-  }
-  ctx.lightStyle = {
-    version: 8,
-    sources: {
-      carto: {
-        type: "raster",
-        tiles: [...MAP_CONFIG.tileUrls.light],
-        tileSize: 256,
-        maxzoom: 19,
-      },
-    },
-    layers: [{ id: "carto", type: "raster", source: "carto" }],
-  }
-  ctx.darkStyle = {
-    version: 8,
-    sources: {
-      "carto-dark": {
-        type: "raster",
-        tiles: [...MAP_CONFIG.tileUrls.dark],
-        tileSize: 256,
-        maxzoom: 19,
-      },
-    },
-    layers: [{ id: "carto-dark", type: "raster", source: "carto-dark" }],
-  }
+  ctx.streetStyle = buildRasterStyle(MAP_CONFIG.tileUrls.street, "osm", 19, {
+    attribution:
+      '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  })
+  ctx.lightStyle = buildRasterStyle(MAP_CONFIG.tileUrls.light, "carto", 19)
+  ctx.darkStyle = buildRasterStyle(MAP_CONFIG.tileUrls.dark, "carto-dark", 19)
 
   currentActiveStyle = satelliteStyle
 
-  const geomanOptions = {
+  const geomanOptions = buildGeomanOptions()
+
+  _setBaseLayer = (key: string) => switchBaseLayer(key, geomanOptions)
+
+  await new Promise<void>((resolve) => ctx.map.once("load", resolve))
+
+  await initGeoman(ctx.map, geomanOptions)
+  initSources()
+}
+
+function buildGeomanOptions() {
+  return {
     settings: {
       useControlsUi: false,
       useDefaultLayers: true,
@@ -114,49 +103,49 @@ export async function initMap(): Promise<void> {
       },
     },
   }
+}
 
-  _setBaseLayer = async (key: string) => {
-    const styles: Record<string, maplibregl.StyleSpecification | undefined> = {
-      satellite: ctx.satelliteStyle,
-      street: ctx.streetStyle,
-      light: ctx.lightStyle,
-      dark: ctx.darkStyle,
-    }
-    const next = styles[key]
-    if (!next || next === currentActiveStyle) return
-    currentActiveStyle = next
-
-    const styleLoaded = new Promise<void>((resolve) => {
-      ctx.map!.once("style.load", () => resolve())
-    })
-    const styleTimeout = new Promise<void>((_, reject) =>
-      setTimeout(() => reject(new Error("Style load timeout")), 10000),
-    )
-
-    ctx.map.setStyle(next)
-    await Promise.race([styleLoaded, styleTimeout])
-
-    initSources()
-    featuresStore.updateSource()
-    if (ctx.boundariesGeoJson) ctx.boundariesSource?.setData(ctx.boundariesGeoJson)
-    if (ctx.scatteredGeoJson) ctx.scatteredSource?.setData(ctx.scatteredGeoJson)
-    refreshLayerVisibility()
-
-    updateEndpointMarkers()
-
-    ctx.geoman = await createGeomanInstance(ctx.map, geomanOptions)
-    suppressGeomanFill()
-    ensureGeomanDrawEdgesVisible()
-    ctx.map.doubleClickZoom.disable()
-  }
-
-  await new Promise<void>((resolve) => ctx.map.once("load", resolve))
-
-  ctx.geoman = await createGeomanInstance(ctx.map, geomanOptions)
+async function initGeoman(
+  map: maplibregl.Map,
+  options: ReturnType<typeof buildGeomanOptions>,
+): Promise<void> {
+  ctx.geoman = await createGeomanInstance(map, options)
   suppressGeomanFill()
   ensureGeomanDrawEdgesVisible()
+  map.doubleClickZoom.disable()
+}
 
-  ctx.map.doubleClickZoom.disable()
+async function switchBaseLayer(
+  key: string,
+  geomanOptions: ReturnType<typeof buildGeomanOptions>,
+): Promise<void> {
+  const styles: Record<string, maplibregl.StyleSpecification | undefined> = {
+    satellite: ctx.satelliteStyle,
+    street: ctx.streetStyle,
+    light: ctx.lightStyle,
+    dark: ctx.darkStyle,
+  }
+  const next = styles[key]
+  if (!next || next === currentActiveStyle) return
+  currentActiveStyle = next
+
+  const styleLoaded = new Promise<void>((resolve) => {
+    ctx.map!.once("style.load", () => resolve())
+  })
+  const styleTimeout = new Promise<void>((_, reject) =>
+    setTimeout(() => reject(new Error("Style load timeout")), MAP_CONFIG.styleLoadTimeout),
+  )
+
+  ctx.map.setStyle(next)
+  await Promise.race([styleLoaded, styleTimeout])
 
   initSources()
+  featuresStore.updateSource()
+  if (ctx.boundariesGeoJson) ctx.boundariesSource?.setData(ctx.boundariesGeoJson)
+  if (ctx.scatteredGeoJson) ctx.scatteredSource?.setData(ctx.scatteredGeoJson)
+  refreshLayerVisibility()
+
+  updateEndpointMarkers()
+
+  await initGeoman(ctx.map!, geomanOptions)
 }

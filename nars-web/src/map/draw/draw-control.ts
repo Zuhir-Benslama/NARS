@@ -5,11 +5,12 @@
 import { ctx } from "../core/state"
 import { debugLog, debugError } from "../../utils/debug"
 import { ensureGeomanDrawEdgesVisible } from "../edit/edit-state"
+import { DRAW_CONFIG } from "../../config"
+import { useDrawStore } from "../../stores/drawStore"
 import type { DrawModeName } from "@geoman-io/maplibre-geoman-free"
 
 type PhaseConfig = { key: string; drawType: string; color: string }
 
-// Map NARS drawType strings to Geoman shape names
 const DRAW_TYPE_MAP: Record<string, DrawModeName> = {
   polygon: "polygon",
   polyline: "line",
@@ -17,15 +18,10 @@ const DRAW_TYPE_MAP: Record<string, DrawModeName> = {
   circle: "circle",
 }
 
-// Track the last phase key we built for — skip if unchanged
-let lastPhaseKey: string | null = null
-let modeSwitchToken = 0
-
-// ─── STATE RESET (for testing & HMR) ──────────────────────────────────────────
-
 export function resetDrawControl(): void {
-  lastPhaseKey = null
-  modeSwitchToken = 0
+  const store = useDrawStore()
+  store.lastPhaseKey = null
+  store.modeSwitchToken = 0
 }
 
 function delay(ms: number): Promise<void> {
@@ -36,24 +32,22 @@ export function buildDrawControl(phase: PhaseConfig): void {
   const gm = ctx.geoman
   if (!gm) return
 
+  const store = useDrawStore()
   const shapeName = DRAW_TYPE_MAP[phase.drawType]
   if (!shapeName) return
 
   debugLog("[DRAW CONTROL] Phase:", phase.key, "| drawType:", phase.drawType, "| shape:", shapeName)
 
-  // Check if we're already in the correct draw mode.
-  // Note: getActiveDrawModes may not exist on all Geoman versions; falls back to [].
   const activeModes = gm.getActiveDrawModes?.() || []
-  if (lastPhaseKey === phase.key && activeModes.length > 0 && activeModes[0] === shapeName) {
+  if (store.lastPhaseKey === phase.key && activeModes.length > 0 && activeModes[0] === shapeName) {
     debugLog("[DRAW CONTROL] Already in correct draw mode:", shapeName)
     return
   }
 
-  lastPhaseKey = phase.key
-  const token = ++modeSwitchToken
+  store.lastPhaseKey = phase.key
+  const token = ++store.modeSwitchToken
 
   void (async () => {
-    // Disable current draw mode only if one is active
     if (activeModes.length > 0) {
       debugLog("[DRAW CONTROL] Disabling current draw mode:", activeModes)
       try {
@@ -63,17 +57,13 @@ export function buildDrawControl(phase: PhaseConfig): void {
       }
     }
 
-    // Use a short delay to let Geoman settle before enabling new draw mode.
-    await delay(50)
+    await delay(DRAW_CONFIG.modeSwitchSettleMs)
 
-    // Double-check we haven't been superseded.
-    if (token !== modeSwitchToken || lastPhaseKey !== phase.key) return
+    if (token !== store.modeSwitchToken || store.lastPhaseKey !== phase.key) return
 
-    // Re-read ctx.geoman in case it was replaced or nulled after the timeout was scheduled.
     const currentGm = ctx.geoman
     if (!currentGm) return
 
-    // Enable the correct draw mode for this phase.
     debugLog("[DRAW CONTROL] Enabling draw mode:", shapeName)
     currentGm
       .enableDraw(shapeName)
@@ -83,13 +73,13 @@ export function buildDrawControl(phase: PhaseConfig): void {
           ensureGeomanDrawEdgesVisible()
           let retries = 0
           const poll = setInterval(() => {
-            if (++retries > 10) {
+            if (++retries > DRAW_CONFIG.edgeRetryMax) {
               clearInterval(poll)
               return
             }
             ensureGeomanDrawEdgesVisible()
-          }, 200)
-          setTimeout(() => clearInterval(poll), 2500)
+          }, DRAW_CONFIG.edgeRetryIntervalMs)
+          setTimeout(() => clearInterval(poll), DRAW_CONFIG.edgeRetryTimeoutMs)
         }
       })
       .catch((err) => debugError("[DRAW CONTROL] Failed to enable draw mode:", shapeName, err))

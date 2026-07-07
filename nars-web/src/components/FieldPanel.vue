@@ -11,6 +11,8 @@
         v-for="tab in tabs"
         :key="tab.key"
         :class="['fp-tab', { active: activeTab === tab.key }]"
+        role="tab"
+        :aria-selected="activeTab === tab.key"
         @click="activeTab = tab.key"
       >
         {{ tab.label }}

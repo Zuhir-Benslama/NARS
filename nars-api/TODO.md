@@ -1,17 +1,20 @@
 # Code Quality Issues
 
 ## 🔴 High
-- [x] **Login timing side-channel** — Lockout check now happens after BCrypt verify (using dummy hash for unknown users).
-- [x] **DbUpdateException silently swallowed** — Exceptions are now logged via `logger.LogWarning`.
+- [x] **Unify error response envelope** — Standardized on `Problem(detail:, statusCode:)` across all controllers.
+- [x] **Authorization default case** — `ValidateCreateUserScopeAsync` now returns error for unknown role combos.
+- [x] **No concurrency control** — Added `[Timestamp]` to `FeatureBase`.
 
 ## 🟠 Medium
-- [x] **Duplicated authorization logic** — Extracted into `IUserAuthorizationService` / `UserAuthorizationService`.
-- [x] **Controllers inject DbContext directly** — `LogsController`, `SpatialController`, `ValidationController`, and `UsersController` migrated to service injection. `LocationsController` kept as-is (DbContext usage is encapsulated in generic pagination helper). `AuthController`, `AdminController`, `FieldController` partially extracted (complex, need dedicated service layer in future).
+- [x] **Missing XML docs** — Added `<summary>` to all controller actions and service interface methods.
+- [x] **Monolithic extension methods** — `AddNarsServices` split into 10 focused sub-methods.
+- [x] **Raw SQL fragility** — Extracted magic timeout to named constant.
+- [x] **DTO envelope inconsistency** — Removed `ActionResponse`, unified on `ApiResponse`.
+- [x] **Missing foreign keys** — Added `[ForeignKey]` attributes to `FeatureBase.UserId`, `HouseEntrance.RoadId`, `Inspection.UserId`.
 
 ## 🔶 Low
-- [x] **Inconsistent field naming** — Renamed `MaxFeatureDataSize` → `_maxFeatureDataSize`.
-- [x] **TOCTOU race in catch block** — Now returns generic conflict message without re-querying DB.
-- [x] **Null commune scope bypass** — Added explicit `.HasValue` check in `FieldController.cs`.
-- [x] **Redundant DTO validation attributes** — Removed `[Required]` in favor of `[JsonRequired]`.
-- [x] **WKT string duplication** — Extracted shared `AppendWktCoords` helper.
-- [x] **Cache policy limited** — Cache now serves all non-search paginated requests, not just skip=0/take=500.
+- [x] **Hard-coded CSP** — Now configurable via `CspOptions` / `appsettings.json:Csp`.
+- [x] **Dead code** — Removed `DetailResponse`.
+- [x] **Magic numbers/strings** — Extracted JWT min length (`32`) and delete timeout (`30`) to constants.
+- [x] ~~**JSON column converter**~~ — Skipped. Current `string` + `jsonb` is appropriate for varying GeoJSON-like data; EF Core converter would require a rigid model.
+- [x] ~~**ConfigureAwait(false)**~~ — Skipped. No analyzer enforces CA2007; no sync context in ASP.NET Core, so zero benefit.

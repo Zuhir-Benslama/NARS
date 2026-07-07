@@ -19,6 +19,11 @@ if (import.meta.hot) {
   })
 }
 
+export function resetGeometryState(): void {
+  municipalLimitRings = []
+  scatteredPolygons = []
+}
+
 function pointInRing(lat: number, lng: number, ring: number[][]): boolean {
   let inside = false
   const x = lat,
@@ -63,14 +68,13 @@ export function renderScatteredAreas(geoJsonStr: string | GeoJSON.Geometry): voi
 
     // Extract scattered polygons for spatial hit-testing
     if (geojson.type === "Polygon") {
-      const coords = (geojson as GeoJSON.Polygon).coordinates
+      const coords = geojson.coordinates
       scatteredPolygons.push({
         outer: coords[0] as [number, number][],
         holes: coords.slice(1) as [number, number][][],
       })
     } else if (geojson.type === "MultiPolygon") {
-      const mp = geojson as GeoJSON.MultiPolygon
-      for (const poly of mp.coordinates) {
+      for (const poly of geojson.coordinates) {
         scatteredPolygons.push({
           outer: poly[0] as [number, number][],
           holes: poly.slice(1) as [number, number][][],
@@ -95,10 +99,9 @@ export async function displayCommuneBoundary(communeId: number): Promise<void> {
     // Extract rings for point-in-polygon hit testing
     municipalLimitRings = []
     if (geojson.type === "Polygon") {
-      municipalLimitRings.push(...(geojson as GeoJSON.Polygon).coordinates)
+      municipalLimitRings.push(...geojson.coordinates)
     } else if (geojson.type === "MultiPolygon") {
-      const mp = geojson as GeoJSON.MultiPolygon
-      for (const poly of mp.coordinates) {
+      for (const poly of geojson.coordinates) {
         municipalLimitRings.push(...poly)
       }
     }
@@ -149,15 +152,15 @@ function computeBoundsFromGeometry(geojson: GeoJSON.Geometry): maplibregl.LngLat
   }
 
   if (geojson.type === "Polygon") {
-    collectCoords((geojson as GeoJSON.Polygon).coordinates)
+    collectCoords(geojson.coordinates)
   } else if (geojson.type === "MultiPolygon") {
-    collectCoords((geojson as GeoJSON.MultiPolygon).coordinates)
+    collectCoords(geojson.coordinates)
   } else if (geojson.type === "Point") {
-    const c = (geojson as GeoJSON.Point).coordinates
+    const c = geojson.coordinates
     bounds.extend(c as [number, number])
     hasCoords = true
   } else if (geojson.type === "LineString") {
-    collectCoords((geojson as GeoJSON.LineString).coordinates)
+    collectCoords(geojson.coordinates)
   }
 
   return hasCoords ? bounds : null
@@ -267,6 +270,19 @@ export function haversineDistance(lat1: number, lng1: number, lat2: number, lng2
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+/**
+ * Compute the center point (lat/lng) from a closed ring of [lng, lat] coordinates.
+ */
+export function computeCircleCenter(coords: [number, number][]): { lat: number; lng: number } {
+  let sumLat = 0,
+    sumLng = 0
+  for (const [lng, lat] of coords) {
+    sumLat += lat
+    sumLng += lng
+  }
+  return { lat: sumLat / coords.length, lng: sumLng / coords.length }
 }
 
 /**

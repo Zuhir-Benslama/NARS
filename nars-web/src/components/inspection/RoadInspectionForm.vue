@@ -10,6 +10,7 @@
           v-for="opt in trafficOptions"
           :key="opt.value"
           :class="['rif-btn', { active: data.roadTraffic === opt.value }]"
+          :aria-pressed="data.roadTraffic === opt.value"
           @click="data.roadTraffic = opt.value as RoadInspectionData['roadTraffic']"
         >
           {{ opt.label }}

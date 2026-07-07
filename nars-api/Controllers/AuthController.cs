@@ -40,15 +40,15 @@ public partial class AuthController(
     [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status410Gone)]
     public IActionResult SignUp() =>
-        StatusCode(410, new
-        {
-            detail = "Self-registration is disabled. " +
+        Problem(
+            detail: "Self-registration is disabled. " +
             "Contact your daira admin to create a commune user account, " +
-            "or use POST /api/admin/authorized-signup for admin accounts."
-        });
+            "or use POST /api/admin/authorized-signup for admin accounts.",
+            statusCode: 410);
 
     // ── POST /api/signin ──────────────────────────────────────
 
+    /// <summary>Authenticates a user and issues access + refresh token cookies.</summary>
     [HttpPost("signin")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicies.Auth)]
@@ -72,7 +72,7 @@ public partial class AuthController(
         // from a wrong-password response.
         if (user is not null && user.LockedUntil.HasValue && user.LockedUntil.Value > timeProvider.UtcNow)
         {
-            return Unauthorized(new { detail = "Invalid username or password" });
+            return Problem(detail: "Invalid username or password", statusCode: 401);
         }
 
         if (!passwordValid)
@@ -81,12 +81,12 @@ public partial class AuthController(
             {
                 await RecordFailedLogin(user, cancellationToken);
             }
-            return Unauthorized(new { detail = "Invalid username or password" });
+            return Problem(detail: "Invalid username or password", statusCode: 401);
         }
 
         if (user is null)
         {
-            return Unauthorized(new { detail = "Invalid username or password" });
+            return Problem(detail: "Invalid username or password", statusCode: 401);
         }
 
         // Successful login — reset failed attempts
@@ -154,6 +154,7 @@ public partial class AuthController(
 
     // ── POST /api/logout ──────────────────────────────────────
 
+    /// <summary>Revokes all refresh tokens and clears auth cookies.</summary>
     [HttpPost("logout")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -172,11 +173,12 @@ public partial class AuthController(
 
         Response.Cookies.Delete("access_token");
         Response.Cookies.Delete("refresh_token");
-        return Ok(new ActionResponse(Success: true, Message: "Logged out successfully"));
+        return Ok(ApiResponse.Ok("Logged out successfully"));
     }
 
     // ── POST /api/refresh — issue a new access token using a valid refresh token
     // Rate-limited to prevent refresh token brute-force attacks.
+    /// <summary>Issues a new access token using a valid refresh token cookie.</summary>
     [HttpPost("refresh")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicies.Auth)]
@@ -188,7 +190,7 @@ public partial class AuthController(
         var result = await refreshService.RotateRefreshTokenAsync(Request.Cookies["refresh_token"], cancellationToken);
         if (!result.Success)
         {
-            return Unauthorized(new { detail = result.Detail });
+            return Problem(detail: result.Detail, statusCode: 401);
         }
 
         var cookieMaxAge = result.RefreshExpiry!.Value - timeProvider.UtcNow;
@@ -202,6 +204,7 @@ public partial class AuthController(
     // fix #1: [Authorize] + User.FindFirst(...) replaces manual GetPrincipalFromCookie(),
     // routing unauthenticated requests through the standard JWT bearer pipeline → 401.
 
+    /// <summary>Returns the authenticated user's profile with location chain.</summary>
     [HttpGet("current_user")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -211,7 +214,7 @@ public partial class AuthController(
         var userIdStr = User.FindFirstValue(ClaimNames.UserId);
         if (!Guid.TryParse(userIdStr, out Guid userId))
         {
-            return Unauthorized(new { detail = "Malformed token claims." });
+            return Problem(detail: "Malformed token claims.", statusCode: 401);
         }
 
         // Query the database for fresh user data instead of relying on
@@ -219,7 +222,7 @@ public partial class AuthController(
         var user = await db.Users.FindAsync([userId], cancellationToken);
         if (user is null)
         {
-            return Unauthorized(new { detail = "User no longer exists." });
+            return Problem(detail: "User no longer exists.", statusCode: 401);
         }
 
         if (!int.TryParse(User.FindFirstValue(ClaimNames.CommuneId), out var communeId))

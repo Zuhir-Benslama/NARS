@@ -90,9 +90,9 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
       const reversed = [...entry.data.coordinates!].reverse()
       featuresStore.update(entry.id, {
         geometry: {
-          type: "LineString",
+          type: "LineString" as const,
           coordinates: reversed.map((c) => [c.lng, c.lat]),
-        } as GeoJSON.LineString,
+        },
       })
       try {
         await apiFetch(`/api/features/${entry.dbId}`, {
@@ -105,9 +105,9 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
         debugError(`Road direction save error (id=${dbId}):`, err)
         featuresStore.update(entry.id, {
           geometry: {
-            type: "LineString",
+            type: "LineString" as const,
             coordinates: entry.data.coordinates!.map((c) => [c.lng, c.lat]),
-          } as GeoJSON.LineString,
+          },
         })
       }
     }

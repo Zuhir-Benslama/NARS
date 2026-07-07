@@ -3,6 +3,7 @@ import { useLayerStore } from "../../stores/layerStore"
 import { useEditStore } from "../../stores/editStore"
 import type { LayerState } from "../../stores/layerStore"
 import type { LayerEntry, LatLng } from "../../types"
+import { EDIT_CONFIG } from "../../config"
 import { ctx, updateSelectionHighlight } from "../core/state"
 import {
   enableCrosshair,
@@ -106,9 +107,9 @@ export function ensureGeomanDrawEdgesVisible(): void {
   for (const layerId of ["gm_temporary-polygon__line-layer-0", "gm_temporary-line__line-layer-0"]) {
     try {
       if (ctx.map.getLayer(layerId)) {
-        ctx.map.setPaintProperty(layerId, "line-opacity", 0.8)
-        ctx.map.setPaintProperty(layerId, "line-color", "#3498db")
-        ctx.map.setPaintProperty(layerId, "line-width", 3)
+        ctx.map.setPaintProperty(layerId, "line-opacity", EDIT_CONFIG.edgeLineOpacity)
+        ctx.map.setPaintProperty(layerId, "line-color", EDIT_CONFIG.edgeLineColor)
+        ctx.map.setPaintProperty(layerId, "line-width", EDIT_CONFIG.edgeLineWidth)
       }
     } catch {
       /* layer may not exist yet */
@@ -118,9 +119,9 @@ export function ensureGeomanDrawEdgesVisible(): void {
   for (const layerId of ["gm_main-polygon__line-layer-0", "gm_main-line__line-layer-0"]) {
     try {
       if (ctx.map.getLayer(layerId)) {
-        ctx.map.setPaintProperty(layerId, "line-opacity", 0.8)
-        ctx.map.setPaintProperty(layerId, "line-color", "#3498db")
-        ctx.map.setPaintProperty(layerId, "line-width", 3)
+        ctx.map.setPaintProperty(layerId, "line-opacity", EDIT_CONFIG.edgeLineOpacity)
+        ctx.map.setPaintProperty(layerId, "line-color", EDIT_CONFIG.edgeLineColor)
+        ctx.map.setPaintProperty(layerId, "line-width", EDIT_CONFIG.edgeLineWidth)
       }
     } catch {
       /* layer may not exist yet */

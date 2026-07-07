@@ -28,4 +28,6 @@ export async function resetAllState(): Promise<void> {
   await safe("./map-boundary", "resetBoundaryEvents")
   await safe("./rotation", "resetRotation")
   await safe("./core/state", "resetMapState")
+  await safe("./rendering/geometry", "resetGeometryState")
+  await safe("../../lib/logger", "resetLoggerState")
 }

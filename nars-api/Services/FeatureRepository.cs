@@ -94,6 +94,8 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
         return true;
     }
 
+    private const int DeleteCommandTimeoutSeconds = 30;
+
     public async Task<(int total, List<Guid> ids)> ClearAllFeaturesAsync(Guid userId, CancellationToken ct)
     {
         var conn = db.Database.GetDbConnection();
@@ -131,7 +133,7 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
 
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = sb.ToString();
-        cmd.CommandTimeout = 30;
+        cmd.CommandTimeout = DeleteCommandTimeoutSeconds;
         SqlFragments.AddParam(cmd, "@uid", userId);
 
         var ids = new List<Guid>();

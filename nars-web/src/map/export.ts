@@ -1,3 +1,4 @@
+import { EXPORT_CONFIG } from "../config"
 import { t, currentLang } from "../i18n"
 
 export type PaperSize = "A0" | "A3"
@@ -110,9 +111,9 @@ export async function exportMapToPdf(
       useCORS: true,
       allowTaint: false,
       backgroundColor: "#000",
-      scale: size === "A0" ? 3 : 2,
+      scale: size === "A0" ? EXPORT_CONFIG.a0Scale : EXPORT_CONFIG.a3Scale,
       logging: false,
-      imageTimeout: 15000,
+      imageTimeout: EXPORT_CONFIG.imageTimeoutMs,
       foreignObjectRendering: false,
     })
     onProgress(82, t("export_step_compose"))
@@ -131,11 +132,11 @@ export async function exportMapToPdf(
   })
 
   const printW = pageW - margin * 2
-  const printH = pageH - margin * 2 - 14
+  const printH = pageH - margin * 2 - EXPORT_CONFIG.titleBarOffsetMm
   const { imgW, imgH } = computeImageDimensions(canvas.width, canvas.height, printW, printH)
 
   pdf.addImage(
-    canvas.toDataURL("image/jpeg", 0.92),
+    canvas.toDataURL("image/jpeg", EXPORT_CONFIG.jpegQuality),
     "JPEG",
     margin + (printW - imgW) / 2,
     margin,

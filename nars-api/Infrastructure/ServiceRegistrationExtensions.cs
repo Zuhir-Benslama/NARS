@@ -23,7 +23,25 @@ public static class ServiceRegistrationExtensions
         string? jwtIssuer,
         string? jwtAudience)
     {
-        // ── Register typed options ────────────────────────────────
+        services.AddNarsOptions(config);
+        services.AddNarsOpenTelemetry(config);
+        services.AddNarsDatabase(connectionString);
+        services.AddNarsJwtAuthentication(jwtSecret, issuer: jwtIssuer, audience: jwtAudience);
+        services.AddNarsDomainServices();
+        services.AddNarsHttpClients(config);
+        var assemblyVersion = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "2.0.0";
+        services.AddNarsControllers(assemblyVersion);
+        services.AddNarsCors(config);
+        services.AddNarsCompression();
+        services.AddNarsRateLimiting(config);
+        services.AddNarsHealthChecks(connectionString);
+        services.AddNarsAntiforgery();
+        services.AddNarsFormOptions(config);
+        return services;
+    }
+
+    private static void AddNarsOptions(this IServiceCollection services, IConfiguration config)
+    {
         services.Configure<CacheOptions>(config.GetSection("Cache"));
         services.Configure<LocationsOptions>(config.GetSection("Locations"));
         services.Configure<JwtOptions>(config.GetSection("Jwt"));
@@ -33,7 +51,11 @@ public static class ServiceRegistrationExtensions
         services.Configure<AccountLockoutOptions>(config.GetSection("AccountLockout"));
         services.Configure<OpenTelemetryOptions>(config.GetSection("OpenTelemetry"));
         services.Configure<BackgroundTaskOptions>(config.GetSection("BackgroundTask"));
+        services.Configure<CspOptions>(config.GetSection("Csp"));
+    }
 
+    private static void AddNarsOpenTelemetry(this IServiceCollection services, IConfiguration config)
+    {
         var otelOpts = config.GetSection("OpenTelemetry").Get<OpenTelemetryOptions>() ?? new OpenTelemetryOptions();
         var otelEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")
             ?? otelOpts.OtlpEndpoint;
@@ -55,16 +77,10 @@ public static class ServiceRegistrationExtensions
                 .AddMeter("Microsoft.AspNetCore.Hosting")
                 .AddMeter("Microsoft.AspNetCore.Server.Kestrel")
                 .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)));
+    }
 
-        if (string.IsNullOrEmpty(connectionString))
-        {
-            throw new InvalidOperationException("DefaultConnection is not configured.");
-        }
-
-        services.AddNarsDatabase(connectionString);
-
-        services.AddNarsJwtAuthentication(jwtSecret, issuer: jwtIssuer, audience: jwtAudience);
-
+    private static void AddNarsDomainServices(this IServiceCollection services)
+    {
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
         services.AddSingleton<IBackgroundTaskQueue, BackgroundTaskQueue>();
         services.AddHostedService<BackgroundQueueProcessor>();
@@ -82,31 +98,31 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ILocationQueryService, LocationQueryService>();
         services.AddScoped<IRoadQueryService, RoadQueryService>();
         services.AddScoped<IUserProfileService, UserProfileService>();
+    }
 
+    private static void AddNarsHttpClients(this IServiceCollection services, IConfiguration config)
+    {
         var httpOpts = config.GetSection("HttpClient").Get<HttpClientOptions>() ?? new HttpClientOptions();
         services.AddHttpClient("tile-proxy", client =>
         {
             client.Timeout = TimeSpan.FromSeconds(httpOpts.TileProxyTimeoutSeconds);
             client.DefaultRequestHeaders.Add("User-Agent", "NARS-TileProxy/1.0");
         });
-
         services.AddHttpClient("satellite", client =>
         {
             client.Timeout = TimeSpan.FromSeconds(httpOpts.SatelliteTimeoutSeconds);
             client.DefaultRequestHeaders.Add("User-Agent", "NARS-Satellite/1.0");
         });
+    }
 
+    private static void AddNarsControllers(this IServiceCollection services, string assemblyVersion)
+    {
         services.AddMemoryCache();
-
         services.AddControllers()
             .AddJsonOptions(opts =>
             {
                 opts.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
             });
-
-        services.AddNarsCors(config);
-        services.AddNarsCompression();
-
         services.AddOpenApi(options =>
         {
             options.AddDocumentTransformer((doc, _, _) =>
@@ -117,12 +133,16 @@ public static class ServiceRegistrationExtensions
                 return Task.CompletedTask;
             });
         });
+    }
 
-        services.AddNarsRateLimiting(config);
-
+    private static void AddNarsHealthChecks(this IServiceCollection services, string connectionString)
+    {
         services.AddHealthChecks()
             .AddNarsDatabaseHealthCheck(connectionString);
+    }
 
+    private static void AddNarsAntiforgery(this IServiceCollection services)
+    {
         services.AddAntiforgery(options =>
         {
             options.HeaderName = "X-CSRF-Token";
@@ -130,14 +150,15 @@ public static class ServiceRegistrationExtensions
             options.Cookie.HttpOnly = false;
             options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
         });
+    }
 
+    private static void AddNarsFormOptions(this IServiceCollection services, IConfiguration config)
+    {
         var featureOpts = config.GetSection("FeatureDefaults").Get<FeatureDefaultsOptions>() ?? new FeatureDefaultsOptions();
         services.Configure<FormOptions>(options =>
         {
             options.MultipartBodyLengthLimit = featureOpts.MultipartBodyLengthLimit;
             options.ValueLengthLimit = featureOpts.ValueLengthLimit;
         });
-
-        return services;
     }
 }

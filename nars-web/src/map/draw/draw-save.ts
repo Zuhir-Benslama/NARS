@@ -18,6 +18,7 @@ import { debugError } from "../../utils/debug"
 import type { ModalResult } from "../../types"
 import { updateEndpointMarkers } from "../roads/road-directions"
 import { buildFeatureData } from "../features/feature-data"
+import { DRAW_CONFIG } from "../../config"
 import { saveToDatabase } from "../features/feature-persistence"
 import { openModalForFeature } from "./draw-modal"
 import { getDrawingPhase, setSavingFeature, repatchMarker } from "./draw-state"
@@ -238,14 +239,14 @@ async function saveAndUpdateStore(
     )
     await updateStoresAfterSave(featureId, payload, drawingPhase, featureData, narsDrawType)
 
-    await delay(100)
+    await delay(DRAW_CONFIG.geomanCleanupDelayMs)
     deleteGeomanFeature(geomanFeatureData)
   } catch (err) {
     debugError("[COMPLETE] Save error:", err)
     showToast("Save failed: " + getErrorMessage(err), "error")
   } finally {
     setSavingFeature(false)
-    await delay(200)
+    await delay(DRAW_CONFIG.drawModeResetDelayMs)
     await resetDrawMode()
   }
 }

@@ -22,6 +22,7 @@ public class FieldController(
 {
     private readonly int _maxFeatureDataSize = featureDefaults.Value.MaxFeatureDataSize;
 
+    /// <summary>Lists features of a given type visible to the field worker's commune.</summary>
     [HttpGet("field/features")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -60,6 +61,7 @@ public class FieldController(
         return Ok(new LoadFeaturesResponse<FieldFeatureResult>(Features: Items, Count: Total, Skip: skip, Take: take));
     }
 
+    /// <summary>Submits a field inspection for a feature (road, entrance, or panel).</summary>
     [HttpPost("field/inspect")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -143,6 +145,7 @@ public class FieldController(
         ));
     }
 
+    /// <summary>Returns all inspections for a given feature, newest first.</summary>
     [HttpGet("field/inspections/{featureId:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -169,6 +172,7 @@ public class FieldController(
         return Ok(new FieldInspectionsResponse(inspections));
     }
 
+    /// <summary>Creates a house entrance linked to a road from a field inspection.</summary>
     [HttpPost("field/entrance")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
