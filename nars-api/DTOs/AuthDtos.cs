@@ -59,17 +59,11 @@ public record AuthorizedAdminSignupRequest(
     int? DairaId,
     int? WilayaId
 );
-/// <summary>
-/// Request body for user login.
-/// </summary>
 public record SignInRequest(
     [property: Required(AllowEmptyStrings = false)] string Username,
     [property: Required(AllowEmptyStrings = false)] string Password
 );
 
-/// <summary>
-/// Request body for updating user account details.
-/// </summary>
 public record UpdateUserRequest(
     [property: JsonPropertyName("username")] string? Username,
     [property: JsonPropertyName("email")] string? Email,

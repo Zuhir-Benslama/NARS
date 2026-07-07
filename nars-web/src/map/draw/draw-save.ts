@@ -5,8 +5,7 @@
 import { PHASES } from "../../phases"
 import { useAppStore } from "../../stores/appStore"
 import { useLayerStore } from "../../stores/layerStore"
-import type { LayerState } from "../../stores/layerStore"
-import type { LayerEntry, FeatureData } from "../../types"
+import type { FeatureData } from "../../types"
 import { ctx, featuresStore } from "../core/state"
 import { buildDrawControl } from "./draw-control"
 import { refreshLayerVisibility } from "../rendering/labels"
@@ -197,8 +196,8 @@ async function updateStoresAfterSave(
   })
 
   const layerStore = useLayerStore()
-  const phaseKey = drawingPhase.key as keyof LayerState
-  ;(layerStore.$state[phaseKey] as LayerEntry[]).push({
+  const phaseKey = drawingPhase.key
+  layerStore.$state[phaseKey].push({
     id: featureId,
     dbId: payload.dbId,
     data: featureData,

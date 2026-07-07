@@ -7,6 +7,7 @@ using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
+using Microsoft.AspNetCore.Http;
 using NarsApi.Services;
 using Moq;
 using static NarsApi.Tests.TestData;
@@ -258,29 +259,16 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
 
     private async Task<Guid> CreateUserAsync()
     {
-        var userId = Guid.NewGuid();
-        await _db.Users.AddAsync(new User
-        {
-            Id = userId,
-            Name = "Features Test User",
-            Email = $"features-{userId:N}@test.com",
-            Phone = DefaultPhone,
-            Username = $"features_{userId:N}",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
-            CommuneId = 1,
-        });
-
+        var user = await SeedData.CreateUserAsync(_db, "commune_user", communeId: 1, name: "Features Test User");
         await SeedData.SeedBasicLocationsAsync(_db);
-
-        await _db.SaveChangesAsync();
-        return userId;
+        return user.Id;
     }
 
     private void SetUserId(Guid userId, int communeId)
     {
-        var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+        var httpContext = new DefaultHttpContext();
         httpContext.User = AuthTestHelper.CreateClaimsPrincipal(userId, "commune_user", communeId: communeId);
-        _controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext { HttpContext = httpContext };
+        _controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
     }
 
 }

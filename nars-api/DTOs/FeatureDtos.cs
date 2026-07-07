@@ -31,9 +31,6 @@ public record FeatureUpdateRequest(
     JsonElement? Data
 );
 
-/// <summary>
-/// A single layer option in the feature type definition response.
-/// </summary>
 public record LayerOption(
     string Key,
     string Label,

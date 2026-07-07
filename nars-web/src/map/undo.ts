@@ -8,13 +8,12 @@ import { showToast } from "../lib/toast"
 import { useAppStore } from "../stores/appStore"
 import { useLayerStore } from "../stores/layerStore"
 import { useUndoStore } from "../stores/undoStore"
-import type { LayerState } from "../stores/layerStore"
 import { featuresStore } from "./core/state"
 import { toApiSaveShape } from "./features/feature-data"
 import { PHASES } from "../phases"
 import { computeCircleRing, closeRing } from "./rendering/geometry"
 import { debugLog, debugError, debugWarn } from "../utils/debug"
-import type { LayerEntry } from "../types"
+import type { FeatureTypeKey, LayerEntry } from "../types"
 
 // ─── STATE RESET (for testing & HMR) ──────────────────────────────────────────
 
@@ -33,7 +32,7 @@ export function getUndoLabel(): string | null {
 // ─── RECORD ───────────────────────────────────────────────────────────────────
 
 /** Call BEFORE a feature is deleted. Captures the entry for Ctrl+Z restore. */
-export function recordDelete(entry: LayerEntry, phaseKey: string): void {
+export function recordDelete(entry: LayerEntry, phaseKey: FeatureTypeKey): void {
   useUndoStore().recordDelete(entry, phaseKey)
 }
 
@@ -82,8 +81,8 @@ export async function undo(): Promise<void> {
     const layerStore = useLayerStore()
     const state = layerStore.$state
 
-    if (state[phaseKey as keyof LayerState]) {
-      ;(state[phaseKey as keyof LayerState] as LayerEntry[]).push(restoredEntry)
+    if (state[phaseKey]) {
+      state[phaseKey].push(restoredEntry)
     }
 
     // Repair cross-references: update any secondary entrances that pointed

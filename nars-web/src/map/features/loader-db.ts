@@ -14,7 +14,7 @@ import { getFeatureType } from "../house-numbering"
 import { debugError, debugLog } from "../../utils/debug"
 import { updateEndpointMarkers } from "../roads/road-directions"
 import { loadPhase } from "../../phases-nav/storage"
-import type { FeatureData, LayerEntry, DbFeature } from "../../types"
+import type { FeatureData, FeatureTypeKey, LayerEntry, DbFeature } from "../../types"
 import { buildGeoJsonFeature } from "./loader-build"
 
 // ─── PER-FEATURE PROCESSING ──────────────────────────────────────
@@ -30,7 +30,7 @@ const TYPE_TO_LAYER: Record<string, string> = {
   naming_panel: "naming_panel",
 }
 
-function resolvePhaseKey(feature: DbFeature): string | undefined {
+function resolvePhaseKey(feature: DbFeature): FeatureTypeKey | undefined {
   let key = API_LAYER_TO_PHASE[feature.layer]
   if (!key && feature.feature_type) key = API_LAYER_TO_PHASE[feature.feature_type]
   if (!key) {
@@ -73,7 +73,7 @@ function processFeature(
       data,
       type: getFeatureType(phase.drawType),
     }
-    ;(state[phaseKey as keyof LayerState] as LayerEntry[]).push(layerEntry)
+    state[phaseKey].push(layerEntry)
 
     const geojsonFeature = buildGeoJsonFeature(feature.id, data, phase)
     if (geojsonFeature) {

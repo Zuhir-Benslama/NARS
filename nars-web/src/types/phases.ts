@@ -1,8 +1,10 @@
+import type { FeatureTypeKey } from "./features"
+
 export type DrawType = "polygon" | "polyline" | "marker" | "circle"
 
 export interface Phase {
   index: number
-  key: string
+  key: FeatureTypeKey
   label: string
   drawType: DrawType
   color: string

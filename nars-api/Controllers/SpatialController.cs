@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
@@ -40,14 +41,15 @@ public class SpatialController(
         }
 
         var roadData = JsonHelper.DeserializeSafe(road.Data);
-        if (!roadData.TryGetProperty("coordinates", out var coordsEl))
+        var coordsNode = roadData?["coordinates"];
+        if (coordsNode is not JsonArray coordsArr || coordsArr.Count < 2)
         {
             return Problem(detail: "Road data is missing coordinates.", statusCode: 400);
         }
 
-        var roadCoords = coordsEl.EnumerateArray()
-            .Select(c => (Lat: c.GetProperty("lat").GetDouble(),
-                          Lng: c.GetProperty("lng").GetDouble()))
+        var roadCoords = coordsArr
+            .Select(c => (Lat: c!["lat"]!.GetValue<double>(),
+                          Lng: c!["lng"]!.GetValue<double>()))
             .ToList();
 
         if (roadCoords.Count < 2)

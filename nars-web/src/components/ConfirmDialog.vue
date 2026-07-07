@@ -3,6 +3,7 @@
     <Transition name="confirm">
       <div
         v-if="store.visible"
+        ref="dialogRef"
         class="confirm-backdrop"
         role="dialog"
         aria-modal="true"
@@ -26,9 +27,13 @@
 <script setup lang="ts">
 import { watch, ref, nextTick } from "vue"
 import { useConfirmStore } from "../stores/confirmStore"
+import { useFocusTrap } from "../composables/useFocusTrap"
 
 const store = useConfirmStore()
+const dialogRef = ref<HTMLElement | null>(null)
 const okRef = ref<HTMLElement | null>(null)
+
+useFocusTrap(dialogRef, () => store.visible)
 
 watch(
   () => store.visible,

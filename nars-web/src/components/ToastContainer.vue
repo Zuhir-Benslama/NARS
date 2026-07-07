@@ -2,15 +2,17 @@
   <Teleport to="body">
     <div id="nars-toast-container" role="status" aria-live="polite">
       <TransitionGroup name="toast">
-        <div
+        <button
           v-for="t in store.toasts"
           :key="t.id"
           class="nars-toast"
           :style="{ background: toastBg(t.type) }"
           @click="store.removeToast(t.id)"
+          @keydown.enter="store.removeToast(t.id)"
+          @keydown.space.prevent="store.removeToast(t.id)"
         >
           {{ t.message }}
-        </div>
+        </button>
       </TransitionGroup>
     </div>
   </Teleport>
@@ -49,6 +51,15 @@ function toastBg(type: string): string {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
   pointer-events: auto;
   cursor: default;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+  display: block;
+  width: 100%;
+}
+
+.nars-toast::-moz-focus-inner {
+  border: 0;
 }
 
 .toast-enter-active {

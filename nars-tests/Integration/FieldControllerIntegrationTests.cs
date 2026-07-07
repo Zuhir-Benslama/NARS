@@ -1,4 +1,4 @@
-using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -50,22 +50,9 @@ public class FieldControllerIntegrationTests : IAsyncLifetime
 
     private async Task<Guid> CreateWorkerAsync()
     {
-        var userId = Guid.NewGuid();
-        await _db.Users.AddAsync(new User
-        {
-            Id = userId,
-            Name = "Field Worker Integration",
-            Email = $"field-int-{userId:N}@test.com",
-            Phone = DefaultPhone,
-            Username = $"field_int_{userId:N}",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
-            Role = UserRoles.FieldWorker,
-            CommuneId = 1,
-        });
-
+        var user = await SeedData.CreateUserAsync(_db, UserRoles.FieldWorker, communeId: 1, name: "Field Worker Integration");
         await SeedData.SeedBasicLocationsAsync(_db);
-        await _db.SaveChangesAsync();
-        return userId;
+        return user.Id;
     }
 
     private async Task<Guid> CreateRoadWithOwnerAsync()
@@ -135,7 +122,7 @@ public class FieldControllerIntegrationTests : IAsyncLifetime
         var result = await _controller.SubmitInspection(new FieldInspectRequest(
             FeatureId: roadId.ToString(),
             Type: FeatureTypes.Road,
-            Data: JsonDocument.Parse("{}").RootElement,
+            Data: JsonNode.Parse("{}")!,
             Status: "good"
         ));
 
@@ -151,7 +138,7 @@ public class FieldControllerIntegrationTests : IAsyncLifetime
         var result = await _controller.SubmitInspection(new FieldInspectRequest(
             FeatureId: Guid.NewGuid().ToString(),
             Type: "invalid_type",
-            Data: JsonDocument.Parse("{}").RootElement,
+            Data: JsonNode.Parse("{}")!,
             Status: "good"
         ));
 
@@ -192,7 +179,7 @@ public class FieldControllerIntegrationTests : IAsyncLifetime
         var result = await _controller.SubmitInspection(new FieldInspectRequest(
             FeatureId: roadId.ToString(),
             Type: FeatureTypes.Road,
-            Data: JsonDocument.Parse("{}").RootElement,
+            Data: JsonNode.Parse("{}")!,
             Status: "good"
         ));
 
@@ -207,7 +194,7 @@ public class FieldControllerIntegrationTests : IAsyncLifetime
         await _controller.SubmitInspection(new FieldInspectRequest(
             FeatureId: roadId.ToString(),
             Type: FeatureTypes.Road,
-            Data: JsonDocument.Parse("{}").RootElement,
+            Data: JsonNode.Parse("{}")!,
             Status: "good"
         ));
 
@@ -225,7 +212,7 @@ public class FieldControllerIntegrationTests : IAsyncLifetime
 
         var result = await _controller.CreateEntranceFromInspection(new FieldEntranceCreateRequest(
             RoadId: roadId.ToString(),
-            Data: JsonDocument.Parse("{}").RootElement,
+            Data: JsonNode.Parse("{}")!,
             Label: "Integration Entrance"
         ));
 
@@ -245,7 +232,7 @@ public class FieldControllerIntegrationTests : IAsyncLifetime
     {
         var result = await _controller.CreateEntranceFromInspection(new FieldEntranceCreateRequest(
             RoadId: Guid.NewGuid().ToString(),
-            Data: JsonDocument.Parse("{}").RootElement,
+            Data: JsonNode.Parse("{}")!,
             Label: "No Road"
         ));
 

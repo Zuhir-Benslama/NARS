@@ -46,7 +46,7 @@ function buildSnapToggleItem(): CtxMenuItem {
   }
 }
 
-export function showContextMenu(x: number, y: number, dbId: string, phaseKey: string): void {
+function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
   const layerStore = useLayerStore()
   const state = layerStore.$state
   const currentPhase = PHASES[useAppStore().currentPhase]
@@ -67,13 +67,12 @@ export function showContextMenu(x: number, y: number, dbId: string, phaseKey: st
       false)
 
   if (isCityCenter && currentPhaseKey !== "cityCenter") {
-    useContextMenuStore().show(x, y, [
+    return [
       {
         label: t("ctx_cc_lock"),
         onClick: () => showToast(t("ctx_cc_lock_msg"), "info"),
       },
-    ])
-    return
+    ]
   }
 
   const items: CtxMenuItem[] = []
@@ -126,8 +125,11 @@ export function showContextMenu(x: number, y: number, dbId: string, phaseKey: st
   }
 
   items.push(buildSnapToggleItem())
+  return items
+}
 
-  useContextMenuStore().show(x, y, items)
+export function showContextMenu(x: number, y: number, dbId: string, phaseKey: string): void {
+  useContextMenuStore().show(x, y, buildFeatureMenuItems(dbId, phaseKey))
 }
 
 export function bindContextMenu(e: DrawContextEvent, dbId: string, phaseKey: string): void {

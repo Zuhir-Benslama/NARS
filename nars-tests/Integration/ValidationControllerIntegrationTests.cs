@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -112,27 +113,16 @@ public class ValidationControllerIntegrationTests : IAsyncLifetime
 
     private async Task<Guid> CreateTestUserAsync()
     {
-        var userId = Guid.NewGuid();
-        await _db.Users.AddAsync(new User
-        {
-            Id = userId,
-            Name = "Validation Test User",
-            Email = $"validation-{userId:N}@test.com",
-            Phone = DefaultPhone,
-            Username = $"validation_{userId:N}",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
-            CommuneId = 1,
-        });
-        await _db.SaveChangesAsync();
-        return userId;
+        var user = await SeedData.CreateUserAsync(_db, "commune_user", communeId: 1, name: "Validation Test User");
+        return user.Id;
     }
 
     private async Task SeedReferenceDataAsync() => await SeedData.SeedBasicLocationsAsync(_db);
 
     private void SetUserId(Guid userId)
     {
-        var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext();
-        httpContext.User = AuthTestHelper.CreateClaimsPrincipal(userId, "field_worker");
-        _controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext { HttpContext = httpContext };
+        var httpContext = new DefaultHttpContext();
+        httpContext.User = AuthTestHelper.CreateClaimsPrincipal(userId, "commune_user", communeId: 1);
+        _controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
     }
 }

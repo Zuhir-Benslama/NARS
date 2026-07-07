@@ -43,8 +43,23 @@ function buildRasterStyle(
   }
 }
 
+export function resetMapInit(): void {
+  currentActiveStyle = undefined
+  _setBaseLayer = (_key: string) => {
+    debugWarn("setBaseLayer called before map initialization")
+  }
+}
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => resetMapInit())
+}
+
 export async function initMap(): Promise<void> {
-  const satelliteStyle = buildRasterStyle(MAP_CONFIG.tileUrls.satellite, "satellite", 17)
+  const satelliteStyle = buildRasterStyle(
+    MAP_CONFIG.tileUrls.satellite,
+    "satellite",
+    MAP_CONFIG.tileMaxZoomSatellite,
+  )
 
   _setCtx(ctx)
 
@@ -64,12 +79,21 @@ export async function initMap(): Promise<void> {
   }
 
   ctx.satelliteStyle = satelliteStyle
-  ctx.streetStyle = buildRasterStyle(MAP_CONFIG.tileUrls.street, "osm", 19, {
-    attribution:
-      '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-  })
-  ctx.lightStyle = buildRasterStyle(MAP_CONFIG.tileUrls.light, "carto", 19)
-  ctx.darkStyle = buildRasterStyle(MAP_CONFIG.tileUrls.dark, "carto-dark", 19)
+  ctx.streetStyle = buildRasterStyle(
+    MAP_CONFIG.tileUrls.street,
+    "osm",
+    MAP_CONFIG.tileMaxZoomStreet,
+    {
+      attribution:
+        '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    },
+  )
+  ctx.lightStyle = buildRasterStyle(MAP_CONFIG.tileUrls.light, "carto", MAP_CONFIG.tileMaxZoomLight)
+  ctx.darkStyle = buildRasterStyle(
+    MAP_CONFIG.tileUrls.dark,
+    "carto-dark",
+    MAP_CONFIG.tileMaxZoomDark,
+  )
 
   currentActiveStyle = satelliteStyle
 

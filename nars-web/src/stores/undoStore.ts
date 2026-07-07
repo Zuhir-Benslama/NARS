@@ -1,9 +1,9 @@
 import { defineStore } from "pinia"
-import type { LayerEntry } from "../types"
+import type { LayerEntry, FeatureTypeKey } from "../types"
 
 interface DeletedFeature {
   entry: LayerEntry
-  phaseKey: string
+  phaseKey: FeatureTypeKey
 }
 
 export const useUndoStore = defineStore("undo", {
@@ -20,7 +20,7 @@ export const useUndoStore = defineStore("undo", {
   },
 
   actions: {
-    recordDelete(entry: LayerEntry, phaseKey: string): void {
+    recordDelete(entry: LayerEntry, phaseKey: FeatureTypeKey): void {
       this.undoStack.push({ entry, phaseKey })
     },
     popUndo(): DeletedFeature | undefined {

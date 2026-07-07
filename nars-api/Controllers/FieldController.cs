@@ -1,4 +1,5 @@
-using System.Text.Json;
+using System.Data;
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -83,66 +84,25 @@ public class FieldController(
             return Problem(detail: "Invalid feature_id.", statusCode: 400);
         }
 
-        var validTypes = ValidInspectionTypes;
-        if (!validTypes.Contains(body.Type))
+        var featureError = await ValidateInspectionTargetAsync(featureId, body.Type, cancellationToken);
+        if (featureError is not null)
         {
-            return Problem(detail: $"Invalid inspection type. Must be one of: {string.Join(", ", validTypes)}", statusCode: 400);
+            return featureError;
         }
 
-        var registryEntry = await db.FeatureRegistry.FindAsync([featureId], cancellationToken);
-        if (registryEntry is null)
-        {
-            return Problem(detail: "Feature not found.", statusCode: 400);
-        }
-
-        var feature = await fieldService.GetFeatureOwnerAsync(registryEntry.FeatureType, featureId, cancellationToken);
-        if (feature is null)
-        {
-            return Problem(detail: "Feature not found.", statusCode: 400);
-        }
-
-        if (!feature.Value.CommuneId.HasValue || feature.Value.CommuneId != CurrentCommuneId)
-        {
-            return Forbid();
-        }
-
-        var rawData = body.Data.ValueKind == JsonValueKind.String
-            ? body.Data.GetString()!
-            : body.Data.GetRawText();
-
+        var rawData = ExtractJsonData(body.Data);
         if (rawData.Length > _maxFeatureDataSize)
         {
             return Problem(detail: "Inspection data is too large (max 512 KB).", statusCode: 400);
         }
 
-        var validStatuses = new[] { "good", "issue" };
-        if (!validStatuses.Contains(body.Status))
+        var statusError = ValidateInspectionStatus(body.Status);
+        if (statusError is not null)
         {
-            return Problem(detail: "Status must be 'good' or 'issue'.", statusCode: 400);
+            return statusError;
         }
 
-        var inspection = new Inspection
-        {
-            Id = Guid.CreateVersion7(),
-            FeatureId = featureId,
-            UserId = RequiredCurrentUserId,
-            Type = body.Type,
-            Data = rawData,
-            Status = body.Status,
-            CreatedAt = timeProvider.UtcNow,
-        };
-
-        db.Add(inspection);
-        await db.SaveChangesAsync(cancellationToken);
-
-        logger.LogInformation("[Field] Worker {WorkerId} inspected {Type} {FeatureId} — status: {Status}",
-            CurrentUserId, body.Type, featureId, body.Status);
-
-        return StatusCode(201, new FieldInspectSubmitResponse(
-            Success: true,
-            Id: inspection.Id.ToString(),
-            Message: "Inspection saved."
-        ));
+        return await SaveInspectionAsync(featureId, body.Type, body.Status, rawData, cancellationToken);
     }
 
     /// <summary>Returns all inspections for a given feature, newest first.</summary>
@@ -211,9 +171,7 @@ public class FieldController(
             return Forbid();
         }
 
-        var rawData = body.Data.ValueKind == JsonValueKind.String
-            ? body.Data.GetString()!
-            : body.Data.GetRawText();
+        var rawData = ExtractJsonData(body.Data);
 
         if (rawData.Length > _maxFeatureDataSize)
         {
@@ -234,7 +192,7 @@ public class FieldController(
             CreatedAt = timeProvider.UtcNow,
         };
 
-        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
 
         db.HouseEntrances.Add(entrance);
         db.FeatureRegistry.Add(new FeatureRegistry
@@ -258,5 +216,77 @@ public class FieldController(
 
     private static readonly string[] ValidInspectionTypes = [FeatureTypes.Road, FeatureTypes.HouseEntrance, FeatureTypes.NamingPanel];
 
-    private static JsonElement DeserializeJsonSafe(string json) => JsonHelper.DeserializeSafe(json);
+    private async Task<IActionResult?> ValidateInspectionTargetAsync(Guid featureId, string type, CancellationToken ct)
+    {
+        var validTypes = ValidInspectionTypes;
+        if (!validTypes.Contains(type))
+        {
+            return Problem(detail: $"Invalid inspection type. Must be one of: {string.Join(", ", validTypes)}", statusCode: 400);
+        }
+
+        var registryEntry = await db.FeatureRegistry.FindAsync([featureId], ct);
+        if (registryEntry is null)
+        {
+            return Problem(detail: "Feature not found.", statusCode: 400);
+        }
+
+        var feature = await fieldService.GetFeatureOwnerAsync(registryEntry.FeatureType, featureId, ct);
+        if (feature is null)
+        {
+            return Problem(detail: "Feature not found.", statusCode: 400);
+        }
+
+        if (!feature.Value.CommuneId.HasValue || feature.Value.CommuneId != CurrentCommuneId)
+        {
+            return Forbid();
+        }
+
+        return null;
+    }
+
+    private static string ExtractJsonData(JsonNode data)
+    {
+        return data is JsonValue value && value.TryGetValue<string>(out var str)
+            ? str
+            : data.ToJsonString();
+    }
+
+    private IActionResult? ValidateInspectionStatus(string status)
+    {
+        var validStatuses = new[] { "good", "issue" };
+        if (!validStatuses.Contains(status))
+        {
+            return Problem(detail: "Status must be 'good' or 'issue'.", statusCode: 400);
+        }
+
+        return null;
+    }
+
+    private async Task<IActionResult> SaveInspectionAsync(Guid featureId, string type, string status, string rawData, CancellationToken ct)
+    {
+        var inspection = new Inspection
+        {
+            Id = Guid.CreateVersion7(),
+            FeatureId = featureId,
+            UserId = RequiredCurrentUserId,
+            Type = type,
+            Data = rawData,
+            Status = status,
+            CreatedAt = timeProvider.UtcNow,
+        };
+
+        db.Add(inspection);
+        await db.SaveChangesAsync(ct);
+
+        logger.LogInformation("[Field] Worker {WorkerId} inspected {Type} {FeatureId} — status: {Status}",
+            CurrentUserId, type, featureId, status);
+
+        return StatusCode(201, new FieldInspectSubmitResponse(
+            Success: true,
+            Id: inspection.Id.ToString(),
+            Message: "Inspection saved."
+        ));
+    }
+
+    private static JsonNode? DeserializeJsonSafe(string json) => JsonHelper.DeserializeSafe(json);
 }

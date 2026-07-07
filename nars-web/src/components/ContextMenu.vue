@@ -13,6 +13,7 @@
           v-else
           :class="['ctx-item', { 'ctx-danger': item.danger }]"
           role="menuitem"
+          tabindex="0"
           @click="handleClick(item)"
         >
           {{ item.label }}
@@ -23,7 +24,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue"
+import { computed, ref, watch, nextTick } from "vue"
 import { useContextMenuStore } from "../stores/contextMenuStore"
 
 const store = useContextMenuStore()
@@ -48,6 +49,9 @@ watch(
       document.addEventListener("click", onDocClick, true)
       document.addEventListener("contextmenu", onDocClick, true)
       document.addEventListener("keydown", onKeyDown, true)
+      nextTick(() => {
+        menuRef.value?.querySelector<HTMLElement>(".ctx-item")?.focus()
+      })
     } else {
       document.removeEventListener("click", onDocClick, true)
       document.removeEventListener("contextmenu", onDocClick, true)
@@ -61,7 +65,19 @@ function onDocClick() {
 }
 
 function onKeyDown(e: KeyboardEvent) {
-  if (e.key === "Escape") store.hide()
+  if (e.key === "Escape") {
+    store.hide()
+    return
+  }
+  if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return
+  e.preventDefault()
+  const items = menuRef.value?.querySelectorAll<HTMLElement>(".ctx-item") ?? []
+  if (items.length === 0) return
+  const current = document.activeElement
+  let idx = Array.from(items).indexOf(current as HTMLElement)
+  if (e.key === "ArrowDown") idx = (idx + 1) % items.length
+  else idx = (idx - 1 + items.length) % items.length
+  items[idx]?.focus()
 }
 
 function handleClick(item: { onClick?: () => void }) {

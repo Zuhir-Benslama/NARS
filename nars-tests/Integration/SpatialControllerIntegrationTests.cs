@@ -44,21 +44,9 @@ public class SpatialControllerIntegrationTests : IAsyncLifetime
 
     private async Task<Guid> CreateUserAsync()
     {
-        var userId = Guid.NewGuid();
-        await _db.Users.AddAsync(new User
-        {
-            Id = userId,
-            Name = "Spatial Test User",
-            Email = $"spatial-{userId:N}@test.com",
-            Phone = DefaultPhone,
-            Username = $"spatial_{userId:N}",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
-            CommuneId = 1,
-        });
-
+        var user = await SeedData.CreateUserAsync(_db, "field_worker", communeId: 1, name: "Spatial Test User");
         await SeedData.SeedBasicLocationsAsync(_db);
-        await _db.SaveChangesAsync();
-        return userId;
+        return user.Id;
     }
 
     private void SetAuthenticatedUser(Guid userId, int communeId)

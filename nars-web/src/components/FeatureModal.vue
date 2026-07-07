@@ -1,6 +1,7 @@
 <template>
   <div
     v-show="modalStore.visible"
+    ref="modalRef"
     class="modal"
     role="dialog"
     aria-modal="true"
@@ -156,13 +157,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch, onMounted, onUnmounted } from "vue"
+import { computed, watch, onMounted, onUnmounted, ref } from "vue"
 import { useI18n } from "vue-i18n"
 import { PHASES, DISTRICT_TYPES, ROAD_TYPES, PUBLIC_SPACE_TYPES } from "../phases"
 import { useAppStore } from "../stores/appStore"
 import { useModalStore } from "../stores/modalStore"
 import { fetchRoadSide, computeBisNumber, prepareModalExtras } from "../map"
 import { useFeatureValidation } from "../composables/useFeatureValidation"
+import { useFocusTrap } from "../composables/useFocusTrap"
 import AreaTypeSelector from "./modals/AreaTypeSelector.vue"
 import RoadAssignmentSelector from "./modals/RoadAssignmentSelector.vue"
 import BuildingTypeSelector from "./modals/BuildingTypeSelector.vue"
@@ -173,6 +175,9 @@ const modalStore = useModalStore()
 const phase = computed(() =>
   modalStore.phaseIndex !== null ? (PHASES[modalStore.phaseIndex] ?? null) : null,
 )
+
+const modalRef = ref<HTMLElement | null>(null)
+useFocusTrap(modalRef, () => modalStore.visible)
 
 const { validate, buildModalResult, isMainUrban, isCityCenter, isHouseEntranceEdit } =
   useFeatureValidation(modalStore)

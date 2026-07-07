@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NarsApi.Data;
@@ -24,16 +25,9 @@ public class RefreshTokenService(
             System.Security.Cryptography.SHA256.HashData(
                 System.Text.Encoding.UTF8.GetBytes(rawRefreshToken)));
 
-        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
 
-        var tableName = db.Model.FindEntityType(typeof(RefreshToken))?.GetTableName() ?? "refresh_tokens";
-#pragma warning disable EF1002 // tableName is from EF Core metadata, not user input
-        var stored = await db.RefreshTokens
-            .FromSqlRaw(
-                $"SELECT * FROM {tableName} WHERE token_hash = {{0}} AND revoked = false AND expires_at > NOW() FOR UPDATE SKIP LOCKED",
-                hash)
-            .FirstOrDefaultAsync(cancellationToken);
-#pragma warning restore EF1002
+        var stored = await FindRefreshTokenByHashAsync(hash, cancellationToken);
 
         if (stored is null)
         {
@@ -65,5 +59,14 @@ public class RefreshTokenService(
             communeId: user.CommuneId, role: user.Role, dairaId: user.DairaId, wilayaId: user.WilayaId);
 
         return new RefreshTokenResult(true, null, user.Username, newRaw, newAccessToken, refreshExpiry);
+    }
+
+    protected virtual Task<RefreshToken?> FindRefreshTokenByHashAsync(string hash, CancellationToken ct)
+    {
+        var tableName = db.Model.FindEntityType(typeof(RefreshToken))?.GetTableName() ?? "refresh_tokens";
+        return db.RefreshTokens
+            .FromSqlInterpolated(
+                $"SELECT * FROM {tableName} WHERE token_hash = {hash} AND revoked = false AND expires_at > NOW() FOR UPDATE SKIP LOCKED")
+            .FirstOrDefaultAsync(ct);
     }
 }

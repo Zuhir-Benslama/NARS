@@ -23,12 +23,16 @@
       </div>
       <span :class="['dropdown-arrow', { open: dropdownOpen }]">▼</span>
     </div>
-    <div :class="['profile-dropdown', { show: dropdownOpen }]" role="menu">
-      <div class="dropdown-item" role="menuitem" @click="onSettings">
+    <div
+      :class="['profile-dropdown', { show: dropdownOpen }]"
+      role="menu"
+      @keydown="onDropdownKeydown"
+    >
+      <div class="dropdown-item" role="menuitem" tabindex="0" @click="onSettings">
         <span>⚙️</span>
         <span>{{ t("menu_settings") }}</span>
       </div>
-      <div class="dropdown-item logout" role="menuitem" @click="onLogout">
+      <div class="dropdown-item logout" role="menuitem" tabindex="0" @click="onLogout">
         <span>🚪</span>
         <span>{{ t("menu_logout") }}</span>
       </div>
@@ -40,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue"
+import { ref, computed, nextTick, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useAppStore } from "../stores/appStore"
 import { apiFetch } from "../api"
@@ -63,6 +67,28 @@ const toggleDropdown = () => {
 }
 const closeDropdown = () => {
   dropdownOpen.value = false
+}
+
+watch(dropdownOpen, (open) => {
+  if (open) {
+    nextTick(() => {
+      document.querySelector<HTMLElement>(".dropdown-item")?.focus()
+    })
+  }
+})
+
+function onDropdownKeydown(e: KeyboardEvent) {
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault()
+    const items = document.querySelectorAll<HTMLElement>(".dropdown-item")
+    if (items.length === 0) return
+    const current = document.activeElement
+    let idx = Array.from(items).indexOf(current as HTMLElement)
+    if (e.key === "ArrowDown") idx = (idx + 1) % items.length
+    else idx = (idx - 1 + items.length) % items.length
+    items[idx]?.focus()
+  }
+  if (e.key === "Escape") closeDropdown()
 }
 
 function onSettings() {

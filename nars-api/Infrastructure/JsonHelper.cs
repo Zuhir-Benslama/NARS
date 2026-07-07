@@ -1,12 +1,13 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace NarsApi.Infrastructure;
 
 public static class JsonHelper
 {
-    public static JsonElement DeserializeSafe(string json)
+    public static JsonNode? DeserializeSafe(string json)
     {
-        try { return JsonSerializer.Deserialize<JsonElement>(json); }
-        catch (JsonException) { return JsonDocument.Parse("{}").RootElement; }
+        try { return JsonSerializer.Deserialize<JsonNode>(json); }
+        catch (JsonException) { return JsonNode.Parse("{}"); }
     }
 }

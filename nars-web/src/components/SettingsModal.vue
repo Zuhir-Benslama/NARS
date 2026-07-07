@@ -1,6 +1,7 @@
 <template>
   <div
     v-if="visible"
+    ref="modalRef"
     class="modal"
     role="dialog"
     aria-modal="true"
@@ -13,10 +14,15 @@
 
       <div class="settings-container">
         <!-- Sidebar -->
-        <div class="settings-sidebar">
+        <div class="settings-sidebar" role="tablist" @keydown="onTabKeydown">
           <button
             v-for="tab in tabs"
+            :id="'settings-tab-' + tab.id"
             :key="tab.id"
+            role="tab"
+            :aria-selected="activeTab === tab.id"
+            :aria-controls="'settings-panel-' + tab.id"
+            :tabindex="activeTab === tab.id ? 0 : -1"
             :class="['sidebar-tab', { active: activeTab === tab.id }]"
             @click="activeTab = tab.id"
           >
@@ -25,7 +31,12 @@
         </div>
 
         <!-- Active tab panel -->
-        <div class="settings-main">
+        <div
+          :id="'settings-panel-' + activeTab"
+          class="settings-main"
+          role="tabpanel"
+          :aria-labelledby="'settings-tab-' + activeTab"
+        >
           <SettingsGeneral v-if="activeTab === 'general'" />
           <SettingsAccount v-if="activeTab === 'account'" :visible="visible" />
           <SettingsUsers v-if="activeTab === 'users'" />
@@ -45,6 +56,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from "vue"
+import { useFocusTrap } from "../composables/useFocusTrap"
 import { useI18n } from "vue-i18n"
 import { useAppStore } from "../stores/appStore"
 import SettingsGeneral from "./settings/SettingsGeneral.vue"
@@ -53,8 +65,11 @@ import SettingsUsers from "./settings/SettingsUsers.vue"
 import SettingsFeatures from "./settings/SettingsFeatures.vue"
 import SettingsAbout from "./settings/SettingsAbout.vue"
 
-defineProps<{ visible: boolean }>()
+const props = defineProps<{ visible: boolean }>()
 defineEmits(["close"])
+
+const modalRef = ref<HTMLElement | null>(null)
+useFocusTrap(modalRef, () => props.visible)
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -74,6 +89,21 @@ const adminTab = { id: "users", tKey: "tab_users", icon: "👥" }
 const tabs = computed(() =>
   isAdmin.value ? [baseTabs[0], baseTabs[1], adminTab, baseTabs[2], baseTabs[3]] : baseTabs,
 )
+
+function onTabKeydown(e: KeyboardEvent) {
+  const idx = tabs.value.findIndex((t) => t.id === activeTab.value)
+  if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+    e.preventDefault()
+    const next = (idx + 1) % tabs.value.length
+    activeTab.value = tabs.value[next].id
+  } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+    e.preventDefault()
+    const prev = (idx - 1 + tabs.value.length) % tabs.value.length
+    activeTab.value = tabs.value[prev].id
+  }
+  const el = document.getElementById("settings-tab-" + activeTab.value)
+  el?.focus()
+}
 </script>
 
 <style scoped>

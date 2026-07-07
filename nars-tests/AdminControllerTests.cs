@@ -100,6 +100,38 @@ public class AdminControllerTests
         Assert.IsType<ForbidResult>(result);
     }
 
+    [Fact]
+    public async Task Overview_WilayaAdmin_ValidId_ReturnsOk()
+    {
+        var db = CreateDb();
+        var overview = new Mock<IAdminOverviewService>();
+        overview.Setup(s => s.GetWilayaReportAsync(1, default))
+            .ReturnsAsync(new WilayaReport(1, "Alger", "", null, []));
+        var ctrl = CreateController(db, overview.Object);
+        SetUser(ctrl, UserRoles.WilayaAdmin, wilayaId: 1);
+
+        var result = await ctrl.Overview(default);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.NotNull(ok.Value);
+    }
+
+    [Fact]
+    public async Task Overview_DairaAdmin_ValidId_ReturnsOk()
+    {
+        var db = CreateDb();
+        var overview = new Mock<IAdminOverviewService>();
+        overview.Setup(s => s.GetDairaReportAsync(1, default))
+            .ReturnsAsync(new DairaReport(1, "Draria", "", null, []));
+        var ctrl = CreateController(db, overview.Object);
+        SetUser(ctrl, UserRoles.DairaAdmin, dairaId: 1);
+
+        var result = await ctrl.Overview(default);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.NotNull(ok.Value);
+    }
+
     // ─── GetWilaya ──────────────────────────────────────────────────────
 
     [Fact]
