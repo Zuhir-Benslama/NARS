@@ -643,13 +643,24 @@ secrets-apply: .env namespace-ensure ## Create nars-secrets and regcred with gen
 		echo "→ Skipping regcred (DOCKER_TOKEN not set — using locally loaded images)"
 	fi
 
-.PHONY: kustomize-apply
-kustomize-apply: secrets-validate ## Apply k8s manifests via kustomize
-	@echo "→ Applying kustomization..."
+.PHONY: kustomize-set-image-tag
+kustomize-set-image-tag: ## Pin all kustomize image tags to IMAGE_TAG (e.g. IMAGE_TAG=abc1234)
 	@if echo "$(IMAGE_TAG)" | grep -qi "latest"; then \
-		echo "  ⚠ IMAGE_TAG=$(IMAGE_TAG) — using 'latest' for non-reproducible builds."; \
-		echo "  Set IMAGE_TAG=<commit-sha> for deterministic deployments."; \
+		echo "  ⚠ IMAGE_TAG=$(IMAGE_TAG) is 'latest' — not pinning. Set IMAGE_TAG=<commit-sha> for reproducible deployments."; \
+	else \
+		echo "→ Pinning kustomize image tags to $(IMAGE_TAG)..."; \
+		cd "$(K8S_DIR)" && \
+		kustomize edit set image \
+			zuhirbenslama/nars-api=zuhirbenslama/nars-api:$(IMAGE_TAG) \
+			zuhirbenslama/nars-postgis=zuhirbenslama/nars-postgis:$(IMAGE_TAG) \
+			zuhirbenslama/nars-vite=zuhirbenslama/nars-vite:$(IMAGE_TAG); \
+		echo "✓ Image tags pinned to $(IMAGE_TAG)"; \
 	fi
+
+.PHONY: kustomize-apply
+kustomize-apply: secrets-validate ## Apply k8s manifests via kustomize (pin tags with IMAGE_TAG=<sha>)
+	$(MAKE) kustomize-set-image-tag
+	@echo "→ Applying kustomization..."
 	@kubectl kustomize "$(K8S_DIR)" | $(KUBECTL) apply -f -
 	@echo "✓ Kustomization applied"
 

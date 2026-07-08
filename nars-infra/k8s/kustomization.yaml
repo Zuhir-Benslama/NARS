@@ -33,14 +33,14 @@ images:
   # ⚠ `latest` tags are for local dev only — they produce non-reproducible
   # deployments. CI/CD pipelines MUST override newTag with a pinned SHA:
   #
+  #   make kustomize-apply IMAGE_TAG=<commit-sha>
+  #
+  # Or via kustomize directly:
   #   kustomize edit set image \
-  #     zuhirbenslama/nars-api=ghcr.io/org/nars-api:<commit-sha>
+  #     zuhirbenslama/nars-api=zuhirbenslama/nars-api:<commit-sha>
   #
   # For production, use a specific commit SHA. Example:
-  #   kustomize edit set image \
-  #     zuhirbenslama/nars-api=ghcr.io/org/nars-api:abc1234 \
-  #     zuhirbenslama/nars-postgis=ghcr.io/org/nars-postgis:abc1234 \
-  #     zuhirbenslama/nars-vite=ghcr.io/org/nars-vite:abc1234
+  #   make kustomize-apply IMAGE_TAG=abc1234
   #
   # imagePullPolicy is set to IfNotPresent directly in each Deployment YAML
   # because the bundled kustomize (v5.5.0 in kubectl 1.32) does not support
