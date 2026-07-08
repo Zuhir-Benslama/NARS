@@ -19,7 +19,13 @@ const {
   mockGetErrorMessage: vi.fn((e) => `err:${e.message}`),
   mockRecordDelete: vi.fn(),
   mockEnableEditMode: vi.fn(),
-  mockComputeCircleRing: vi.fn(() => [[0, 0], [1, 1]] as [number, number][]),
+  mockComputeCircleRing: vi.fn(
+    () =>
+      [
+        [0, 0],
+        [1, 1],
+      ] as [number, number][],
+  ),
   mockCloseRing: vi.fn((ring) => ring),
   mockDebugError: vi.fn(),
   mockUpdateEndpointMarkers: vi.fn(),
@@ -73,10 +79,14 @@ function addLayerEntry(phaseKey: string, overrides: Record<string, any> = {}): R
   const entry = {
     id: `feat_${dbId}`,
     dbId,
-    data: { type: "areas", label: "Test", coordinates: [{ lat: 36.0, lng: 127.0 }] },
     type: "geojson",
     ...overrides,
-    data: { type: "areas", label: "Test", coordinates: [{ lat: 36.0, lng: 127.0 }], ...(overrides.data || {}) },
+    data: {
+      type: "areas",
+      label: "Test",
+      coordinates: [{ lat: 36.0, lng: 127.0 }],
+      ...(overrides.data || {}),
+    },
   }
   useLayerStore().addFeature(phaseKey, entry)
   return entry
@@ -121,7 +131,11 @@ describe("enableEditGeometry", () => {
   })
 
   it("delegates to editFeatureInfo for circle type", () => {
-    addLayerEntry("cityCenter", { dbId: "circle1", type: "circle", data: { type: "cityCenter", label: "CC", radius: 100, lat: 36.0, lng: 127.0 } })
+    addLayerEntry("cityCenter", {
+      dbId: "circle1",
+      type: "circle",
+      data: { type: "cityCenter", label: "CC", radius: 100, lat: 36.0, lng: 127.0 },
+    })
 
     mod.enableEditGeometry("circle1")
 

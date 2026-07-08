@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import type maplibregl from "maplibre-gl"
 
-const mockSetData = vi.fn()
 const mockGetSource = vi.fn()
 const mockMap = {
   getSource: mockGetSource,
@@ -61,7 +60,11 @@ describe("featuresStore", () => {
   })
 
   it("add appends feature and calls updateSource", () => {
-    const f = { id: "1", geometry: { type: "Point", coordinates: [0, 0] } as any, properties: { phaseKey: "areas", label: "A" } }
+    const f = {
+      id: "1",
+      geometry: { type: "Point", coordinates: [0, 0] } as any,
+      properties: { phaseKey: "areas", label: "A" },
+    }
     mod.featuresStore.add(f)
 
     expect(mod.featuresStore.getAll()).toHaveLength(1)
@@ -69,23 +72,43 @@ describe("featuresStore", () => {
   })
 
   it("batchAdd pushes multiple features", () => {
-    const f1 = { id: "1", geometry: { type: "Point", coordinates: [0, 0] } as any, properties: { phaseKey: "areas", label: "A" } }
-    const f2 = { id: "2", geometry: { type: "Point", coordinates: [1, 1] } as any, properties: { phaseKey: "roads", label: "R" } }
+    const f1 = {
+      id: "1",
+      geometry: { type: "Point", coordinates: [0, 0] } as any,
+      properties: { phaseKey: "areas", label: "A" },
+    }
+    const f2 = {
+      id: "2",
+      geometry: { type: "Point", coordinates: [1, 1] } as any,
+      properties: { phaseKey: "roads", label: "R" },
+    }
     mod.featuresStore.batchAdd([f1, f2])
 
     expect(mod.featuresStore.getAll()).toHaveLength(2)
   })
 
   it("clear empties the store", () => {
-    mod.featuresStore.add({ id: "1", geometry: { type: "Point", coordinates: [0, 0] } as any, properties: { phaseKey: "areas", label: "A" } })
+    mod.featuresStore.add({
+      id: "1",
+      geometry: { type: "Point", coordinates: [0, 0] } as any,
+      properties: { phaseKey: "areas", label: "A" },
+    })
     mod.featuresStore.clear()
 
     expect(mod.featuresStore.getAll()).toHaveLength(0)
   })
 
   it("remove filters out by id", () => {
-    mod.featuresStore.add({ id: "1", geometry: { type: "Point", coordinates: [0, 0] } as any, properties: { phaseKey: "areas", label: "A" } })
-    mod.featuresStore.add({ id: "2", geometry: { type: "Point", coordinates: [1, 1] } as any, properties: { phaseKey: "roads", label: "R" } })
+    mod.featuresStore.add({
+      id: "1",
+      geometry: { type: "Point", coordinates: [0, 0] } as any,
+      properties: { phaseKey: "areas", label: "A" },
+    })
+    mod.featuresStore.add({
+      id: "2",
+      geometry: { type: "Point", coordinates: [1, 1] } as any,
+      properties: { phaseKey: "roads", label: "R" },
+    })
     mod.featuresStore.remove("1")
 
     expect(mod.featuresStore.getAll()).toHaveLength(1)
@@ -93,10 +116,14 @@ describe("featuresStore", () => {
   })
 
   it("update patches geometry and properties", () => {
-    mod.featuresStore.add({ id: "1", geometry: { type: "Point", coordinates: [0, 0] } as any, properties: { phaseKey: "areas", label: "A" } })
+    mod.featuresStore.add({
+      id: "1",
+      geometry: { type: "Point", coordinates: [0, 0] } as any,
+      properties: { phaseKey: "areas", label: "A" },
+    })
     mod.featuresStore.update("1", {
       geometry: { type: "Point", coordinates: [2, 3] } as any,
-      properties: { label: "Updated" },
+      properties: { label: "Updated", phaseKey: "areas" },
     })
 
     const f = mod.featuresStore.getAll()[0]
@@ -120,8 +147,22 @@ describe("featuresStore", () => {
   })
 
   it("updateSource sets feature collection without id field", () => {
-    const f1 = { id: "1", geometry: { type: "Point", coordinates: [0, 0] } as any, properties: { label: "A", phaseKey: "areas" } }
-    const f2 = { id: "2", geometry: { type: "LineString", coordinates: [[0, 0], [1, 1]] } as any, properties: { label: "R", phaseKey: "roads" } }
+    const f1 = {
+      id: "1",
+      geometry: { type: "Point", coordinates: [0, 0] } as any,
+      properties: { label: "A", phaseKey: "areas" },
+    }
+    const f2 = {
+      id: "2",
+      geometry: {
+        type: "LineString",
+        coordinates: [
+          [0, 0],
+          [1, 1],
+        ],
+      } as any,
+      properties: { label: "R", phaseKey: "roads" },
+    }
     mod.featuresStore.batchAdd([f1, f2])
     featuresSource.setData.mockClear()
     mod.featuresStore.updateSource()
@@ -164,7 +205,11 @@ describe("updateSelectionHighlight", () => {
   })
 
   it("sets selection to matching feature geometry", () => {
-    const f = { id: "1", geometry: { type: "Point", coordinates: [10, 20] } as any, properties: { phaseKey: "areas", label: "A", dbId: "1" } }
+    const f = {
+      id: "1",
+      geometry: { type: "Point", coordinates: [10, 20] } as any,
+      properties: { phaseKey: "areas", label: "A", dbId: "1" },
+    }
     mod.featuresStore.add(f)
     mod.updateSelectionHighlight("1")
 

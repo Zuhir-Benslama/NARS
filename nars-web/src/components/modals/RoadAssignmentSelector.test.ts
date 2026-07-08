@@ -16,24 +16,24 @@ interface ModalState {
   errors: Record<string, string>
 }
 
-const modalState = vi.hoisted((): ModalState => ({
-  entranceTypeKey: "main_entrance",
-  isEdit: false,
-  selectedRoadIdx: "",
-  roadOptions: [
-    { idx: 1, label: "Street A" },
-    { idx: 2, label: "Avenue B" },
-  ],
-  entranceNumber: null,
-  entranceSide: null,
-  entranceSideLoading: false,
-  selectedMainIdx: "",
-  mainEntranceOptions: [
-    { idx: 10, label: "Entrance X" },
-  ],
-  bisNumber: null,
-  errors: {},
-}))
+const modalState = vi.hoisted(
+  (): ModalState => ({
+    entranceTypeKey: "main_entrance",
+    isEdit: false,
+    selectedRoadIdx: "",
+    roadOptions: [
+      { idx: 1, label: "Street A" },
+      { idx: 2, label: "Avenue B" },
+    ],
+    entranceNumber: null,
+    entranceSide: null,
+    entranceSideLoading: false,
+    selectedMainIdx: "",
+    mainEntranceOptions: [{ idx: 10, label: "Entrance X" }],
+    bisNumber: null,
+    errors: {},
+  }),
+)
 
 vi.mock("../../stores/modalStore", () => ({
   useModalStore: () => modalState,

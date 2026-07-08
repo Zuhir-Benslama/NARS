@@ -30,6 +30,7 @@ describe("InfoPanel", () => {
       publicBuildings: 2,
       publicSpaces: 4,
       cityCenter: 1,
+      namingPanels: 0,
     }
     const wrapper = mount(InfoPanel)
     expect(wrapper.text()).toContain("5")
@@ -59,7 +60,7 @@ describe("InfoPanel", () => {
   it("shows em dash for city center when not placed and not auto", () => {
     const store = useAppStore()
     store.counts.cityCenter = 0
-    store.cityCenterMode = "manual"
+    store.cityCenterMode = null
     const wrapper = mount(InfoPanel)
     expect(wrapper.text()).toContain("—")
   })

@@ -2,12 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { createPinia, setActivePinia } from "pinia"
 import type { LayerEntry } from "../../types"
 
-const {
-  mockProject,
-  mockSetData,
-  mockDebugLog,
-  mockDebugWarn,
-} = vi.hoisted(() => ({
+const { mockProject, mockSetData, mockDebugLog, mockDebugWarn } = vi.hoisted(() => ({
   mockProject: vi.fn(),
   mockSetData: vi.fn(),
   mockDebugLog: vi.fn(),
@@ -41,11 +36,7 @@ async function reloadModule() {
   updateEndpointMarkers = mod.updateEndpointMarkers
 }
 
-function makeRoad(
-  id: string,
-  dbId: string,
-  coords: { lat: number; lng: number }[],
-): LayerEntry {
+function makeRoad(id: string, dbId: string, coords: { lat: number; lng: number }[]): LayerEntry {
   return {
     id,
     dbId,
@@ -84,14 +75,20 @@ describe("road-markers", () => {
     it("creates start and end markers for each road", async () => {
       const { useLayerStore } = await import("../../stores/layerStore")
       const store = useLayerStore()
-      store.addFeature("roads", makeRoad("r1", "db-1", [
-        { lat: 36.0, lng: 127.0 },
-        { lat: 36.01, lng: 127.01 },
-      ]))
-      store.addFeature("roads", makeRoad("r2", "db-2", [
-        { lat: 36.02, lng: 127.02 },
-        { lat: 36.03, lng: 127.03 },
-      ]))
+      store.addFeature(
+        "roads",
+        makeRoad("r1", "db-1", [
+          { lat: 36.0, lng: 127.0 },
+          { lat: 36.01, lng: 127.01 },
+        ]),
+      )
+      store.addFeature(
+        "roads",
+        makeRoad("r2", "db-2", [
+          { lat: 36.02, lng: 127.02 },
+          { lat: 36.03, lng: 127.03 },
+        ]),
+      )
 
       updateEndpointMarkers()
 
@@ -107,12 +104,22 @@ describe("road-markers", () => {
         id: "cc-1",
         dbId: "db-cc-1",
         type: "circle",
-        data: { type: "cityCenter", label: "C", decisionNumber: "", decisionDate: "", lat: 36.0, lng: 127.0 },
+        data: {
+          type: "cityCenter",
+          label: "C",
+          decisionNumber: "",
+          decisionDate: "",
+          lat: 36.0,
+          lng: 127.0,
+        },
       })
-      store.addFeature("roads", makeRoad("r1", "db-1", [
-        { lat: 36.0, lng: 127.0 },
-        { lat: 36.01, lng: 127.01 },
-      ]))
+      store.addFeature(
+        "roads",
+        makeRoad("r1", "db-1", [
+          { lat: 36.0, lng: 127.0 },
+          { lat: 36.01, lng: 127.01 },
+        ]),
+      )
 
       updateEndpointMarkers()
 
@@ -128,12 +135,22 @@ describe("road-markers", () => {
         id: "cc-1",
         dbId: "db-cc-1",
         type: "circle",
-        data: { type: "cityCenter", label: "C", decisionNumber: "", decisionDate: "", lat: 36.00001, lng: 127.00001 },
+        data: {
+          type: "cityCenter",
+          label: "C",
+          decisionNumber: "",
+          decisionDate: "",
+          lat: 36.00001,
+          lng: 127.00001,
+        },
       })
-      store.addFeature("roads", makeRoad("r1", "db-1", [
-        { lat: 36.0, lng: 127.0 },
-        { lat: 36.01, lng: 127.01 },
-      ]))
+      store.addFeature(
+        "roads",
+        makeRoad("r1", "db-1", [
+          { lat: 36.0, lng: 127.0 },
+          { lat: 36.01, lng: 127.01 },
+        ]),
+      )
 
       updateEndpointMarkers()
 
@@ -157,10 +174,13 @@ describe("road-markers", () => {
 
       const { useLayerStore } = await import("../../stores/layerStore")
       const store = useLayerStore()
-      store.addFeature("roads", makeRoad("r1", "db-1", [
-        { lat: 36.0, lng: 127.0 },
-        { lat: 36.01, lng: 127.01 },
-      ]))
+      store.addFeature(
+        "roads",
+        makeRoad("r1", "db-1", [
+          { lat: 36.0, lng: 127.0 },
+          { lat: 36.01, lng: 127.01 },
+        ]),
+      )
 
       updateEndpointMarkers()
 

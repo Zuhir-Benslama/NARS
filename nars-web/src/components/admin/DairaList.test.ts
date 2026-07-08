@@ -27,13 +27,27 @@ describe("DairaList", () => {
   })
 
   it("shows daira admin name when assigned", () => {
-    const daira = { ...baseDaira, daira_admin: { id: 1, name: "Admin User" } }
+    const daira = {
+      ...baseDaira,
+      daira_admin: {
+        user_id: "1",
+        username: "admin",
+        name: "Admin User",
+        email: "admin@test.com",
+        role: "daira_admin" as const,
+      },
+    }
     const wrapper = mount(DairaList, { props: { dairas: [daira], role: "national_admin" } })
     expect(wrapper.text()).toContain("Admin User")
   })
 
   it("shows commune count", () => {
-    const commune = (id: number) => ({ commune_id: id, commune_name_fr: `Commune ${id}`, commune_name_ar: "", users: [] })
+    const commune = (id: number) => ({
+      commune_id: id,
+      commune_name_fr: `Commune ${id}`,
+      commune_name_ar: "",
+      users: [],
+    })
     const daira = { ...baseDaira, communes: [commune(1), commune(2)] }
     const wrapper = mount(DairaList, { props: { dairas: [daira], role: "national_admin" } })
     expect(wrapper.text()).toContain("2 admin.communes")

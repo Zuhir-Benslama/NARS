@@ -27,7 +27,11 @@ vi.mock("../../api", () => ({ apiFetch: mockApiFetch }))
 vi.mock("../rendering/geometry", () => ({ renderScatteredAreas: mockRenderScatteredAreas }))
 vi.mock("../rendering/labels", () => ({ refreshLayerVisibility: mockRefreshLayerVisibility }))
 vi.mock("../house-numbering", () => ({ getFeatureType: mockGetFeatureType }))
-vi.mock("../../utils/debug", () => ({ debugError: mockDebugError, debugLog: mockDebugLog, debugWarn: vi.fn() }))
+vi.mock("../../utils/debug", () => ({
+  debugError: mockDebugError,
+  debugLog: mockDebugLog,
+  debugWarn: vi.fn(),
+}))
 vi.mock("../roads/road-directions", () => ({ updateEndpointMarkers: mockUpdateEndpointMarkers }))
 vi.mock("../../phases-nav/storage", () => ({ loadPhase: mockLoadPhase }))
 vi.mock("./loader-build", () => ({ buildGeoJsonFeature: mockBuildGeoJsonFeature }))
@@ -66,7 +70,12 @@ describe("loader-db", () => {
   })
 
   it("processes a road feature successfully", async () => {
-    const feature = { id: "1", layer: "street", data: { type: "roads", coordinates: [{ lat: 36.0, lng: 127.0 }], label: "Main St" }, geometry: null }
+    const feature = {
+      id: "1",
+      layer: "street",
+      data: { type: "roads", coordinates: [{ lat: 36.0, lng: 127.0 }], label: "Main St" },
+      geometry: null,
+    }
     mockApiFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([feature]) })
     mockGetFeatureType.mockReturnValue("geojson")
     mockBuildGeoJsonFeature.mockReturnValue({
@@ -81,7 +90,11 @@ describe("loader-db", () => {
   })
 
   it("handles scattered features", async () => {
-    const feature = { id: "2", layer: "scattered", data: { geometry: { type: "Point", coordinates: [0, 0] } } }
+    const feature = {
+      id: "2",
+      layer: "scattered",
+      data: { geometry: { type: "Point", coordinates: [0, 0] } },
+    }
     mockApiFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([feature]) })
 
     await loadFromDatabase()
@@ -101,7 +114,15 @@ describe("loader-db", () => {
   })
 
   it("parses feature.data when it is a string", async () => {
-    const feature = { id: "1", layer: "street", data: JSON.stringify({ type: "roads", label: "Parsed St", coordinates: [{ lat: 36.0, lng: 127.0 }] }) }
+    const feature = {
+      id: "1",
+      layer: "street",
+      data: JSON.stringify({
+        type: "roads",
+        label: "Parsed St",
+        coordinates: [{ lat: 36.0, lng: 127.0 }],
+      }),
+    }
     mockApiFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([feature]) })
     mockGetFeatureType.mockReturnValue("geojson")
     mockBuildGeoJsonFeature.mockReturnValue({
@@ -117,7 +138,11 @@ describe("loader-db", () => {
   })
 
   it("handles cityCenter feature and updates appStore", async () => {
-    const feature = { id: "4", layer: "city_center", data: { type: "cityCenter", label: "CC", lat: 36.0, lng: 127.5 } }
+    const feature = {
+      id: "4",
+      layer: "city_center",
+      data: { type: "cityCenter", label: "CC", lat: 36.0, lng: 127.5 },
+    }
     mockApiFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([feature]) })
     mockGetFeatureType.mockReturnValue("circle")
     mockBuildGeoJsonFeature.mockReturnValue({
@@ -134,7 +159,11 @@ describe("loader-db", () => {
   })
 
   it("restores persisted phase index", async () => {
-    const feature = { id: "1", layer: "city_center", data: { type: "cityCenter", label: "X", lat: 36.0, lng: 127.0 } }
+    const feature = {
+      id: "1",
+      layer: "city_center",
+      data: { type: "cityCenter", label: "X", lat: 36.0, lng: 127.0 },
+    }
     mockApiFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([feature]) })
     mockGetFeatureType.mockReturnValue("circle")
     mockBuildGeoJsonFeature.mockReturnValue(null)
@@ -148,7 +177,11 @@ describe("loader-db", () => {
   })
 
   it("falls back to phase 0 when persisted phase is invalid", async () => {
-    const feature = { id: "1", layer: "city_center", data: { type: "cityCenter", label: "X", lat: 36.0, lng: 127.0 } }
+    const feature = {
+      id: "1",
+      layer: "city_center",
+      data: { type: "cityCenter", label: "X", lat: 36.0, lng: 127.0 },
+    }
     mockApiFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([feature]) })
     mockGetFeatureType.mockReturnValue("circle")
     mockBuildGeoJsonFeature.mockReturnValue(null)
@@ -162,7 +195,11 @@ describe("loader-db", () => {
   })
 
   it("sets loading states and calls post-load hooks", async () => {
-    const feature = { id: "1", layer: "city_center", data: { type: "cityCenter", label: "X", lat: 36.0, lng: 127.0 } }
+    const feature = {
+      id: "1",
+      layer: "city_center",
+      data: { type: "cityCenter", label: "X", lat: 36.0, lng: 127.0 },
+    }
     mockApiFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([feature]) })
     mockGetFeatureType.mockReturnValue("circle")
     mockBuildGeoJsonFeature.mockReturnValue(null)

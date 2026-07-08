@@ -36,7 +36,14 @@ describe("SettingsAccount", () => {
 
   it("pre-fills username and email from store", () => {
     const store = useAppStore()
-    store.user = { username: "jdoe", email: "john@test.com", name: "John", commune: { name_fr: "X", name_ar: "", id: 1 }, role: "user" }
+    store.user = {
+      id: 1,
+      username: "jdoe",
+      email: "john@test.com",
+      name: "John",
+      commune: { name_fr: "X", name_ar: "", id: 1, latitude: null, longitude: null },
+      role: "field_worker",
+    }
     const wrapper = mount(SettingsAccount, { props: { visible: false } })
     const inputs = wrapper.findAll("input")
     expect((inputs[0].element as HTMLInputElement).value).toBe("jdoe")
@@ -46,7 +53,14 @@ describe("SettingsAccount", () => {
   it("syncs form when visible becomes true", async () => {
     const store = useAppStore()
     const wrapper = mount(SettingsAccount, { props: { visible: false } })
-    store.user = { username: "sync_user", email: "sync@test.com", name: "Sync", commune: { name_fr: "X", name_ar: "", id: 1 }, role: "user" }
+    store.user = {
+      id: 1,
+      username: "sync_user",
+      email: "sync@test.com",
+      name: "Sync",
+      commune: { name_fr: "X", name_ar: "", id: 1, latitude: null, longitude: null },
+      role: "field_worker",
+    }
     await wrapper.setProps({ visible: true })
     const inputs = wrapper.findAll("input")
     expect((inputs[0].element as HTMLInputElement).value).toBe("sync_user")
@@ -79,17 +93,27 @@ describe("SettingsAccount", () => {
   it("calls API on valid form submission", async () => {
     mockApiFetch.mockResolvedValueOnce({ ok: true })
     const store = useAppStore()
-    store.user = { username: "jdoe", email: "john@test.com", name: "John", commune: { name_fr: "X", name_ar: "", id: 1 }, role: "user" }
+    store.user = {
+      id: 1,
+      username: "jdoe",
+      email: "john@test.com",
+      name: "John",
+      commune: { name_fr: "X", name_ar: "", id: 1, latitude: null, longitude: null },
+      role: "field_worker",
+    }
     const wrapper = mount(SettingsAccount, { props: { visible: true } })
     const inputs = wrapper.findAll("input")
     await inputs[0].setValue("newuser")
     await inputs[1].setValue("new@email.com")
     await inputs[2].setValue("newpass123")
     await wrapper.find(".modal-btn-save").trigger("click")
-    expect(mockApiFetch).toHaveBeenCalledWith("/api/user/update", expect.objectContaining({
-      method: "PUT",
-      body: expect.stringContaining("newuser"),
-    }))
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      "/api/user/update",
+      expect.objectContaining({
+        method: "PUT",
+        body: expect.stringContaining("newuser"),
+      }),
+    )
   })
 
   it("shows success toast on API success", async () => {

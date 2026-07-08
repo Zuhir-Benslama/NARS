@@ -7,12 +7,12 @@ const mockSnapPointForEdit = vi.fn()
 
 function buildMockCtx() {
   return {
-    map: { project: mockProject },
+    map: { project: mockProject } as any,
     geoman: {
       markerPointer: {
         marker: { setLngLat: mockSetLngLat },
       },
-    },
+    } as any,
   }
 }
 
@@ -81,12 +81,9 @@ describe("edit-snap", () => {
     })
 
     it("patched function snaps position when snap found", async () => {
-      const { useEditStore } = await import("../../stores/editStore")
-      const store = useEditStore()
-
       patchMarkerPointerSnap("entry-1")
       const ctxMod = await import("../core/state")
-      const patchedFn = ctxMod.ctx.geoman!.markerPointer!.marker.setLngLat
+      const patchedFn = (ctxMod.ctx.geoman as any).markerPointer.marker.setLngLat
 
       mockSnapPointForEdit.mockReturnValue({ lat: 36.5, lng: 127.5 })
       patchedFn([10, 20])
@@ -97,12 +94,9 @@ describe("edit-snap", () => {
     })
 
     it("patched function uses original position when no snap found", async () => {
-      const { useEditStore } = await import("../../stores/editStore")
-      const store = useEditStore()
-
       patchMarkerPointerSnap("entry-1")
       const ctxMod = await import("../core/state")
-      const patchedFn = ctxMod.ctx.geoman!.markerPointer!.marker.setLngLat
+      const patchedFn = (ctxMod.ctx.geoman as any).markerPointer.marker.setLngLat
 
       mockSnapPointForEdit.mockReturnValue(null)
       patchedFn([10, 20])
@@ -121,7 +115,7 @@ describe("edit-snap", () => {
 
       unpatchMarkerPointerSnap()
 
-      const restoredFn = ctxMod.ctx.geoman!.markerPointer!.marker.setLngLat
+      const restoredFn = (ctxMod.ctx.geoman as any).markerPointer.marker.setLngLat
       restoredFn([99, 88])
       expect(mockSetLngLat).toHaveBeenCalledWith([99, 88])
       expect(store.origSetLngLat).toBeNull()

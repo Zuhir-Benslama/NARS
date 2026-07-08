@@ -26,7 +26,7 @@ vi.mock("../core/state", () => ({
     geoman: {
       disableGlobalEditMode: mockDisableGlobalEditMode,
     },
-  },
+  } as any,
   updateSelectionHighlight: mockUpdateSelectionHighlight,
 }))
 
@@ -75,7 +75,7 @@ beforeEach(async () => {
   setActivePinia(createPinia())
   vi.clearAllMocks()
   const mockCtx = await import("../core/state")
-  mockCtx.ctx.geoman = { disableGlobalEditMode: mockDisableGlobalEditMode }
+  ;(mockCtx.ctx as any).geoman = { disableGlobalEditMode: mockDisableGlobalEditMode }
   await loadModule()
 })
 
@@ -154,7 +154,7 @@ describe("edit-state", () => {
   describe("disableEditMode", () => {
     it("returns early when ctx.geoman is missing", async () => {
       const mockCtx = await import("../core/state")
-      mockCtx.ctx.geoman = undefined
+      ;(mockCtx.ctx as any).geoman = undefined
 
       disableEditMode()
       expect(mockUnpatchMarkerPointerSnap).not.toHaveBeenCalled()
@@ -218,9 +218,7 @@ describe("edit-state", () => {
 
   describe("suppressGeomanFill", () => {
     it("hides polygon fill layers when they exist", () => {
-      mockGetLayer.mockImplementation((id: string) =>
-        id.includes("polygon") ? true : false,
-      )
+      mockGetLayer.mockImplementation((id: string) => (id.includes("polygon") ? true : false))
 
       suppressGeomanFill()
 
@@ -237,9 +235,7 @@ describe("edit-state", () => {
     })
 
     it("hides circle layers when they exist", () => {
-      mockGetLayer.mockImplementation((id: string) =>
-        id.includes("circle") ? true : false,
-      )
+      mockGetLayer.mockImplementation((id: string) => (id.includes("circle") ? true : false))
 
       suppressGeomanFill()
 

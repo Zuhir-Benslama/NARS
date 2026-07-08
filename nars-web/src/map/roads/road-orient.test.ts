@@ -5,10 +5,7 @@ import { nk } from "./road-graph"
 
 import { geographicDirection, orientFromCityCenter } from "./road-orient"
 
-function makeSeg(
-  coords: Coord[],
-  dbId = "db-1",
-): Seg {
+function makeSeg(coords: Coord[], dbId = "db-1"): Seg {
   return {
     coords,
     entry: {
@@ -94,13 +91,7 @@ describe("road-orient", () => {
       segs.set("seg1", seg)
 
       const visited = new Set<string>()
-      orientFromCityCenter(
-        { lat: 36.0, lng: 127.0 },
-        1,
-        graph,
-        segs,
-        visited,
-      )
+      orientFromCityCenter({ lat: 36.0, lng: 127.0 }, 1, graph, segs, visited)
 
       expect(visited.size).toBeGreaterThan(0)
     })
@@ -111,10 +102,7 @@ describe("road-orient", () => {
       const visited = new Set<string>()
 
       expect(() =>
-        orientFromCityCenter(
-          { lat: 36.0, lng: 127.0 },
-          100, graph, segs, visited,
-        ),
+        orientFromCityCenter({ lat: 36.0, lng: 127.0 }, 100, graph, segs, visited),
       ).not.toThrow()
     })
   })

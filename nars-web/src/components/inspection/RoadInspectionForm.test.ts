@@ -26,7 +26,9 @@ describe("RoadInspectionForm", () => {
   })
 
   it("renders title and feature label", () => {
-    const wrapper = mount(RoadInspectionForm, { props: { feature: { id: "1", label: "Main Road" } } })
+    const wrapper = mount(RoadInspectionForm, {
+      props: { feature: { id: "1", label: "Main Road" } },
+    })
     expect(wrapper.text()).toContain("Road Inspection")
     expect(wrapper.text()).toContain("Main Road")
   })
@@ -69,10 +71,13 @@ describe("RoadInspectionForm", () => {
     mockApiFetch.mockResolvedValueOnce({ ok: true })
     const wrapper = mount(RoadInspectionForm, { props: { feature: { id: "1", label: "R" } } })
     await wrapper.find(".rif-submit").trigger("click")
-    expect(mockApiFetch).toHaveBeenCalledWith("/api/field/inspect", expect.objectContaining({
-      method: "POST",
-      body: expect.stringContaining("road"),
-    }))
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      "/api/field/inspect",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining("road"),
+      }),
+    )
   })
 
   it("emits done on successful submit", async () => {
@@ -92,7 +97,10 @@ describe("RoadInspectionForm", () => {
   })
 
   it("shows error toast when API fails", async () => {
-    mockApiFetch.mockResolvedValueOnce({ ok: false, json: vi.fn().mockResolvedValue({ detail: "Server error" }) })
+    mockApiFetch.mockResolvedValueOnce({
+      ok: false,
+      json: vi.fn().mockResolvedValue({ detail: "Server error" }),
+    })
     const wrapper = mount(RoadInspectionForm, { props: { feature: { id: "1", label: "R" } } })
     await wrapper.find(".rif-submit").trigger("click")
     await nextTick()

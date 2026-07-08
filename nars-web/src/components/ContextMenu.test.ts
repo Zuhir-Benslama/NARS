@@ -7,7 +7,7 @@ import ContextMenu from "./ContextMenu.vue"
 import { useContextMenuStore } from "../stores/contextMenuStore"
 
 const globalOpts = {
-  stubs: { Teleport: { template: '<div><slot /></div>' } },
+  stubs: { Teleport: { template: "<div><slot /></div>" } },
 }
 
 describe("ContextMenu", () => {

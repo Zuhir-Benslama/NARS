@@ -59,7 +59,10 @@ describe("setPhase", () => {
     const { savePhase } = await import("./storage")
     const appStore = useAppStore()
     appStore.setUser({
-      id: 1, username: "u", name: "U", email: "u@u.com",
+      id: 1,
+      username: "u",
+      name: "U",
+      email: "u@u.com",
       role: "commune_user",
       commune: { id: 99, name_fr: "C", name_ar: "", latitude: null, longitude: null },
     })

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { mount } from "@vue/test-utils"
-import { nextTick } from "vue"
+
 import { setActivePinia, createPinia } from "pinia"
 
 vi.mock("vue-i18n", () => ({
@@ -52,7 +52,14 @@ describe("SettingsModal", () => {
 
   it("shows users tab for admin users", () => {
     const store = useAppStore()
-    store.user = { username: "admin", name: "Admin", commune: { name_fr: "X", name_ar: "", id: 1 }, role: "national_admin" }
+    store.user = {
+      id: 1,
+      username: "admin",
+      name: "Admin",
+      email: "admin@test.com",
+      commune: { name_fr: "X", name_ar: "", id: 1, latitude: null, longitude: null },
+      role: "national_admin",
+    }
     const wrapper = mount(SettingsModal, { props: { visible: true }, global: globalOpts })
     const tabs = wrapper.findAll(".sidebar-tab")
     expect(tabs).toHaveLength(5)

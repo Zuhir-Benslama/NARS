@@ -32,19 +32,21 @@ const project = (ll: [number, number]) => ({ x: ll[0], y: -ll[1] })
 const unproject = (pt: [number, number]) =>
   ({ lng: pt[0], lat: -pt[1] }) as unknown as maplibregl.LngLat
 
+import type { SnapResult } from "./snap-search"
+
 let findNearestSnap: (
   cursorX: number,
   cursorY: number,
   phaseKeys: string[],
   includeMidpoint: boolean,
   excludeId?: string | null,
-) => { lat: number; lng: number; type: string } | null
+) => SnapResult | null
 let mergeExternalSnapWithDrawFirstVertex: (
   cursorX: number,
   cursorY: number,
-  external: { lat: number; lng: number; type: string } | null,
+  external: SnapResult | null,
   project: (ll: [number, number]) => { x: number; y: number },
-) => { lat: number; lng: number; type: string } | null
+) => SnapResult | null
 async function loadModule() {
   const mod = await import("./snap-search")
   findNearestSnap = mod.findNearestSnap
@@ -68,7 +70,7 @@ beforeEach(async () => {
 
 describe("snap-search", () => {
   describe("mergeExternalSnapWithDrawFirstVertex", () => {
-    function makeExternal(overrides = {}): { lat: number; lng: number; type: string } {
+    function makeExternal(overrides = {}): SnapResult {
       return { lat: 30, lng: 120, type: "vertex", ...overrides }
     }
 
@@ -252,9 +254,7 @@ describe("snap-search", () => {
     })
 
     it("snaps to circle perimeter", () => {
-      mockGetCityCenterCircles.mockReturnValue([
-        { lat: 10, lng: 10, radius: 1000000 },
-      ])
+      mockGetCityCenterCircles.mockReturnValue([{ lat: 10, lng: 10, radius: 1000000 }])
 
       const result = findNearestSnap(15, -10, ["cityCenter"], false)
       expect(result).not.toBeNull()
@@ -287,17 +287,15 @@ describe("snap-search", () => {
     })
 
     it("excludes the entry with the given excludeId", () => {
-      mockGetSnapRings.mockImplementation(
-        (_phaseKeys: string[], excludeId?: string | null) => {
-          if (excludeId === "exclude-me") return []
-          return [
-            [
-              { lat: 0, lng: 0 },
-              { lat: 10, lng: 0 },
-            ],
-          ]
-        },
-      )
+      mockGetSnapRings.mockImplementation((_phaseKeys: string[], excludeId?: string | null) => {
+        if (excludeId === "exclude-me") return []
+        return [
+          [
+            { lat: 0, lng: 0 },
+            { lat: 10, lng: 0 },
+          ],
+        ]
+      })
 
       const withExclude = findNearestSnap(0, 0, ["areas"], false, "exclude-me")
       expect(withExclude).toBeNull()
@@ -340,9 +338,7 @@ describe("snap-search", () => {
     })
 
     it("snaps from snap points", () => {
-      mockGetSnapPoints.mockReturnValue([
-        { lat: 10, lng: 20 },
-      ])
+      mockGetSnapPoints.mockReturnValue([{ lat: 10, lng: 20 }])
 
       const result = findNearestSnap(20, -10, ["areas"], false)
       expect(result).not.toBeNull()

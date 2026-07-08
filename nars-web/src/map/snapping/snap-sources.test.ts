@@ -30,7 +30,9 @@ describe("setSnapSourceExclude", () => {
 describe("getSnapRings", () => {
   function addPoly(phaseKey: string, id: string, coords: { lat: number; lng: number }[]) {
     useLayerStore().addFeature(phaseKey, {
-      id, dbId: id, type: "polygon",
+      id,
+      dbId: id,
+      type: "polygon",
       data: { type: phaseKey, label: "P", coordinates: coords },
     } as any)
   }
@@ -41,7 +43,11 @@ describe("getSnapRings", () => {
   })
 
   it("collects polygon rings from matching phase keys", () => {
-    addPoly("areas", "a1", [{ lat: 0, lng: 0 }, { lat: 1, lng: 0 }, { lat: 0, lng: 1 }])
+    addPoly("areas", "a1", [
+      { lat: 0, lng: 0 },
+      { lat: 1, lng: 0 },
+      { lat: 0, lng: 1 },
+    ])
 
     const result = mod.getSnapRings(["areas"])
 
@@ -50,8 +56,16 @@ describe("getSnapRings", () => {
   })
 
   it("excludes entry by id", () => {
-    addPoly("areas", "keep", [{ lat: 0, lng: 0 }, { lat: 1, lng: 0 }, { lat: 0, lng: 1 }])
-    addPoly("areas", "skip", [{ lat: 2, lng: 2 }, { lat: 3, lng: 2 }, { lat: 2, lng: 3 }])
+    addPoly("areas", "keep", [
+      { lat: 0, lng: 0 },
+      { lat: 1, lng: 0 },
+      { lat: 0, lng: 1 },
+    ])
+    addPoly("areas", "skip", [
+      { lat: 2, lng: 2 },
+      { lat: 3, lng: 2 },
+      { lat: 2, lng: 3 },
+    ])
 
     const result = mod.getSnapRings(["areas"], "skip")
 
@@ -61,8 +75,17 @@ describe("getSnapRings", () => {
 
   it("skips non-polygon entries", () => {
     useLayerStore().addFeature("areas", {
-      id: "line1", dbId: "line1", type: "line",
-      data: { type: "areas", label: "L", coordinates: [{ lat: 0, lng: 0 }, { lat: 1, lng: 1 }] },
+      id: "line1",
+      dbId: "line1",
+      type: "line",
+      data: {
+        type: "areas",
+        label: "L",
+        coordinates: [
+          { lat: 0, lng: 0 },
+          { lat: 1, lng: 1 },
+        ],
+      },
     } as any)
 
     const result = mod.getSnapRings(["areas"])
@@ -71,7 +94,10 @@ describe("getSnapRings", () => {
   })
 
   it("skips polygon with fewer than 3 coordinates", () => {
-    addPoly("areas", "short", [{ lat: 0, lng: 0 }, { lat: 1, lng: 0 }])
+    addPoly("areas", "short", [
+      { lat: 0, lng: 0 },
+      { lat: 1, lng: 0 },
+    ])
 
     const result = mod.getSnapRings(["areas"])
 
@@ -82,14 +108,23 @@ describe("getSnapRings", () => {
     _setCtx({
       boundariesGeoJson: {
         type: "FeatureCollection",
-        features: [{
-          type: "Feature",
-          geometry: {
-            type: "Polygon",
-            coordinates: [[[127.0, 36.0], [127.1, 36.0], [127.05, 36.1], [127.0, 36.0]]],
+        features: [
+          {
+            type: "Feature",
+            geometry: {
+              type: "Polygon",
+              coordinates: [
+                [
+                  [127.0, 36.0],
+                  [127.1, 36.0],
+                  [127.05, 36.1],
+                  [127.0, 36.0],
+                ],
+              ],
+            },
+            properties: {},
           },
-          properties: {},
-        }],
+        ],
       },
     } as any)
 
@@ -107,8 +142,17 @@ describe("getRoadChains", () => {
 
   it("collects line entries from roads layer", () => {
     useLayerStore().addFeature("roads", {
-      id: "r1", dbId: "r1", type: "line",
-      data: { type: "roads", label: "R", coordinates: [{ lat: 0, lng: 0 }, { lat: 1, lng: 1 }] },
+      id: "r1",
+      dbId: "r1",
+      type: "line",
+      data: {
+        type: "roads",
+        label: "R",
+        coordinates: [
+          { lat: 0, lng: 0 },
+          { lat: 1, lng: 1 },
+        ],
+      },
     } as any)
 
     const result = mod.getRoadChains(["roads"])
@@ -119,8 +163,17 @@ describe("getRoadChains", () => {
 
   it("excludes entry by id", () => {
     useLayerStore().addFeature("roads", {
-      id: "exclude", dbId: "exclude", type: "line",
-      data: { type: "roads", label: "X", coordinates: [{ lat: 0, lng: 0 }, { lat: 1, lng: 1 }] },
+      id: "exclude",
+      dbId: "exclude",
+      type: "line",
+      data: {
+        type: "roads",
+        label: "X",
+        coordinates: [
+          { lat: 0, lng: 0 },
+          { lat: 1, lng: 1 },
+        ],
+      },
     } as any)
 
     expect(mod.getRoadChains(["roads"], "exclude")).toEqual([])
@@ -128,8 +181,18 @@ describe("getRoadChains", () => {
 
   it("skips non-line entries", () => {
     useLayerStore().addFeature("roads", {
-      id: "r2", dbId: "r2", type: "polygon",
-      data: { type: "roads", label: "P", coordinates: [{ lat: 0, lng: 0 }, { lat: 1, lng: 0 }, { lat: 0, lng: 1 }] },
+      id: "r2",
+      dbId: "r2",
+      type: "polygon",
+      data: {
+        type: "roads",
+        label: "P",
+        coordinates: [
+          { lat: 0, lng: 0 },
+          { lat: 1, lng: 0 },
+          { lat: 0, lng: 1 },
+        ],
+      },
     } as any)
 
     expect(mod.getRoadChains(["roads"])).toEqual([])
@@ -143,7 +206,9 @@ describe("getCityCenterCircles", () => {
 
   it("collects entries with valid lat/lng/radius", () => {
     useLayerStore().addFeature("cityCenter", {
-      id: "cc1", dbId: "cc1", type: "circle",
+      id: "cc1",
+      dbId: "cc1",
+      type: "circle",
       data: { type: "cityCenter", label: "CC", lat: 36.0, lng: 127.0, radius: 500 },
     } as any)
 
@@ -154,7 +219,9 @@ describe("getCityCenterCircles", () => {
 
   it("skips entries with missing or zero radius", () => {
     useLayerStore().addFeature("cityCenter", {
-      id: "cc2", dbId: "cc2", type: "circle",
+      id: "cc2",
+      dbId: "cc2",
+      type: "circle",
       data: { type: "cityCenter", label: "CC", lat: 36.0, lng: 127.0, radius: 0 },
     } as any)
 
@@ -165,7 +232,9 @@ describe("getCityCenterCircles", () => {
 describe("getSnapPoints", () => {
   it("collects point features with lat/lng", () => {
     useLayerStore().addFeature("cityCenter", {
-      id: "p1", dbId: "p1", type: "point",
+      id: "p1",
+      dbId: "p1",
+      type: "point",
       data: { type: "cityCenter", label: "P", lat: 36.5, lng: 127.5 },
     } as any)
 
@@ -176,7 +245,9 @@ describe("getSnapPoints", () => {
 
   it("skips entries without lat/lng", () => {
     useLayerStore().addFeature("cityCenter", {
-      id: "p2", dbId: "p2", type: "point",
+      id: "p2",
+      dbId: "p2",
+      type: "point",
       data: { type: "cityCenter", label: "P" },
     } as any)
 

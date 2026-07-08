@@ -27,7 +27,9 @@ const {
         project: vi.fn(() => ({ x: 100, y: 200 })),
       },
     } as any,
-    resetMockDom: () => { mockCanvas.style.cursor = "" },
+    resetMockDom: () => {
+      mockCanvas.style.cursor = ""
+    },
   }
 })
 
@@ -124,8 +126,18 @@ describe("isSnappingActive", () => {
 describe("getActiveSnapPhases", () => {
   it("returns all non-empty phases in edit mode", () => {
     useSnapStore().editModeActive = true
-    useLayerStore().addFeature("areas", { id: "f1", dbId: "1", data: { type: "areas", label: "A" } as any, type: "geojson" })
-    useLayerStore().addFeature("roads", { id: "f2", dbId: "2", data: { type: "roads", label: "R" } as any, type: "geojson" })
+    useLayerStore().addFeature("areas", {
+      id: "f1",
+      dbId: "1",
+      data: { type: "areas", label: "A" } as any,
+      type: "geojson",
+    })
+    useLayerStore().addFeature("roads", {
+      id: "f2",
+      dbId: "2",
+      data: { type: "roads", label: "R" } as any,
+      type: "geojson",
+    })
 
     const result = mod.getActiveSnapPhases()
 
@@ -218,7 +230,9 @@ describe("installSnapInterceptors", () => {
 
   it("injects snap lngLat into event when snap is active", () => {
     const handlers: Record<string, Function> = {}
-    mockCtx.map.on = (ev: string, fn: Function) => { handlers[ev] = fn }
+    mockCtx.map.on = (ev: string, fn: Function) => {
+      handlers[ev] = fn
+    }
     mod.installSnapInterceptors()
 
     useSnapStore().snapActive = true

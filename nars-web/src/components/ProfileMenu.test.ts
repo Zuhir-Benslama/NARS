@@ -30,7 +30,11 @@ import { vClickOutside } from "../directives/clickOutside"
 
 const globalOpts = {
   directives: { "click-outside": vClickOutside },
-  stubs: { SettingsModal: { template: '<div v-if="$attrs.visible" class="mock-settings-modal">Settings</div>' } },
+  stubs: {
+    SettingsModal: {
+      template: '<div v-if="$attrs.visible" class="mock-settings-modal">Settings</div>',
+    },
+  },
 }
 
 describe("ProfileMenu", () => {
@@ -42,7 +46,14 @@ describe("ProfileMenu", () => {
 
   it("renders profile button with user data", () => {
     const store = useAppStore()
-    store.user = { username: "jdoe", name: "John Doe", commune: { name_fr: "Test", name_ar: "", id: 1 }, role: "user" }
+    store.user = {
+      id: 1,
+      username: "jdoe",
+      name: "John Doe",
+      email: "j@t.com",
+      commune: { name_fr: "Test", name_ar: "", id: 1, latitude: null, longitude: null },
+      role: "field_worker",
+    }
     const wrapper = mount(ProfileMenu, { global: globalOpts })
     expect(wrapper.text()).toContain("jdoe")
     expect(wrapper.text()).toContain("John Doe")
@@ -55,7 +66,14 @@ describe("ProfileMenu", () => {
 
   it("shows initials from username", () => {
     const store = useAppStore()
-    store.user = { username: "jdoe", name: "John", commune: { name_fr: "Test", name_ar: "", id: 1 }, role: "user" }
+    store.user = {
+      id: 1,
+      username: "jdoe",
+      name: "John",
+      email: "j@t.com",
+      commune: { name_fr: "Test", name_ar: "", id: 1, latitude: null, longitude: null },
+      role: "field_worker",
+    }
     const wrapper = mount(ProfileMenu, { global: globalOpts })
     expect(wrapper.find(".profile-icon").text()).toBe("J")
   })
@@ -101,7 +119,14 @@ describe("ProfileMenu", () => {
     mockApiFetch.mockResolvedValueOnce({ ok: true })
     const store = useAppStore()
     store.currentPhase = 2
-    store.user = { username: "jdoe", name: "John", commune: { name_fr: "Test", name_ar: "", id: 1 }, role: "user" }
+    store.user = {
+      id: 1,
+      username: "jdoe",
+      name: "John",
+      email: "j@t.com",
+      commune: { name_fr: "Test", name_ar: "", id: 1, latitude: null, longitude: null },
+      role: "field_worker",
+    }
     const wrapper = mount(ProfileMenu, { global: globalOpts })
     await wrapper.find(".profile-button").trigger("click")
     await wrapper.findAll(".dropdown-item")[1].trigger("click")
@@ -112,7 +137,14 @@ describe("ProfileMenu", () => {
   it("redirects on successful logout", async () => {
     mockApiFetch.mockResolvedValueOnce({ ok: true })
     const store = useAppStore()
-    store.user = { username: "jdoe", name: "John", commune: { name_fr: "Test", name_ar: "", id: 1 }, role: "user" }
+    store.user = {
+      id: 1,
+      username: "jdoe",
+      name: "John",
+      email: "j@t.com",
+      commune: { name_fr: "Test", name_ar: "", id: 1, latitude: null, longitude: null },
+      role: "field_worker",
+    }
     Object.defineProperty(window, "location", { value: { href: "" }, writable: true })
     const wrapper = mount(ProfileMenu, { global: globalOpts })
     await wrapper.find(".profile-button").trigger("click")
@@ -125,7 +157,14 @@ describe("ProfileMenu", () => {
   it("shows toast on failed logout", async () => {
     mockApiFetch.mockRejectedValueOnce(new Error("Network error"))
     const store = useAppStore()
-    store.user = { username: "jdoe", name: "John", commune: { name_fr: "Test", name_ar: "", id: 1 }, role: "user" }
+    store.user = {
+      id: 1,
+      username: "jdoe",
+      name: "John",
+      email: "j@t.com",
+      commune: { name_fr: "Test", name_ar: "", id: 1, latitude: null, longitude: null },
+      role: "field_worker",
+    }
     const wrapper = mount(ProfileMenu, { global: globalOpts })
     await wrapper.find(".profile-button").trigger("click")
     await wrapper.findAll(".dropdown-item")[1].trigger("click")

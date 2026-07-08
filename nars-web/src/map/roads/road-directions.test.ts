@@ -31,7 +31,11 @@ vi.mock("../../utils/debug", () => ({
 
 vi.mock("./road-graph", () => ({
   buildConnectionGraph: mockBuildConnectionGraph,
-  dm: vi.fn((a, b) => Math.abs(a.lat - b.lat) * 111320 + Math.abs(a.lng - b.lng) * 111320 * Math.cos(36 * Math.PI / 180)),
+  dm: vi.fn(
+    (a, b) =>
+      Math.abs(a.lat - b.lat) * 111320 +
+      Math.abs(a.lng - b.lng) * 111320 * Math.cos((36 * Math.PI) / 180),
+  ),
   fromNk: vi.fn((k: string) => {
     const [lat, lng] = k.split(",").map(Number)
     return { lat, lng }
@@ -50,11 +54,7 @@ vi.mock("./road-markers", () => ({
   updateEndpointMarkers: mockUpdateEndpointMarkers,
 }))
 
-function makeRoad(
-  id: string,
-  dbId: string,
-  coords: { lat: number; lng: number }[],
-): LayerEntry {
+function makeRoad(id: string, dbId: string, coords: { lat: number; lng: number }[]): LayerEntry {
   return {
     id,
     dbId,
@@ -146,10 +146,13 @@ describe("road-directions", () => {
 
       const { useLayerStore } = await import("../../stores/layerStore")
       const store = useLayerStore()
-      store.addFeature("roads", makeRoad("r1", "db-1", [
-        { lat: 36.0, lng: 127.0 },
-        { lat: 36.01, lng: 127.01 },
-      ]))
+      store.addFeature(
+        "roads",
+        makeRoad("r1", "db-1", [
+          { lat: 36.0, lng: 127.0 },
+          { lat: 36.01, lng: 127.01 },
+        ]),
+      )
 
       await computeAndApplyRoadDirections()
 
@@ -165,15 +168,26 @@ describe("road-directions", () => {
 
       const { useLayerStore } = await import("../../stores/layerStore")
       const store = useLayerStore()
-      store.addFeature("roads", makeRoad("r1", "db-1", [
-        { lat: 36.0, lng: 127.0 },
-        { lat: 36.01, lng: 127.01 },
-      ]))
+      store.addFeature(
+        "roads",
+        makeRoad("r1", "db-1", [
+          { lat: 36.0, lng: 127.0 },
+          { lat: 36.01, lng: 127.01 },
+        ]),
+      )
       store.addFeature("cityCenter", {
         id: "cc-1",
         dbId: "db-cc-1",
         type: "circle",
-        data: { type: "cityCenter", label: "C", decisionNumber: "", decisionDate: "", lat: 36.0, lng: 127.0, radius: 50 },
+        data: {
+          type: "cityCenter",
+          label: "C",
+          decisionNumber: "",
+          decisionDate: "",
+          lat: 36.0,
+          lng: 127.0,
+          radius: 50,
+        },
       })
 
       await computeAndApplyRoadDirections()

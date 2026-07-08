@@ -1,19 +1,8 @@
 import { describe, it, expect } from "vitest"
-import {
-  buildConnectionGraph,
-  nk,
-  fromNk,
-  dm,
-  toPt,
-  toLn,
-} from "./road-graph"
+import { buildConnectionGraph, nk, fromNk, dm, toPt, toLn } from "./road-graph"
 import type { LayerEntry } from "../../types"
 
-function makeRoad(
-  id: string,
-  dbId: string,
-  coords: { lat: number; lng: number }[],
-): LayerEntry {
+function makeRoad(id: string, dbId: string, coords: { lat: number; lng: number }[]): LayerEntry {
   return {
     id,
     dbId,
@@ -147,7 +136,7 @@ describe("road-graph", () => {
       ])
       const { segs } = buildConnectionGraph([road])
       expect(segs.size).toBe(1)
-      const seg = segs.values().next().value
+      const seg = segs.values().next().value!
       expect(seg.coords.length).toBe(3)
     })
 
@@ -168,7 +157,7 @@ describe("road-graph", () => {
         { lat: 36.01, lng: 127.01 },
       ])
       const { segs } = buildConnectionGraph([road])
-      const seg = segs.values().next().value
+      const seg = segs.values().next().value!
       expect(seg.dbId).toBe("db-road-1")
       expect(seg.entry).toBe(road)
     })

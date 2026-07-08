@@ -17,14 +17,14 @@ const {
 } = vi.hoisted(() => ({
   mockApiFetch: vi.fn(),
   mockSetEditDragActive: vi.fn(),
-  mockGetActiveSnapPhases: vi.fn(() => []),
-  mockSnapPointForEdit: vi.fn(),
+  mockGetActiveSnapPhases: vi.fn((): any[] => []),
+  mockSnapPointForEdit: vi.fn((): any => null),
   mockDisableEditMode: vi.fn(),
-  mockGetActiveEditEntry: vi.fn(() => null),
-  mockIsEditMode: vi.fn(() => false),
+  mockGetActiveEditEntry: vi.fn((): any => null),
+  mockIsEditMode: vi.fn((): boolean => false),
   mockRecordDelete: vi.fn(),
   mockRefreshLayerVisibility: vi.fn(),
-  mockGetErrorMessage: vi.fn((e) => `err:${e.message}`),
+  mockGetErrorMessage: vi.fn((e: any) => `err:${e.message}`),
   mockShowToast: vi.fn(),
   mockDebugError: vi.fn(),
 }))
@@ -58,8 +58,9 @@ let mod: typeof import("./geoman-events")
 let mapOn: ReturnType<typeof vi.fn>
 let useEditStore: any
 
-function getHandler(eventName: string): (...args: any[]) => any {
-  return mapOn.mock.calls.find(([name]: [string]) => name === eventName)?.[1]
+function getHandler(eventName: string): (...args: any[]) => void {
+  const call = mapOn.mock.calls.find((call: any[]) => call[0] === eventName)
+  return call ? call[1] : vi.fn()
 }
 
 function addLayerEntry(phaseKey: string, overrides: Record<string, any> = {}): void {
@@ -67,10 +68,14 @@ function addLayerEntry(phaseKey: string, overrides: Record<string, any> = {}): v
   const entry: any = {
     id: `feat_${dbId}`,
     dbId,
-    data: { type: phaseKey, label: "Test", coordinates: [{ lat: 36.0, lng: 127.0 }] },
     type: "geojson",
     ...overrides,
-    data: { type: phaseKey, label: "Test", coordinates: [{ lat: 36.0, lng: 127.0 }], ...(overrides.data || {}) },
+    data: {
+      type: phaseKey,
+      label: "Test",
+      coordinates: [{ lat: 36.0, lng: 127.0 }],
+      ...(overrides.data || {}),
+    },
   }
   useLayerStore().addFeature(phaseKey as any, entry)
 }
@@ -150,14 +155,15 @@ describe("onVertexDragEnd", () => {
 
 describe("onEditEnd", () => {
   it("updates point geometry coordinates", () => {
-    mockGetActiveEditEntry.mockReturnValue({ id: "feat_1", data: { lat: 0, lng: 0 } })
+    const entry = { id: "feat_1", data: { lat: 0, lng: 0 } }
+    mockGetActiveEditEntry.mockReturnValue(entry)
     mod.registerGeomanEvents()
     const handler = getHandler("gm:editend")
 
     handler({ feature: { _geoJson: { geometry: { type: "Point", coordinates: [10, 20] } } } })
 
-    expect(mockGetActiveEditEntry().data.lat).toBe(20)
-    expect(mockGetActiveEditEntry().data.lng).toBe(10)
+    expect(entry.data.lat).toBe(20)
+    expect(entry.data.lng).toBe(10)
   })
 
   it("updates line geometry coordinates", () => {
@@ -171,7 +177,10 @@ describe("onEditEnd", () => {
         _geoJson: {
           geometry: {
             type: "LineString",
-            coordinates: [[127.0, 36.0], [127.1, 36.1]],
+            coordinates: [
+              [127.0, 36.0],
+              [127.1, 36.1],
+            ],
           },
         },
       },
@@ -187,7 +196,11 @@ describe("onEditEnd", () => {
     mockGetActiveSnapPhases.mockReturnValue(["roads"])
     useEditStore().draggedVertexIndex = 0
     mockSnapPointForEdit.mockReturnValue({ lat: 37.0, lng: 128.0 })
-    _setCtx({ map: { on: mapOn, project: vi.fn(() => ({ x: 100, y: 200 })) } as any, geoman: {} as any, featuresSource: { setData: vi.fn() } as any })
+    _setCtx({
+      map: { on: mapOn, project: vi.fn(() => ({ x: 100, y: 200 })) } as any,
+      geoman: {} as any,
+      featuresSource: { setData: vi.fn() } as any,
+    })
 
     const entry = { id: "feat_1", data: { coordinates: [] } }
     mockGetActiveEditEntry.mockReturnValue(entry)
@@ -206,8 +219,8 @@ describe("onEditEnd", () => {
     })
 
     expect(mockSnapPointForEdit).toHaveBeenCalled()
-    expect(entry.data.coordinates[0].lat).toBe(37.0)
-    expect(entry.data.coordinates[0].lng).toBe(128.0)
+    expect((entry.data.coordinates as any)[0].lat).toBe(37.0)
+    expect((entry.data.coordinates as any)[0].lng).toBe(128.0)
   })
 
   it("does nothing when no active edit entry", () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, beforeEach } from "vitest"
 import { mount } from "@vue/test-utils"
 import { nextTick } from "vue"
 import { setActivePinia, createPinia } from "pinia"
@@ -8,7 +8,7 @@ import { useConfirmStore } from "../stores/confirmStore"
 
 const globalOpts = {
   stubs: {
-    Teleport: { template: '<div><slot /></div>' },
+    Teleport: { template: "<div><slot /></div>" },
   },
 }
 

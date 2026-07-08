@@ -161,7 +161,9 @@ describe("FieldPanel", () => {
     const wrapper = mount(FieldPanel, {
       global: globalOpts,
       props: {
-        fetchFeaturesFn: async () => { throw new Error("Network error") },
+        fetchFeaturesFn: async () => {
+          throw new Error("Network error")
+        },
       },
     })
     await new Promise((r) => setTimeout(r, 0))
