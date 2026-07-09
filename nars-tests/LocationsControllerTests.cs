@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Controllers;
@@ -16,12 +15,9 @@ public class LocationsControllerTests
 {
     private static LocationsController CreateController(
         AppDbContext db,
-        IMemoryCache? cache = null,
         IBoundaryService? boundaryService = null) =>
         new(
             db,
-            cache ?? new MemoryCache(new MemoryCacheOptions()),
-            Options.Create(new CacheOptions()),
             Options.Create(new LocationsOptions()),
             boundaryService ?? Mock.Of<IBoundaryService>());
 
@@ -109,8 +105,7 @@ public class LocationsControllerTests
     {
         var db = CreateDb(nameof(GetWilayas_NoSearchSkip0Take500_Caches));
         SeedWilayas(db);
-        var cache = new MemoryCache(new MemoryCacheOptions());
-        var ctrl = CreateController(db, cache: cache);
+        var ctrl = CreateController(db);
 
         var result1 = await ctrl.GetWilayas(search: "", skip: 0, take: 500);
         var ok1 = Assert.IsType<OkObjectResult>(result1);
@@ -124,7 +119,7 @@ public class LocationsControllerTests
         var result2 = await ctrl.GetWilayas(search: "", skip: 0, take: 500);
         var ok2 = Assert.IsType<OkObjectResult>(result2);
         var resp2 = Assert.IsType<PagedResponse<WilayaItem>>(ok2.Value);
-        Assert.Equal(3, resp2.Total);
+        Assert.Equal(4, resp2.Total); // No caching — queries DB directly
     }
 
     // ── GET /api/dairas ───────────────────────────────────────────────────

@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Controllers;
@@ -39,8 +38,6 @@ public class LocationsControllerIntegrationTests : IAsyncLifetime
     {
         return new LocationsController(
             _db,
-            new MemoryCache(new MemoryCacheOptions()),
-            Options.Create(new CacheOptions()),
             Options.Create(new LocationsOptions()),
             Mock.Of<IBoundaryService>());
     }

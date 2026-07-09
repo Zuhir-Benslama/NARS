@@ -49,8 +49,9 @@ public partial class AuthController
         // IMPORTANT: always run BCrypt.Verify even when the user is not found.
         // Short-circuiting on "admin is null" leaks whether a username exists
         // via response-time difference (~0 µs vs ~300 ms for a real BCrypt check).
+        var adminNormalized = body.AdminUsername.ToLowerInvariant();
         var admin = await db.Users
-            .FirstOrDefaultAsync(u => u.Username == body.AdminUsername, cancellationToken);
+            .FirstOrDefaultAsync(u => u.Username == adminNormalized, cancellationToken);
 
         var hashToCheck = admin?.PasswordHash ?? DummyHash;
         var passwordValid = BCrypt.Net.BCrypt.Verify(body.AdminPassword, hashToCheck);
@@ -96,12 +97,13 @@ public partial class AuthController
             return Problem(detail: geoError, statusCode: 400);
         }
 
-        // 6. Uniqueness.
+        // 6. Uniqueness (normalised to lowercase for case-insensitive matching).
+        var normalizedNewUsername = body.Username.ToLowerInvariant();
         var existing = await db.Users
-            .FirstOrDefaultAsync(u => u.Username == body.Username || u.Email == body.Email, cancellationToken);
+            .FirstOrDefaultAsync(u => u.Username == normalizedNewUsername || u.Email == body.Email, cancellationToken);
         if (existing is not null)
         {
-            var field = existing.Username == body.Username ? "Username" : "Email";
+            var field = existing.Username == normalizedNewUsername ? "Username" : "Email";
             return Problem(detail: $"{field} already exists.", statusCode: 409);
         }
 
@@ -118,7 +120,7 @@ public partial class AuthController
             Name = body.Name,
             Email = body.Email,
             Phone = body.Phone,
-            Username = body.Username,
+            Username = normalizedNewUsername,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(body.Password),
             Role = body.Role,
             // commune_user and field_worker get a CommuneId; admins get their geographic anchor.

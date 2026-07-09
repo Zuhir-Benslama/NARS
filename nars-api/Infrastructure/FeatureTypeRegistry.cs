@@ -41,6 +41,11 @@ public sealed class FeatureTypeDescriptor
     public required Func<AppDbContext, FeatureBase, EntityEntry> AddToContext { get; init; }
 
     /// <summary>
+    /// Factory that creates new entity instances.
+    /// </summary>
+    public required Func<FeatureBase> CreateInstance { get; init; }
+
+    /// <summary>
     /// Optional post-update action for type-specific column updates.
     /// Called after the common fields (UpdatedAt, Label, Data) are updated.
     /// Parameters: (AppDbContext, featureId, userId, data, CancellationToken).
@@ -63,7 +68,7 @@ public sealed class FeatureTypeDescriptor
     /// </summary>
     public FeatureBase CreateEntity(Guid id, Guid userId, string layer, string label, string data, DateTime createdAt)
     {
-        var entity = (FeatureBase)Activator.CreateInstance(EntityType)!;
+        var entity = CreateInstance();
         entity.Id = id;
         entity.UserId = userId;
         entity.Layer = layer;
@@ -84,7 +89,7 @@ public sealed class FeatureTypeDescriptor
 /// </summary>
 public static class FeatureTypeRegistry
 {
-    private static FeatureTypeDescriptor Descriptor<T>(string type, string tableName, Func<AppDbContext, Microsoft.EntityFrameworkCore.DbSet<T>> dbSet, Func<AppDbContext, Guid, Guid, System.Text.Json.JsonElement?, CancellationToken, Task>? postUpdateAction = null, IReadOnlyList<IndexDefinition>? indexes = null, IReadOnlyList<CompositeIndexDefinition>? compositeIndexes = null) where T : FeatureBase =>
+    private static FeatureTypeDescriptor Descriptor<T>(string type, string tableName, Func<AppDbContext, Microsoft.EntityFrameworkCore.DbSet<T>> dbSet, Func<AppDbContext, Guid, Guid, System.Text.Json.JsonElement?, CancellationToken, Task>? postUpdateAction = null, IReadOnlyList<IndexDefinition>? indexes = null, IReadOnlyList<CompositeIndexDefinition>? compositeIndexes = null) where T : FeatureBase, new() =>
         new()
         {
             Type = type,
@@ -92,6 +97,7 @@ public static class FeatureTypeRegistry
             EntityType = typeof(T),
             DbSetAccessor = db => dbSet(db),
             AddToContext = (db, e) => db.Entry(dbSet(db).Add((T)e).Entity),
+            CreateInstance = static () => new T(),
             PostUpdateAction = postUpdateAction,
             Indexes = indexes ?? [],
             CompositeIndexes = compositeIndexes ?? [],

@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -20,15 +21,15 @@ public static class AuthenticationExtensions
         string? issuer = null,
         string? audience = null)
     {
-        // Prevent JwtSecurityTokenHandler from renaming custom claims.
-        // By default it maps e.g. "role" → long URI claim type, which breaks
-        // User.FindFirstValue("role") in NarsControllerBase.CurrentUserRole.
-        Microsoft.IdentityModel.JsonWebTokens.JsonWebTokenHandler.DefaultMapInboundClaims = false;
-        System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
-
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
+                // Per-instance (not global) opt-out of claim renaming.
+                // MapInboundClaims=false keeps "role" as "role" instead of
+                // remapping to the long URI claim type, which would break
+                // User.FindFirstValue("role") in NarsControllerBase.CurrentUserRole.
+                options.MapInboundClaims = false;
+
                 var validationParams = new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
@@ -76,6 +77,15 @@ public static class AuthenticationExtensions
                         return Task.CompletedTask;
                     }
                 };
+            })
+            .AddCookie("Pages", options =>
+            {
+                options.Cookie.HttpOnly = true;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+                options.Cookie.SameSite = SameSiteMode.Lax;
+                options.ExpireTimeSpan = TimeSpan.FromMinutes(15);
+                options.SlidingExpiration = true;
+                options.LoginPath = "/login";
             });
 
         services.AddAuthorization();

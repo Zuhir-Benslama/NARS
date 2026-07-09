@@ -6,20 +6,21 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
+public class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactory) : IFeatureStatsService
 {
     public async Task<Dictionary<string, long>> GetFeatureCountsAsync(Guid userId, CancellationToken ct = default)
     {
         var descriptors = FeatureTypeRegistry.GetAllDescriptors();
-        var counts = new Dictionary<string, long>(descriptors.Count);
-        foreach (var descriptor in descriptors)
+        var tasks = descriptors.Select(async d =>
         {
-            var count = await descriptor.GetDbSet(db)
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            var count = await d.GetDbSet(db)
                 .Where(f => f.UserId == userId)
                 .LongCountAsync(ct);
-            counts[descriptor.Type] = count;
-        }
-        return counts;
+            return (d.Type, Count: count);
+        });
+        var results = await Task.WhenAll(tasks);
+        return results.ToDictionary(r => r.Type, r => r.Count);
     }
 
     public async Task<Dictionary<Guid, UserFeatureStats>> GetUserFeatureCountsAsync(Guid[] userIds, CancellationToken ct = default)
@@ -29,42 +30,46 @@ public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
             return [];
         }
 
-        var users = await db.Users
+        await using var userDb = await dbFactory.CreateDbContextAsync(ct);
+        var users = await userDb.Users
             .Where(u => userIds.Contains(u.Id))
             .ToListAsync(ct);
 
         var descriptors = FeatureTypeRegistry.GetAllDescriptors();
-        var featureCounts = new Dictionary<Guid, Dictionary<string, long>>();
-        foreach (var user in users)
-        {
-            featureCounts[user.Id] = descriptors.ToDictionary(d => d.Type, _ => 0L);
-        }
+        var featureCounts = users.ToDictionary(u => u.Id, _ => descriptors.ToDictionary(d => d.Type, _ => 0L));
 
-        foreach (var descriptor in descriptors)
+        var tasks = descriptors.Select(async d =>
         {
-            var perUser = await descriptor.GetDbSet(db)
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            var perUser = await d.GetDbSet(db)
                 .Where(f => userIds.Contains(f.UserId))
                 .GroupBy(f => f.UserId)
                 .Select(g => new { UserId = g.Key, Count = g.LongCount() })
                 .ToListAsync(ct);
+            return (Type: d.Type, Data: perUser);
+        });
 
-            foreach (var item in perUser)
+        var results = await Task.WhenAll(tasks);
+
+        foreach (var result in results)
+        {
+            foreach (var item in result.Data)
             {
                 if (featureCounts.TryGetValue(item.UserId, out var counts))
                 {
-                    counts[descriptor.Type] = item.Count;
+                    counts[result.Type] = item.Count;
                 }
             }
         }
 
-        var result = new Dictionary<Guid, UserFeatureStats>(users.Count);
+        var resultList = new Dictionary<Guid, UserFeatureStats>(users.Count);
         foreach (var user in users)
         {
             var counts = featureCounts[user.Id];
             long GetCount(string type) => counts.GetValueOrDefault(type, 0);
             var total = counts.Values.Sum();
 
-            result[user.Id] = new UserFeatureStats(
+            resultList[user.Id] = new UserFeatureStats(
                 UserId: user.Id.ToString(),
                 Username: user.Username,
                 Name: user.Name,
@@ -81,17 +86,19 @@ public class FeatureStatsService(AppDbContext db) : IFeatureStatsService
                 Total: total
             );
         }
-        return result;
+        return resultList;
     }
 
     public async Task<(List<FeatureResult> features, int totalCount)> LoadAllFeaturesAsync(Guid userId, int skip, int take, CancellationToken ct = default)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
         var conn = db.Database.GetDbConnection();
         return await FeatureQueryHelper.LoadAllFeaturesAsync(conn, userId, skip, take, ct);
     }
 
     public async Task<(List<FeatureResult> features, int totalCount)> LoadByLayerAsync(Guid userId, string layer, int skip, int take, CancellationToken ct = default)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
         var conn = db.Database.GetDbConnection();
         return await FeatureQueryHelper.LoadByLayerAsync(conn, userId, layer, skip, take, ct);
     }

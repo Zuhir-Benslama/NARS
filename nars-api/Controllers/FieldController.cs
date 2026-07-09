@@ -22,6 +22,7 @@ public class FieldController(
     IFieldService fieldService) : NarsControllerBase
 {
     private readonly int _maxFeatureDataSize = featureDefaults.Value.MaxFeatureDataSize;
+    private const string DefaultEntranceLabel = "Entrance (field worker)";
 
     /// <summary>Lists features of a given type visible to the field worker's commune.</summary>
     [HttpGet("field/features")]
@@ -186,7 +187,7 @@ public class FieldController(
             return Problem(detail: "Feature data is too large (max 512 KB).", statusCode: 400);
         }
 
-        var label = body.Label ?? "Entrance (field worker)";
+        var label = body.Label ?? DefaultEntranceLabel;
         var newId = Guid.CreateVersion7();
 
         var entrance = new HouseEntrance

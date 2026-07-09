@@ -7,18 +7,27 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public class ValidationService(AppDbContext db) : IValidationService
+public class ValidationService : IValidationService
 {
-    private static string RoadTable => FeatureTypeRegistry.GetDescriptor(FeatureTypes.Road)?.TableName
-        ?? throw new InvalidOperationException("FeatureTypeRegistry missing Road descriptor");
-    private static string AreaTable => FeatureTypeRegistry.GetDescriptor(FeatureTypes.Area)?.TableName
-        ?? throw new InvalidOperationException("FeatureTypeRegistry missing Area descriptor");
-    private static string DistrictTable => FeatureTypeRegistry.GetDescriptor(FeatureTypes.District)?.TableName
-        ?? throw new InvalidOperationException("FeatureTypeRegistry missing District descriptor");
+    private readonly AppDbContext _db;
+    private readonly string _roadTable;
+    private readonly string _areaTable;
+    private readonly string _districtTable;
+
+    public ValidationService(AppDbContext db)
+    {
+        _db = db;
+        _roadTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.Road)?.TableName
+            ?? throw new InvalidOperationException("FeatureTypeRegistry missing Road descriptor");
+        _areaTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.Area)?.TableName
+            ?? throw new InvalidOperationException("FeatureTypeRegistry missing Area descriptor");
+        _districtTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.District)?.TableName
+            ?? throw new InvalidOperationException("FeatureTypeRegistry missing District descriptor");
+    }
 
     private async Task<object?> ExecuteScalarAsync(string sql, List<(string name, object value)> parameters, CancellationToken ct)
     {
-        var conn = db.Database.GetDbConnection();
+        var conn = _db.Database.GetDbConnection();
         await using var handle = await conn.EnsureOpenAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = sql;
@@ -34,7 +43,7 @@ public class ValidationService(AppDbContext db) : IValidationService
         var sql = $@"
             SELECT EXISTS (
                 SELECT 1
-                FROM {RoadTable} f
+                FROM {_roadTable} f
                 WHERE f.user_id = @uid
                   AND ST_DWithin(
                         ({SqlFragments.LineStringFromData})::geography,
@@ -52,13 +61,13 @@ public class ValidationService(AppDbContext db) : IValidationService
             WITH
             urban AS (
                 SELECT ST_Union({SqlFragments.PolygonFromData}) AS geom
-                FROM {AreaTable} f
+                FROM {_areaTable} f
                 WHERE f.user_id = @uid
                   AND f.layer  IN ('central_urban', 'secondary_urban')
             ),
             districts AS (
                 SELECT ST_Union({SqlFragments.PolygonFromData}) AS geom
-                FROM {DistrictTable} f
+                FROM {_districtTable} f
                 WHERE f.user_id = @uid
             )
             SELECT ST_Covers(
@@ -75,7 +84,7 @@ public class ValidationService(AppDbContext db) : IValidationService
     {
         var sql = $@"
             SELECT EXISTS (
-                SELECT 1 FROM {DistrictTable} f
+                SELECT 1 FROM {_districtTable} f
                 WHERE f.user_id = @uid
                   AND ST_Intersects(
                         ({SqlFragments.PolygonFromData}),
@@ -91,11 +100,11 @@ public class ValidationService(AppDbContext db) : IValidationService
         var sql = $@"
             WITH area_geom AS (
                 SELECT {SqlFragments.PolygonFromDataWithAlias("a")} AS geom
-                FROM {AreaTable} a
+                FROM {_areaTable} a
                 WHERE a.user_id = @uid
                   AND a.layer IN ('central_urban', 'secondary_urban')
             )
-            SELECT COUNT(*) FROM {DistrictTable} d
+            SELECT COUNT(*) FROM {_districtTable} d
             WHERE d.user_id = @uid
               AND EXISTS (
                   SELECT 1 FROM area_geom ag
@@ -111,12 +120,12 @@ public class ValidationService(AppDbContext db) : IValidationService
         var sql = $@"
             WITH district_geom AS (
                 SELECT {SqlFragments.PolygonFromData} AS geom
-                FROM {DistrictTable} f
+                FROM {_districtTable} f
                 WHERE f.user_id = @uid
             ),
             area_geom AS (
                 SELECT {SqlFragments.PolygonFromDataWithAlias("a")} AS geom
-                FROM {AreaTable} a
+                FROM {_areaTable} a
                 WHERE a.user_id = @uid
                   AND a.layer IN ('central_urban', 'secondary_urban')
             )
@@ -135,14 +144,14 @@ public class ValidationService(AppDbContext db) : IValidationService
     }
 
     public async Task<bool> UserHasCentralUrbanAreaAsync(Guid userId, CancellationToken ct = default) =>
-        await db.Set<Area>().AnyAsync(a => a.UserId == userId && a.Layer == FeatureTypes.AreaLayers.CentralUrban, ct);
+        await _db.Set<Area>().AnyAsync(a => a.UserId == userId && a.Layer == FeatureTypes.AreaLayers.CentralUrban, ct);
 
     public Task<int> CountUserRoadsAsync(Guid userId, CancellationToken ct = default) =>
-        db.Set<Road>().CountAsync(r => r.UserId == userId, ct);
+        _db.Set<Road>().CountAsync(r => r.UserId == userId, ct);
 
     public Task<int> CountUserDistrictsAsync(Guid userId, CancellationToken ct = default) =>
-        db.Set<District>().CountAsync(d => d.UserId == userId, ct);
+        _db.Set<District>().CountAsync(d => d.UserId == userId, ct);
 
     public Task<int> CountUserUrbanAreasAsync(Guid userId, CancellationToken ct = default) =>
-        db.Set<Area>().CountAsync(a => a.UserId == userId && (a.Layer == FeatureTypes.AreaLayers.CentralUrban || a.Layer == FeatureTypes.AreaLayers.SecondaryUrban), ct);
+        _db.Set<Area>().CountAsync(a => a.UserId == userId && (a.Layer == FeatureTypes.AreaLayers.CentralUrban || a.Layer == FeatureTypes.AreaLayers.SecondaryUrban), ct);
 }

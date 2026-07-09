@@ -39,7 +39,7 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
 
     private AdminController CreateController()
     {
-        var featureStats = new FeatureStatsService(_db);
+        var featureStats = new FeatureStatsService(_fixture.CreateDbContextFactory());
         return new AdminController(_db, Mock.Of<Microsoft.Extensions.Logging.ILogger<AdminController>>(), new AdminOverviewService(_db, featureStats), new UserAuthorizationService(_db));
     }
 

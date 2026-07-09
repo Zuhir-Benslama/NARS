@@ -71,8 +71,8 @@ public class LogsController(IErrorLogService errorLogService, ILogger<LogsContro
                 continue;
             }
 
-            var level = (entry.Level ?? "error").ToLowerInvariant();
-            if (!AllowedLevels.Contains(level))
+            var level = entry.Level ?? "error";
+            if (!AllowedLevels.Contains(level, StringComparer.OrdinalIgnoreCase))
             {
                 skipped++;
                 continue;

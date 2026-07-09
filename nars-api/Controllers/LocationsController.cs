@@ -1,6 +1,6 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using NarsApi.Data;
 using NarsApi.DTOs;
@@ -23,26 +23,12 @@ namespace NarsApi.Controllers;
 [Tags("Locations")]
 public class LocationsController(
     AppDbContext db,
-    IMemoryCache cache,
-    IOptions<CacheOptions> cacheOptions,
     IOptions<LocationsOptions> locationsOptions,
     IBoundaryService boundaryService) : ControllerBase
 {
-    private const string WilayaCacheKey = "wilayas_all";
-    private const string DairaCacheKeyPrefix = "dairas_wilaya_";
-    private const string CommuneCacheKeyPrefix = "communes_daira_";
-    private TimeSpan ReferenceDataCacheDuration => TimeSpan.FromHours(cacheOptions.Value.ReferenceDataDurationHours);
-
-    private async Task<List<T>> CacheOrFetchAsync<T>(string key, Func<Task<List<T>>> fetch) =>
-        (await cache.GetOrCreateAsync(key, async entry =>
-        {
-            entry.AbsoluteExpirationRelativeToNow = ReferenceDataCacheDuration;
-            return await fetch();
-        })) ?? [];
 
     private async Task<IActionResult> PaginateAsync<TEntity, TDto>(
         string search, int skip, int take,
-        string cacheKey,
         Func<IQueryable<TEntity>> baseQuery,
         Func<IQueryable<TEntity>, IQueryable<TEntity>>? searchFilter,
         Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>> orderBy,
@@ -57,18 +43,12 @@ public class LocationsController(
             return Problem(detail: $"Search query is too long (max {maxSearchLength} characters).", statusCode: 400);
         }
 
-        if (string.IsNullOrEmpty(search))
+        var q = baseQuery();
+        if (!string.IsNullOrEmpty(search) && searchFilter is not null)
         {
-            var cached = await CacheOrFetchAsync(cacheKey, async () =>
-            {
-                var all = await orderBy(baseQuery()).ToListAsync(cancellationToken);
-                return all.Select(mapper).ToList();
-            });
-            var paged = cached.Skip(skip).Take(take).ToList();
-            return Ok(new PagedResponse<TDto>(paged, cached.Count, skip, take));
+            q = searchFilter(q);
         }
 
-        var q = searchFilter is not null ? searchFilter(baseQuery()) : baseQuery();
         var total = await q.CountAsync(cancellationToken);
         var result = await orderBy(q).Skip(skip).Take(take).ToListAsync(cancellationToken);
         var items = result.Select(mapper).ToList();
@@ -88,7 +68,6 @@ public class LocationsController(
         [FromQuery] int take = 100,
         CancellationToken cancellationToken = default) => await PaginateAsync(
             search, skip, take,
-            WilayaCacheKey,
             () => db.Wilayas.AsQueryable(),
             q => q.Where(w => EF.Functions.ILike(w.WilayaFr!, $"%{search}%")
                            || EF.Functions.ILike(w.WilayaAr!, $"%{search}%")),
@@ -116,7 +95,6 @@ public class LocationsController(
 
         return await PaginateAsync(
             search, skip, take,
-            $"{DairaCacheKeyPrefix}{wilaya_id}",
             () => db.Dairas.Where(d => d.WilayaId == wilaya_id),
             q => q.Where(d => EF.Functions.ILike(d.DairaFr, $"%{search}%")
                            || EF.Functions.ILike(d.DairaAr, $"%{search}%")),
@@ -145,7 +123,6 @@ public class LocationsController(
 
         return await PaginateAsync(
             search, skip, take,
-            $"{CommuneCacheKeyPrefix}{daira_id}",
             () => db.Communes.Where(c => c.DairaId == daira_id),
             q => q.Where(c => EF.Functions.ILike(c.CommuneFr, $"%{search}%")
                            || EF.Functions.ILike(c.CommuneAr, $"%{search}%")),
@@ -172,7 +149,11 @@ public class LocationsController(
         {
             if (commune?.CommuneLatitude is not null && commune.CommuneLongitude is not null)
             {
-                geoJson = $"{{\"type\":\"Point\",\"coordinates\":[{commune.CommuneLongitude.Value},{commune.CommuneLatitude.Value}]}}";
+                geoJson = JsonSerializer.Serialize(new
+                {
+                    type = "Point",
+                    coordinates = new[] { commune.CommuneLongitude.Value, commune.CommuneLatitude.Value }
+                });
             }
             else
             {

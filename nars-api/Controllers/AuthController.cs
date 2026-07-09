@@ -27,6 +27,7 @@ public partial class AuthController(
 {
     // Stable dummy hash so BCrypt always does the full work, even for unknown users.
     // Prevents username enumeration via response-time side-channel.
+    // NOTE: Only applies to signin and authorized-signup — refresh uses token hash, not BCrypt.
     private const string DummyHash = "$2a$11$BCfJgwy.hTY703/9RBjPo.8UjBrTHh/95zFznkYLiapLvWdf5ISbO";
     // ── POST /api/signup — DISABLED ────────────────────────────────────────
     // Self-registration is not allowed. All accounts must be created by an
@@ -61,7 +62,8 @@ public partial class AuthController(
             return Problem(detail: "Request body is required.", statusCode: 400);
         }
 
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Username == body.Username, cancellationToken);
+        var normalizedUsername = body.Username.ToLowerInvariant();
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Username == normalizedUsername, cancellationToken);
 
         var hashToCheck = user?.PasswordHash ?? DummyHash;
         var passwordValid = BCrypt.Net.BCrypt.Verify(body.Password, hashToCheck);

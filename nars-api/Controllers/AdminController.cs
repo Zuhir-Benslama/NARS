@@ -126,11 +126,12 @@ public class AdminController(
             return Problem(detail: geoError, statusCode: 400);
         }
 
+        var normalizedNewUsername = body.Username.ToLowerInvariant();
         var existing = await db.Users.FirstOrDefaultAsync(u =>
-            u.Username == body.Username || u.Email == body.Email, cancellationToken);
+            u.Username == normalizedNewUsername || u.Email == body.Email, cancellationToken);
         if (existing is not null)
         {
-            var field = existing.Username == body.Username ? "Username" : "Email";
+            var field = existing.Username == normalizedNewUsername ? "Username" : "Email";
             return Problem(detail: $"{field} already exists.", statusCode: 409);
         }
 
@@ -149,7 +150,7 @@ public class AdminController(
             Name = body.Name,
             Email = body.Email,
             Phone = body.Phone,
-            Username = body.Username,
+            Username = normalizedNewUsername,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(body.Password),
             Role = body.Role,
             WilayaId = body.WilayaId,
@@ -158,7 +159,16 @@ public class AdminController(
         };
 
         db.Users.Add(newUser);
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex)
+        {
+            logger.LogWarning(ex, "Duplicate user during admin signup (username={Username}, email={Email})",
+                normalizedNewUsername, body.Email);
+            return Problem(detail: "Username or email already exists.", statusCode: 409);
+        }
 
         logger.LogInformation("[Admin] {CallerRole} {CallerId} created {Role} {UserId}",
             callerRole, CurrentUserId, body.Role, newUser.Id);
@@ -396,6 +406,6 @@ public class AdminController(
     private async Task<IActionResult> DairaOverview(int dairaId, CancellationToken cancellationToken)
     {
         var report = await overviewService.GetDairaReportAsync(dairaId, cancellationToken);
-        return Ok(report ?? new DairaReport(dairaId, "", "", null, []));
+        return report is null ? Problem(detail: "Daira not found.", statusCode: 404) : Ok(report);
     }
 }

@@ -50,11 +50,13 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
                 : command.Body.Data.Value.GetRawText();
         }
 
+        var updatedAt = command.UpdatedAt;
+        var newLabel = command.Body.Label;
         var rows = await query
             .Where(f => f.Id == command.FeatureId && f.UserId == command.UserId)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(f => f.UpdatedAt, command.UpdatedAt)
-                .SetProperty(f => f.Label, f => command.Body.Label ?? f.Label)
+                .SetProperty(f => f.UpdatedAt, updatedAt)
+                .SetProperty(f => f.Label, f => newLabel ?? f.Label)
                 .SetProperty(f => f.Data, f => dataStr ?? f.Data)
             , ct);
 

@@ -63,10 +63,16 @@ public class RefreshTokenService(
 
     protected virtual Task<RefreshToken?> FindRefreshTokenByHashAsync(string hash, CancellationToken ct)
     {
-        var tableName = db.Model.FindEntityType(typeof(RefreshToken))?.GetTableName() ?? "refresh_tokens";
+        const string expectedTable = "refresh_tokens";
+        var tableName = db.Model.FindEntityType(typeof(RefreshToken))?.GetTableName();
+        if (!string.Equals(tableName, expectedTable, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"Unexpected table name '{tableName}' for RefreshToken entity.");
+        }
+
         return db.RefreshTokens
             .FromSqlInterpolated(
-                $"SELECT * FROM {tableName} WHERE token_hash = {hash} AND revoked = false AND expires_at > NOW() FOR UPDATE SKIP LOCKED")
+                $"SELECT * FROM {expectedTable} WHERE token_hash = {hash} AND revoked = false AND expires_at > NOW() FOR UPDATE SKIP LOCKED")
             .FirstOrDefaultAsync(ct);
     }
 }

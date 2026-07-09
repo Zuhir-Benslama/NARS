@@ -9,14 +9,13 @@ namespace NarsApi.Tests;
 
 public class FeatureStatsServiceTests
 {
-    private static AppDbContext CreateDb() => CreateInMemoryDb("FeatureStatsTest");
-
     private static readonly Guid UserId1 = Guid.NewGuid();
     private static readonly Guid UserId2 = Guid.NewGuid();
 
-    private static async Task<AppDbContext> SeedWithFeaturesAsync()
+    private static async Task<IDbContextFactory<AppDbContext>> SeedWithFeaturesAsync()
     {
-        var db = CreateDb();
+        var factory = CreateInMemoryDbFactory("FeatureStatsTest");
+        await using var db = await factory.CreateDbContextAsync();
 
         db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = UserId1, Layer = "central_urban", Label = "A1", Data = "{}", CreatedAt = FixedUtcNow });
         db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = UserId1, Layer = "secondary_urban", Label = "A2", Data = "{}", CreatedAt = FixedUtcNow });
@@ -28,14 +27,14 @@ public class FeatureStatsServiceTests
         db.Users.Add(new User { Id = UserId2, Username = "user2", Name = "User 2", Email = "u2@test.com", Phone = "0555000001", PasswordHash = "hash", Role = "commune_user", CommuneId = 1 });
 
         await db.SaveChangesAsync();
-        return db;
+        return factory;
     }
 
     [Fact]
     public async Task GetFeatureCountsAsync_ReturnsCorrectCounts()
     {
-        var db = await SeedWithFeaturesAsync();
-        var svc = new FeatureStatsService(db);
+        var factory = await SeedWithFeaturesAsync();
+        var svc = new FeatureStatsService(factory);
 
         var counts = await svc.GetFeatureCountsAsync(UserId1);
 
@@ -52,8 +51,8 @@ public class FeatureStatsServiceTests
     [Fact]
     public async Task GetFeatureCountsAsync_UnknownUser_ReturnsAllZeros()
     {
-        var db = await SeedWithFeaturesAsync();
-        var svc = new FeatureStatsService(db);
+        var factory = await SeedWithFeaturesAsync();
+        var svc = new FeatureStatsService(factory);
 
         var counts = await svc.GetFeatureCountsAsync(Guid.NewGuid());
 
@@ -63,8 +62,8 @@ public class FeatureStatsServiceTests
     [Fact]
     public async Task GetFeatureCountsAsync_EmptyDb_ReturnsAllZeros()
     {
-        var db = CreateDb();
-        var svc = new FeatureStatsService(db);
+        var factory = CreateInMemoryDbFactory("FeatureStatsTest");
+        var svc = new FeatureStatsService(factory);
 
         var counts = await svc.GetFeatureCountsAsync(UserId1);
 
@@ -74,8 +73,8 @@ public class FeatureStatsServiceTests
     [Fact]
     public async Task GetUserFeatureCountsAsync_ReturnsPerUserCounts()
     {
-        var db = await SeedWithFeaturesAsync();
-        var svc = new FeatureStatsService(db);
+        var factory = await SeedWithFeaturesAsync();
+        var svc = new FeatureStatsService(factory);
 
         var result = await svc.GetUserFeatureCountsAsync([UserId1, UserId2]);
 
@@ -97,8 +96,8 @@ public class FeatureStatsServiceTests
     [Fact]
     public async Task GetUserFeatureCountsAsync_EmptyArray_ReturnsEmpty()
     {
-        var db = CreateDb();
-        var svc = new FeatureStatsService(db);
+        var factory = CreateInMemoryDbFactory("FeatureStatsTest");
+        var svc = new FeatureStatsService(factory);
 
         var result = await svc.GetUserFeatureCountsAsync([]);
 
@@ -108,11 +107,14 @@ public class FeatureStatsServiceTests
     [Fact]
     public async Task GetUserFeatureCountsAsync_UserWithNoFeatures_ReturnsZeros()
     {
-        var db = await SeedWithFeaturesAsync();
+        var factory = await SeedWithFeaturesAsync();
         var unknownId = Guid.NewGuid();
-        db.Users.Add(new User { Id = unknownId, Username = "empty", Name = "Empty", Email = "empty@test.com", Phone = DefaultPhone, PasswordHash = "hash", Role = "commune_user", CommuneId = 1 });
-        await db.SaveChangesAsync();
-        var svc = new FeatureStatsService(db);
+        await using (var db = await factory.CreateDbContextAsync())
+        {
+            db.Users.Add(new User { Id = unknownId, Username = "empty", Name = "Empty", Email = "empty@test.com", Phone = DefaultPhone, PasswordHash = "hash", Role = "commune_user", CommuneId = 1 });
+            await db.SaveChangesAsync();
+        }
+        var svc = new FeatureStatsService(factory);
 
         var result = await svc.GetUserFeatureCountsAsync([unknownId]);
 

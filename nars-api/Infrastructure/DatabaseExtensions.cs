@@ -16,12 +16,16 @@ public static class DatabaseExtensions
         this IServiceCollection services,
         string connectionString)
     {
-        services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(connectionString, o => o.UseNetTopologySuite()));
+        services.AddSingleton<UpdatedAtInterceptor>();
+
+        services.AddDbContext<AppDbContext>((sp, options) =>
+            options.UseNpgsql(connectionString, o => o.UseNetTopologySuite())
+                   .AddInterceptors(sp.GetRequiredService<UpdatedAtInterceptor>()));
 
         // DbContextFactory for parallel queries outside request scope
-        services.AddDbContextFactory<AppDbContext>(options =>
-            options.UseNpgsql(connectionString, o => o.UseNetTopologySuite()));
+        services.AddDbContextFactory<AppDbContext>((sp, options) =>
+            options.UseNpgsql(connectionString, o => o.UseNetTopologySuite())
+                   .AddInterceptors(sp.GetRequiredService<UpdatedAtInterceptor>()));
 
         return services;
     }

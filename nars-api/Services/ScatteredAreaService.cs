@@ -66,6 +66,8 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
                 return;
             }
 
+            await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
+
             await db.Areas
                 .Where(f => f.UserId == userId &&
                             f.Layer == FeatureTypes.AreaLayers.Scattered)
@@ -97,6 +99,7 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
                 }),
             });
             await db.SaveChangesAsync(cancellationToken);
+            await tx.CommitAsync(cancellationToken);
         }
         catch (Exception ex)
         {

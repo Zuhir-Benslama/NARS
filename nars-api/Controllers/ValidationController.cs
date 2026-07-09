@@ -14,7 +14,8 @@ namespace NarsApi.Controllers;
 [Tags("Validation")]
 public class ValidationController(
     IOptions<ValidationOptions> validationOptions,
-    IValidationService validationService) : NarsControllerBase
+    IValidationService validationService,
+    ILogger<ValidationController> logger) : NarsControllerBase
 {
     private double DistrictBoundaryToleranceMeters => validationOptions.Value.DistrictBoundaryToleranceMeters;
 
@@ -73,6 +74,10 @@ public class ValidationController(
             }
 
             var dot = (v1x * v2x + v1y * v2y) / (len1 * len2);
+            if (dot is < -1.0 or > 1.0)
+            {
+                logger.LogDebug("Clamping dot product {Dot} at point {Index} (floating-point drift)", dot, i + 2);
+            }
             var angle = Math.Acos(Math.Clamp(dot, -1.0, 1.0)) * (180.0 / Math.PI);
 
             if (angle > MaxRoadTurnAngleDegrees)

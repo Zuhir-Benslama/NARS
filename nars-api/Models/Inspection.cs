@@ -12,6 +12,6 @@ public class Inspection
     [Column("type"), MaxLength(30), Required] public string Type { get; set; } = string.Empty;
     [Column("data", TypeName = "jsonb"), Required] public string Data { get; set; } = string.Empty;
     [Column("status"), MaxLength(20), Required] public string Status { get; set; } = string.Empty;
-    [Column("created_at")] public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    [Column("created_at")] public DateTime CreatedAt { get; set; }
     [Column("updated_at")] public DateTime? UpdatedAt { get; set; }
 }

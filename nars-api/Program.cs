@@ -27,6 +27,16 @@ if (jwtSecret.Length < minJwtSecretLength)
     throw new InvalidOperationException($"Jwt:SecretKey must be at least {minJwtSecretLength} characters for HMAC-SHA256 security.");
 }
 
+var hasLower = jwtSecret.Any(char.IsLower);
+var hasUpper = jwtSecret.Any(char.IsUpper);
+var hasDigit = jwtSecret.Any(char.IsDigit);
+var hasSpecial = jwtSecret.Any(c => !char.IsLetterOrDigit(c));
+if (new[] { hasLower, hasUpper, hasDigit, hasSpecial }.Count(v => v) < 3)
+{
+    throw new InvalidOperationException(
+        "Jwt:SecretKey must contain at least 3 of the following: lowercase, uppercase, digits, special characters.");
+}
+
 var jwtIssuer = builder.Configuration["Jwt:Issuer"];
 var jwtAudience = builder.Configuration["Jwt:Audience"];
 

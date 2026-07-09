@@ -101,6 +101,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<Inspection>()
             .HasIndex(i => i.UserId)
             .HasDatabaseName("ix_inspections_user_id");
+        // Composite index: FeatureId ASC (false = not descending), CreatedAt DESC (true = descending).
+        // Optimizes "latest inspections per feature" queries.
         modelBuilder.Entity<Inspection>()
             .HasIndex(i => new { i.FeatureId, i.CreatedAt })
             .IsDescending(false, true)

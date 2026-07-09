@@ -80,14 +80,29 @@ internal static class SqlFragments
     /// Uses format-string templating instead of string.Replace to guarantee
     /// no accidental matches inside JSON string values or column names.
     /// </summary>
-    internal static string PolygonFromDataWithAlias(string alias) =>
-        string.Format(PolygonFromDataTemplate, alias);
+    internal static string PolygonFromDataWithAlias(string alias)
+    {
+        if (!IsValidAlias(alias))
+        {
+            throw new ArgumentException($"Invalid table alias '{alias}'. Only alphanumeric characters are allowed.", nameof(alias));
+        }
+        return string.Format(PolygonFromDataTemplate, alias);
+    }
 
     /// <summary>
     /// Returns the linestring SQL fragment with the given table alias substituted.
     /// </summary>
-    internal static string LineStringFromDataWithAlias(string alias) =>
-        string.Format(LineStringFromDataTemplate, alias);
+    internal static string LineStringFromDataWithAlias(string alias)
+    {
+        if (!IsValidAlias(alias))
+        {
+            throw new ArgumentException($"Invalid table alias '{alias}'. Only alphanumeric characters are allowed.", nameof(alias));
+        }
+        return string.Format(LineStringFromDataTemplate, alias);
+    }
+
+    private static bool IsValidAlias(string alias) =>
+        !string.IsNullOrWhiteSpace(alias) && alias.All(c => char.IsAsciiLetterOrDigit(c) || c == '_');
 
     /// <summary>
     /// Default alias ("f") variant for backward compatibility.

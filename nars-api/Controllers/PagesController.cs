@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -126,7 +127,7 @@ public class PagesController(
 
         if (principal is not null)
         {
-            HttpContext.User = principal;
+            await HttpContext.SignInAsync("Pages", principal);
             return true;
         }
 
@@ -207,6 +208,12 @@ public class PagesController(
             logger.LogInformation("[Pages] Silent refresh SUCCESS. Issuing new cookies for {Username}", result.Username);
             Response.Cookies.Append("access_token", result.NewAccessToken!, MakeCookieOptions(jwt.AccessTokenExpiresIn));
             Response.Cookies.Append("refresh_token", result.NewRawToken!, MakeCookieOptions(maxAge));
+
+            var principal = result.NewAccessToken is not null ? jwt.ValidateToken(result.NewAccessToken) : null;
+            if (principal is not null)
+            {
+                await HttpContext.SignInAsync("Pages", principal);
+            }
 
             return true;
         }

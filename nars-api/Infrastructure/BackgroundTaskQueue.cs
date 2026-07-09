@@ -16,7 +16,8 @@ public class BackgroundTaskQueue : IBackgroundTaskQueue
         var capacity = options.Value.Capacity;
         var channelOptions = new BoundedChannelOptions(capacity)
         {
-            FullMode = BoundedChannelFullMode.Wait,
+            // Drop oldest when queue is full to avoid blocking the HTTP request path.
+            FullMode = BoundedChannelFullMode.DropOldest,
             SingleWriter = false,
             SingleReader = true,
         };

@@ -45,4 +45,19 @@ public static class TestData
             .Options;
         return new AppDbContext(options);
     }
+
+    public static IDbContextFactory<AppDbContext> CreateInMemoryDbFactory(string prefix)
+    {
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase($"{prefix}_{Guid.NewGuid()}")
+            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
+            .Options;
+        return new InMemoryDbContextFactory(options);
+    }
+
+    private sealed class InMemoryDbContextFactory(DbContextOptions<AppDbContext> options) : IDbContextFactory<AppDbContext>
+    {
+        public AppDbContext CreateDbContext() => new(options);
+        public async Task<AppDbContext> CreateDbContextAsync(CancellationToken ct = default) => new(options);
+    }
 }

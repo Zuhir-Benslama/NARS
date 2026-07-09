@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Controllers;
@@ -25,7 +26,8 @@ public class ValidationControllerTests
 
         var ctrl = new ValidationController(
             Options.Create(new ValidationOptions()),
-            validationService ?? new ValidationService(context))
+            validationService ?? new ValidationService(context),
+            Mock.Of<ILogger<ValidationController>>())
         {
             ControllerContext = new ControllerContext
             {
@@ -155,7 +157,7 @@ public class ValidationControllerTests
                 It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<double>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        var ctrl2 = new ValidationController(Options.Create(new ValidationOptions { RoadTurnAngleDegrees = 45 }), validationMock.Object)
+        var ctrl2 = new ValidationController(Options.Create(new ValidationOptions { RoadTurnAngleDegrees = 45 }), validationMock.Object, Mock.Of<ILogger<ValidationController>>())
         {
             ControllerContext = ctrl.ControllerContext
         };
@@ -196,7 +198,7 @@ public class ValidationControllerTests
                 It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<double>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
-        var ctrl2 = new ValidationController(Options.Create(new ValidationOptions()), validationMock.Object)
+        var ctrl2 = new ValidationController(Options.Create(new ValidationOptions()), validationMock.Object, Mock.Of<ILogger<ValidationController>>())
         {
             ControllerContext = ctrl.ControllerContext
         };

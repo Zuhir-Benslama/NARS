@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
@@ -71,14 +72,13 @@ public static class PipelineExtensions
                     {
                         logger.LogWarning(ex, "Unauthorized access");
                         ctx.Response.StatusCode = 401;
-                        var authProblem = new Microsoft.AspNetCore.Mvc.ProblemDetails
+                        var authProblem = new ProblemDetails
                         {
                             Detail = app.Environment.IsDevelopment() ? ex.Message : "Authentication required.",
                             Status = 401,
                             Title = "Unauthorized",
                         };
-                        await ctx.Response.WriteAsync(
-                            JsonSerializer.Serialize(authProblem, JsonOptions));
+                        await ctx.Response.WriteAsJsonAsync(authProblem, JsonOptions);
                         return;
                     }
 
@@ -89,15 +89,14 @@ public static class PipelineExtensions
                     ? ex?.Message ?? "An unexpected error occurred."
                     : "An internal server error occurred. Please try again.";
 
-                var problem = new Microsoft.AspNetCore.Mvc.ProblemDetails
+                var problem = new ProblemDetails
                 {
                     Detail = message,
                     Status = 500,
                     Title = "Internal Server Error",
                     Type = "https://tools.ietf.org/html/rfc7231#section-6.6.1",
                 };
-                await ctx.Response.WriteAsync(
-                    JsonSerializer.Serialize(problem, JsonOptions));
+                await ctx.Response.WriteAsJsonAsync(problem, JsonOptions);
             });
         });
 

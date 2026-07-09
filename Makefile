@@ -17,6 +17,7 @@ DB_NAME            ?= nars_db
 POSTGRES_DATA_DIR  ?= data/nars/postgis
 REGISTRY_IMAGES    := nars-api nars-postgis nars-vite
 SCALABLE_DEPLOYS   := postgis nars-api nars-frontend
+POSTGIS_GET_POD_CMD = $(KUBECTL) get pod -n "$(NAMESPACE)" -l app.kubernetes.io/name=postgis -o jsonpath='{.items[0].metadata.name}' 2>/dev/null
 
 # ─── Secrets ──────────────────────────────────────────────────
 # Auto-generate .env with stable secrets if missing.
@@ -296,11 +297,11 @@ cluster-stop: ## Scale all deployments to 0 (stop pods, keep cluster)
 	@echo "→ Stopping all pods..."
 	@for deploy in $(SCALABLE_DEPLOYS); do
 	@	saved="$(BACKUP_DIR)/replicas/$$deploy.txt"
-	@	replicas=$$($(KUBECTL) get deployment $$deploy -n "$(NAMESPACE)" \
+	@	replicas=$$($(KUBECTL) get deployment "$$deploy" -n "$(NAMESPACE)" \
 		-o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
 	@	mkdir -p "$(BACKUP_DIR)/replicas"
 	@	echo "$$replicas" > "$$saved"
-	@	$(KUBECTL) scale deployment $$deploy -n "$(NAMESPACE)" --replicas=0
+	@	$(KUBECTL) scale deployment "$$deploy" -n "$(NAMESPACE)" --replicas=0
 	@	echo "  ✓ $$deploy → 0 (was $$replicas)"
 	@done
 	@echo "✓ All pods stopped. Run 'make cluster-start' to resume."
@@ -315,13 +316,13 @@ cluster-start: ## Scale all deployments back to their original replica count
 	@	else
 	@		replicas=1
 	@	fi
-	@	$(KUBECTL) scale deployment $$deploy -n "$(NAMESPACE)" --replicas=$$replicas
+	@	$(KUBECTL) scale deployment "$$deploy" -n "$(NAMESPACE)" --replicas=$$replicas
 	@	echo "  ✓ $$deploy → $$replicas"
 	@done
 	@echo "→ Waiting for deployments..."
 	@for deploy in $(SCALABLE_DEPLOYS); do
 	@	$(KUBECTL) wait --namespace "$(NAMESPACE)" \
-		--for=condition=Available deployment/$$deploy --timeout=180s 2>/dev/null || true
+		--for=condition=Available "deployment/$$deploy" --timeout=180s 2>/dev/null || true
 	@done
 	@echo "✓ All pods running"
 
@@ -332,9 +333,7 @@ cluster-restart: cluster-stop cluster-start ## Stop all pods, then start them ag
 
 .PHONY: db-get-pod
 db-get-pod:
-	@$(KUBECTL) get pod -n "$(NAMESPACE)" -l app.kubernetes.io/name=postgis \
-		-o jsonpath='{.items[0].metadata.name}' 2>/dev/null \
-		|| echo ""
+	@$(POSTGIS_GET_POD_CMD) || echo ""
 
 .PHONY: db-get-password
 db-get-password:
@@ -344,8 +343,7 @@ db-get-password:
 
 .PHONY: db-backup
 db-backup: ## Dump the PostGIS database to a local file
-	@POD=$$($(KUBECTL) get pod -n "$(NAMESPACE)" 	-l app.kubernetes.io/name=postgis \
-		-o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+	@POD=$$($(POSTGIS_GET_POD_CMD))
 	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found in namespace '$(NAMESPACE)'"; exit 1; fi
 	@PASS=$$($(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
 		-o jsonpath='{.data.postgres_password}' | base64 -d)
@@ -361,8 +359,7 @@ db-backup: ## Dump the PostGIS database to a local file
 
 .PHONY: db-restore
 db-restore: ## Restore a backup. Usage: make db-restore FILE=data/nars/postgis/backups/nars_db_20250101_120000.sql.gz
-	@POD=$$($(KUBECTL) get pod -n "$(NAMESPACE)" 	-l app.kubernetes.io/name=postgis \
-		-o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+	@POD=$$($(POSTGIS_GET_POD_CMD))
 	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found in namespace '$(NAMESPACE)'"; exit 1; fi
 	@if [ -z "$(FILE)" ]; then
 		echo "✖ Usage: make db-restore FILE=data/nars/postgis/backups/nars_db_<timestamp>.sql.gz"
@@ -389,8 +386,7 @@ db-restore: ## Restore a backup. Usage: make db-restore FILE=data/nars/postgis/b
 
 .PHONY: db-shell
 db-shell: ## Open an interactive psql shell inside the postgis pod
-	@POD=$$($(KUBECTL) get pod -n "$(NAMESPACE)" 	-l app.kubernetes.io/name=postgis \
-		-o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+	@POD=$$($(POSTGIS_GET_POD_CMD))
 	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found"; exit 1; fi
 	@$(KUBECTL) exec -it "$$POD" -n "$(NAMESPACE)" -- psql -U postgres -d "$(DB_NAME)"
 
@@ -682,15 +678,15 @@ kustomize-apply: secrets-validate ## Apply k8s manifests via kustomize (pin tags
 
 	@echo "→ Waiting for app deployments..."
 	@for deploy in nars-api nars-frontend; do
-		if $(KUBECTL) get deployment $$deploy -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
+		if $(KUBECTL) get deployment "$$deploy" -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
 			if ! $(KUBECTL) wait --namespace "$(NAMESPACE)" \
-				--for=condition=Available deployment/$$deploy --timeout=240s; then
+				--for=condition=Available "deployment/$$deploy" --timeout=240s; then
 				echo "✖ Deployment '$$deploy' did not become Available in time."
 				echo "→ describe deployment/$$deploy"
-				$(KUBECTL) describe deployment $$deploy -n "$(NAMESPACE)" || true
+				$(KUBECTL) describe deployment "$$deploy" -n "$(NAMESPACE)" || true
 				echo "→ pods for $$deploy"
-				$(KUBECTL) get pods -n "$(NAMESPACE)" -l app.kubernetes.io/name=$$deploy -o wide || true
-				for pod in $$($(KUBECTL) get pods -n "$(NAMESPACE)" -l app.kubernetes.io/name=$$deploy -o name); do
+				$(KUBECTL) get pods -n "$(NAMESPACE)" -l "app.kubernetes.io/name=$$deploy" -o wide || true
+				for pod in $$($(KUBECTL) get pods -n "$(NAMESPACE)" -l "app.kubernetes.io/name=$$deploy" -o name); do
 					echo "→ logs $$pod (current)"
 					$(KUBECTL) logs -n "$(NAMESPACE)" $$pod --tail=120 || true
 					echo "→ logs $$pod (previous)"

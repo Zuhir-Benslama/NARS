@@ -105,21 +105,29 @@ public static class FeatureQueryHelper
         var totalCount = 0;
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
+        var idOrdinal = reader.GetOrdinal("id");
+        var labelOrdinal = reader.GetOrdinal("label");
+        var dataOrdinal = reader.GetOrdinal("data");
+        var createdAtOrdinal = reader.GetOrdinal("created_at");
+        var layerOrdinal = reader.GetOrdinal("layer");
+        var typeOrdinal = reader.GetOrdinal("feature_type");
+        var totalOrdinal = reader.GetOrdinal("total_count");
+
         while (await reader.ReadAsync(ct))
         {
-            var idValue = reader.GetValue(0);
+            var idValue = reader.GetValue(idOrdinal);
             Guid id = idValue switch
             {
                 Guid g => g,
                 string s => Guid.Parse(s),
                 _ => throw new InvalidOperationException($"Unexpected ID type: {idValue?.GetType().Name}")
             };
-            var label = await reader.IsDBNullAsync(1, ct) ? null : reader.GetString(1);
-            var dataJson = await reader.IsDBNullAsync(2, ct) ? "{}" : reader.GetString(2);
-            var createdAt = reader.GetDateTime(3);
-            var layerVal = await reader.IsDBNullAsync(4, ct) ? null : reader.GetString(4);
-            var type = reader.GetString(5);
-            totalCount = (int)reader.GetInt64(6);
+            var label = await reader.IsDBNullAsync(labelOrdinal, ct) ? null : reader.GetString(labelOrdinal);
+            var dataJson = await reader.IsDBNullAsync(dataOrdinal, ct) ? "{}" : reader.GetString(dataOrdinal);
+            var createdAt = reader.GetDateTime(createdAtOrdinal);
+            var layerVal = await reader.IsDBNullAsync(layerOrdinal, ct) ? null : reader.GetString(layerOrdinal);
+            var type = reader.GetString(typeOrdinal);
+            totalCount = (int)reader.GetInt64(totalOrdinal);
 
             rows.Add(new FeatureResult(
                 Id: id.ToString(),

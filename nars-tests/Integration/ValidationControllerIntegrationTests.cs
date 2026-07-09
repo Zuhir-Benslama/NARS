@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Controllers;
@@ -43,7 +44,7 @@ public class ValidationControllerIntegrationTests : IAsyncLifetime
 
     private ValidationController CreateController(Guid userId)
     {
-        var ctrl = new ValidationController(Options.Create(new ValidationOptions()), new ValidationService(_db));
+        var ctrl = new ValidationController(Options.Create(new ValidationOptions()), new ValidationService(_db), Mock.Of<ILogger<ValidationController>>());
         var httpContext = new DefaultHttpContext
         {
             User = AuthTestHelper.CreateClaimsPrincipal(userId, "commune_user", communeId: 1)

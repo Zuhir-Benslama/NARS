@@ -13,6 +13,10 @@ public static class PasswordValidator
         "monkey123", "dragon123", "master123", "passw0rd", "P@ssw0rd",
         "Passw0rd!", "Password1", "Aa123456", "Abc123!", "Test1234",
         "Abc123!@", "Xyz789#!", "Qwerty!1", "Letmein1!", "Welcome@1",
+        "1234567890", "qwertyuiop", "asdfghjkl", "zxcvbnm", "iloveyou",
+        "princess", "sunshine", "trustno1", "baseball", "football",
+        "starwars", "whatever", "password!", "Passw0rd123", "changeme",
+        "summer2023", "winter2024", "spring2025", "autumn2022", "test123!",
     ];
 
     public static string? Validate(string password)

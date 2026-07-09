@@ -38,15 +38,19 @@ public class UsersController(IUserProfileService userProfile, ILogger<UsersContr
             return Problem(detail: "User not found.", statusCode: 404);
         }
 
-        // Validate username uniqueness if changed
-        if (!string.IsNullOrWhiteSpace(body.Username) && body.Username != user.Username)
+        // Validate username uniqueness if changed (store normalized lowercase)
+        if (!string.IsNullOrWhiteSpace(body.Username))
         {
-            if (await userProfile.IsUsernameTakenAsync(body.Username, cancellationToken))
+            var normalized = body.Username.ToLowerInvariant();
+            if (normalized != user.Username)
             {
-                return Problem(detail: "Username already exists.", statusCode: 409);
-            }
+                if (await userProfile.IsUsernameTakenAsync(normalized, cancellationToken))
+                {
+                    return Problem(detail: "Username already exists.", statusCode: 409);
+                }
 
-            user.Username = body.Username;
+                user.Username = normalized;
+            }
         }
 
         // Validate email uniqueness if changed
