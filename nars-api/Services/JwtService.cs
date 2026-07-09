@@ -82,6 +82,13 @@ public class JwtService(string secret, string? issuer, string? audience, IOption
                     ValidateAudience = !string.IsNullOrEmpty(audience),
                     ValidIssuer = issuer,
                     ValidAudience = audience,
+                    ValidateLifetime = true,
+                    LifetimeValidator = (notBefore, expires, _, _) =>
+                    {
+                        var now = timeProvider.UtcNow;
+                        return (notBefore == null || notBefore.Value <= now)
+                            && expires != null && expires.Value > now;
+                    },
                     ClockSkew = TimeSpan.Zero,
                 }, out _);
         }
