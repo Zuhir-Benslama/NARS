@@ -78,16 +78,23 @@ config:
       #   cert_file: /etc/otel/certs/tls.crt
       #   key_file: /etc/otel/certs/tls.key
       #   ca_file: /etc/otel/certs/ca.crt
+      # ⚠ SECURITY: insecure=true disables TLS for dev. For production,
+      # generate certs and set insecure: false (see commented config above).
       tls:
         insecure: true
     loki:
+      # ⚠ SECURITY: Loki auth should be enabled in production:
+      #   --set loki.auth_enabled=true
       endpoint: http://loki-gateway:80/loki/api/v1/push
     prometheus:
       endpoint: 0.0.0.0:8889
       resource_to_telemetry_conversion:
         enabled: true
+    # ⚠ SECURITY: debug exporter logs all trace/log/metric data to collector
+    # stdout. Set verbosity to 'critical' (errors only) or remove entirely
+    # from pipelines below for production deployments.
     debug:
-      verbosity: basic
+      verbosity: critical
 
   service:
     pipelines:

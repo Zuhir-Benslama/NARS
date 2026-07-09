@@ -51,7 +51,7 @@ for pkg in psycopg2-binary bcrypt; do
     module="${pkg%%-*}"
     if ! python3 -c "import sys; __import__(sys.argv[1])" "${module}" 2>/dev/null; then
         if [[ -z "${VENV_DIR}" ]]; then
-            VENV_DIR=$(mktemp -d)
+            VENV_DIR=""; VENV_DIR=$(mktemp -d)
             python3 -m venv "${VENV_DIR}"
             # shellcheck disable=SC1091
             source "${VENV_DIR}/bin/activate"

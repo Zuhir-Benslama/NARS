@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Controllers;
@@ -10,6 +8,7 @@ using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
 using NarsApi.Services;
+using static NarsApi.Tests.TestData;
 using Xunit;
 
 namespace NarsApi.Tests;
@@ -22,10 +21,7 @@ public class ValidationControllerTests
         AppDbContext? db = null,
         IValidationService? validationService = null)
     {
-        var opts = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase($"ValidationTest_{Guid.NewGuid()}")
-            .Options;
-        var context = db ?? new AppDbContext(opts);
+        var context = db ?? CreateInMemoryDb("ValidationTest");
 
         var ctrl = new ValidationController(
             Options.Create(new ValidationOptions()),
@@ -67,7 +63,7 @@ public class ValidationControllerTests
             Layer = FeatureTypes.AreaLayers.CentralUrban,
             Data = "{}",
             Label = "urban",
-            UpdatedAt = DateTime.UtcNow
+            UpdatedAt = FixedUtcNow
         });
         await db.SaveChangesAsync();
 
@@ -150,7 +146,7 @@ public class ValidationControllerTests
             Layer = FeatureTypes.RoadLayers.Street,
             Data = "{}",
             Label = "r",
-            UpdatedAt = DateTime.UtcNow
+            UpdatedAt = FixedUtcNow
         });
         await db.SaveChangesAsync();
 
@@ -189,7 +185,7 @@ public class ValidationControllerTests
             Layer = FeatureTypes.RoadLayers.Street,
             Data = "{}",
             Label = "r",
-            UpdatedAt = DateTime.UtcNow
+            UpdatedAt = FixedUtcNow
         });
         await db.SaveChangesAsync();
 
@@ -264,7 +260,7 @@ public class ValidationControllerTests
             Layer = "residential",
             Data = "{}",
             Label = "d",
-            UpdatedAt = DateTime.UtcNow
+            UpdatedAt = FixedUtcNow
         });
         await db.SaveChangesAsync();
 
@@ -313,7 +309,7 @@ public class ValidationControllerTests
             Layer = FeatureTypes.AreaLayers.CentralUrban,
             Data = "{}",
             Label = "urban",
-            UpdatedAt = DateTime.UtcNow
+            UpdatedAt = FixedUtcNow
         });
         await db.SaveChangesAsync();
 

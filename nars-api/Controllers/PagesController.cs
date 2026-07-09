@@ -48,13 +48,13 @@ public class PagesController(
     // GET /login — inject CSRF token and CSP nonce into the HTML
     [HttpGet("/login")]
     [AllowAnonymous]
-    public IActionResult LoginPage()
+    public async Task<IActionResult> LoginPage()
     {
         logger.LogInformation("[Pages] Serving login page");
         var tokens = antiforgery.GetAndStoreTokens(HttpContext);
         var nonce = HttpContext.Items["csp-nonce"] as string ?? string.Empty;
 
-        var template = LoadPageTemplate("login_html", "login.html") ?? string.Empty;
+        var template = (await LoadPageTemplateAsync("login_html", "login.html")) ?? string.Empty;
 
         var html = template
             // Inject the CSRF token into the <meta name="csrf-token"> placeholder
@@ -85,7 +85,7 @@ public class PagesController(
         var tokens = antiforgery.GetAndStoreTokens(HttpContext);
         var nonce = HttpContext.Items["csp-nonce"] as string ?? string.Empty;
 
-        var template = LoadPageTemplate("index_html", "index.html") ?? string.Empty;
+        var template = (await LoadPageTemplateAsync("index_html", "index.html")) ?? string.Empty;
 
         var html = template
             // Inject CSRF token into the meta placeholder
@@ -99,20 +99,19 @@ public class PagesController(
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private string LoadPageTemplate(string cacheKey, string fileName)
+    private async Task<string> LoadPageTemplateAsync(string cacheKey, string fileName)
     {
         var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", fileName);
-        // In development, avoid template caching so HTML updates are reflected immediately.
         if (env.IsDevelopment())
         {
-            return System.IO.File.ReadAllText(path);
+            return await System.IO.File.ReadAllTextAsync(path);
         }
 
-        return cache.GetOrCreate(cacheKey, entry =>
+        return (await cache.GetOrCreateAsync(cacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(cacheOptions.Value.PageTemplateDurationHours);
-            return System.IO.File.ReadAllText(path);
-        }) ?? string.Empty;
+            return await System.IO.File.ReadAllTextAsync(path);
+        })) ?? string.Empty;
     }
 
     private async Task<bool> TryAuthenticateAsync(CancellationToken cancellationToken)

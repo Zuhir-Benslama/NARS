@@ -79,10 +79,6 @@ public class BackgroundQueueProcessor(
     public async ValueTask DisposeAsync()
     {
         _shutdown.Dispose();
-        if (_executingTask is not null)
-        {
-            await _executingTask;
-        }
         GC.SuppressFinalize(this);
     }
 

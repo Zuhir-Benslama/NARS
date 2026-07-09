@@ -29,6 +29,24 @@ resources:
   # otel-metrics-service.yaml and servicemonitor.yaml are applied separately
   # after the observability stack is installed (their CRDs are only available then):
   #   make observability-servicemonitor
+# ─── Environment Overlays ──────────────────────────────────────────────
+# This directory is the base. To add environment-specific overlays:
+#
+#   k8s/overlays/
+#   ├── development/  # (default — this base)
+#   ├── staging/
+#   │   ├── kustomization.yaml   # resources: [../../base]
+#   │   └── patches/             # replica count, resource limits, etc.
+#   └── production/
+#       ├── kustomization.yaml
+#       └── patches/
+#           ├── replica-count.yaml
+#           ├── resource-limits.yaml
+#           ├── ingress-tls.yaml
+#           └── storage-class.yaml
+#
+# Apply with:
+#   kustomize build k8s/overlays/production | kubectl apply -f -
 images:
   # ⚠ `latest` tags are for local dev only — they produce non-reproducible
   # deployments. CI/CD pipelines MUST override newTag with a pinned SHA:

@@ -28,14 +28,16 @@ export function sanitizeHtml(dirty: string): string {
   })
 }
 
+const _escapeEl = typeof document !== "undefined" ? document.createElement("div") : null
+
 /**
  * Escape HTML entities in text content.
  * Use for plain text that might contain HTML special characters.
  */
 export function escapeHtml(dirty: string): string {
-  const div = document.createElement("div")
-  div.textContent = dirty
-  return div.innerHTML
+  if (!_escapeEl) return dirty
+  _escapeEl.textContent = dirty
+  return _escapeEl.innerHTML
 }
 
 /**

@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -18,17 +17,11 @@ namespace NarsApi.Tests;
 
 public class AuthControllerTests
 {
-    private static AppDbContext CreateInMemoryDbContext()
-    {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(databaseName: $"NarsTest_{Guid.NewGuid()}")
-            .Options;
-        return new AppDbContext(options);
-    }
+    private static AppDbContext CreateDb() => CreateInMemoryDb("AuthTest");
 
     private static JwtService CreateJwtService(IDateTimeProvider? timeProvider = null)
     {
-        timeProvider ??= Mock.Of<IDateTimeProvider>(x => x.UtcNow == DateTime.UtcNow);
+        timeProvider ??= Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var jwtOptions = Options.Create(new JwtOptions { ExpiresInMinutes = 60, RefreshExpiresInDays = 30 });
         return new JwtService(
             AuthTestHelper.TestJwtSecret,
@@ -41,7 +34,7 @@ public class AuthControllerTests
 
     private static AuthController CreateController(AppDbContext db)
     {
-        var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == DateTime.UtcNow);
+        var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var jwtOptions = Options.Create(new JwtOptions());
         var lockoutOptions = Options.Create(new AccountLockoutOptions());
         return new AuthController(
@@ -57,7 +50,7 @@ public class AuthControllerTests
     [Fact]
     public void SignUp_PublicEndpointIsDisabled_Returns410()
     {
-        var db = CreateInMemoryDbContext();
+        var db = CreateDb();
         var controller = CreateController(db);
 
         var result = controller.SignUp();
@@ -69,7 +62,7 @@ public class AuthControllerTests
     [Fact]
     public async Task AuthorizedAdminSignup_ValidRequest_Returns201()
     {
-        var db = CreateInMemoryDbContext();
+        var db = CreateDb();
         await SeedLocationDataAsync(db);
         await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
 
@@ -96,7 +89,7 @@ public class AuthControllerTests
     [Fact]
     public async Task AuthorizedAdminSignup_WeakPassword_Returns400()
     {
-        var db = CreateInMemoryDbContext();
+        var db = CreateDb();
         await SeedLocationDataAsync(db);
         await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
 
@@ -123,7 +116,7 @@ public class AuthControllerTests
     [Fact]
     public async Task AuthorizedAdminSignup_DuplicateUsername_Returns409()
     {
-        var db = CreateInMemoryDbContext();
+        var db = CreateDb();
         await SeedLocationDataAsync(db);
         await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
         await db.Users.AddAsync(new User
@@ -155,13 +148,53 @@ public class AuthControllerTests
             WilayaId: null
         ));
 
-        Assert.IsType<ObjectResult>(result);
+        var conflict = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(409, conflict.StatusCode);
+    }
+
+    [Fact]
+    public async Task AuthorizedAdminSignup_DuplicateEmail_Returns409()
+    {
+        var db = CreateDb();
+        await SeedLocationDataAsync(db);
+        await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
+        await db.Users.AddAsync(new User
+        {
+            Id = Guid.NewGuid(),
+            Name = "Existing",
+            Email = "dupe@example.com",
+            Phone = TestData.DefaultPhone,
+            Username = "existinguser",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
+            Role = UserRoles.CommuneUser,
+            CommuneId = 1,
+        });
+        await db.SaveChangesAsync();
+
+        var controller = CreateController(db);
+
+        var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
+            AdminUsername: "admin",
+            AdminPassword: DefaultPassword,
+            Name: "New User",
+            Email: "dupe@example.com",
+            Phone: AltPhone,
+            Username: "newuser",
+            Password: AltPassword,
+            Role: UserRoles.CommuneUser,
+            CommuneId: 1,
+            DairaId: null,
+            WilayaId: null
+        ));
+
+        var conflict = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(409, conflict.StatusCode);
     }
 
     [Fact]
     public async Task AuthorizedAdminSignup_CommuneOutsideAdminScope_Returns403()
     {
-        var db = CreateInMemoryDbContext();
+        var db = CreateDb();
         await SeedLocationDataAsync(db);
         await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
 
@@ -188,7 +221,7 @@ public class AuthControllerTests
     [Fact]
     public async Task SignIn_WrongPassword_Returns401()
     {
-        var db = CreateInMemoryDbContext();
+        var db = CreateDb();
         await SeedLocationDataAsync(db);
         await db.Users.AddAsync(new User
         {
@@ -215,13 +248,14 @@ public class AuthControllerTests
             Password: "WrongP@ss1"
         ));
 
-        Assert.IsType<ObjectResult>(result);
+        var unauthorized = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(401, unauthorized.StatusCode);
     }
 
     [Fact]
     public async Task SignIn_UserNotFound_Returns401()
     {
-        var db = CreateInMemoryDbContext();
+        var db = CreateDb();
         var controller = CreateController(db);
 
         var result = await controller.SignIn(new SignInRequest(
@@ -229,7 +263,8 @@ public class AuthControllerTests
             Password: DefaultPassword
         ));
 
-        Assert.IsType<ObjectResult>(result);
+        var unauthorized = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(401, unauthorized.StatusCode);
     }
 
     // Logout is tested in AuthControllerIntegrationTests.Logout_RevokesRefreshTokens

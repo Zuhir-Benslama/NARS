@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { PHASES, API_LAYER_TO_PHASE } from "./phases"
+import { PHASES, getApiLayerToPhase } from "./phases"
 
 describe("PHASES", () => {
   it("has exactly 8 phases", () => {
@@ -59,48 +59,50 @@ describe("PHASES", () => {
   })
 })
 
-describe("API_LAYER_TO_PHASE", () => {
+describe("getApiLayerToPhase", () => {
   it("maps central_urban to areas", () => {
-    expect(API_LAYER_TO_PHASE["central_urban"]).toBe("areas")
+    expect(getApiLayerToPhase()["central_urban"]).toBe("areas")
   })
 
   it("maps secondary_urban to areas", () => {
-    expect(API_LAYER_TO_PHASE["secondary_urban"]).toBe("areas")
+    expect(getApiLayerToPhase()["secondary_urban"]).toBe("areas")
   })
 
   it("maps city_center to cityCenter", () => {
-    expect(API_LAYER_TO_PHASE["city_center"]).toBe("cityCenter")
+    expect(getApiLayerToPhase()["city_center"]).toBe("cityCenter")
   })
 
   it("maps all road types to roads", () => {
     const roadLayers = ["boulevard", "avenue", "street", "drive", "lane", "cul_de_sac"]
     for (const layer of roadLayers) {
-      expect(API_LAYER_TO_PHASE[layer]).toBe("roads")
+      expect(getApiLayerToPhase()[layer]).toBe("roads")
     }
   })
 
   it("maps naming_panel to namingPanels", () => {
-    expect(API_LAYER_TO_PHASE["naming_panel"]).toBe("namingPanels")
+    expect(getApiLayerToPhase()["naming_panel"]).toBe("namingPanels")
   })
 
   it("maps all public building sub-types to publicBuildings", () => {
     const buildingLayers = ["bank", "post_office", "school", "mosque", "public_hospital", "stadium"]
     for (const layer of buildingLayers) {
-      expect(API_LAYER_TO_PHASE[layer]).toBe("publicBuildings")
+      expect(getApiLayerToPhase()[layer]).toBe("publicBuildings")
     }
   })
 
   it("every phase key has at least one corresponding API layer", () => {
+    const map = getApiLayerToPhase()
     const phaseKeys = new Set(PHASES.map((p) => p.key))
-    const mappedKeys = new Set(Object.values(API_LAYER_TO_PHASE))
+    const mappedKeys = new Set(Object.values(map))
     for (const key of phaseKeys) {
       expect(mappedKeys.has(key)).toBe(true)
     }
   })
 
   it("all layer values are valid phase keys", () => {
+    const map = getApiLayerToPhase()
     const phaseKeys = new Set(PHASES.map((p) => p.key))
-    for (const phaseKey of Object.values(API_LAYER_TO_PHASE)) {
+    for (const phaseKey of Object.values(map)) {
       expect(phaseKeys.has(phaseKey)).toBe(true)
     }
   })

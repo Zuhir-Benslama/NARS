@@ -28,11 +28,11 @@ public abstract class NarsControllerBase : ControllerBase
     protected string CurrentUsername =>
         User.FindFirstValue(ClaimNames.Username) ?? string.Empty;
 
-    /// <summary>The role of the authenticated user (defaults to "commune_user" if absent).</summary>
+    /// <summary>The role of the authenticated user (empty if absent).</summary>
     protected string CurrentUserRole =>
         User.FindFirstValue(ClaimNames.Role)
         ?? User.FindFirstValue(ClaimTypes.Role)
-        ?? UserRoles.CommuneUser;
+        ?? string.Empty;
 
     /// <summary>The commune ID for commune_user accounts, or null for admin accounts.</summary>
     protected int? CurrentCommuneId =>

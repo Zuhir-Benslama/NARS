@@ -84,7 +84,7 @@ public class LogsController(IErrorLogService errorLogService, ILogger<LogsContro
                 UserId = userId,
                 Level = level,
                 Code = entry.Code ?? "",
-                Message = entry.Message[..Math.Min(entry.Message.Length, MaxEntryLength)],
+                Message = entry.Message,
                 Context = string.IsNullOrEmpty(entry.Context) ? null : entry.Context,
                 Url = entry.Url?[..Math.Min(entry.Url.Length, MaxUrlLength)],
                 Method = entry.Method?[..Math.Min(entry.Method.Length, MaxMethodLength)],

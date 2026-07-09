@@ -618,14 +618,20 @@ secrets-validate: ## Fail if kustomize output contains placeholder values (REPLA
 
 .PHONY: secrets-apply
 secrets-apply: .env namespace-ensure ## Create nars-secrets and regcred with generated/variable values
-# SECURITY: --from-literal passes secrets via CLI args, visible in `ps aux`.
-# This is a kubectl limitation. Acceptable for local dev kind clusters.
+# SECURITY: Uses temp files instead of --from-literal to avoid secret
+# exposure in `ps aux` / CI logs. Files are cleaned up on exit.
 	@echo "→ Creating 'nars-secrets'..."
+	@tmpdir=$$(mktemp -d); \
+	trap 'rm -rf "$$tmpdir"' EXIT; \
+	echo -n "$(POSTGRES_PASSWORD)" > "$$tmpdir/postgres_password"; \
+	echo -n "Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=$(POSTGRES_PASSWORD)" > "$$tmpdir/ConnectionStrings__DefaultConnection"; \
+	echo -n "$(JWT_SECRET)" > "$$tmpdir/Jwt__SecretKey"; \
+	echo -n "$(GPG_PASSPHRASE)" > "$$tmpdir/gpg-passphrase"; \
 	$(KUBECTL) create secret generic nars-secrets -n "$(NAMESPACE)" \
-		--from-literal=postgres_password="$(POSTGRES_PASSWORD)" \
-		--from-literal=ConnectionStrings__DefaultConnection="Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=$(POSTGRES_PASSWORD)" \
-		--from-literal=Jwt__SecretKey="$(JWT_SECRET)" \
-		--from-literal=gpg-passphrase="$(GPG_PASSPHRASE)" \
+		--from-file=postgres_password="$$tmpdir/postgres_password" \
+		--from-file=ConnectionStrings__DefaultConnection="$$tmpdir/ConnectionStrings__DefaultConnection" \
+		--from-file=Jwt__SecretKey="$$tmpdir/Jwt__SecretKey" \
+		--from-file=gpg-passphrase="$$tmpdir/gpg-passphrase" \
 		--dry-run=client -o yaml \
 	| $(KUBECTL) apply -f -
 	@echo "✓ nars-secrets created"

@@ -37,11 +37,12 @@ public class FieldService(
         var total = 0;
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
+        var totalOrdinal = reader.GetOrdinal("total");
         while (await reader.ReadAsync(ct))
         {
             if (total == 0)
             {
-                total = reader.GetInt32(7);
+                total = reader.GetInt32(totalOrdinal);
             }
 
             var id = reader.GetGuid(0);

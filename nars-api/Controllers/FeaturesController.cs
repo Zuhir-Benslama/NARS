@@ -242,13 +242,18 @@ public class FeaturesController(
     private async ValueTask QueueScatteredRefresh()
     {
         var currentUserId = RequiredCurrentUserId;
-        var currentCommuneId = RequiredCommuneId;
+        var currentCommuneId = CurrentCommuneId;
+        if (currentCommuneId is null)
+        {
+            return;
+        }
+
         await bgQueue.QueueBackgroundWorkItemAsync(async (sp, ct) =>
         {
             try
             {
                 var svc = sp.GetRequiredService<IScatteredAreaService>();
-                await svc.RefreshAsync(currentUserId, currentCommuneId, ct);
+                await svc.RefreshAsync(currentUserId, currentCommuneId.Value, ct);
             }
             catch (Exception ex)
             {

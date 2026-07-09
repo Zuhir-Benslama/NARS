@@ -1,6 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Data;
@@ -15,17 +13,9 @@ namespace NarsApi.Tests;
 
 public class RefreshTokenServiceTests
 {
-    private static readonly DateTime FixedNow = new(2025, 6, 1, 12, 0, 0, DateTimeKind.Utc);
     private static readonly Guid UserId = Guid.NewGuid();
 
-    private static AppDbContext CreateDb()
-    {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase($"RefreshTokenTest_{Guid.NewGuid()}")
-            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
-            .Options;
-        return new AppDbContext(options);
-    }
+    private static AppDbContext CreateDb() => CreateInMemoryDb("RefreshTokenTest");
 
     private static Mock<IJwtService> CreateJwtMock()
     {
@@ -39,7 +29,7 @@ public class RefreshTokenServiceTests
     }
 
     private static IDateTimeProvider CreateTimeProvider() =>
-        Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedNow);
+        Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
 
     /// <summary>
     /// A testable subclass that replaces the PostgreSQL-specific FOR UPDATE SKIP LOCKED
@@ -61,7 +51,7 @@ public class RefreshTokenServiceTests
 
         protected override Task<RefreshToken?> FindRefreshTokenByHashAsync(string hash, CancellationToken ct)
             => _db.RefreshTokens
-                .FirstOrDefaultAsync(rt => rt.TokenHash == hash && !rt.Revoked && rt.ExpiresAt > FixedNow, ct);
+                .FirstOrDefaultAsync(rt => rt.TokenHash == hash && !rt.Revoked && rt.ExpiresAt > FixedUtcNow, ct);
     }
 
     private static TestableRefreshTokenService CreateService(AppDbContext db, IJwtService? jwt = null, IDateTimeProvider? timeProvider = null)
@@ -97,8 +87,8 @@ public class RefreshTokenServiceTests
             Id = Guid.NewGuid(),
             UserId = UserId,
             TokenHash = hash,
-            ExpiresAt = FixedNow.AddDays(30),
-            CreatedAt = FixedNow,
+            ExpiresAt = FixedUtcNow.AddDays(30),
+            CreatedAt = FixedUtcNow,
         });
         await db.SaveChangesAsync();
         var svc = CreateService(db);
@@ -200,8 +190,8 @@ public class RefreshTokenServiceTests
             Id = Guid.NewGuid(),
             UserId = UserId,
             TokenHash = hash,
-            ExpiresAt = FixedNow.AddDays(-1),
-            CreatedAt = FixedNow,
+            ExpiresAt = FixedUtcNow.AddDays(-1),
+            CreatedAt = FixedUtcNow,
         });
         await db.SaveChangesAsync();
         var svc = CreateService(db);
@@ -236,8 +226,8 @@ public class RefreshTokenServiceTests
             Id = Guid.NewGuid(),
             UserId = UserId,
             TokenHash = hash,
-            ExpiresAt = FixedNow.AddDays(30),
-            CreatedAt = FixedNow,
+            ExpiresAt = FixedUtcNow.AddDays(30),
+            CreatedAt = FixedUtcNow,
             Revoked = true,
         });
         await db.SaveChangesAsync();
@@ -262,8 +252,8 @@ public class RefreshTokenServiceTests
             Id = Guid.NewGuid(),
             UserId = Guid.NewGuid(),
             TokenHash = hash,
-            ExpiresAt = FixedNow.AddDays(30),
-            CreatedAt = FixedNow,
+            ExpiresAt = FixedUtcNow.AddDays(30),
+            CreatedAt = FixedUtcNow,
         });
         await db.SaveChangesAsync();
         var svc = CreateService(db);

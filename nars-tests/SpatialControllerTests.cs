@@ -1,13 +1,12 @@
-using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Moq;
 using NarsApi.Controllers;
-using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Models;
+using NarsApi.Data;
 using NarsApi.Services;
+using static NarsApi.Tests.TestData;
 using Xunit;
 
 namespace NarsApi.Tests;
@@ -19,10 +18,7 @@ public class SpatialControllerTests
         IEntranceQueryService? entranceQuery = null,
         Guid? userId = null)
     {
-        var opts = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase($"SpatialTest_{Guid.NewGuid()}")
-            .Options;
-        var db = new AppDbContext(opts);
+        var db = CreateInMemoryDb("SpatialTest");
 
         var ctrl = new SpatialController(
             new RoadQueryService(db),
@@ -51,7 +47,7 @@ public class SpatialControllerTests
             Data = coordsJson,
             Label = "Test Road",
             Layer = "main",
-            UpdatedAt = DateTime.UtcNow
+            UpdatedAt = FixedUtcNow
         });
         db.SaveChanges();
         return id;

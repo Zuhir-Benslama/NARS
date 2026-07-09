@@ -31,7 +31,11 @@ def main() -> None:
     for png in pngs:
         pdf = png.with_suffix(".pdf")
         print(f"Converting {png.name} -> {pdf.name}...")
-        img = Image.open(png).convert("RGB")
+        try:
+            img = Image.open(png).convert("RGB")
+        except Exception as e:
+            print(f"Error: cannot open '{png.name}' — {e}", file=sys.stderr)
+            continue
         img.save(pdf, "PDF", resolution=150)
 
     print("Done.")

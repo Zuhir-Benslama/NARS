@@ -44,7 +44,7 @@ spec:
           activeDeadlineSeconds: 600
           containers:
             - name: pg-dump
-              image: postgres:17-alpine
+              image: postgres:17-alpine@sha256:af194ccf3e2d7fe367012c7b88ce8b816c5c889b18a5b316799a1f0d7eac746a
               imagePullPolicy: IfNotPresent
               securityContext:
                 allowPrivilegeEscalation: false
@@ -64,6 +64,11 @@ spec:
                   FILE="/backup/nars_db_${TIMESTAMP}.sql"
                   echo "→ Backing up database 'nars_db'..."
                   echo "  → Encrypting with GPG symmetric cipher..."
+                  # --no-owner: prevents OWNER TO clauses in the dump, which avoids
+                  # errors when restoring against a PostGIS instance with a different
+                  # role name. However, on restore you must ensure the correct owner
+                  # is set manually or via a post-restore script, otherwise all
+                  # objects will be owned by the restoring user.
                   pg_dump \
                     -h "${PGHOST}" -U "${PGUSER}" -d "${PGDATABASE}" \
                     --no-owner | gpg --batch --yes --passphrase-file <(echo "${GPG_PASSPHRASE}") \

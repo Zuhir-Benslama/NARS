@@ -96,11 +96,15 @@ export const PHASES: Phase[] = [
   },
 ]
 
-// ─── API_LAYER_TO_PHASE ───────────────────────────────────────────────
+// ─── getApiLayerToPhase ───────────────────────────────────────────────
 // Auto-generated from feature-types.ts — no manual sync needed when
 // adding new sub-types. Maps every DB layer value to its phase key.
 
-function buildApiLayerToPhase(): Record<string, FeatureTypeKey> {
+let _apiLayerToPhase: Record<string, FeatureTypeKey> | null = null
+
+export function getApiLayerToPhase(): Record<string, FeatureTypeKey> {
+  if (_apiLayerToPhase) return _apiLayerToPhase
+
   const map: Record<string, FeatureTypeKey> = {}
 
   for (const t of AREA_TYPES) map[t.key] = "areas"
@@ -116,7 +120,6 @@ function buildApiLayerToPhase(): Record<string, FeatureTypeKey> {
   for (const t of PUBLIC_SPACE_TYPES) map[t.key] = "publicSpaces"
   map.naming_panel = "namingPanels"
 
+  _apiLayerToPhase = map
   return map
 }
-
-export const API_LAYER_TO_PHASE: Record<string, FeatureTypeKey> = buildApiLayerToPhase()

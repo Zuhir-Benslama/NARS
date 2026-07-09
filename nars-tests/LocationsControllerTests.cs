@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -8,6 +7,7 @@ using NarsApi.Infrastructure;
 using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Services;
+using static NarsApi.Tests.TestData;
 using Xunit;
 
 namespace NarsApi.Tests;
@@ -25,13 +25,7 @@ public class LocationsControllerTests
             Options.Create(new LocationsOptions()),
             boundaryService ?? Mock.Of<IBoundaryService>());
 
-    private static AppDbContext CreateDb(string name)
-    {
-        var opts = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase($"LocationsTest_{name}_{Guid.NewGuid()}")
-            .Options;
-        return new AppDbContext(opts);
-    }
+    private static AppDbContext CreateDb(string name) => CreateInMemoryDb($"LocationsTest_{name}");
 
     private static void SeedWilayas(AppDbContext db)
     {

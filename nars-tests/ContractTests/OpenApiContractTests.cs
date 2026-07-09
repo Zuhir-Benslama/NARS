@@ -1,8 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Xunit;
 
 namespace NarsApi.Tests.ContractTests;
@@ -18,8 +16,9 @@ public class OpenApiContractTests : IClassFixture<WebApplicationFactory<Program>
             builder.UseSetting("Jwt:SecretKey", AuthTestHelper.TestJwtSecret);
             builder.UseSetting("Jwt:Issuer", "test");
             builder.UseSetting("Jwt:Audience", "test");
-            builder.UseSetting("ConnectionStrings:DefaultConnection",
-                "Host=localhost;Database=nars_contract_test;Username=test;Password=test");
+            var connStr = Environment.GetEnvironmentVariable("NARS_CONTRACT_CONNECTION_STRING")
+                ?? "Host=localhost;Database=nars_contract_test;Username=test;Password=test";
+            builder.UseSetting("ConnectionStrings:DefaultConnection", connStr);
 
             builder.UseSetting("HostOptions:Validate", "false");
 

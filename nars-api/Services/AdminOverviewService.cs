@@ -80,11 +80,10 @@ public class AdminOverviewService(AppDbContext db, IFeatureStatsService featureS
 
         var dairaIds = dairas.Select(d => d.DairaId).ToArray();
 
-        var dairaAdmins = (await db.Users
-                .Where(u => u.Role == UserRoles.DairaAdmin && u.DairaId.HasValue && dairaIds.Contains(u.DairaId.Value))
-                .ToListAsync(cancellationToken))
-            .GroupBy(u => u.DairaId!.Value)
-            .ToDictionary(g => g.Key, g => g.First());
+        var dairaAdmins = await db.Users
+            .Where(u => u.Role == UserRoles.DairaAdmin && u.DairaId.HasValue && dairaIds.Contains(u.DairaId.Value))
+            .Select(u => new { u.DairaId, u })
+            .ToDictionaryAsync(x => x.DairaId!.Value, x => x.u, cancellationToken);
 
         var communeReports = await BuildCommunesForDairasAsync(dairaIds, cancellationToken);
 

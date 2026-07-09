@@ -134,6 +134,10 @@ spec:
             matchLabels:
               app.kubernetes.io/name: nars-api
               app.kubernetes.io/component: api
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgis-backup
+              app.kubernetes.io/component: backup
       ports:
         - port: 5432
 ---

@@ -32,12 +32,22 @@ spec:
         app.kubernetes.io/name: postgis
         app.kubernetes.io/component: database
     spec:
+      imagePullSecrets:
+        - name: regcred
       serviceAccountName: postgis
       terminationGracePeriodSeconds: 60
-      # rootless Docker requirement: the official postgis entrypoint starts
-      # as root (uid 0) to chmod the data directory, then drops to the
-      # postgres user for the actual server. In rootless Docker, uid 0
-      # inside the container maps to the host user who owns the data dir.
+      # ⚠ SECURITY: PostGIS runs as root (uid 0).
+      # The official postgis entrypoint starts as root to chown the data
+      # directory, then drops to the postgres user (uid 999) for the server.
+      # In Kubernetes, setting runAsUser: 0 skips the entrypoint's setpriv
+      # step, causing the postgres process to remain root.
+      #
+      # Possible mitigation for production:
+      #   1. Use an initContainer (runAsUser: 0) to chown /var/lib/postgresql/data
+      #      to the postgres uid (999), matching the PV's fsGroup.
+      #   2. Set runAsUser: 999, fsGroup: 999 in the main container.
+      #   3. Override entrypoint to skip chown (already done in custom image).
+      # See: https://github.com/docker-library/postgres/issues/672
       securityContext:
         runAsUser: 0
         fsGroup: 0

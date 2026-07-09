@@ -19,6 +19,8 @@ spec:
         app.kubernetes.io/name: nars-api
         app.kubernetes.io/component: api
     spec:
+      imagePullSecrets:
+        - name: regcred
       serviceAccountName: nars-api
       terminationGracePeriodSeconds: 30
       topologySpreadConstraints:

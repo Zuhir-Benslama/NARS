@@ -1,7 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using NarsApi.Data;
-using NarsApi.Infrastructure;
 using NarsApi.Models;
 using NarsApi.Services;
 using static NarsApi.Tests.TestData;
@@ -11,29 +9,21 @@ namespace NarsApi.Tests;
 
 public class FeatureStatsServiceTests
 {
-    private static AppDbContext CreateDb()
-    {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase($"FeatureStatsTest_{Guid.NewGuid()}")
-            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
-            .Options;
-        return new AppDbContext(options);
-    }
+    private static AppDbContext CreateDb() => CreateInMemoryDb("FeatureStatsTest");
 
     private static readonly Guid UserId1 = Guid.NewGuid();
     private static readonly Guid UserId2 = Guid.NewGuid();
-    private static readonly DateTime FixedNow = new(2025, 6, 1, 12, 0, 0, DateTimeKind.Utc);
 
     private static async Task<AppDbContext> SeedWithFeaturesAsync()
     {
         var db = CreateDb();
 
-        db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = UserId1, Layer = "central_urban", Label = "A1", Data = "{}", CreatedAt = FixedNow });
-        db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = UserId1, Layer = "secondary_urban", Label = "A2", Data = "{}", CreatedAt = FixedNow });
-        db.Roads.Add(new Road { Id = Guid.CreateVersion7(), UserId = UserId1, Layer = "street", Label = "R1", Data = "{}", CreatedAt = FixedNow });
-        db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = UserId2, Layer = "central_urban", Label = "A3", Data = "{}", CreatedAt = FixedNow });
-        db.Districts.Add(new District { Id = Guid.CreateVersion7(), UserId = UserId2, Layer = "housing_estate", Label = "D1", Data = "{}", CreatedAt = FixedNow });
-        db.Districts.Add(new District { Id = Guid.CreateVersion7(), UserId = UserId2, Layer = "district", Label = "D2", Data = "{}", CreatedAt = FixedNow });
+        db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = UserId1, Layer = "central_urban", Label = "A1", Data = "{}", CreatedAt = FixedUtcNow });
+        db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = UserId1, Layer = "secondary_urban", Label = "A2", Data = "{}", CreatedAt = FixedUtcNow });
+        db.Roads.Add(new Road { Id = Guid.CreateVersion7(), UserId = UserId1, Layer = "street", Label = "R1", Data = "{}", CreatedAt = FixedUtcNow });
+        db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = UserId2, Layer = "central_urban", Label = "A3", Data = "{}", CreatedAt = FixedUtcNow });
+        db.Districts.Add(new District { Id = Guid.CreateVersion7(), UserId = UserId2, Layer = "housing_estate", Label = "D1", Data = "{}", CreatedAt = FixedUtcNow });
+        db.Districts.Add(new District { Id = Guid.CreateVersion7(), UserId = UserId2, Layer = "district", Label = "D2", Data = "{}", CreatedAt = FixedUtcNow });
         db.Users.Add(new User { Id = UserId1, Username = "user1", Name = "User 1", Email = "u1@test.com", Phone = DefaultPhone, PasswordHash = "hash", Role = "commune_user", CommuneId = 1 });
         db.Users.Add(new User { Id = UserId2, Username = "user2", Name = "User 2", Email = "u2@test.com", Phone = "0555000001", PasswordHash = "hash", Role = "commune_user", CommuneId = 1 });
 

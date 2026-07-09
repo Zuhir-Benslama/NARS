@@ -27,12 +27,16 @@
 import { computed } from "vue"
 import { useEditStore } from "../stores/editStore"
 import { commitEditMode } from "../map/edit/edit-mode"
+import { showToast } from "../lib/toast"
 
 const store = useEditStore()
 const visible = computed(() => store.isEditMode)
 
 function save() {
-  commitEditMode().catch(() => {})
+  commitEditMode().catch((err) => {
+    const message = err instanceof Error ? err.message : "Please try again."
+    showToast("Save failed: " + message, "error")
+  })
 }
 </script>
 

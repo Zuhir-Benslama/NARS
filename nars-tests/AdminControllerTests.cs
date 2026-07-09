@@ -1,28 +1,21 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
 using NarsApi.Controllers;
-using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
+using NarsApi.Data;
 using NarsApi.Services;
+using static NarsApi.Tests.TestData;
 using Xunit;
 
 namespace NarsApi.Tests;
 
 public class AdminControllerTests
 {
-    private static AppDbContext CreateDb()
-    {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase($"AdminTest_{Guid.NewGuid()}")
-            .Options;
-        return new AppDbContext(options);
-    }
+    private static AppDbContext CreateDb() => CreateInMemoryDb("AdminTest");
 
     private static AdminController CreateController(AppDbContext db,
         IAdminOverviewService? overview = null) =>
@@ -307,7 +300,8 @@ public class AdminControllerTests
             DairaId: null,
             WilayaId: 1), default);
 
-        Assert.IsType<ObjectResult>(result);
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(409, problem.StatusCode);
     }
 
     [Fact]
@@ -538,7 +532,7 @@ public class AdminControllerTests
     [InlineData(UserRoles.DairaAdmin, UserRoles.WilayaAdmin, false)]
     public void CanCreateRole_ValidatesCorrectly(string caller, string target, bool expected)
     {
-        var svc = new UserAuthorizationService(CreateDb());
+        var svc = new UserAuthorizationService(null!);
         Assert.Equal(expected, svc.CanCreateRole(caller, target));
     }
 }

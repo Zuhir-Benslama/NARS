@@ -94,5 +94,3 @@ export const useLayerStore = defineStore("layer", {
     },
   },
 })
-
-// selectedFeatureDbId moved to selectionStore

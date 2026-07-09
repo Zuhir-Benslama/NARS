@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Infrastructure;
 using NarsApi.Services;
+using static NarsApi.Tests.TestData;
 
 namespace NarsApi.Tests;
 
@@ -23,7 +24,7 @@ public class JwtServiceTests
         });
 
         var loggerMock = Mock.Of<ILogger<JwtService>>();
-        var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == DateTime.UtcNow);
+        var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         return new JwtService(secret, null, null, jwtOptions, loggerMock, timeProvider);
     }
 
@@ -36,7 +37,6 @@ public class JwtServiceTests
 
         Assert.NotNull(token);
         Assert.NotEmpty(token);
-        // JWT has 3 parts separated by dots
         Assert.Equal(3, token.Split('.').Length);
     }
 
@@ -133,5 +133,17 @@ public class JwtServiceTests
 
         Assert.NotEqual(raw1, raw2);
         Assert.NotEqual(hash1, hash2);
+    }
+
+    [Fact]
+    public void ValidateToken_ExpiredToken_ReturnsNull()
+    {
+        var expiredService = CreateService(expiresMinutes: -1);
+        var token = expiredService.CreateToken(
+            Guid.NewGuid(), "testuser", "Test User", "test@example.com", 1);
+
+        var principal = expiredService.ValidateToken(token);
+
+        Assert.Null(principal);
     }
 }

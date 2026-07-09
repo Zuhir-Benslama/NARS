@@ -105,20 +105,28 @@ public class FieldController(
         return await SaveInspectionAsync(featureId, body.Type, body.Status, rawData, cancellationToken);
     }
 
-    /// <summary>Returns all inspections for a given feature, newest first.</summary>
+    /// <summary>Returns inspections for a given feature, newest first, with pagination.</summary>
     [HttpGet("field/inspections/{featureId:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> GetInspections(Guid featureId, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetInspections(
+        Guid featureId,
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 100,
+        CancellationToken cancellationToken = default)
     {
         if (CurrentUserRole != UserRoles.FieldWorker)
         {
             return Forbid();
         }
 
+        take = Math.Clamp(take, 1, 500);
+
         var inspections = await db.Inspections
             .Where(i => i.FeatureId == featureId)
             .OrderByDescending(i => i.CreatedAt)
+            .Skip(skip)
+            .Take(take)
             .Select(i => new FieldInspectionResponse(
                 Id: i.Id.ToString(),
                 FeatureId: i.FeatureId.ToString(),
@@ -166,7 +174,7 @@ public class FieldController(
             return Problem(detail: "Road not found.", statusCode: 400);
         }
 
-        if (roadData.CommuneId.HasValue && CurrentCommuneId.HasValue && roadData.CommuneId != CurrentCommuneId)
+        if (!roadData.CommuneId.HasValue || !CurrentCommuneId.HasValue || roadData.CommuneId != CurrentCommuneId)
         {
             return Forbid();
         }

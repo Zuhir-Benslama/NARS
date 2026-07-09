@@ -7,9 +7,9 @@ function getFocusable(el: HTMLElement): HTMLElement[] {
   return Array.from(el.querySelectorAll<HTMLElement>(FOCUSABLE))
 }
 
-let previousActiveElement: HTMLElement | null = null
-
 export function useFocusTrap(containerRef: Ref<HTMLElement | null>, isActive: () => boolean): void {
+  let previousActiveElement: HTMLElement | null = null
+
   function onKeydown(e: KeyboardEvent) {
     if (!isActive() || e.key !== "Tab") return
     const container = containerRef.value

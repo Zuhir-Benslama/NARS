@@ -20,19 +20,24 @@ namespace NarsApi.Tests.Integration;
 public class AuthControllerIntegrationTests : IAsyncLifetime
 {
     private readonly NarsDatabaseFixture _fixture;
-    private readonly AppDbContext _db;
-    private readonly AuthController _controller;
+    private AppDbContext _db = null!;
 
     public AuthControllerIntegrationTests(NarsDatabaseFixture fixture)
     {
         _fixture = fixture;
-        _db = fixture.CreateDbContext();
-        _controller = CreateController(_db);
     }
 
-    public async Task InitializeAsync() => await SeedReferenceDataAsync();
+    public async Task InitializeAsync()
+    {
+        _db = _fixture.CreateDbContext();
+        await SeedReferenceDataAsync();
+    }
 
-    public async Task DisposeAsync() => await _fixture.CleanTablesAsync();
+    public async Task DisposeAsync()
+    {
+        await _db.DisposeAsync();
+        await _fixture.CleanTablesAsync();
+    }
 
     [Fact]
     public async Task AuthorizedAdminSignup_ValidRequest_CreatesUser()
@@ -43,7 +48,8 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             password: DefaultPassword,
             dairaId: 1);
 
-        var result = await _controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
+        var controller = CreateController();
+        var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "daira_admin_1",
             AdminPassword: DefaultPassword,
             Name: "Integration Test User",
@@ -75,7 +81,8 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             password: DefaultPassword,
             dairaId: 1);
 
-        await _controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
+        var first = CreateController();
+        await first.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "daira_admin_1",
             AdminPassword: DefaultPassword,
             Name: "User One",
@@ -89,7 +96,8 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             WilayaId: null
         ));
 
-        var result = await _controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
+        var second = CreateController();
+        var result = await second.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "daira_admin_1",
             AdminPassword: DefaultPassword,
             Name: "User Two",
@@ -103,7 +111,8 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             WilayaId: null
         ));
 
-        Assert.IsType<ObjectResult>(result);
+        var conflict = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(409, conflict.StatusCode);
     }
 
     [Fact]
@@ -189,7 +198,8 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             Password: "WrongPass1!"
         ));
 
-        Assert.IsType<ObjectResult>(result);
+        var unauthorized = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(401, unauthorized.StatusCode);
     }
 
     [Fact]
@@ -211,9 +221,10 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
 
         var claims = new List<Claim> { new(ClaimNames.UserId, user.Id.ToString()) };
         var httpContext = CreateHttpContext(claims);
-        _controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+        var logoutController = CreateController();
+        logoutController.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
-        var result = await _controller.Logout();
+        var result = await logoutController.Logout();
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(200, okResult.StatusCode);
 
@@ -235,16 +246,19 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             new(ClaimNames.CommuneId, "1"),
         };
         var httpContext = CreateHttpContext(claims);
-        _controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+        var currentController = CreateController();
+        currentController.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
-        var result = await _controller.CurrentUser();
+        var result = await currentController.CurrentUser();
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.NotNull(okResult.Value);
     }
 
+    private AuthController CreateController() => CreateController(_db);
+
     private static AuthController CreateController(AppDbContext db)
     {
-        var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == DateTime.UtcNow);
+        var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var jwtOpts = Options.Create(new JwtOptions { ExpiresInMinutes = 60, RefreshExpiresInDays = 30 });
         var jwt = new JwtService(
             AuthTestHelper.TestJwtSecret,

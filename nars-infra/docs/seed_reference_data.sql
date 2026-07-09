@@ -2168,3 +2168,9 @@ COPY public.communes (commune_id, daira_id, commune_code, commune_ar, commune_fr
 
 COMMIT;
 
+-- Update table statistics and reclaim storage after bulk load.
+-- Without this, the query planner may make poor decisions until autovacuum
+-- kicks in (which could take minutes on a fresh cluster).
+VACUUM ANALYZE public.wilayas;
+VACUUM ANALYZE public.dairas;
+

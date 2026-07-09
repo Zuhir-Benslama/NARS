@@ -201,6 +201,10 @@ const isZoneWithTypeName = computed(
 
 let _roadSideController: AbortController | null = null
 
+onUnmounted(() => {
+  _roadSideController?.abort()
+})
+
 // When road selection changes → fetch side + suggested number.
 // In edit mode the side/number are already populated from existing data — skip
 // the API call so we don't overwrite them when the selector is pre-selected.

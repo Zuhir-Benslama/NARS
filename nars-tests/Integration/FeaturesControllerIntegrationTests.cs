@@ -23,34 +23,43 @@ namespace NarsApi.Tests.Integration;
 public class FeaturesControllerIntegrationTests : IAsyncLifetime
 {
     private readonly NarsDatabaseFixture _fixture;
-    private readonly AppDbContext _db;
-    private readonly FeaturesController _controller;
+    private AppDbContext _db = null!;
     private Guid _userId;
 
     public FeaturesControllerIntegrationTests(NarsDatabaseFixture fixture)
     {
         _fixture = fixture;
-        _db = fixture.CreateDbContext();
-
-        var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == DateTime.UtcNow);
-        var jwtOptions = Options.Create(new JwtOptions { ExpiresInMinutes = 60, RefreshExpiresInDays = 30 });
-        var jwt = new JwtService(AuthTestHelper.TestJwtSecret, null, null, jwtOptions, Mock.Of<ILogger<JwtService>>(), timeProvider);
-        var bgQueueMock = Mock.Of<IBackgroundTaskQueue>();
-
-        _controller = new FeaturesController(new FeatureRepository(_db), bgQueueMock, Mock.Of<ILogger<FeaturesController>>(), Options.Create(new FeatureDefaultsOptions()), timeProvider, new FeatureStatsService(_db));
     }
 
     public async Task InitializeAsync()
     {
+        _db = _fixture.CreateDbContext();
         _userId = await CreateUserAsync();
-        SetUserId(_userId, 1);
     }
 
-    public async Task DisposeAsync() => await _fixture.CleanTablesAsync();
+    public async Task DisposeAsync()
+    {
+        await _db.DisposeAsync();
+        await _fixture.CleanTablesAsync();
+    }
+
+    private FeaturesController CreateController()
+    {
+        var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
+        var bgQueueMock = Mock.Of<IBackgroundTaskQueue>();
+        var ctrl = new FeaturesController(new FeatureRepository(_db), bgQueueMock, Mock.Of<ILogger<FeaturesController>>(), Options.Create(new FeatureDefaultsOptions()), timeProvider, new FeatureStatsService(_db));
+        var httpContext = new DefaultHttpContext
+        {
+            User = AuthTestHelper.CreateClaimsPrincipal(_userId, "commune_user", communeId: 1)
+        };
+        ctrl.ControllerContext = new ControllerContext { HttpContext = httpContext };
+        return ctrl;
+    }
 
     [Fact]
     public async Task SaveFeature_ValidArea_Returns201()
     {
+        var controller = CreateController();
         var data = new
         {
             coordinates = new[] {
@@ -61,7 +70,7 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
             }
         };
 
-        var result = await _controller.SaveFeature(new FeatureSaveRequest(
+        var result = await controller.SaveFeature(new FeatureSaveRequest(
             Type: "area",
             Layer: "central_urban",
             Label: "Test Central Urban",
@@ -80,6 +89,7 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task SaveFeature_ValidRoad_Returns201()
     {
+        var controller = CreateController();
         var data = new
         {
             coordinates = new[] {
@@ -88,7 +98,7 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
             }
         };
 
-        var result = await _controller.SaveFeature(new FeatureSaveRequest(
+        var result = await controller.SaveFeature(new FeatureSaveRequest(
             Type: "road",
             Layer: "street",
             Label: "Test Road",
@@ -105,7 +115,8 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task SaveFeature_InvalidType_Returns400()
     {
-        var result = await _controller.SaveFeature(new FeatureSaveRequest(
+        var controller = CreateController();
+        var result = await controller.SaveFeature(new FeatureSaveRequest(
             Type: "nonexistent_type",
             Layer: "central_urban",
             Label: "Bad Type",
@@ -119,19 +130,20 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task LoadFeatures_ReturnsAllUserFeatures()
     {
+        var controller = CreateController();
         // Create some features first
         var dataArea = new { coordinates = new[] { new { lat = 36.71, lng = 2.95 }, new { lat = 36.72, lng = 2.96 }, new { lat = 36.71, lng = 2.96 } } };
         var dataRoad = new { coordinates = new[] { new { lat = 36.71, lng = 2.95 }, new { lat = 36.72, lng = 2.96 } } };
 
-        await _controller.SaveFeature(new FeatureSaveRequest(
+        await controller.SaveFeature(new FeatureSaveRequest(
             Type: "area", Layer: "central_urban", Label: "Area 1",
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(dataArea)).RootElement));
 
-        await _controller.SaveFeature(new FeatureSaveRequest(
+        await controller.SaveFeature(new FeatureSaveRequest(
             Type: "road", Layer: "street", Label: "Road 1",
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(dataRoad)).RootElement));
 
-        var result = await _controller.LoadFeatures();
+        var result = await controller.LoadFeatures();
 
         var okResult = Assert.IsType<OkObjectResult>(result);
         var loadResponse = Assert.IsType<LoadFeaturesResponse<FeatureResult>>(okResult.Value);
@@ -141,9 +153,10 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task DeleteFeature_RemovesFromDatabase()
     {
+        var controller = CreateController();
         var data = new { coordinates = new[] { new { lat = 36.71, lng = 2.95 }, new { lat = 36.72, lng = 2.96 }, new { lat = 36.71, lng = 2.96 } } };
 
-        var saveResult = await _controller.SaveFeature(new FeatureSaveRequest(
+        var saveResult = await controller.SaveFeature(new FeatureSaveRequest(
             Type: "area", Layer: "central_urban", Label: "To Delete",
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(data)).RootElement));
 
@@ -154,7 +167,7 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
         var featureId = Guid.Parse(saveResponse.Id);
 
         // Delete it
-        var deleteResult = await _controller.DeleteFeature(featureId);
+        var deleteResult = await controller.DeleteFeature(featureId);
         var deleteOk = Assert.IsType<OkObjectResult>(deleteResult);
         Assert.Equal(200, deleteOk.StatusCode);
 
@@ -170,7 +183,8 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task DeleteFeature_NonExistent_Returns404()
     {
-        var result = await _controller.DeleteFeature(Guid.NewGuid());
+        var controller = CreateController();
+        var result = await controller.DeleteFeature(Guid.NewGuid());
         var notFound = Assert.IsType<ObjectResult>(result);
         Assert.Equal(404, notFound.StatusCode);
     }
@@ -178,16 +192,17 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task ClearFeatures_RemovesAll()
     {
+        var controller = CreateController();
         var data = new { coordinates = new[] { new { lat = 36.71, lng = 2.95 }, new { lat = 36.72, lng = 2.96 }, new { lat = 36.71, lng = 2.96 } } };
 
-        await _controller.SaveFeature(new FeatureSaveRequest(
+        await controller.SaveFeature(new FeatureSaveRequest(
             Type: "area", Layer: "central_urban", Label: "Area 1",
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(data)).RootElement));
-        await _controller.SaveFeature(new FeatureSaveRequest(
+        await controller.SaveFeature(new FeatureSaveRequest(
             Type: "area", Layer: "secondary_urban", Label: "Area 2",
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(data)).RootElement));
 
-        var result = await _controller.ClearFeatures(new ClearFeaturesRequest(Confirm: true));
+        var result = await controller.ClearFeatures(new ClearFeaturesRequest(Confirm: true));
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(200, okResult.StatusCode);
 
@@ -201,9 +216,10 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task UpdateFeature_ValidUpdate_Returns200()
     {
+        var controller = CreateController();
         var data = new { coordinates = new[] { new { lat = 36.71, lng = 2.95 }, new { lat = 36.72, lng = 2.96 }, new { lat = 36.71, lng = 2.96 } } };
 
-        var saveResult = await _controller.SaveFeature(new FeatureSaveRequest(
+        var saveResult = await controller.SaveFeature(new FeatureSaveRequest(
             Type: "area", Layer: "central_urban", Label: "Original Label",
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(data)).RootElement));
 
@@ -213,7 +229,7 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
 
         // Update the label
         var updateData = new { coordinates = new[] { new { lat = 36.80, lng = 3.00 } } };
-        var updateResult = await _controller.UpdateFeature(featureId, new FeatureUpdateRequest(
+        var updateResult = await controller.UpdateFeature(featureId, new FeatureUpdateRequest(
             Label: "Updated Label",
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(updateData)).RootElement
         ));
@@ -231,7 +247,8 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task UpdateFeature_NonExistent_Returns404()
     {
-        var result = await _controller.UpdateFeature(Guid.NewGuid(), new FeatureUpdateRequest(Label: "Test", Data: null));
+        var controller = CreateController();
+        var result = await controller.UpdateFeature(Guid.NewGuid(), new FeatureUpdateRequest(Label: "Test", Data: null));
         var notFound = Assert.IsType<ObjectResult>(result);
         Assert.Equal(404, notFound.StatusCode);
     }
@@ -239,9 +256,10 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task UpdateFeature_LabelOnly_Returns200()
     {
+        var controller = CreateController();
         var data = new { coordinates = new[] { new { lat = 36.71, lng = 2.95 }, new { lat = 36.72, lng = 2.96 } } };
 
-        var saveResult = await _controller.SaveFeature(new FeatureSaveRequest(
+        var saveResult = await controller.SaveFeature(new FeatureSaveRequest(
             Type: "road", Layer: "street", Label: "Road Before",
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(data)).RootElement));
 
@@ -249,7 +267,7 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
         var saveResponse = Assert.IsType<SaveFeatureResponse>(saveOk.Value);
         var featureId = Guid.Parse(saveResponse.Id);
 
-        var updateResult = await _controller.UpdateFeature(featureId, new FeatureUpdateRequest(Label: "Road After", Data: null));
+        var updateResult = await controller.UpdateFeature(featureId, new FeatureUpdateRequest(Label: "Road After", Data: null));
         var updateOk = Assert.IsType<OkObjectResult>(updateResult);
         Assert.Equal(200, updateOk.StatusCode);
 
@@ -262,13 +280,6 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
         var user = await SeedData.CreateUserAsync(_db, "commune_user", communeId: 1, name: "Features Test User");
         await SeedData.SeedBasicLocationsAsync(_db);
         return user.Id;
-    }
-
-    private void SetUserId(Guid userId, int communeId)
-    {
-        var httpContext = new DefaultHttpContext();
-        httpContext.User = AuthTestHelper.CreateClaimsPrincipal(userId, "commune_user", communeId: communeId);
-        _controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
     }
 
 }

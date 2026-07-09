@@ -25,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-import { watch, ref, nextTick } from "vue"
+import { watch, ref, nextTick, onMounted, onUnmounted } from "vue"
 import { useConfirmStore } from "../stores/confirmStore"
 import { useFocusTrap } from "../composables/useFocusTrap"
 
@@ -51,9 +51,13 @@ function onKey(e: KeyboardEvent) {
   }
 }
 
-if (typeof window !== "undefined") {
+onMounted(() => {
   window.addEventListener("keydown", onKey)
-}
+})
+
+onUnmounted(() => {
+  window.removeEventListener("keydown", onKey)
+})
 </script>
 
 <style scoped>

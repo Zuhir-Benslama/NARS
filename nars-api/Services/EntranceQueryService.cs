@@ -19,11 +19,12 @@ public class EntranceQueryService(AppDbContext db) : IEntranceQueryService
             SELECT (data::jsonb->>'entranceNumber')::int
             FROM {heTable}
             WHERE user_id = @uid
-              AND layer   = 'main_entrance'
+              AND layer   = @layer
               AND road_id = @rid
               AND data::jsonb->>'entranceNumber' IS NOT NULL";
         SqlFragments.AddParam(cmd, "@uid", userId);
         SqlFragments.AddParam(cmd, "@rid", roadId);
+        SqlFragments.AddParam(cmd, "@layer", FeatureTypes.HouseEntranceLayers.Main);
 
         using var reader = await cmd.ExecuteReaderAsync(ct);
         while (await reader.ReadAsync(ct))

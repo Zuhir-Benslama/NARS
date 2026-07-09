@@ -116,8 +116,14 @@ export const useModalStore = defineStore("modal", {
 // Since the modal is a singleton, a single pending promise is sufficient.
 
 let _modalResolver: ((result: ModalResult | null) => void) | null = null
+let _modalResult: ModalResult | null = null
 
 export function awaitModalResult(): Promise<ModalResult | null> {
+  if (_modalResult !== null) {
+    const result = _modalResult
+    _modalResult = null
+    return Promise.resolve(result)
+  }
   return new Promise((resolve) => {
     _modalResolver = resolve
   })
@@ -126,8 +132,12 @@ export function awaitModalResult(): Promise<ModalResult | null> {
 function resolveModalPromise(result: ModalResult | null): void {
   const modalStore = useModalStore()
   modalStore.currentModalFeatureId = null
-  _modalResolver?.(result)
-  _modalResolver = null
+  if (_modalResolver) {
+    _modalResolver(result)
+    _modalResolver = null
+  } else {
+    _modalResult = result
+  }
 }
 
 // ─── LEGACY HELPER FUNCTIONS ───────────────────────────────────────────────────

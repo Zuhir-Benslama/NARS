@@ -2,7 +2,6 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -12,6 +11,7 @@ using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
 using NarsApi.Services;
+using static NarsApi.Tests.TestData;
 using Xunit;
 
 namespace NarsApi.Tests;
@@ -19,26 +19,20 @@ namespace NarsApi.Tests;
 public class FeaturesControllerTests
 {
     private static readonly Guid UserId = Guid.NewGuid();
-    private static readonly DateTime FixedNow = new(2025, 6, 1, 12, 0, 0, DateTimeKind.Utc);
-
     private static (FeaturesController, AppDbContext) CreateController(
         AppDbContext? db = null,
         IBackgroundTaskQueue? bgQueue = null,
         IDateTimeProvider? timeProvider = null,
         IFeatureStatsService? featureStatsService = null)
     {
-        var opts = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase($"FeaturesTest_{Guid.NewGuid()}")
-            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
-            .Options;
-        var context = db ?? new AppDbContext(opts);
+        var context = db ?? CreateInMemoryDb("FeaturesTest");
 
         var ctrl = new FeaturesController(
             new FeatureRepository(context),
             bgQueue ?? Mock.Of<IBackgroundTaskQueue>(),
             Mock.Of<ILogger<FeaturesController>>(),
             Options.Create(new FeatureDefaultsOptions()),
-            timeProvider ?? Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedNow),
+            timeProvider ?? Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow),
             featureStatsService ?? Mock.Of<IFeatureStatsService>())
         {
             ControllerContext = new ControllerContext
@@ -131,7 +125,7 @@ public class FeaturesControllerTests
             Layer = FeatureTypes.RoadLayers.Street,
             Data = "{}",
             Label = "road",
-            UpdatedAt = FixedNow
+            UpdatedAt = FixedUtcNow
         });
         await db.SaveChangesAsync();
 
@@ -247,7 +241,7 @@ public class FeaturesControllerTests
             Layer = FeatureTypes.RoadLayers.Street,
             Data = "{}",
             Label = "other",
-            UpdatedAt = FixedNow
+            UpdatedAt = FixedUtcNow
         });
         db.FeatureRegistry.Add(new FeatureRegistry { Id = otherId, FeatureType = FeatureTypes.Road });
         await db.SaveChangesAsync();
@@ -270,7 +264,7 @@ public class FeaturesControllerTests
             Layer = FeatureTypes.RoadLayers.Street,
             Data = "{}",
             Label = "road",
-            UpdatedAt = FixedNow
+            UpdatedAt = FixedUtcNow
         });
         db.FeatureRegistry.Add(new FeatureRegistry { Id = fid, FeatureType = FeatureTypes.Road });
         await db.SaveChangesAsync();

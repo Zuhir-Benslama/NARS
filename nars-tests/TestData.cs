@@ -1,3 +1,7 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using NarsApi.Data;
+
 namespace NarsApi.Tests;
 
 /// <summary>Shared constants used across test files to avoid magic-string duplication.</summary>
@@ -24,6 +28,7 @@ public static class TestData
 
     // ── Date / time ────────────────────────────────────────────────────
     public static readonly DateTime FixedUtcNow = new(2025, 6, 1, 12, 0, 0, DateTimeKind.Utc);
+    public static readonly DateTimeOffset FixedUtcNowOffset = new(2025, 6, 1, 12, 0, 0, TimeSpan.Zero);
 
     // ── Helpers ────────────────────────────────────────────────────────
     public static string UniqueEmail(string prefix = "test") =>
@@ -31,4 +36,13 @@ public static class TestData
 
     public static string UniqueUsername(string prefix = "user") =>
         $"{prefix}_{Guid.NewGuid():N}";
+
+    public static AppDbContext CreateInMemoryDb(string prefix)
+    {
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase($"{prefix}_{Guid.NewGuid()}")
+            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
+            .Options;
+        return new AppDbContext(options);
+    }
 }

@@ -18,29 +18,40 @@ namespace NarsApi.Tests.Integration;
 public class AdminControllerIntegrationTests : IAsyncLifetime
 {
     private readonly NarsDatabaseFixture _fixture;
-    private readonly AppDbContext _db;
-    private readonly AdminController _controller;
+    private AppDbContext _db = null!;
 
     public AdminControllerIntegrationTests(NarsDatabaseFixture fixture)
     {
         _fixture = fixture;
-        _db = fixture.CreateDbContext();
-        var featureStats = new FeatureStatsService(_db);
-        _controller = new AdminController(_db, Mock.Of<Microsoft.Extensions.Logging.ILogger<AdminController>>(), new AdminOverviewService(_db, featureStats), new UserAuthorizationService(_db));
     }
 
-    public async Task InitializeAsync() => await SeedReferenceDataAsync();
+    public async Task InitializeAsync()
+    {
+        _db = _fixture.CreateDbContext();
+        await SeedReferenceDataAsync();
+    }
 
-    public async Task DisposeAsync() => await _fixture.CleanTablesAsync();
+    public async Task DisposeAsync()
+    {
+        await _db.DisposeAsync();
+        await _fixture.CleanTablesAsync();
+    }
+
+    private AdminController CreateController()
+    {
+        var featureStats = new FeatureStatsService(_db);
+        return new AdminController(_db, Mock.Of<Microsoft.Extensions.Logging.ILogger<AdminController>>(), new AdminOverviewService(_db, featureStats), new UserAuthorizationService(_db));
+    }
 
     [Fact]
     public async Task CreateAdmin_DairaAdminToCommuneUser_InOwnDaira_Returns201()
     {
         var creator = await CreateUserAsync(UserRoles.DairaAdmin, dairaId: 10);
-        SetAuthenticatedUser(creator);
+        var controller = CreateController();
+        SetAuthenticatedUser(controller, creator);
         var request = BuildRequest(UserRoles.CommuneUser, communeId: 100);
 
-        var result = await _controller.CreateAdmin(request);
+        var result = await controller.CreateAdmin(request);
 
         var created = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, created.StatusCode);
@@ -55,10 +66,11 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     public async Task CreateAdmin_WilayaAdminToDairaAdmin_InOwnWilaya_Returns201()
     {
         var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 1);
-        SetAuthenticatedUser(creator);
+        var controller = CreateController();
+        SetAuthenticatedUser(controller, creator);
         var request = BuildRequest(UserRoles.DairaAdmin, dairaId: 10);
 
-        var result = await _controller.CreateAdmin(request);
+        var result = await controller.CreateAdmin(request);
 
         var created = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, created.StatusCode);
@@ -73,10 +85,11 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     public async Task CreateAdmin_NationalAdminToWilayaAdmin_Returns201()
     {
         var creator = await CreateUserAsync(UserRoles.NationalAdmin);
-        SetAuthenticatedUser(creator);
+        var controller = CreateController();
+        SetAuthenticatedUser(controller, creator);
         var request = BuildRequest(UserRoles.WilayaAdmin, wilayaId: 2);
 
-        var result = await _controller.CreateAdmin(request);
+        var result = await controller.CreateAdmin(request);
 
         var created = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, created.StatusCode);
@@ -91,10 +104,11 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     public async Task CreateAdmin_DairaAdminToCommuneUser_OutsideOwnDaira_ReturnsForbid()
     {
         var creator = await CreateUserAsync(UserRoles.DairaAdmin, dairaId: 10);
-        SetAuthenticatedUser(creator);
+        var controller = CreateController();
+        SetAuthenticatedUser(controller, creator);
         var request = BuildRequest(UserRoles.CommuneUser, communeId: 101);
 
-        var result = await _controller.CreateAdmin(request);
+        var result = await controller.CreateAdmin(request);
 
         Assert.IsType<ForbidResult>(result);
     }
@@ -103,10 +117,11 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     public async Task CreateAdmin_WilayaAdminToDairaAdmin_OutsideOwnWilaya_ReturnsForbid()
     {
         var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 1);
-        SetAuthenticatedUser(creator);
+        var controller = CreateController();
+        SetAuthenticatedUser(controller, creator);
         var request = BuildRequest(UserRoles.DairaAdmin, dairaId: 11);
 
-        var result = await _controller.CreateAdmin(request);
+        var result = await controller.CreateAdmin(request);
 
         Assert.IsType<ForbidResult>(result);
     }
@@ -120,10 +135,11 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
             dairaId: creatorRole == UserRoles.DairaAdmin ? 10 : null,
             wilayaId: creatorRole == UserRoles.WilayaAdmin ? 1 : null,
             communeId: creatorRole == UserRoles.CommuneUser ? 100 : null);
-        SetAuthenticatedUser(creator);
+        var controller = CreateController();
+        SetAuthenticatedUser(controller, creator);
         var request = BuildRequest(targetRole, communeId: 100, dairaId: 10, wilayaId: 1);
 
-        var result = await _controller.CreateAdmin(request);
+        var result = await controller.CreateAdmin(request);
 
         Assert.IsType<ForbidResult>(result);
     }
@@ -151,10 +167,11 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     public async Task CreateAdmin_CommuneUserToFieldWorker_Returns201()
     {
         var creator = await CreateUserAsync(UserRoles.CommuneUser, communeId: 100);
-        SetAuthenticatedUser(creator);
+        var controller = CreateController();
+        SetAuthenticatedUser(controller, creator);
         var request = BuildRequest(UserRoles.FieldWorker, communeId: null);
 
-        var result = await _controller.CreateAdmin(request);
+        var result = await controller.CreateAdmin(request);
 
         var created = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, created.StatusCode);
@@ -171,9 +188,10 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     public async Task Overview_NationalAdmin_ReturnsNationalOverview()
     {
         var creator = await CreateUserAsync(UserRoles.NationalAdmin);
-        SetAuthenticatedUser(creator);
+        var controller = CreateController();
+        SetAuthenticatedUser(controller, creator);
 
-        var result = await _controller.Overview();
+        var result = await controller.Overview();
 
         var okResult = Assert.IsType<OkObjectResult>(result);
         var json = System.Text.Json.JsonSerializer.Serialize(okResult.Value);
@@ -186,9 +204,10 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     public async Task Overview_WilayaAdmin_ReturnsWilayaReport()
     {
         var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 2);
-        SetAuthenticatedUser(creator);
+        var controller = CreateController();
+        SetAuthenticatedUser(controller, creator);
 
-        var result = await _controller.Overview();
+        var result = await controller.Overview();
 
         var okResult = Assert.IsType<OkObjectResult>(result);
         var report = Assert.IsType<WilayaReport>(okResult.Value);
@@ -201,9 +220,10 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     public async Task Overview_DairaAdmin_ReturnsDairaReport()
     {
         var creator = await CreateUserAsync(UserRoles.DairaAdmin, dairaId: 10);
-        SetAuthenticatedUser(creator);
+        var controller = CreateController();
+        SetAuthenticatedUser(controller, creator);
 
-        var result = await _controller.Overview();
+        var result = await controller.Overview();
 
         var okResult = Assert.IsType<OkObjectResult>(result);
         var report = Assert.IsType<DairaReport>(okResult.Value);
@@ -216,9 +236,10 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     public async Task Overview_CommuneUser_ReturnsForbid()
     {
         var creator = await CreateUserAsync(UserRoles.CommuneUser, communeId: 100);
-        SetAuthenticatedUser(creator);
+        var controller = CreateController();
+        SetAuthenticatedUser(controller, creator);
 
-        var result = await _controller.Overview();
+        var result = await controller.Overview();
 
         Assert.IsType<ForbidResult>(result);
     }
@@ -227,9 +248,10 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     public async Task Overview_FieldWorker_ReturnsForbid()
     {
         var creator = await CreateUserAsync(UserRoles.FieldWorker, communeId: 100);
-        SetAuthenticatedUser(creator);
+        var controller = CreateController();
+        SetAuthenticatedUser(controller, creator);
 
-        var result = await _controller.Overview();
+        var result = await controller.Overview();
 
         Assert.IsType<ForbidResult>(result);
     }
@@ -240,9 +262,10 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     public async Task GetWilaya_NationalAdmin_ReturnsWilayaReport()
     {
         var creator = await CreateUserAsync(UserRoles.NationalAdmin);
-        SetAuthenticatedUser(creator);
+        var controller = CreateController();
+        SetAuthenticatedUser(controller, creator);
 
-        var result = await _controller.GetWilaya(2);
+        var result = await controller.GetWilaya(2);
 
         var okResult = Assert.IsType<OkObjectResult>(result);
         var report = Assert.IsType<WilayaReport>(okResult.Value);
@@ -255,9 +278,10 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     public async Task GetWilaya_NationalAdmin_UnknownId_ReturnsNotFound()
     {
         var creator = await CreateUserAsync(UserRoles.NationalAdmin);
-        SetAuthenticatedUser(creator);
+        var controller = CreateController();
+        SetAuthenticatedUser(controller, creator);
 
-        var result = await _controller.GetWilaya(999);
+        var result = await controller.GetWilaya(999);
 
         var notFound = Assert.IsType<ObjectResult>(result);
         Assert.Equal(404, notFound.StatusCode);
@@ -269,9 +293,10 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     public async Task GetDaira_WilayaAdmin_OwnDaira_ReturnsDairaReport()
     {
         var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 1);
-        SetAuthenticatedUser(creator);
+        var controller = CreateController();
+        SetAuthenticatedUser(controller, creator);
 
-        var result = await _controller.GetDaira(10);
+        var result = await controller.GetDaira(10);
 
         var okResult = Assert.IsType<OkObjectResult>(result);
         var report = Assert.IsType<DairaReport>(okResult.Value);
@@ -283,9 +308,10 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     public async Task GetDaira_WilayaAdmin_WrongWilaya_ReturnsForbid()
     {
         var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 1);
-        SetAuthenticatedUser(creator);
+        var controller = CreateController();
+        SetAuthenticatedUser(controller, creator);
 
-        var result = await _controller.GetDaira(11);
+        var result = await controller.GetDaira(11);
 
         Assert.IsType<ForbidResult>(result);
     }
@@ -294,9 +320,10 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     public async Task GetDaira_NationalAdmin_ReturnsDairaReport()
     {
         var creator = await CreateUserAsync(UserRoles.NationalAdmin);
-        SetAuthenticatedUser(creator);
+        var controller = CreateController();
+        SetAuthenticatedUser(controller, creator);
 
-        var result = await _controller.GetDaira(11);
+        var result = await controller.GetDaira(11);
 
         var okResult = Assert.IsType<OkObjectResult>(result);
         var report = Assert.IsType<DairaReport>(okResult.Value);
@@ -308,9 +335,10 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     public async Task GetDaira_NationalAdmin_UnknownId_ReturnsNotFound()
     {
         var creator = await CreateUserAsync(UserRoles.NationalAdmin);
-        SetAuthenticatedUser(creator);
+        var controller = CreateController();
+        SetAuthenticatedUser(controller, creator);
 
-        var result = await _controller.GetDaira(999);
+        var result = await controller.GetDaira(999);
 
         var notFound = Assert.IsType<ObjectResult>(result);
         Assert.Equal(404, notFound.StatusCode);
@@ -344,14 +372,14 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
         return await SeedData.CreateUserAsync(_db, role, communeId, dairaId, wilayaId, name: $"Creator {Guid.NewGuid().ToString("N")[..8]}");
     }
 
-    private void SetAuthenticatedUser(User user)
+    private static void SetAuthenticatedUser(AdminController controller, User user)
     {
         var httpContext = new DefaultHttpContext
         {
             User = AuthTestHelper.CreateClaimsPrincipal(
                 user.Id, user.Role, user.CommuneId, user.DairaId, user.WilayaId, user.Username)
         };
-        _controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
     }
 
     private async Task SeedReferenceDataAsync() => await SeedData.SeedAdminLocationsAsync(_db);

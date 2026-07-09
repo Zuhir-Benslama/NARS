@@ -1,8 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -21,16 +19,7 @@ public class FieldControllerTests
 {
     private static readonly Guid UserId = Guid.NewGuid();
     private static readonly Guid OtherUserId = Guid.NewGuid();
-    private static readonly DateTime FixedNow = new(2025, 6, 1, 12, 0, 0, DateTimeKind.Utc);
-
-    private static AppDbContext CreateDb()
-    {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase($"FieldTest_{Guid.NewGuid()}")
-            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
-            .Options;
-        return new AppDbContext(options);
-    }
+    private static AppDbContext CreateDb() => CreateInMemoryDb("FieldTest");
 
     private static FieldController CreateController(
         AppDbContext db,
@@ -41,7 +30,7 @@ public class FieldControllerTests
             db,
             Mock.Of<ILogger<FieldController>>(),
             Options.Create(new FeatureDefaultsOptions()),
-            timeProvider ?? Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedNow),
+            timeProvider ?? Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow),
             fieldService ?? Mock.Of<IFieldService>())
         {
             ControllerContext = new ControllerContext
@@ -122,7 +111,7 @@ public class FieldControllerTests
         mockFieldService.Setup(s => s.QueryFeaturesAsync(descriptor, 1, 0, 500, default))
             .ReturnsAsync((new List<FieldFeatureResult>
             {
-                new("r1", UserId.ToString(), "street", "Road 1", System.Text.Json.JsonDocument.Parse("{}").RootElement, FixedNow, null),
+                new("r1", UserId.ToString(), "street", "Road 1", System.Text.Json.JsonDocument.Parse("{}").RootElement, FixedUtcNow, null),
             }, 1));
         var ctrl = CreateController(db, fieldService: mockFieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
@@ -289,7 +278,7 @@ public class FieldControllerTests
             Type = FeatureTypes.Road,
             Data = "{}",
             Status = "good",
-            CreatedAt = FixedNow,
+            CreatedAt = FixedUtcNow,
         });
         db.Inspections.Add(new Inspection
         {
@@ -299,7 +288,7 @@ public class FieldControllerTests
             Type = FeatureTypes.Road,
             Data = "{}",
             Status = "issue",
-            CreatedAt = FixedNow.AddHours(1),
+            CreatedAt = FixedUtcNow.AddHours(1),
         });
         await db.SaveChangesAsync();
         var ctrl = CreateController(db);
@@ -403,7 +392,7 @@ public class FieldControllerTests
             Layer = "street",
             Label = "Main Street",
             Data = "{}",
-            CreatedAt = FixedNow,
+            CreatedAt = FixedUtcNow,
         });
         await db.SaveChangesAsync();
         var ctrl = CreateController(db);
@@ -441,7 +430,7 @@ public class FieldControllerTests
             Layer = "street",
             Label = "Main Street",
             Data = "{}",
-            CreatedAt = FixedNow,
+            CreatedAt = FixedUtcNow,
         });
         await db.SaveChangesAsync();
         var ctrl = CreateController(db);

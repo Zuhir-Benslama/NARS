@@ -3,7 +3,7 @@
 // the feature store with a single setData call for performance.
 
 import { apiFetch } from "../../api"
-import { PHASES, API_LAYER_TO_PHASE } from "../../phases"
+import { PHASES, getApiLayerToPhase } from "../../phases"
 import { useAppStore } from "../../stores/appStore"
 import { useLayerStore } from "../../stores/layerStore"
 import type { LayerState } from "../../stores/layerStore"
@@ -31,11 +31,12 @@ const TYPE_TO_LAYER: Record<string, string> = {
 }
 
 function resolvePhaseKey(feature: DbFeature): FeatureTypeKey | undefined {
-  let key = API_LAYER_TO_PHASE[feature.layer]
-  if (!key && feature.feature_type) key = API_LAYER_TO_PHASE[feature.feature_type]
+  const apiLayerToPhase = getApiLayerToPhase()
+  let key = apiLayerToPhase[feature.layer]
+  if (!key && feature.feature_type) key = apiLayerToPhase[feature.feature_type]
   if (!key) {
     const inferred = TYPE_TO_LAYER[feature.feature_type || ""]
-    if (inferred) key = API_LAYER_TO_PHASE[inferred]
+    if (inferred) key = getApiLayerToPhase()[inferred]
   }
   return key
 }

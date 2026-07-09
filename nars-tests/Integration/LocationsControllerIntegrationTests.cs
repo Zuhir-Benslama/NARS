@@ -16,14 +16,28 @@ namespace NarsApi.Tests.Integration;
 public class LocationsControllerIntegrationTests : IAsyncLifetime
 {
     private readonly NarsDatabaseFixture _fixture;
-    private readonly AppDbContext _db;
-    private readonly LocationsController _controller;
+    private AppDbContext _db = null!;
 
     public LocationsControllerIntegrationTests(NarsDatabaseFixture fixture)
     {
         _fixture = fixture;
-        _db = fixture.CreateDbContext();
-        _controller = new LocationsController(
+    }
+
+    public async Task InitializeAsync()
+    {
+        _db = _fixture.CreateDbContext();
+        await SeedData.SeedAdminLocationsAsync(_db);
+    }
+
+    public async Task DisposeAsync()
+    {
+        await _db.DisposeAsync();
+        await _fixture.CleanTablesAsync();
+    }
+
+    private LocationsController CreateController()
+    {
+        return new LocationsController(
             _db,
             new MemoryCache(new MemoryCacheOptions()),
             Options.Create(new CacheOptions()),
@@ -31,17 +45,11 @@ public class LocationsControllerIntegrationTests : IAsyncLifetime
             Mock.Of<IBoundaryService>());
     }
 
-    public async Task InitializeAsync()
-    {
-        await SeedData.SeedAdminLocationsAsync(_db);
-    }
-
-    public async Task DisposeAsync() => await _fixture.CleanTablesAsync();
-
     [Fact]
     public async Task SearchWilayas_ByName_ReturnsMatches()
     {
-        var result = await _controller.GetWilayas(search: "Alger");
+        var controller = CreateController();
+        var result = await controller.GetWilayas(search: "Alger");
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<PagedResponse<WilayaItem>>(ok.Value);
@@ -53,7 +61,8 @@ public class LocationsControllerIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task SearchWilayas_ByArabicName_ReturnsMatches()
     {
-        var result = await _controller.GetWilayas(search: "الجزائر");
+        var controller = CreateController();
+        var result = await controller.GetWilayas(search: "الجزائر");
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<PagedResponse<WilayaItem>>(ok.Value);
@@ -65,7 +74,8 @@ public class LocationsControllerIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task SearchWilayas_PartialName_ReturnsMatches()
     {
-        var result = await _controller.GetWilayas(search: "Bli");
+        var controller = CreateController();
+        var result = await controller.GetWilayas(search: "Bli");
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<PagedResponse<WilayaItem>>(ok.Value);
@@ -77,7 +87,8 @@ public class LocationsControllerIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task SearchWilayas_NoMatch_ReturnsEmpty()
     {
-        var result = await _controller.GetWilayas(search: "Nonexistent");
+        var controller = CreateController();
+        var result = await controller.GetWilayas(search: "Nonexistent");
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<PagedResponse<WilayaItem>>(ok.Value);
@@ -88,7 +99,8 @@ public class LocationsControllerIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task SearchWilayas_EmptySearch_ReturnsAll()
     {
-        var result = await _controller.GetWilayas(search: "");
+        var controller = CreateController();
+        var result = await controller.GetWilayas(search: "");
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<PagedResponse<WilayaItem>>(ok.Value);
