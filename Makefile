@@ -50,7 +50,7 @@ POSTGRES_PASSWORD  ?= changeme_postgres_$(shell date +%s)
 JWT_SECRET         ?= changeme_jwt_secret_key_must_be_32_chars_long!
 GPG_PASSPHRASE     ?= changeme_gpg_passphrase_32_characters_long!
 GRAFANA_PASSWORD   ?= changeme_grafana_admin_$(shell date +%s)
-export
+export POSTGRES_PASSWORD JWT_SECRET GPG_PASSPHRASE GRAFANA_PASSWORD
 
 .PHONY: help _build-nars-api _build-nars-postgis _build-nars-vite db-get-pod db-get-password
 help:
@@ -132,17 +132,22 @@ cluster-reset: cluster-clean cluster-up-full ## Wipe data, recreate cluster with
 .PHONY: cluster-clean
 cluster-clean: ## Delete cluster AND wipe postgis data (irreversible!)
 	@echo "⚠  WARNING: This will DESTROY all postgis data at $(POSTGRES_DATA_DIR)"
-	@read -p "  Type the cluster name '$(CLUSTER_NAME)' to confirm: " confirm; \
-		if [ "$$confirm" != "$(CLUSTER_NAME)" ]; then echo "  Cancelled."; exit 1; fi
+	@if [ -t 0 ]; then \
+		read -p "  Type the cluster name '$(CLUSTER_NAME)' to confirm: " confirm; \
+		if [ "$$confirm" != "$(CLUSTER_NAME)" ]; then echo "  Cancelled."; exit 1; fi; \
+	else \
+		echo "  Non-interactive shell — refusing destructive operation."; \
+		exit 1; \
+	fi
 	$(MAKE) cluster-down
 	@echo "→ Wiping postgis data..."
-	@if [[ "$(POSTGRES_DATA_DIR)" == /* ]]; then
-	@	rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null \
-		|| sudo -n rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null \
-		|| true
-	@else
-	@	rm -rf "$(POSTGRES_DATA_DIR)"
-	@fi
+	if [[ "$(POSTGRES_DATA_DIR)" == /* ]]; then
+		rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null \
+			|| sudo -n rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null \
+			|| true
+	else
+		rm -rf "$(POSTGRES_DATA_DIR)"
+	fi
 	@echo "✓ Data wiped"
 
 .PHONY: cluster-status
@@ -197,15 +202,17 @@ proxy-up: port-forward-start ## Start Docker socat bridge: host:8080 → kind:80
 		-c "socat tcp-l:8080,fork,reuseaddr tcp:nars-control-plane:8080 & socat tcp-l:8443,fork,reuseaddr tcp:nars-control-plane:8443 & wait" > /dev/null
 	@echo "→ Waiting for proxy to be ready..."
 	@for i in $$(seq 1 12); do \
-		if curl -s --connect-timeout 2 -o /dev/null -w "" http://localhost:8080/ 2>/dev/null; then \
+		status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:8080/ 2>/dev/null || echo "000"); \
+		if [ "$$status" != "000" ]; then \
 			break; \
 		fi; \
 		sleep 2; \
 	done; \
-	if curl -s --connect-timeout 2 -o /dev/null -w "" http://localhost:8080/ 2>/dev/null; then \
-		echo "✓ Proxy ready"; \
+	status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:8080/ 2>/dev/null || echo "000"); \
+	if [ "$$status" = "200" ] || [ "$$status" = "302" ]; then \
+		echo "✓ Proxy ready ($$status)"; \
 	else \
-		echo "⚠ Proxy may not be reachable (check port-forward or rootless Docker networking)"; \
+		echo "⚠ Proxy may not be reachable (status: $$status — check port-forward or rootless Docker networking)"; \
 	fi
 	@echo ""
 	@echo "✓ App accessible at http://localhost:8080/"
@@ -296,34 +303,34 @@ smoke-test: ## Post-deploy smoke test: verify /health, frontend, and API auth
 cluster-stop: ## Scale all deployments to 0 (stop pods, keep cluster)
 	@echo "→ Stopping all pods..."
 	@for deploy in $(SCALABLE_DEPLOYS); do
-	@	saved="$(BACKUP_DIR)/replicas/$$deploy.txt"
-	@	replicas=$$($(KUBECTL) get deployment "$$deploy" -n "$(NAMESPACE)" \
-		-o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
-	@	mkdir -p "$(BACKUP_DIR)/replicas"
-	@	echo "$$replicas" > "$$saved"
-	@	$(KUBECTL) scale deployment "$$deploy" -n "$(NAMESPACE)" --replicas=0
-	@	echo "  ✓ $$deploy → 0 (was $$replicas)"
-	@done
+		saved="$(BACKUP_DIR)/replicas/$$deploy.txt"
+		replicas=$$($(KUBECTL) get deployment "$$deploy" -n "$(NAMESPACE)" \
+			-o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
+		mkdir -p "$(BACKUP_DIR)/replicas"
+		echo "$$replicas" > "$$saved"
+		$(KUBECTL) scale deployment "$$deploy" -n "$(NAMESPACE)" --replicas=0
+		echo "  ✓ $$deploy → 0 (was $$replicas)"
+	done
 	@echo "✓ All pods stopped. Run 'make cluster-start' to resume."
 
 .PHONY: cluster-start
 cluster-start: ## Scale all deployments back to their original replica count
 	@echo "→ Starting pods..."
 	@for deploy in $(SCALABLE_DEPLOYS); do
-	@	saved="$(BACKUP_DIR)/replicas/$$deploy.txt"
-	@	if [ -f "$$saved" ]; then
-	@		replicas=$$(cat "$$saved")
-	@	else
-	@		replicas=1
-	@	fi
-	@	$(KUBECTL) scale deployment "$$deploy" -n "$(NAMESPACE)" --replicas=$$replicas
-	@	echo "  ✓ $$deploy → $$replicas"
-	@done
+		saved="$(BACKUP_DIR)/replicas/$$deploy.txt"
+		if [ -f "$$saved" ]; then
+			replicas=$$(cat "$$saved")
+		else
+			replicas=1
+		fi
+		$(KUBECTL) scale deployment "$$deploy" -n "$(NAMESPACE)" --replicas=$$replicas
+		echo "  ✓ $$deploy → $$replicas"
+	done
 	@echo "→ Waiting for deployments..."
 	@for deploy in $(SCALABLE_DEPLOYS); do
-	@	$(KUBECTL) wait --namespace "$(NAMESPACE)" \
-		--for=condition=Available "deployment/$$deploy" --timeout=180s 2>/dev/null || true
-	@done
+		$(KUBECTL) wait --namespace "$(NAMESPACE)" \
+			--for=condition=Available "deployment/$$deploy" --timeout=180s 2>/dev/null || true
+	done
 	@echo "✓ All pods running"
 
 .PHONY: cluster-restart
@@ -361,20 +368,25 @@ db-backup: ## Dump the PostGIS database to a local file
 db-restore: ## Restore a backup. Usage: make db-restore FILE=data/nars/postgis/backups/nars_db_20250101_120000.sql.gz
 	@POD=$$($(POSTGIS_GET_POD_CMD))
 	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found in namespace '$(NAMESPACE)'"; exit 1; fi
-	@if [ -z "$(FILE)" ]; then
-		echo "✖ Usage: make db-restore FILE=data/nars/postgis/backups/nars_db_<timestamp>.sql.gz"
-		echo ""
-		echo "Available backups:"
-		ls -1 "$(BACKUP_DIR)"/*.sql.gz 2>/dev/null | sed 's/^/  /' || echo "  (none)"
-		exit 1
+	@if [ -z "$(FILE)" ]; then \
+		echo "✖ Usage: make db-restore FILE=data/nars/postgis/backups/nars_db_<timestamp>.sql.gz"; \
+		echo ""; \
+		echo "Available backups:"; \
+		ls -1 "$(BACKUP_DIR)"/*.sql.gz 2>/dev/null | sed 's/^/  /' || echo "  (none)"; \
+		exit 1; \
 	fi
 	@if [ ! -f "$(FILE)" ]; then echo "✖ File not found: $(FILE)"; exit 1; fi
 	@PASS=$$($(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
 		-o jsonpath='{.data.postgres_password}' | base64 -d)
 	@echo "→ Restoring '$(FILE)' into $(DB_NAME)..."
 	@echo "  ⚠ This will OVERWRITE the current database."
-	@read -p "  Continue? (yes/no): " confirm; \
-		if [ "$$confirm" != "yes" ]; then echo "  Cancelled."; exit 0; fi
+	@if [ -t 0 ]; then \
+		read -p "  Continue? (yes/no): " confirm; \
+		if [ "$$confirm" != "yes" ]; then echo "  Cancelled."; exit 0; fi; \
+	else \
+		echo "  Non-interactive shell — refusing restore."; \
+		exit 1; \
+	fi
 	@if echo "$(FILE)" | grep -q '\.gz$$'; then
 		gunzip -c "$(FILE)" | $(KUBECTL) exec -i "$$POD" -n "$(NAMESPACE)" -- \
 			env PGPASSWORD="$$PASS" psql -U postgres -d "$(DB_NAME)"
@@ -548,7 +560,7 @@ tls-generate: namespace-ensure ## Generate TLS certificate for $(DOMAIN) (idempo
 		echo "→ Generating TLS certificate for $(DOMAIN)..."
 		CERT_FILE=/tmp/$(CLUSTER_NAME)-tls.crt
 		KEY_FILE=/tmp/$(CLUSTER_NAME)-tls.key
-		mkcert -cert-file "$$CERT_FILE" -key-file "$$KEY_FILE" "$(DOMAIN)" 2>/dev/null
+		mkcert -cert-file "$$CERT_FILE" -key-file "$$KEY_FILE" "$(DOMAIN)"
 		CERT_B64=$$(base64 -w0 < "$$CERT_FILE")
 		KEY_B64=$$(base64 -w0 < "$$KEY_FILE")
 		printf 'apiVersion: v1\nkind: Secret\nmetadata:\n  name: nars-tls\n  namespace: %s\ntype: kubernetes.io/tls\ndata:\n  tls.crt: %s\n  tls.key: %s\n' \
@@ -653,9 +665,9 @@ kustomize-set-image-tag: ## Pin all kustomize image tags to IMAGE_TAG (e.g. IMAG
 		echo "→ Pinning kustomize image tags to $(IMAGE_TAG)..."; \
 		cd "$(K8S_DIR)" && \
 		kustomize edit set image \
-			zuhirbenslama/nars-api=zuhirbenslama/nars-api:$(IMAGE_TAG) \
-			zuhirbenslama/nars-postgis=zuhirbenslama/nars-postgis:$(IMAGE_TAG) \
-			zuhirbenslama/nars-vite=zuhirbenslama/nars-vite:$(IMAGE_TAG); \
+			$(DOCKER_ORG)/nars-api=$(DOCKER_ORG)/nars-api:$(IMAGE_TAG) \
+			$(DOCKER_ORG)/nars-postgis=$(DOCKER_ORG)/nars-postgis:$(IMAGE_TAG) \
+			$(DOCKER_ORG)/nars-vite=$(DOCKER_ORG)/nars-vite:$(IMAGE_TAG); \
 		echo "✓ Image tags pinned to $(IMAGE_TAG)"; \
 	fi
 
@@ -677,7 +689,7 @@ kustomize-apply: secrets-validate ## Apply k8s manifests via kustomize (pin tags
 	fi
 
 	@echo "→ Waiting for app deployments..."
-	@for deploy in nars-api nars-frontend; do
+	@for deploy in $(filter-out postgis,$(SCALABLE_DEPLOYS)); do
 		if $(KUBECTL) get deployment "$$deploy" -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
 			if ! $(KUBECTL) wait --namespace "$(NAMESPACE)" \
 				--for=condition=Available "deployment/$$deploy" --timeout=240s; then
