@@ -58,6 +58,6 @@ public static class TestData
     private sealed class InMemoryDbContextFactory(DbContextOptions<AppDbContext> options) : IDbContextFactory<AppDbContext>
     {
         public AppDbContext CreateDbContext() => new(options);
-        public async Task<AppDbContext> CreateDbContextAsync(CancellationToken ct = default) => new(options);
+        public Task<AppDbContext> CreateDbContextAsync(CancellationToken ct = default) => Task.FromResult<AppDbContext>(new(options));
     }
 }

@@ -7,12 +7,11 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <!-- Content Security Policy:
-         - script-src: 'unsafe-inline' removed; Vite dev needs it for HMR.
-           In PRODUCTION the server MUST replace this with a per-request nonce:
-           script-src 'nonce-<RANDOM>' 'strict-dynamic';
+         - script-src: 'unsafe-inline' intentionally omitted. The server MUST replace
+           this header with a per-request nonce: script-src 'nonce-<RANDOM>' 'strict-dynamic'.
          - style-src: 'unsafe-inline' required for SPA dynamic style injection.
          - connect-src: data: needed for base64 tile sources. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' http: https: data: ws://127.0.0.1:* http://127.0.0.1:* https://*.arcgisonline.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com; worker-src 'self' blob:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' http: https: data: ws://127.0.0.1:* http://127.0.0.1:* https://*.arcgisonline.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com; worker-src 'self' blob:;">
     <title>NARS - National Addressing Reference System (Maplibre)</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <!-- CSRF token injected by PagesController at request time -->

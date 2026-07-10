@@ -368,6 +368,14 @@ CREATE TABLE IF NOT EXISTS public.error_logs
 );
 
 -- ══════════════════════════════════════════════════════════════════════════════
+-- 9.  Indices for error_logs (admin dashboard queries)
+-- ══════════════════════════════════════════════════════════════════════════════
+
+CREATE INDEX IF NOT EXISTS ix_error_logs_created_at ON public.error_logs (created_at);
+CREATE INDEX IF NOT EXISTS ix_error_logs_user_id    ON public.error_logs (user_id);
+CREATE INDEX IF NOT EXISTS ix_error_logs_level      ON public.error_logs (level);
+
+-- ══════════════════════════════════════════════════════════════════════════════
 -- Verification
 -- ══════════════════════════════════════════════════════════════════════════════
 DO $$

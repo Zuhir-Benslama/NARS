@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -31,7 +32,8 @@ public class FieldControllerTests
             Mock.Of<ILogger<FieldController>>(),
             Options.Create(new FeatureDefaultsOptions()),
             timeProvider ?? Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow),
-            fieldService ?? Mock.Of<IFieldService>())
+            fieldService ?? Mock.Of<IFieldService>(),
+            Mock.Of<IWebHostEnvironment>())
         {
             ControllerContext = new ControllerContext
             {

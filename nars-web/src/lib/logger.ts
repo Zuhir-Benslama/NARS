@@ -14,10 +14,17 @@ interface LogEntry {
 const BATCH_LIMIT = 20
 const FLUSH_INTERVAL_MS = 30_000
 const MAX_RETRIES = 1
+const REQUEST_TIMEOUT_MS = 5_000
 
 const batch: LogEntry[] = []
 let timer: ReturnType<typeof setTimeout> | null = null
 let flushing = false
+
+/** Read CSRF token from <meta>. Duplicated here to avoid circular dependency with api/. */
+function getCsrfToken(): string | null {
+  const meta = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
+  return meta?.content ?? null
+}
 
 function push(entry: LogEntry): void {
   batch.push(entry)
@@ -40,12 +47,21 @@ async function flush(): Promise<void> {
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      const csrfToken = getCsrfToken()
+      if (csrfToken) headers["X-CSRF-Token"] = csrfToken
+
       const res = await fetch(`${getApiBaseUrl()}/api/logs`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ logs: entries }),
+        signal: controller.signal,
       })
+      clearTimeout(timeoutId)
       if (res.ok) break
     } catch (err) {
       // Silently ignore in production — don't create a feedback loop by logging the logger
@@ -61,8 +77,12 @@ if (typeof window !== "undefined") {
   window.addEventListener("beforeunload", () => {
     if (timer) clearTimeout(timer)
     if (batch.length > 0) {
-      const body = JSON.stringify({ logs: batch })
-      navigator.sendBeacon(`${getApiBaseUrl()}/api/logs`, body)
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      const csrfToken = getCsrfToken()
+      if (csrfToken) headers["X-CSRF-Token"] = csrfToken
+
+      const blob = new Blob([JSON.stringify({ logs: batch })], { type: "application/json" })
+      navigator.sendBeacon(`${getApiBaseUrl()}/api/logs`, blob)
     }
   })
 }

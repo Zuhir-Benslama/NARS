@@ -22,7 +22,7 @@ import { ctx } from "../core/state"
 import { useDrawStore } from "../../stores/drawStore"
 import { setRepatchMarkerPointer } from "./draw-state"
 import { repatchMarkerPointer } from "./draw-marker-patch"
-import { registerDrawHandlers } from "./draw-handlers"
+import { registerDrawHandlers, destroyDrawHandlers } from "./draw-handlers"
 import { patchGeomanMarkerPointerSnap } from "./draw-marker-patch"
 import { installSnapInterceptors } from "../snapping/snapping"
 import { setDrawingPhase } from "./draw-state"
@@ -42,6 +42,7 @@ export function destroyDrawEvents(): void {
   const store = useDrawStore()
   store.cleanupDrawWatcher?.()
   store.cleanupDrawWatcher = null
+  destroyDrawHandlers()
 }
 
 function watchDrawType() {

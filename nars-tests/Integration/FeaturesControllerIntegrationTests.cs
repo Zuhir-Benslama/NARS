@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -47,7 +48,14 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
     {
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var bgQueueMock = Mock.Of<IBackgroundTaskQueue>();
-        var ctrl = new FeaturesController(new FeatureRepository(_db), bgQueueMock, Mock.Of<ILogger<FeaturesController>>(), Options.Create(new FeatureDefaultsOptions()), timeProvider, new FeatureStatsService(_fixture.CreateDbContextFactory()));
+        var ctrl = new FeaturesController(
+            new FeatureRepository(_db),
+            bgQueueMock,
+            Mock.Of<ILogger<FeaturesController>>(),
+            Options.Create(new FeatureDefaultsOptions()),
+            timeProvider,
+            new FeatureStatsService(_fixture.CreateDbContextFactory()),
+            Mock.Of<IWebHostEnvironment>());
         var httpContext = new DefaultHttpContext
         {
             User = AuthTestHelper.CreateClaimsPrincipal(_userId, "commune_user", communeId: 1)

@@ -101,6 +101,7 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
 
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
 
+        // Collect all IDs across all feature types in a single pass.
         foreach (var descriptor in FeatureTypeRegistry.GetAllDescriptors())
         {
             var ids = await descriptor.GetDbSet(db)
@@ -113,15 +114,19 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
                 continue;
             }
 
-            await descriptor.GetDbSet(db)
-                .Where(f => f.UserId == userId)
-                .ExecuteDeleteAsync(ct);
-
             deletedIds.AddRange(ids);
         }
 
+        // Now delete from all feature tables and the registry in bulk.
         if (deletedIds.Count > 0)
         {
+            foreach (var descriptor in FeatureTypeRegistry.GetAllDescriptors())
+            {
+                await descriptor.GetDbSet(db)
+                    .Where(f => f.UserId == userId)
+                    .ExecuteDeleteAsync(ct);
+            }
+
             await db.FeatureRegistry
                 .Where(r => deletedIds.Contains(r.Id))
                 .ExecuteDeleteAsync(ct);

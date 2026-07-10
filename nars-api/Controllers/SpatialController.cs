@@ -17,7 +17,8 @@ namespace NarsApi.Controllers;
 public class SpatialController(
     IRoadQueryService roadQuery,
     IScatteredAreaService scatteredService,
-    IEntranceQueryService entranceQuery) : NarsControllerBase
+    IEntranceQueryService entranceQuery,
+    IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     // ── POST /api/road-side ───────────────────────────────────────────────────
 
@@ -47,10 +48,19 @@ public class SpatialController(
             return Problem(detail: "Road data is missing coordinates.", statusCode: 400);
         }
 
-        var roadCoords = coordsArr
-            .Select(c => (Lat: c!["lat"]!.GetValue<double>(),
-                          Lng: c!["lng"]!.GetValue<double>()))
-            .ToList();
+        var roadCoords = new List<(double Lat, double Lng)>();
+        foreach (var c in coordsArr)
+        {
+            if (c is not JsonObject obj ||
+                !obj.TryGetPropertyValue("lat", out var latNode) ||
+                !obj.TryGetPropertyValue("lng", out var lngNode) ||
+                latNode is not JsonValue latVal || !latVal.TryGetValue(out double lat) ||
+                lngNode is not JsonValue lngVal || !lngVal.TryGetValue(out double lng))
+            {
+                return Problem(detail: "Road coordinate entry is missing 'lat' or 'lng' or has invalid values.", statusCode: 400);
+            }
+            roadCoords.Add((lat, lng));
+        }
 
         if (roadCoords.Count < 2)
         {
@@ -97,7 +107,7 @@ public class SpatialController(
 
         // Next available odd (left) or even (right) number
         var suggested = side == "left" ? 1 : 2;
-        while (usedNumbers.Contains(suggested))
+        while (usedNumbers.Contains(suggested) && suggested < 10_000)
         {
             suggested += 2;
         }

@@ -159,11 +159,15 @@ public static class PipelineExtensions
                     ? cspOptions.ScriptSrc.Replace("'nonce-'", $"'nonce-{nonce}'")
                     : $"{cspOptions.ScriptSrc} 'nonce-{nonce}'";
 
+                var styleSrc = cspOptions.StyleSrc.Contains("'nonce-'")
+                    ? cspOptions.StyleSrc.Replace("'nonce-'", $"'nonce-{nonce}'")
+                    : $"{cspOptions.StyleSrc} 'nonce-{nonce}'";
+
                 ctx.Response.Headers.ContentSecurityPolicy =
                     $"default-src {cspOptions.DefaultSrc}; " +
                     $"script-src {scriptSrc}; " +
                     $"worker-src {cspOptions.WorkerSrc}; " +
-                    $"style-src {cspOptions.StyleSrc}; " +
+                    $"style-src {styleSrc}; " +
                     $"img-src {cspOptions.ImgSrc}; " +
                     $"font-src {cspOptions.FontSrc}; " +
                     $"connect-src {cspOptions.ConnectSrc}; " +

@@ -36,21 +36,39 @@ spec:
         - name: regcred
       serviceAccountName: postgis
       terminationGracePeriodSeconds: 60
-      # ⚠ SECURITY: PostGIS runs as root (uid 0).
-      # The official postgis entrypoint starts as root to chown the data
-      # directory, then drops to the postgres user (uid 999) for the server.
-      # In Kubernetes, setting runAsUser: 0 skips the entrypoint's setpriv
-      # step, causing the postgres process to remain root.
-      #
-      # Possible mitigation for production:
-      #   1. Use an initContainer (runAsUser: 0) to chown /var/lib/postgresql/data
-      #      to the postgres uid (999), matching the PV's fsGroup.
-      #   2. Set runAsUser: 999, fsGroup: 999 in the main container.
-      #   3. Override entrypoint to skip chown (already done in custom image).
+      # PostGIS runs as uid 999 (postgres) via initContainer + entrypoint override.
+      # The initContainer (root) chowns the data directory, then the main container
+      # runs as the postgres user. This avoids running the database server as root.
       # See: https://github.com/docker-library/postgres/issues/672
       securityContext:
-        runAsUser: 0
-        fsGroup: 0
+        runAsUser: 999
+        fsGroup: 999
+      initContainers:
+        # Chown the data directory to the postgres uid (999) before the main
+        # container starts. Must run as root to change ownership.
+        - name: init-chown
+          image: zuhirbenslama/nars-postgis:latest
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              chown -R 999:999 /var/lib/postgresql/data
+              chmod 700 /var/lib/postgresql/data
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+            readOnlyRootFilesystem: false
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              add:
+                - CHOWN
+                - FOWNER
+              drop:
+                - ALL
+          volumeMounts:
+            - name: postgis-data
+              mountPath: /var/lib/postgresql/data
       containers:
         - name: postgis
           image: zuhirbenslama/nars-postgis:latest
@@ -117,24 +135,17 @@ spec:
             limits:
               cpu: 1
               memory: 1Gi
-          # PostGIS init requires CHOWN, DAC_OVERRIDE, SETUID/SETGID, FOWNER
-          # for shared memory, data dir permissions, and pg_ctl operations.
-          # allowPrivilegeEscalation remains true because postgres's init
-          # process fork/exec model depends on it during startup. After init
-          # the postgres user drops capabilities internally.
+          # The initContainer handles chown; the main container can now run as
+          # the postgres user (uid 999). CHOWN/DAC_OVERRIDE/SETUID/SETGID/FOWNER
+          # are only needed during init (handled above). allowPrivilegeEscalation
+          # remains true because postgres's postmaster forks child processes.
           securityContext:
             allowPrivilegeEscalation: true
             readOnlyRootFilesystem: false
-            runAsNonRoot: false
+            runAsNonRoot: true
             seccompProfile:
               type: RuntimeDefault
             capabilities:
-              add:
-                - CHOWN
-                - DAC_OVERRIDE
-                - SETUID
-                - SETGID
-                - FOWNER
               drop:
                 - ALL
           volumeMounts:

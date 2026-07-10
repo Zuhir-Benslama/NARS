@@ -29,6 +29,7 @@ public class LogsController(IErrorLogService errorLogService, ILogger<LogsContro
     [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> SubmitLogs([FromBody] LogBatch body, CancellationToken cancellationToken = default)
     {
         if (body is null)
@@ -83,13 +84,13 @@ public class LogsController(IErrorLogService errorLogService, ILogger<LogsContro
                 Id = Guid.CreateVersion7(),
                 UserId = userId,
                 Level = level,
-                Code = entry.Code ?? "",
+                Code = SanitizeLogField(entry.Code ?? "", 100),
                 Message = entry.Message,
-                Context = string.IsNullOrEmpty(entry.Context) ? null : entry.Context,
-                Url = entry.Url?[..Math.Min(entry.Url.Length, MaxUrlLength)],
-                Method = entry.Method?[..Math.Min(entry.Method.Length, MaxMethodLength)],
+                Context = string.IsNullOrEmpty(entry.Context) ? null : SanitizeLogField(entry.Context, MaxEntryLength),
+                Url = SanitizeLogField(entry.Url ?? "", MaxUrlLength),
+                Method = SanitizeLogField(entry.Method ?? "", MaxMethodLength),
                 IpAddress = ipAddress,
-                UserAgent = userAgent?[..Math.Min(userAgent.Length, MaxUserAgentLength)],
+                UserAgent = SanitizeLogField(userAgent ?? "", MaxUserAgentLength),
                 CreatedAt = now,
             });
         }
@@ -112,5 +113,27 @@ public class LogsController(IErrorLogService errorLogService, ILogger<LogsContro
     {
         var claim = User.FindFirst(ClaimNames.UserId);
         return claim is not null && Guid.TryParse(claim.Value, out var id) ? id : null;
+    }
+
+    /// <summary>
+    /// Strips control characters (except \n, \r, \t) and truncates to maxLen.
+    /// Prevents stored XSS in log viewers and log injection via control chars.
+    /// </summary>
+    private static string SanitizeLogField(string value, int maxLen)
+    {
+        if (string.IsNullOrEmpty(value)) return value;
+
+        Span<char> buffer = stackalloc char[value.Length];
+        int written = 0;
+        foreach (var c in value)
+        {
+            if (c is '\n' or '\r' or '\t' || !char.IsControl(c))
+            {
+                buffer[written++] = c;
+            }
+        }
+
+        var cleaned = new string(buffer[..written]);
+        return cleaned.Length <= maxLen ? cleaned : cleaned[..maxLen];
     }
 }

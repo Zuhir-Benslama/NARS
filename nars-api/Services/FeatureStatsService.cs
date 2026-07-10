@@ -1,4 +1,7 @@
+using System.Data;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
@@ -8,19 +11,45 @@ namespace NarsApi.Services;
 
 public class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactory) : IFeatureStatsService
 {
+    private static readonly string[] _featureTypes =
+    [
+        FeatureTypes.Area, FeatureTypes.District, FeatureTypes.CityCenter, FeatureTypes.Road,
+        FeatureTypes.HouseEntrance, FeatureTypes.PublicBuilding, FeatureTypes.PublicSpace, FeatureTypes.NamingPanel,
+    ];
+
     public async Task<Dictionary<string, long>> GetFeatureCountsAsync(Guid userId, CancellationToken ct = default)
     {
-        var descriptors = FeatureTypeRegistry.GetAllDescriptors();
-        var tasks = descriptors.Select(async d =>
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var conn = (NpgsqlConnection)db.Database.GetDbConnection();
+        if (conn.State != ConnectionState.Open) await conn.OpenAsync(ct);
+
+        var sb = new StringBuilder();
+        var paramIndex = 0;
+        foreach (var type in _featureTypes)
         {
-            await using var db = await dbFactory.CreateDbContextAsync(ct);
-            var count = await d.GetDbSet(db)
-                .Where(f => f.UserId == userId)
-                .LongCountAsync(ct);
-            return (d.Type, Count: count);
-        });
-        var results = await Task.WhenAll(tasks);
-        return results.ToDictionary(r => r.Type, r => r.Count);
+            var descriptor = FeatureTypeRegistry.GetDescriptor(type);
+            if (descriptor is null) continue;
+
+            if (sb.Length > 0) sb.AppendLine(" UNION ALL");
+            sb.Append($"SELECT '{type}' AS Type, COUNT(*)::bigint AS Count FROM {descriptor.TableName} WHERE user_id = @u{paramIndex}");
+            paramIndex++;
+        }
+
+        await using var cmd = new NpgsqlCommand(sb.ToString(), conn);
+        paramIndex = 0;
+        foreach (var _ in _featureTypes)
+        {
+            cmd.Parameters.AddWithValue($"u{paramIndex}", userId);
+            paramIndex++;
+        }
+
+        var result = new Dictionary<string, long>(StringComparer.Ordinal);
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            result[reader.GetString(0)] = reader.GetInt64(1);
+        }
+        return result;
     }
 
     public async Task<Dictionary<Guid, UserFeatureStats>> GetUserFeatureCountsAsync(Guid[] userIds, CancellationToken ct = default)
@@ -30,44 +59,67 @@ public class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactory) : IF
             return [];
         }
 
-        await using var userDb = await dbFactory.CreateDbContextAsync(ct);
-        var users = await userDb.Users
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var users = await db.Users
             .Where(u => userIds.Contains(u.Id))
             .ToListAsync(ct);
 
-        var descriptors = FeatureTypeRegistry.GetAllDescriptors();
-        var featureCounts = users.ToDictionary(u => u.Id, _ => descriptors.ToDictionary(d => d.Type, _ => 0L));
+        await using var conn = (NpgsqlConnection)db.Database.GetDbConnection();
+        if (conn.State != ConnectionState.Open) await conn.OpenAsync(ct);
 
-        var tasks = descriptors.Select(async d =>
+        // Build a single UNION ALL query across all tables, grouped by user_id.
+        var sb = new StringBuilder();
+        var paramIndex = 0;
+        foreach (var type in _featureTypes)
         {
-            await using var db = await dbFactory.CreateDbContextAsync(ct);
-            var perUser = await d.GetDbSet(db)
-                .Where(f => userIds.Contains(f.UserId))
-                .GroupBy(f => f.UserId)
-                .Select(g => new { UserId = g.Key, Count = g.LongCount() })
-                .ToListAsync(ct);
-            return (Type: d.Type, Data: perUser);
+            var descriptor = FeatureTypeRegistry.GetDescriptor(type);
+            if (descriptor is null) continue;
+
+            if (sb.Length > 0) sb.AppendLine(" UNION ALL");
+            sb.Append($"SELECT user_id, '{type}' AS Type, COUNT(*)::bigint AS Count FROM {descriptor.TableName} WHERE user_id = ANY(@u{paramIndex}) GROUP BY user_id");
+            paramIndex++;
+        }
+
+        var userIdArray = userIds.ToArray();
+        await using var cmd = new NpgsqlCommand(sb.ToString(), conn);
+        paramIndex = 0;
+        foreach (var _ in _featureTypes)
+        {
+            cmd.Parameters.AddWithValue($"u{paramIndex}", userIdArray);
+            paramIndex++;
+        }
+
+        // Parse per-user-per-type counts from the single round-trip.
+        var counts = users.ToDictionary(u => u.Id, _ => new Dictionary<string, long>(StringComparer.Ordinal)
+        {
+            [FeatureTypes.Area] = 0,
+            [FeatureTypes.District] = 0,
+            [FeatureTypes.CityCenter] = 0,
+            [FeatureTypes.Road] = 0,
+            [FeatureTypes.HouseEntrance] = 0,
+            [FeatureTypes.PublicBuilding] = 0,
+            [FeatureTypes.PublicSpace] = 0,
+            [FeatureTypes.NamingPanel] = 0,
         });
 
-        var results = await Task.WhenAll(tasks);
-
-        foreach (var result in results)
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
         {
-            foreach (var item in result.Data)
+            var uid = reader.GetGuid(0);
+            var type = reader.GetString(1);
+            var count = reader.GetInt64(2);
+            if (counts.TryGetValue(uid, out var userCounts))
             {
-                if (featureCounts.TryGetValue(item.UserId, out var counts))
-                {
-                    counts[result.Type] = item.Count;
-                }
+                userCounts[type] = count;
             }
         }
 
         var resultList = new Dictionary<Guid, UserFeatureStats>(users.Count);
         foreach (var user in users)
         {
-            var counts = featureCounts[user.Id];
-            long GetCount(string type) => counts.GetValueOrDefault(type, 0);
-            var total = counts.Values.Sum();
+            var userCounts = counts[user.Id];
+            long GetCount(string type) => userCounts.GetValueOrDefault(type, 0);
+            var total = userCounts.Values.Sum();
 
             resultList[user.Id] = new UserFeatureStats(
                 UserId: user.Id.ToString(),

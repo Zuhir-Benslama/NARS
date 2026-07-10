@@ -18,7 +18,8 @@ public class FeaturesController(
     ILogger<FeaturesController> logger,
     IOptions<FeatureDefaultsOptions> featureDefaults,
     IDateTimeProvider timeProvider,
-    IFeatureStatsService featureStatsService) : NarsControllerBase
+    IFeatureStatsService featureStatsService,
+    IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     private readonly int _maxFeatureDataSize = featureDefaults.Value.MaxFeatureDataSize;
 
@@ -101,10 +102,11 @@ public class FeaturesController(
     }
 
     /// <summary>Deletes all features owned by the authenticated user.</summary>
-    [HttpDelete("")]
+    [HttpPost("clear")]
     [EnableRateLimiting(RateLimitPolicies.Clear)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> ClearFeatures([FromBody] ClearFeaturesRequest body, CancellationToken cancellationToken = default)
     {
         if (body is null)

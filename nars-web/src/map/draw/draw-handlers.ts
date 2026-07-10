@@ -287,14 +287,26 @@ function onKeyDown(e: KeyboardEvent): void {
 
 // ─── REGISTRATION ─────────────────────────────────────────────────────────────
 
+let contextMenuCleanup: (() => void) | null = null
+let keydownCleanup: (() => void) | null = null
+
 export function registerDrawHandlers(): void {
   const map = ctx.map
 
   map.on("gm:create", onFeatureCreated)
 
   window.addEventListener("contextmenu", onContextMenu, true)
+  contextMenuCleanup = () => window.removeEventListener("contextmenu", onContextMenu, true)
 
   map.on("click", onClick)
 
   document.addEventListener("keydown", onKeyDown, true)
+  keydownCleanup = () => document.removeEventListener("keydown", onKeyDown, true)
+}
+
+export function destroyDrawHandlers(): void {
+  contextMenuCleanup?.()
+  contextMenuCleanup = null
+  keydownCleanup?.()
+  keydownCleanup = null
 }

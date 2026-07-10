@@ -23,17 +23,17 @@ public class LocationsControllerTests
 
     private static AppDbContext CreateDb(string name) => CreateInMemoryDb($"LocationsTest_{name}");
 
-    private static void SeedWilayas(AppDbContext db)
+    private static async Task SeedWilayas(AppDbContext db)
     {
         db.Wilayas.AddRange(
             new Models.Wilaya { WilayaId = 1, WilayaFr = "Alger", WilayaAr = "الجزائر" },
             new Models.Wilaya { WilayaId = 2, WilayaFr = "Oran", WilayaAr = "وهران" },
             new Models.Wilaya { WilayaId = 3, WilayaFr = "Constantine", WilayaAr = "قسنطينة" }
         );
-        db.SaveChanges();
+        await db.SaveChangesAsync();
     }
 
-    private static void SeedDairas(AppDbContext db, int wilayaId)
+    private static async Task SeedDairas(AppDbContext db, int wilayaId)
     {
         // Use unique IDs per wilaya
         var offset = wilayaId * 100;
@@ -41,10 +41,10 @@ public class LocationsControllerTests
             new Models.Daira { DairaId = offset + 1, WilayaId = wilayaId, DairaFr = "Daira A", DairaAr = "دائرة أ" },
             new Models.Daira { DairaId = offset + 2, WilayaId = wilayaId, DairaFr = "Daira B", DairaAr = "دائرة ب" }
         );
-        db.SaveChanges();
+        await db.SaveChangesAsync();
     }
 
-    private static void SeedCommunes(AppDbContext db, int dairaId)
+    private static async Task SeedCommunes(AppDbContext db, int dairaId)
     {
         // Use unique IDs per daira
         var offset = dairaId * 100;
@@ -52,7 +52,7 @@ public class LocationsControllerTests
             new Models.Commune { CommuneId = offset + 1, DairaId = dairaId, CommuneFr = "Commune X", CommuneAr = "بلدية X" },
             new Models.Commune { CommuneId = offset + 2, DairaId = dairaId, CommuneFr = "Commune Y", CommuneAr = "بلدية Y" }
         );
-        db.SaveChanges();
+        await db.SaveChangesAsync();
     }
 
     // ── GET /api/wilayas ──────────────────────────────────────────────────
@@ -61,7 +61,7 @@ public class LocationsControllerTests
     public async Task GetWilayas_NoSearch_ReturnsAllWilayas()
     {
         var db = CreateDb(nameof(GetWilayas_NoSearch_ReturnsAllWilayas));
-        SeedWilayas(db);
+        await SeedWilayas(db);
         var ctrl = CreateController(db);
 
         var result = await ctrl.GetWilayas(search: "", skip: 0, take: 100);
@@ -76,7 +76,7 @@ public class LocationsControllerTests
     public async Task GetWilayas_SearchTooLong_Returns400()
     {
         var db = CreateDb(nameof(GetWilayas_SearchTooLong_Returns400));
-        SeedWilayas(db);
+        await SeedWilayas(db);
         var ctrl = CreateController(db);
 
         var result = await ctrl.GetWilayas(search: new string('x', 201), skip: 0, take: 100);
@@ -89,7 +89,7 @@ public class LocationsControllerTests
     public async Task GetWilayas_TakeClampedTo500()
     {
         var db = CreateDb(nameof(GetWilayas_TakeClampedTo500));
-        SeedWilayas(db);
+        await SeedWilayas(db);
         var ctrl = CreateController(db);
 
         var result = await ctrl.GetWilayas(search: "", skip: 0, take: 1000);
@@ -101,10 +101,10 @@ public class LocationsControllerTests
     }
 
     [Fact]
-    public async Task GetWilayas_NoSearchSkip0Take500_Caches()
+    public async Task GetWilayas_NoSearchSkip0Take500_QueriesDbDirectly()
     {
-        var db = CreateDb(nameof(GetWilayas_NoSearchSkip0Take500_Caches));
-        SeedWilayas(db);
+        var db = CreateDb(nameof(GetWilayas_NoSearchSkip0Take500_QueriesDbDirectly));
+        await SeedWilayas(db);
         var ctrl = CreateController(db);
 
         var result1 = await ctrl.GetWilayas(search: "", skip: 0, take: 500);
@@ -140,8 +140,8 @@ public class LocationsControllerTests
     public async Task GetDairas_ValidWilaya_ReturnsDairas()
     {
         var db = CreateDb(nameof(GetDairas_ValidWilaya_ReturnsDairas));
-        SeedDairas(db, wilayaId: 1);
-        SeedDairas(db, wilayaId: 2);
+        await SeedDairas(db, wilayaId: 1);
+        await SeedDairas(db, wilayaId: 2);
         var ctrl = CreateController(db);
 
         var result = await ctrl.GetDairas(wilaya_id: 1);
@@ -181,7 +181,7 @@ public class LocationsControllerTests
     public async Task GetCommunes_ValidDaira_ReturnsCommunes()
     {
         var db = CreateDb(nameof(GetCommunes_ValidDaira_ReturnsCommunes));
-        SeedCommunes(db, dairaId: 10);
+        await SeedCommunes(db, dairaId: 10);
         var ctrl = CreateController(db);
 
         var result = await ctrl.GetCommunes(daira_id: 10);
@@ -197,7 +197,7 @@ public class LocationsControllerTests
     public async Task GetCommuneBoundary_Found_Returns200()
     {
         var db = CreateDb(nameof(GetCommuneBoundary_Found_Returns200));
-        SeedCommunes(db, dairaId: 10);
+        await SeedCommunes(db, dairaId: 10);
 
         var boundaryMock = new Mock<IBoundaryService>();
         boundaryMock.Setup(b => b.GetBoundaryGeoJsonAsync(1001, It.IsAny<CancellationToken>()))
@@ -257,7 +257,7 @@ public class LocationsControllerTests
     public async Task GetWilayas_SmallTake_ReturnsOk()
     {
         var db = CreateDb(nameof(GetWilayas_SmallTake_ReturnsOk));
-        SeedWilayas(db);
+        await SeedWilayas(db);
         var ctrl = CreateController(db);
 
         var result = await ctrl.GetWilayas(skip: 0, take: 1);

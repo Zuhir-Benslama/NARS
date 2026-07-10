@@ -166,34 +166,46 @@ public class RefreshTokenServiceTests
         Assert.Equal(1, unrevoked);
     }
 
-    [Fact]
-    public async Task RotateRefreshTokenAsync_ExpiredToken_ReturnsFailure()
+    private static async Task<(AppDbContext Db, string RawToken)> SeedTokenAsync(
+        DateTime expiresAt, bool revoked = false, Guid? userId = null, bool skipUser = false)
     {
         var db = CreateDb();
-        db.Users.Add(new User
+        var uid = userId ?? UserId;
+        if (!skipUser)
         {
-            Id = UserId,
-            Username = "testuser",
-            Name = "Test User",
-            Email = "test@test.com",
-            Phone = DefaultPhone,
-            PasswordHash = "hash",
-            Role = "commune_user",
-            CommuneId = 1,
-        });
-        const string raw = "expired-token";
+            db.Users.Add(new User
+            {
+                Id = uid,
+                Username = "testuser",
+                Name = "Test User",
+                Email = "test@test.com",
+                Phone = DefaultPhone,
+                PasswordHash = "hash",
+                Role = "commune_user",
+                CommuneId = 1,
+            });
+        }
+        var raw = $"{(revoked ? "revoked" : "expired")}-token-{Guid.NewGuid():N}";
         var hash = Convert.ToBase64String(
             System.Security.Cryptography.SHA256.HashData(
                 System.Text.Encoding.UTF8.GetBytes(raw)));
         db.RefreshTokens.Add(new RefreshToken
         {
             Id = Guid.NewGuid(),
-            UserId = UserId,
+            UserId = uid,
             TokenHash = hash,
-            ExpiresAt = FixedUtcNow.AddDays(-1),
+            ExpiresAt = expiresAt,
             CreatedAt = FixedUtcNow,
+            Revoked = revoked,
         });
         await db.SaveChangesAsync();
+        return (db, raw);
+    }
+
+    [Fact]
+    public async Task RotateRefreshTokenAsync_ExpiredToken_ReturnsFailure()
+    {
+        var (db, raw) = await SeedTokenAsync(FixedUtcNow.AddDays(-1));
         var svc = CreateService(db);
 
         var result = await svc.RotateRefreshTokenAsync(raw);
@@ -205,32 +217,7 @@ public class RefreshTokenServiceTests
     [Fact]
     public async Task RotateRefreshTokenAsync_RevokedToken_ReturnsFailure()
     {
-        var db = CreateDb();
-        db.Users.Add(new User
-        {
-            Id = UserId,
-            Username = "testuser",
-            Name = "Test User",
-            Email = "test@test.com",
-            Phone = DefaultPhone,
-            PasswordHash = "hash",
-            Role = "commune_user",
-            CommuneId = 1,
-        });
-        const string raw = "revoked-token";
-        var hash = Convert.ToBase64String(
-            System.Security.Cryptography.SHA256.HashData(
-                System.Text.Encoding.UTF8.GetBytes(raw)));
-        db.RefreshTokens.Add(new RefreshToken
-        {
-            Id = Guid.NewGuid(),
-            UserId = UserId,
-            TokenHash = hash,
-            ExpiresAt = FixedUtcNow.AddDays(30),
-            CreatedAt = FixedUtcNow,
-            Revoked = true,
-        });
-        await db.SaveChangesAsync();
+        var (db, raw) = await SeedTokenAsync(FixedUtcNow.AddDays(30), revoked: true);
         var svc = CreateService(db);
 
         var result = await svc.RotateRefreshTokenAsync(raw);
@@ -242,20 +229,7 @@ public class RefreshTokenServiceTests
     [Fact]
     public async Task RotateRefreshTokenAsync_DeletedUser_ReturnsFailure()
     {
-        var db = CreateDb();
-        const string raw = "orphan-token";
-        var hash = Convert.ToBase64String(
-            System.Security.Cryptography.SHA256.HashData(
-                System.Text.Encoding.UTF8.GetBytes(raw)));
-        db.RefreshTokens.Add(new RefreshToken
-        {
-            Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
-            TokenHash = hash,
-            ExpiresAt = FixedUtcNow.AddDays(30),
-            CreatedAt = FixedUtcNow,
-        });
-        await db.SaveChangesAsync();
+        var (db, raw) = await SeedTokenAsync(FixedUtcNow.AddDays(30), userId: Guid.NewGuid(), skipUser: true);
         var svc = CreateService(db);
 
         var result = await svc.RotateRefreshTokenAsync(raw);

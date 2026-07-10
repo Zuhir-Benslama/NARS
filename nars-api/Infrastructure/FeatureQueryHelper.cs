@@ -119,7 +119,8 @@ public static class FeatureQueryHelper
             Guid id = idValue switch
             {
                 Guid g => g,
-                string s => Guid.Parse(s),
+                string s => Guid.TryParse(s, out var parsed) ? parsed
+                    : throw new InvalidOperationException($"Invalid GUID in database: {s}"),
                 _ => throw new InvalidOperationException($"Unexpected ID type: {idValue?.GetType().Name}")
             };
             var label = await reader.IsDBNullAsync(labelOrdinal, ct) ? null : reader.GetString(labelOrdinal);

@@ -69,8 +69,8 @@ public class LocationsController(
         CancellationToken cancellationToken = default) => await PaginateAsync(
             search, skip, take,
             () => db.Wilayas.AsQueryable(),
-            q => q.Where(w => EF.Functions.ILike(w.WilayaFr!, $"%{search}%")
-                           || EF.Functions.ILike(w.WilayaAr!, $"%{search}%")),
+            q => q.Where(w => EF.Functions.ILike(w.WilayaFr ?? "", $"%{search}%")
+                           || EF.Functions.ILike(w.WilayaAr ?? "", $"%{search}%")),
             q => q.OrderBy(w => w.WilayaFr),
             w => new WilayaItem(w.WilayaId, w.WilayaFr ?? "", w.WilayaAr ?? "", w.WilayaLatitude, w.WilayaLongitude),
             cancellationToken);

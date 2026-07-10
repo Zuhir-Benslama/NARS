@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
@@ -23,7 +24,8 @@ public class SpatialControllerTests
         var ctrl = new SpatialController(
             new RoadQueryService(db),
             scatteredService ?? Mock.Of<IScatteredAreaService>(),
-            entranceQuery ?? Mock.Of<IEntranceQueryService>());
+            entranceQuery ?? Mock.Of<IEntranceQueryService>(),
+            Mock.Of<IWebHostEnvironment>());
 
         var uid = userId ?? Guid.NewGuid();
         ctrl.ControllerContext = new ControllerContext

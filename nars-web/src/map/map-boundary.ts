@@ -6,6 +6,9 @@ import { showToast } from "../lib/toast"
 import { escapeHtml } from "../utils/sanitize"
 import { useAppStore } from "../stores/appStore"
 
+const CTX_MENU_WIDTH = 180
+const CTX_MENU_HEIGHT = 100
+
 // ─── STATE RESET (for testing & HMR) ──────────────────────────────────────────
 
 export function resetBoundaryEvents(): void {
@@ -72,8 +75,8 @@ function showBoundaryContextMenu(x: number, y: number, communeName: string): voi
 
   document.body.appendChild(menu)
 
-  menu.style.left = (x + 180 > window.innerWidth ? x - 180 : x) + "px"
-  menu.style.top = (y + 100 > window.innerHeight ? y - 100 : y) + "px"
+  menu.style.left = (x + CTX_MENU_WIDTH > window.innerWidth ? x - CTX_MENU_WIDTH : x) + "px"
+  menu.style.top = (y + CTX_MENU_HEIGHT > window.innerHeight ? y - CTX_MENU_HEIGHT : y) + "px"
 
   const hide = () => {
     menu.remove()

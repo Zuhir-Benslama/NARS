@@ -8,6 +8,7 @@ import { ensureGeomanDrawEdgesVisible } from "../edit/edit-state"
 import { DRAW_CONFIG } from "../../config"
 import { useDrawStore } from "../../stores/drawStore"
 import type { DrawModeName } from "@geoman-io/maplibre-geoman-free"
+import { delay } from "../../utils/time"
 
 type PhaseConfig = { key: string; drawType: string; color: string }
 
@@ -24,10 +25,6 @@ export function resetDrawControl(): void {
   store.modeSwitchToken = 0
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
 export function buildDrawControl(phase: PhaseConfig): void {
   const gm = ctx.geoman
   if (!gm) return
@@ -35,6 +32,16 @@ export function buildDrawControl(phase: PhaseConfig): void {
   const store = useDrawStore()
   const shapeName = DRAW_TYPE_MAP[phase.drawType]
   if (!shapeName) return
+
+  // Clear any lingering edge-visibility poll from a previous phase
+  if (store.edgePollId !== null) {
+    clearInterval(store.edgePollId)
+    store.edgePollId = null
+  }
+  if (store.edgeTimeoutId !== null) {
+    clearTimeout(store.edgeTimeoutId)
+    store.edgeTimeoutId = null
+  }
 
   debugLog("[DRAW CONTROL] Phase:", phase.key, "| drawType:", phase.drawType, "| shape:", shapeName)
 
@@ -75,11 +82,17 @@ export function buildDrawControl(phase: PhaseConfig): void {
           const poll = setInterval(() => {
             if (++retries > DRAW_CONFIG.edgeRetryMax) {
               clearInterval(poll)
+              store.edgePollId = null
               return
             }
             ensureGeomanDrawEdgesVisible()
           }, DRAW_CONFIG.edgeRetryIntervalMs)
-          setTimeout(() => clearInterval(poll), DRAW_CONFIG.edgeRetryTimeoutMs)
+          store.edgePollId = poll
+          store.edgeTimeoutId = setTimeout(() => {
+            clearInterval(poll)
+            store.edgePollId = null
+            store.edgeTimeoutId = null
+          }, DRAW_CONFIG.edgeRetryTimeoutMs)
         }
       })
       .catch((err) => debugError("[DRAW CONTROL] Failed to enable draw mode:", shapeName, err))

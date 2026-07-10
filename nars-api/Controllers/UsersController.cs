@@ -12,10 +12,10 @@ namespace NarsApi.Controllers;
 [ApiController]
 [Route("/api")]
 [Tags("Users")]
-public class UsersController(IUserProfileService userProfile, ILogger<UsersController> logger) : NarsControllerBase
+public class UsersController(IUserProfileService userProfile, ILogger<UsersController> logger, IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     /// <summary>Updates the authenticated user's username, email, and/or password.</summary>
-    [HttpPut("user/update")]
+    [HttpPut("user/profile")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

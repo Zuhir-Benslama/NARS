@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -33,7 +34,8 @@ public class FeaturesControllerTests
             Mock.Of<ILogger<FeaturesController>>(),
             Options.Create(new FeatureDefaultsOptions()),
             timeProvider ?? Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow),
-            featureStatsService ?? Mock.Of<IFeatureStatsService>())
+            featureStatsService ?? Mock.Of<IFeatureStatsService>(),
+            Mock.Of<IWebHostEnvironment>())
         {
             ControllerContext = new ControllerContext
             {

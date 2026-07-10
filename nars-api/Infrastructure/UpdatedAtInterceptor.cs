@@ -6,6 +6,8 @@ namespace NarsApi.Infrastructure;
 
 public sealed class UpdatedAtInterceptor : SaveChangesInterceptor
 {
+    private static readonly TimeProvider _timeProvider = TimeProvider.System;
+
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
         DbContextEventData eventData,
         InterceptionResult<int> result,
@@ -13,7 +15,7 @@ public sealed class UpdatedAtInterceptor : SaveChangesInterceptor
     {
         if (eventData.Context is not null)
         {
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             foreach (var entry in eventData.Context.ChangeTracker.Entries<FeatureBase>()
                 .Where(e => e.State is EntityState.Modified or EntityState.Added))
             {

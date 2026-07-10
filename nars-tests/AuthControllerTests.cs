@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -35,7 +36,7 @@ public class AuthControllerTests
     private static AuthController CreateController(AppDbContext db)
     {
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
-        var jwtOptions = Options.Create(new JwtOptions());
+        var jwtOptions = Options.Create(new JwtOptions { ExpiresInMinutes = 60, RefreshExpiresInDays = 30 });
         var lockoutOptions = Options.Create(new AccountLockoutOptions());
         return new AuthController(
             db,
@@ -44,7 +45,9 @@ public class AuthControllerTests
             lockoutOptions,
             Mock.Of<ILogger<AuthController>>(),
             timeProvider,
-            new UserAuthorizationService(db));
+            new UserAuthorizationService(db),
+            AuthTestHelper.CreateUserCreationMock(db),
+            Mock.Of<IWebHostEnvironment>());
     }
 
     [Fact]
@@ -235,7 +238,6 @@ public class AuthControllerTests
             CommuneId = 1,
         });
         await db.SaveChangesAsync();
-
 
         var controller = CreateController(db);
         controller.ControllerContext = new ControllerContext

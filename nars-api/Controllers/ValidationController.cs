@@ -15,7 +15,8 @@ namespace NarsApi.Controllers;
 public class ValidationController(
     IOptions<ValidationOptions> validationOptions,
     IValidationService validationService,
-    ILogger<ValidationController> logger) : NarsControllerBase
+    ILogger<ValidationController> logger,
+    IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     private double DistrictBoundaryToleranceMeters => validationOptions.Value.DistrictBoundaryToleranceMeters;
 
@@ -51,19 +52,19 @@ public class ValidationController(
             return Problem(detail: "A road must have at least 2 points.", statusCode: 400);
         }
 
-        if (!CheckCoordinateBounds(body.Coordinates, out var boundsError))
+        if (!CheckCoordinateBounds(body.Coordinates, MaxCoordinateCount, out var boundsError))
         {
             return Problem(detail: boundsError, statusCode: 400);
         }
 
         for (var i = 0; i < body.Coordinates.Count - 2; i++)
         {
-            var A = body.Coordinates[i];
-            var B = body.Coordinates[i + 1];
-            var C = body.Coordinates[i + 2];
+            var p1 = body.Coordinates[i];
+            var p2 = body.Coordinates[i + 1];
+            var p3 = body.Coordinates[i + 2];
 
-            double v1x = B.Lng - A.Lng, v1y = B.Lat - A.Lat;
-            double v2x = C.Lng - B.Lng, v2y = C.Lat - B.Lat;
+            double v1x = p2.Lng - p1.Lng, v1y = p2.Lat - p1.Lat;
+            double v2x = p3.Lng - p2.Lng, v2y = p3.Lat - p2.Lat;
 
             var len1 = Math.Sqrt(v1x * v1x + v1y * v1y);
             var len2 = Math.Sqrt(v2x * v2x + v2y * v2y);
@@ -121,7 +122,7 @@ public class ValidationController(
             return Problem(detail: "A district must have at least 3 points.", statusCode: 400);
         }
 
-        if (!CheckCoordinateBounds(body.Coordinates, out var inputError))
+        if (!CheckCoordinateBounds(body.Coordinates, MaxCoordinateCount, out var inputError))
         {
             return Problem(detail: inputError, statusCode: 400);
         }
@@ -189,9 +190,9 @@ public class ValidationController(
                 : "Districts do not yet fully cover all urban areas. Please fill any remaining gaps before proceeding."));
     }
 
-    private bool CheckCoordinateBounds(List<CoordDto> coords, out string? error)
+    private static bool CheckCoordinateBounds(List<CoordDto> coords, int maxCoordinateCount, out string? error)
     {
-        if (coords.Count > MaxCoordinateCount) { error = $"Too many coordinates (max {MaxCoordinateCount:N0})."; return false; }
+        if (coords.Count > maxCoordinateCount) { error = $"Too many coordinates (max {maxCoordinateCount:N0})."; return false; }
         if (coords.Any(c => double.IsNaN(c.Lat) || double.IsInfinity(c.Lat) ||
                             double.IsNaN(c.Lng) || double.IsInfinity(c.Lng)))
         {

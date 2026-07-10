@@ -48,10 +48,10 @@ public class ValidationService : IValidationService
                   AND ST_DWithin(
                         ({SqlFragments.LineStringFromData})::geography,
                         ST_SetSRID(ST_GeomFromText(@wkt), 4326)::geography,
-                        {maxDistanceMeters}
+                        @maxDist
                       )
             )";
-        var result = await ExecuteScalarAsync(sql, [("@uid", (object)userId), ("@wkt", wkt)], ct);
+        var result = await ExecuteScalarAsync(sql, [("@uid", (object)userId), ("@wkt", wkt), ("@maxDist", maxDistanceMeters)], ct);
         return Convert.ToBoolean(result);
     }
 
@@ -71,12 +71,12 @@ public class ValidationService : IValidationService
                 WHERE f.user_id = @uid
             )
             SELECT ST_Covers(
-                ST_Buffer(districts.geom::geography, {toleranceMeters})::geometry,
+                ST_Buffer(districts.geom::geography, @tolerance)::geometry,
                 urban.geom
             )
             FROM urban, districts
             WHERE urban.geom IS NOT NULL AND districts.geom IS NOT NULL";
-        var result = await ExecuteScalarAsync(sql, [("@uid", (object)userId)], ct);
+        var result = await ExecuteScalarAsync(sql, [("@uid", (object)userId), ("@tolerance", toleranceMeters)], ct);
         return result is bool b && b;
     }
 

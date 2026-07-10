@@ -430,6 +430,9 @@ const dairaPlaceholder = computed(() =>
 )
 
 watch(targetRole, () => {
+  if (wilayaTimer) { clearTimeout(wilayaTimer); wilayaTimer = null }
+  if (dairaTimer) { clearTimeout(dairaTimer); dairaTimer = null }
+  if (communeTimer) { clearTimeout(communeTimer); communeTimer = null }
   if (!editingUser.value) {
     wilayaQuery.value = ""
     selectedWilayaId.value = null

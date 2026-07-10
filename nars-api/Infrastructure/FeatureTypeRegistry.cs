@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -103,7 +104,7 @@ public static class FeatureTypeRegistry
             CompositeIndexes = compositeIndexes ?? [],
         };
 
-    private static readonly IReadOnlyDictionary<string, FeatureTypeDescriptor> _registry =
+    private static readonly FrozenDictionary<string, FeatureTypeDescriptor> _registry =
         new Dictionary<string, FeatureTypeDescriptor>
         {
             [FeatureTypes.Area] = Descriptor<Area>(FeatureTypes.Area, "areas", db => db.Areas,
@@ -130,10 +131,10 @@ public static class FeatureTypeRegistry
                 indexes: [new("UserId", "ix_public_spaces_user_id")]),
             [FeatureTypes.NamingPanel] = Descriptor<NamingPanel>(FeatureTypes.NamingPanel, "naming_panels", db => db.NamingPanels,
                 indexes: [new("UserId", "ix_naming_panels_user_id")]),
-        };
+        }.ToFrozenDictionary();
 
-    private static readonly IReadOnlyDictionary<Type, FeatureTypeDescriptor> _entityTypeMap =
-        _registry.Values.ToDictionary(d => d.EntityType);
+    private static readonly FrozenDictionary<Type, FeatureTypeDescriptor> _entityTypeMap =
+        _registry.Values.ToDictionary(d => d.EntityType).ToFrozenDictionary();
 
     private static readonly IReadOnlyList<string> _allTypes = [.. _registry.Keys];
 

@@ -17,13 +17,13 @@ namespace NarsApi.Services;
 public class JwtService(string secret, string? issuer, string? audience, IOptions<JwtOptions> jwtOptions, ILogger<JwtService> logger, IDateTimeProvider timeProvider) : IJwtService
 {
     private readonly int _expiresMinutes = jwtOptions.Value.ExpiresInMinutes;
+    private readonly SymmetricSecurityKey _key = new(Encoding.UTF8.GetBytes(secret));
     public TimeSpan AccessTokenExpiresIn => TimeSpan.FromMinutes(_expiresMinutes);
 
     public string CreateToken(Guid userId, string username, string name, string email, int? communeId,
         string role = "commune_user", int? dairaId = null, int? wilayaId = null)
     {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var creds = new SigningCredentials(_key, SecurityAlgorithms.HmacSha256);
 
         var claims = new List<Claim>
         {
@@ -70,14 +70,13 @@ public class JwtService(string secret, string? issuer, string? audience, IOption
 
     public ClaimsPrincipal? ValidateToken(string token)
     {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
         try
         {
             return new JwtSecurityTokenHandler().ValidateToken(token,
                 new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = key,
+                    IssuerSigningKey = _key,
                     ValidateIssuer = !string.IsNullOrEmpty(issuer),
                     ValidateAudience = !string.IsNullOrEmpty(audience),
                     ValidIssuer = issuer,

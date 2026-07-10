@@ -37,6 +37,7 @@ public partial class AuthController
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status423Locked)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> AuthorizedAdminSignup(
         [FromBody] AuthorizedAdminSignupRequest body,
         CancellationToken cancellationToken = default)
@@ -58,18 +59,23 @@ public partial class AuthController
 
         if (admin is null || !passwordValid)
         {
+            if (admin is not null && !passwordValid)
+            {
+                await RecordFailedLogin(admin, cancellationToken);
+            }
+
             return Problem(detail: "Admin credentials are invalid.", statusCode: 401);
+        }
+
+        // 2. Lockout check (after password verify to preserve timing-attack resistance).
+        if (admin.LockedUntil.HasValue && admin.LockedUntil > timeProvider.UtcNow)
+        {
+            return Problem(detail: "Admin account is temporarily locked.", statusCode: 423);
         }
 
         if (!UserRoles.IsAdmin(admin.Role))
         {
             return Forbid();
-        }
-
-        // 2. Lockout check.
-        if (admin.LockedUntil.HasValue && admin.LockedUntil > timeProvider.UtcNow)
-        {
-            return Problem(detail: "Admin account is temporarily locked.", statusCode: 423);
         }
 
         // 3. Role hierarchy.
@@ -90,47 +96,20 @@ public partial class AuthController
             return Problem(detail: scopeResult.Error, statusCode: 403);
         }
 
-        // 5. Geographic fields present.
-        var geoError = GeographicValidator.Validate(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
-        if (geoError is not null)
+        // 5. Validate and create user (uniqueness, password strength, entity creation).
+        var (newUser, error) = await userCreationService.ValidateAndCreateUserAsync(
+            body.Name, body.Email, body.Phone, body.Username, body.Password,
+            body.Role, body.CommuneId, body.DairaId, body.WilayaId,
+            cancellationToken);
+        if (error is not null)
         {
-            return Problem(detail: geoError, statusCode: 400);
+            var statusCode = error.Contains("already exists") ? 409 : 400;
+            return Problem(detail: error, statusCode: statusCode);
         }
 
-        // 6. Uniqueness (normalised to lowercase for case-insensitive matching).
-        var normalizedNewUsername = body.Username.ToLowerInvariant();
-        var existing = await db.Users
-            .FirstOrDefaultAsync(u => u.Username == normalizedNewUsername || u.Email == body.Email, cancellationToken);
-        if (existing is not null)
-        {
-            var field = existing.Username == normalizedNewUsername ? "Username" : "Email";
-            return Problem(detail: $"{field} already exists.", statusCode: 409);
-        }
-
-        // 7. Password strength.
-        var pwdErr = PasswordValidator.Validate(body.Password);
-        if (pwdErr is not null)
-        {
-            return Problem(detail: pwdErr, statusCode: 400);
-        }
-
-        // 8. Create.
-        var newUser = new User
-        {
-            Name = body.Name,
-            Email = body.Email,
-            Phone = body.Phone,
-            Username = normalizedNewUsername,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(body.Password),
-            Role = body.Role,
-            // commune_user and field_worker get a CommuneId; admins get their geographic anchor.
-            CommuneId = body.Role is UserRoles.CommuneUser or UserRoles.FieldWorker ? body.CommuneId : null,
-            DairaId = body.Role == UserRoles.DairaAdmin ? body.DairaId : null,
-            WilayaId = body.Role == UserRoles.WilayaAdmin ? body.WilayaId : null,
-            FailedLoginAttempts = 0,
-        };
-
-        db.Users.Add(newUser);
+        // 6. Persist.
+        db.Users.Add(newUser!);
+        await ResetFailedAttemptsIfNeededAsync(admin, cancellationToken);
         try
         {
             await db.SaveChangesAsync(cancellationToken);
@@ -144,7 +123,7 @@ public partial class AuthController
 
         logger.LogInformation(
             "[Auth] {AdminUser} ({AdminRole}) created {NewRole} account {NewUser} via login page",
-            admin.Username, admin.Role, newUser.Role, newUser.Username);
+            admin.Username, admin.Role, newUser!.Role, newUser.Username);
 
         return StatusCode(201, ApiResponse.Ok($"{body.Role} account created successfully."));
     }

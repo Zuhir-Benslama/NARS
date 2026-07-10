@@ -2,41 +2,54 @@ using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
 using NarsApi.Models;
 using NarsApi.Services;
+using NarsApi.Tests.Integration;
 using static NarsApi.Tests.TestData;
 using Xunit;
 
 namespace NarsApi.Tests;
 
-public class FeatureStatsServiceTests
+[Collection("PostgreSQL Integration")]
+public class FeatureStatsServiceTests : IAsyncLifetime
 {
-    private static readonly Guid UserId1 = Guid.NewGuid();
-    private static readonly Guid UserId2 = Guid.NewGuid();
+    private readonly NarsDatabaseFixture _fixture;
+    private AppDbContext _db = null!;
+    private Guid _userId1;
+    private Guid _userId2;
 
-    private static async Task<IDbContextFactory<AppDbContext>> SeedWithFeaturesAsync()
+    public FeatureStatsServiceTests(NarsDatabaseFixture fixture)
     {
-        var factory = CreateInMemoryDbFactory("FeatureStatsTest");
-        await using var db = await factory.CreateDbContextAsync();
+        _fixture = fixture;
+    }
 
-        db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = UserId1, Layer = "central_urban", Label = "A1", Data = "{}", CreatedAt = FixedUtcNow });
-        db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = UserId1, Layer = "secondary_urban", Label = "A2", Data = "{}", CreatedAt = FixedUtcNow });
-        db.Roads.Add(new Road { Id = Guid.CreateVersion7(), UserId = UserId1, Layer = "street", Label = "R1", Data = "{}", CreatedAt = FixedUtcNow });
-        db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = UserId2, Layer = "central_urban", Label = "A3", Data = "{}", CreatedAt = FixedUtcNow });
-        db.Districts.Add(new District { Id = Guid.CreateVersion7(), UserId = UserId2, Layer = "housing_estate", Label = "D1", Data = "{}", CreatedAt = FixedUtcNow });
-        db.Districts.Add(new District { Id = Guid.CreateVersion7(), UserId = UserId2, Layer = "district", Label = "D2", Data = "{}", CreatedAt = FixedUtcNow });
-        db.Users.Add(new User { Id = UserId1, Username = "user1", Name = "User 1", Email = "u1@test.com", Phone = DefaultPhone, PasswordHash = "hash", Role = "commune_user", CommuneId = 1 });
-        db.Users.Add(new User { Id = UserId2, Username = "user2", Name = "User 2", Email = "u2@test.com", Phone = "0555000001", PasswordHash = "hash", Role = "commune_user", CommuneId = 1 });
+    public async Task InitializeAsync()
+    {
+        _db = _fixture.CreateDbContext();
+        _userId1 = Guid.NewGuid();
+        _userId2 = Guid.NewGuid();
 
-        await db.SaveChangesAsync();
-        return factory;
+        _db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = _userId1, Layer = "central_urban", Label = "A1", Data = "{}", CreatedAt = FixedUtcNow });
+        _db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = _userId1, Layer = "secondary_urban", Label = "A2", Data = "{}", CreatedAt = FixedUtcNow });
+        _db.Roads.Add(new Road { Id = Guid.CreateVersion7(), UserId = _userId1, Layer = "street", Label = "R1", Data = "{}", CreatedAt = FixedUtcNow });
+        _db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = _userId2, Layer = "central_urban", Label = "A3", Data = "{}", CreatedAt = FixedUtcNow });
+        _db.Districts.Add(new District { Id = Guid.CreateVersion7(), UserId = _userId2, Layer = "housing_estate", Label = "D1", Data = "{}", CreatedAt = FixedUtcNow });
+        _db.Districts.Add(new District { Id = Guid.CreateVersion7(), UserId = _userId2, Layer = "district", Label = "D2", Data = "{}", CreatedAt = FixedUtcNow });
+        _db.Users.Add(new User { Id = _userId1, Username = "user1", Name = "User 1", Email = "u1@test.com", Phone = DefaultPhone, PasswordHash = "hash", Role = "commune_user", CommuneId = 1 });
+        _db.Users.Add(new User { Id = _userId2, Username = "user2", Name = "User 2", Email = "u2@test.com", Phone = "0555000001", PasswordHash = "hash", Role = "commune_user", CommuneId = 1 });
+        await _db.SaveChangesAsync();
+    }
+
+    public async Task DisposeAsync()
+    {
+        await _db.DisposeAsync();
+        await _fixture.CleanTablesAsync();
     }
 
     [Fact]
     public async Task GetFeatureCountsAsync_ReturnsCorrectCounts()
     {
-        var factory = await SeedWithFeaturesAsync();
-        var svc = new FeatureStatsService(factory);
+        var svc = new FeatureStatsService(_fixture.CreateDbContextFactory());
 
-        var counts = await svc.GetFeatureCountsAsync(UserId1);
+        var counts = await svc.GetFeatureCountsAsync(_userId1);
 
         Assert.Equal(2, counts[FeatureTypes.Area]);
         Assert.Equal(1, counts[FeatureTypes.Road]);
@@ -51,8 +64,7 @@ public class FeatureStatsServiceTests
     [Fact]
     public async Task GetFeatureCountsAsync_UnknownUser_ReturnsAllZeros()
     {
-        var factory = await SeedWithFeaturesAsync();
-        var svc = new FeatureStatsService(factory);
+        var svc = new FeatureStatsService(_fixture.CreateDbContextFactory());
 
         var counts = await svc.GetFeatureCountsAsync(Guid.NewGuid());
 
@@ -62,10 +74,9 @@ public class FeatureStatsServiceTests
     [Fact]
     public async Task GetFeatureCountsAsync_EmptyDb_ReturnsAllZeros()
     {
-        var factory = CreateInMemoryDbFactory("FeatureStatsTest");
-        var svc = new FeatureStatsService(factory);
+        var svc = new FeatureStatsService(_fixture.CreateDbContextFactory());
 
-        var counts = await svc.GetFeatureCountsAsync(UserId1);
+        var counts = await svc.GetFeatureCountsAsync(Guid.NewGuid());
 
         Assert.All(counts.Values, v => Assert.Equal(0, v));
     }
@@ -73,20 +84,19 @@ public class FeatureStatsServiceTests
     [Fact]
     public async Task GetUserFeatureCountsAsync_ReturnsPerUserCounts()
     {
-        var factory = await SeedWithFeaturesAsync();
-        var svc = new FeatureStatsService(factory);
+        var svc = new FeatureStatsService(_fixture.CreateDbContextFactory());
 
-        var result = await svc.GetUserFeatureCountsAsync([UserId1, UserId2]);
+        var result = await svc.GetUserFeatureCountsAsync([_userId1, _userId2]);
 
         Assert.Equal(2, result.Count);
 
-        var u1 = result[UserId1];
+        var u1 = result[_userId1];
         Assert.Equal(2, u1.Areas);
         Assert.Equal(0, u1.Districts);
         Assert.Equal(1, u1.Roads);
         Assert.Equal(3, u1.Total);
 
-        var u2 = result[UserId2];
+        var u2 = result[_userId2];
         Assert.Equal(1, u2.Areas);
         Assert.Equal(2, u2.Districts);
         Assert.Equal(0, u2.Roads);
@@ -96,8 +106,7 @@ public class FeatureStatsServiceTests
     [Fact]
     public async Task GetUserFeatureCountsAsync_EmptyArray_ReturnsEmpty()
     {
-        var factory = CreateInMemoryDbFactory("FeatureStatsTest");
-        var svc = new FeatureStatsService(factory);
+        var svc = new FeatureStatsService(_fixture.CreateDbContextFactory());
 
         var result = await svc.GetUserFeatureCountsAsync([]);
 
@@ -107,14 +116,10 @@ public class FeatureStatsServiceTests
     [Fact]
     public async Task GetUserFeatureCountsAsync_UserWithNoFeatures_ReturnsZeros()
     {
-        var factory = await SeedWithFeaturesAsync();
         var unknownId = Guid.NewGuid();
-        await using (var db = await factory.CreateDbContextAsync())
-        {
-            db.Users.Add(new User { Id = unknownId, Username = "empty", Name = "Empty", Email = "empty@test.com", Phone = DefaultPhone, PasswordHash = "hash", Role = "commune_user", CommuneId = 1 });
-            await db.SaveChangesAsync();
-        }
-        var svc = new FeatureStatsService(factory);
+        _db.Users.Add(new User { Id = unknownId, Username = "empty", Name = "Empty", Email = "empty@test.com", Phone = DefaultPhone, PasswordHash = "hash", Role = "commune_user", CommuneId = 1 });
+        await _db.SaveChangesAsync();
+        var svc = new FeatureStatsService(_fixture.CreateDbContextFactory());
 
         var result = await svc.GetUserFeatureCountsAsync([unknownId]);
 

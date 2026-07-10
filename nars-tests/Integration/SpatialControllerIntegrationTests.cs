@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -42,7 +43,8 @@ public class SpatialControllerIntegrationTests : IAsyncLifetime
         var ctrl = new SpatialController(
             new RoadQueryService(_db),
             scatteredService ?? Mock.Of<IScatteredAreaService>(),
-            new EntranceQueryService(_db));
+            new EntranceQueryService(_db),
+            Mock.Of<IWebHostEnvironment>());
         var httpContext = new DefaultHttpContext
         {
             User = AuthTestHelper.CreateClaimsPrincipal(_userId, "field_worker", communeId: 1)
@@ -113,7 +115,7 @@ public class SpatialControllerIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetScatteredStatus_ReturnsStatus()
+    public void GetScatteredStatus_ReturnsStatus()
     {
         var controller = CreateController();
         var result = controller.GetScatteredStatus();
@@ -147,7 +149,8 @@ public class SpatialControllerIntegrationTests : IAsyncLifetime
         var controller = new SpatialController(
             new RoadQueryService(_db),
             Mock.Of<IScatteredAreaService>(),
-            new EntranceQueryService(_db))
+            new EntranceQueryService(_db),
+            Mock.Of<IWebHostEnvironment>())
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext }
         };

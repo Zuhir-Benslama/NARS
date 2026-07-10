@@ -41,14 +41,14 @@ spec:
 # ─── Health Check Ingress (no mTLS) ────────────────────────────────────
 # Separate ingress for /health so external monitoring can reach it
 # without requiring a client certificate.
-# ⚠ SECURITY: This endpoint is publicly reachable. In production, add
-# IP whitelisting via annotation:
-#   nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,1.2.3.4/32"
+# Only cluster-internal traffic (10.0.0.0/8) is allowed.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: nars-api-health
   namespace: nars
+  annotations:
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8"
   # No ssl-redirect — health checks must work over plain HTTP for monitoring
   # systems that don't support HTTPS. The /health endpoint exposes no
   # sensitive data.

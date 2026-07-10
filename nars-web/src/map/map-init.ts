@@ -151,16 +151,18 @@ async function switchBaseLayer(
   }
   const next = styles[key]
   if (!next || next === currentActiveStyle) return
+  if (!ctx.map) return
   currentActiveStyle = next
 
+  const map = ctx.map
   const styleLoaded = new Promise<void>((resolve) => {
-    ctx.map!.once("style.load", () => resolve())
+    map.once("style.load", () => resolve())
   })
   const styleTimeout = new Promise<void>((_, reject) =>
     setTimeout(() => reject(new Error("Style load timeout")), MAP_CONFIG.styleLoadTimeout),
   )
 
-  ctx.map.setStyle(next)
+  map.setStyle(next)
   await Promise.race([styleLoaded, styleTimeout])
 
   initSources()
@@ -171,5 +173,5 @@ async function switchBaseLayer(
 
   updateEndpointMarkers()
 
-  await initGeoman(ctx.map!, geomanOptions)
+  await initGeoman(map, geomanOptions)
 }

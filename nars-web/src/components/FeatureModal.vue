@@ -259,7 +259,9 @@ watch(
 // ── Validation + submit ───────────────────────────────────────────────────────
 
 function onSave() {
-  if (!validate()) return
+  const errors = validate()
+  modalStore.errors = errors
+  if (Object.keys(errors).length > 0) return
   const result = buildModalResult(appStore.communeName)
   modalStore.close(result as import("../types").ModalResult)
 }
@@ -269,13 +271,13 @@ function onCancel() {
 }
 
 // Keyboard shortcuts — listen on window so focus is not required
-function onKeyup(e: KeyboardEvent) {
+function onKeydown(e: KeyboardEvent) {
   if (!modalStore.visible) return
-  if (e.key === "Enter") onSave()
-  if (e.key === "Escape") onCancel()
+  if (e.key === "Enter") { e.preventDefault(); onSave() }
+  if (e.key === "Escape") { e.preventDefault(); onCancel() }
 }
 onMounted(async () => {
-  window.addEventListener("keyup", onKeyup)
+  window.addEventListener("keydown", onKeydown)
   // Populate phase-specific extras (e.g. mainUrbanExists, roadOptions) after
   // the modal store is initialized by openCreate/openEdit.
   if (modalStore.phaseIndex !== null) {
@@ -286,5 +288,5 @@ onMounted(async () => {
     }
   }
 })
-onUnmounted(() => window.removeEventListener("keyup", onKeyup))
+onUnmounted(() => window.removeEventListener("keydown", onKeydown))
 </script>

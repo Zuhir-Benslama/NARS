@@ -68,11 +68,13 @@ public class BackgroundQueueProcessor(
         {
             try
             {
-                await _executingTask.WaitAsync(cancellationToken);
+                // Give in-flight task a grace period to complete before forcing shutdown.
+                using var graceCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                await _executingTask.WaitAsync(graceCts.Token);
             }
             catch (OperationCanceledException)
             {
-                // Shutdown timeout elapsed — runtime will force-stop.
+                // Grace period or shutdown timeout elapsed — runtime will force-stop.
             }
         }
     }

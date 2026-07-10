@@ -22,7 +22,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue"
+import { ref, computed, onMounted, onUnmounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useI18n } from "vue-i18n"
 import { apiFetch } from "../api"
@@ -39,6 +39,7 @@ const appStore = useAppStore()
 const wilaya = ref<WilayaReport | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
+let abortController: AbortController | null = null
 
 const userRole = computed<UserRole>(() => appStore.user?.role ?? "commune_user")
 
@@ -50,9 +51,12 @@ onMounted(async () => {
   const wilayaNameSlug = route.params.wilayaName as string
   loading.value = true
   error.value = null
+  abortController = new AbortController()
+  const { signal } = abortController
 
   try {
-    const res = await apiFetch("/api/admin/overview")
+    const res = await apiFetch("/api/admin/overview", { signal })
+    if (signal.aborted) return
     const data = await res.json()
 
     let wilayaId: number | null = null
@@ -79,14 +83,18 @@ onMounted(async () => {
       return
     }
 
-    const detailRes = await apiFetch(`/api/admin/wilaya/${wilayaId}`)
+    const detailRes = await apiFetch(`/api/admin/wilaya/${wilayaId}`, { signal })
+    if (signal.aborted) return
     wilaya.value = (await detailRes.json()) as WilayaReport
   } catch (err) {
+    if (signal.aborted) return
     error.value = err instanceof Error ? err.message : t("admin.load_error")
   } finally {
-    loading.value = false
+    if (!signal.aborted) loading.value = false
   }
 })
+
+onUnmounted(() => abortController?.abort())
 </script>
 
 <style scoped>

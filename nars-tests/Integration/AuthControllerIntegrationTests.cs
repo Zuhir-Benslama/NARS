@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -274,7 +275,9 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             Options.Create(new AccountLockoutOptions()),
             Mock.Of<ILogger<AuthController>>(),
             timeProvider,
-            new UserAuthorizationService(db));
+            new UserAuthorizationService(db),
+            AuthTestHelper.CreateUserCreationMock(db),
+            Mock.Of<IWebHostEnvironment>());
     }
 
     private async Task SeedReferenceDataAsync() => await SeedData.SeedBasicLocationsAsync(_db);

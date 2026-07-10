@@ -12,7 +12,8 @@ namespace NarsApi.Controllers;
 [Route("/api")]
 [Tags("Feature Catalog")]
 public class FeatureCatalogController(
-    IFeatureStatsService featureStatsService) : NarsControllerBase
+    IFeatureStatsService featureStatsService,
+    IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     private const string IconArea = "\u2B1F";
     private const string IconRoad = "\U0001F6E3️";
@@ -126,7 +127,7 @@ public class FeatureCatalogController(
     }
 
     /// <summary>Loads features filtered by layer type with pagination.</summary>
-    [HttpGet("load/layer/{layerType}")]
+    [HttpGet("features/by-layer/{layerType}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> LoadByLayer(string layerType, [FromQuery] int skip = 0, [FromQuery] int take = 100, CancellationToken cancellationToken = default)
     {

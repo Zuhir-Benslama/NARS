@@ -18,7 +18,7 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
     () => phase.value?.key === "areas" && modalStore.areaTypeKey === "central_urban",
   )
 
-  function validate(): boolean {
+  function validate(): Record<string, string> {
     const errors: Record<string, string> = {}
     const key = phase.value?.key
 
@@ -58,8 +58,7 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
         errors.mainEntrance = "Required"
     }
 
-    modalStore.errors = errors
-    return Object.keys(errors).length === 0
+    return errors
   }
 
   function buildModalResult(communeName: string): Partial<FeatureData> {

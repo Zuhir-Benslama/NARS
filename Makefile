@@ -303,6 +303,11 @@ smoke-test: ## Post-deploy smoke test: verify /health, frontend, and API auth
 cluster-stop: ## Scale all deployments to 0 (stop pods, keep cluster)
 	@echo "→ Stopping all pods..."
 	@for deploy in $(SCALABLE_DEPLOYS); do
+		exists=$$($(KUBECTL) get deployment "$$deploy" -n "$(NAMESPACE)" 2>/dev/null && echo "true" || echo "false")
+		if [ "$$exists" = "false" ]; then
+			echo "  ⚠ $$deploy not found, skipping"
+			continue
+		fi
 		saved="$(BACKUP_DIR)/replicas/$$deploy.txt"
 		replicas=$$($(KUBECTL) get deployment "$$deploy" -n "$(NAMESPACE)" \
 			-o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
@@ -339,11 +344,11 @@ cluster-restart: cluster-stop cluster-start ## Stop all pods, then start them ag
 # ─── Database Backup / Restore ──────────────────────────────
 
 .PHONY: db-get-pod
-db-get-pod:
+db-get-pod: ## Get the postgis pod name
 	@$(POSTGIS_GET_POD_CMD) || echo ""
 
 .PHONY: db-get-password
-db-get-password:
+db-get-password: ## Get the postgis password from k8s secret
 	@$(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
 		-o jsonpath='{.data.postgres_password}' 2>/dev/null \
 		| base64 -d 2>/dev/null || echo ""
@@ -946,8 +951,8 @@ observability-stop: ## Stop observability port-forwards
 	@echo "✓ Port-forwards stopped"
 
 .PHONY: grafana-password
-grafana-password: ## Show the generated Grafana admin password
-	@echo "$(GRAFANA_PASSWORD)"
+grafana-password: ## Show the generated Grafana admin password (stderr only)
+	@echo "$(GRAFANA_PASSWORD)" >&2
 
 # ─── Code Quality (nars-infra) ──────────────────────────────
 
@@ -977,7 +982,12 @@ infra-lint-docker: ## Lint Dockerfiles with hadolint
 			hadolint/hadolint \
 			/mnt/nars-infra/docker/Dockerfile.nars-api \
 			/mnt/nars-infra/docker/Dockerfile.nars-postgis \
-			/mnt/nars-infra/docker/Dockerfile.nars-vite
+			/mnt/nars-infra/docker/Dockerfile.nars-vite \
+			$$(find nars-infra/docker -name 'Dockerfile.*' \
+				! -name 'Dockerfile.nars-api' \
+				! -name 'Dockerfile.nars-postgis' \
+				! -name 'Dockerfile.nars-vite' \
+				| sed 's|^|/mnt/|')
 	fi
 
 .PHONY: infra-lint-yaml
@@ -985,7 +995,7 @@ infra-lint-yaml: ## Lint k8s YAML with yamllint (uses .yamllint.yaml config)
 	@if command -v yamllint >/dev/null 2>&1; then
 		yamllint -c nars-infra/.yamllint.yaml nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml
 	else
-		# cytopia/yamllint:1.36.0@sha256:... — replace with pinned SHA for CI
+		# TODO: pin to digest for CI reproducibility
 		docker run --rm -v "$$(pwd):/mnt" cytopia/yamllint:1.36.0 \
 			-c nars-infra/.yamllint.yaml nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml
 	fi

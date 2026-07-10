@@ -51,7 +51,7 @@ for pkg in psycopg2-binary bcrypt; do
     module="${pkg%%-*}"
     if ! python3 -c "import sys; __import__(sys.argv[1])" "${module}" 2>/dev/null; then
         if [[ -z "${VENV_DIR}" ]]; then
-            VENV_DIR=""; VENV_DIR=$(mktemp -d)
+            VENV_DIR=$(mktemp -d)
             python3 -m venv "${VENV_DIR}"
             # shellcheck disable=SC1091
             source "${VENV_DIR}/bin/activate"
@@ -204,7 +204,7 @@ NEW_UUID=$(
     export NARS_ADMIN_PHONE="${ADMIN_PHONE}"
     export NARS_ADMIN_USERNAME="${ADMIN_USERNAME}"
     PYTHONPATH="${DB_HELPER_DIR}" "${PYTHON}" - << 'PYEOF'
-import os, uuid, bcrypt
+import sys, os, uuid, bcrypt
 from db_helper import connect_db
 
 name    = os.environ["NARS_ADMIN_NAME"]

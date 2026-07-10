@@ -19,7 +19,8 @@ public class FieldController(
     ILogger<FieldController> logger,
     IOptions<FeatureDefaultsOptions> featureDefaults,
     IDateTimeProvider timeProvider,
-    IFieldService fieldService) : NarsControllerBase
+    IFieldService fieldService,
+    IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     private readonly int _maxFeatureDataSize = featureDefaults.Value.MaxFeatureDataSize;
     private const string DefaultEntranceLabel = "Entrance (field worker)";

@@ -22,8 +22,10 @@ public partial class AuthController(
     IOptions<AccountLockoutOptions> lockoutOptions,
     ILogger<AuthController> logger,
     IDateTimeProvider timeProvider,
-    IUserAuthorizationService authorizationService
-) : NarsControllerBase
+    IUserAuthorizationService authorizationService,
+    IUserCreationService userCreationService,
+    IWebHostEnvironment webHost
+) : NarsControllerBase(webHost)
 {
     // Stable dummy hash so BCrypt always does the full work, even for unknown users.
     // Prevents username enumeration via response-time side-channel.
@@ -55,6 +57,7 @@ public partial class AuthController(
     [EnableRateLimiting(RateLimitPolicies.Auth)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> SignIn([FromBody] SignInRequest body, CancellationToken cancellationToken = default)
     {
         if (body is null)
@@ -117,6 +120,7 @@ public partial class AuthController(
     [EnableRateLimiting(RateLimitPolicies.Auth)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Refresh(
         [FromServices] IRefreshTokenService refreshService, CancellationToken cancellationToken = default)
     {

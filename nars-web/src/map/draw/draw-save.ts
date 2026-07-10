@@ -22,14 +22,7 @@ import { saveToDatabase } from "../features/feature-persistence"
 import { openModalForFeature } from "./draw-modal"
 import { getDrawingPhase, setSavingFeature, repatchMarker } from "./draw-state"
 import { areaStyle } from "../rendering/styles"
-
-// ─── DELAY HELPER ─────────────────────────────────────────────────────────────
-// Promise-based delay so async functions can await timing dependencies
-// instead of using fragile magic-number setTimeout callbacks.
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
+import { delay } from "../../utils/time"
 
 // ─── GEOMAN CLEANUP HELPER ─────────────────────────────────────────────────────
 // Geoman's feature data type is poorly typed — accessing .delete() requires

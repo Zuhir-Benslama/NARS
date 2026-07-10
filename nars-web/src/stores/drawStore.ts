@@ -17,6 +17,8 @@ export const useDrawStore = defineStore("draw", {
     modeSwitchToken: 0,
     cleanupDrawWatcher: null as (() => void) | null,
     patchRafRef: { current: null } as { current: number | null },
+    edgePollId: null as ReturnType<typeof setInterval> | null,
+    edgeTimeoutId: null as ReturnType<typeof setTimeout> | null,
   }),
 
   actions: {

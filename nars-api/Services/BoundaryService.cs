@@ -11,7 +11,7 @@ public class BoundaryService(AppDbContext db) : IBoundaryService
         var conn = db.Database.GetDbConnection();
         await using var handle = await conn.EnsureOpenAsync(ct);
 
-        using var cmd = conn.CreateCommand();
+        await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT ST_AsGeoJSON(geometry) FROM communes_boundaries WHERE commune_id = @id";
         SqlFragments.AddParam(cmd, "@id", communeId);
 

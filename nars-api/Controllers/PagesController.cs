@@ -28,7 +28,8 @@ public class PagesController(
     ILogger<PagesController> logger,
     IRefreshTokenService refreshService,
     IOptions<CacheOptions> cacheOptions,
-    IDateTimeProvider timeProvider) : NarsControllerBase
+    IDateTimeProvider timeProvider,
+    IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     // GET / — redirect to map if authenticated, otherwise to login
     [HttpGet("/")]
@@ -225,6 +226,11 @@ public class PagesController(
         catch (InvalidOperationException ex)
         {
             logger.LogError(ex, "[Pages] Invalid operation during silent refresh");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[Pages] Unexpected error during silent refresh");
             return false;
         }
     }

@@ -1,8 +1,8 @@
 ---
 mode: deployment
-# Single replica is acceptable for dev. For production, increase to 2+ and add
-# a PodDisruptionBudget to avoid telemetry gaps during node maintenance.
-replicaCount: 1
+# 2 replicas for production HA. During node maintenance, one replica can
+# continue receiving telemetry while the other is rescheduled.
+replicaCount: 2
 
 image:
   repository: otel/opentelemetry-collector-contrib
@@ -78,8 +78,13 @@ config:
       #   cert_file: /etc/otel/certs/tls.crt
       #   key_file: /etc/otel/certs/tls.key
       #   ca_file: /etc/otel/certs/ca.crt
-      # ⚠ SECURITY: insecure=true disables TLS for dev. For production,
-      # generate certs and set insecure: false (see commented config above).
+      # ⚠ SECURITY: insecure=true sends traces unencrypted to Tempo.
+      # For production, generate certs and override via Helm:
+      #   --set config.exporters.otlp.tls.insecure=false
+      #   --set config.exporters.otlp.tls.cert_file=/etc/otel/certs/tls.crt
+      #   --set config.exporters.otlp.tls.key_file=/etc/otel/certs/tls.key
+      #   --set config.exporters.otlp.tls.ca_file=/etc/otel/certs/ca.crt
+      # See commented tls block above for full volume mount instructions.
       tls:
         insecure: true
     loki:
@@ -90,9 +95,9 @@ config:
       endpoint: 0.0.0.0:8889
       resource_to_telemetry_conversion:
         enabled: true
-    # ⚠ SECURITY: debug exporter logs all trace/log/metric data to collector
-    # stdout. Set verbosity to 'critical' (errors only) or remove entirely
-    # from pipelines below for production deployments.
+    # debug exporter with verbosity: critical only logs errors, not full
+    # telemetry payloads. Safe for dev/staging. Remove from pipelines or
+    # increase verbosity to 'normal' for production observability.
     debug:
       verbosity: critical
 

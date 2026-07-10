@@ -98,6 +98,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ILocationQueryService, LocationQueryService>();
         services.AddScoped<IRoadQueryService, RoadQueryService>();
         services.AddScoped<IUserProfileService, UserProfileService>();
+        services.AddScoped<IUserCreationService, UserCreationService>();
     }
 
     private static void AddNarsHttpClients(this IServiceCollection services, IConfiguration config)

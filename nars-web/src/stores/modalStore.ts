@@ -3,6 +3,7 @@
 
 import { defineStore } from "pinia"
 import type { ModalState, RoadOption, EntranceOption, ModalResult, FeatureData } from "../types"
+import { debugWarn } from "../utils/debug"
 
 function createDefaultModalState(): ModalState {
   return {
@@ -123,6 +124,12 @@ export function awaitModalResult(): Promise<ModalResult | null> {
     const result = _modalResult
     _modalResult = null
     return Promise.resolve(result)
+  }
+  if (_modalResolver !== null) {
+    // Resolve the orphaned promise so callers don't hang forever
+    debugWarn("[MODAL] awaitModalResult called while a modal is already pending")
+    _modalResolver(null)
+    _modalResolver = null
   }
   return new Promise((resolve) => {
     _modalResolver = resolve

@@ -12,7 +12,8 @@ namespace NarsApi.Controllers;
 /// manual cookie->token->principal validation in every controller.
 /// </summary>
 [Authorize]
-public abstract class NarsControllerBase : ControllerBase
+public abstract class NarsControllerBase(
+    IWebHostEnvironment environment) : ControllerBase
 {
     /// <summary>The authenticated user's database ID (UUID v7), or null if absent.</summary>
     protected Guid? CurrentUserId =>
@@ -61,7 +62,7 @@ public abstract class NarsControllerBase : ControllerBase
     protected CookieOptions MakeCookieOptions(TimeSpan maxAge) => new()
     {
         HttpOnly = true,
-        Secure = Request.IsHttps,
+        Secure = environment.IsProduction() || Request.IsHttps,
         SameSite = SameSiteMode.Lax,
         MaxAge = maxAge,
         Path = "/",

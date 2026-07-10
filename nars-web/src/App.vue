@@ -115,14 +115,14 @@ onUnmounted(() => {
   align-items: center;
   gap: 16px;
   padding: 32px 48px;
-  background: #fff;
+  background: var(--modal-bg, #fff);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
 .loading-spinner p {
   margin: 0;
   font-size: 14px;
-  color: #374151;
+  color: var(--text-primary, #374151);
   font-weight: 500;
 }
 .spinner {

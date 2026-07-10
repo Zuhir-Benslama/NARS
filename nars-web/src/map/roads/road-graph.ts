@@ -2,6 +2,9 @@
 // Phase 1: Connection scan builds a full topology graph from road coordinates.
 // Handles endpoint-to-endpoint, endpoint-to-body (T-junctions),
 // and body-to-body (X-junctions / crossings).
+//
+// Uses a spatial grid to reduce junction detection from O(n²) to O(n·k),
+// where k is the number of roads in nearby cells.
 
 import Graph from "graphology"
 import * as turfHelpers from "@turf/helpers"
@@ -40,6 +43,35 @@ export interface Seg {
   reversed: boolean
 }
 
+// ─── SPATIAL GRID ─────────────────────────────────────────────────────────────
+
+/**
+ * Grid-based spatial index. Cell size is 2× CONNECT_M so any road
+ * within CONNECT_M of a cell border is also present in the neighbor cell.
+ * This guarantees we never miss a junction that straddles cells.
+ */
+const CELL_SIZE = CONNECT_M * 2
+
+/** Expand a bounding box into the set of grid cells it overlaps. */
+function cellsForBbox(
+  minLat: number,
+  maxLat: number,
+  minLng: number,
+  maxLng: number,
+): Set<string> {
+  const cells = new Set<string>()
+  const r0 = Math.floor(minLat / CELL_SIZE)
+  const r1 = Math.floor(maxLat / CELL_SIZE)
+  const c0 = Math.floor(minLng / CELL_SIZE)
+  const c1 = Math.floor(maxLng / CELL_SIZE)
+  for (let r = r0; r <= r1; r++) {
+    for (let c = c0; c <= c1; c++) {
+      cells.add(`${r},${c}`)
+    }
+  }
+  return cells
+}
+
 // ─── PHASE 1: CONNECTION SCAN → GRAPH ────────────────────────────────────────
 
 export function buildConnectionGraph(roads: LayerEntry[]): {
@@ -56,22 +88,75 @@ export function buildConnectionGraph(roads: LayerEntry[]): {
     return k
   }
 
+  // ── Build spatial grid ────────────────────────────────────────────────────
+  interface RoadEntry {
+    road: LayerEntry
+    coords: Coord[]
+    minLat: number
+    maxLat: number
+    minLng: number
+    maxLng: number
+    endpoints: Coord[]
+  }
+
+  const roadEntries: RoadEntry[] = []
+  const grid = new Map<string, RoadEntry[]>()
+
   for (const road of roads) {
     const coords = road.data.coordinates
     if (!coords?.length) continue
+
+    let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity
+    for (const c of coords) {
+      if (c.lat < minLat) minLat = c.lat
+      if (c.lat > maxLat) maxLat = c.lat
+      if (c.lng < minLng) minLng = c.lng
+      if (c.lng > maxLng) maxLng = c.lng
+    }
+
+    const entry: RoadEntry = {
+      road,
+      coords,
+      minLat,
+      maxLat,
+      minLng,
+      maxLng,
+      endpoints: [coords[0], coords[coords.length - 1]],
+    }
+    roadEntries.push(entry)
+
+    for (const ck of cellsForBbox(minLat, maxLat, minLng, maxLng)) {
+      let bucket = grid.get(ck)
+      if (!bucket) {
+        bucket = []
+        grid.set(ck, bucket)
+      }
+      bucket.push(entry)
+    }
+  }
+
+  // ── Detect junctions using grid neighbors only ─────────────────────────────
+  for (const re of roadEntries) {
+    const { road, coords } = re
     const dbId = road.dbId
     const line = toLn(coords)
 
+    // Collect candidate neighbors from all cells this road touches
+    const neighborSet = new Set<RoadEntry>()
+    for (const ck of cellsForBbox(re.minLat, re.maxLat, re.minLng, re.maxLng)) {
+      for (const n of grid.get(ck) ?? []) {
+        if (n !== re) neighborSet.add(n)
+      }
+    }
+
     const junctions: Array<{ segIdx: number; pt: Coord }> = []
 
-    for (const other of roads) {
-      if (other === road) continue
-      const otherCoords = other.data.coordinates
-      if (!otherCoords?.length) continue
+    for (const other of neighborSet) {
+      const otherCoords = other.coords
       const otherLine = toLn(otherCoords)
 
       // ── T-junction: endpoint of `other` lands on body of `road` ─────
-      for (const ep of [otherCoords[0], otherCoords[otherCoords.length - 1]]) {
+      for (const ep of other.endpoints) {
         if (dm(ep, coords[0]) <= CONNECT_M) continue
         if (dm(ep, coords[coords.length - 1]) <= CONNECT_M) continue
 
@@ -90,8 +175,8 @@ export function buildConnectionGraph(roads: LayerEntry[]): {
       }
 
       // ── X-junction: body of `other` crosses body of `road` ──────────
-      const intersects = turfLineIntersect.lineIntersect(line, otherLine)
-      for (const feature of intersects.features) {
+      const intersections = turfLineIntersect.lineIntersect(line, otherLine)
+      for (const feature of intersections.features) {
         const pt: Coord = {
           lat: feature.geometry.coordinates[1],
           lng: feature.geometry.coordinates[0],

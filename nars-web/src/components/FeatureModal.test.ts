@@ -357,7 +357,7 @@ describe("FeatureModal", () => {
     mount(FeatureModal)
     await nextTick()
 
-    window.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter" }))
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }))
     await nextTick()
 
     expect(mockModalStore.close).toHaveBeenCalled()
@@ -370,7 +370,7 @@ describe("FeatureModal", () => {
     mount(FeatureModal)
     await nextTick()
 
-    window.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape" }))
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))
     await nextTick()
 
     expect(mockModalStore.close).toHaveBeenCalledWith(null)
