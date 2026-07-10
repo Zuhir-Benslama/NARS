@@ -53,12 +53,7 @@ export interface Seg {
 const CELL_SIZE = CONNECT_M * 2
 
 /** Expand a bounding box into the set of grid cells it overlaps. */
-function cellsForBbox(
-  minLat: number,
-  maxLat: number,
-  minLng: number,
-  maxLng: number,
-): Set<string> {
+function cellsForBbox(minLat: number, maxLat: number, minLng: number, maxLng: number): Set<string> {
   const cells = new Set<string>()
   const r0 = Math.floor(minLat / CELL_SIZE)
   const r1 = Math.floor(maxLat / CELL_SIZE)
@@ -106,7 +101,10 @@ export function buildConnectionGraph(roads: LayerEntry[]): {
     const coords = road.data.coordinates
     if (!coords?.length) continue
 
-    let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity
+    let minLat = Infinity,
+      maxLat = -Infinity,
+      minLng = Infinity,
+      maxLng = -Infinity
     for (const c of coords) {
       if (c.lat < minLat) minLat = c.lat
       if (c.lat > maxLat) maxLat = c.lat

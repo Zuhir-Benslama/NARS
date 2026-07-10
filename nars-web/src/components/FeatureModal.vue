@@ -273,8 +273,14 @@ function onCancel() {
 // Keyboard shortcuts — listen on window so focus is not required
 function onKeydown(e: KeyboardEvent) {
   if (!modalStore.visible) return
-  if (e.key === "Enter") { e.preventDefault(); onSave() }
-  if (e.key === "Escape") { e.preventDefault(); onCancel() }
+  if (e.key === "Enter") {
+    e.preventDefault()
+    onSave()
+  }
+  if (e.key === "Escape") {
+    e.preventDefault()
+    onCancel()
+  }
 }
 onMounted(async () => {
   window.addEventListener("keydown", onKeydown)
