@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS public.users
     CONSTRAINT chk_user_geographic_role CHECK (
         CASE role
             WHEN 'commune_user'   THEN commune_id IS NOT NULL
+            WHEN 'field_worker'   THEN commune_id IS NOT NULL
             WHEN 'daira_admin'    THEN daira_id   IS NOT NULL
             WHEN 'wilaya_admin'   THEN wilaya_id  IS NOT NULL
             WHEN 'national_admin' THEN TRUE

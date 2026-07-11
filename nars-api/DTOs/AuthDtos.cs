@@ -45,15 +45,15 @@ public record PagedResponse<T>(
 /// </summary>
 public record AuthorizedAdminSignupRequest(
     // ── Authorizing admin ────────────────────────────────────────────────────
-    [property: Required(AllowEmptyStrings = false)] string AdminUsername,
-    [property: Required(AllowEmptyStrings = false)] string AdminPassword,
+    [Required(AllowEmptyStrings = false)] string AdminUsername,
+    [Required(AllowEmptyStrings = false)] string AdminPassword,
     // ── New account details ──────────────────────────────────────────────────
-    [property: Required(AllowEmptyStrings = false)] string Name,
-    [property: Required(AllowEmptyStrings = false), EmailAddress] string Email,
-    [property: Required(AllowEmptyStrings = false)] string Phone,
-    [property: Required(AllowEmptyStrings = false)] string Username,
-    [property: Required(AllowEmptyStrings = false)] string Password,
-    [property: Required(AllowEmptyStrings = false)] string Role,
+    [Required(AllowEmptyStrings = false)] string Name,
+    [Required(AllowEmptyStrings = false), EmailAddress] string Email,
+    [Required(AllowEmptyStrings = false)] string Phone,
+    [Required(AllowEmptyStrings = false)] string Username,
+    [Required(AllowEmptyStrings = false)] string Password,
+    [Required(AllowEmptyStrings = false)] string Role,
     // ── Geographic anchor (one required depending on role) ───────────────────
     int? CommuneId,
     int? DairaId,
