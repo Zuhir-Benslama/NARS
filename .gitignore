@@ -24,6 +24,7 @@ nars-web/.vscode/
 *.bak
 
 # === Secrets ===
+credentials.csv
 .env
 .env.*
 !.env.example
