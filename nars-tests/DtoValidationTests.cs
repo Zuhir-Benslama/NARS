@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Reflection;
 using System.Text.Json;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
@@ -10,6 +11,36 @@ namespace NarsApi.Tests;
 
 public class DtoValidationTests
 {
+    /// <summary>
+    /// Validates a record instance by checking [Required] attributes on
+    /// constructor parameters — the same way .NET 10 MVC model binding
+    /// validates record DTOs.  Validator.TryValidateObject only inspects
+    /// properties, which misses parameter-level attributes on records.
+    /// </summary>
+    private static List<ValidationResult> ValidateRecord<T>(T record)
+    {
+        var results = new List<ValidationResult>();
+        var ctor = typeof(T).GetConstructors().First();
+        foreach (var param in ctor.GetParameters())
+        {
+            var required = param.GetCustomAttribute<RequiredAttribute>();
+            if (required is null) continue;
+
+            var value = record!
+                .GetType()
+                .GetProperty(param.Name!, BindingFlags.Public | BindingFlags.Instance)!
+                .GetValue(record);
+
+            if (required.AllowEmptyStrings && value is string s && string.IsNullOrEmpty(s))
+                results.Add(new ValidationResult($"{param.Name} is required.", [param.Name!]));
+            else if (!required.AllowEmptyStrings && value is string s2 && string.IsNullOrEmpty(s2))
+                results.Add(new ValidationResult($"{param.Name} is required.", [param.Name!]));
+            else if (value is null && param.ParameterType.IsValueType)
+                results.Add(new ValidationResult($"{param.Name} is required.", [param.Name!]));
+        }
+        return results;
+    }
+
     [Fact]
     public void AuthorizedAdminSignupRequest_AllValid_PassesValidation()
     {
@@ -27,11 +58,8 @@ public class DtoValidationTests
             WilayaId: null
         );
 
-        var context = new ValidationContext(request);
-        var results = new List<ValidationResult>();
-        var isValid = Validator.TryValidateObject(request, context, results, true);
-
-        Assert.True(isValid);
+        var results = ValidateRecord(request);
+        Assert.Empty(results);
     }
 
     [Fact]
@@ -42,11 +70,8 @@ public class DtoValidationTests
             Password: DefaultPassword
         );
 
-        var context = new ValidationContext(request);
-        var results = new List<ValidationResult>();
-        var isValid = Validator.TryValidateObject(request, context, results, true);
-
-        Assert.True(isValid);
+        var results = ValidateRecord(request);
+        Assert.Empty(results);
     }
 
     [Fact]
@@ -57,11 +82,9 @@ public class DtoValidationTests
             Password: DefaultPassword
         );
 
-        var context = new ValidationContext(request);
-        var results = new List<ValidationResult>();
-        var isValid = Validator.TryValidateObject(request, context, results, true);
-
-        Assert.False(isValid);
+        var results = ValidateRecord(request);
+        Assert.NotEmpty(results);
+        Assert.Contains(results, r => r.ErrorMessage!.Contains("Username"));
     }
 
     [Fact]
@@ -74,8 +97,8 @@ public class DtoValidationTests
         );
 
         var context = new ValidationContext(request);
-        var results = new List<ValidationResult>();
-        var isValid = Validator.TryValidateObject(request, context, results, true);
+        var vr = new List<ValidationResult>();
+        var isValid = Validator.TryValidateObject(request, context, vr, true);
 
         Assert.True(isValid);
     }
