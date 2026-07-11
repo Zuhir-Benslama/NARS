@@ -48,10 +48,10 @@ metadata:
   name: nars-api-health
   namespace: nars
   annotations:
+    # No ssl-redirect — health checks must work over plain HTTP for monitoring
+    # systems that don't support HTTPS. The /health endpoint exposes no
+    # sensitive data.
     nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8"
-  # No ssl-redirect — health checks must work over plain HTTP for monitoring
-  # systems that don't support HTTPS. The /health endpoint exposes no
-  # sensitive data.
 spec:
   ingressClassName: nginx
   tls:

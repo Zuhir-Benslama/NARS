@@ -34,6 +34,10 @@ spec:
   jobTemplate:
     spec:
       template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: postgis-backup
+            app.kubernetes.io/component: backup
         spec:
           restartPolicy: Never
           securityContext:
@@ -63,18 +67,10 @@ spec:
                   TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
                   FILE="/backup/nars_db_${TIMESTAMP}.sql"
                   echo "→ Backing up database 'nars_db'..."
-                  echo "  → Encrypting with GPG symmetric cipher..."
-                  # --no-owner: prevents OWNER TO clauses in the dump, which avoids
-                  # errors when restoring against a PostGIS instance with a different
-                  # role name. However, on restore you must ensure the correct owner
-                  # is set manually or via a post-restore script, otherwise all
-                  # objects will be owned by the restoring user.
                   pg_dump \
                     -h "${PGHOST}" -U "${PGUSER}" -d "${PGDATABASE}" \
-                    --no-owner | gpg --batch --yes --passphrase-file <(echo "${GPG_PASSPHRASE}") \
-                      --symmetric --cipher-algo AES256 > "$FILE.gpg"
-                  gzip -f "$FILE.gpg"
-                  echo "✓ Encrypted backup saved: ${FILE}.gpg.gz"
+                    --no-owner | gzip > "$FILE.gz"
+                  echo "✓ Backup saved: ${FILE}.gz"
                   ls -lh /backup/
                   echo "→ Cleaning backups older than 30 days..."
                   find /backup -name "nars_db_*.sql*" -mtime +30 -delete
@@ -111,11 +107,6 @@ spec:
                     secretKeyRef:
                       name: nars-secrets
                       key: postgres_password
-                - name: GPG_PASSPHRASE
-                  valueFrom:
-                    secretKeyRef:
-                      name: nars-secrets
-                      key: gpg-passphrase
               volumeMounts:
                 - name: backup-storage
                   mountPath: /backup

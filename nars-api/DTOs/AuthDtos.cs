@@ -60,8 +60,8 @@ public record AuthorizedAdminSignupRequest(
     int? WilayaId
 );
 public record SignInRequest(
-    [property: Required(AllowEmptyStrings = false)] string Username,
-    [property: Required(AllowEmptyStrings = false)] string Password
+    [Required(AllowEmptyStrings = false)] string Username,
+    [Required(AllowEmptyStrings = false)] string Password
 );
 
 public record UpdateUserRequest(

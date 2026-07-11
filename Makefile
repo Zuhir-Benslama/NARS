@@ -113,12 +113,40 @@ namespace-ensure: ## Ensure $(NAMESPACE) namespace exists (idempotent)
 	@$(KUBECTL) create namespace "$(NAMESPACE)" --dry-run=client -o yaml | $(KUBECTL) apply -f -
 
 .PHONY: cluster-down
-cluster-down: proxy-down ## Delete the kind cluster (preserves postgis data)
+cluster-down: proxy-down _pre-cluster-down-backup ## Delete the kind cluster (auto-backs up data first)
 	@echo "→ Deleting cluster '$(CLUSTER_NAME)'..."
 	@kind delete cluster --name "$(CLUSTER_NAME)" 2>/dev/null || true
 	@docker rm -f kube-proxy 2>/dev/null || true
 	@rm -f /tmp/$(CLUSTER_NAME)-tls.crt /tmp/$(CLUSTER_NAME)-tls.key
 	@echo "✓ Cluster deleted (postgis data preserved at $(POSTGRES_DATA_DIR))"
+
+# Internal: auto-backup before cluster teardown. Blocks if backup fails.
+.PHONY: _pre-cluster-down-backup
+_pre-cluster-down-backup:
+	@POD=$$($(POSTGIS_GET_POD_CMD) 2>/dev/null); \
+	if [ -z "$$POD" ]; then \
+		echo "→ No postgis pod running — skipping auto-backup"; \
+		exit 0; \
+	fi; \
+	echo "→ Auto-backing up database before cluster teardown..."; \
+	PASS=$$($(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
+		-o jsonpath='{.data.postgres_password}' 2>/dev/null | base64 -d 2>/dev/null); \
+	if [ -z "$$PASS" ]; then \
+		echo "  ⚠ Could not read DB password — skipping backup"; \
+		exit 0; \
+	fi; \
+	mkdir -p "$(BACKUP_DIR)"; \
+	TIMESTAMP=$$(date +"%Y%m%d_%H%M%S"); \
+	FILE="$(BACKUP_DIR)/nars_db_$${TIMESTAMP}.sql"; \
+	$(KUBECTL) exec "$$POD" -n "$(NAMESPACE)" -- env PGPASSWORD="$$PASS" \
+		pg_dump -U postgres -d "$(DB_NAME)" --no-owner > "$$FILE" 2>/dev/null; \
+	if [ ! -s "$$FILE" ]; then \
+		echo "✖ Auto-backup FAILED — refusing to tear down cluster"; \
+		rm -f "$$FILE"; \
+		exit 1; \
+	fi; \
+	gzip -f "$$FILE"; \
+	echo "✓ Auto-backup saved: $${FILE}.gz"
 
 .PHONY: cluster-rebuild
 cluster-rebuild: cluster-down cluster-up ## Delete and recreate the cluster (preserves data)
@@ -778,6 +806,14 @@ postgis-migration-baseline: ## Backfill EF migration history for pre-existing sc
 
 .PHONY: postgis-pv-fix
 postgis-pv-fix: ## Fix postgis PV permissions inside kind container (rootless Docker workaround)
+	@echo "→ This will modify ownership of $(POSTGRES_DATA_DIR) inside the kind node."
+	@if [ -t 0 ]; then \
+		read -p "  Continue? (yes/no): " confirm; \
+		if [ "$$confirm" != "yes" ]; then echo "  Cancelled."; exit 0; fi; \
+	else \
+		echo "  Non-interactive shell — refusing to modify data directory."; \
+		exit 1; \
+	fi
 	@echo "→ Fixing postgis PV permissions..."
 	@docker exec nars-control-plane sh -c '
 		if [ -d /mnt/nars/postgis/data ]; then
@@ -995,7 +1031,6 @@ infra-lint-yaml: ## Lint k8s YAML with yamllint (uses .yamllint.yaml config)
 	@if command -v yamllint >/dev/null 2>&1; then
 		yamllint -c nars-infra/.yamllint.yaml nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml
 	else
-		# TODO: pin to digest for CI reproducibility
 		docker run --rm -v "$$(pwd):/mnt" cytopia/yamllint:1.36.0 \
 			-c nars-infra/.yamllint.yaml nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml
 	fi
