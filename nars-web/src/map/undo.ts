@@ -104,9 +104,7 @@ export async function undo(): Promise<void> {
       for (const entrance of state.houseEntrances || []) {
         if (entrance.data.roadDbId === oldDbId) {
           entrance.data.roadDbId = newDbId
-          debugLog(
-            `[UNDO] Updated entrance "${entrance.data.label}" → roadDbId ${newDbId}`,
-          )
+          debugLog(`[UNDO] Updated entrance "${entrance.data.label}" → roadDbId ${newDbId}`)
         }
       }
     }

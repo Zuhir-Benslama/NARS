@@ -42,12 +42,12 @@
         <span v-if="isMainUrban" class="modal-field-note">
           {{ t("modal_note_main_urban") }}
         </span>
-        <span v-if="isZoneWithTypeName" class="modal-field-note"
-          >{{ t("modal_note_zone_type_name") }}</span
-        >
-        <span v-if="isCityCenter" class="modal-field-note"
-          >{{ t("modal_note_city_center_name") }}</span
-        >
+        <span v-if="isZoneWithTypeName" class="modal-field-note">{{
+          t("modal_note_zone_type_name")
+        }}</span>
+        <span v-if="isCityCenter" class="modal-field-note">{{
+          t("modal_note_city_center_name")
+        }}</span>
       </div>
 
       <!-- Decision No. + Date — hidden when editing a house entrance or city center -->
