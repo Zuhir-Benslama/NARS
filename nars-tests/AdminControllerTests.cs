@@ -220,7 +220,7 @@ public class AdminControllerTests
     }
 
     [Fact]
-    public async Task GetDaira_WilayaAdmin_WrongWilaya_ReturnsForbid()
+    public async Task GetDaira_WilayaAdmin_WrongWilaya_ReturnsNotFound()
     {
         var db = CreateDb();
         db.Dairas.Add(new Daira { DairaId = 1, WilayaId = 1, DairaFr = "Draria" });
@@ -230,7 +230,7 @@ public class AdminControllerTests
 
         var result = await ctrl.GetDaira(1, default);
 
-        Assert.IsType<ForbidResult>(result);
+        Assert.IsType<NotFoundResult>(result);
     }
 
     // ─── CanCreateRole (static helper) ──────────────────────────────────

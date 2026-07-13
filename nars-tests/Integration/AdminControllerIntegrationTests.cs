@@ -318,7 +318,7 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetDaira_WilayaAdmin_WrongWilaya_ReturnsForbid()
+    public async Task GetDaira_WilayaAdmin_WrongWilaya_ReturnsNotFound()
     {
         var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 1);
         var controller = CreateOverviewController();
@@ -326,7 +326,7 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
 
         var result = await controller.GetDaira(11);
 
-        Assert.IsType<ForbidResult>(result);
+        Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]

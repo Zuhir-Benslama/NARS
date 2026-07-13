@@ -30,6 +30,8 @@ public class FeaturesController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> SaveFeature([FromBody] FeatureSaveRequest body, CancellationToken cancellationToken = default)
     {
+        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
+
         if (!FeatureTypes.AllTypes.Contains(body.Type))
         {
             return Problem(detail: $"Unknown feature type '{body.Type}'.", statusCode: 400);
@@ -104,6 +106,8 @@ public class FeaturesController(
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> ClearFeatures([FromBody] ClearFeaturesRequest body, CancellationToken cancellationToken = default)
     {
+        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
+
         if (!body.Confirm)
         {
             return Problem(detail: "Set \"confirm\": true to delete all features.", statusCode: 400);
@@ -144,6 +148,8 @@ public class FeaturesController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateFeature(Guid featureId, [FromBody] FeatureUpdateRequest body, CancellationToken cancellationToken = default)
     {
+        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
+
         var featureType = await featureService.GetFeatureTypeAsync(featureId, cancellationToken);
         if (featureType is null)
         {

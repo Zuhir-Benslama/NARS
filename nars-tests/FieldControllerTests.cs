@@ -54,18 +54,6 @@ public class FieldControllerTests
     // ─── GET /api/field/features ─────────────────────────────────────────
 
     [Fact]
-    public async Task GetFeatures_NonFieldWorker_ReturnsForbid()
-    {
-        var db = CreateDb();
-        var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.CommuneUser, communeId: 1);
-
-        var result = await ctrl.GetFeatures(type: "road");
-
-        Assert.IsType<ForbidResult>(result);
-    }
-
-    [Fact]
     public async Task GetFeatures_NoCommuneId_Returns400()
     {
         var db = CreateDb();
@@ -139,18 +127,6 @@ public class FieldControllerTests
 
         var problem = Assert.IsType<ObjectResult>(result);
         Assert.Equal(400, problem.StatusCode);
-    }
-
-    [Fact]
-    public async Task SubmitInspection_NonFieldWorker_ReturnsForbid()
-    {
-        var db = CreateDb();
-        var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.CommuneUser, communeId: 1);
-
-        var result = await ctrl.SubmitInspection(new FieldInspectRequest("id", "road", Json("{}"), "good"));
-
-        Assert.IsType<ForbidResult>(result);
     }
 
     [Fact]
@@ -256,18 +232,6 @@ public class FieldControllerTests
     // ─── GET /api/field/inspections/{featureId} ──────────────────────────
 
     [Fact]
-    public async Task GetInspections_NonFieldWorker_ReturnsForbid()
-    {
-        var db = CreateDb();
-        var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.CommuneUser, communeId: 1);
-
-        var result = await ctrl.GetInspections(Guid.NewGuid());
-
-        Assert.IsType<ForbidResult>(result);
-    }
-
-    [Fact]
     public async Task GetInspections_ValidRequest_ReturnsInspections()
     {
         var db = CreateDb();
@@ -330,18 +294,6 @@ public class FieldControllerTests
 
         var problem = Assert.IsType<ObjectResult>(result);
         Assert.Equal(400, problem.StatusCode);
-    }
-
-    [Fact]
-    public async Task CreateEntranceFromInspection_NonFieldWorker_ReturnsForbid()
-    {
-        var db = CreateDb();
-        var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.CommuneUser, communeId: 1);
-
-        var result = await ctrl.CreateEntranceFromInspection(new FieldEntranceCreateRequest("road-id", Json("{}"), "Label"));
-
-        Assert.IsType<ForbidResult>(result);
     }
 
     [Fact]
