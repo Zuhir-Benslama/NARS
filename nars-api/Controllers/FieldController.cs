@@ -1,5 +1,6 @@
 using System.Data;
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -14,6 +15,7 @@ namespace NarsApi.Controllers;
 [ApiController]
 [Route("/api")]
 [Tags("Field")]
+[Authorize(Roles = UserRoles.FieldWorker)]
 public class FieldController(
     AppDbContext db,
     ILogger<FieldController> logger,
@@ -37,11 +39,6 @@ public class FieldController(
         [FromQuery] int take = 500,
         CancellationToken cancellationToken = default)
     {
-        if (CurrentUserRole != UserRoles.FieldWorker)
-        {
-            return Forbid();
-        }
-
         var communeId = CurrentCommuneId;
         if (communeId is null)
         {
@@ -71,16 +68,6 @@ public class FieldController(
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> SubmitInspection([FromBody] FieldInspectRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null)
-        {
-            return Problem(detail: "Request body is required.", statusCode: 400);
-        }
-
-        if (CurrentUserRole != UserRoles.FieldWorker)
-        {
-            return Forbid();
-        }
-
         if (!Guid.TryParse(body.FeatureId, out var featureId))
         {
             return Problem(detail: "Invalid feature_id.", statusCode: 400);
@@ -117,11 +104,6 @@ public class FieldController(
         [FromQuery] int take = 100,
         CancellationToken cancellationToken = default)
     {
-        if (CurrentUserRole != UserRoles.FieldWorker)
-        {
-            return Forbid();
-        }
-
         take = Math.Clamp(take, 1, 500);
 
         var inspections = await db.Inspections
@@ -149,16 +131,6 @@ public class FieldController(
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> CreateEntranceFromInspection([FromBody] FieldEntranceCreateRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null)
-        {
-            return Problem(detail: "Request body is required.", statusCode: 400);
-        }
-
-        if (CurrentUserRole != UserRoles.FieldWorker)
-        {
-            return Forbid();
-        }
-
         if (!Guid.TryParse(body.RoadId, out var roadId))
         {
             return Problem(detail: "Invalid road_id.", statusCode: 400);
@@ -261,10 +233,11 @@ public class FieldController(
             : data.ToJsonString();
     }
 
+    private static readonly string[] ValidInspectionStatuses = ["good", "issue"];
+
     private IActionResult? ValidateInspectionStatus(string status)
     {
-        var validStatuses = new[] { "good", "issue" };
-        if (!validStatuses.Contains(status))
+        if (!ValidInspectionStatuses.Contains(status))
         {
             return Problem(detail: "Status must be 'good' or 'issue'.", statusCode: 400);
         }

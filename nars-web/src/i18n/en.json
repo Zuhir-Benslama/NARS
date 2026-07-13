@@ -218,5 +218,8 @@
   "su_confirm_delete": "Delete {username}?",
   "su_delete_success": "User deleted successfully.",
   "su_update_success": "User updated successfully.",
-  "su_err_update_generic": "Failed to update account."
+  "su_err_update_generic": "Failed to update account.",
+  "modal_note_main_urban": "The main urban area takes the municipality name.",
+  "modal_note_zone_type_name": "This zone uses its type name.",
+  "modal_note_city_center_name": "The city center is always named \"City Center\"."
 }

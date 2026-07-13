@@ -380,10 +380,10 @@ public class FieldControllerTests
             Id = userId,
             Username = "owner",
             Name = "Owner",
-            Email = "owner@test.com",
+            Email = "test@example.com",
             Phone = DefaultPhone,
             PasswordHash = "hash",
-            Role = "commune_user",
+            Role = UserRoles.CommuneUser,
             CommuneId = 1,
         });
         var roadId = Guid.NewGuid();
@@ -421,7 +421,7 @@ public class FieldControllerTests
             Email = "owner@test.com",
             Phone = DefaultPhone,
             PasswordHash = "hash",
-            Role = "commune_user",
+            Role = UserRoles.CommuneUser,
             CommuneId = 2,
         });
         var roadId = Guid.NewGuid();

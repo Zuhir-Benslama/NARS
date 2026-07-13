@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Moq;
 using NarsApi.Controllers;
 using NarsApi.DTOs;
+using NarsApi.Infrastructure;
 using NarsApi.Models;
 using NarsApi.Data;
 using NarsApi.Services;
@@ -32,7 +33,7 @@ public class SpatialControllerTests
         {
             HttpContext = new DefaultHttpContext
             {
-                User = AuthTestHelper.CreateClaimsPrincipal(uid, "field_worker", communeId: 1)
+                User = AuthTestHelper.CreateClaimsPrincipal(uid, UserRoles.FieldWorker, communeId: 1)
             }
         };
 
@@ -182,7 +183,7 @@ public class SpatialControllerTests
         {
             HttpContext = new DefaultHttpContext
             {
-                User = AuthTestHelper.CreateClaimsPrincipal(uid, "national_admin", communeId: null)
+                User = AuthTestHelper.CreateClaimsPrincipal(uid, UserRoles.NationalAdmin, communeId: null)
             }
         };
 

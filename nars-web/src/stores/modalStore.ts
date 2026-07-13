@@ -50,7 +50,7 @@ export const useModalStore = defineStore("modal", {
   actions: {
     /** Open the modal for creating a new feature in the given phase. */
     openCreate(phaseIndex: number, extras?: { radius?: number }) {
-      Object.assign(this, {
+      this.$patch({
         ...createDefaultModalState(),
         visible: true,
         phaseIndex,
@@ -62,7 +62,7 @@ export const useModalStore = defineStore("modal", {
 
     /** Open the modal for editing an existing feature. */
     openEdit(phaseIndex: number, dbId: string, existing: FeatureData) {
-      Object.assign(this, {
+      this.$patch({
         ...createDefaultModalState(),
         visible: true,
         phaseIndex,
@@ -96,8 +96,7 @@ export const useModalStore = defineStore("modal", {
 
     /** Reset all modal fields to defaults (without closing). */
     resetFields() {
-      const defaults = createDefaultModalState()
-      Object.assign(this, defaults)
+      this.$patch(createDefaultModalState())
     },
 
     setRoadOptions(options: RoadOption[]) {

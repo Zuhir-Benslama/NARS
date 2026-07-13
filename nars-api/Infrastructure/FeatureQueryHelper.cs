@@ -14,6 +14,7 @@ namespace NarsApi.Infrastructure;
 /// </summary>
 public static class FeatureQueryHelper
 {
+    private static readonly JsonElement EmptyJsonObject = JsonDocument.Parse("{}").RootElement;
     private static readonly string _loadFeaturesSql = BuildSql(withLayer: false);
     private static readonly string _loadByLayerSql = BuildSql(withLayer: true);
 
@@ -136,7 +137,7 @@ public static class FeatureQueryHelper
                 Layer: layerVal,
                 Label: label,
                 Data: string.IsNullOrWhiteSpace(dataJson)
-                    ? JsonDocument.Parse("{}").RootElement
+                    ? EmptyJsonObject
                     : JsonSerializer.Deserialize<JsonElement>(dataJson),
                 CreatedAt: createdAt.ToString(FeatureDtoConverter.IsoDateFormat)
             ));

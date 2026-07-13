@@ -1,11 +1,10 @@
-using System.Text.Json;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public interface IFeatureRepository
+public interface IFeatureService
 {
     /// <summary>Checks whether a road feature with the given ID exists for the user.</summary>
     Task<bool> RoadExistsAsync(Guid roadId, Guid userId, CancellationToken ct);

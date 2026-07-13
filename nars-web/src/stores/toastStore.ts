@@ -9,16 +9,15 @@ export interface ToastItem {
   type: ToastType
 }
 
-let nextToastId = 0
-
 export const useToastStore = defineStore("toast", {
   state: () => ({
     toasts: [] as ToastItem[],
+    nextId: 0,
   }),
 
   actions: {
     addToast(message: string, type: ToastType): number {
-      const id = ++nextToastId
+      const id = ++this.nextId
       this.toasts.push({ id, message, type })
       setTimeout(() => {
         this.removeToast(id)

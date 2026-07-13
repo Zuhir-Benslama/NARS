@@ -31,14 +31,19 @@ public record CreateAdminRequest(
 /// All fields are optional — only provided fields will be updated.
 /// </summary>
 public record UpdateAdminRequest(
-    [property: JsonPropertyName("name")] string? Name,
-    [property: JsonPropertyName("email")] string? Email,
-    [property: JsonPropertyName("phone")] string? Phone,
-    [property: JsonPropertyName("role")] string? Role,
+    [property: JsonPropertyName("name")]
+    [MaxLength(255)] string? Name,
+    [property: JsonPropertyName("email")]
+    [EmailAddress, MaxLength(255)] string? Email,
+    [property: JsonPropertyName("phone")]
+    [MaxLength(50)] string? Phone,
+    [property: JsonPropertyName("role")]
+    [MaxLength(20)] string? Role,
     [property: JsonPropertyName("commune_id")] int? CommuneId,
     [property: JsonPropertyName("daira_id")] int? DairaId,
     [property: JsonPropertyName("wilaya_id")] int? WilayaId,
-    [property: JsonPropertyName("password")] string? Password
+    [property: JsonPropertyName("password")]
+    [MaxLength(128)] string? Password
 );
 
 // ─── ADMIN USER SUMMARY ──────────────────────────────────────────────────────

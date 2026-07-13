@@ -23,7 +23,7 @@ public class AuthControllerTests
     private static JwtService CreateJwtService(IDateTimeProvider? timeProvider = null)
     {
         timeProvider ??= Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
-        var jwtOptions = Options.Create(new JwtOptions { ExpiresInMinutes = 60, RefreshExpiresInDays = 30 });
+        var jwtOptions = DefaultJwtOptions;
         return new JwtService(
             AuthTestHelper.TestJwtSecret,
             null,
@@ -36,7 +36,7 @@ public class AuthControllerTests
     private static AuthController CreateController(AppDbContext db)
     {
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
-        var jwtOptions = Options.Create(new JwtOptions { ExpiresInMinutes = 60, RefreshExpiresInDays = 30 });
+        var jwtOptions = DefaultJwtOptions;
         var lockoutOptions = Options.Create(new AccountLockoutOptions());
         return new AuthController(
             db,
@@ -102,7 +102,7 @@ public class AuthControllerTests
             AdminUsername: "admin",
             AdminPassword: TestData.DefaultPassword,
             Name: "Test User",
-            Email: "test@example.com",
+            Email: TestData.DefaultEmail,
             Phone: AltPhone,
             Username: "testuser",
             Password: "weak",
@@ -207,7 +207,7 @@ public class AuthControllerTests
             AdminUsername: "admin",
             AdminPassword: DefaultPassword,
             Name: "Test User",
-            Email: "test@example.com",
+            Email: TestData.DefaultEmail,
             Phone: AltPhone,
             Username: "testuser",
             Password: AltPassword,

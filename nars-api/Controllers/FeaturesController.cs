@@ -13,7 +13,7 @@ namespace NarsApi.Controllers;
 [Route("/api/features")]
 [Tags("Features")]
 public class FeaturesController(
-    IFeatureRepository featureRepo,
+    IFeatureService featureService,
     IBackgroundTaskQueue bgQueue,
     ILogger<FeaturesController> logger,
     IOptions<FeatureDefaultsOptions> featureDefaults,
@@ -30,11 +30,6 @@ public class FeaturesController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> SaveFeature([FromBody] FeatureSaveRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null)
-        {
-            return Problem(detail: "Request body is required.", statusCode: 400);
-        }
-
         if (!FeatureTypes.AllTypes.Contains(body.Type))
         {
             return Problem(detail: $"Unknown feature type '{body.Type}'.", statusCode: 400);
@@ -58,7 +53,7 @@ public class FeaturesController(
 
         var roadId = TryExtractRoadId(body);
 
-        if (roadId.HasValue && !await featureRepo.RoadExistsAsync(roadId.Value, RequiredCurrentUserId, cancellationToken))
+        if (roadId.HasValue && !await featureService.RoadExistsAsync(roadId.Value, RequiredCurrentUserId, cancellationToken))
         {
             return Problem(detail: "Referenced road not found.", statusCode: 400);
         }
@@ -72,7 +67,7 @@ public class FeaturesController(
             entrance.RoadId = roadId;
         }
 
-        await featureRepo.SaveFeatureAsync(entity, body.Type, cancellationToken);
+        await featureService.SaveFeatureAsync(entity, body.Type, cancellationToken);
 
         if (body.Type == FeatureTypes.Area)
         {
@@ -109,17 +104,12 @@ public class FeaturesController(
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> ClearFeatures([FromBody] ClearFeaturesRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null)
-        {
-            return Problem(detail: "Request body is required.", statusCode: 400);
-        }
-
         if (!body.Confirm)
         {
             return Problem(detail: "Set \"confirm\": true to delete all features.", statusCode: 400);
         }
 
-        var (total, _) = await featureRepo.ClearAllFeaturesAsync(RequiredCurrentUserId, cancellationToken);
+        var (total, _) = await featureService.ClearAllFeaturesAsync(RequiredCurrentUserId, cancellationToken);
 
         return Ok(ApiResponse.Ok($"Deleted {total} features"));
     }
@@ -154,18 +144,13 @@ public class FeaturesController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateFeature(Guid featureId, [FromBody] FeatureUpdateRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null)
-        {
-            return Problem(detail: "Request body is required.", statusCode: 400);
-        }
-
-        var featureType = await featureRepo.GetFeatureTypeAsync(featureId, cancellationToken);
+        var featureType = await featureService.GetFeatureTypeAsync(featureId, cancellationToken);
         if (featureType is null)
         {
             return Problem(detail: "Feature not found", statusCode: 404);
         }
 
-        if (!await featureRepo.OwnsFeatureAsync(featureId, featureType, RequiredCurrentUserId, cancellationToken))
+        if (!await featureService.OwnsFeatureAsync(featureId, featureType, RequiredCurrentUserId, cancellationToken))
         {
             return Problem(detail: "Feature not found", statusCode: 404);
         }
@@ -187,7 +172,7 @@ public class FeaturesController(
 
         var updatedAt = timeProvider.UtcNow;
         var command = new UpdateFeatureCommand(descriptor, featureId, RequiredCurrentUserId, body, updatedAt);
-        if (!await featureRepo.UpdateFeatureAsync(command, cancellationToken))
+        if (!await featureService.UpdateFeatureAsync(command, cancellationToken))
         {
             return Problem(detail: "Feature not found", statusCode: 404);
         }
@@ -207,13 +192,13 @@ public class FeaturesController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteFeature(Guid featureId, CancellationToken cancellationToken = default)
     {
-        var featureType = await featureRepo.GetFeatureTypeAsync(featureId, cancellationToken);
+        var featureType = await featureService.GetFeatureTypeAsync(featureId, cancellationToken);
         if (featureType is null)
         {
             return Problem(detail: "Feature not found", statusCode: 404);
         }
 
-        if (!await featureRepo.DeleteFeatureAsync(featureId, RequiredCurrentUserId, featureType, cancellationToken))
+        if (!await featureService.DeleteFeatureAsync(featureId, RequiredCurrentUserId, featureType, cancellationToken))
         {
             return Problem(detail: "Feature not found", statusCode: 404);
         }

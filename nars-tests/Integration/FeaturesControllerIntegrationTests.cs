@@ -49,7 +49,7 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var bgQueueMock = Mock.Of<IBackgroundTaskQueue>();
         var ctrl = new FeaturesController(
-            new FeatureRepository(_db),
+            new FeatureService(_db),
             bgQueueMock,
             Mock.Of<ILogger<FeaturesController>>(),
             Options.Create(new FeatureDefaultsOptions()),
@@ -58,7 +58,7 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
             Mock.Of<IWebHostEnvironment>());
         var httpContext = new DefaultHttpContext
         {
-            User = AuthTestHelper.CreateClaimsPrincipal(_userId, "commune_user", communeId: 1)
+            User = AuthTestHelper.CreateClaimsPrincipal(_userId, UserRoles.CommuneUser, communeId: 1)
         };
         ctrl.ControllerContext = new ControllerContext { HttpContext = httpContext };
         return ctrl;
@@ -285,7 +285,7 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
 
     private async Task<Guid> CreateUserAsync()
     {
-        var user = await SeedData.CreateUserAsync(_db, "commune_user", communeId: 1, name: "Features Test User");
+        var user = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: 1, name: "Features Test User");
         await SeedData.SeedBasicLocationsAsync(_db);
         return user.Id;
     }

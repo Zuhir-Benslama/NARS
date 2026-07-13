@@ -52,7 +52,7 @@ public class ValidationControllerIntegrationTests : IAsyncLifetime
             Mock.Of<IWebHostEnvironment>());
         var httpContext = new DefaultHttpContext
         {
-            User = AuthTestHelper.CreateClaimsPrincipal(userId, "commune_user", communeId: 1)
+            User = AuthTestHelper.CreateClaimsPrincipal(userId, UserRoles.CommuneUser, communeId: 1)
         };
         ctrl.ControllerContext = new ControllerContext { HttpContext = httpContext };
         return ctrl;
@@ -134,7 +134,7 @@ public class ValidationControllerIntegrationTests : IAsyncLifetime
 
     private async Task<Guid> CreateTestUserAsync()
     {
-        var user = await SeedData.CreateUserAsync(_db, "commune_user", communeId: 1, name: "Validation Test User");
+        var user = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: 1, name: "Validation Test User");
         return user.Id;
     }
 

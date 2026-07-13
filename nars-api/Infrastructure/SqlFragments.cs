@@ -108,11 +108,11 @@ internal static class SqlFragments
     /// Default alias ("f") variant for backward compatibility.
     /// New code should call PolygonFromDataWithAlias explicitly.
     /// </summary>
-    internal static string PolygonFromData => string.Format(PolygonFromDataTemplate, "f");
+    internal static string PolygonFromData { get; } = string.Format(PolygonFromDataTemplate, "f");
 
     /// <summary>
     /// Default alias ("f") variant for backward compatibility.
     /// New code should call LineStringFromDataWithAlias explicitly.
     /// </summary>
-    internal static string LineStringFromData => string.Format(LineStringFromDataTemplate, "f");
+    internal static string LineStringFromData { get; } = string.Format(LineStringFromDataTemplate, "f");
 }

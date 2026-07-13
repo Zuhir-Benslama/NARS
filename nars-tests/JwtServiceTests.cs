@@ -33,7 +33,7 @@ public class JwtServiceTests
     {
         var service = CreateService();
         var token = service.CreateToken(
-            Guid.NewGuid(), "testuser", "Test User", "test@example.com", 1);
+            Guid.NewGuid(), "testuser", "Test User", DefaultEmail, 1);
 
         Assert.NotNull(token);
         Assert.NotEmpty(token);
@@ -46,7 +46,7 @@ public class JwtServiceTests
         var service = CreateService();
         var userId = Guid.NewGuid();
         var token = service.CreateToken(
-            userId, "testuser", "Test User", "test@example.com", 42);
+            userId, "testuser", "Test User", DefaultEmail, 42);
 
         var handler = new JwtSecurityTokenHandler();
         var jwt = handler.ReadJwtToken(token);
@@ -57,7 +57,7 @@ public class JwtServiceTests
             jwt.Claims.First(c => c.Type == ClaimNames.Username).Value);
         Assert.Equal("Test User",
             jwt.Claims.First(c => c.Type == ClaimNames.Name).Value);
-        Assert.Equal("test@example.com",
+        Assert.Equal(DefaultEmail,
             jwt.Claims.First(c => c.Type == ClaimNames.Email).Value);
         Assert.Equal("42",
             jwt.Claims.First(c => c.Type == ClaimNames.CommuneId).Value);
@@ -68,7 +68,7 @@ public class JwtServiceTests
     {
         var service = CreateService();
         var token = service.CreateToken(
-            Guid.NewGuid(), "testuser", "Test User", "test@example.com", 1);
+            Guid.NewGuid(), "testuser", "Test User", DefaultEmail, 1);
 
         var principal = service.ValidateToken(token);
 
@@ -81,7 +81,7 @@ public class JwtServiceTests
     {
         var service = CreateService();
         var token = service.CreateToken(
-            Guid.NewGuid(), "testuser", "Test User", "test@example.com", 1);
+            Guid.NewGuid(), "testuser", "Test User", DefaultEmail, 1);
 
         // Tamper with the token
         var tampered = token[..^5] + "XXXXX";
@@ -101,7 +101,7 @@ public class JwtServiceTests
     {
         var issuer = CreateService(secret: "correct-secret-key-that-is-long-enough!!");
         var token = issuer.CreateToken(
-            Guid.NewGuid(), "testuser", "Test User", "test@example.com", 1);
+            Guid.NewGuid(), "testuser", "Test User", DefaultEmail, 1);
 
         var verifier = CreateService(secret: "wrong-secret-key-that-is-long-enough-32chars!!");
 
@@ -140,7 +140,7 @@ public class JwtServiceTests
     {
         var expiredService = CreateService(expiresMinutes: -1);
         var token = expiredService.CreateToken(
-            Guid.NewGuid(), "testuser", "Test User", "test@example.com", 1);
+            Guid.NewGuid(), "testuser", "Test User", DefaultEmail, 1);
 
         var principal = expiredService.ValidateToken(token);
 

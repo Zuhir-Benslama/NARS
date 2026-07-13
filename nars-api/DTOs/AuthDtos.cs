@@ -45,19 +45,27 @@ public record PagedResponse<T>(
 /// </summary>
 public record AuthorizedAdminSignupRequest(
     // ── Authorizing admin ────────────────────────────────────────────────────
+    [property: JsonPropertyName("admin_username")]
     [Required(AllowEmptyStrings = false)] string AdminUsername,
+    [property: JsonPropertyName("admin_password")]
     [Required(AllowEmptyStrings = false)] string AdminPassword,
     // ── New account details ──────────────────────────────────────────────────
+    [property: JsonPropertyName("name")]
     [Required(AllowEmptyStrings = false)] string Name,
+    [property: JsonPropertyName("email")]
     [Required(AllowEmptyStrings = false), EmailAddress] string Email,
+    [property: JsonPropertyName("phone")]
     [Required(AllowEmptyStrings = false)] string Phone,
+    [property: JsonPropertyName("username")]
     [Required(AllowEmptyStrings = false)] string Username,
+    [property: JsonPropertyName("password")]
     [Required(AllowEmptyStrings = false)] string Password,
+    [property: JsonPropertyName("role")]
     [Required(AllowEmptyStrings = false)] string Role,
     // ── Geographic anchor (one required depending on role) ───────────────────
-    int? CommuneId,
-    int? DairaId,
-    int? WilayaId
+    [property: JsonPropertyName("commune_id")] int? CommuneId,
+    [property: JsonPropertyName("daira_id")] int? DairaId,
+    [property: JsonPropertyName("wilaya_id")] int? WilayaId
 );
 public record SignInRequest(
     [Required(AllowEmptyStrings = false)] string Username,
@@ -65,9 +73,12 @@ public record SignInRequest(
 );
 
 public record UpdateUserRequest(
-    [property: JsonPropertyName("username")] string? Username,
-    [property: JsonPropertyName("email")] string? Email,
-    [property: JsonPropertyName("password")] string? Password
+    [property: JsonPropertyName("username")]
+    [MaxLength(100)] string? Username,
+    [property: JsonPropertyName("email")]
+    [EmailAddress, MaxLength(255)] string? Email,
+    [property: JsonPropertyName("password")]
+    [MaxLength(128)] string? Password
 );
 
 // ─── RESPONSE DTOs ────────────────────────────────────────────────────────────

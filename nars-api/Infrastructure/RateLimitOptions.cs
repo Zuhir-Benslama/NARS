@@ -45,6 +45,15 @@ public static class RateLimitExtensions
         {
             rateOptions.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
+            rateOptions.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = options.ApiPermitLimit,
+                        Window = TimeSpan.FromMinutes(options.ApiWindowMinutes),
+                    }));
+
             rateOptions.AddSlidingWindowLimiter("auth", limiter =>
             {
                 limiter.PermitLimit = options.AuthPermitLimit;

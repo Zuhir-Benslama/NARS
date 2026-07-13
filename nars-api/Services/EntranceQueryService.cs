@@ -14,7 +14,7 @@ public class EntranceQueryService(AppDbContext db) : IEntranceQueryService
         await using var handle = await conn.EnsureOpenAsync(ct);
 
         var heTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.HouseEntrance)?.TableName ?? "house_entrances";
-        using var cmd = conn.CreateCommand();
+        await using var cmd = conn.CreateCommand();
         cmd.CommandText = $@"
             SELECT (data::jsonb->>'entranceNumber')::int
             FROM {heTable}
@@ -26,7 +26,7 @@ public class EntranceQueryService(AppDbContext db) : IEntranceQueryService
         SqlFragments.AddParam(cmd, "@rid", roadId);
         SqlFragments.AddParam(cmd, "@layer", FeatureTypes.HouseEntranceLayers.Main);
 
-        using var reader = await cmd.ExecuteReaderAsync(ct);
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
         while (await reader.ReadAsync(ct))
         {
             if (!await reader.IsDBNullAsync(0, ct))

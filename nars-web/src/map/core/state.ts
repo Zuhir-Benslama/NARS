@@ -154,13 +154,15 @@ export const featuresStore: {
         properties: f.properties,
       })),
     }
-    debugLog("[STORE] updateSource - features count:", data.features.length)
-    const geomTypes = new Map<string, number>()
-    for (const f of data.features) {
-      const t = f.geometry?.type ?? "null"
-      geomTypes.set(t, (geomTypes.get(t) || 0) + 1)
+    if (import.meta.env.DEV) {
+      debugLog("[STORE] updateSource - features count:", data.features.length)
+      const geomTypes = new Map<string, number>()
+      for (const f of data.features) {
+        const t = f.geometry?.type ?? "null"
+        geomTypes.set(t, (geomTypes.get(t) || 0) + 1)
+      }
+      debugLog("[STORE] Geometry types:", Object.fromEntries(geomTypes))
     }
-    debugLog("[STORE] Geometry types:", Object.fromEntries(geomTypes))
 
     try {
       ctx.featuresSource?.setData(data)

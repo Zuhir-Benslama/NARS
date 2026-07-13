@@ -46,10 +46,12 @@ fi
 
 # Fallback values — only used if .env is missing and system has neither
 # openssl nor python3 (unlikely on any modern OS).
-POSTGRES_PASSWORD  ?= changeme_postgres_$(shell date +%s)
-JWT_SECRET         ?= changeme_jwt_secret_key_must_be_32_chars_long!
-GPG_PASSPHRASE     ?= changeme_gpg_passphrase_32_characters_long!
-GRAFANA_PASSWORD   ?= changeme_grafana_admin_$(shell date +%s)
+# Empty defaults ensure secrets-protect targets fail fast rather than
+# proceeding with guessable credentials.
+POSTGRES_PASSWORD  ?=
+JWT_SECRET         ?=
+GPG_PASSPHRASE     ?=
+GRAFANA_PASSWORD   ?=
 export POSTGRES_PASSWORD JWT_SECRET GPG_PASSPHRASE GRAFANA_PASSWORD
 
 .PHONY: help _build-nars-api _build-nars-postgis _build-nars-vite db-get-pod db-get-password
@@ -69,10 +71,17 @@ prerequisites: ## Check that all required tools are installed
 	@command -v docker >/dev/null 2>&1 || { echo "✖ docker is not installed"; exit 1; }
 	@echo "✓ All prerequisites met"
 
+.PHONY: _check-secrets
+_check-secrets: ## Fail fast if critical secrets are empty (prevents deploying with insecure defaults)
+	@if [ -z "$(POSTGRES_PASSWORD)" ] || [ -z "$(JWT_SECRET)" ]; then \
+		echo "✖ Secrets not configured — run 'make .env' to generate them"; \
+		exit 1; \
+	fi
+
 # ─── Cluster Lifecycle ──────────────────────────────────────
 
 .PHONY: cluster-up
-cluster-up: prerequisites ## Full bootstrap: create cluster, build images, deploy everything
+cluster-up: prerequisites _check-secrets ## Full bootstrap: create cluster, build images, deploy everything
 	$(MAKE) cluster-create
 	$(MAKE) kubeconfig-fix
 	$(MAKE) ingress-install
@@ -135,17 +144,12 @@ _pre-cluster-down-backup:
 		echo "  ⚠ Could not read DB password — skipping backup"; \
 		exit 0; \
 	fi; \
-	mkdir -p "$(BACKUP_DIR)"; \
-	TIMESTAMP=$$(date +"%Y%m%d_%H%M%S"); \
-	FILE="$(BACKUP_DIR)/nars_db_$${TIMESTAMP}.sql"; \
-	$(KUBECTL) exec "$$POD" -n "$(NAMESPACE)" -- env PGPASSWORD="$$PASS" \
-		pg_dump -U postgres -d "$(DB_NAME)" --no-owner > "$$FILE" 2>/dev/null; \
+	$(_pg_dump_cmd); \
 	if [ ! -s "$$FILE" ]; then \
 		echo "✖ Auto-backup FAILED — refusing to tear down cluster"; \
 		rm -f "$$FILE"; \
 		exit 1; \
 	fi; \
-	gzip -f "$$FILE"; \
 	echo "✓ Auto-backup saved: $${FILE}.gz"
 
 .PHONY: cluster-rebuild
@@ -185,6 +189,9 @@ cluster-status: ## Show cluster resources
 	@echo ""
 	@echo "=== Namespace: $(NAMESPACE) ==="
 	@$(KUBECTL) get all,ingress,pvc -n "$(NAMESPACE)" 2>/dev/null || echo "(not deployed)"
+	@echo ""
+	@echo "=== Namespace: $(OBSERVABILITY_NAMESPACE) ==="
+	@$(KUBECTL) get all,pods -n "$(OBSERVABILITY_NAMESPACE)" 2>/dev/null || echo "(not deployed)"
 	@echo ""
 	@echo "=== Endpoints ==="
 	@$(KUBECTL) get endpoints -n "$(NAMESPACE)" 2>/dev/null || true
@@ -227,7 +234,7 @@ proxy-up: port-forward-start ## Start Docker socat bridge: host:8080 → kind:80
 		--network kind \
 		--entrypoint sh \
 		alpine/socat \
-		-c "socat tcp-l:8080,fork,reuseaddr tcp:nars-control-plane:8080 & socat tcp-l:8443,fork,reuseaddr tcp:nars-control-plane:8443 & wait" > /dev/null
+		-c "socat tcp-l:8080,fork,reuseaddr tcp:nars-control-plane:8080 & socat tcp-l:8443,fork,reuseaddr tcp:nars-control-plane:8443 & wait -n" > /dev/null
 	@echo "→ Waiting for proxy to be ready..."
 	@for i in $$(seq 1 12); do \
 		status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:8080/ 2>/dev/null || echo "000"); \
@@ -371,6 +378,15 @@ cluster-restart: cluster-stop cluster-start ## Stop all pods, then start them ag
 
 # ─── Database Backup / Restore ──────────────────────────────
 
+# Shared pg_dump + gzip logic. Expects $$POD and $$PASS to be set in shell scope.
+_pg_dump_cmd = \
+	mkdir -p "$(BACKUP_DIR)"; \
+	TIMESTAMP=$$(date +"%Y%m%d_%H%M%S"); \
+	FILE="$(BACKUP_DIR)/nars_db_$${TIMESTAMP}.sql"; \
+	$(KUBECTL) exec "$$POD" -n "$(NAMESPACE)" -- env PGPASSWORD="$$PASS" \
+		pg_dump -U postgres -d "$(DB_NAME)" --no-owner > "$$FILE"; \
+	gzip -f "$$FILE"
+
 .PHONY: db-get-pod
 db-get-pod: ## Get the postgis pod name
 	@$(POSTGIS_GET_POD_CMD) || echo ""
@@ -387,13 +403,8 @@ db-backup: ## Dump the PostGIS database to a local file
 	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found in namespace '$(NAMESPACE)'"; exit 1; fi
 	@PASS=$$($(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
 		-o jsonpath='{.data.postgres_password}' | base64 -d)
-	@mkdir -p "$(BACKUP_DIR)"
-	@TIMESTAMP=$$(date +"%Y%m%d_%H%M%S")
-	@FILE="$(BACKUP_DIR)/nars_db_$${TIMESTAMP}.sql"
 	@echo "→ Backing up database '$(DB_NAME)' from pod $$POD..."
-	@$(KUBECTL) exec "$$POD" -n "$(NAMESPACE)" -- env PGPASSWORD="$$PASS" \
-		pg_dump -U postgres -d "$(DB_NAME)" --no-owner > "$$FILE"
-	@gzip -f "$$FILE"
+	@$(_pg_dump_cmd)
 	@echo "✓ Backup saved: $${FILE}.gz"
 	@ls -lh "$${FILE}.gz"
 
@@ -462,7 +473,7 @@ cluster-create: ## Create the kind cluster with host-mounted postgis data (idemp
 	else
 		echo "→ Creating postgis data directory at $(POSTGRES_DATA_DIR)..."
 		mkdir -p "$(POSTGRES_DATA_DIR)"
-		chmod 777 "$(POSTGRES_DATA_DIR)" 2>/dev/null || true
+		chmod 750 "$(POSTGRES_DATA_DIR)" 2>/dev/null || true
 		echo "→ Generating kind config..."
 		DATA_DIR="$(POSTGRES_DATA_DIR)"
 		if echo "$$DATA_DIR" | grep -qv '^/'; then
@@ -658,7 +669,7 @@ secrets-validate: ## Fail if kustomize output contains placeholder values (REPLA
 	echo "✓ No placeholder values found"
 
 .PHONY: secrets-apply
-secrets-apply: .env namespace-ensure ## Create nars-secrets and regcred with generated/variable values
+secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and regcred with generated/variable values
 # SECURITY: Uses temp files instead of --from-literal to avoid secret
 # exposure in `ps aux` / CI logs. Files are cleaned up on exit.
 	@echo "→ Creating 'nars-secrets'..."
@@ -696,11 +707,11 @@ kustomize-set-image-tag: ## Pin all kustomize image tags to IMAGE_TAG (e.g. IMAG
 		echo "  ⚠ IMAGE_TAG=$(IMAGE_TAG) is 'latest' — not pinning. Set IMAGE_TAG=<commit-sha> for reproducible deployments."; \
 	else \
 		echo "→ Pinning kustomize image tags to $(IMAGE_TAG)..."; \
-		cd "$(K8S_DIR)" && \
+		(cd "$(K8S_DIR)" && \
 		kustomize edit set image \
 			$(DOCKER_ORG)/nars-api=$(DOCKER_ORG)/nars-api:$(IMAGE_TAG) \
 			$(DOCKER_ORG)/nars-postgis=$(DOCKER_ORG)/nars-postgis:$(IMAGE_TAG) \
-			$(DOCKER_ORG)/nars-vite=$(DOCKER_ORG)/nars-vite:$(IMAGE_TAG); \
+			$(DOCKER_ORG)/nars-vite=$(DOCKER_ORG)/nars-vite:$(IMAGE_TAG)); \
 		echo "✓ Image tags pinned to $(IMAGE_TAG)"; \
 	fi
 
@@ -745,12 +756,11 @@ kustomize-apply: secrets-validate ## Apply k8s manifests via kustomize (pin tags
 
 .PHONY: postgis-password-sync
 postgis-password-sync: ## Align postgres user password with POSTGRES_PASSWORD (for persisted volumes)
-# PGPASSWORD is visible in the host process table (kubectl CLI limitation),
-# but within the pod it's an env var — not in psql's argv.
+# Password piped via stdin to avoid exposure in kubectl's remote command arguments.
 	@echo "→ Syncing postgres password..."
-	@$(KUBECTL) exec -i -n "$(NAMESPACE)" deployment/postgis -- \
-		env PGPASSWORD="$(POSTGRES_PASSWORD)" \
-		bash -c 'printf "ALTER USER postgres WITH PASSWORD '\''%s'\'';\n" "$$PGPASSWORD" | psql -U postgres -d postgres -v ON_ERROR_STOP=1' >/dev/null
+	@printf '%s\n' "$(POSTGRES_PASSWORD)" | \
+		$(KUBECTL) exec -i -n "$(NAMESPACE)" deployment/postgis -- \
+		bash -c 'read -r _pgpw; printf "ALTER USER postgres WITH PASSWORD '\''%s'\'';\n" "$$_pgpw" | psql -U postgres -d postgres -v ON_ERROR_STOP=1' >/dev/null
 	@echo "✓ Postgres password synced"
 
 .PHONY: postgis-migration-baseline
@@ -797,7 +807,7 @@ postgis-migration-baseline: ## Backfill EF migration history for pre-existing sc
 
 	    IF has_areas AND has_inspections THEN
 	        INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
-	        VALUES ('20260515165724_SyncPendingModelChanges', '10.0.7')
+	        VALUES ('20260705061915_MigrateToTimestamptz', '10.0.7')
 	        ON CONFLICT ("MigrationId") DO NOTHING;
 	    END IF;
 	END $$$$;
@@ -987,8 +997,13 @@ observability-stop: ## Stop observability port-forwards
 	@echo "✓ Port-forwards stopped"
 
 .PHONY: grafana-password
-grafana-password: ## Show the generated Grafana admin password (stderr only)
-	@echo "$(GRAFANA_PASSWORD)" >&2
+grafana-password: ## Show the generated Grafana admin password (stderr only, non-CI safe)
+	@if [ -t 2 ]; then \
+		echo "$(GRAFANA_PASSWORD)" >&2; \
+	else \
+		echo "⚠ Refusing to print password to non-tty stderr (use 'make grafana-password' interactively)" >&2; \
+		exit 1; \
+	fi
 
 # ─── Code Quality (nars-infra) ──────────────────────────────
 
@@ -1043,6 +1058,9 @@ IMAGE_TAG ?= latest
 
 .PHONY: images-build
 images-build: ## Build all Docker images
+	@if echo "$(IMAGE_TAG)" | grep -qi "latest"; then \
+		echo "  ⚠ IMAGE_TAG=$(IMAGE_TAG) — set IMAGE_TAG=<commit-sha> for CI/CD builds"; \
+	fi
 	@echo "→ Building images..."
 	$(MAKE) _build-nars-api
 	$(MAKE) _build-nars-postgis
@@ -1069,6 +1087,9 @@ _build-nars-vite:
 
 .PHONY: images-push
 images-push: ## Push all Docker images to registry
+	@if echo "$(IMAGE_TAG)" | grep -qi "latest"; then \
+		echo "  ⚠ Pushing 'latest' tag — set IMAGE_TAG=<commit-sha> for CI/CD builds"; \
+	fi
 	@	for img in $(REGISTRY_IMAGES); do
 		echo "→ Pushing $(DOCKER_ORG)/$$img:$(IMAGE_TAG)..."
 		docker push "$(DOCKER_ORG)/$$img:$(IMAGE_TAG)"
@@ -1077,6 +1098,9 @@ images-push: ## Push all Docker images to registry
 
 .PHONY: images-load
 images-load: ## Load locally built Docker images into the kind cluster
+	@if echo "$(IMAGE_TAG)" | grep -qi "latest"; then \
+		echo "  ⚠ Loading 'latest' tag — set IMAGE_TAG=<commit-sha> for CI/CD builds"; \
+	fi
 	@for img in $(REGISTRY_IMAGES); do
 		full="$(DOCKER_ORG)/$$img:$(IMAGE_TAG)"
 		if docker image inspect "$$full" >/dev/null 2>&1; then

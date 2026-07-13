@@ -25,7 +25,9 @@ grafana:
 prometheus:
   prometheusSpec:
     serviceMonitorSelectorNilUsesHelmValues: false
-    serviceMonitorSelector: {}
+    serviceMonitorSelector:
+      matchLabels:
+        release: prometheus-stack
     resources:
       requests:
         cpu: 100m

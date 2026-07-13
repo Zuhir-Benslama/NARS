@@ -21,8 +21,8 @@ public static class CorsCompressionExtensions
         services.AddCors(options =>
             options.AddDefaultPolicy(policy =>
                 policy.WithOrigins(allowedOrigins)
-                      .AllowAnyMethod()
-                      .AllowAnyHeader()
+                      .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                      .WithHeaders("Authorization", "Content-Type", "X-CSRF-Token")
                       .AllowCredentials()
             )
         );

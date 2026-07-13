@@ -69,7 +69,7 @@ public class AdminController(
                     var daira = await db.Dairas.FindAsync([dairaId], cancellationToken);
                     if (daira is null || daira.WilayaId != CurrentWilayaId)
                     {
-                        return Forbid();
+                        return NotFound();
                     }
 
                     break;

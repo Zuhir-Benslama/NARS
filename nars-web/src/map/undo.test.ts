@@ -16,7 +16,7 @@ vi.mock("../lib/toast", () => ({
   showToast: mockToast,
 }))
 
-vi.mock("./features/features", () => ({
+vi.mock("./features/feature-data", () => ({
   toApiSaveShape: mockToApiSaveShape,
 }))
 

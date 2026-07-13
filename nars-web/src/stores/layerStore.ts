@@ -25,6 +25,16 @@ function createInitialState(): LayerState {
   }
 }
 
+const LAYER_KEYS = Object.keys(createInitialState()) as (keyof LayerState)[]
+
+// Module-level cache for the feature map — invalidated on mutations.
+let _featureMapDirty = true
+let _cachedFeatureMap: Map<string, { layer: keyof LayerState; entry: LayerEntry }> | null = null
+
+function invalidateFeatureMap(): void {
+  _featureMapDirty = true
+}
+
 export const useLayerStore = defineStore("layer", {
   state: (): LayerState => createInitialState(),
 
@@ -51,15 +61,19 @@ export const useLayerStore = defineStore("layer", {
     publicSpaceCount: (state) => state.publicSpaces.length,
     namingPanelCount: (state) => state.namingPanels.length,
 
-    /** Map of dbId → { layer, entry } for O(1) lookups via getFeature(). */
+    /** Map of dbId → { layer, entry } for O(1) lookups via getFeature(). Cached. */
     _featureMap(state): Map<string, { layer: keyof LayerState; entry: LayerEntry }> {
+      if (!_featureMapDirty && _cachedFeatureMap) {
+        return _cachedFeatureMap
+      }
       const map = new Map<string, { layer: keyof LayerState; entry: LayerEntry }>()
-      const layerKeys = Object.keys(createInitialState()) as (keyof LayerState)[]
-      for (const key of layerKeys) {
+      for (const key of LAYER_KEYS) {
         for (const entry of state[key]) {
           map.set(entry.dbId, { layer: key, entry })
         }
       }
+      _cachedFeatureMap = map
+      _featureMapDirty = false
       return map
     },
   },
@@ -67,22 +81,28 @@ export const useLayerStore = defineStore("layer", {
   actions: {
     addFeature(layer: keyof LayerState, entry: LayerEntry) {
       this[layer].push(entry)
+      invalidateFeatureMap()
     },
 
     removeFeature(layer: keyof LayerState, dbId: string) {
       const idx = this[layer].findIndex((e) => e.dbId === dbId)
-      if (idx !== -1) this[layer].splice(idx, 1)
+      if (idx !== -1) {
+        this[layer].splice(idx, 1)
+        invalidateFeatureMap()
+      }
     },
 
     updateFeature(layer: keyof LayerState, dbId: string, data: Partial<LayerEntry["data"]>) {
       const entry = this[layer].find((e) => e.dbId === dbId)
       if (entry) {
         Object.assign(entry.data, data)
+        invalidateFeatureMap()
       }
     },
 
     clearLayer(layer: keyof LayerState) {
       this[layer] = []
+      invalidateFeatureMap()
     },
 
     getFeature(dbId: string): LayerEntry | null {
@@ -91,6 +111,7 @@ export const useLayerStore = defineStore("layer", {
 
     reset() {
       this.$reset()
+      invalidateFeatureMap()
     },
   },
 })

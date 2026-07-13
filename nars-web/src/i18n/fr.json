@@ -218,5 +218,8 @@
   "su_confirm_delete": "Supprimer {username}?",
   "su_delete_success": "Utilisateur supprimé avec succès.",
   "su_update_success": "Utilisateur mis à jour avec succès.",
-  "su_err_update_generic": "Échec de la mise à jour du compte."
+  "su_err_update_generic": "Échec de la mise à jour du compte.",
+  "modal_note_main_urban": "La zone urbaine principale porte le nom de la commune.",
+  "modal_note_zone_type_name": "Cette zone utilise le nom de son type.",
+  "modal_note_city_center_name": "Le centre-ville est toujours nommé \"Centre-ville\"."
 }

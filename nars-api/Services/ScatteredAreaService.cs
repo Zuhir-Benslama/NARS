@@ -103,7 +103,7 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
             await db.SaveChangesAsync(cancellationToken);
             await tx.CommitAsync(cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             lock (_errorLock) _lastError = (DateTimeOffset.UtcNow, ex.Message);
             logger.LogError(ex, "ScatteredAreaService refresh failed for user {UserId}, commune {CommuneId}", userId, communeId);

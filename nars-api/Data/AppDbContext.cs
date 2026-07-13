@@ -92,7 +92,19 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         // ── refresh_tokens: index on token_hash for efficient refresh lookups ──
         modelBuilder.Entity<RefreshToken>()
             .HasIndex(rt => rt.TokenHash)
+            .IsUnique()
             .HasDatabaseName("ix_refresh_tokens_token_hash");
+
+        // ── error_logs: indexes for common query patterns ────────────────────
+        modelBuilder.Entity<ErrorLog>()
+            .HasIndex(el => el.UserId)
+            .HasDatabaseName("ix_error_logs_user_id");
+        modelBuilder.Entity<ErrorLog>()
+            .HasIndex(el => el.Level)
+            .HasDatabaseName("ix_error_logs_level");
+        modelBuilder.Entity<ErrorLog>()
+            .HasIndex(el => el.CreatedAt)
+            .HasDatabaseName("ix_error_logs_created_at");
 
         // ── inspections: index on feature_id for history lookups ──────────────
         modelBuilder.Entity<Inspection>()

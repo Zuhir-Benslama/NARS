@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Moq;
 using NarsApi.Data;
 using NarsApi.Infrastructure;
@@ -82,5 +84,18 @@ public static class AuthTestHelper
         }
 
         return new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth"));
+    }
+
+    public static void SetUser<T>(T controller, Guid userId, string role,
+        int? communeId = null, int? dairaId = null, int? wilayaId = null, string? username = null)
+        where T : ControllerBase
+    {
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = CreateClaimsPrincipal(userId, role, communeId, dairaId, wilayaId, username ?? "testuser")
+            }
+        };
     }
 }

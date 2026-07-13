@@ -6,8 +6,8 @@ namespace NarsApi.Services;
 
 public class UserProfileService(AppDbContext db) : IUserProfileService
 {
-    public Task<User?> GetUserByIdAsync(Guid userId, CancellationToken ct = default) =>
-        db.Users.FindAsync([userId], ct).AsTask()!;
+    public async Task<User?> GetUserByIdAsync(Guid userId, CancellationToken ct = default) =>
+        await db.Users.FindAsync([userId], ct);
 
     public Task<bool> IsUsernameTakenAsync(string username, CancellationToken ct = default) =>
         db.Users.AnyAsync(u => u.Username == username, ct);

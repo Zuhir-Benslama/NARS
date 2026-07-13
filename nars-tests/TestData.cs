@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Options;
 using NarsApi.Data;
+using NarsApi.Infrastructure;
 
 namespace NarsApi.Tests;
 
@@ -17,6 +19,11 @@ public static class TestData
 
     // ── Names & emails ─────────────────────────────────────────────────
     public const string DefaultEmail = "test@example.com";
+    public const string AltEmail = "test@test.com";
+
+    // ── JWT ────────────────────────────────────────────────────────────
+    public static IOptions<JwtOptions> DefaultJwtOptions { get; } =
+        Options.Create(new JwtOptions { ExpiresInMinutes = 60, RefreshExpiresInDays = 30 });
 
     // ── Location IDs ───────────────────────────────────────────────────
     public const int CommuneId1 = 1;

@@ -1,5 +1,6 @@
 import { NarsError, type ErrorContext } from "./errors"
 import { getApiBaseUrl, isDev } from "../config"
+import { getCsrfToken } from "./csrf"
 import { debugWarn } from "../utils/debug"
 
 interface LogEntry {
@@ -19,12 +20,6 @@ const REQUEST_TIMEOUT_MS = 5_000
 const batch: LogEntry[] = []
 let timer: ReturnType<typeof setTimeout> | null = null
 let flushing = false
-
-/** Read CSRF token from <meta>. Duplicated here to avoid circular dependency with api/. */
-function getCsrfToken(): string | null {
-  const meta = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
-  return meta?.content ?? null
-}
 
 function push(entry: LogEntry): void {
   batch.push(entry)
@@ -77,12 +72,11 @@ if (typeof window !== "undefined") {
   window.addEventListener("beforeunload", () => {
     if (timer) clearTimeout(timer)
     if (batch.length > 0) {
-      const headers: Record<string, string> = { "Content-Type": "application/json" }
       const csrfToken = getCsrfToken()
-      if (csrfToken) headers["X-CSRF-Token"] = csrfToken
+      const qs = csrfToken ? `?csrf=${encodeURIComponent(csrfToken)}` : ""
 
       const blob = new Blob([JSON.stringify({ logs: batch })], { type: "application/json" })
-      navigator.sendBeacon(`${getApiBaseUrl()}/api/logs`, blob)
+      navigator.sendBeacon(`${getApiBaseUrl()}/api/logs${qs}`, blob)
     }
   })
 }

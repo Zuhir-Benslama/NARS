@@ -56,7 +56,7 @@ public class RefreshTokenServiceTests
 
     private static TestableRefreshTokenService CreateService(AppDbContext db, IJwtService? jwt = null, IDateTimeProvider? timeProvider = null)
     {
-        var jwtOptions = Options.Create(new JwtOptions { ExpiresInMinutes = 60, RefreshExpiresInDays = 30 });
+        var jwtOptions = DefaultJwtOptions;
         return new TestableRefreshTokenService(
             db,
             jwt ?? CreateJwtMock().Object,
@@ -72,10 +72,10 @@ public class RefreshTokenServiceTests
             Id = UserId,
             Username = "testuser",
             Name = "Test User",
-            Email = "test@test.com",
+            Email = AltEmail,
             Phone = DefaultPhone,
             PasswordHash = "hash",
-            Role = "commune_user",
+            Role = UserRoles.CommuneUser,
             CommuneId = 1,
         });
         const string raw = "valid-refresh-token";
@@ -131,7 +131,7 @@ public class RefreshTokenServiceTests
     [Fact]
     public async Task RotateRefreshTokenAsync_ValidToken_ReturnsSuccessWithNewToken()
     {
-        var (svc, db, raw) = await SeedWithValidTokenAsync();
+        var (svc, _, raw) = await SeedWithValidTokenAsync();
 
         var result = await svc.RotateRefreshTokenAsync(raw);
 
@@ -178,10 +178,10 @@ public class RefreshTokenServiceTests
                 Id = uid,
                 Username = "testuser",
                 Name = "Test User",
-                Email = "test@test.com",
+                Email = AltEmail,
                 Phone = DefaultPhone,
                 PasswordHash = "hash",
-                Role = "commune_user",
+                Role = UserRoles.CommuneUser,
                 CommuneId = 1,
             });
         }

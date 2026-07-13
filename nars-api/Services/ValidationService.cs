@@ -52,7 +52,7 @@ public class ValidationService : IValidationService
                       )
             )";
         var result = await ExecuteScalarAsync(sql, [("@uid", (object)userId), ("@wkt", wkt), ("@maxDist", maxDistanceMeters)], ct);
-        return Convert.ToBoolean(result);
+        return result is bool b && b;
     }
 
     public async Task<bool> CheckDistrictCoverageAsync(Guid userId, double toleranceMeters, CancellationToken ct = default)

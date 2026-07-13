@@ -6,8 +6,7 @@ namespace NarsApi.Models;
 [Table("error_logs")]
 public class ErrorLog
 {
-    [Key]
-    [Column("id")]
+    [Key, Column("id")]
     public Guid Id { get; set; }
 
     [Column("user_id")]

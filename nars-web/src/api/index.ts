@@ -13,19 +13,12 @@ import {
   logError,
 } from "../lib/errors"
 import { API_CONFIG, getApiBaseUrl, getLoginPath } from "../config"
+import { getCsrfToken } from "../lib/csrf"
 import { debugLog } from "../utils/debug"
 
 const DEFAULT_TIMEOUT = API_CONFIG.defaultTimeout
 
 export const apiUrl = (path: string): string => `${getApiBaseUrl()}${path}`
-
-// ─── CSRF TOKEN ───────────────────────────────────────────────────────────────
-
-/** Read CSRF token from <meta name="csrf-token"> set by the server. */
-function getCsrfToken(): string | null {
-  const meta = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
-  return meta?.content ?? null
-}
 
 // ─── ERROR RESPONSE PARSING ───────────────────────────────────────────────────
 

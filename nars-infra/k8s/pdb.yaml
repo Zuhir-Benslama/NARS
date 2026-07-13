@@ -51,7 +51,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: otel-collector
-  namespace: nars
+  namespace: observability
   labels:
     app.kubernetes.io/name: opentelemetry-collector
     app.kubernetes.io/component: observability

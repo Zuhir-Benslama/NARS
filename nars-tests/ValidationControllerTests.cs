@@ -35,7 +35,7 @@ public class ValidationControllerTests
             {
                 HttpContext = new DefaultHttpContext
                 {
-                    User = AuthTestHelper.CreateClaimsPrincipal(UserId, "field_worker", communeId: 1)
+                    User = AuthTestHelper.CreateClaimsPrincipal(UserId, UserRoles.FieldWorker, communeId: 1)
                 }
             }
         };
@@ -174,7 +174,8 @@ public class ValidationControllerTests
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<ValidateRoadResponse>(ok.Value);
         Assert.False(resp.Valid);
-        Assert.Contains("turn", resp.Error?.ToLowerInvariant() ?? "");
+        Assert.NotNull(resp.Error);
+        Assert.Contains("turn", resp.Error, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -214,7 +215,8 @@ public class ValidationControllerTests
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<ValidateRoadResponse>(ok.Value);
         Assert.False(resp.Valid);
-        Assert.Contains("connect", resp.Error?.ToLowerInvariant() ?? "");
+        Assert.NotNull(resp.Error);
+        Assert.Contains("connect", resp.Error, StringComparison.OrdinalIgnoreCase);
     }
 
     // ── POST /api/validate/district ───────────────────────────────────────
@@ -287,7 +289,8 @@ public class ValidationControllerTests
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<ValidateDistrictResponse>(ok.Value);
         Assert.False(resp.Valid);
-        Assert.Contains("overlap", resp.Error?.ToLowerInvariant() ?? "");
+        Assert.NotNull(resp.Error);
+        Assert.Contains("overlap", resp.Error, StringComparison.OrdinalIgnoreCase);
     }
 
     // ── GET /api/validate/districts/coverage ──────────────────────────────

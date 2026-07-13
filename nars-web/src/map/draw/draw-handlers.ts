@@ -111,21 +111,34 @@ function findNearestFeatureAtPoint(
     const fDbId = f.properties?.dbId
     if (!fDbId || !fPhaseKey) continue
 
-    if (fPhaseKey === "roads" || fPhaseKey === "houseEntrances") {
-      if (f.geometry.type === "Point") {
-        const point = ctx.map.project([f.geometry.coordinates[0], f.geometry.coordinates[1]])
-        const dist = Math.sqrt((point.x - px) ** 2 + (point.y - py) ** 2)
+    if (f.geometry.type === "Point") {
+      const point = ctx.map.project([f.geometry.coordinates[0], f.geometry.coordinates[1]])
+      const dist = Math.sqrt((point.x - px) ** 2 + (point.y - py) ** 2)
+      if (dist < nearestDist) {
+        nearestDist = dist
+        nearestDbId = fDbId
+        nearestPhaseKey = fPhaseKey
+      }
+    }
+    if (f.geometry.type === "LineString") {
+      const coords = f.geometry.coordinates as [number, number][]
+      for (let i = 0; i < coords.length - 1; i++) {
+        const p1 = ctx.map.project([coords[i][0], coords[i][1]])
+        const p2 = ctx.map.project([coords[i + 1][0], coords[i + 1][1]])
+        const dist = pointToSegmentDist(px, py, p1.x, p1.y, p2.x, p2.y)
         if (dist < nearestDist) {
           nearestDist = dist
           nearestDbId = fDbId
           nearestPhaseKey = fPhaseKey
         }
       }
-      if (f.geometry.type === "LineString") {
-        const coords = f.geometry.coordinates as [number, number][]
-        for (let i = 0; i < coords.length - 1; i++) {
-          const p1 = ctx.map.project([coords[i][0], coords[i][1]])
-          const p2 = ctx.map.project([coords[i + 1][0], coords[i + 1][1]])
+    }
+    if (f.geometry.type === "Polygon") {
+      const rings = (f.geometry as GeoJSON.Polygon).coordinates
+      for (const ring of rings) {
+        for (let i = 0; i < ring.length - 1; i++) {
+          const p1 = ctx.map.project(ring[i] as [number, number])
+          const p2 = ctx.map.project(ring[i + 1] as [number, number])
           const dist = pointToSegmentDist(px, py, p1.x, p1.y, p2.x, p2.y)
           if (dist < nearestDist) {
             nearestDist = dist

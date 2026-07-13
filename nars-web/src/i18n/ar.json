@@ -218,5 +218,8 @@
   "su_confirm_delete": "حذف {username}؟",
   "su_delete_success": "تم حذف المستخدم بنجاح.",
   "su_update_success": "تم تحديث المستخدم بنجاح.",
-  "su_err_update_generic": "فشل تحديث الحساب."
+  "su_err_update_generic": "فشل تحديث الحساب.",
+  "modal_note_main_urban": "المنطقة الحضرية الرئيسية تحمل اسم البلدية.",
+  "modal_note_zone_type_name": "هذه المنطقة تستخدم اسم نوعها.",
+  "modal_note_city_center_name": "مركز المدينة يُسمى دائماً \"مركز المدينة\"."
 }

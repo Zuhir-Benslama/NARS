@@ -40,13 +40,13 @@
           autofocus
         />
         <span v-if="isMainUrban" class="modal-field-note">
-          The main urban area takes the municipality name.
+          {{ t("modal_note_main_urban") }}
         </span>
         <span v-if="isZoneWithTypeName" class="modal-field-note"
-          >This zone uses its type name.</span
+          >{{ t("modal_note_zone_type_name") }}</span
         >
         <span v-if="isCityCenter" class="modal-field-note"
-          >The city center is always named "City Center".</span
+          >{{ t("modal_note_city_center_name") }}</span
         >
       </div>
 
@@ -222,8 +222,13 @@ watch(
     if (modalStore.isEdit) return
     const roadOption = modalStore.roadOptions[Number(val)]
     if (!roadOption) return
-    _roadSideController = new AbortController()
-    await fetchRoadSide(roadOption.dbId, undefined, _roadSideController.signal)
+    const controller = new AbortController()
+    _roadSideController = controller
+    try {
+      await fetchRoadSide(roadOption.dbId, undefined, controller.signal)
+    } catch {
+      // AbortError expected when switching roads rapidly — ignore
+    }
   },
 )
 

@@ -84,10 +84,8 @@ async function readGeomanGeometry(entry: LayerEntry): Promise<boolean> {
         entry.data.radius = computeCircleRadius(entry.data.lat, entry.data.lng, coords)
       }
     } else {
-      const coords =
-        geometry.type === "Polygon"
-          ? (geometry.coordinates as [number, number][][])[0]
-          : (geometry.coordinates as [number, number][])
+      // LineString
+      const coords = geometry.coordinates as [number, number][]
       entry.data.coordinates = coords.map((c) => ({ lat: c[1], lng: c[0] }))
     }
   } catch (err) {

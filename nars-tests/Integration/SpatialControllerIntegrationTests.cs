@@ -47,7 +47,7 @@ public class SpatialControllerIntegrationTests : IAsyncLifetime
             Mock.Of<IWebHostEnvironment>());
         var httpContext = new DefaultHttpContext
         {
-            User = AuthTestHelper.CreateClaimsPrincipal(_userId, "field_worker", communeId: 1)
+            User = AuthTestHelper.CreateClaimsPrincipal(_userId, UserRoles.FieldWorker, communeId: 1)
         };
         ctrl.ControllerContext = new ControllerContext { HttpContext = httpContext };
         return ctrl;
@@ -55,7 +55,7 @@ public class SpatialControllerIntegrationTests : IAsyncLifetime
 
     private async Task<Guid> CreateUserAsync()
     {
-        var user = await SeedData.CreateUserAsync(_db, "field_worker", communeId: 1, name: "Spatial Test User");
+        var user = await SeedData.CreateUserAsync(_db, UserRoles.FieldWorker, communeId: 1, name: "Spatial Test User");
         await SeedData.SeedBasicLocationsAsync(_db);
         return user.Id;
     }
@@ -145,7 +145,7 @@ public class SpatialControllerIntegrationTests : IAsyncLifetime
     public async Task RefreshScattered_NoCommuneId_Returns400()
     {
         var httpContext = new DefaultHttpContext();
-        httpContext.User = AuthTestHelper.CreateClaimsPrincipal(_userId, "national_admin", communeId: null);
+        httpContext.User = AuthTestHelper.CreateClaimsPrincipal(_userId, UserRoles.NationalAdmin, communeId: null);
         var controller = new SpatialController(
             new RoadQueryService(_db),
             Mock.Of<IScatteredAreaService>(),

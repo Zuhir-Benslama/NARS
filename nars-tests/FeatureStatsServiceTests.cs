@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
+using NarsApi.Infrastructure;
 using NarsApi.Models;
 using NarsApi.Services;
 using NarsApi.Tests.Integration;
@@ -33,8 +34,8 @@ public class FeatureStatsServiceTests : IAsyncLifetime
         _db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = _userId2, Layer = "central_urban", Label = "A3", Data = "{}", CreatedAt = FixedUtcNow });
         _db.Districts.Add(new District { Id = Guid.CreateVersion7(), UserId = _userId2, Layer = "housing_estate", Label = "D1", Data = "{}", CreatedAt = FixedUtcNow });
         _db.Districts.Add(new District { Id = Guid.CreateVersion7(), UserId = _userId2, Layer = "district", Label = "D2", Data = "{}", CreatedAt = FixedUtcNow });
-        _db.Users.Add(new User { Id = _userId1, Username = "user1", Name = "User 1", Email = "u1@test.com", Phone = DefaultPhone, PasswordHash = "hash", Role = "commune_user", CommuneId = 1 });
-        _db.Users.Add(new User { Id = _userId2, Username = "user2", Name = "User 2", Email = "u2@test.com", Phone = "0555000001", PasswordHash = "hash", Role = "commune_user", CommuneId = 1 });
+        _db.Users.Add(new User { Id = _userId1, Username = "user1", Name = "User 1", Email = "u1@test.com", Phone = DefaultPhone, PasswordHash = "hash", Role = UserRoles.CommuneUser, CommuneId = 1 });
+        _db.Users.Add(new User { Id = _userId2, Username = "user2", Name = "User 2", Email = "u2@test.com", Phone = AltPhone, PasswordHash = "hash", Role = UserRoles.CommuneUser, CommuneId = 1 });
         await _db.SaveChangesAsync();
     }
 
@@ -117,7 +118,7 @@ public class FeatureStatsServiceTests : IAsyncLifetime
     public async Task GetUserFeatureCountsAsync_UserWithNoFeatures_ReturnsZeros()
     {
         var unknownId = Guid.NewGuid();
-        _db.Users.Add(new User { Id = unknownId, Username = "empty", Name = "Empty", Email = "empty@test.com", Phone = DefaultPhone, PasswordHash = "hash", Role = "commune_user", CommuneId = 1 });
+        _db.Users.Add(new User { Id = unknownId, Username = "empty", Name = "Empty", Email = "empty@test.com", Phone = DefaultPhone, PasswordHash = "hash", Role = UserRoles.CommuneUser, CommuneId = 1 });
         await _db.SaveChangesAsync();
         var svc = new FeatureStatsService(_fixture.CreateDbContextFactory());
 

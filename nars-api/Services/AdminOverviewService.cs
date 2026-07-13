@@ -18,15 +18,13 @@ public class AdminOverviewService(AppDbContext db, IFeatureStatsService featureS
             .Where(u => u.Role == UserRoles.WilayaAdmin && u.WilayaId.HasValue && wilayaIds.Contains(u.WilayaId.Value))
             .ToDictionaryAsync(u => u.WilayaId!.Value, cancellationToken);
 
-        var dairaCounts = await db.Dairas
-            .Where(d => wilayaIds.Contains(d.WilayaId))
-            .GroupBy(d => d.WilayaId)
-            .Select(g => new { WilayaId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.WilayaId, x => x.Count, cancellationToken);
-
         var dairas = await db.Dairas
             .Where(d => wilayaIds.Contains(d.WilayaId))
             .ToListAsync(cancellationToken);
+
+        var dairaCounts = dairas
+            .GroupBy(d => d.WilayaId)
+            .ToDictionary(g => g.Key, g => g.Count());
 
         var allDairaIds = dairas.Select(d => d.DairaId).ToArray();
 

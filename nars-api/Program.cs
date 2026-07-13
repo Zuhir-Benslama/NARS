@@ -19,6 +19,13 @@ if (!string.IsNullOrEmpty(envDbPassword))
     connStr = connStr?.Replace("${NARS_DB_PASSWORD}", envDbPassword);
 }
 
+if (connStr is null)
+{
+    throw new InvalidOperationException(
+        "Connection string 'DefaultConnection' is not configured. " +
+        "Set it in appsettings.json or provide NARS_DB_PASSWORD via environment variable.");
+}
+
 var jwtSecret = GetRequiredConfig(builder.Configuration, "Jwt:SecretKey", ["NARS_JWT_SECRET", "Jwt:SecretKey"]);
 
 const int minJwtSecretLength = 32;

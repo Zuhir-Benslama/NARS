@@ -85,16 +85,27 @@ export async function undo(): Promise<void> {
       state[phaseKey].push(restoredEntry)
     }
 
-    // Repair cross-references: update any secondary entrances that pointed
-    // to the old main entrance DB ID to now point to the new one.
+    // Repair cross-references: update any features that pointed to the old
+    // database ID to now point to the new one.
+    const oldDbId = entry.dbId
     if (phaseKey === "houseEntrances") {
-      const oldDbId = entry.dbId
       for (const entrance of state.houseEntrances || []) {
         if (entrance.data.mainEntranceDbId === oldDbId) {
           entrance.data.mainEntranceDbId = newDbId
           entrance.data.mainEntranceLabel = restoredEntry.data.label
           debugLog(
             `[UNDO] Updated secondary entrance "${entrance.data.label}" → mainEntranceDbId ${newDbId}`,
+          )
+        }
+      }
+    }
+
+    if (phaseKey === "roads") {
+      for (const entrance of state.houseEntrances || []) {
+        if (entrance.data.roadDbId === oldDbId) {
+          entrance.data.roadDbId = newDbId
+          debugLog(
+            `[UNDO] Updated entrance "${entrance.data.label}" → roadDbId ${newDbId}`,
           )
         }
       }

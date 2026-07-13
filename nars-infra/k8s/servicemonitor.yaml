@@ -5,8 +5,7 @@ metadata:
   name: otel-collector
   namespace: observability
   labels:
-    # Kept for documentation: required only if serviceMonitorSelector is configured
-    # with this label. Current selector config picks up ALL ServiceMonitors.
+    # Required by kube-prometheus-stack serviceMonitorSelector (release: prometheus-stack)
     release: prometheus-stack
 spec:
   selector:

@@ -22,11 +22,6 @@ public class UsersController(IUserProfileService userProfile, ILogger<UsersContr
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateCredentials([FromBody] UpdateUserRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null)
-        {
-            return Problem(detail: "Request body is required.", statusCode: 400);
-        }
-
         if (CurrentUserId is null)
         {
             return Problem(detail: "Authentication required.", statusCode: 401);

@@ -7,7 +7,7 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public class FeatureRepository(AppDbContext db) : IFeatureRepository
+public class FeatureService(AppDbContext db) : IFeatureService
 {
     public async Task<bool> RoadExistsAsync(Guid roadId, Guid userId, CancellationToken ct)
         => await db.Roads.AnyAsync(r => r.Id == roadId && r.UserId == userId, ct);
@@ -101,7 +101,6 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
 
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
 
-        // Collect all IDs across all feature types in a single pass.
         foreach (var descriptor in FeatureTypeRegistry.GetAllDescriptors())
         {
             var ids = await descriptor.GetDbSet(db)
@@ -117,7 +116,6 @@ public class FeatureRepository(AppDbContext db) : IFeatureRepository
             deletedIds.AddRange(ids);
         }
 
-        // Now delete from all feature tables and the registry in bulk.
         if (deletedIds.Count > 0)
         {
             foreach (var descriptor in FeatureTypeRegistry.GetAllDescriptors())

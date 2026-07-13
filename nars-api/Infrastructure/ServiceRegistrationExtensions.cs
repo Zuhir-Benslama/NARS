@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Extensions.Options;
 using NarsApi.Services;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -42,16 +43,26 @@ public static class ServiceRegistrationExtensions
 
     private static void AddNarsOptions(this IServiceCollection services, IConfiguration config)
     {
-        services.Configure<CacheOptions>(config.GetSection("Cache"));
-        services.Configure<LocationsOptions>(config.GetSection("Locations"));
-        services.Configure<JwtOptions>(config.GetSection("Jwt"));
-        services.Configure<FeatureDefaultsOptions>(config.GetSection("FeatureDefaults"));
-        services.Configure<LoggingOptions>(config.GetSection("Logging"));
-        services.Configure<ValidationOptions>(config.GetSection("Validation"));
-        services.Configure<AccountLockoutOptions>(config.GetSection("AccountLockout"));
-        services.Configure<OpenTelemetryOptions>(config.GetSection("OpenTelemetry"));
-        services.Configure<BackgroundTaskOptions>(config.GetSection("BackgroundTask"));
-        services.Configure<CspOptions>(config.GetSection("Csp"));
+        services.AddOptions<CacheOptions>().Bind(config.GetSection("Cache"))
+            .ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<LocationsOptions>().Bind(config.GetSection("Locations"))
+            .ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<JwtOptions>().Bind(config.GetSection("Jwt"))
+            .ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<FeatureDefaultsOptions>().Bind(config.GetSection("FeatureDefaults"))
+            .ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<LoggingOptions>().Bind(config.GetSection("Logging"))
+            .ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<ValidationOptions>().Bind(config.GetSection("Validation"))
+            .ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<AccountLockoutOptions>().Bind(config.GetSection("AccountLockout"))
+            .ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<OpenTelemetryOptions>().Bind(config.GetSection("OpenTelemetry"))
+            .ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<BackgroundTaskOptions>().Bind(config.GetSection("BackgroundTask"))
+            .ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<CspOptions>().Bind(config.GetSection("Csp"))
+            .ValidateDataAnnotations().ValidateOnStart();
     }
 
     private static void AddNarsOpenTelemetry(this IServiceCollection services, IConfiguration config)
@@ -89,7 +100,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IValidationService, ValidationService>();
         services.AddScoped<IFieldService, FieldService>();
         services.AddScoped<IFeatureStatsService, FeatureStatsService>();
-        services.AddScoped<IFeatureRepository, FeatureRepository>();
+        services.AddScoped<IFeatureService, FeatureService>();
         services.AddScoped<IBoundaryService, BoundaryService>();
         services.AddScoped<IEntranceQueryService, EntranceQueryService>();
         services.AddScoped<IAdminOverviewService, AdminOverviewService>();

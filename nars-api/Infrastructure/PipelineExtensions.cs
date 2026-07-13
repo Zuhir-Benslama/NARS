@@ -82,6 +82,34 @@ public static class PipelineExtensions
                         return;
                     }
 
+                    if (ex is ArgumentException or InvalidOperationException)
+                    {
+                        logger.LogWarning(ex, "Bad request: {Message}", ex.Message);
+                        ctx.Response.StatusCode = 400;
+                        var badRequestProblem = new ProblemDetails
+                        {
+                            Detail = app.Environment.IsDevelopment() ? ex.Message : "The request is invalid.",
+                            Status = 400,
+                            Title = "Bad Request",
+                        };
+                        await ctx.Response.WriteAsJsonAsync(badRequestProblem, JsonOptions);
+                        return;
+                    }
+
+                    if (ex is KeyNotFoundException)
+                    {
+                        logger.LogWarning(ex, "Resource not found: {Message}", ex.Message);
+                        ctx.Response.StatusCode = 404;
+                        var notFoundProblem = new ProblemDetails
+                        {
+                            Detail = "The requested resource was not found.",
+                            Status = 404,
+                            Title = "Not Found",
+                        };
+                        await ctx.Response.WriteAsJsonAsync(notFoundProblem, JsonOptions);
+                        return;
+                    }
+
                     logger.LogError(ex, "Unhandled exception");
                 }
 
@@ -131,13 +159,13 @@ public static class PipelineExtensions
 
     private static void UseSecurityMiddleware(WebApplication app)
     {
-        app.UseRouting();
-
+        app.UseHsts();
         app.UseForwardedHeaders(new ForwardedHeadersOptions
         {
             ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
         });
 
+        app.UseRouting();
         app.UseCors();
         app.UseResponseCompression();
         app.UseRateLimiter();

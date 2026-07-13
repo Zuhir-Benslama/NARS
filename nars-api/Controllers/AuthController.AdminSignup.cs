@@ -42,10 +42,6 @@ public partial class AuthController
         [FromBody] AuthorizedAdminSignupRequest body,
         CancellationToken cancellationToken = default)
     {
-        if (body is null)
-        {
-            return Problem(detail: "Request body is required.", statusCode: 400);
-        }
         // 1. Verify the authorizing admin's credentials.
         // IMPORTANT: always run BCrypt.Verify even when the user is not found.
         // Short-circuiting on "admin is null" leaks whether a username exists

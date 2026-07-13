@@ -29,7 +29,7 @@ public class FeaturesControllerTests
         var context = db ?? CreateInMemoryDb("FeaturesTest");
 
         var ctrl = new FeaturesController(
-            new FeatureRepository(context),
+            new FeatureService(context),
             bgQueue ?? Mock.Of<IBackgroundTaskQueue>(),
             Mock.Of<ILogger<FeaturesController>>(),
             Options.Create(new FeatureDefaultsOptions()),
@@ -41,7 +41,7 @@ public class FeaturesControllerTests
             {
                 HttpContext = new DefaultHttpContext
                 {
-                    User = AuthTestHelper.CreateClaimsPrincipal(UserId, "field_worker", communeId: 1)
+                    User = AuthTestHelper.CreateClaimsPrincipal(UserId, UserRoles.FieldWorker, communeId: 1)
                 }
             }
         };
