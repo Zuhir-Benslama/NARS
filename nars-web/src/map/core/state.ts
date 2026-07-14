@@ -73,7 +73,9 @@ export function updateSelectionHighlight(dbId: string | null): void {
   }
 
   // Find the feature in the features store and copy its geometry
-  const selected = useFeaturesStore().getAll().find((f: MaplibreFeature) => f.properties?.dbId === dbId)
+  const selected = useFeaturesStore()
+    .getAll()
+    .find((f: MaplibreFeature) => f.properties?.dbId === dbId)
 
   if (selected && selected.geometry) {
     const feature: GeoJSON.Feature = {
