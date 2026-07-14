@@ -21,7 +21,6 @@ export function debugLog(...args: unknown[]): void {
  */
 export function debugError(...args: unknown[]): void {
   if (DEBUG) {
-    // eslint-disable-next-line no-console
     console.error(...args)
   }
 }
@@ -32,7 +31,6 @@ export function debugError(...args: unknown[]): void {
  */
 export function debugWarn(...args: unknown[]): void {
   if (DEBUG) {
-    // eslint-disable-next-line no-console
     console.warn(...args)
   }
 }
