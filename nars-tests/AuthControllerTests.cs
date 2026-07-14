@@ -277,18 +277,8 @@ public class AuthControllerTests
 
     private static async Task SeedAdminAsync(AppDbContext db, string username, string role, int? dairaId = null, int? wilayaId = null)
     {
-        db.Users.Add(new User
-        {
-            Id = Guid.NewGuid(),
-            Name = "Admin User",
-            Email = $"admin-{Guid.NewGuid():N}@test.com",
-            Phone = TestData.DefaultPhone,
-            Username = username,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
-            Role = role,
-            DairaId = dairaId,
-            WilayaId = wilayaId,
-        });
+        var user = await SeedData.CreateUserAsync(db, role, dairaId: dairaId, wilayaId: wilayaId, name: "Admin User");
+        user.Username = username;
         await db.SaveChangesAsync();
     }
 }

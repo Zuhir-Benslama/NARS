@@ -2,7 +2,7 @@
 // Finds the nearest snap target (circle, vertex, midpoint, edge) to the cursor.
 // Snap priority: circle → vertex → midpoint → edge.
 
-import { ctx } from "../core/state"
+import { getCtx } from "../core/state"
 import { SNAP_CONFIG } from "../../config"
 import { closestOnSegmentProjected, closestOnCirclePerimeter, pixelDist } from "./snap-geometry"
 import { getSnapRings, getRoadChains, getCityCenterCircles, getSnapPoints } from "./snap-sources"
@@ -48,7 +48,7 @@ export function mergeExternalSnapWithDrawFirstVertex(
   external: SnapResult | null,
   project: (ll: [number, number]) => { x: number; y: number },
 ): SnapResult | null {
-  const gm = ctx.geoman as
+  const gm = getCtx().geoman as
     | {
         actionInstances?: Record<string, { lineDrawer?: { shapeLngLats?: [number, number][] } }>
       }
@@ -81,6 +81,7 @@ export function findNearestSnap(
   includeMidpoint: boolean,
   excludeId?: string | null,
 ): SnapResult | null {
+  const { map } = getCtx()
   const best: {
     vertex: SnapCandidate | null
     midpoint: SnapCandidate | null
@@ -88,11 +89,11 @@ export function findNearestSnap(
     circle: SnapCandidate | null
   } = { vertex: null, midpoint: null, edge: null, circle: null }
 
-  const project = (ll: [number, number]) => ctx.map.project(ll)
-  const unproject = (pt: [number, number]) => ctx.map.unproject(pt)
+  const project = (ll: [number, number]) => map.project(ll)
+  const unproject = (pt: [number, number]) => map.unproject(pt)
 
   // ── Viewport culling ────────────────────────────────────────────
-  const bounds = ctx.map.getBounds()
+  const bounds = map.getBounds()
   const CULL_PAD = 0.03
   const inCullBox = (lat: number, lng: number): boolean =>
     lat >= bounds.getSouth() - CULL_PAD &&

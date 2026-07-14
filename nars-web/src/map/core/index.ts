@@ -1,6 +1,5 @@
 export {
-  ctx,
-  featuresStore,
+  getCtx,
   _setCtx,
   type MapContext,
   updateSelectionHighlight,

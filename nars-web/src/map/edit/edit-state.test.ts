@@ -15,18 +15,20 @@ const mockSetPaintProperty = vi.fn()
 const mockAddLayer = vi.fn()
 const mockGetSource = vi.fn()
 
+const mockStateCtx = {
+  map: {
+    getLayer: mockGetLayer,
+    setPaintProperty: mockSetPaintProperty,
+    addLayer: mockAddLayer,
+    getSource: mockGetSource,
+  },
+  geoman: {
+    disableGlobalEditMode: mockDisableGlobalEditMode,
+  },
+} as any
+
 vi.mock("../core/state", () => ({
-  ctx: {
-    map: {
-      getLayer: mockGetLayer,
-      setPaintProperty: mockSetPaintProperty,
-      addLayer: mockAddLayer,
-      getSource: mockGetSource,
-    },
-    geoman: {
-      disableGlobalEditMode: mockDisableGlobalEditMode,
-    },
-  } as any,
+  getCtx: () => mockStateCtx,
   updateSelectionHighlight: mockUpdateSelectionHighlight,
 }))
 
@@ -74,8 +76,7 @@ async function loadModule() {
 beforeEach(async () => {
   setActivePinia(createPinia())
   vi.clearAllMocks()
-  const mockCtx = await import("../core/state")
-  ;(mockCtx.ctx as any).geoman = { disableGlobalEditMode: mockDisableGlobalEditMode }
+  mockStateCtx.geoman = { disableGlobalEditMode: mockDisableGlobalEditMode }
   await loadModule()
 })
 
@@ -153,8 +154,7 @@ describe("edit-state", () => {
 
   describe("disableEditMode", () => {
     it("returns early when ctx.geoman is missing", async () => {
-      const mockCtx = await import("../core/state")
-      ;(mockCtx.ctx as any).geoman = undefined
+      mockStateCtx.geoman = undefined
 
       disableEditMode()
       expect(mockUnpatchMarkerPointerSnap).not.toHaveBeenCalled()

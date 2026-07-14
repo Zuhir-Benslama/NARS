@@ -8,13 +8,14 @@
 
 import { useAppStore } from "../stores/appStore"
 import { useLayerStore } from "../stores/layerStore"
-import { featuresStore } from "./core/state"
+import { useFeaturesStore } from "../stores/featuresStore"
 import { showToast } from "../lib/toast"
 import { t } from "../i18n"
 import { apiFetch } from "../api"
 import { debugError } from "../utils/debug"
 
 export async function setHouseNumbers(options?: { syncCounts?: boolean }): Promise<void> {
+  const featuresStore = useFeaturesStore()
   const appStore = useAppStore()
   if (appStore.referenceRoadDbId == null) {
     showToast(t("alert_no_ref_road"), "error")

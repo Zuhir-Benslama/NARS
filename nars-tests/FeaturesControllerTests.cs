@@ -49,7 +49,7 @@ public class FeaturesControllerTests
         return (ctrl, context);
     }
 
-    private static JsonElement Json(string raw) => JsonDocument.Parse(raw).RootElement;
+    private static JsonElement Json(string raw) => System.Text.Json.JsonSerializer.Deserialize<JsonElement>(raw);
 
     // ── POST /api/save ────────────────────────────────────────────────────
 
@@ -272,7 +272,7 @@ public class FeaturesControllerTests
         await db.SaveChangesAsync();
 
         var largeData = new string('x', 600_000);
-        var body = new FeatureUpdateRequest(Label: null, Data: JsonDocument.Parse($"\"{largeData}\"").RootElement);
+        var body = new FeatureUpdateRequest(Label: null, Data: System.Text.Json.JsonSerializer.Deserialize<JsonElement>($"\"{largeData}\""));
         var result = await ctrl.UpdateFeature(fid, body);
         var objResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(400, objResult.StatusCode);

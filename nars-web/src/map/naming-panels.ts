@@ -10,7 +10,7 @@
 
 import distance from "@turf/distance"
 import { useLayerStore } from "../stores/layerStore"
-import { featuresStore } from "./core/state"
+import { useFeaturesStore } from "../stores/featuresStore"
 import { debugError } from "../utils/debug"
 import type { FeatureData, LayerEntry, LatLng } from "../types"
 import { PHASES } from "../phases"
@@ -116,6 +116,7 @@ async function addPanelIfMissing(
 
   layerStore.$state.namingPanels.push(layerEntry)
 
+  const featuresStore = useFeaturesStore()
   featuresStore.add({
     id: layerEntry.id,
     geometry: { type: "Point", coordinates: [lng, lat] },

@@ -18,7 +18,7 @@ export { getFeatureStyle } from "./draw-save"
 
 // ─── IMPORTS FOR REGISTRATION ───────────────────────────────────────
 
-import { ctx } from "../core/state"
+import { getCtx } from "../core/state"
 import { useDrawStore } from "../../stores/drawStore"
 import { setRepatchMarkerPointer } from "./draw-state"
 import { repatchMarkerPointer } from "./draw-marker-patch"
@@ -52,7 +52,7 @@ function watchDrawType() {
   store.cleanupDrawWatcher = watch(
     () => appStore.currentPhase,
     (phaseIdx) => {
-      const activeDrawModes = ctx.geoman?.getActiveDrawModes?.() || []
+      const activeDrawModes = getCtx().geoman?.getActiveDrawModes?.() || []
       if (activeDrawModes.length > 0) {
         debugWarn("[WATCH] Phase changed while draw mode is active; forcing mode sync")
       }
@@ -68,14 +68,14 @@ function watchDrawType() {
             const userLng = appStore.user?.commune?.longitude
 
             if (userLat && userLng) {
-              ctx.map.flyTo({
+              getCtx().map.flyTo({
                 center: [userLng, userLat],
                 zoom: 16,
                 duration: 1500,
                 essential: true,
               })
             } else if (appStore.cityCenterLatLng) {
-              ctx.map.flyTo({
+              getCtx().map.flyTo({
                 center: [appStore.cityCenterLatLng.lng, appStore.cityCenterLatLng.lat],
                 zoom: 17,
                 duration: 1500,

@@ -2,7 +2,7 @@
 // Shared geometry computation functions used across draw-complete, loader,
 // edit-mode, and undo modules.
 
-import { ctx } from "../core/state"
+import { getCtx } from "../core/state"
 import { apiFetch } from "../../api"
 import { GEOMETRY_CONFIG } from "../../config"
 import { debugError } from "../../utils/debug"
@@ -107,8 +107,9 @@ export async function displayCommuneBoundary(communeId: number): Promise<void> {
     }
 
     // Update the boundaries GeoJSON source
-    if (ctx.boundariesSource) {
-      ctx.boundariesSource.setData({
+    const { boundariesSource, map } = getCtx()
+    if (boundariesSource) {
+      boundariesSource.setData({
         type: "FeatureCollection",
         features: [
           {
@@ -121,10 +122,10 @@ export async function displayCommuneBoundary(communeId: number): Promise<void> {
     }
 
     // Fly camera to frame the commune boundary
-    if (ctx.map) {
+    if (map) {
       const bounds = computeBoundsFromGeometry(geojson)
       if (bounds) {
-        ctx.map.fitBounds(bounds, {
+        map.fitBounds(bounds, {
           padding: 60,
           maxZoom: 14,
           duration: 1500,

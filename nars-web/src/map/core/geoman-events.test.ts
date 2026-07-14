@@ -53,7 +53,7 @@ vi.mock("../../utils/debug", () => ({
 import { useLayerStore } from "../../stores/layerStore"
 
 let _setCtx: (ctx: any) => void
-let featuresStore: any
+let mockFeaturesStoreRemove: ReturnType<typeof vi.fn>
 let mod: typeof import("./geoman-events")
 let mapOn: ReturnType<typeof vi.fn>
 let useEditStore: any
@@ -87,7 +87,16 @@ beforeEach(async () => {
 
   const stateMod = await import("./state")
   _setCtx = stateMod._setCtx
-  featuresStore = stateMod.featuresStore
+
+  mockFeaturesStoreRemove = vi.fn()
+  vi.doMock("../../stores/featuresStore", () => ({
+    useFeaturesStore: () => ({
+      getAll: vi.fn().mockReturnValue([]),
+      add: vi.fn(),
+      remove: mockFeaturesStoreRemove,
+      update: vi.fn(),
+    }),
+  }))
 
   mapOn = vi.fn()
   _setCtx({
@@ -264,7 +273,7 @@ describe("onRemove", () => {
     await handler({ feature: { _geoJson: { properties: { dbId: "del1" } } } })
 
     expect(mockApiFetch).toHaveBeenCalledWith("/api/features/del1", { method: "DELETE" })
-    expect(featuresStore.getAll()).toHaveLength(0)
+    expect(mockFeaturesStoreRemove).toHaveBeenCalledWith("feat_del1")
     expect(mockShowToast).toHaveBeenCalledWith("Feature deleted.", "success")
   })
 

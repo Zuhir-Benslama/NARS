@@ -48,7 +48,7 @@ vi.mock("../../utils/debug", () => ({
 vi.mock("../roads/road-directions", () => ({ updateEndpointMarkers: mockUpdateEndpointMarkers }))
 
 let _setCtx: (ctx: any) => void
-let featuresStore: any
+let mockFeaturesStoreRemove: ReturnType<typeof vi.fn>
 let mod: any
 let useLayerStore: any
 let useAppStore: any
@@ -61,7 +61,15 @@ beforeEach(async () => {
 
   const stateMod = await import("../core/state")
   _setCtx = stateMod._setCtx
-  featuresStore = stateMod.featuresStore
+  mockFeaturesStoreRemove = vi.fn()
+  vi.doMock("../../stores/featuresStore", () => ({
+    useFeaturesStore: () => ({
+      getAll: vi.fn().mockReturnValue([]),
+      add: vi.fn(),
+      remove: mockFeaturesStoreRemove,
+      update: vi.fn(),
+    }),
+  }))
   _setCtx({ featuresSource: { setData: vi.fn() } } as any)
 
   mod = await import("./ctx-menu-actions")
@@ -205,7 +213,7 @@ describe("removeFeature", () => {
 
     expect(mockRecordDelete).toHaveBeenCalled()
     expect(mockApiFetch).toHaveBeenCalledWith("/api/features/del1", { method: "DELETE" })
-    expect(featuresStore.getAll()).toHaveLength(0)
+    expect(mockFeaturesStoreRemove).toHaveBeenCalledWith("feat_del1")
     expect(mockShowToast).toHaveBeenCalledWith("Feature deleted.", "success")
   })
 

@@ -8,7 +8,7 @@ import { showToast } from "../lib/toast"
 import { useAppStore } from "../stores/appStore"
 import { useLayerStore } from "../stores/layerStore"
 import { useUndoStore } from "../stores/undoStore"
-import { featuresStore } from "./core/state"
+import { useFeaturesStore } from "../stores/featuresStore"
 import { toApiSaveShape } from "./features/feature-data"
 import { PHASES } from "../phases"
 import { computeCircleRing, closeRing } from "./rendering/geometry"
@@ -121,6 +121,7 @@ export async function undo(): Promise<void> {
     }
 
     const geometry = entryDataToGeometry(entry.data, entry.type)
+    const featuresStore = useFeaturesStore()
     featuresStore.add({
       id: newId,
       geometry,

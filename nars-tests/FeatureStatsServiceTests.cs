@@ -9,7 +9,7 @@ using Xunit;
 
 namespace NarsApi.Tests;
 
-[Collection("PostgreSQL Integration")]
+[Collection(Integration.PostgreSqlCollection.CollectionName)]
 public class FeatureStatsServiceTests : IAsyncLifetime
 {
     private readonly NarsDatabaseFixture _fixture;
@@ -73,7 +73,7 @@ public class FeatureStatsServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetFeatureCountsAsync_EmptyDb_ReturnsAllZeros()
+    public async Task GetFeatureCountsAsync_NoDataForUser_ReturnsAllZeros()
     {
         var svc = new FeatureStatsService(_fixture.CreateDbContextFactory());
 

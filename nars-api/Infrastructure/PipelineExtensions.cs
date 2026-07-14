@@ -49,7 +49,14 @@ public static class PipelineExtensions
         logger.LogInformation("NARS - ASP.NET Core + PostgreSQL/PostGIS");
         logger.LogInformation("==================================================");
 
-        await dbCtx.Database.CanConnectAsync();
+        var canConnect = await dbCtx.Database.CanConnectAsync();
+        if (!canConnect)
+        {
+            throw new InvalidOperationException(
+                "Unable to connect to the database. " +
+                "Verify the connection string and ensure the database server is running.");
+        }
+
         logger.LogInformation("Database connection verified");
     }
 

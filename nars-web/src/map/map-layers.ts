@@ -1,5 +1,5 @@
 import maplibregl from "maplibre-gl"
-import { ctx } from "./core/state"
+import { getCtx } from "./core/state"
 import { debugLog } from "../utils/debug"
 import { addBoundaryClickEvents } from "./map-boundary"
 
@@ -208,6 +208,7 @@ const ENDPOINT_LAYERS: Array<{ type: "start" | "end"; layers: maplibregl.LayerSp
 ]
 
 export function initSources(): void {
+  const ctx = getCtx()
   const map = ctx.map
 
   for (const name of [
@@ -279,7 +280,7 @@ export function addDrawingPreviewLayer(map: maplibregl.Map): void {
 }
 
 export function updateDrawingPreview(geometry: [number, number][] | null): void {
-  const source = getGeoJSON(ctx.map, "drawing-preview")
+  const source = getGeoJSON(getCtx().map, "drawing-preview")
   if (!source) return
   const features: GeoJSON.Feature[] =
     geometry && geometry.length > 0

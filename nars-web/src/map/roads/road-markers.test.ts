@@ -9,11 +9,10 @@ const { mockProject, mockSetData, mockDebugLog, mockDebugWarn } = vi.hoisted(() 
   mockDebugWarn: vi.fn(),
 }))
 
+const mockGetCtx = vi.fn()
+
 vi.mock("../core/state", () => ({
-  ctx: {
-    map: { project: mockProject },
-    endpointsSource: { setData: mockSetData },
-  },
+  getCtx: () => mockGetCtx(),
 }))
 
 vi.mock("../../utils/debug", () => ({
@@ -54,8 +53,10 @@ function makeRoad(id: string, dbId: string, coords: { lat: number; lng: number }
 beforeEach(async () => {
   setActivePinia(createPinia())
   vi.clearAllMocks()
-  const ctxMod = await import("../core/state")
-  ctxMod.ctx.endpointsSource = { setData: mockSetData }
+  mockGetCtx.mockReturnValue({
+    map: { project: mockProject },
+    endpointsSource: { setData: mockSetData },
+  })
   mockProject.mockReturnValue({ x: 100, y: 200 })
   await reloadModule()
 })
@@ -63,8 +64,10 @@ beforeEach(async () => {
 describe("road-markers", () => {
   describe("updateEndpointMarkers", () => {
     it("warns and returns when endpointsSource is missing", async () => {
-      const ctxMod = await import("../core/state")
-      ctxMod.ctx.endpointsSource = undefined
+      mockGetCtx.mockReturnValue({
+        map: { project: mockProject },
+        endpointsSource: undefined,
+      })
 
       updateEndpointMarkers()
 

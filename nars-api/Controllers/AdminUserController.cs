@@ -87,43 +87,15 @@ public class AdminUserController(
         ));
     }
 
-    private static readonly System.Linq.Expressions.Expression<Func<User, AdminUserSummary>> ToAdminSummary =
-        u => new AdminUserSummary(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role, u.Phone ?? "", u.CommuneId, u.DairaId, u.WilayaId);
-
     /// <summary>Lists users that the caller has authority to manage.</summary>
     [HttpGet("admin/users")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetManageableUsers(CancellationToken cancellationToken = default)
     {
-        List<AdminUserSummary> users = CurrentUserRole switch
-        {
-            UserRoles.NationalAdmin => await db.Users
-                .Where(u => u.Role == UserRoles.WilayaAdmin)
-                .Select(ToAdminSummary)
-                .ToListAsync(cancellationToken),
-
-            UserRoles.WilayaAdmin when CurrentWilayaId.HasValue => await db.Users
-                .Where(u => u.Role == UserRoles.DairaAdmin && u.DairaId.HasValue)
-                .Join(db.Dairas.Where(d => d.WilayaId == CurrentWilayaId.Value),
-                    u => u.DairaId!.Value, d => d.DairaId, (u, _) => u)
-                .Select(ToAdminSummary)
-                .ToListAsync(cancellationToken),
-
-            UserRoles.DairaAdmin when CurrentDairaId.HasValue => await db.Users
-                .Where(u => u.Role == UserRoles.CommuneUser && u.CommuneId.HasValue)
-                .Join(db.Communes.Where(c => c.DairaId == CurrentDairaId.Value),
-                    u => u.CommuneId!.Value, c => c.CommuneId, (u, _) => u)
-                .Select(ToAdminSummary)
-                .ToListAsync(cancellationToken),
-
-            UserRoles.CommuneUser when CurrentCommuneId.HasValue => await db.Users
-                .Where(u => u.Role == UserRoles.FieldWorker && u.CommuneId == CurrentCommuneId)
-                .Select(ToAdminSummary)
-                .ToListAsync(cancellationToken),
-
-            _ => [],
-        };
+        var users = await authorizationService.GetManageableUsersAsync(
+            CurrentUserRole, RequiredCurrentUserId, CurrentCommuneId, CurrentDairaId, CurrentWilayaId,
+            cancellationToken);
 
         return Ok(users);
     }

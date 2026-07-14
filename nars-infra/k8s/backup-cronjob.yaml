@@ -114,3 +114,18 @@ spec:
             - name: backup-storage
               persistentVolumeClaim:
                 claimName: postgis-backup-pvc
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: postgis-backup
+  namespace: nars
+  labels:
+    app.kubernetes.io/name: postgis-backup
+    app.kubernetes.io/component: backup
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgis-backup
+      app.kubernetes.io/component: backup

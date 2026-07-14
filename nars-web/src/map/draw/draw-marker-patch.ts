@@ -16,7 +16,7 @@
 // Solution: Monkey-patch MarkerPointer.onMouseMove to use our NARS snap logic
 // directly, bypassing the snapping helper entirely.
 
-import { ctx } from "../core/state"
+import { getCtx } from "../core/state"
 import { useDrawStore } from "../../stores/drawStore"
 import { findNearestSnap, mergeExternalSnapWithDrawFirstVertex } from "../snapping/snap-search"
 import { getFrozenSnapPos, getActiveSnapPhases } from "../snapping/snapping"
@@ -46,7 +46,7 @@ export function makeSnapSetLngLat(mp: GeomanMarkerPointer, orig: SetLngLatFn): S
       : (lngLat.toArray?.() ?? [lngLat.lng ?? 0, lngLat.lat ?? 0])
     const lng0 = Number(rawPair[0])
     const lat0 = Number(rawPair[1])
-    const rawPx = ctx.map.project([lng0, lat0])
+    const rawPx = getCtx().map.project([lng0, lat0])
 
     const frozen = getFrozenSnapPos()
     if (frozen) {
@@ -56,7 +56,7 @@ export function makeSnapSetLngLat(mp: GeomanMarkerPointer, orig: SetLngLatFn): S
     }
 
     const phases = getActiveSnapPhases()
-    const project = (ll: [number, number]) => ctx.map.project(ll)
+    const project = (ll: [number, number]) => getCtx().map.project(ll)
     const external = phases.length > 0 ? findNearestSnap(rawPx.x, rawPx.y, phases, true) : null
     const snap = mergeExternalSnapWithDrawFirstVertex(rawPx.x, rawPx.y, external, project)
     if (snap) {
@@ -132,7 +132,7 @@ function startPolling(
 // ─── SHARED HELPERS ───────────────────────────────────────────────────────────
 
 function getMarkerPointer(): GeomanMarkerPointer | null {
-  return (ctx.geoman?.markerPointer as GeomanMarkerPointer | undefined) ?? null
+  return (getCtx().geoman?.markerPointer as GeomanMarkerPointer | undefined) ?? null
 }
 
 // ─── PATCH REGISTRATION ───────────────────────────────────────────────────────

@@ -2,7 +2,7 @@
 // Uses Geoman's native enableDraw() for the current phase's geometry type.
 // Mirrors the reference implementation in nars-web/src/map/draw-control.ts
 
-import { ctx } from "../core/state"
+import { getCtx } from "../core/state"
 import { debugLog, debugError } from "../../utils/debug"
 import { ensureGeomanDrawEdgesVisible } from "../edit/edit-state"
 import { DRAW_CONFIG } from "../../config"
@@ -26,7 +26,7 @@ export function resetDrawControl(): void {
 }
 
 export function buildDrawControl(phase: PhaseConfig): void {
-  const gm = ctx.geoman
+  const gm = getCtx().geoman
   if (!gm) return
 
   const store = useDrawStore()
@@ -68,7 +68,7 @@ export function buildDrawControl(phase: PhaseConfig): void {
 
     if (token !== store.modeSwitchToken || store.lastPhaseKey !== phase.key) return
 
-    const currentGm = ctx.geoman
+    const currentGm = getCtx().geoman
     if (!currentGm) return
 
     debugLog("[DRAW CONTROL] Enabling draw mode:", shapeName)

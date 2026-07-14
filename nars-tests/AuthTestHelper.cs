@@ -34,7 +34,7 @@ public static class AuthTestHelper
                         return ((User?)null, "Email already exists.");
                 }
 
-                var pwdError = Infrastructure.PasswordValidator.Validate(password);
+                var pwdError = PasswordValidator.Validate(password);
                 if (pwdError is not null)
                     return ((User?)null, pwdError);
 

@@ -7,7 +7,8 @@ import { PHASES, getApiLayerToPhase } from "../../phases"
 import { useAppStore } from "../../stores/appStore"
 import { useLayerStore } from "../../stores/layerStore"
 import type { LayerState } from "../../stores/layerStore"
-import { featuresStore, type MaplibreFeature } from "../core/state"
+import { type MaplibreFeature } from "../core/state"
+import { useFeaturesStore } from "../../stores/featuresStore"
 import { renderScatteredAreas } from "../rendering/geometry"
 import { refreshLayerVisibility } from "../rendering/labels"
 import { getFeatureType } from "../house-numbering"
@@ -97,6 +98,7 @@ function processFeature(
 }
 
 export async function loadFromDatabase(): Promise<void> {
+  const featuresStore = useFeaturesStore()
   const appStore = useAppStore()
   debugLog("[LOAD] Starting...")
   appStore.isLoading = true
@@ -133,9 +135,7 @@ export async function loadFromDatabase(): Promise<void> {
     featuresStore.batchAdd(maplibreFeatures)
     debugLog("[LOAD] batchAdd", maplibreFeatures.length, "features into features source")
 
-    const communeId =
-      (appStore.user as { commune?: { id?: number | string } } | null | undefined)?.commune?.id ??
-      null
+    const communeId = appStore.user?.commune?.id ?? null
     const persistedPhase = loadPhase(communeId)
 
     if (

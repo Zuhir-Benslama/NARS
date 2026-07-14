@@ -6,12 +6,12 @@ const { mockEaseTo, mockGetContainer } = vi.hoisted(() => ({
 }))
 
 vi.mock("./core/state", () => ({
-  ctx: {
+  getCtx: () => ({
     map: {
       easeTo: mockEaseTo,
       getContainer: mockGetContainer,
     },
-  },
+  }),
 }))
 
 vi.mock("../i18n", () => ({

@@ -3,7 +3,7 @@
 // commit/cancel from edit-commit for backward compatibility.
 
 import type { GeoJsonImportFeature } from "@geoman-io/maplibre-geoman-free"
-import { ctx } from "../core/state"
+import { getCtx } from "../core/state"
 import {
   disableCrosshair,
   disableSnapping,
@@ -33,7 +33,8 @@ export { commitEditMode, cancelEditMode } from "./edit-commit"
 // ─── ENABLE EDIT MODE ────────────────────────────────────────────────────────
 
 export async function enableEditMode(featureId?: string): Promise<void> {
-  if (!ctx.geoman) return
+  const { geoman } = getCtx()
+  if (!geoman) return
 
   if (featureId) {
     const entry = findLayerEntryByFeatureId(featureId)
@@ -49,7 +50,7 @@ export async function enableEditMode(featureId?: string): Promise<void> {
       const gj = buildGeomanImportFeature(entry)
       if (gj) {
         try {
-          const result = await ctx.geoman.features.importGeoJson(gj as GeoJsonImportFeature, {
+          const result = await geoman.features.importGeoJson(gj as GeoJsonImportFeature, {
             overwrite: true,
           })
           const added = (result as { addedFeatures?: Array<{ id?: string }> } | undefined)
@@ -65,7 +66,7 @@ export async function enableEditMode(featureId?: string): Promise<void> {
   disableCrosshair()
   disableSnapping()
 
-  await ctx.geoman.enableGlobalEditMode()
+  await geoman.enableGlobalEditMode()
   setEditModeActive(true)
   useEditStore().isEditMode = true
   setSnapExclude(featureId ?? null)

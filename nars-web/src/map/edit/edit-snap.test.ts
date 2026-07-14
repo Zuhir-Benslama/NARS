@@ -16,8 +16,10 @@ function buildMockCtx() {
   }
 }
 
+const mockCtx = buildMockCtx()
+
 vi.mock("../core/state", () => ({
-  ctx: buildMockCtx(),
+  getCtx: () => mockCtx,
 }))
 
 vi.mock("../snapping/snapping", () => ({
@@ -39,10 +41,9 @@ beforeEach(async () => {
   mockProject.mockReset()
   mockSnapPointForEdit.mockReset()
   mockProject.mockReturnValue({ x: 100, y: 200 })
-  const ctxMod = await import("../core/state")
   const fresh = buildMockCtx()
-  ctxMod.ctx.map = fresh.map
-  ctxMod.ctx.geoman = fresh.geoman
+  mockCtx.map = fresh.map
+  mockCtx.geoman = fresh.geoman
   await reloadModule()
 })
 
@@ -60,8 +61,7 @@ describe("edit-snap", () => {
     })
 
     it("does not patch if marker pointer is missing", async () => {
-      const ctxMod = await import("../core/state")
-      ctxMod.ctx.geoman = undefined
+      mockCtx.geoman = undefined
 
       const { useEditStore } = await import("../../stores/editStore")
       const store = useEditStore()
@@ -82,8 +82,7 @@ describe("edit-snap", () => {
 
     it("patched function snaps position when snap found", async () => {
       patchMarkerPointerSnap("entry-1")
-      const ctxMod = await import("../core/state")
-      const patchedFn = (ctxMod.ctx.geoman as any).markerPointer.marker.setLngLat
+      const patchedFn = (mockCtx.geoman as any).markerPointer.marker.setLngLat
 
       mockSnapPointForEdit.mockReturnValue({ lat: 36.5, lng: 127.5 })
       patchedFn([10, 20])
@@ -95,8 +94,7 @@ describe("edit-snap", () => {
 
     it("patched function uses original position when no snap found", async () => {
       patchMarkerPointerSnap("entry-1")
-      const ctxMod = await import("../core/state")
-      const patchedFn = (ctxMod.ctx.geoman as any).markerPointer.marker.setLngLat
+      const patchedFn = (mockCtx.geoman as any).markerPointer.marker.setLngLat
 
       mockSnapPointForEdit.mockReturnValue(null)
       patchedFn([10, 20])
@@ -111,19 +109,17 @@ describe("edit-snap", () => {
       const store = useEditStore()
 
       patchMarkerPointerSnap("entry-1")
-      const ctxMod = await import("../core/state")
 
       unpatchMarkerPointerSnap()
 
-      const restoredFn = (ctxMod.ctx.geoman as any).markerPointer.marker.setLngLat
+      const restoredFn = (mockCtx.geoman as any).markerPointer.marker.setLngLat
       restoredFn([99, 88])
       expect(mockSetLngLat).toHaveBeenCalledWith([99, 88])
       expect(store.origSetLngLat).toBeNull()
     })
 
     it("always clears store.origSetLngLat even when no marker pointer", async () => {
-      const ctxMod = await import("../core/state")
-      ctxMod.ctx.geoman = undefined
+      mockCtx.geoman = undefined
 
       const { useEditStore } = await import("../../stores/editStore")
       const store = useEditStore()

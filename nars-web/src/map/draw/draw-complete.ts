@@ -2,7 +2,7 @@
 // Re-exports from split modules for backward compatibility.
 // Contains removeLastVertex (not moved — tightly coupled to Geoman internals).
 
-import { ctx } from "../core/state"
+import { getCtx } from "../core/state"
 import { asGeomanInternal } from "../core/geoman-types"
 import type { GeomanActionInstance } from "../core/geoman-types"
 
@@ -26,7 +26,7 @@ export { normalizeGeometry, completeDrawingWithGeometry, getFeatureStyle } from 
 // ─── REMOVE LAST VERTEX ───────────────────────────────────────────────────────
 
 function geomanActionInstance(name: string): GeomanActionInstance | undefined {
-  return asGeomanInternal(ctx.geoman)?.actionInstances?.[name]
+  return asGeomanInternal(getCtx().geoman)?.actionInstances?.[name]
 }
 
 export async function removeLastVertex(): Promise<void> {
@@ -38,7 +38,7 @@ export async function removeLastVertex(): Promise<void> {
 
   const coords: [number, number][] = lineDrawer.shapeLngLats ?? []
   if (coords.length <= 1) {
-    const gm = asGeomanInternal(ctx.geoman)
+    const gm = asGeomanInternal(getCtx().geoman)
     try {
       await gm?.disableDraw?.()
     } catch {

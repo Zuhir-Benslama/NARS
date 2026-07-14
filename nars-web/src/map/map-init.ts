@@ -4,7 +4,9 @@
 
 import maplibregl from "maplibre-gl"
 import { createGeomanInstance } from "@geoman-io/maplibre-geoman-free"
-import { ctx, featuresStore, _setCtx } from "./core/state"
+import { getCtx, _setCtx } from "./core/state"
+import { useFeaturesStore } from "../stores/featuresStore"
+import type { MapContext } from "./core/state"
 import { initSources } from "./map-layers"
 import { suppressGeomanFill, ensureGeomanDrawEdgesVisible } from "./edit/edit-mode"
 import { updateEndpointMarkers } from "./roads/road-directions"
@@ -61,6 +63,7 @@ export async function initMap(): Promise<void> {
     MAP_CONFIG.tileMaxZoomSatellite,
   )
 
+  const ctx: MapContext = {} as MapContext
   _setCtx(ctx)
 
   ctx.map = new maplibregl.Map({
@@ -133,7 +136,7 @@ async function initGeoman(
   map: maplibregl.Map,
   options: ReturnType<typeof buildGeomanOptions>,
 ): Promise<void> {
-  ctx.geoman = await createGeomanInstance(map, options)
+  getCtx().geoman = await createGeomanInstance(map, options)
   suppressGeomanFill()
   ensureGeomanDrawEdgesVisible()
   map.doubleClickZoom.disable()
@@ -143,6 +146,7 @@ async function switchBaseLayer(
   key: string,
   geomanOptions: ReturnType<typeof buildGeomanOptions>,
 ): Promise<void> {
+  const ctx = getCtx()
   const styles: Record<string, maplibregl.StyleSpecification | undefined> = {
     satellite: ctx.satelliteStyle,
     street: ctx.streetStyle,
@@ -166,6 +170,7 @@ async function switchBaseLayer(
   await Promise.race([styleLoaded, styleTimeout])
 
   initSources()
+  const featuresStore = useFeaturesStore()
   featuresStore.updateSource()
   if (ctx.boundariesGeoJson) ctx.boundariesSource?.setData(ctx.boundariesGeoJson)
   if (ctx.scatteredGeoJson) ctx.scatteredSource?.setData(ctx.scatteredGeoJson)

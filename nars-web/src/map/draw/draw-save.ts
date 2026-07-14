@@ -6,7 +6,8 @@ import { PHASES } from "../../phases"
 import { useAppStore } from "../../stores/appStore"
 import { useLayerStore } from "../../stores/layerStore"
 import type { FeatureData } from "../../types"
-import { ctx, featuresStore } from "../core/state"
+import { getCtx } from "../core/state"
+import { useFeaturesStore } from "../../stores/featuresStore"
 import { buildDrawControl } from "./draw-control"
 import { refreshLayerVisibility } from "../rendering/labels"
 import { computeCircleRing, computeCircleRadius, closeRing } from "../rendering/geometry"
@@ -176,6 +177,7 @@ async function updateStoresAfterSave(
   featureData: FeatureData,
   narsDrawType: string,
 ): Promise<void> {
+  const featuresStore = useFeaturesStore()
   featuresStore.add({
     id: featureId,
     geometry: payload.storeGeometry,
@@ -257,7 +259,7 @@ export async function completeDrawingWithGeometry(
   if (!validateGeometry(geometry, drawingPhase, geomanFeatureData)) return
 
   const featureId = crypto.randomUUID()
-  const gm = ctx.geoman
+  const gm = getCtx().geoman
   if (gm) {
     try {
       await gm.disableDraw()
@@ -341,7 +343,7 @@ function validateGeometry(
 // ─── DRAW MODE RESET ──────────────────────────────────────────────────────────
 
 async function resetDrawMode(): Promise<void> {
-  const gm = ctx.geoman
+  const gm = getCtx().geoman
   const phase = getDrawingPhase()
   if (!gm || !phase) return
 

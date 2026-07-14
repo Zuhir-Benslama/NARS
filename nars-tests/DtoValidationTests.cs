@@ -31,12 +31,14 @@ public class DtoValidationTests
                 .GetProperty(param.Name!, BindingFlags.Public | BindingFlags.Instance)!
                 .GetValue(record);
 
-            if (required.AllowEmptyStrings && value is string s && string.IsNullOrEmpty(s))
+            if (value is null && param.ParameterType.IsValueType)
+            {
                 results.Add(new ValidationResult($"{param.Name} is required.", [param.Name!]));
-            else if (!required.AllowEmptyStrings && value is string s2 && string.IsNullOrEmpty(s2))
+            }
+            else if (!required.AllowEmptyStrings && value is string s && string.IsNullOrEmpty(s))
+            {
                 results.Add(new ValidationResult($"{param.Name} is required.", [param.Name!]));
-            else if (value is null && param.ParameterType.IsValueType)
-                results.Add(new ValidationResult($"{param.Name} is required.", [param.Name!]));
+            }
         }
         return results;
     }
@@ -96,11 +98,9 @@ public class DtoValidationTests
             Password: null
         );
 
-        var context = new ValidationContext(request);
-        var vr = new List<ValidationResult>();
-        var isValid = Validator.TryValidateObject(request, context, vr, true);
+        var results = ValidateRecord(request);
 
-        Assert.True(isValid);
+        Assert.Empty(results);
     }
 
     [Fact]

@@ -5,16 +5,16 @@
 // Start marker suppressed if road starts at city center location.
 
 import { useLayerStore } from "../../stores/layerStore"
-import { ctx } from "../core/state"
+import { getCtx } from "../core/state"
 import { PHASES } from "../../phases"
 import { debugLog, debugWarn } from "../../utils/debug"
 import type { Coord } from "./road-graph"
 
 /** Update the endpoint source with start/end-of-road markers. */
 export function updateEndpointMarkers(): void {
-  const endpointsSource = ctx.endpointsSource
+  const { endpointsSource } = getCtx()
   if (!endpointsSource) {
-    debugWarn("[NARS ENDPOINTS] ctx.endpointsSource is NOT set!")
+    debugWarn("[NARS ENDPOINTS] endpointsSource is NOT set!")
     return
   }
   const layerStore = useLayerStore()
@@ -76,8 +76,9 @@ export function updateEndpointMarkers(): void {
 /** Compute the bearing angle (in degrees) from point A to point B,
  * matching the Leaflet segmentAngle() formula used in nars-web. */
 function computeSegmentAngle(a: Coord, b: Coord): number {
-  const fp = ctx.map.project([a.lng, a.lat])
-  const tp = ctx.map.project([b.lng, b.lat])
+  const { map } = getCtx()
+  const fp = map.project([a.lng, a.lat])
+  const tp = map.project([b.lng, b.lat])
   return Math.atan2(tp.y - fp.y, tp.x - fp.x) * (180 / Math.PI)
 }
 

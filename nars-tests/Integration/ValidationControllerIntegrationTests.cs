@@ -20,7 +20,7 @@ namespace NarsApi.Tests.Integration;
 /// Integration tests for ValidationController against real PostgreSQL + PostGIS.
 /// Tests spatial validation logic that cannot be tested with InMemory provider.
 /// </summary>
-[Collection("PostgreSQL Integration")]
+[Collection(PostgreSqlCollection.CollectionName)]
 public class ValidationControllerIntegrationTests : IAsyncLifetime
 {
     private readonly NarsDatabaseFixture _fixture;

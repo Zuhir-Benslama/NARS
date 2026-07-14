@@ -3,7 +3,7 @@
 // Each accepts an optional excludeId; if omitted falls back to the shared
 // snapExclude managed by snapping.ts.
 
-import { ctx } from "../core/state"
+import { getCtx } from "../core/state"
 import { useLayerStore } from "../../stores/layerStore"
 import { useSnapStore } from "../../stores/snapStore"
 import type { LayerState } from "../../stores/layerStore"
@@ -39,7 +39,8 @@ export function getSnapRings(
   }
 
   // Commune boundary rings (matching reference: boundariesLayer)
-  if (ctx.boundariesGeoJson) {
+  const boundariesGeoJson = getCtx().boundariesGeoJson
+  if (boundariesGeoJson) {
     const extractRings = (coords: unknown): void => {
       if (!Array.isArray(coords) || coords.length === 0) return
       const head = (coords as unknown[])[0]
@@ -58,7 +59,7 @@ export function getSnapRings(
       }
       for (const part of coords as unknown[]) extractRings(part)
     }
-    for (const feature of ctx.boundariesGeoJson.features) {
+    for (const feature of boundariesGeoJson.features) {
       const geom = feature.geometry
       if (geom.type === "Polygon") {
         geom.coordinates.forEach((ring: unknown) => extractRings(ring))

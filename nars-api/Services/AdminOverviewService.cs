@@ -133,6 +133,9 @@ public class AdminOverviewService(AppDbContext db, IFeatureStatsService featureS
         );
     }
 
+    public async Task<Daira?> GetDairaByIdAsync(int dairaId, CancellationToken cancellationToken = default)
+        => await db.Dairas.FindAsync([dairaId], cancellationToken);
+
     private async Task<Dictionary<int, List<CommuneReport>>> BuildCommunesForDairasAsync(int[] dairaIds, CancellationToken cancellationToken = default)
     {
         var communes = await db.Communes.Where(c => dairaIds.Contains(c.DairaId))

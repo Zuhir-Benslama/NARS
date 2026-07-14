@@ -1,7 +1,6 @@
 // ─── DEBUG UTILITY ────────────────────────────────────────────────────────────
 // Centralized debug logging that respects environment settings.
 // In development mode, logs to console. In production, logs are suppressed.
-/* eslint-disable no-console */
 
 const DEBUG = import.meta.env?.DEV ?? false
 
@@ -11,6 +10,7 @@ const DEBUG = import.meta.env?.DEV ?? false
  */
 export function debugLog(...args: unknown[]): void {
   if (DEBUG) {
+    // eslint-disable-next-line no-console
     console.log(...args)
   }
 }
@@ -21,6 +21,7 @@ export function debugLog(...args: unknown[]): void {
  */
 export function debugError(...args: unknown[]): void {
   if (DEBUG) {
+    // eslint-disable-next-line no-console
     console.error(...args)
   }
 }
@@ -31,6 +32,7 @@ export function debugError(...args: unknown[]): void {
  */
 export function debugWarn(...args: unknown[]): void {
   if (DEBUG) {
+    // eslint-disable-next-line no-console
     console.warn(...args)
   }
 }

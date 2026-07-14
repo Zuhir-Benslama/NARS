@@ -1,5 +1,5 @@
 import maplibregl from "maplibre-gl"
-import { ctx } from "../core/state"
+import { getCtx } from "../core/state"
 import { useAppStore } from "../../stores/appStore"
 import { useLayerStore } from "../../stores/layerStore"
 import { useSnapStore } from "../../stores/snapStore"
@@ -87,17 +87,19 @@ export function getActiveSnapPhases(): string[] {
 }
 
 export function enableCrosshair(): void {
+  const { map } = getCtx()
   const store = useSnapStore()
   if (store.crosshairActive) return
   store.crosshairActive = true
-  ctx.map.getCanvas().style.cursor = "crosshair"
+  map.getCanvas().style.cursor = "crosshair"
 }
 
 export function disableCrosshair(): void {
+  const { map } = getCtx()
   const store = useSnapStore()
   if (!store.crosshairActive) return
   store.crosshairActive = false
-  ctx.map.getCanvas().style.cursor = ""
+  map.getCanvas().style.cursor = ""
 }
 
 function onMouseDown(): void {
@@ -111,18 +113,20 @@ function onMouseUp(): void {
 
 export function enableSnapping(): void {
   if (isSnappingEnabled()) return
+  const { map } = getCtx()
   const store = useSnapStore()
   setSnappingEnabled(true)
   store.snapActive = true
   setSnapSourceExclude(null)
-  ctx.map.getContainer().addEventListener("mousemove", onSnapMove, true)
-  ctx.map.getContainer().addEventListener("mousedown", onMouseDown, true)
-  ctx.map.getContainer().addEventListener("mouseup", onMouseUp, true)
+  map.getContainer().addEventListener("mousemove", onSnapMove, true)
+  map.getContainer().addEventListener("mousedown", onMouseDown, true)
+  map.getContainer().addEventListener("mouseup", onMouseUp, true)
   repatchMarker()
 }
 
 export function disableSnapping(): void {
   if (!isSnappingEnabled()) return
+  const { map } = getCtx()
   const store = useSnapStore()
   setSnappingEnabled(false)
   store.snapActive = false
@@ -134,9 +138,9 @@ export function disableSnapping(): void {
     store.snapRafId = null
   }
   store.snapPendingEvent = null
-  ctx.map.getContainer().removeEventListener("mousemove", onSnapMove, true)
-  ctx.map.getContainer().removeEventListener("mousedown", onMouseDown, true)
-  ctx.map.getContainer().removeEventListener("mouseup", onMouseUp, true)
+  map.getContainer().removeEventListener("mousemove", onSnapMove, true)
+  map.getContainer().removeEventListener("mousedown", onMouseDown, true)
+  map.getContainer().removeEventListener("mouseup", onMouseUp, true)
   if (snapMarker) {
     snapMarker.remove()
     snapMarker = null
@@ -148,7 +152,7 @@ export function disableSnapping(): void {
   if (import.meta.env.DEV) {
     window.__narsSnapLatLng = null
   }
-  ctx.map.getCanvas().style.cursor = store.crosshairActive ? "crosshair" : ""
+  map.getCanvas().style.cursor = store.crosshairActive ? "crosshair" : ""
   unpatchGeomanMarker()
 }
 
@@ -189,13 +193,14 @@ if (import.meta.hot) {
 }
 
 function processSnapMove(): void {
+  const { map } = getCtx()
   const store = useSnapStore()
   store.snapRafId = null
   const e = store.snapPendingEvent
   store.snapPendingEvent = null
   if (!e || store.snapFrozen) return
 
-  if (!ctx.map.getContainer().contains(e.target as Node)) return
+  if (!map.getContainer().contains(e.target as Node)) return
 
   if (store.editModeActive && !store.editDragActive) {
     if (store.snapActive) {
@@ -212,7 +217,7 @@ function processSnapMove(): void {
   const activePhases = getActiveSnapPhases()
   if (activePhases.length === 0) return
 
-  const rect = ctx.map.getContainer().getBoundingClientRect()
+  const rect = map.getContainer().getBoundingClientRect()
   const x = e.clientX - rect.left
   const y = e.clientY - rect.top
 
@@ -220,7 +225,7 @@ function processSnapMove(): void {
   if (snap) {
     store.snapActive = true
     store.snapLatLng = { lat: snap.lat, lng: snap.lng }
-    const pos = ctx.map.project([snap.lng, snap.lat])
+    const pos = map.project([snap.lng, snap.lat])
     showSnapIndicator(pos.x, pos.y, snap.type)
     if (import.meta.env.DEV) window.__narsSnapLatLng = store.snapLatLng
   } else {
@@ -231,7 +236,7 @@ function processSnapMove(): void {
     snapMarker = null
     snapCursor?.remove()
     snapCursor = null
-    ctx.map.getCanvas().style.cursor = store.crosshairActive ? "crosshair" : ""
+    map.getCanvas().style.cursor = store.crosshairActive ? "crosshair" : ""
   }
 }
 
@@ -253,12 +258,13 @@ const MARKER_SHAPES: Record<string, string> = {
 }
 
 function showSnapIndicator(px: number, py: number, type: string): void {
+  const { map } = getCtx()
   const color = SNAP_COLORS[type]
   const snapLngLat = useSnapStore().snapLatLng
   if (!snapMarker) {
     const el = document.createElement("div")
     snapMarker = new maplibregl.Marker({ element: el, anchor: "center", pitchAlignment: "map" })
-    snapMarker.setLngLat([snapLngLat?.lng ?? 0, snapLngLat?.lat ?? 0]).addTo(ctx.map)
+    snapMarker.setLngLat([snapLngLat?.lng ?? 0, snapLngLat?.lat ?? 0]).addTo(map)
   }
   if (snapLngLat) {
     snapMarker.setLngLat([snapLngLat.lng, snapLngLat.lat])
@@ -266,11 +272,11 @@ function showSnapIndicator(px: number, py: number, type: string): void {
     el.style.cssText = MARKER_SHAPES[type].replace("{color}", color)
   }
 
-  ctx.map.getCanvas().style.cursor = "crosshair"
+  map.getCanvas().style.cursor = "crosshair"
   if (!snapCursor) {
     snapCursor = document.createElement("div")
     snapCursor.className = "nars-snap-crosshair"
-    ctx.map.getContainer().appendChild(snapCursor)
+    map.getContainer().appendChild(snapCursor)
   }
   snapCursor.style.cssText = `
     position:absolute;pointer-events:none;z-index:10000;
@@ -289,7 +295,7 @@ export function snapPointForEdit(
 }
 
 export function installSnapInterceptors(): void {
-  const map = ctx.map
+  const { map } = getCtx()
 
   const snapLngLat = (e: Record<string, unknown>): void => {
     const store = useSnapStore()

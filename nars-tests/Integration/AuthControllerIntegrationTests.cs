@@ -17,7 +17,7 @@ using Xunit;
 
 namespace NarsApi.Tests.Integration;
 
-[Collection("PostgreSQL Integration")]
+[Collection(PostgreSqlCollection.CollectionName)]
 public class AuthControllerIntegrationTests : IAsyncLifetime
 {
     private readonly NarsDatabaseFixture _fixture;
@@ -289,39 +289,19 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
         int? dairaId = null,
         int? wilayaId = null)
     {
-        var user = new User
-        {
-            Id = Guid.NewGuid(),
-            Name = $"Admin {username}",
-            Email = $"{username}@test.com",
-            Phone = DefaultPhone,
-            Username = username,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
-            Role = role,
-            DairaId = dairaId,
-            WilayaId = wilayaId,
-        };
-
-        await _db.Users.AddAsync(user);
+        var user = await SeedData.CreateUserAsync(_db, role, dairaId: dairaId, wilayaId: wilayaId, name: $"Admin {username}");
+        // Override username since CreateUserAsync generates one
+        user.Username = username;
+        user.Email = $"{username}@test.com";
         await _db.SaveChangesAsync();
         return user;
     }
 
     private async Task<User> CreateCommuneUserAsync(string username, string password, int communeId)
     {
-        var user = new User
-        {
-            Id = Guid.NewGuid(),
-            Name = $"User {username}",
-            Email = $"{username}@test.com",
-            Phone = DefaultPhone,
-            Username = username,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
-            Role = UserRoles.CommuneUser,
-            CommuneId = communeId,
-        };
-
-        await _db.Users.AddAsync(user);
+        var user = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: communeId, name: $"User {username}");
+        user.Username = username;
+        user.Email = $"{username}@test.com";
         await _db.SaveChangesAsync();
         return user;
     }

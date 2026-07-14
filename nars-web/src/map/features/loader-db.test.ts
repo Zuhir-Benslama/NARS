@@ -11,6 +11,8 @@ const {
   mockUpdateEndpointMarkers,
   mockLoadPhase,
   mockBuildGeoJsonFeature,
+  mockFeaturesStoreBatchAdd,
+  mockFeaturesStoreClear,
 } = vi.hoisted(() => ({
   mockApiFetch: vi.fn(),
   mockRenderScatteredAreas: vi.fn(),
@@ -21,6 +23,8 @@ const {
   mockUpdateEndpointMarkers: vi.fn(),
   mockLoadPhase: vi.fn(),
   mockBuildGeoJsonFeature: vi.fn(),
+  mockFeaturesStoreBatchAdd: vi.fn(),
+  mockFeaturesStoreClear: vi.fn(),
 }))
 
 vi.mock("../../api", () => ({ apiFetch: mockApiFetch }))
@@ -36,7 +40,15 @@ vi.mock("../roads/road-directions", () => ({ updateEndpointMarkers: mockUpdateEn
 vi.mock("../../phases-nav/storage", () => ({ loadPhase: mockLoadPhase }))
 vi.mock("./loader-build", () => ({ buildGeoJsonFeature: mockBuildGeoJsonFeature }))
 
-import { _setCtx, featuresStore } from "../core/state"
+import { _setCtx } from "../core/state"
+
+vi.mock("../../stores/featuresStore", () => ({
+  useFeaturesStore: () => ({
+    clear: mockFeaturesStoreClear,
+    batchAdd: mockFeaturesStoreBatchAdd,
+    updateSource: vi.fn(),
+  }),
+}))
 
 let loadFromDatabase: () => Promise<void>
 
@@ -86,7 +98,8 @@ describe("loader-db", () => {
     await loadFromDatabase()
 
     expect(mockApiFetch).toHaveBeenCalledWith("/api/features")
-    expect(featuresStore.getAll()).toHaveLength(1)
+    expect(mockFeaturesStoreBatchAdd).toHaveBeenCalledTimes(1)
+    expect(mockFeaturesStoreBatchAdd.mock.calls[0][0]).toHaveLength(1)
   })
 
   it("handles scattered features", async () => {
@@ -100,7 +113,7 @@ describe("loader-db", () => {
     await loadFromDatabase()
 
     expect(mockRenderScatteredAreas).toHaveBeenCalledWith(feature.data.geometry)
-    expect(featuresStore.getAll()).toHaveLength(0)
+    expect(mockFeaturesStoreBatchAdd).toHaveBeenCalledWith([])
   })
 
   it("handles unknown layer gracefully", async () => {
@@ -110,7 +123,7 @@ describe("loader-db", () => {
     await loadFromDatabase()
 
     expect(mockDebugError).toHaveBeenCalled()
-    expect(featuresStore.getAll()).toHaveLength(0)
+    expect(mockFeaturesStoreBatchAdd).toHaveBeenCalledWith([])
   })
 
   it("parses feature.data when it is a string", async () => {
@@ -132,9 +145,10 @@ describe("loader-db", () => {
 
     await loadFromDatabase()
 
-    expect(featuresStore.getAll()).toHaveLength(1)
-    const entry = featuresStore.getAll()[0]
-    expect(entry.properties.label).toBe("Parsed St")
+    expect(mockFeaturesStoreBatchAdd).toHaveBeenCalledTimes(1)
+    const batchFeatures = mockFeaturesStoreBatchAdd.mock.calls[0][0]
+    expect(batchFeatures).toHaveLength(1)
+    expect(batchFeatures[0].properties.label).toBe("Parsed St")
   })
 
   it("handles cityCenter feature and updates appStore", async () => {

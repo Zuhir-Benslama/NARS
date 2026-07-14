@@ -6,7 +6,8 @@ import { useAppStore } from "../../stores/appStore"
 import { useSelectionStore } from "../../stores/selectionStore"
 import { openEditModal } from "../../stores/modalStore"
 import { PHASES } from "../../phases"
-import { featuresStore, ctx } from "../core/state"
+import { getCtx } from "../core/state"
+import { useFeaturesStore } from "../../stores/featuresStore"
 import { showToast, showConfirm } from "../../lib/toast"
 import type { FeatureTypeKey } from "../../types"
 import { getErrorMessage } from "../../lib/errors"
@@ -57,7 +58,7 @@ export function enableEditGeometry(dbId: string): void {
     return
   }
 
-  if (!ctx.geoman) {
+  if (!getCtx().geoman) {
     showToast("Edit mode not available", "error")
     return
   }
@@ -95,6 +96,7 @@ export async function editFeatureInfo(dbId: string): Promise<void> {
 
     Object.assign(entry.data, result)
 
+    const featuresStore = useFeaturesStore()
     if (entry.type === "circle" && entry.data.radius && entry.data.lat && entry.data.lng) {
       const ring = closeRing(computeCircleRing(entry.data.lat, entry.data.lng, entry.data.radius))
       featuresStore.update(entry.id, {
@@ -151,6 +153,7 @@ export async function removeFeature(dbId: string): Promise<void> {
   try {
     await apiFetch(`/api/features/${dbId}`, { method: "DELETE" })
 
+    const featuresStore = useFeaturesStore()
     featuresStore.remove(entry.id)
     layerStore.removeFeature(phaseKey, dbId)
 

@@ -15,7 +15,7 @@ using Xunit;
 
 namespace NarsApi.Tests.Integration;
 
-[Collection("PostgreSQL Integration")]
+[Collection(PostgreSqlCollection.CollectionName)]
 public class AdminControllerIntegrationTests : IAsyncLifetime
 {
     private readonly NarsDatabaseFixture _fixture;
@@ -41,7 +41,7 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     private AdminController CreateOverviewController()
     {
         var featureStats = new FeatureStatsService(_fixture.CreateDbContextFactory());
-        return new AdminController(_db, new AdminOverviewService(_db, featureStats), Mock.Of<IWebHostEnvironment>());
+        return new AdminController(new AdminOverviewService(_db, featureStats), Mock.Of<IWebHostEnvironment>());
     }
 
     private AdminUserController CreateUserManagementController()

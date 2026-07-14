@@ -8,7 +8,8 @@ import { useAppStore } from "../../stores/appStore"
 import { useLayerStore } from "../../stores/layerStore"
 import { useEditStore } from "../../stores/editStore"
 import type { LayerState } from "../../stores/layerStore"
-import { ctx, featuresStore } from "./state"
+import { getCtx } from "./state"
+import { useFeaturesStore } from "../../stores/featuresStore"
 import { getActiveSnapPhases, snapPointForEdit, setEditDragActive } from "../snapping/snapping"
 import { disableEditMode, getActiveEditEntry, isEditMode } from "../edit/edit-mode"
 import { recordDelete } from "../undo"
@@ -43,14 +44,14 @@ function onDblClick(e: MapLibreMapMouseEvent): void {
   if (!isEditMode()) return
   e.preventDefault()
 
-  const gm = ctx.geoman
+  const { geoman: gm, map } = getCtx()
   if (!gm) return
 
   const actionInstances = gm.actionInstances as ActionInstances | undefined
   const shapeHelper = actionInstances?.["helper__shape_markers"]
   if (!shapeHelper) return
 
-  const allFeatures = ctx.map.queryRenderedFeatures(e.point)
+  const allFeatures = map.queryRenderedFeatures(e.point)
 
   const vertexFeatures = allFeatures.filter(
     (f) => f.source !== "features" && f.geometry?.type === "Point",
@@ -79,6 +80,7 @@ function onDblClick(e: MapLibreMapMouseEvent): void {
 }
 
 function onEditEnd(e: GeomanEditEvent): void {
+  const { map } = getCtx()
   const feature = e.feature
   if (!feature) return
 
@@ -87,6 +89,8 @@ function onEditEnd(e: GeomanEditEvent): void {
 
   const geometry = feature._geoJson?.geometry
   if (!geometry) return
+
+  const featuresStore = useFeaturesStore()
 
   if (geometry.type === "Point") {
     const c = geometry.coordinates as [number, number]
@@ -108,7 +112,7 @@ function onEditEnd(e: GeomanEditEvent): void {
         editStore.draggedVertexIndex < newCoords.length
       ) {
         const coord = newCoords[editStore.draggedVertexIndex]
-        const px = ctx.map.project([coord.lng, coord.lat])
+        const px = map.project([coord.lng, coord.lat])
         const snapped = snapPointForEdit(px.x, px.y, layerEntry.id)
         if (snapped) {
           newCoords[editStore.draggedVertexIndex].lat = snapped.lat
@@ -117,7 +121,7 @@ function onEditEnd(e: GeomanEditEvent): void {
       } else {
         for (let i = 0; i < newCoords.length; i++) {
           const coord = newCoords[i]
-          const px = ctx.map.project([coord.lng, coord.lat])
+          const px = map.project([coord.lng, coord.lat])
           const snapped = snapPointForEdit(px.x, px.y, layerEntry.id)
           if (snapped) {
             newCoords[i].lat = snapped.lat
@@ -177,7 +181,7 @@ async function onRemove(e: GeomanRemoveEvent): Promise<void> {
       return
     }
 
-    featuresStore.remove(removed.id)
+    useFeaturesStore().remove(removed.id)
     layerStore.removeFeature(phaseKey, dbId)
     useAppStore().syncCounts()
     refreshLayerVisibility()
@@ -189,8 +193,7 @@ async function onRemove(e: GeomanRemoveEvent): Promise<void> {
 }
 
 export function registerGeomanEvents(): void {
-  const map = ctx.map
-  const geoman = ctx.geoman
+  const { map, geoman } = getCtx()
   if (!geoman) {
     debugError("Geoman not initialized")
     return

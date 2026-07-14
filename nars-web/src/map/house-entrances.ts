@@ -6,13 +6,14 @@
 import { useAppStore } from "../stores/appStore"
 import { useLayerStore } from "../stores/layerStore"
 import type { LayerState } from "../stores/layerStore"
-import { featuresStore } from "./core/state"
+import { useFeaturesStore } from "../stores/featuresStore"
 
 const REFERENCE_COLOR = "#f39c12"
 const DEFAULT_ROAD_COLOR = "#3498db"
 const DEFAULT_ENTRANCE_COLOR = "#27ae60"
 
 function highlightFeature(phaseKey: string, dbId: string, active: boolean): void {
+  const featuresStore = useFeaturesStore()
   const layerStore = useLayerStore()
   const state = layerStore.$state
   const entries = state[phaseKey as keyof LayerState] || []

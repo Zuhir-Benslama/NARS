@@ -1,8 +1,5 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using NarsApi.Data;
 using NarsApi.Infrastructure;
-using NarsApi.Models;
 using NarsApi.Services;
 
 namespace NarsApi.Controllers;
@@ -11,7 +8,6 @@ namespace NarsApi.Controllers;
 [Route("/api")]
 [Tags("Admin")]
 public class AdminController(
-    AppDbContext db,
     IAdminOverviewService overviewService,
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
@@ -66,7 +62,7 @@ public class AdminController(
         {
             case UserRoles.WilayaAdmin:
                 {
-                    var daira = await db.Dairas.FindAsync([dairaId], cancellationToken);
+                    var daira = await overviewService.GetDairaByIdAsync(dairaId, cancellationToken);
                     if (daira is null || daira.WilayaId != CurrentWilayaId)
                     {
                         return NotFound();

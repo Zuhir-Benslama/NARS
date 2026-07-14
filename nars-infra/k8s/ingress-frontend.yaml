@@ -29,21 +29,21 @@ spec:
               service:
                 name: nars-api
                 port:
-                  number: 80
+                  number: 8080
           - path: /login
             pathType: Exact
             backend:
               service:
                 name: nars-api
                 port:
-                  number: 80
+                  number: 8080
           - path: /api(/|$)(.*)
             pathType: ImplementationSpecific
             backend:
               service:
                 name: nars-api
                 port:
-                  number: 80
+                  number: 8080
           - path: /(.*)
             pathType: ImplementationSpecific
             backend:
@@ -76,21 +76,21 @@ spec:
               service:
                 name: nars-api
                 port:
-                  number: 80
+                  number: 8080
           - path: /login
             pathType: Exact
             backend:
               service:
                 name: nars-api
                 port:
-                  number: 80
+                  number: 8080
           - path: /api(/|$)(.*)
             pathType: ImplementationSpecific
             backend:
               service:
                 name: nars-api
                 port:
-                  number: 80
+                  number: 8080
           - path: /(.*)
             pathType: ImplementationSpecific
             backend:
@@ -106,21 +106,21 @@ spec:
               service:
                 name: nars-api
                 port:
-                  number: 80
+                  number: 8080
           - path: /login
             pathType: Exact
             backend:
               service:
                 name: nars-api
                 port:
-                  number: 80
+                  number: 8080
           - path: /api(/|$)(.*)
             pathType: ImplementationSpecific
             backend:
               service:
                 name: nars-api
                 port:
-                  number: 80
+                  number: 8080
           - path: /(.*)
             pathType: ImplementationSpecific
             backend:

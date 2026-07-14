@@ -11,7 +11,7 @@ using Xunit;
 
 namespace NarsApi.Tests.Integration;
 
-[Collection("PostgreSQL Integration")]
+[Collection(PostgreSqlCollection.CollectionName)]
 public class LocationsControllerIntegrationTests : IAsyncLifetime
 {
     private readonly NarsDatabaseFixture _fixture;

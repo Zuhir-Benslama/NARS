@@ -14,7 +14,7 @@ using Xunit;
 
 namespace NarsApi.Tests.Integration;
 
-[Collection("PostgreSQL Integration")]
+[Collection(PostgreSqlCollection.CollectionName)]
 public class SpatialControllerIntegrationTests : IAsyncLifetime
 {
     private readonly NarsDatabaseFixture _fixture;
@@ -60,7 +60,7 @@ public class SpatialControllerIntegrationTests : IAsyncLifetime
         return user.Id;
     }
 
-    private Guid AddRoad(AppDbContext db, Guid ownerId, string coordsJson)
+    private async Task<Guid> AddRoadAsync(AppDbContext db, Guid ownerId, string coordsJson)
     {
         var id = Guid.NewGuid();
         db.Roads.Add(new Road
@@ -73,7 +73,7 @@ public class SpatialControllerIntegrationTests : IAsyncLifetime
             UpdatedAt = FixedUtcNow,
         });
         db.FeatureRegistry.Add(new FeatureRegistry { Id = id, FeatureType = FeatureTypes.Road });
-        db.SaveChanges();
+        await db.SaveChangesAsync();
         return id;
     }
 
@@ -82,7 +82,7 @@ public class SpatialControllerIntegrationTests : IAsyncLifetime
     {
         var controller = CreateController();
         var coords = """{"coordinates":[{"lat":36.4,"lng":2.9},{"lat":36.4,"lng":3.1}]}""";
-        var roadId = AddRoad(_db, _userId, coords);
+        var roadId = await AddRoadAsync(_db, _userId, coords);
 
         var result = await controller.GetRoadSide(new RoadSideRequest(
             RoadId: roadId, Lat: 36.5, Lng: 3.0));

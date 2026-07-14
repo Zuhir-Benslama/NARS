@@ -17,6 +17,7 @@ namespace NarsApi.Tests;
 
 public class ValidationControllerTests
 {
+    private const double SharpTurnAngleDegrees = 45.0;
     private static readonly Guid UserId = Guid.NewGuid();
 
     private static (ValidationController, AppDbContext) CreateController(
@@ -159,7 +160,7 @@ public class ValidationControllerTests
                 It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<double>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        var ctrl2 = new ValidationController(Options.Create(new ValidationOptions { RoadTurnAngleDegrees = 45 }), validationMock.Object, Mock.Of<ILogger<ValidationController>>(), Mock.Of<IWebHostEnvironment>())
+        var ctrl2 = new ValidationController(Options.Create(new ValidationOptions { RoadTurnAngleDegrees = SharpTurnAngleDegrees }), validationMock.Object, Mock.Of<ILogger<ValidationController>>(), Mock.Of<IWebHostEnvironment>())
         {
             ControllerContext = ctrl.ControllerContext
         };

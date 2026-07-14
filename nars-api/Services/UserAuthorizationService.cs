@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
+using NarsApi.DTOs;
 using NarsApi.Infrastructure;
+using NarsApi.Models;
 
 namespace NarsApi.Services;
 
@@ -53,6 +55,40 @@ public class UserAuthorizationService(AppDbContext db) : IUserAuthorizationServi
             default:
                 return Error($"Unsupported role transition ({callerRole} → {targetRole}).");
         }
+    }
+
+    public async Task<List<AdminUserSummary>> GetManageableUsersAsync(
+        string callerRole, Guid callerUserId, int? communeId, int? dairaId, int? wilayaId,
+        CancellationToken ct = default)
+    {
+        return callerRole switch
+        {
+            UserRoles.NationalAdmin => await db.Users
+                .Where(u => u.Role == UserRoles.WilayaAdmin)
+                .Select(u => new AdminUserSummary(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role, u.Phone ?? "", u.CommuneId, u.DairaId, u.WilayaId))
+                .ToListAsync(ct),
+
+            UserRoles.WilayaAdmin when wilayaId.HasValue => await db.Users
+                .Where(u => u.Role == UserRoles.DairaAdmin && u.DairaId.HasValue)
+                .Join(db.Dairas.Where(d => d.WilayaId == wilayaId.Value),
+                    u => u.DairaId!.Value, d => d.DairaId, (u, _) => u)
+                .Select(u => new AdminUserSummary(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role, u.Phone ?? "", u.CommuneId, u.DairaId, u.WilayaId))
+                .ToListAsync(ct),
+
+            UserRoles.DairaAdmin when dairaId.HasValue => await db.Users
+                .Where(u => u.Role == UserRoles.CommuneUser && u.CommuneId.HasValue)
+                .Join(db.Communes.Where(c => c.DairaId == dairaId.Value),
+                    u => u.CommuneId!.Value, c => c.CommuneId, (u, _) => u)
+                .Select(u => new AdminUserSummary(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role, u.Phone ?? "", u.CommuneId, u.DairaId, u.WilayaId))
+                .ToListAsync(ct),
+
+            UserRoles.CommuneUser when communeId.HasValue => await db.Users
+                .Where(u => u.Role == UserRoles.FieldWorker && u.CommuneId == communeId)
+                .Select(u => new AdminUserSummary(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role, u.Phone ?? "", u.CommuneId, u.DairaId, u.WilayaId))
+                .ToListAsync(ct),
+
+            _ => [],
+        };
     }
 
     private static ScopeValidationResult Valid() => new(null, false);

@@ -6,10 +6,10 @@ const mockFeaturesStoreAdd = vi.fn()
 const mockToast = vi.fn()
 const mockToApiSaveShape = vi.fn()
 
-vi.mock("./core/state", () => ({
-  featuresStore: {
+vi.mock("../stores/featuresStore", () => ({
+  useFeaturesStore: () => ({
     add: mockFeaturesStoreAdd,
-  },
+  }),
 }))
 
 vi.mock("../lib/toast", () => ({

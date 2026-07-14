@@ -3,7 +3,8 @@
 // and cleaning up Geoman state.
 
 import { apiFetch } from "../../api"
-import { featuresStore, ctx } from "../core/state"
+import { getCtx } from "../core/state"
+import { useFeaturesStore } from "../../stores/featuresStore"
 import {
   computeCircleRing,
   computeCircleRadius,
@@ -28,9 +29,10 @@ import {
 
 async function removeGeomanFeature(): Promise<void> {
   const geomanId = getActiveGeomanFeatureId()
-  if (!ctx.geoman || !geomanId) return
+  const { geoman } = getCtx()
+  if (!geoman || !geomanId) return
   try {
-    await ctx.geoman.features.delete(geomanId)
+    await geoman.features.delete(geomanId)
   } catch {
     // Feature may already be gone
   }
@@ -40,9 +42,10 @@ async function removeGeomanFeature(): Promise<void> {
 // ─── GEOMETRY EXTRACTION ─────────────────────────────────────────
 
 async function readGeomanGeometry(entry: LayerEntry): Promise<boolean> {
-  if (!getActiveGeomanFeatureId() || !ctx.geoman) return true
+  if (!getActiveGeomanFeatureId() || !getCtx().geoman) return true
+  const { geoman } = getCtx()
   try {
-    const geomanFeatures = await ctx.geoman.features.getAll()
+    const geomanFeatures = await geoman!.features.getAll()
     const geomanFeature = (
       geomanFeatures as {
         features?: Array<{ id?: string; geometry?: unknown }>
@@ -115,6 +118,7 @@ async function saveGeometry(entry: LayerEntry): Promise<boolean> {
 // ─── COMMIT EDIT MODE ────────────────────────────────────────────────────────
 
 function updateFeatureGeometry(entry: LayerEntry): void {
+  const featuresStore = useFeaturesStore()
   if (entry.data.lat != null && entry.data.lng != null) {
     if (entry.type === "circle" && entry.data.radius) {
       const ring = closeRing(computeCircleRing(entry.data.lat, entry.data.lng, entry.data.radius))
@@ -159,7 +163,7 @@ export async function commitEditMode(): Promise<void> {
     return
   }
 
-  if (getActiveGeomanFeatureId() && ctx.geoman) {
+  if (getActiveGeomanFeatureId() && getCtx().geoman) {
     const ok = await readGeomanGeometry(entry)
     if (!ok) return
   }

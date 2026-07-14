@@ -20,7 +20,7 @@ namespace NarsApi.Tests.Integration;
 /// Integration tests for FeaturesController against real PostgreSQL + PostGIS.
 /// Tests the full CRUD pipeline with spatial data.
 /// </summary>
-[Collection("PostgreSQL Integration")]
+[Collection(PostgreSqlCollection.CollectionName)]
 public class FeaturesControllerIntegrationTests : IAsyncLifetime
 {
     private readonly NarsDatabaseFixture _fixture;

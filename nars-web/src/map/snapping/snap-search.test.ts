@@ -5,15 +5,17 @@ const mockGetBounds = vi.fn()
 const mockProjectFn = vi.fn()
 const mockUnprojectFn = vi.fn()
 
-vi.mock("../core/state", () => ({
-  ctx: {
-    map: {
-      project: mockProjectFn,
-      unproject: mockUnprojectFn,
-      getBounds: mockGetBounds,
-    },
-    geoman: undefined,
+const mockCtx = {
+  map: {
+    project: mockProjectFn,
+    unproject: mockUnprojectFn,
+    getBounds: mockGetBounds,
   },
+  geoman: undefined as any,
+}
+
+vi.mock("../core/state", () => ({
+  getCtx: () => mockCtx,
 }))
 
 const mockGetSnapRings = vi.fn()
@@ -55,8 +57,7 @@ async function loadModule() {
 
 beforeEach(async () => {
   vi.clearAllMocks()
-  const ctxMod = await import("../core/state")
-  ctxMod.ctx.geoman = undefined
+  mockCtx.geoman = undefined
   mockProjectFn.mockImplementation((ll: [number, number]) => project(ll))
   mockUnprojectFn.mockImplementation((pt: [number, number]) => unproject(pt))
   mockGetBounds.mockReturnValue({
@@ -80,16 +81,14 @@ describe("snap-search", () => {
     })
 
     it("returns external when no lineDrawer", async () => {
-      const ctxMod = await import("../core/state")
-      ctxMod.ctx.geoman = { actionInstances: { draw__polygon: {} } } as any
+      mockCtx.geoman = { actionInstances: { draw__polygon: {} } } as any
 
       const result = mergeExternalSnapWithDrawFirstVertex(0, 0, makeExternal(), project)
       expect(result).toEqual(makeExternal())
     })
 
     it("returns external when no shapeLngLats", async () => {
-      const ctxMod = await import("../core/state")
-      ctxMod.ctx.geoman = {
+      mockCtx.geoman = {
         actionInstances: {
           draw__polygon: { lineDrawer: {} },
         },
@@ -100,8 +99,7 @@ describe("snap-search", () => {
     })
 
     it("returns first vertex when it is close and no external", async () => {
-      const ctxMod = await import("../core/state")
-      ctxMod.ctx.geoman = {
+      mockCtx.geoman = {
         actionInstances: {
           draw__polygon: {
             lineDrawer: { shapeLngLats: [[100, 0]] },
@@ -114,8 +112,7 @@ describe("snap-search", () => {
     })
 
     it("returns first vertex when closer than external", async () => {
-      const ctxMod = await import("../core/state")
-      ctxMod.ctx.geoman = {
+      mockCtx.geoman = {
         actionInstances: {
           draw__polygon: {
             lineDrawer: { shapeLngLats: [[100, 0]] },
@@ -133,8 +130,7 @@ describe("snap-search", () => {
     })
 
     it("returns external when first vertex is further away", async () => {
-      const ctxMod = await import("../core/state")
-      ctxMod.ctx.geoman = {
+      mockCtx.geoman = {
         actionInstances: {
           draw__polygon: {
             lineDrawer: { shapeLngLats: [[100, 0]] },
@@ -152,8 +148,7 @@ describe("snap-search", () => {
     })
 
     it("returns external when first vertex is outside CORNER_PX", async () => {
-      const ctxMod = await import("../core/state")
-      ctxMod.ctx.geoman = {
+      mockCtx.geoman = {
         actionInstances: {
           draw__polygon: {
             lineDrawer: { shapeLngLats: [[500, 0]] },
@@ -167,8 +162,7 @@ describe("snap-search", () => {
     })
 
     it("handles draw__line action type", async () => {
-      const ctxMod = await import("../core/state")
-      ctxMod.ctx.geoman = {
+      mockCtx.geoman = {
         actionInstances: {
           draw__line: {
             lineDrawer: { shapeLngLats: [[99, 0]] },

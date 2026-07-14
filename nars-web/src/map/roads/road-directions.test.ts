@@ -15,10 +15,10 @@ vi.mock("../../api", () => ({
   apiFetch: mockApiFetch,
 }))
 
-vi.mock("../core/state", () => ({
-  featuresStore: {
+vi.mock("../../stores/featuresStore", () => ({
+  useFeaturesStore: () => ({
     update: mockFeaturesStoreUpdate,
-  },
+  }),
 }))
 
 vi.mock("../../lib/toast", () => ({

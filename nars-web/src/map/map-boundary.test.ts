@@ -14,7 +14,7 @@ vi.mock("../lib/toast", () => ({
   showToast: vi.fn(),
 }))
 
-vi.mock("./core/state", () => ({ ctx: {} }))
+vi.mock("./core/state", () => ({ getCtx: () => ({}) }))
 
 beforeEach(() => {
   vi.clearAllMocks()

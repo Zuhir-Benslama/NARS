@@ -1,7 +1,7 @@
 // ─── MAP ROTATION ─────────────────────────────────────────────────────────────
 // Adds rotation controls to the Maplibre GL JS map.
 
-import { ctx } from "./core/state"
+import { getCtx } from "./core/state"
 import { useRotationStore } from "../stores/rotationStore"
 import { t } from "../i18n"
 
@@ -14,11 +14,11 @@ export function resetRotation(): void {
 export function setBearing(deg: number): void {
   const store = useRotationStore()
   store.setBearing(deg)
-  ctx.map.easeTo({ bearing: store.currentBearing, duration: 300 })
+  getCtx().map.easeTo({ bearing: store.currentBearing, duration: 300 })
 }
 
 export function initRotationControls(): void {
-  const container = ctx.map.getContainer()
+  const container = getCtx().map.getContainer()
 
   const wrap = document.createElement("div")
   wrap.className = "nars-rotation-control leaflet-bar"

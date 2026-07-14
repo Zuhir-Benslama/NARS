@@ -31,13 +31,6 @@ public class AdminUserControllerTests
             }
         };
 
-    private static void SetUser(AdminUserController ctrl, string role,
-        int? communeId = null, int? dairaId = null, int? wilayaId = null)
-    {
-        ctrl.ControllerContext.HttpContext.User =
-            AuthTestHelper.CreateClaimsPrincipal(Guid.NewGuid(), role, communeId, dairaId, wilayaId);
-    }
-
     // ─── CreateAdmin ────────────────────────────────────────────────────
 
     [Fact]
@@ -45,7 +38,7 @@ public class AdminUserControllerTests
     {
         var db = CreateDb();
         var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.NationalAdmin);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
         var result = await ctrl.CreateAdmin(null!, default);
 
@@ -58,7 +51,7 @@ public class AdminUserControllerTests
     {
         var db = CreateDb();
         var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.NationalAdmin);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
         var result = await ctrl.CreateAdmin(new CreateAdminRequest(
             Username: "new_wilaya_admin",
@@ -92,7 +85,7 @@ public class AdminUserControllerTests
         });
         await db.SaveChangesAsync();
         var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.NationalAdmin);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
         var result = await ctrl.CreateAdmin(new CreateAdminRequest(
             Username: "existing",
@@ -114,7 +107,7 @@ public class AdminUserControllerTests
     {
         var db = CreateDb();
         var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.CommuneUser, communeId: 1);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.CommuneUser, communeId: 1);
 
         var result = await ctrl.CreateAdmin(new CreateAdminRequest(
             Username: "new_user",
@@ -137,7 +130,7 @@ public class AdminUserControllerTests
         db.Communes.Add(new Commune { CommuneId = 99, DairaId = 99, CommuneFr = "Other" });
         await db.SaveChangesAsync();
         var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.DairaAdmin, dairaId: 1);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.DairaAdmin, dairaId: 1);
 
         var result = await ctrl.CreateAdmin(new CreateAdminRequest(
             Username: "new_user",
@@ -183,7 +176,7 @@ public class AdminUserControllerTests
         });
         await db.SaveChangesAsync();
         var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.NationalAdmin);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
         var result = await ctrl.GetManageableUsers(default);
 
@@ -200,7 +193,7 @@ public class AdminUserControllerTests
     {
         var db = CreateDb();
         var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.NationalAdmin);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
         var result = await ctrl.UpdateAdmin(
             Guid.NewGuid(),
@@ -217,7 +210,7 @@ public class AdminUserControllerTests
     {
         var db = CreateDb();
         var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.NationalAdmin);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
         var result = await ctrl.UpdateAdmin(Guid.NewGuid(), null!, default);
 
@@ -243,7 +236,7 @@ public class AdminUserControllerTests
         });
         await db.SaveChangesAsync();
         var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.NationalAdmin);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
         var result = await ctrl.UpdateAdmin(
             userId,
@@ -264,7 +257,7 @@ public class AdminUserControllerTests
     {
         var db = CreateDb();
         var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.NationalAdmin);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
         var result = await ctrl.DeleteAdmin(Guid.NewGuid(), default);
 
@@ -290,7 +283,7 @@ public class AdminUserControllerTests
         });
         await db.SaveChangesAsync();
         var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.NationalAdmin);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
         var result = await ctrl.DeleteAdmin(userId, default);
 
@@ -317,7 +310,7 @@ public class AdminUserControllerTests
         });
         await db.SaveChangesAsync();
         var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.WilayaAdmin, wilayaId: 1);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.WilayaAdmin, wilayaId: 1);
 
         var result = await ctrl.DeleteAdmin(userId, default);
 

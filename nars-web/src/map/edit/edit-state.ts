@@ -4,7 +4,7 @@ import { useEditStore } from "../../stores/editStore"
 import type { LayerState } from "../../stores/layerStore"
 import type { LayerEntry, LatLng } from "../../types"
 import { EDIT_CONFIG } from "../../config"
-import { ctx, updateSelectionHighlight } from "../core/state"
+import { getCtx, updateSelectionHighlight } from "../core/state"
 import {
   enableCrosshair,
   disableSnapping,
@@ -47,10 +47,11 @@ export function resetEditState(): void {
 }
 
 export function disableEditMode(): void {
-  if (!ctx.geoman) return
+  const { geoman } = getCtx()
+  if (!geoman) return
   const store = useEditStore()
   unpatchMarkerPointerSnap()
-  ctx.geoman.disableGlobalEditMode()
+  geoman.disableGlobalEditMode()
   store.isEditMode = false
   setEditModeActive(false)
   store.setActiveGeomanFeatureId(null)
@@ -81,10 +82,11 @@ export function findLayerEntryByFeatureId(featureId: string | undefined): LayerE
 }
 
 export function suppressGeomanFill(): void {
+  const { map } = getCtx()
   for (const layerId of ["gm_main-polygon__fill-layer-0", "gm_temporary-polygon__fill-layer-0"]) {
     try {
-      if (ctx.map.getLayer(layerId)) {
-        ctx.map.setPaintProperty(layerId, "fill-opacity", 0)
+      if (map.getLayer(layerId)) {
+        map.setPaintProperty(layerId, "fill-opacity", 0)
       }
     } catch {
       /* layer may not exist */
@@ -93,9 +95,9 @@ export function suppressGeomanFill(): void {
 
   for (const layerId of ["gm_main-circle__circle-layer-0", "gm_temporary-circle__circle-layer-0"]) {
     try {
-      if (ctx.map.getLayer(layerId)) {
-        ctx.map.setPaintProperty(layerId, "circle-opacity", 0)
-        ctx.map.setPaintProperty(layerId, "circle-stroke-opacity", 0)
+      if (map.getLayer(layerId)) {
+        map.setPaintProperty(layerId, "circle-opacity", 0)
+        map.setPaintProperty(layerId, "circle-stroke-opacity", 0)
       }
     } catch {
       /* layer may not exist */
@@ -104,12 +106,13 @@ export function suppressGeomanFill(): void {
 }
 
 export function ensureGeomanDrawEdgesVisible(): void {
+  const { map } = getCtx()
   for (const layerId of ["gm_temporary-polygon__line-layer-0", "gm_temporary-line__line-layer-0"]) {
     try {
-      if (ctx.map.getLayer(layerId)) {
-        ctx.map.setPaintProperty(layerId, "line-opacity", EDIT_CONFIG.edgeLineOpacity)
-        ctx.map.setPaintProperty(layerId, "line-color", EDIT_CONFIG.edgeLineColor)
-        ctx.map.setPaintProperty(layerId, "line-width", EDIT_CONFIG.edgeLineWidth)
+      if (map.getLayer(layerId)) {
+        map.setPaintProperty(layerId, "line-opacity", EDIT_CONFIG.edgeLineOpacity)
+        map.setPaintProperty(layerId, "line-color", EDIT_CONFIG.edgeLineColor)
+        map.setPaintProperty(layerId, "line-width", EDIT_CONFIG.edgeLineWidth)
       }
     } catch {
       /* layer may not exist yet */
@@ -118,10 +121,10 @@ export function ensureGeomanDrawEdgesVisible(): void {
 
   for (const layerId of ["gm_main-polygon__line-layer-0", "gm_main-line__line-layer-0"]) {
     try {
-      if (ctx.map.getLayer(layerId)) {
-        ctx.map.setPaintProperty(layerId, "line-opacity", EDIT_CONFIG.edgeLineOpacity)
-        ctx.map.setPaintProperty(layerId, "line-color", EDIT_CONFIG.edgeLineColor)
-        ctx.map.setPaintProperty(layerId, "line-width", EDIT_CONFIG.edgeLineWidth)
+      if (map.getLayer(layerId)) {
+        map.setPaintProperty(layerId, "line-opacity", EDIT_CONFIG.edgeLineOpacity)
+        map.setPaintProperty(layerId, "line-color", EDIT_CONFIG.edgeLineColor)
+        map.setPaintProperty(layerId, "line-width", EDIT_CONFIG.edgeLineWidth)
       }
     } catch {
       /* layer may not exist yet */
@@ -130,9 +133,9 @@ export function ensureGeomanDrawEdgesVisible(): void {
 
   // Add a NARS fallback edge layer that reads from gm_temporary source
   // to ensure edges are visible during draw regardless of Geoman's own layers.
-  if (!ctx.map.getLayer("nars-temp-edge") && !!ctx.map.getSource("gm_temporary")) {
+  if (!map.getLayer("nars-temp-edge") && !!map.getSource("gm_temporary")) {
     try {
-      ctx.map.addLayer({
+      map.addLayer({
         id: "nars-temp-edge",
         type: "line",
         source: "gm_temporary",

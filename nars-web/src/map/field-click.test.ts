@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { registerFieldWorkerClick } from "./field-click"
 import type { MapGeoJSONFeature } from "maplibre-gl"
 
-const { mockSelectFeature, mockMapOn } = vi.hoisted(() => ({
+const { mockSelectFeature, mockMapOn, mockQueryRenderedFeatures } = vi.hoisted(() => ({
   mockSelectFeature: vi.fn(),
   mockMapOn: vi.fn(),
+  mockQueryRenderedFeatures: vi.fn(),
 }))
 
 vi.mock("../stores/fieldStore", () => ({
@@ -18,16 +19,15 @@ vi.mock("../stores/appStore", () => ({
 }))
 
 vi.mock("./core/state", () => ({
-  ctx: {
+  getCtx: () => ({
     map: {
       on: mockMapOn,
-      queryRenderedFeatures: vi.fn(),
+      queryRenderedFeatures: mockQueryRenderedFeatures,
     },
-  },
+  }),
 }))
 
 import { useAppStore } from "../stores/appStore"
-import { ctx } from "./core/state"
 
 function makeMockFeature(overrides: Partial<MapGeoJSONFeature> = {}): MapGeoJSONFeature {
   return {
@@ -93,7 +93,7 @@ describe("registerFieldWorkerClick", () => {
 
     registerFieldWorkerClick()
 
-    vi.mocked(ctx.map.queryRenderedFeatures).mockReturnValue([])
+    mockQueryRenderedFeatures.mockReturnValue([])
     capturedHandler({ point: { x: 0, y: 0 } })
     expect(mockSelectFeature).not.toHaveBeenCalled()
   })
@@ -110,7 +110,7 @@ describe("registerFieldWorkerClick", () => {
 
     registerFieldWorkerClick()
 
-    vi.mocked(ctx.map.queryRenderedFeatures).mockReturnValue([
+    mockQueryRenderedFeatures.mockReturnValue([
       makeMockFeature({
         properties: { phaseKey: "roads", dbId: "road-1", label: "Main Road" },
       }),
@@ -135,7 +135,7 @@ describe("registerFieldWorkerClick", () => {
 
     registerFieldWorkerClick()
 
-    vi.mocked(ctx.map.queryRenderedFeatures).mockReturnValue([
+    mockQueryRenderedFeatures.mockReturnValue([
       makeMockFeature({
         properties: { phaseKey: "areas", dbId: "area-1" },
       }),

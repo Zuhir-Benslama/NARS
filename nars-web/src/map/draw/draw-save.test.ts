@@ -14,8 +14,11 @@ const mockToast = vi.fn()
 const mockBuildDrawControl = vi.fn()
 
 vi.mock("../core/state", () => ({
-  ctx: { geoman: { disableDraw: mockDisableDraw } },
-  featuresStore: { add: mockFeaturesStoreAdd },
+  getCtx: () => ({ geoman: { disableDraw: mockDisableDraw } }),
+}))
+
+vi.mock("../../stores/featuresStore", () => ({
+  useFeaturesStore: () => ({ add: mockFeaturesStoreAdd }),
 }))
 
 vi.mock("./draw-modal", () => ({

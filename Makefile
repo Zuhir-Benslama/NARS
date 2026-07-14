@@ -6,6 +6,8 @@ SHELL := /bin/bash
 CLUSTER_NAME       ?= nars
 NAMESPACE          ?= nars
 DOMAIN             ?= nars.dz
+APP_PORT           ?= 8080
+APP_TLS_PORT       ?= 8443
 K8S_DIR            ?= nars-infra/k8s
 DOCKER_DIR         ?= nars-infra/docker
 DOCKER_ORG         ?= zuhirbenslama
@@ -17,6 +19,9 @@ DB_NAME            ?= nars_db
 POSTGRES_DATA_DIR  ?= data/nars/postgis
 REGISTRY_IMAGES    := nars-api nars-postgis nars-vite
 SCALABLE_DEPLOYS   := postgis nars-api nars-frontend
+INGRESS_NGINX_VERSION ?= v1.12.0
+LOCAL_PATH_PROVISIONER_VERSION ?= v0.0.30
+YAMLLINT_IMAGE     ?= cytopia/yamllint:1.36.0
 POSTGIS_GET_POD_CMD = $(KUBECTL) get pod -n "$(NAMESPACE)" -l app.kubernetes.io/name=postgis -o jsonpath='{.items[0].metadata.name}' 2>/dev/null
 
 # ─── Secrets ──────────────────────────────────────────────────
@@ -55,7 +60,7 @@ GRAFANA_PASSWORD   ?=
 export POSTGRES_PASSWORD JWT_SECRET GPG_PASSPHRASE GRAFANA_PASSWORD
 
 .PHONY: help _build-nars-api _build-nars-postgis _build-nars-vite db-get-pod db-get-password
-help:
+help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| sort \
 		| awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-28s\033[0m %s\n", $$1, $$2}'
@@ -75,6 +80,10 @@ prerequisites: ## Check that all required tools are installed
 _check-secrets: ## Fail fast if critical secrets are empty (prevents deploying with insecure defaults)
 	@if [ -z "$(POSTGRES_PASSWORD)" ] || [ -z "$(JWT_SECRET)" ]; then \
 		echo "✖ Secrets not configured — run 'make .env' to generate them"; \
+		exit 1; \
+	fi
+	@if [ -z "$(GPG_PASSPHRASE)" ] || [ -z "$(GRAFANA_PASSWORD)" ]; then \
+		echo "✖ GPG_PASSPHRASE or GRAFANA_PASSWORD not set — run 'make .env' to generate them"; \
 		exit 1; \
 	fi
 
@@ -102,7 +111,7 @@ cluster-up: prerequisites _check-secrets ## Full bootstrap: create cluster, buil
 	@echo "  Proxy:         make proxy-up"
 	@echo "  Mobile app:    make adb-reverse"
 	@echo "  Smoke test:    make smoke-test"
-	@echo "  Visit:         http://localhost:8080/"
+	@echo "  Visit:         http://localhost:$(APP_PORT)/"
 	@echo "  Stop proxy:    make proxy-down"
 	@echo "  Stop pods:     make cluster-stop"
 	@echo "  Tear down:     make cluster-down (data preserved)"
@@ -115,7 +124,7 @@ cluster-up-full: ## Full bootstrap including observability stack
 	@echo ""
 	@echo "✓ Cluster '$(CLUSTER_NAME)' with observability is ready!"
 	@echo "  Port-forward:  make observability-port-forward"
-	@echo "  Visit:         http://localhost:8080/"
+	@echo "  Visit:         http://localhost:$(APP_PORT)/"
 
 .PHONY: namespace-ensure
 namespace-ensure: ## Ensure $(NAMESPACE) namespace exists (idempotent)
@@ -171,6 +180,7 @@ cluster-clean: ## Delete cluster AND wipe postgis data (irreversible!)
 		echo "  Non-interactive shell — refusing destructive operation."; \
 		exit 1; \
 	fi
+	# cluster-down auto-backs up pg_dump before teardown — order is intentional
 	$(MAKE) cluster-down
 	@echo "→ Wiping postgis data..."
 	if [[ "$(POSTGRES_DATA_DIR)" == /* ]]; then
@@ -212,9 +222,9 @@ port-forward-start: ## Start kubectl port-forward inside the kind container (bac
 	@docker exec nars-control-plane sh -c 'pkill -f "port-forward.*ingress-nginx" 2>/dev/null; true' 2>/dev/null || true
 	@sleep 0.5
 	@docker exec -d nars-control-plane kubectl port-forward --address 0.0.0.0 \
-		-n ingress-nginx service/ingress-nginx-controller 8080:80 > /dev/null 2>&1
+		-n ingress-nginx service/ingress-nginx-controller $(APP_PORT):80 > /dev/null 2>&1
 	@docker exec -d nars-control-plane kubectl port-forward --address 0.0.0.0 \
-		-n ingress-nginx service/ingress-nginx-controller 8443:443 > /dev/null 2>&1
+		-n ingress-nginx service/ingress-nginx-controller $(APP_TLS_PORT):443 > /dev/null 2>&1
 	@sleep 2
 	@echo "✓ Port-forward started inside kind container"
 
@@ -224,34 +234,38 @@ port-forward-stop: ## Stop port-forward inside the kind container
 	@echo "✓ Port-forward stopped"
 
 .PHONY: proxy-up
-proxy-up: port-forward-start ## Start Docker socat bridge: host:8080 → kind:8080
+proxy-up: port-forward-start ## Start Docker socat bridge: host:$(APP_PORT) → kind:$(APP_PORT)
 	@echo "→ Setting up socat bridge container..."
 	@docker rm -f "$(PROXY_CONTAINER)" 2>/dev/null || true
 	@sleep 0.5
 	@docker run -d --name "$(PROXY_CONTAINER)" --rm \
-		-p 0.0.0.0:8080:8080 \
-		-p 0.0.0.0:8443:8443 \
+		-p 0.0.0.0:$(APP_PORT):$(APP_PORT) \
+		-p 0.0.0.0:$(APP_TLS_PORT):$(APP_TLS_PORT) \
 		--network kind \
 		--entrypoint sh \
 		alpine/socat \
-		-c "socat tcp-l:8080,fork,reuseaddr tcp:nars-control-plane:8080 & socat tcp-l:8443,fork,reuseaddr tcp:nars-control-plane:8443 & wait -n" > /dev/null
+		-c "socat tcp-l:$(APP_PORT),fork,reuseaddr tcp:nars-control-plane:$(APP_PORT) & socat tcp-l:$(APP_TLS_PORT),fork,reuseaddr tcp:nars-control-plane:$(APP_TLS_PORT) & wait -n" > /dev/null
 	@echo "→ Waiting for proxy to be ready..."
-	@for i in $$(seq 1 12); do \
-		status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:8080/ 2>/dev/null || echo "000"); \
-		if [ "$$status" != "000" ]; then \
-			break; \
+	@for i in $$(seq 1 15); do \
+		running=$$(docker inspect -f '{{.State.Running}}' "$(PROXY_CONTAINER)" 2>/dev/null || echo "false"); \
+		if [ "$$running" != "true" ]; then \
+			echo "✖ socat container '$(PROXY_CONTAINER)' exited unexpectedly"; \
+			docker logs "$(PROXY_CONTAINER)" 2>&1 | tail -5; \
+			exit 1; \
 		fi; \
-		sleep 2; \
+		status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:$(APP_PORT)/ 2>/dev/null || echo "000"); \
+		if [ "$$status" != "000" ]; then break; fi; \
+		sleep 1; \
 	done; \
-	status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:8080/ 2>/dev/null || echo "000"); \
+	status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:$(APP_PORT)/ 2>/dev/null || echo "000"); \
 	if [ "$$status" = "200" ] || [ "$$status" = "302" ]; then \
 		echo "✓ Proxy ready ($$status)"; \
 	else \
 		echo "⚠ Proxy may not be reachable (status: $$status — check port-forward or rootless Docker networking)"; \
 	fi
 	@echo ""
-	@echo "✓ App accessible at http://localhost:8080/"
-	@echo "  Health:      http://localhost:8080/api/health"
+	@echo "✓ App accessible at http://localhost:$(APP_PORT)/"
+	@echo "  Health:      http://localhost:$(APP_PORT)/api/health"
 	@echo "  Mobile app:  make adb-reverse    (if connected via USB)"
 	@echo "  Smoke test:  make smoke-test"
 	@echo "  Stop proxy:  make proxy-down"
@@ -263,26 +277,26 @@ proxy-down: port-forward-stop ## Stop the socat bridge and port-forward
 	@echo "✓ Proxy stopped"
 
 .PHONY: adb-reverse
-adb-reverse: ## Forward phone:8080 → host:8080 via USB (for mobile dev)
+adb-reverse: ## Forward phone:$(APP_PORT) → host:$(APP_PORT) via USB (for mobile dev)
 	@echo "→ Setting up adb reverse proxy..."
-	@adb reverse tcp:8080 tcp:8080 2>&1
-	@echo "✓ Phone can now reach the API at http://localhost:8080/"
+	@adb reverse tcp:$(APP_PORT) tcp:$(APP_PORT) 2>&1
+	@echo "✓ Phone can now reach the API at http://localhost:$(APP_PORT)/"
 	@echo "  (Lasts while USB is connected; re-run after USB disconnect/reconnect)"
 
 .PHONY: proxy-status
 proxy-status: ## Show proxy status
 	@echo "=== Port-forward (kind container) ==="
-	@docker exec nars-control-plane ss -tlnp 2>/dev/null | grep -E '8080|8443' || echo "  NOT RUNNING"
+	@docker exec nars-control-plane ss -tlnp 2>/dev/null | grep -E '$(APP_PORT)|$(APP_TLS_PORT)' || echo "  NOT RUNNING"
 	@echo ""
 	@echo "=== socat bridge container ==="
 	@docker ps --filter name=$(PROXY_CONTAINER) --format '  {{.ID}} {{.Status}} {{.Image}}' 2>/dev/null || echo "  NOT RUNNING"
 	@echo ""
 	@echo "=== App health ==="
-	@curl -s -o /dev/null -w "  HTTP %{http_code}\n" --connect-timeout 3 http://localhost:8080/ 2>/dev/null || echo "  UNREACHABLE"
+	@curl -s -o /dev/null -w "  HTTP %{http_code}\n" --connect-timeout 3 http://localhost:$(APP_PORT)/ 2>/dev/null || echo "  UNREACHABLE"
 
 # ─── Smoke Test ────────────────────────────────────────────
 
-SMOKE_BASE_URL ?= http://localhost:8080
+SMOKE_BASE_URL ?= http://localhost:$(APP_PORT)
 
 .PHONY: smoke-test
 smoke-test: ## Post-deploy smoke test: verify /health, frontend, and API auth
@@ -451,9 +465,10 @@ db-admin: export NON_INTERACTIVE := 1
 db-admin: export ADMIN_NAME := National Admin
 db-admin: export ADMIN_EMAIL := admin@nars.dz
 db-admin: export ADMIN_PHONE := +213000000000
-db-admin: .env ## Create national admin with one-time generated credentials
+db-admin: .env prerequisites ## Create national admin with one-time generated credentials
 	@echo ""
 	@echo "→ Generating one-time national admin credentials..."
+	@command -v openssl >/dev/null 2>&1 || { echo "✖ openssl is not installed"; exit 1; }
 	@ADMIN_USERNAME="admin_$$(openssl rand -hex 4)"
 	@ADMIN_PASSWORD="$$(openssl rand -base64 12)"
 	@export ADMIN_USERNAME ADMIN_PASSWORD
@@ -546,7 +561,7 @@ kubeconfig-fix: ## Patch kubeconfig for rootless Docker (port 16443 via kube-pro
 ingress-install: ## Install NGINX Ingress Controller (idempotent)
 	@echo "→ Installing NGINX Ingress Controller..."
 	@$(KUBECTL) apply -f \
-		https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.0/deploy/static/provider/kind/deploy.yaml
+		https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-$(INGRESS_NGINX_VERSION)/deploy/static/provider/kind/deploy.yaml
 	@$(KUBECTL) label node --overwrite nars-control-plane ingress-ready=true 2>/dev/null || true
 	@echo "✓ Ingress controller installed"
 
@@ -585,7 +600,7 @@ metrics-wait: ## Wait for metrics-server to be ready
 storage-provisioner-install: ## Install local-path StorageClass (dynamic provisioning, idempotent)
 	@echo "→ Installing local-path StorageClass..."
 	@$(KUBECTL) apply -f \
-		https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.30/deploy/local-path-storage.yaml
+		https://raw.githubusercontent.com/rancher/local-path-provisioner/$(LOCAL_PATH_PROVISIONER_VERSION)/deploy/local-path-storage.yaml
 	@echo "✓ local-path StorageClass installed"
 
 .PHONY: storage-provisioner-wait
@@ -842,9 +857,6 @@ OBSERVABILITY_NAMESPACE ?= observability
 .PHONY: observability-install
 observability-install: helm-check helm-repos ## Install LGTM stack + OpenTelemetry Collector
 	$(MAKE) observability-namespace
-	# These Helm installs are independent and could be parallelised:
-	#   $(MAKE) -j3 observability-prometheus-stack observability-loki observability-tempo
-	# Sequential is safer for debug output and avoids resource contention on small clusters.
 	$(MAKE) observability-prometheus-stack
 	$(MAKE) observability-loki
 	$(MAKE) observability-tempo
@@ -1031,14 +1043,7 @@ infra-lint-docker: ## Lint Dockerfiles with hadolint
 			-v "$$(pwd):/mnt" \
 			-v "$$(pwd)/nars-infra/.hadolint.yaml:/home/hadolint/.hadolint.yaml:ro" \
 			hadolint/hadolint \
-			/mnt/nars-infra/docker/Dockerfile.nars-api \
-			/mnt/nars-infra/docker/Dockerfile.nars-postgis \
-			/mnt/nars-infra/docker/Dockerfile.nars-vite \
-			$$(find nars-infra/docker -name 'Dockerfile.*' \
-				! -name 'Dockerfile.nars-api' \
-				! -name 'Dockerfile.nars-postgis' \
-				! -name 'Dockerfile.nars-vite' \
-				| sed 's|^|/mnt/|')
+			/mnt/nars-infra/docker/Dockerfile.*
 	fi
 
 .PHONY: infra-lint-yaml
@@ -1046,7 +1051,7 @@ infra-lint-yaml: ## Lint k8s YAML with yamllint (uses .yamllint.yaml config)
 	@if command -v yamllint >/dev/null 2>&1; then
 		yamllint -c nars-infra/.yamllint.yaml nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml
 	else
-		docker run --rm -v "$$(pwd):/mnt" cytopia/yamllint:1.36.0 \
+		docker run --rm -v "$$(pwd):/mnt" $(YAMLLINT_IMAGE) \
 			-c nars-infra/.yamllint.yaml nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml
 	fi
 

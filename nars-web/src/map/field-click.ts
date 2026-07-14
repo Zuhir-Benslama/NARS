@@ -1,11 +1,11 @@
-import { ctx } from "./core/state"
+import { getCtx } from "./core/state"
 import { useFieldStore } from "../stores/fieldStore"
 import { useAppStore } from "../stores/appStore"
 import type { InspectionType } from "../types/inspection"
 import type { MapMouseEvent } from "maplibre-gl"
 
 export function registerFieldWorkerClick(): void {
-  const map = ctx.map
+  const map = getCtx().map
   const appStore = useAppStore()
 
   if (appStore.user?.role !== "field_worker") return

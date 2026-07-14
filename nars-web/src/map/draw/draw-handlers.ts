@@ -10,7 +10,8 @@ import { repatchMarker } from "./draw-state"
 import type { GeomanCreateEvent, ActionInstances } from "../core/geoman-types"
 import type { MapMouseEvent as MapLibreMapMouseEvent } from "maplibre-gl"
 
-import { ctx, updateSelectionHighlight, featuresStore } from "../core/state"
+import { getCtx, updateSelectionHighlight } from "../core/state"
+import { useFeaturesStore } from "../../stores/featuresStore"
 import { showContextMenu, showMapContextMenu } from "../context-menu/context-menu"
 import { buildDrawControl } from "./draw-control"
 import {
@@ -101,6 +102,8 @@ function findNearestFeatureAtPoint(
   px: number,
   py: number,
 ): { dbId: string; phaseKey: string } | null {
+  const { map } = getCtx()
+  const featuresStore = useFeaturesStore()
   const allFeatures = featuresStore.getAll()
   let nearestDbId: string | null = null
   let nearestPhaseKey: string | null = null
@@ -112,7 +115,7 @@ function findNearestFeatureAtPoint(
     if (!fDbId || !fPhaseKey) continue
 
     if (f.geometry.type === "Point") {
-      const point = ctx.map.project([f.geometry.coordinates[0], f.geometry.coordinates[1]])
+      const point = map.project([f.geometry.coordinates[0], f.geometry.coordinates[1]])
       const dist = Math.sqrt((point.x - px) ** 2 + (point.y - py) ** 2)
       if (dist < nearestDist) {
         nearestDist = dist
@@ -123,8 +126,8 @@ function findNearestFeatureAtPoint(
     if (f.geometry.type === "LineString") {
       const coords = f.geometry.coordinates as [number, number][]
       for (let i = 0; i < coords.length - 1; i++) {
-        const p1 = ctx.map.project([coords[i][0], coords[i][1]])
-        const p2 = ctx.map.project([coords[i + 1][0], coords[i + 1][1]])
+        const p1 = map.project([coords[i][0], coords[i][1]])
+        const p2 = map.project([coords[i + 1][0], coords[i + 1][1]])
         const dist = pointToSegmentDist(px, py, p1.x, p1.y, p2.x, p2.y)
         if (dist < nearestDist) {
           nearestDist = dist
@@ -137,8 +140,8 @@ function findNearestFeatureAtPoint(
       const rings = (f.geometry as GeoJSON.Polygon).coordinates
       for (const ring of rings) {
         for (let i = 0; i < ring.length - 1; i++) {
-          const p1 = ctx.map.project(ring[i] as [number, number])
-          const p2 = ctx.map.project(ring[i + 1] as [number, number])
+          const p1 = map.project(ring[i] as [number, number])
+          const p2 = map.project(ring[i + 1] as [number, number])
           const dist = pointToSegmentDist(px, py, p1.x, p1.y, p2.x, p2.y)
           if (dist < nearestDist) {
             nearestDist = dist
@@ -157,7 +160,8 @@ function findNearestFeatureAtPoint(
 
 function onContextMenu(e: MouseEvent): void {
   const appStore = useAppStore()
-  const mapEl = ctx.map.getContainer()
+  const { map, geoman } = getCtx()
+  const mapEl = map.getContainer()
   if (!mapEl.contains(e.target as Node)) return
 
   if (isEditMode()) {
@@ -166,7 +170,7 @@ function onContextMenu(e: MouseEvent): void {
     return
   }
 
-  const actionInstances = ctx.geoman?.actionInstances as ActionInstances | undefined
+  const actionInstances = geoman?.actionInstances as ActionInstances | undefined
   const polygonInst = actionInstances?.["draw__polygon"]
   const lineInst = actionInstances?.["draw__line"]
   const drawInstance = polygonInst ?? lineInst
@@ -179,8 +183,8 @@ function onContextMenu(e: MouseEvent): void {
     const coords: [number, number][] = lineDrawer.shapeLngLats
     if (coords.length <= 1) {
       const phase = PHASES[appStore.currentPhase]
-      ctx
-        .geoman!.disableDraw()
+      geoman!
+        .disableDraw()
         .then(() => {
           if (phase && phase.key !== "namingPanels") {
             buildDrawControl(phase)
@@ -199,11 +203,11 @@ function onContextMenu(e: MouseEvent): void {
   const phase = PHASES[appStore.currentPhase]
   if (!phase) return
 
-  const rect = ctx.map.getContainer().getBoundingClientRect()
+  const rect = map.getContainer().getBoundingClientRect()
   const px = e.clientX - rect.left
   const py = e.clientY - rect.top
 
-  const features = ctx.map.queryRenderedFeatures([px, py] as [number, number])
+  const features = map.queryRenderedFeatures([px, py] as [number, number])
   let feature
   if (phase.key === "cityCenter") {
     feature = features.find(
@@ -230,10 +234,11 @@ function onContextMenu(e: MouseEvent): void {
 function onClick(e: MapLibreMapMouseEvent & { point: { x: number; y: number } }): void {
   const appStore = useAppStore()
   if (isEditMode()) return
-  if (ctx.geoman && ctx.geoman.getActiveDrawModes?.().length > 0) return
+  const { geoman, map } = getCtx()
+  if (geoman && geoman.getActiveDrawModes?.().length > 0) return
 
   const phase = PHASES[appStore.currentPhase]
-  const features = ctx.map.queryRenderedFeatures(e.point)
+  const features = map.queryRenderedFeatures(e.point)
 
   let feature
   if (phase?.key === "cityCenter") {
@@ -269,13 +274,14 @@ function onKeyDown(e: KeyboardEvent): void {
   if (e.key === "Escape") {
     if (useModalStore().visible) return
 
-    const drawing = (ctx.geoman?.getActiveDrawModes?.().length ?? 0) > 0
+    const geoman = getCtx().geoman
+    const drawing = (geoman?.getActiveDrawModes?.().length ?? 0) > 0
     if (drawing) {
       e.preventDefault()
       e.stopImmediatePropagation()
       const phase = PHASES[appStore.currentPhase]
-      ctx
-        .geoman!.disableDraw()
+      geoman!
+        .disableDraw()
         .then(() => {
           if (phase && phase.key !== "namingPanels") {
             buildDrawControl(phase)
@@ -304,7 +310,7 @@ let contextMenuCleanup: (() => void) | null = null
 let keydownCleanup: (() => void) | null = null
 
 export function registerDrawHandlers(): void {
-  const map = ctx.map
+  const map = getCtx().map
 
   map.on("gm:create", onFeatureCreated)
 

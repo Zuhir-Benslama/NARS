@@ -3,7 +3,7 @@
 import { PHASES } from "../../phases"
 import { useAppStore } from "../../stores/appStore"
 import maplibregl from "maplibre-gl"
-import { ctx } from "../core/state"
+import { getCtx } from "../core/state"
 import { debugLog } from "../../utils/debug"
 
 const PHASE_VISIBILITY: Record<string, string[]> = {
@@ -27,7 +27,7 @@ export function refreshLayerVisibility(): void {
   const appStore = useAppStore()
   const currentPhaseKey = PHASES[appStore.currentPhase]?.key
 
-  const map = ctx.map
+  const map = getCtx().map
   if (!map) return
 
   const visibleLayers = PHASE_VISIBILITY[currentPhaseKey] || [currentPhaseKey]

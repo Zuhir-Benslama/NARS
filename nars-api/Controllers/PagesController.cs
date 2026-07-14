@@ -36,14 +36,11 @@ public class PagesController(
     [AllowAnonymous]
     public async Task<IActionResult> Root(CancellationToken cancellationToken = default)
     {
-        logger.LogInformation("[Pages] Root request. Checking auth...");
         if (await TryAuthenticateAsync(cancellationToken))
         {
-            logger.LogInformation("[Pages] Root authenticated, redirecting to /map");
             return Redirect("/map");
         }
 
-        logger.LogInformation("[Pages] Root NOT authenticated, redirecting to /login");
         return Redirect("/login");
     }
 
@@ -52,7 +49,6 @@ public class PagesController(
     [AllowAnonymous]
     public async Task<IActionResult> LoginPage()
     {
-        logger.LogInformation("[Pages] Serving login page");
         var tokens = antiforgery.GetAndStoreTokens(HttpContext);
         var nonce = HttpContext.Items["csp-nonce"] as string ?? string.Empty;
 
@@ -75,14 +71,11 @@ public class PagesController(
     [AllowAnonymous]
     public async Task<IActionResult> MapPage(CancellationToken cancellationToken = default)
     {
-        logger.LogInformation("[Pages] Map page request. Checking auth...");
         if (!await TryAuthenticateAsync(cancellationToken))
         {
-            logger.LogWarning("[Pages] Map page NOT authenticated. Redirecting to /login");
+            logger.LogDebug("[Pages] Map page not authenticated, redirecting to /login");
             return Redirect("/login");
         }
-
-        logger.LogInformation("[Pages] Serving index.html for map");
 
         var tokens = antiforgery.GetAndStoreTokens(HttpContext);
         var nonce = HttpContext.Items["csp-nonce"] as string ?? string.Empty;
@@ -150,7 +143,7 @@ public class PagesController(
         }
         else
         {
-            logger.LogInformation("[Pages] access_token cookie is EXPIRED or INVALID.");
+            logger.LogDebug("[Pages] access_token cookie is EXPIRED or INVALID.");
         }
 
         return principal;
@@ -174,12 +167,12 @@ public class PagesController(
         var principal = jwt.ValidateToken(bearerToken);
         if (principal is not null)
         {
-            logger.LogInformation("[Pages] Valid bearer token header found. Setting access_token cookie.");
+            logger.LogDebug("[Pages] Valid bearer token header found. Setting access_token cookie.");
             Response.Cookies.Append("access_token", bearerToken, MakeCookieOptions(jwt.AccessTokenExpiresIn));
         }
         else
         {
-            logger.LogInformation("[Pages] Bearer token header is invalid or expired.");
+            logger.LogDebug("[Pages] Bearer token header is invalid or expired.");
         }
 
         return principal;
@@ -190,11 +183,11 @@ public class PagesController(
         var refreshToken = Request.Cookies["refresh_token"];
         if (string.IsNullOrEmpty(refreshToken))
         {
-            logger.LogInformation("[Pages] refresh_token cookie NOT FOUND. Cannot silent refresh.");
+            logger.LogDebug("[Pages] refresh_token cookie NOT FOUND. Cannot silent refresh.");
             return false;
         }
 
-        logger.LogInformation("[Pages] Found refresh_token. Attempting silent refresh...");
+        logger.LogDebug("[Pages] Found refresh_token. Attempting silent refresh...");
 
         try
         {
@@ -206,7 +199,7 @@ public class PagesController(
             }
 
             var maxAge = result.RefreshExpiry!.Value - timeProvider.UtcNow;
-            logger.LogInformation("[Pages] Silent refresh SUCCESS. Issuing new cookies for {Username}", result.Username);
+            logger.LogDebug("[Pages] Silent refresh SUCCESS. Issuing new cookies for {Username}", result.Username);
             Response.Cookies.Append("access_token", result.NewAccessToken!, MakeCookieOptions(jwt.AccessTokenExpiresIn));
             Response.Cookies.Append("refresh_token", result.NewRawToken!, MakeCookieOptions(maxAge));
 

@@ -1,13 +1,11 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Moq;
 using NarsApi.Controllers;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
-using NarsApi.Data;
 using NarsApi.Services;
 using static NarsApi.Tests.TestData;
 using Xunit;
@@ -16,12 +14,9 @@ namespace NarsApi.Tests;
 
 public class AdminControllerTests
 {
-    private static AppDbContext CreateDb() => CreateInMemoryDb("AdminTest");
-
-    private static AdminController CreateController(AppDbContext db,
+    private static AdminController CreateController(
         IAdminOverviewService? overview = null) =>
-        new(db,
-            overview ?? Mock.Of<IAdminOverviewService>(),
+        new(overview ?? Mock.Of<IAdminOverviewService>(),
             Mock.Of<IWebHostEnvironment>())
         {
             ControllerContext = new ControllerContext
@@ -30,24 +25,16 @@ public class AdminControllerTests
             }
         };
 
-    private static void SetUser(AdminController ctrl, string role,
-        int? communeId = null, int? dairaId = null, int? wilayaId = null)
-    {
-        ctrl.ControllerContext.HttpContext.User =
-            AuthTestHelper.CreateClaimsPrincipal(Guid.NewGuid(), role, communeId, dairaId, wilayaId);
-    }
-
     // ─── Overview ───────────────────────────────────────────────────────
 
     [Fact]
     public async Task Overview_NationalAdmin_ReturnsNationalOverview()
     {
-        var db = CreateDb();
         var overview = new Mock<IAdminOverviewService>();
         overview.Setup(s => s.GetNationalOverviewAsync(default))
             .ReturnsAsync([]);
-        var ctrl = CreateController(db, overview.Object);
-        SetUser(ctrl, UserRoles.NationalAdmin);
+        var ctrl = CreateController(overview.Object);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
         var result = await ctrl.Overview(default);
 
@@ -58,9 +45,8 @@ public class AdminControllerTests
     [Fact]
     public async Task Overview_WilayaAdmin_MissingWilayaId_Returns403()
     {
-        var db = CreateDb();
-        var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.WilayaAdmin);
+        var ctrl = CreateController();
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.WilayaAdmin);
 
         var result = await ctrl.Overview(default);
 
@@ -71,9 +57,8 @@ public class AdminControllerTests
     [Fact]
     public async Task Overview_DairaAdmin_MissingDairaId_Returns403()
     {
-        var db = CreateDb();
-        var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.DairaAdmin);
+        var ctrl = CreateController();
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.DairaAdmin);
 
         var result = await ctrl.Overview(default);
 
@@ -84,9 +69,8 @@ public class AdminControllerTests
     [Fact]
     public async Task Overview_CommuneUser_ReturnsForbid()
     {
-        var db = CreateDb();
-        var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.CommuneUser, communeId: 1);
+        var ctrl = CreateController();
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.CommuneUser, communeId: 1);
 
         var result = await ctrl.Overview(default);
 
@@ -96,33 +80,33 @@ public class AdminControllerTests
     [Fact]
     public async Task Overview_WilayaAdmin_ValidId_ReturnsOk()
     {
-        var db = CreateDb();
         var overview = new Mock<IAdminOverviewService>();
         overview.Setup(s => s.GetWilayaReportAsync(1, default))
             .ReturnsAsync(new WilayaReport(1, "Alger", "", null, []));
-        var ctrl = CreateController(db, overview.Object);
-        SetUser(ctrl, UserRoles.WilayaAdmin, wilayaId: 1);
+        var ctrl = CreateController(overview.Object);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.WilayaAdmin, wilayaId: 1);
 
         var result = await ctrl.Overview(default);
 
         var ok = Assert.IsType<OkObjectResult>(result);
-        Assert.NotNull(ok.Value);
+        var reportValue = Assert.IsType<WilayaReport>(ok.Value);
+        Assert.Equal(1, reportValue.WilayaId);
     }
 
     [Fact]
     public async Task Overview_DairaAdmin_ValidId_ReturnsOk()
     {
-        var db = CreateDb();
         var overview = new Mock<IAdminOverviewService>();
         overview.Setup(s => s.GetDairaReportAsync(1, default))
             .ReturnsAsync(new DairaReport(1, "Draria", "", null, []));
-        var ctrl = CreateController(db, overview.Object);
-        SetUser(ctrl, UserRoles.DairaAdmin, dairaId: 1);
+        var ctrl = CreateController(overview.Object);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.DairaAdmin, dairaId: 1);
 
         var result = await ctrl.Overview(default);
 
         var ok = Assert.IsType<OkObjectResult>(result);
-        Assert.NotNull(ok.Value);
+        var reportValue = Assert.IsType<DairaReport>(ok.Value);
+        Assert.Equal(1, reportValue.DairaId);
     }
 
     // ─── GetWilaya ──────────────────────────────────────────────────────
@@ -130,12 +114,11 @@ public class AdminControllerTests
     [Fact]
     public async Task GetWilaya_NationalAdmin_ValidId_ReturnsOk()
     {
-        var db = CreateDb();
         var overview = new Mock<IAdminOverviewService>();
         overview.Setup(s => s.GetWilayaReportAsync(1, default))
             .ReturnsAsync(new WilayaReport(1, "Alger", "", null, []));
-        var ctrl = CreateController(db, overview.Object);
-        SetUser(ctrl, UserRoles.NationalAdmin);
+        var ctrl = CreateController(overview.Object);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
         var result = await ctrl.GetWilaya(1, default);
 
@@ -147,12 +130,11 @@ public class AdminControllerTests
     [Fact]
     public async Task GetWilaya_NationalAdmin_UnknownId_ReturnsNotFound()
     {
-        var db = CreateDb();
         var overview = new Mock<IAdminOverviewService>();
         overview.Setup(s => s.GetWilayaReportAsync(999, default))
             .ReturnsAsync((WilayaReport?)null);
-        var ctrl = CreateController(db, overview.Object);
-        SetUser(ctrl, UserRoles.NationalAdmin);
+        var ctrl = CreateController(overview.Object);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
         var result = await ctrl.GetWilaya(999, default);
 
@@ -163,9 +145,8 @@ public class AdminControllerTests
     [Fact]
     public async Task GetWilaya_NonNationalAdmin_ReturnsForbid()
     {
-        var db = CreateDb();
-        var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.WilayaAdmin, wilayaId: 1);
+        var ctrl = CreateController();
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.WilayaAdmin, wilayaId: 1);
 
         var result = await ctrl.GetWilaya(1, default);
 
@@ -177,12 +158,11 @@ public class AdminControllerTests
     [Fact]
     public async Task GetDaira_NationalAdmin_ReturnsOk()
     {
-        var db = CreateDb();
         var overview = new Mock<IAdminOverviewService>();
         overview.Setup(s => s.GetDairaReportAsync(1, default))
             .ReturnsAsync(new DairaReport(1, "Draria", "", null, []));
-        var ctrl = CreateController(db, overview.Object);
-        SetUser(ctrl, UserRoles.NationalAdmin);
+        var ctrl = CreateController(overview.Object);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
         var result = await ctrl.GetDaira(1, default);
 
@@ -194,12 +174,11 @@ public class AdminControllerTests
     [Fact]
     public async Task GetDaira_NationalAdmin_UnknownId_ReturnsNotFound()
     {
-        var db = CreateDb();
         var overview = new Mock<IAdminOverviewService>();
         overview.Setup(s => s.GetDairaReportAsync(999, default))
             .ReturnsAsync((DairaReport?)null);
-        var ctrl = CreateController(db, overview.Object);
-        SetUser(ctrl, UserRoles.NationalAdmin);
+        var ctrl = CreateController(overview.Object);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
         var result = await ctrl.GetDaira(999, default);
 
@@ -210,9 +189,8 @@ public class AdminControllerTests
     [Fact]
     public async Task GetDaira_CommuneUser_ReturnsForbid()
     {
-        var db = CreateDb();
-        var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.CommuneUser, communeId: 1);
+        var ctrl = CreateController();
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.CommuneUser, communeId: 1);
 
         var result = await ctrl.GetDaira(1, default);
 
@@ -222,11 +200,11 @@ public class AdminControllerTests
     [Fact]
     public async Task GetDaira_WilayaAdmin_WrongWilaya_ReturnsNotFound()
     {
-        var db = CreateDb();
-        db.Dairas.Add(new Daira { DairaId = 1, WilayaId = 1, DairaFr = "Draria" });
-        await db.SaveChangesAsync();
-        var ctrl = CreateController(db);
-        SetUser(ctrl, UserRoles.WilayaAdmin, wilayaId: 2);
+        var overview = new Mock<IAdminOverviewService>();
+        overview.Setup(s => s.GetDairaByIdAsync(1, default))
+            .ReturnsAsync((NarsApi.Models.Daira?)null);
+        var ctrl = CreateController(overview.Object);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.WilayaAdmin, wilayaId: 2);
 
         var result = await ctrl.GetDaira(1, default);
 

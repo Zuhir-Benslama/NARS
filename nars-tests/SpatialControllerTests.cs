@@ -40,7 +40,7 @@ public class SpatialControllerTests
         return (ctrl, db);
     }
 
-    private static Guid AddRoad(AppDbContext db, Guid userId, string coordsJson)
+    private static async Task<Guid> AddRoadAsync(AppDbContext db, Guid userId, string coordsJson)
     {
         var id = Guid.NewGuid();
         db.Roads.Add(new Road
@@ -52,7 +52,7 @@ public class SpatialControllerTests
             Layer = "main",
             UpdatedAt = FixedUtcNow
         });
-        db.SaveChanges();
+        await db.SaveChangesAsync();
         return id;
     }
 
@@ -83,7 +83,7 @@ public class SpatialControllerTests
         var uid = Guid.NewGuid();
         var (ctrl, db) = CreateController(userId: uid);
 
-        var roadId = AddRoad(db, uid, /* single point */ """{"coordinates":[{"lat":36.0,"lng":3.0}]}""");
+        var roadId = await AddRoadAsync(db, uid, /* single point */ """{"coordinates":[{"lat":36.0,"lng":3.0}]}""");
 
         var result = await ctrl.GetRoadSide(new RoadSideRequest(RoadId: roadId, Lat: 36.0, Lng: 3.0));
         var objResult = Assert.IsType<ObjectResult>(result);
@@ -102,7 +102,7 @@ public class SpatialControllerTests
             entranceQuery: Mock.Of<IEntranceQueryService>(x =>
                 x.GetUsedEntranceNumbersAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())
                 == Task.FromResult(new HashSet<int>())));
-        var roadId = AddRoad(db, uid, """{"coordinates":[{"lat":36.4,"lng":2.9},{"lat":36.4,"lng":3.1}]}""");
+        var roadId = await AddRoadAsync(db, uid, """{"coordinates":[{"lat":36.4,"lng":2.9},{"lat":36.4,"lng":3.1}]}""");
 
         var result = await ctrl.GetRoadSide(new RoadSideRequest(
             RoadId: roadId, Lat: lat, Lng: lng));
@@ -117,7 +117,7 @@ public class SpatialControllerTests
         var (ctrl, db) = CreateController(userId: uid);
 
         // Road data without a "coordinates" property
-        var roadId = AddRoad(db, uid, """{"foo":"bar"}""");
+        var roadId = await AddRoadAsync(db, uid, """{"foo":"bar"}""");
 
         var result = await ctrl.GetRoadSide(new RoadSideRequest(RoadId: roadId, Lat: 36.0, Lng: 3.0));
         var objResult = Assert.IsType<ObjectResult>(result);
@@ -138,7 +138,7 @@ public class SpatialControllerTests
 
         // Horizontal segment from (36.4, 2.9) to (36.4, 3.1)
         var coords = """{"coordinates":[{"lat":36.4,"lng":2.9},{"lat":36.4,"lng":3.1}]}""";
-        var roadId = AddRoad(db, uid, coords);
+        var roadId = await AddRoadAsync(db, uid, coords);
 
         var result = await ctrl.GetRoadSide(new RoadSideRequest(RoadId: roadId, Lat: markerLat, Lng: markerLng));
 
@@ -159,7 +159,7 @@ public class SpatialControllerTests
                 == Task.FromResult(usedNumbers)));
 
         var coords = """{"coordinates":[{"lat":36.4,"lng":2.9},{"lat":36.4,"lng":3.1}]}""";
-        var roadId = AddRoad(db, uid, coords);
+        var roadId = await AddRoadAsync(db, uid, coords);
 
         // Marker above the segment -> left -> odd numbers
         var result = await ctrl.GetRoadSide(new RoadSideRequest(RoadId: roadId, Lat: 36.5, Lng: 3.0));
