@@ -2,6 +2,7 @@ using BCrypt.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Services;
@@ -108,8 +109,16 @@ public partial class AuthController
             return Problem(detail: error, statusCode: statusCode);
         }
 
-        // 6. Persist.
-        await refreshService.AddUserAsync(newUser!, cancellationToken);
+        // 6. Persist (catch DB-level unique constraint races).
+        try
+        {
+            await refreshService.AddUserAsync(newUser!, cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            return Problem(detail: "A user with that username or email already exists.", statusCode: 409);
+        }
+
         await refreshService.ResetFailedAttemptsIfNeededAsync(admin, cancellationToken);
 
         logger.LogInformation(

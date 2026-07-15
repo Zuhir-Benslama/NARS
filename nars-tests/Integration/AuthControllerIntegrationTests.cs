@@ -217,19 +217,20 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             Password: DefaultPassword
         ));
 
-        var tokenCount = await _db.RefreshTokens.CountAsync(rt => rt.UserId == user.Id && !rt.Revoked);
+        await using var db = _fixture.CreateDbContext();
+        var tokenCount = await db.RefreshTokens.CountAsync(rt => rt.UserId == user.Id && !rt.Revoked);
         Assert.True(tokenCount > 0);
 
         var claims = new List<Claim> { new(ClaimNames.UserId, user.Id.ToString()) };
         var httpContext = CreateHttpContext(claims);
-        var logoutController = CreateController();
+        var logoutController = CreateController(db);
         logoutController.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
         var result = await logoutController.Logout();
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(200, okResult.StatusCode);
 
-        var revokedCount = await _db.RefreshTokens.CountAsync(rt => rt.UserId == user.Id && rt.Revoked);
+        var revokedCount = await db.RefreshTokens.CountAsync(rt => rt.UserId == user.Id && rt.Revoked);
         Assert.True(revokedCount > 0);
     }
 
@@ -268,8 +269,9 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             jwtOpts,
             Mock.Of<ILogger<JwtService>>(),
             timeProvider);
+        var refreshService = new RefreshTokenService(db, jwt, jwtOpts, timeProvider);
         return new AuthController(
-            Mock.Of<IRefreshTokenService>(),
+            refreshService,
             jwt,
             Options.Create(new AccountLockoutOptions()),
             Mock.Of<ILogger<AuthController>>(),
