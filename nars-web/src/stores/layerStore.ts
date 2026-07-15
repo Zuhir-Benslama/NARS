@@ -32,7 +32,7 @@ function createInitialState(): LayerState & LayerCache {
   }
 }
 
-const LAYER_KEYS: (keyof LayerState)[] = [
+export const LAYER_KEYS: (keyof LayerState)[] = [
   "areas",
   "cityCenter",
   "districts",

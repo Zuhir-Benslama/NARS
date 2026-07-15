@@ -13,8 +13,7 @@ import type { FeatureTypeKey } from "../../types"
 import { getErrorMessage } from "../../lib/errors"
 import { recordDelete } from "../undo"
 import { enableEditMode } from "../draw/draw-events"
-import { useLayerStore } from "../../stores/layerStore"
-import type { LayerState } from "../../stores/layerStore"
+import { useLayerStore, LAYER_KEYS } from "../../stores/layerStore"
 import type { LayerEntry } from "../../types"
 import { computeCircleRing, closeRing } from "../rendering/geometry"
 import { debugError } from "../../utils/debug"
@@ -25,7 +24,7 @@ import { updateEndpointMarkers } from "../roads/road-directions"
 export function findLayerEntryByDbId(dbId: string): LayerEntry | null {
   const layerStore = useLayerStore()
   const state = layerStore.$state
-  for (const key of Object.keys(state) as (keyof LayerState)[]) {
+  for (const key of LAYER_KEYS) {
     const entries = state[key]
     const entry = entries?.find((e) => e.dbId === dbId)
     if (entry) return entry
@@ -139,7 +138,7 @@ export async function removeFeature(dbId: string): Promise<void> {
   const layerStore = useLayerStore()
   const state = layerStore.$state
   let phaseKey: FeatureTypeKey | "" = ""
-  for (const key of Object.keys(state) as (keyof LayerState)[]) {
+  for (const key of LAYER_KEYS) {
     const entries = state[key]
     if (entries?.some((f) => f.dbId === dbId)) {
       phaseKey = key

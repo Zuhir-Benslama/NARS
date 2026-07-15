@@ -1,5 +1,5 @@
 import { useSelectionStore } from "../../stores/selectionStore"
-import { useLayerStore } from "../../stores/layerStore"
+import { useLayerStore, LAYER_KEYS } from "../../stores/layerStore"
 import { useEditStore } from "../../stores/editStore"
 import type { LayerState } from "../../stores/layerStore"
 import type { LayerEntry, LatLng } from "../../types"
@@ -73,7 +73,7 @@ export function findLayerEntryByFeatureId(featureId: string | undefined): LayerE
   if (!featureId) return null
   const layerStore = useLayerStore()
   const state = layerStore.$state
-  for (const key of Object.keys(state)) {
+  for (const key of LAYER_KEYS) {
     const entries = state[key as keyof LayerState]
     const entry = entries?.find((e) => e.id === featureId)
     if (entry) return entry
