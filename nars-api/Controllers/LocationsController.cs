@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
+using NarsApi.Models;
 using NarsApi.Services;
 
 namespace NarsApi.Controllers;
@@ -21,10 +22,12 @@ namespace NarsApi.Controllers;
 [ApiController]
 [Route("/api")]
 [Tags("Locations")]
+#pragma warning disable S6960 // LocationsController intentionally serves paginated reference data + boundary endpoints
 public class LocationsController(
     AppDbContext db,
     IOptions<LocationsOptions> locationsOptions,
-    IBoundaryService boundaryService) : ControllerBase
+    IBoundaryService boundaryService,
+    ILocationQueryService locationQuery) : ControllerBase
 {
 
     private async Task<IActionResult> PaginateAsync<TEntity, TDto>(
@@ -37,6 +40,7 @@ public class LocationsController(
     {
         take = Math.Clamp(take, 1, 500);
 
+        search ??= "";
         var maxSearchLength = locationsOptions.Value.MaxSearchLength;
         if (search.Length > maxSearchLength)
         {
@@ -139,7 +143,7 @@ public class LocationsController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetCommuneBoundary(int communeId, CancellationToken cancellationToken = default)
     {
-        var commune = await db.Communes.FirstOrDefaultAsync(c => c.CommuneId == communeId, cancellationToken);
+        var commune = await locationQuery.GetCommuneByIdAsync(communeId, cancellationToken);
 
         // Raw ADO.NET required — ST_AsGeoJSON returns a text result that
         // EF Core's Npgsql mapper mis-handles under UseSnakeCaseNamingConvention().
@@ -171,7 +175,6 @@ public class LocationsController(
 
     // ── GET /api/commune/{id}/boundary-debug ──────────────────
     // Development-only endpoint for inspecting commune boundary geometry.
-    // Returns internal details (geometry type, point count, validity, envelope).
 
     /// <summary>Development-only endpoint for inspecting commune boundary geometry details.</summary>
     [HttpGet("commune/{communeId:int}/boundary-debug")]
@@ -184,7 +187,7 @@ public class LocationsController(
             return NotFound();
         }
 
-        var boundary = await db.CommuneBoundaries.FirstOrDefaultAsync(b => b.CommuneId == communeId, cancellationToken);
+        var boundary = await locationQuery.GetCommuneBoundaryAsync(communeId, cancellationToken);
         if (boundary is null)
         {
             return Problem(detail: "Boundary not found", statusCode: 404);

@@ -26,5 +26,11 @@ export const useContextMenuStore = defineStore("contextMenu", {
       this.visible = false
       this.items = []
     },
+    reset(): void {
+      this.visible = false
+      this.x = 0
+      this.y = 0
+      this.items = []
+    },
   },
 })

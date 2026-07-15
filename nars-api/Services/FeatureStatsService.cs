@@ -31,14 +31,15 @@ public class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactory) : IF
             if (descriptor is null) continue;
 
             if (sb.Length > 0) sb.AppendLine(" UNION ALL");
-            sb.Append($"SELECT '{type}' AS Type, COUNT(*)::bigint AS Count FROM {descriptor.TableName} WHERE user_id = @u{paramIndex}");
+            sb.Append($"SELECT @t{paramIndex} AS Type, COUNT(*)::bigint AS Count FROM {descriptor.TableName} WHERE user_id = @u{paramIndex}");
             paramIndex++;
         }
 
         await using var cmd = new NpgsqlCommand(sb.ToString(), conn);
         paramIndex = 0;
-        foreach (var _ in _featureTypes)
+        foreach (var type in _featureTypes)
         {
+            cmd.Parameters.AddWithValue($"t{paramIndex}", type);
             cmd.Parameters.AddWithValue($"u{paramIndex}", userId);
             paramIndex++;
         }
@@ -80,12 +81,11 @@ public class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactory) : IF
             paramIndex++;
         }
 
-        var userIdArray = userIds.ToArray();
         await using var cmd = new NpgsqlCommand(sb.ToString(), conn);
         paramIndex = 0;
         foreach (var _ in _featureTypes)
         {
-            cmd.Parameters.AddWithValue($"u{paramIndex}", userIdArray);
+            cmd.Parameters.AddWithValue($"u{paramIndex}", userIds);
             paramIndex++;
         }
 

@@ -21,23 +21,19 @@
             v-for="w in nationalData.wilayas"
             :key="w.wilaya_id"
             :to="`/nars/${slugify(w.wilaya_name_fr)}`"
-            class="wilaya-card"
+            class="entity-link"
           >
-            <div class="wilaya-card-head">
-              <span class="wilaya-name">{{ w.wilaya_name_fr }}</span>
-              <span class="wilaya-name-ar">{{ w.wilaya_name_ar }}</span>
-            </div>
-            <div class="wilaya-stats">
-              <StatPill :label="t('admin.dairas')" :value="w.daira_count" />
-              <StatPill :label="t('admin.communes')" :value="w.commune_count" />
-              <StatPill :label="t('admin.users')" :value="w.commune_user_count" color="blue" />
-            </div>
-            <div class="wilaya-admin-row">
-              <span class="admin-label">{{ t("admin.wilaya_admin") }}:</span>
-              <span v-if="w.wilaya_admin" class="admin-name">{{ w.wilaya_admin.name }}</span>
-              <span v-else class="admin-missing">{{ t("admin.none_assigned") }}</span>
-            </div>
-            <button class="drill-btn">{{ t("admin.view_detail") }} →</button>
+            <EntityCard
+              :name-fr="w.wilaya_name_fr"
+              :name-ar="w.wilaya_name_ar"
+              :stats="[
+                { label: t('admin.dairas'), value: w.daira_count },
+                { label: t('admin.communes'), value: w.commune_count },
+                { label: t('admin.users'), value: w.commune_user_count, color: 'blue' },
+              ]"
+              :admin-label="t('admin.wilaya_admin')"
+              :admin-name="w.wilaya_admin?.name"
+            />
           </router-link>
         </div>
       </div>
@@ -50,31 +46,23 @@
       </div>
       <div class="content-scroll">
         <div class="wilaya-grid">
-          <div
+          <EntityCard
             v-for="d in wilayaData.dairas"
             :key="d.daira_id"
-            class="wilaya-card"
-            @click="selectedDaira = d"
-          >
-            <div class="wilaya-card-head">
-              <span class="wilaya-name">{{ d.daira_name_fr }}</span>
-              <span class="wilaya-name-ar">{{ d.daira_name_ar }}</span>
-            </div>
-            <div class="wilaya-stats">
-              <StatPill :label="t('admin.communes')" :value="d.communes.length" />
-              <StatPill
-                :label="t('admin.users')"
-                :value="d.communes.reduce((sum, c) => sum + c.users.length, 0)"
-                color="blue"
-              />
-            </div>
-            <div class="wilaya-admin-row">
-              <span class="admin-label">{{ t("admin.daira_admin") }}:</span>
-              <span v-if="d.daira_admin" class="admin-name">{{ d.daira_admin.name }}</span>
-              <span v-else class="admin-missing">{{ t("admin.none_assigned") }}</span>
-            </div>
-            <button class="drill-btn">{{ t("admin.view_detail") }} →</button>
-          </div>
+            :name-fr="d.daira_name_fr"
+            :name-ar="d.daira_name_ar"
+            :stats="[
+              { label: t('admin.communes'), value: d.communes.length },
+              {
+                label: t('admin.users'),
+                value: d.communes.reduce((sum, c) => sum + c.users.length, 0),
+                color: 'blue',
+              },
+            ]"
+            :admin-label="t('admin.daira_admin')"
+            :admin-name="d.daira_admin?.name"
+            @drill="selectedDaira = d"
+          />
         </div>
       </div>
     </template>
@@ -95,21 +83,14 @@
       <div class="section-title">{{ dairaData.daira_name_fr }} — {{ dairaData.daira_name_ar }}</div>
       <div class="content-scroll">
         <div class="wilaya-grid">
-          <div
+          <EntityCard
             v-for="c in dairaData.communes"
             :key="c.commune_id"
-            class="wilaya-card"
-            @click="selectedCommune = c"
-          >
-            <div class="wilaya-card-head">
-              <span class="wilaya-name">{{ c.commune_name_fr }}</span>
-              <span class="wilaya-name-ar">{{ c.commune_name_ar }}</span>
-            </div>
-            <div class="wilaya-stats">
-              <StatPill :label="t('admin.users')" :value="c.users.length" color="blue" />
-            </div>
-            <button class="drill-btn">{{ t("admin.view_detail") }} →</button>
-          </div>
+            :name-fr="c.commune_name_fr"
+            :name-ar="c.commune_name_ar"
+            :stats="[{ label: t('admin.users'), value: c.users.length, color: 'blue' }]"
+            @drill="selectedCommune = c"
+          />
         </div>
       </div>
     </template>
@@ -138,8 +119,8 @@ import { apiFetch } from "../api"
 import { useAppStore } from "../stores/appStore"
 import { slugify } from "../utils/string"
 import type { NationalOverview, WilayaReport, DairaReport, CommuneReport, UserRole } from "../types"
-import StatPill from "./admin/StatPill.vue"
 import CommuneList from "./admin/CommuneList.vue"
+import EntityCard from "./admin/EntityCard.vue"
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -160,27 +141,28 @@ const hasData = computed(
   () => nationalData.value !== null || wilayaData.value !== null || dairaData.value !== null,
 )
 
-const roleLabel = computed(
-  () =>
-    ({
-      national_admin: t("admin.role.national"),
-      wilaya_admin: t("admin.role.wilaya"),
-      daira_admin: t("admin.role.daira"),
-      commune_user: t("admin.role.commune"),
-      field_worker: t("admin.role.field_worker"),
-    })[userRole.value] ?? userRole.value,
-)
+const ROLE_LABELS: Record<string, string> = {
+  national_admin: "admin.role.national",
+  wilaya_admin: "admin.role.wilaya",
+  daira_admin: "admin.role.daira",
+  commune_user: "admin.role.commune",
+  field_worker: "admin.role.field_worker",
+}
 
-const roleBadgeClass = computed(
-  () =>
-    ({
-      national_admin: "badge-national",
-      wilaya_admin: "badge-wilaya",
-      daira_admin: "badge-daira",
-      commune_user: "badge-commune",
-      field_worker: "badge-commune",
-    })[userRole.value] ?? "",
-)
+const ROLE_BADGES: Record<string, string> = {
+  national_admin: "badge-national",
+  wilaya_admin: "badge-wilaya",
+  daira_admin: "badge-daira",
+  commune_user: "badge-commune",
+  field_worker: "badge-commune",
+}
+
+const roleLabel = computed(() => {
+  const key = ROLE_LABELS[userRole.value]
+  return key ? t(key) : userRole.value
+})
+
+const roleBadgeClass = computed(() => ROLE_BADGES[userRole.value] ?? "")
 
 async function loadOverview() {
   loading.value = true
@@ -293,68 +275,9 @@ onMounted(loadOverview)
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1rem;
 }
-.wilaya-card {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: 10px;
-  padding: 1rem;
-  cursor: pointer;
-  transition: box-shadow 0.15s;
-}
-.wilaya-card:hover {
-  box-shadow: var(--glass-shadow);
-  border-color: var(--glass-border);
-}
-.wilaya-card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 0.6rem;
-}
-.wilaya-name {
-  font-weight: 600;
-  font-size: 1rem;
-  color: var(--text-primary);
-}
-.wilaya-name-ar {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  direction: rtl;
-}
-.wilaya-stats {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.6rem;
-  flex-wrap: wrap;
-}
-.wilaya-admin-row {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  margin-bottom: 0.6rem;
-}
-.admin-label {
-  font-weight: 600;
-  margin-right: 0.3rem;
-}
-.admin-name {
-  color: var(--text-primary);
-}
-.admin-missing {
-  color: #e53935;
-  font-style: italic;
-}
-.drill-btn {
-  width: 100%;
-  padding: 0.35rem;
-  font-size: 0.8rem;
-  border: 1px solid var(--glass-border);
-  color: var(--text-primary);
-  border-radius: 5px;
-  background: var(--glass-bg);
-  cursor: pointer;
-}
-.drill-btn:hover {
-  background: var(--glass-bg-hover);
+.entity-link {
+  text-decoration: none;
+  color: inherit;
 }
 .back-btn {
   padding: 0.35rem 0.7rem;

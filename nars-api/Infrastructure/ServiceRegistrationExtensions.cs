@@ -10,6 +10,8 @@ namespace NarsApi.Infrastructure;
 
 public static class ServiceRegistrationExtensions
 {
+    public const string DefaultAssemblyVersion = "2.0.0";
+
     /// <summary>
     /// Registers all NARS application services, EF Core DbContext, authentication,
     /// OpenTelemetry, health checks, CORS, compression, rate limiting, and
@@ -30,7 +32,7 @@ public static class ServiceRegistrationExtensions
         services.AddNarsJwtAuthentication(jwtSecret, issuer: jwtIssuer, audience: jwtAudience);
         services.AddNarsDomainServices();
         services.AddNarsHttpClients(config);
-        var assemblyVersion = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "2.0.0";
+        var assemblyVersion = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? DefaultAssemblyVersion;
         services.AddNarsControllers(assemblyVersion);
         services.AddNarsCors(config);
         services.AddNarsCompression();
@@ -71,7 +73,7 @@ public static class ServiceRegistrationExtensions
         var otelEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")
             ?? otelOpts.OtlpEndpoint;
 
-        var assemblyVersion = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "2.0.0";
+        var assemblyVersion = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? DefaultAssemblyVersion;
         services.AddOpenTelemetry()
             .ConfigureResource(r => r
                 .AddService("nars-api", serviceVersion: assemblyVersion)
@@ -95,7 +97,7 @@ public static class ServiceRegistrationExtensions
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
         services.AddSingleton<IBackgroundTaskQueue, BackgroundTaskQueue>();
         services.AddHostedService<BackgroundQueueProcessor>();
-        services.AddScoped<IScatteredAreaService, ScatteredAreaService>();
+        services.AddSingleton<IScatteredAreaService, ScatteredAreaService>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
         services.AddScoped<IValidationService, ValidationService>();
         services.AddScoped<IFieldService, FieldService>();

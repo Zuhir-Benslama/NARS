@@ -62,7 +62,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             CommuneId: 1,
             DairaId: null,
             WilayaId: null
-        ));
+        ), signupToken: AdminSignupToken);
 
         var statusResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, statusResult.StatusCode);
@@ -95,7 +95,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             CommuneId: 1,
             DairaId: null,
             WilayaId: null
-        ));
+        ), signupToken: AdminSignupToken);
 
         var second = CreateController();
         var result = await second.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
@@ -110,7 +110,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             CommuneId: 1,
             DairaId: null,
             WilayaId: null
-        ));
+        ), signupToken: AdminSignupToken);
 
         var conflict = Assert.IsType<ObjectResult>(result);
         Assert.Equal(409, conflict.StatusCode);
@@ -149,8 +149,8 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
         // Fire both concurrently — both pass the SELECT uniqueness check,
         // then one INSERT succeeds while the other hits the unique constraint.
         var results = await Task.WhenAll(
-            ctrl1.AuthorizedAdminSignup(request, CancellationToken.None),
-            ctrl2.AuthorizedAdminSignup(request, CancellationToken.None)
+            ctrl1.AuthorizedAdminSignup(request, signupToken: "nars-admin-signup-v1", CancellationToken.None),
+            ctrl2.AuthorizedAdminSignup(request, signupToken: "nars-admin-signup-v1", CancellationToken.None)
         );
 
         var statusCodes = results
@@ -269,9 +269,8 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             Mock.Of<ILogger<JwtService>>(),
             timeProvider);
         return new AuthController(
-            db,
+            Mock.Of<IRefreshTokenService>(),
             jwt,
-            jwtOpts,
             Options.Create(new AccountLockoutOptions()),
             Mock.Of<ILogger<AuthController>>(),
             timeProvider,

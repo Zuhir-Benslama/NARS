@@ -16,6 +16,7 @@ namespace NarsApi.Services;
 /// </summary>
 public class JwtService(string secret, string? issuer, string? audience, IOptions<JwtOptions> jwtOptions, ILogger<JwtService> logger, IDateTimeProvider timeProvider) : IJwtService
 {
+    private static readonly JwtSecurityTokenHandler TokenHandler = new();
     private readonly int _expiresMinutes = jwtOptions.Value.ExpiresInMinutes;
     private readonly SymmetricSecurityKey _key = new(Encoding.UTF8.GetBytes(secret));
     public TimeSpan AccessTokenExpiresIn => TimeSpan.FromMinutes(_expiresMinutes);
@@ -57,7 +58,7 @@ public class JwtService(string secret, string? issuer, string? audience, IOption
             signingCredentials: creds
         );
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        return TokenHandler.WriteToken(token);
     }
 
     public (string rawToken, string hash) CreateRefreshToken()
@@ -72,7 +73,7 @@ public class JwtService(string secret, string? issuer, string? audience, IOption
     {
         try
         {
-            return new JwtSecurityTokenHandler().ValidateToken(token,
+            return TokenHandler.ValidateToken(token,
                 new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,

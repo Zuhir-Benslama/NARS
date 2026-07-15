@@ -91,6 +91,31 @@ public class UserAuthorizationService(AppDbContext db) : IUserAuthorizationServi
         };
     }
 
+    public async Task<User?> FindUserByIdAsync(Guid userId, CancellationToken ct = default)
+        => await db.Users.FindAsync([userId], ct);
+
+    public async Task<bool> IsEmailTakenAsync(string email, Guid excludeUserId, CancellationToken ct = default)
+        => await db.Users.AnyAsync(u => u.Email == email && u.Id != excludeUserId, ct);
+
+    public async Task<bool> DeleteUserAsync(Guid userId, CancellationToken ct = default)
+    {
+        var user = await db.Users.FindAsync([userId], ct);
+        if (user is null) return false;
+
+        db.Users.Remove(user);
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    public async Task SaveChangesAsync(CancellationToken ct = default)
+        => await db.SaveChangesAsync(ct);
+
+    public async Task AddUserAsync(User user, CancellationToken ct = default)
+    {
+        db.Users.Add(user);
+        await db.SaveChangesAsync(ct);
+    }
+
     private static ScopeValidationResult Valid() => new(null, false);
     private static ScopeValidationResult Error(string msg) => new(msg, false);
     private static ScopeValidationResult Forbid(string msg) => new(msg, true);

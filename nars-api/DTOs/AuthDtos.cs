@@ -135,7 +135,7 @@ public record RefreshTokenResult(
     [property: JsonPropertyName("success")] bool Success,
     [property: JsonPropertyName("detail")] string? Detail,
     [property: JsonPropertyName("username")] string? Username,
-    [property: JsonPropertyName("new_raw_token")] string? NewRawToken,
-    [property: JsonPropertyName("new_access_token")] string? NewAccessToken,
-    [property: JsonPropertyName("refresh_expiry")] DateTime? RefreshExpiry
+    [property: JsonIgnore] string? NewRawToken,
+    [property: JsonIgnore] string? NewAccessToken,
+    [property: JsonIgnore] DateTime? RefreshExpiry
 );

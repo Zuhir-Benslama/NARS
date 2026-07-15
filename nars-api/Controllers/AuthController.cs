@@ -16,16 +16,14 @@ namespace NarsApi.Controllers;
 [Route("/api")]
 [Tags("Auth")]
 public partial class AuthController(
-    AppDbContext db,
+    IRefreshTokenService refreshService,
     IJwtService jwt,
-    IOptions<JwtOptions> jwtOptions,
     IOptions<AccountLockoutOptions> lockoutOptions,
     ILogger<AuthController> logger,
     IDateTimeProvider timeProvider,
     IUserAuthorizationService authorizationService,
     IUserCreationService userCreationService,
-    IWebHostEnvironment webHost
-) : NarsControllerBase(webHost)
+    IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     // Stable dummy hash so BCrypt always does the full work, even for unknown users.
     // Prevents username enumeration via response-time side-channel.
@@ -61,7 +59,7 @@ public partial class AuthController(
     public async Task<IActionResult> SignIn([FromBody] SignInRequest body, CancellationToken cancellationToken = default)
     {
         var normalizedUsername = body.Username.ToLowerInvariant();
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Username == normalizedUsername, cancellationToken);
+        var user = await refreshService.FindUserByUsernameAsync(normalizedUsername, cancellationToken);
 
         var hashToCheck = user?.PasswordHash ?? DummyHash;
         var passwordValid = BCrypt.Net.BCrypt.Verify(body.Password, hashToCheck);
@@ -72,13 +70,13 @@ public partial class AuthController(
         {
             if (!passwordValid && user is not null)
             {
-                await RecordFailedLogin(user, cancellationToken);
+                await refreshService.RecordFailedLoginAsync(user, MaxFailedAttempts, LockoutMinutes, timeProvider.UtcNow, cancellationToken);
             }
 
             return Problem(detail: "Invalid username or password", statusCode: 401);
         }
 
-        await ResetFailedAttemptsIfNeededAsync(user, cancellationToken);
+        await refreshService.ResetFailedAttemptsIfNeededAsync(user, cancellationToken);
 
         return await BuildSignInResponseAsync(user, cancellationToken);
     }
@@ -91,15 +89,10 @@ public partial class AuthController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> Logout(CancellationToken cancellationToken = default)
     {
-        // Extract user_id from the authenticated token claims
         var userIdStr = User.FindFirstValue(ClaimNames.UserId);
         if (!string.IsNullOrEmpty(userIdStr) && Guid.TryParse(userIdStr, out Guid userId))
         {
-            // Revoke all refresh tokens for the current user
-            await db.RefreshTokens
-                .Where(rt => rt.UserId == userId && !rt.Revoked)
-                .ExecuteUpdateAsync(setters =>
-                    setters.SetProperty(rt => rt.Revoked, true), cancellationToken);
+            await refreshService.RevokeAllUserTokensAsync(userId, cancellationToken);
         }
 
         Response.Cookies.Delete("access_token");
@@ -116,8 +109,7 @@ public partial class AuthController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
-    public async Task<IActionResult> Refresh(
-        [FromServices] IRefreshTokenService refreshService, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Refresh(CancellationToken cancellationToken = default)
     {
         var result = await refreshService.RotateRefreshTokenAsync(Request.Cookies["refresh_token"], cancellationToken);
         if (!result.Success)
@@ -133,8 +125,6 @@ public partial class AuthController(
     }
 
     // ── GET /api/current_user ─────────────────────────────────
-    // fix #1: [Authorize] + User.FindFirst(...) replaces manual GetPrincipalFromCookie(),
-    // routing unauthenticated requests through the standard JWT bearer pipeline → 401.
 
     /// <summary>Returns the authenticated user's profile with location chain.</summary>
     [HttpGet("current_user")]
@@ -151,7 +141,7 @@ public partial class AuthController(
 
         // Query the database for fresh user data instead of relying on
         // potentially stale JWT claims (user profile may have changed).
-        var user = await db.Users.FindAsync([userId], cancellationToken);
+        var user = await refreshService.FindUserByIdAsync(userId, cancellationToken);
         if (user is null)
         {
             return Problem(detail: "User no longer exists.", statusCode: 401);
@@ -201,42 +191,12 @@ public partial class AuthController(
     private int MaxFailedAttempts => lockoutOptions.Value.MaxFailedAttempts;
     private int LockoutMinutes => lockoutOptions.Value.LockoutMinutes;
 
-    private async Task RecordFailedLogin(User user, CancellationToken cancellationToken = default)
-    {
-        user.FailedLoginAttempts = (user.FailedLoginAttempts ?? 0) + 1;
-        if (user.FailedLoginAttempts >= MaxFailedAttempts)
-        {
-            user.LockedUntil = timeProvider.UtcNow.AddMinutes(LockoutMinutes);
-        }
-
-        await db.SaveChangesAsync(cancellationToken);
-    }
-
-    private async Task ResetFailedAttemptsIfNeededAsync(User user, CancellationToken ct)
-    {
-        if (user.FailedLoginAttempts > 0 || user.LockedUntil.HasValue)
-        {
-            user.FailedLoginAttempts = 0;
-            user.LockedUntil = null;
-            await db.SaveChangesAsync(ct);
-        }
-    }
-
-    private async Task<IActionResult> BuildSignInResponseAsync(User user, CancellationToken ct)
+    private async Task<IActionResult> BuildSignInResponseAsync(Models.User user, CancellationToken ct)
     {
         var token = jwt.CreateToken(user.Id, user.Username, user.Name, user.Email,
             communeId: user.CommuneId, role: user.Role, dairaId: user.DairaId, wilayaId: user.WilayaId);
 
-        var (refreshRaw, refreshHash) = jwt.CreateRefreshToken();
-        var refreshExpiry = timeProvider.UtcNow.AddDays(jwtOptions.Value.RefreshExpiresInDays);
-
-        db.RefreshTokens.Add(new RefreshToken
-        {
-            UserId = user.Id,
-            TokenHash = refreshHash,
-            ExpiresAt = refreshExpiry,
-        });
-        await db.SaveChangesAsync(ct);
+        var (refreshRaw, _, refreshExpiry) = await refreshService.IssueRefreshTokenAsync(user.Id, ct);
 
         if (logger.IsEnabled(LogLevel.Debug))
         {
@@ -275,11 +235,9 @@ public partial class AuthController(
     private sealed record LocationChain(Commune? Commune, Daira? Daira, Wilaya? Wilaya);
     private sealed record CommuneWithDaira(Commune? Commune, Daira? Daira);
 
-    /// <summary>
-    /// fix #7: Loads commune → daira → wilaya in one SQL JOIN.
-    /// </summary>
     private async Task<LocationChain> LoadLocationChainAsync(int communeId, CancellationToken cancellationToken = default)
     {
+        await using var db = refreshService.CreateDbContext();
         var row = await (
             from c in db.Communes
             where c.CommuneId == communeId
@@ -295,11 +253,9 @@ public partial class AuthController(
             : new LocationChain(row.Commune, row.Daira, row.Wilaya);
     }
 
-    /// <summary>
-    /// fix #7 + fix #11: SignIn only needs commune + daira (wilaya absent from response).
-    /// </summary>
     private async Task<CommuneWithDaira> LoadCommuneWithDairaAsync(int communeId, CancellationToken cancellationToken = default)
     {
+        await using var db = refreshService.CreateDbContext();
         var row = await (
             from c in db.Communes
             where c.CommuneId == communeId
@@ -313,11 +269,9 @@ public partial class AuthController(
             : new CommuneWithDaira(row.Commune, row.Daira);
     }
 
-    /// <summary>
-    /// Loads daira → wilaya in one JOIN (avoids N+1 from sequential FindAsync calls).
-    /// </summary>
     private async Task<LocationChain> LoadDairaWithWilayaAsync(int dairaId, CancellationToken cancellationToken = default)
     {
+        await using var db = refreshService.CreateDbContext();
         var row = await (
             from d in db.Dairas
             where d.DairaId == dairaId
@@ -331,9 +285,6 @@ public partial class AuthController(
             : new LocationChain(null, row.Daira, row.Wilaya);
     }
 
-    /// <summary>
-    /// Single-query wilaya lookup for national-level admins with no commune/daira.
-    /// </summary>
     private async Task<LocationChain> LoadWilayaOnlyAsync(int? wilayaId, CancellationToken cancellationToken = default)
     {
         if (!wilayaId.HasValue)
@@ -341,6 +292,7 @@ public partial class AuthController(
             return new LocationChain(null, null, null);
         }
 
+        await using var db = refreshService.CreateDbContext();
         var wilaya = await db.Wilayas.FindAsync([wilayaId.Value], cancellationToken);
         return new LocationChain(null, null, wilaya);
     }

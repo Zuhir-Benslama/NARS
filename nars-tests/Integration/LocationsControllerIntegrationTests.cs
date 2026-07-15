@@ -39,7 +39,8 @@ public class LocationsControllerIntegrationTests : IAsyncLifetime
         return new LocationsController(
             _db,
             Options.Create(new LocationsOptions()),
-            Mock.Of<IBoundaryService>());
+            Mock.Of<IBoundaryService>(),
+            Mock.Of<ILocationQueryService>());
     }
 
     [Fact]

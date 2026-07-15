@@ -1,8 +1,10 @@
+using System.Data;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
+using NarsApi.Models;
 
 namespace NarsApi.Services;
 
@@ -95,5 +97,84 @@ public class FieldService(
         var ownerId = reader.GetGuid(0);
         var communeId = await reader.IsDBNullAsync(1, ct) ? null : (int?)reader.GetInt32(1);
         return (ownerId, communeId);
+    }
+
+    public async Task<List<FieldInspectionResponse>> GetInspectionsAsync(Guid featureId, int skip, int take, CancellationToken ct = default)
+    {
+        return await db.Inspections
+            .Where(i => i.FeatureId == featureId)
+            .OrderByDescending(i => i.CreatedAt)
+            .Skip(skip)
+            .Take(take)
+            .Select(i => new FieldInspectionResponse(
+                Id: i.Id.ToString(),
+                FeatureId: i.FeatureId.ToString(),
+                Type: i.Type,
+                Data: JsonHelper.DeserializeSafe(i.Data),
+                Status: i.Status,
+                CreatedAt: i.CreatedAt
+            ))
+            .ToListAsync(ct);
+    }
+
+    public async Task<(Guid OwnerUserId, int? CommuneId)?> GetRoadOwnerAsync(Guid roadId, CancellationToken ct = default)
+    {
+        var result = await (
+            from r in db.Roads
+            join u in db.Users on r.UserId equals u.Id
+            where r.Id == roadId
+            select new { Road = r, u.CommuneId }
+        ).FirstOrDefaultAsync(ct);
+
+        return result is null ? null : (result.Road.UserId, result.CommuneId);
+    }
+
+    public async Task<Guid> CreateEntranceAsync(Guid roadId, Guid ownerUserId, Guid creatorUserId, string label, string data, CancellationToken ct = default)
+    {
+        var newId = Guid.CreateVersion7();
+
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+
+        db.HouseEntrances.Add(new HouseEntrance
+        {
+            Id = newId,
+            UserId = ownerUserId,
+            Layer = FeatureTypes.HouseEntranceLayers.Main,
+            Label = label,
+            Data = data,
+            RoadId = roadId,
+        });
+        db.FeatureRegistry.Add(new FeatureRegistry
+        {
+            Id = newId,
+            FeatureType = FeatureTypes.HouseEntrance
+        });
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+
+        return newId;
+    }
+
+    public async Task<string?> GetFeatureRegistryTypeAsync(Guid featureId, CancellationToken ct = default)
+    {
+        var reg = await db.FeatureRegistry.FindAsync([featureId], ct);
+        return reg?.FeatureType;
+    }
+
+    public async Task<Guid> SubmitInspectionAsync(Guid featureId, Guid userId, string type, string status, string data, CancellationToken ct = default)
+    {
+        var inspection = new Inspection
+        {
+            Id = Guid.CreateVersion7(),
+            FeatureId = featureId,
+            UserId = userId,
+            Type = type,
+            Data = data,
+            Status = status,
+        };
+
+        db.Add(inspection);
+        await db.SaveChangesAsync(ct);
+        return inspection.Id;
     }
 }

@@ -1,7 +1,6 @@
 using BCrypt.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
@@ -14,7 +13,6 @@ namespace NarsApi.Controllers;
 [Route("/api")]
 [Tags("Admin")]
 public class AdminUserController(
-    AppDbContext db,
     ILogger<AdminUserController> logger,
     IUserAuthorizationService authorizationService,
     IUserCreationService userCreationService,
@@ -65,12 +63,11 @@ public class AdminUserController(
             return Problem(detail: error, statusCode: statusCode);
         }
 
-        db.Users.Add(newUser!);
         try
         {
-            await db.SaveChangesAsync(cancellationToken);
+            await authorizationService.AddUserAsync(newUser!, cancellationToken);
         }
-        catch (DbUpdateException ex)
+        catch (InvalidOperationException ex)
         {
             logger.LogWarning(ex, "Duplicate user during admin signup (username={Username}, email={Email})",
                 body.Username, body.Email);
@@ -114,7 +111,7 @@ public class AdminUserController(
     {
         if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
 
-        var target = await db.Users.FindAsync([userId], cancellationToken);
+        var target = await authorizationService.FindUserByIdAsync(userId, cancellationToken);
         if (target is null)
         {
             return Problem(detail: "User not found.", statusCode: 404);
@@ -138,7 +135,7 @@ public class AdminUserController(
             return geoError;
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        await authorizationService.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation("[Admin] {CallerRole} {CallerId} updated user {UserId}",
             CurrentUserRole, CurrentUserId, userId);
@@ -155,7 +152,7 @@ public class AdminUserController(
     public async Task<IActionResult> DeleteAdmin(
         Guid userId, CancellationToken cancellationToken = default)
     {
-        var target = await db.Users.FindAsync([userId], cancellationToken);
+        var target = await authorizationService.FindUserByIdAsync(userId, cancellationToken);
         if (target is null)
         {
             return Problem(detail: "User not found.", statusCode: 404);
@@ -166,8 +163,7 @@ public class AdminUserController(
             return Forbid();
         }
 
-        db.Users.Remove(target);
-        await db.SaveChangesAsync(cancellationToken);
+        await authorizationService.DeleteUserAsync(userId, cancellationToken);
 
         logger.LogInformation("[Admin] {CallerRole} {CallerId} deleted user {UserId} ({Username})",
             CurrentUserRole, CurrentUserId, userId, target.Username);
@@ -199,7 +195,7 @@ public class AdminUserController(
                 return Problem(detail: "Password is required to change role or geographic scope.", statusCode: 400);
             }
 
-            var caller = await db.Users.FindAsync([RequiredCurrentUserId], ct);
+            var caller = await authorizationService.FindUserByIdAsync(RequiredCurrentUserId, ct);
             if (caller is null || !BCrypt.Net.BCrypt.Verify(body.Password, caller.PasswordHash))
             {
                 return Problem(detail: "Password is incorrect.", statusCode: 403);
@@ -218,8 +214,7 @@ public class AdminUserController(
 
         if (body.Email is not null)
         {
-            var emailConflict = await db.Users.AnyAsync(
-                u => u.Email == body.Email && u.Id != target.Id, ct);
+            var emailConflict = await authorizationService.IsEmailTakenAsync(body.Email, target.Id, ct);
             if (emailConflict)
             {
                 return Problem(detail: "Email already exists.", statusCode: 409);

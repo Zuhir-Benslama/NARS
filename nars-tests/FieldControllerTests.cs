@@ -23,15 +23,12 @@ public class FieldControllerTests
     private static AppDbContext CreateDb() => CreateInMemoryDb("FieldTest");
 
     private static FieldController CreateController(
-        AppDbContext db,
         IFieldService? fieldService = null,
         IDateTimeProvider? timeProvider = null)
     {
         return new FieldController(
-            db,
             Mock.Of<ILogger<FieldController>>(),
             Options.Create(new FeatureDefaultsOptions()),
-            timeProvider ?? Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow),
             fieldService ?? Mock.Of<IFieldService>(),
             Mock.Of<IWebHostEnvironment>())
         {
@@ -57,7 +54,7 @@ public class FieldControllerTests
     public async Task GetFeatures_NoCommuneId_Returns400()
     {
         var db = CreateDb();
-        var ctrl = CreateController(db);
+        var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker);
 
         var result = await ctrl.GetFeatures(type: "road");
@@ -70,7 +67,7 @@ public class FieldControllerTests
     public async Task GetFeatures_NullType_Returns400()
     {
         var db = CreateDb();
-        var ctrl = CreateController(db);
+        var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
         var result = await ctrl.GetFeatures(type: null);
@@ -83,7 +80,7 @@ public class FieldControllerTests
     public async Task GetFeatures_InvalidType_Returns400()
     {
         var db = CreateDb();
-        var ctrl = CreateController(db);
+        var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
         var result = await ctrl.GetFeatures(type: "invalid_type");
@@ -103,7 +100,7 @@ public class FieldControllerTests
             {
                 new("r1", UserId.ToString(), "street", "Road 1", System.Text.Json.JsonDocument.Parse("{}").RootElement, FixedUtcNow, null),
             }, 1));
-        var ctrl = CreateController(db, fieldService: mockFieldService.Object);
+        var ctrl = CreateController(fieldService: mockFieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
         var result = await ctrl.GetFeatures(type: "road");
@@ -120,7 +117,7 @@ public class FieldControllerTests
     public async Task SubmitInspection_NullBody_Returns400()
     {
         var db = CreateDb();
-        var ctrl = CreateController(db);
+        var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
         var result = await ctrl.SubmitInspection(null!);
@@ -133,7 +130,7 @@ public class FieldControllerTests
     public async Task SubmitInspection_InvalidFeatureId_Returns400()
     {
         var db = CreateDb();
-        var ctrl = CreateController(db);
+        var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
         var result = await ctrl.SubmitInspection(new FieldInspectRequest("not-a-guid", "road", Json("{}"), "good"));
@@ -146,7 +143,7 @@ public class FieldControllerTests
     public async Task SubmitInspection_InvalidType_Returns400()
     {
         var db = CreateDb();
-        var ctrl = CreateController(db);
+        var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
         var result = await ctrl.SubmitInspection(new FieldInspectRequest(Guid.NewGuid().ToString(), "area", Json("{}"), "good"));
@@ -159,7 +156,7 @@ public class FieldControllerTests
     public async Task SubmitInspection_FeatureNotFound_Returns400()
     {
         var db = CreateDb();
-        var ctrl = CreateController(db);
+        var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
         var result = await ctrl.SubmitInspection(new FieldInspectRequest(Guid.NewGuid().ToString(), "road", Json("{}"), "good"));
@@ -174,9 +171,11 @@ public class FieldControllerTests
         var db = CreateDb();
         var roadId = Guid.NewGuid();
         var fieldService = new Mock<IFieldService>();
+        fieldService.Setup(s => s.GetFeatureRegistryTypeAsync(roadId, default))
+            .ReturnsAsync(FeatureTypes.Road);
         fieldService.Setup(s => s.GetFeatureOwnerAsync(FeatureTypes.Road, roadId, default))
             .ReturnsAsync((OtherUserId, (int?)2));
-        var ctrl = CreateController(db, fieldService: fieldService.Object);
+        var ctrl = CreateController(fieldService: fieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
         db.FeatureRegistry.Add(new FeatureRegistry { Id = roadId, FeatureType = FeatureTypes.Road });
@@ -193,9 +192,13 @@ public class FieldControllerTests
         var db = CreateDb();
         var roadId = Guid.NewGuid();
         var fieldService = new Mock<IFieldService>();
+        fieldService.Setup(s => s.GetFeatureRegistryTypeAsync(roadId, default))
+            .ReturnsAsync(FeatureTypes.Road);
         fieldService.Setup(s => s.GetFeatureOwnerAsync(FeatureTypes.Road, roadId, default))
             .ReturnsAsync((OtherUserId, (int?)1));
-        var ctrl = CreateController(db, fieldService: fieldService.Object);
+        fieldService.Setup(s => s.SubmitInspectionAsync(roadId, It.IsAny<Guid>(), FeatureTypes.Road, "good", It.IsAny<string>(), default))
+            .ReturnsAsync(Guid.NewGuid());
+        var ctrl = CreateController(fieldService: fieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
         db.FeatureRegistry.Add(new FeatureRegistry { Id = roadId, FeatureType = FeatureTypes.Road });
@@ -215,9 +218,11 @@ public class FieldControllerTests
         var db = CreateDb();
         var roadId = Guid.NewGuid();
         var fieldService = new Mock<IFieldService>();
+        fieldService.Setup(s => s.GetFeatureRegistryTypeAsync(roadId, default))
+            .ReturnsAsync(FeatureTypes.Road);
         fieldService.Setup(s => s.GetFeatureOwnerAsync(FeatureTypes.Road, roadId, default))
             .ReturnsAsync((OtherUserId, (int?)1));
-        var ctrl = CreateController(db, fieldService: fieldService.Object);
+        var ctrl = CreateController(fieldService: fieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
         db.FeatureRegistry.Add(new FeatureRegistry { Id = roadId, FeatureType = FeatureTypes.Road });
@@ -236,28 +241,14 @@ public class FieldControllerTests
     {
         var db = CreateDb();
         var featureId = Guid.NewGuid();
-        db.Inspections.Add(new Inspection
-        {
-            Id = Guid.NewGuid(),
-            FeatureId = featureId,
-            UserId = UserId,
-            Type = FeatureTypes.Road,
-            Data = "{}",
-            Status = "good",
-            CreatedAt = FixedUtcNow,
-        });
-        db.Inspections.Add(new Inspection
-        {
-            Id = Guid.NewGuid(),
-            FeatureId = featureId,
-            UserId = UserId,
-            Type = FeatureTypes.Road,
-            Data = "{}",
-            Status = "issue",
-            CreatedAt = FixedUtcNow.AddHours(1),
-        });
-        await db.SaveChangesAsync();
-        var ctrl = CreateController(db);
+        var mockFieldService = new Mock<IFieldService>();
+        mockFieldService.Setup(s => s.GetInspectionsAsync(featureId, 0, 100, default))
+            .ReturnsAsync(new List<FieldInspectionResponse>
+            {
+                new("i1", featureId.ToString(), FeatureTypes.Road, null, "good", FixedUtcNow),
+                new("i2", featureId.ToString(), FeatureTypes.Road, null, "issue", FixedUtcNow.AddHours(1)),
+            });
+        var ctrl = CreateController(fieldService: mockFieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
         var result = await ctrl.GetInspections(featureId);
@@ -271,10 +262,14 @@ public class FieldControllerTests
     public async Task GetInspections_NoInspections_ReturnsEmptyList()
     {
         var db = CreateDb();
-        var ctrl = CreateController(db);
+        var featureId = Guid.NewGuid();
+        var mockFieldService = new Mock<IFieldService>();
+        mockFieldService.Setup(s => s.GetInspectionsAsync(featureId, 0, 100, default))
+            .ReturnsAsync(new List<FieldInspectionResponse>());
+        var ctrl = CreateController(fieldService: mockFieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
-        var result = await ctrl.GetInspections(Guid.NewGuid());
+        var result = await ctrl.GetInspections(featureId);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var response = Assert.IsType<FieldInspectionsResponse>(ok.Value);
@@ -287,7 +282,7 @@ public class FieldControllerTests
     public async Task CreateEntranceFromInspection_NullBody_Returns400()
     {
         var db = CreateDb();
-        var ctrl = CreateController(db);
+        var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
         var result = await ctrl.CreateEntranceFromInspection(null!);
@@ -300,7 +295,7 @@ public class FieldControllerTests
     public async Task CreateEntranceFromInspection_InvalidRoadId_Returns400()
     {
         var db = CreateDb();
-        var ctrl = CreateController(db);
+        var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
         var result = await ctrl.CreateEntranceFromInspection(new FieldEntranceCreateRequest("not-a-guid", Json("{}"), "Label"));
@@ -313,7 +308,7 @@ public class FieldControllerTests
     public async Task CreateEntranceFromInspection_RoadNotFound_Returns400()
     {
         var db = CreateDb();
-        var ctrl = CreateController(db);
+        var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
         var result = await ctrl.CreateEntranceFromInspection(new FieldEntranceCreateRequest(Guid.NewGuid().ToString(), Json("{}"), "Label"));
@@ -327,29 +322,13 @@ public class FieldControllerTests
     {
         var db = CreateDb();
         var userId = UserId;
-        db.Users.Add(new User
-        {
-            Id = userId,
-            Username = "owner",
-            Name = "Owner",
-            Email = "test@example.com",
-            Phone = DefaultPhone,
-            PasswordHash = "hash",
-            Role = UserRoles.CommuneUser,
-            CommuneId = 1,
-        });
         var roadId = Guid.NewGuid();
-        db.Roads.Add(new Road
-        {
-            Id = roadId,
-            UserId = userId,
-            Layer = "street",
-            Label = "Main Street",
-            Data = "{}",
-            CreatedAt = FixedUtcNow,
-        });
-        await db.SaveChangesAsync();
-        var ctrl = CreateController(db);
+        var mockFieldService = new Mock<IFieldService>();
+        mockFieldService.Setup(s => s.GetRoadOwnerAsync(roadId, default))
+            .ReturnsAsync((userId, (int?)1));
+        mockFieldService.Setup(s => s.CreateEntranceAsync(roadId, userId, It.IsAny<Guid>(), "Entrance Label", It.IsAny<string>(), default))
+            .ReturnsAsync(Guid.NewGuid());
+        var ctrl = CreateController(fieldService: mockFieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
         var result = await ctrl.CreateEntranceFromInspection(new FieldEntranceCreateRequest(roadId.ToString(), Json("""{"coordinates": [[36.0, 3.0]]}"""), "Entrance Label"));
@@ -365,29 +344,11 @@ public class FieldControllerTests
     {
         var db = CreateDb();
         var userId = UserId;
-        db.Users.Add(new User
-        {
-            Id = userId,
-            Username = "owner",
-            Name = "Owner",
-            Email = "owner@test.com",
-            Phone = DefaultPhone,
-            PasswordHash = "hash",
-            Role = UserRoles.CommuneUser,
-            CommuneId = 2,
-        });
         var roadId = Guid.NewGuid();
-        db.Roads.Add(new Road
-        {
-            Id = roadId,
-            UserId = userId,
-            Layer = "street",
-            Label = "Main Street",
-            Data = "{}",
-            CreatedAt = FixedUtcNow,
-        });
-        await db.SaveChangesAsync();
-        var ctrl = CreateController(db);
+        var mockFieldService = new Mock<IFieldService>();
+        mockFieldService.Setup(s => s.GetRoadOwnerAsync(roadId, default))
+            .ReturnsAsync((userId, (int?)2));
+        var ctrl = CreateController(fieldService: mockFieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
         var result = await ctrl.CreateEntranceFromInspection(new FieldEntranceCreateRequest(roadId.ToString(), Json("{}"), "Label"));

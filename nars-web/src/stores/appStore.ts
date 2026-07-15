@@ -67,8 +67,5 @@ export const useAppStore = defineStore("app", {
         namingPanels: layerStore.namingPanelCount,
       }
     },
-    reset() {
-      this.$reset()
-    },
   },
 })

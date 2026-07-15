@@ -1,5 +1,6 @@
 .git
 .gitignore
+k8s
 docs
 scripts
 __pycache__

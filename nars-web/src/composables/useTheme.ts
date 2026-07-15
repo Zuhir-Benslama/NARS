@@ -17,7 +17,11 @@ function parseTheme(raw: string | null): ThemeMode {
 }
 
 // Read persisted value, default to dark.
-const stored = parseTheme(localStorage.getItem(STORAGE_KEY))
+// Guard for SSR / test environments where localStorage may be unavailable.
+const stored =
+  typeof localStorage !== "undefined"
+    ? parseTheme(localStorage.getItem(STORAGE_KEY))
+    : ("dark" as ThemeMode)
 export const theme = ref<ThemeMode>(stored)
 
 function applyTheme(mode: ThemeMode): void {

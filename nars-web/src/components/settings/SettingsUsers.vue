@@ -251,8 +251,8 @@ async function fetchUsers() {
   try {
     const res = await apiFetch("/api/admin/users")
     users.value = (await res.json()) as ManageableUser[]
-  } catch {
-    // silent
+  } catch (e) {
+    console.warn("[SettingsUsers] fetchUsers failed:", e)
   } finally {
     loadingUsers.value = false
   }
@@ -463,8 +463,8 @@ async function fetchWilayas(q: string) {
     try {
       const res = await apiFetch(`/api/wilayas?search=${encodeURIComponent(q)}`)
       wilayaOptions.value = extractSearchOptions(await res.json())
-    } catch {
-      /* silent */
+    } catch (e) {
+      console.warn("[SettingsUsers] fetchWilayas failed:", e)
     }
   }, 200)
 }
@@ -481,8 +481,8 @@ async function fetchDairas(q: string) {
       const wilayaParam = selectedWilayaId.value ? `&wilaya_id=${selectedWilayaId.value}` : ""
       const res = await apiFetch(`/api/dairas?search=${encodeURIComponent(q)}${wilayaParam}`)
       dairaOptions.value = extractSearchOptions(await res.json())
-    } catch {
-      /* silent */
+    } catch (e) {
+      console.warn("[SettingsUsers] fetchDairas failed:", e)
     }
   }, 200)
 }
@@ -497,8 +497,8 @@ async function fetchCommunes(q: string) {
     try {
       const res = await apiFetch(`/api/communes?search=${encodeURIComponent(q)}`)
       communeOptions.value = extractSearchOptions(await res.json())
-    } catch {
-      /* silent */
+    } catch (e) {
+      console.warn("[SettingsUsers] fetchCommunes failed:", e)
     }
   }, 200)
 }

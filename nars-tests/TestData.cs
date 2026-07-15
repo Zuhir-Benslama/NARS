@@ -13,6 +13,9 @@ public static class TestData
     public const string DefaultPassword = "Str0ng!Pass";
     public const string AltPassword = "StrongP@ss1";
 
+    // ── Auth tokens ────────────────────────────────────────────────────
+    public const string AdminSignupToken = "nars-admin-signup-v1";
+
     // ── Phone numbers ──────────────────────────────────────────────────
     public const string DefaultPhone = "0555000000";
     public const string AltPhone = "0555123456";

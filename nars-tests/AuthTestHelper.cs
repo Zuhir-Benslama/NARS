@@ -14,6 +14,11 @@ public static class AuthTestHelper
     /// <summary>Shared test JWT secret key (min 32 chars for HMAC-SHA256).</summary>
     public const string TestJwtSecret = "test-secret-key-that-is-at-least-32-chars-long!!";
 
+    /// <summary>
+    /// Creates a test double for <see cref="IUserCreationService"/>.
+    /// Validates password strength and DB uniqueness (same checks as the real service)
+    /// but skips BCrypt hashing — uses a placeholder hash instead.
+    /// </summary>
     public static IUserCreationService CreateUserCreationMock(AppDbContext? db = null)
     {
         var mock = new Mock<IUserCreationService>();
@@ -45,7 +50,7 @@ public static class AuthTestHelper
                     Email = email,
                     Name = name,
                     Phone = phone,
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+                    PasswordHash = "test-hash",
                     Role = role,
                     CommuneId = communeId,
                     DairaId = dairaId,

@@ -2,11 +2,9 @@ using BCrypt.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.EntityFrameworkCore;
-using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
-using NarsApi.Models;
+using NarsApi.Services;
 
 namespace NarsApi.Controllers;
 
@@ -40,15 +38,22 @@ public partial class AuthController
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> AuthorizedAdminSignup(
         [FromBody] AuthorizedAdminSignupRequest body,
+        [FromHeader(Name = "X-Admin-Signup")] string? signupToken,
         CancellationToken cancellationToken = default)
     {
+        // Require a custom header to prevent automated scripts from targeting
+        // this unauthenticated endpoint. The SPA sets this header on the form.
+        if (signupToken != "nars-admin-signup-v1")
+        {
+            return Problem(detail: "Invalid request.", statusCode: 403);
+        }
+
         // 1. Verify the authorizing admin's credentials.
         // IMPORTANT: always run BCrypt.Verify even when the user is not found.
         // Short-circuiting on "admin is null" leaks whether a username exists
         // via response-time difference (~0 µs vs ~300 ms for a real BCrypt check).
         var adminNormalized = body.AdminUsername.ToLowerInvariant();
-        var admin = await db.Users
-            .FirstOrDefaultAsync(u => u.Username == adminNormalized, cancellationToken);
+        var admin = await refreshService.FindUserByUsernameAsync(adminNormalized, cancellationToken);
 
         var hashToCheck = admin?.PasswordHash ?? DummyHash;
         var passwordValid = BCrypt.Net.BCrypt.Verify(body.AdminPassword, hashToCheck);
@@ -57,7 +62,7 @@ public partial class AuthController
         {
             if (admin is not null && !passwordValid)
             {
-                await RecordFailedLogin(admin, cancellationToken);
+                await refreshService.RecordFailedLoginAsync(admin, MaxFailedAttempts, LockoutMinutes, timeProvider.UtcNow, cancellationToken);
             }
 
             return Problem(detail: "Admin credentials are invalid.", statusCode: 401);
@@ -104,18 +109,8 @@ public partial class AuthController
         }
 
         // 6. Persist.
-        db.Users.Add(newUser!);
-        await ResetFailedAttemptsIfNeededAsync(admin, cancellationToken);
-        try
-        {
-            await db.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex)
-        {
-            logger.LogWarning(ex, "Duplicate user during authorized signup (username={Username}, email={Email})",
-                body.Username, body.Email);
-            return Problem(detail: "Username or email already exists.", statusCode: 409);
-        }
+        await refreshService.AddUserAsync(newUser!, cancellationToken);
+        await refreshService.ResetFailedAttemptsIfNeededAsync(admin, cancellationToken);
 
         logger.LogInformation(
             "[Auth] {AdminUser} ({AdminRole}) created {NewRole} account {NewUser} via login page",

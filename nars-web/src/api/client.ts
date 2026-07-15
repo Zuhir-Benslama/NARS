@@ -30,7 +30,6 @@ export interface ActionResponse {
 
 function jsonBody(body: unknown): RequestInit {
   return {
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   }
 }
@@ -122,11 +121,7 @@ export async function updateAdminUser(
   userId: string,
   body: Record<string, unknown>,
 ): Promise<ActionResponse> {
-  const res = await apiFetch(`/api/admin/users/${userId}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  })
+  const res = await apiFetch(`/api/admin/users/${userId}`, { method: "PUT", ...jsonBody(body) })
   return res.json()
 }
 

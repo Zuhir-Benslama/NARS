@@ -47,7 +47,6 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
     private AdminUserController CreateUserManagementController()
     {
         return new AdminUserController(
-            _db,
             Mock.Of<Microsoft.Extensions.Logging.ILogger<AdminUserController>>(),
             new UserAuthorizationService(_db),
             AuthTestHelper.CreateUserCreationMock(),

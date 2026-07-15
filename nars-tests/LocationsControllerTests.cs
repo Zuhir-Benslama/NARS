@@ -19,7 +19,8 @@ public class LocationsControllerTests
         new(
             db,
             Options.Create(new LocationsOptions()),
-            boundaryService ?? Mock.Of<IBoundaryService>());
+            boundaryService ?? Mock.Of<IBoundaryService>(),
+            Mock.Of<ILocationQueryService>());
 
     private static AppDbContext CreateDb(string name) => CreateInMemoryDb($"LocationsTest_{name}");
 

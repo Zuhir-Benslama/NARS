@@ -1,10 +1,7 @@
-using System.Data;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
@@ -17,10 +14,8 @@ namespace NarsApi.Controllers;
 [Tags("Field")]
 [Authorize(Roles = UserRoles.FieldWorker)]
 public class FieldController(
-    AppDbContext db,
     ILogger<FieldController> logger,
     IOptions<FeatureDefaultsOptions> featureDefaults,
-    IDateTimeProvider timeProvider,
     IFieldService fieldService,
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
@@ -93,7 +88,17 @@ public class FieldController(
             return statusError;
         }
 
-        return await SaveInspectionAsync(featureId, body.Type, body.Status, rawData, cancellationToken);
+        var inspectionId = await fieldService.SubmitInspectionAsync(
+            featureId, RequiredCurrentUserId, body.Type, body.Status, rawData, cancellationToken);
+
+        logger.LogInformation("[Field] Worker {WorkerId} inspected {Type} {FeatureId} — status: {Status}",
+            CurrentUserId, body.Type, featureId, body.Status);
+
+        return StatusCode(201, new FieldInspectSubmitResponse(
+            Success: true,
+            Id: inspectionId.ToString(),
+            Message: "Inspection saved."
+        ));
     }
 
     /// <summary>Returns inspections for a given feature, newest first, with pagination.</summary>
@@ -107,22 +112,7 @@ public class FieldController(
         CancellationToken cancellationToken = default)
     {
         take = Math.Clamp(take, 1, 500);
-
-        var inspections = await db.Inspections
-            .Where(i => i.FeatureId == featureId)
-            .OrderByDescending(i => i.CreatedAt)
-            .Skip(skip)
-            .Take(take)
-            .Select(i => new FieldInspectionResponse(
-                Id: i.Id.ToString(),
-                FeatureId: i.FeatureId.ToString(),
-                Type: i.Type,
-                Data: DeserializeJsonSafe(i.Data),
-                Status: i.Status,
-                CreatedAt: i.CreatedAt
-            ))
-            .ToListAsync(cancellationToken);
-
+        var inspections = await fieldService.GetInspectionsAsync(featureId, skip, take, cancellationToken);
         return Ok(new FieldInspectionsResponse(inspections));
     }
 
@@ -140,19 +130,13 @@ public class FieldController(
             return Problem(detail: "Invalid road_id.", statusCode: 400);
         }
 
-        var roadData = await (
-            from r in db.Roads
-            join u in db.Users on r.UserId equals u.Id
-            where r.Id == roadId
-            select new { Road = r, u.CommuneId }
-        ).FirstOrDefaultAsync(cancellationToken);
-
-        if (roadData is null)
+        var roadOwner = await fieldService.GetRoadOwnerAsync(roadId, cancellationToken);
+        if (roadOwner is null)
         {
             return Problem(detail: "Road not found.", statusCode: 400);
         }
 
-        if (!roadData.CommuneId.HasValue || !CurrentCommuneId.HasValue || roadData.CommuneId != CurrentCommuneId)
+        if (!roadOwner.Value.CommuneId.HasValue || !CurrentCommuneId.HasValue || roadOwner.Value.CommuneId != CurrentCommuneId)
         {
             return Forbid();
         }
@@ -165,33 +149,12 @@ public class FieldController(
         }
 
         var label = body.Label ?? DefaultEntranceLabel;
-        var newId = Guid.CreateVersion7();
-
-        var entrance = new HouseEntrance
-        {
-            Id = newId,
-            UserId = roadData.Road.UserId,
-            Layer = FeatureTypes.HouseEntranceLayers.Main,
-            Label = label,
-            Data = rawData,
-            RoadId = roadId,
-            CreatedAt = timeProvider.UtcNow,
-        };
-
-        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
-
-        db.HouseEntrances.Add(entrance);
-        db.FeatureRegistry.Add(new FeatureRegistry
-        {
-            Id = newId,
-            FeatureType = FeatureTypes.HouseEntrance
-        });
-        await db.SaveChangesAsync(cancellationToken);
-        await tx.CommitAsync(cancellationToken);
+        var newId = await fieldService.CreateEntranceAsync(
+            roadId, roadOwner.Value.OwnerUserId, RequiredCurrentUserId, label, rawData, cancellationToken);
 
         logger.LogInformation(
             "[Field] Worker {WorkerId} created entrance {EntranceId} for road {RoadId} (owner: {OwnerId})",
-            CurrentUserId, newId, roadId, roadData.Road.UserId);
+            CurrentUserId, newId, roadId, roadOwner.Value.OwnerUserId);
 
         return StatusCode(201, new CreateEntranceResponse(
             Success: true,
@@ -210,13 +173,13 @@ public class FieldController(
             return Problem(detail: $"Invalid inspection type. Must be one of: {string.Join(", ", validTypes)}", statusCode: 400);
         }
 
-        var registryEntry = await db.FeatureRegistry.FindAsync([featureId], ct);
-        if (registryEntry is null)
+        var registryType = await fieldService.GetFeatureRegistryTypeAsync(featureId, ct);
+        if (registryType is null)
         {
             return Problem(detail: "Feature not found.", statusCode: 400);
         }
 
-        var feature = await fieldService.GetFeatureOwnerAsync(registryEntry.FeatureType, featureId, ct);
+        var feature = await fieldService.GetFeatureOwnerAsync(registryType, featureId, ct);
         if (feature is null)
         {
             return Problem(detail: "Feature not found.", statusCode: 400);
@@ -248,32 +211,4 @@ public class FieldController(
 
         return null;
     }
-
-    private async Task<IActionResult> SaveInspectionAsync(Guid featureId, string type, string status, string rawData, CancellationToken ct)
-    {
-        var inspection = new Inspection
-        {
-            Id = Guid.CreateVersion7(),
-            FeatureId = featureId,
-            UserId = RequiredCurrentUserId,
-            Type = type,
-            Data = rawData,
-            Status = status,
-            CreatedAt = timeProvider.UtcNow,
-        };
-
-        db.Add(inspection);
-        await db.SaveChangesAsync(ct);
-
-        logger.LogInformation("[Field] Worker {WorkerId} inspected {Type} {FeatureId} — status: {Status}",
-            CurrentUserId, type, featureId, status);
-
-        return StatusCode(201, new FieldInspectSubmitResponse(
-            Success: true,
-            Id: inspection.Id.ToString(),
-            Message: "Inspection saved."
-        ));
-    }
-
-    private static JsonNode? DeserializeJsonSafe(string json) => JsonHelper.DeserializeSafe(json);
 }

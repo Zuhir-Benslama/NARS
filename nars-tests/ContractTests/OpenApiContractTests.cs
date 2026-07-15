@@ -26,12 +26,9 @@ public class OpenApiContractTests : IClassFixture<WebApplicationFactory<Program>
         });
     }
 
-    [Fact]
+    [Fact(Skip = "Requires NARS_CONTRACT_CONNECTION_STRING env var pointing to a running PostgreSQL instance")]
     public async Task OpenApiSpec_ServesJson_WithExpectedStructure()
     {
-        if (ConnectionString is null)
-            return; // requires running PostgreSQL — skip in CI without NARS_CONTRACT_CONNECTION_STRING
-
         var client = _factory.CreateClient();
         var response = await client.GetAsync("/openapi/v1.json");
 
@@ -46,12 +43,9 @@ public class OpenApiContractTests : IClassFixture<WebApplicationFactory<Program>
             doc["info"]!["title"]?.GetValue<string>());
     }
 
-    [Fact]
+    [Fact(Skip = "Requires NARS_CONTRACT_CONNECTION_STRING env var pointing to a running PostgreSQL instance")]
     public async Task OpenApiSpec_ContainsAllControllers()
     {
-        if (ConnectionString is null)
-            return;
-
         var client = _factory.CreateClient();
         var response = await client.GetAsync("/openapi/v1.json");
         var body = await response.Content.ReadAsStringAsync();

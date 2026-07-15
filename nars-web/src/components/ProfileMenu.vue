@@ -24,6 +24,7 @@
       <span :class="['dropdown-arrow', { open: dropdownOpen }]">▼</span>
     </div>
     <div
+      ref="dropdownRef"
       :class="['profile-dropdown', { show: dropdownOpen }]"
       role="menu"
       @keydown="onDropdownKeydown"
@@ -57,6 +58,7 @@ const appStore = useAppStore()
 
 const dropdownOpen = ref(false)
 const settingsVisible = ref(false)
+const dropdownRef = ref<HTMLElement | null>(null)
 
 const username = computed(() => appStore.user?.username || t("loading"))
 const name = computed(() => appStore.user?.name || "")
@@ -72,7 +74,7 @@ const closeDropdown = () => {
 watch(dropdownOpen, (open) => {
   if (open) {
     nextTick(() => {
-      document.querySelector<HTMLElement>(".dropdown-item")?.focus()
+      dropdownRef.value?.querySelector<HTMLElement>(".dropdown-item")?.focus()
     })
   }
 })
@@ -80,7 +82,7 @@ watch(dropdownOpen, (open) => {
 function onDropdownKeydown(e: KeyboardEvent) {
   if (e.key === "ArrowDown" || e.key === "ArrowUp") {
     e.preventDefault()
-    const items = document.querySelectorAll<HTMLElement>(".dropdown-item")
+    const items = dropdownRef.value?.querySelectorAll<HTMLElement>(".dropdown-item") ?? []
     if (items.length === 0) return
     const current = document.activeElement
     let idx = Array.from(items).indexOf(current as HTMLElement)

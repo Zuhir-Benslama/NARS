@@ -3,13 +3,12 @@ using NarsApi.Data;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
 using NarsApi.Services;
-using NarsApi.Tests.Integration;
 using static NarsApi.Tests.TestData;
 using Xunit;
 
-namespace NarsApi.Tests;
+namespace NarsApi.Tests.Integration;
 
-[Collection(Integration.PostgreSqlCollection.CollectionName)]
+[Collection(PostgreSqlCollection.CollectionName)]
 public class FeatureStatsServiceTests : IAsyncLifetime
 {
     private readonly NarsDatabaseFixture _fixture;
@@ -64,16 +63,6 @@ public class FeatureStatsServiceTests : IAsyncLifetime
 
     [Fact]
     public async Task GetFeatureCountsAsync_UnknownUser_ReturnsAllZeros()
-    {
-        var svc = new FeatureStatsService(_fixture.CreateDbContextFactory());
-
-        var counts = await svc.GetFeatureCountsAsync(Guid.NewGuid());
-
-        Assert.All(counts.Values, v => Assert.Equal(0, v));
-    }
-
-    [Fact]
-    public async Task GetFeatureCountsAsync_NoDataForUser_ReturnsAllZeros()
     {
         var svc = new FeatureStatsService(_fixture.CreateDbContextFactory());
 

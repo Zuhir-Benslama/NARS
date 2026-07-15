@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Controllers;
@@ -48,7 +47,6 @@ public class ValidationControllerIntegrationTests : IAsyncLifetime
         var ctrl = new ValidationController(
             Options.Create(new ValidationOptions()),
             new ValidationService(_db),
-            Mock.Of<ILogger<ValidationController>>(),
             Mock.Of<IWebHostEnvironment>());
         var httpContext = new DefaultHttpContext
         {

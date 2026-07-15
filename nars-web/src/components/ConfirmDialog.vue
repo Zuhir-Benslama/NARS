@@ -13,7 +13,7 @@
         <div class="confirm-dialog">
           <p id="confirmMsg" class="confirm-message">{{ store.message }}</p>
           <div class="confirm-actions">
-            <button class="confirm-btn cancel" @click="store.cancel()">Cancel</button>
+            <button class="confirm-btn cancel" @click="store.cancel()">{{ t("cancel") }}</button>
             <button ref="okRef" class="confirm-btn ok" @click="store.confirm()">
               {{ store.okText }}
             </button>
@@ -26,9 +26,11 @@
 
 <script setup lang="ts">
 import { watch, ref, nextTick, onMounted, onUnmounted } from "vue"
+import { useI18n } from "vue-i18n"
 import { useConfirmStore } from "../stores/confirmStore"
 import { useFocusTrap } from "../composables/useFocusTrap"
 
+const { t } = useI18n()
 const store = useConfirmStore()
 const dialogRef = ref<HTMLElement | null>(null)
 const okRef = ref<HTMLElement | null>(null)

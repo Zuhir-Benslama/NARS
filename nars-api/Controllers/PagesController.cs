@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using NarsApi.Data;
@@ -211,19 +210,9 @@ public class PagesController(
 
             return true;
         }
-        catch (DbUpdateException ex)
-        {
-            logger.LogError(ex, "[Pages] Database error during silent refresh");
-            return false;
-        }
-        catch (InvalidOperationException ex)
-        {
-            logger.LogError(ex, "[Pages] Invalid operation during silent refresh");
-            return false;
-        }
         catch (Exception ex)
         {
-            logger.LogError(ex, "[Pages] Unexpected error during silent refresh");
+            logger.LogError(ex, "[Pages] Error during silent refresh");
             return false;
         }
     }

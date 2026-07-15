@@ -226,8 +226,9 @@ watch(
     _roadSideController = controller
     try {
       await fetchRoadSide(roadOption.dbId, undefined, controller.signal)
-    } catch {
-      // AbortError expected when switching roads rapidly — ignore
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return
+      console.warn("[FeatureModal] fetchRoadSide failed:", e)
     }
   },
 )
@@ -294,8 +295,8 @@ onMounted(async () => {
   if (modalStore.phaseIndex !== null) {
     try {
       await prepareModalExtras(PHASES[modalStore.phaseIndex])
-    } catch {
-      /* module may not be ready in tests */
+    } catch (e) {
+      console.warn("[FeatureModal] prepareModalExtras failed:", e)
     }
   }
 })

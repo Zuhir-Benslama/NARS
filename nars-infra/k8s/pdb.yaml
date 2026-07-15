@@ -47,16 +47,6 @@ spec:
       app.kubernetes.io/name: postgis
       app.kubernetes.io/component: database
 ---
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: otel-collector
-  namespace: observability
-  labels:
-    app.kubernetes.io/name: opentelemetry-collector
-    app.kubernetes.io/component: observability
-spec:
-  maxUnavailable: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: opentelemetry-collector
+# otel-collector PDB lives in the observability namespace, managed separately.
+# Do not include it here — applying via nars kustomization would create an
+# orphan resource or fail if the namespace does not exist.

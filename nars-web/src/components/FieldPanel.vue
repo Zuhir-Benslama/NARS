@@ -55,7 +55,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue"
+import { ref, computed, watch, onMounted } from "vue"
 import { useFieldStore } from "../stores/fieldStore"
 import { apiFetch } from "../api"
 import { logError, createNetworkError } from "../lib/errors"
@@ -82,11 +82,6 @@ interface ApiFeature {
 }
 
 export interface FieldPanelProps {
-  /**
-   * Optional async function to fetch features for a given API type string.
-   * Defaults to a fetch from `/api/field/features?type=...`.
-   * Inject this prop in tests or when the API contract differs.
-   */
   fetchFeaturesFn?: (apiType: string) => Promise<ApiFeature[]>
 }
 
@@ -109,10 +104,10 @@ const features = ref<ApiFeature[]>([])
 const loading = ref(false)
 
 const fieldStore = useFieldStore()
-const selectedFeature = ref<{ id: string; label: string; type: InspectionType } | null>(null)
+const selectedFeature = computed(() => fieldStore.selectedFeature)
 
 watch(activeTab, () => {
-  selectedFeature.value = null
+  fieldStore.clearSelection()
   fetchFeatures()
 })
 
@@ -131,12 +126,10 @@ async function fetchFeatures() {
 }
 
 function selectFeature(f: ApiFeature) {
-  selectedFeature.value = { id: f.id, label: f.label, type: activeTab.value }
   fieldStore.selectFeature({ id: f.id, label: f.label, type: activeTab.value })
 }
 
 function clearSelection() {
-  selectedFeature.value = null
   fieldStore.clearSelection()
   fetchFeatures()
 }

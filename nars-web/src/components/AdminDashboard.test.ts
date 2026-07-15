@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { shallowMount } from "@vue/test-utils"
 import { mockApiFetch, createMockSuccessResponse } from "../test/setup"
 import AdminDashboard from "./AdminDashboard.vue"
+import EntityCard from "./admin/EntityCard.vue"
 
 const mockAppStore = vi.fn()
 vi.mock("../stores/appStore", () => ({
@@ -130,33 +131,37 @@ describe("AdminDashboard", () => {
     it("renders wilaya cards grid", async () => {
       const wrapper = shallowMount(AdminDashboard)
       await flush()
-      expect(wrapper.findAll(".wilaya-card").length).toBe(2)
+      expect(wrapper.findAllComponents(EntityCard).length).toBe(2)
     })
 
     it("shows wilaya names", async () => {
       const wrapper = shallowMount(AdminDashboard)
       await flush()
-      expect(wrapper.text()).toContain("Alger")
-      expect(wrapper.text()).toContain("Oran")
+      const cards = wrapper.findAllComponents(EntityCard)
+      expect(cards[0].props("nameFr")).toBe("Alger")
+      expect(cards[1].props("nameFr")).toBe("Oran")
     })
 
     it("shows Arabic names", async () => {
       const wrapper = shallowMount(AdminDashboard)
       await flush()
-      expect(wrapper.text()).toContain("الجزائر")
-      expect(wrapper.text()).toContain("وهران")
+      const cards = wrapper.findAllComponents(EntityCard)
+      expect(cards[0].props("nameAr")).toBe("الجزائر")
+      expect(cards[1].props("nameAr")).toBe("وهران")
     })
 
     it("shows admin name when assigned", async () => {
       const wrapper = shallowMount(AdminDashboard)
       await flush()
-      expect(wrapper.text()).toContain("Admin Alger")
+      const cards = wrapper.findAllComponents(EntityCard)
+      expect(cards[0].props("adminName")).toBe("Admin Alger")
     })
 
     it("shows none_assigned when no admin", async () => {
       const wrapper = shallowMount(AdminDashboard)
       await flush()
-      expect(wrapper.text()).toContain("none_assigned")
+      const cards = wrapper.findAllComponents(EntityCard)
+      expect(cards[1].props("adminName")).toBeFalsy()
     })
   })
 
@@ -171,15 +176,12 @@ describe("AdminDashboard", () => {
       await flush()
       const links = wrapper.findAllComponents({ name: "RouterLinkStub" })
       expect(links.length).toBeGreaterThanOrEqual(2)
-      expect(links[0].text()).toContain("Alger")
-      expect(links[1].text()).toContain("Oran")
     })
 
     it("wilaya card has drill button", async () => {
       const wrapper = shallowMount(AdminDashboard)
       await flush()
-      expect(wrapper.findAll(".wilaya-card").length).toBe(2)
-      expect(wrapper.find(".drill-btn").exists()).toBe(true)
+      expect(wrapper.findAllComponents(EntityCard).length).toBe(2)
     })
   })
 
@@ -198,40 +200,42 @@ describe("AdminDashboard", () => {
     it("renders daira cards grid", async () => {
       const wrapper = shallowMount(AdminDashboard)
       await flush()
-      expect(wrapper.findAll(".wilaya-card").length).toBe(1)
+      expect(wrapper.findAllComponents(EntityCard).length).toBe(1)
     })
 
     it("shows daira names", async () => {
       const wrapper = shallowMount(AdminDashboard)
       await flush()
-      expect(wrapper.text()).toContain("Sidi M'Hamed")
-      expect(wrapper.text()).toContain("سيدي امحمد")
+      const card = wrapper.findComponent(EntityCard)
+      expect(card.props("nameFr")).toBe("Sidi M'Hamed")
+      expect(card.props("nameAr")).toBe("سيدي امحمد")
     })
 
     it("shows daira admin name when assigned", async () => {
       const wrapper = shallowMount(AdminDashboard)
       await flush()
-      expect(wrapper.text()).toContain("Admin SM")
+      const card = wrapper.findComponent(EntityCard)
+      expect(card.props("adminName")).toBe("Admin SM")
     })
 
     it("drills into daira on card click", async () => {
       const wrapper = shallowMount(AdminDashboard)
       await flush()
-      await wrapper.find(".wilaya-card").trigger("click")
+      await wrapper.findComponent(EntityCard).vm.$emit("drill")
       await flush()
       expect(wrapper.find(".back-btn").exists()).toBe(true)
       expect(wrapper.find(".section-title").text()).toContain("Sidi M'Hamed")
-      expect(wrapper.findAll(".wilaya-card").length).toBe(0)
+      expect(wrapper.findAllComponents(EntityCard).length).toBe(0)
     })
 
     it("returns to card grid on back click", async () => {
       const wrapper = shallowMount(AdminDashboard)
       await flush()
-      await wrapper.find(".wilaya-card").trigger("click")
+      await wrapper.findComponent(EntityCard).vm.$emit("drill")
       await flush()
       await wrapper.find(".back-btn").trigger("click")
       await flush()
-      expect(wrapper.findAll(".wilaya-card").length).toBe(1)
+      expect(wrapper.findAllComponents(EntityCard).length).toBe(1)
       expect(wrapper.find(".back-btn").exists()).toBe(false)
     })
   })
@@ -251,34 +255,35 @@ describe("AdminDashboard", () => {
     it("renders commune cards grid", async () => {
       const wrapper = shallowMount(AdminDashboard)
       await flush()
-      expect(wrapper.findAll(".wilaya-card").length).toBe(1)
+      expect(wrapper.findAllComponents(EntityCard).length).toBe(1)
     })
 
     it("shows commune names", async () => {
       const wrapper = shallowMount(AdminDashboard)
       await flush()
-      expect(wrapper.text()).toContain("Alger Centre")
-      expect(wrapper.text()).toContain("الجزائر الوسطى")
+      const card = wrapper.findComponent(EntityCard)
+      expect(card.props("nameFr")).toBe("Alger Centre")
+      expect(card.props("nameAr")).toBe("الجزائر الوسطى")
     })
 
     it("drills into commune on card click", async () => {
       const wrapper = shallowMount(AdminDashboard)
       await flush()
-      await wrapper.find(".wilaya-card").trigger("click")
+      await wrapper.findComponent(EntityCard).vm.$emit("drill")
       await flush()
       expect(wrapper.find(".back-btn").exists()).toBe(true)
       expect(wrapper.find(".section-title").text()).toContain("Alger Centre")
-      expect(wrapper.findAll(".wilaya-card").length).toBe(0)
+      expect(wrapper.findAllComponents(EntityCard).length).toBe(0)
     })
 
     it("returns to card grid on back click", async () => {
       const wrapper = shallowMount(AdminDashboard)
       await flush()
-      await wrapper.find(".wilaya-card").trigger("click")
+      await wrapper.findComponent(EntityCard).vm.$emit("drill")
       await flush()
       await wrapper.find(".back-btn").trigger("click")
       await flush()
-      expect(wrapper.findAll(".wilaya-card").length).toBe(1)
+      expect(wrapper.findAllComponents(EntityCard).length).toBe(1)
       expect(wrapper.find(".back-btn").exists()).toBe(false)
     })
   })

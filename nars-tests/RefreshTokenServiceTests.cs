@@ -52,6 +52,16 @@ public class RefreshTokenServiceTests
         protected override Task<RefreshToken?> FindRefreshTokenByHashAsync(string hash, CancellationToken ct)
             => _db.RefreshTokens
                 .FirstOrDefaultAsync(rt => rt.TokenHash == hash && !rt.Revoked && rt.ExpiresAt > FixedUtcNow, ct);
+
+        public new async Task RevokeAllUserTokensAsync(Guid userId, CancellationToken cancellationToken = default)
+        {
+            var tokens = await _db.RefreshTokens
+                .Where(rt => rt.UserId == userId && !rt.Revoked)
+                .ToListAsync(cancellationToken);
+            foreach (var t in tokens)
+                t.Revoked = true;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
     }
 
     private static TestableRefreshTokenService CreateService(AppDbContext db, IJwtService? jwt = null, IDateTimeProvider? timeProvider = null)
@@ -236,5 +246,334 @@ public class RefreshTokenServiceTests
 
         Assert.False(result.Success);
         Assert.Equal("User no longer exists.", result.Detail);
+    }
+
+    // ── RevokeAllUserTokensAsync ────────────────────────────────────────
+
+    [Fact]
+    public async Task RevokeAllUserTokensAsync_RevokesUnrevokedTokens()
+    {
+        var db = CreateDb();
+        db.Users.Add(new User
+        {
+            Id = UserId,
+            Username = "testuser",
+            Name = "Test User",
+            Email = AltEmail,
+            Phone = DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.CommuneUser,
+            CommuneId = 1,
+        });
+        db.RefreshTokens.Add(new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            TokenHash = "tok1",
+            ExpiresAt = FixedUtcNow.AddDays(30),
+            CreatedAt = FixedUtcNow,
+        });
+        db.RefreshTokens.Add(new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            TokenHash = "tok2",
+            ExpiresAt = FixedUtcNow.AddDays(60),
+            CreatedAt = FixedUtcNow,
+        });
+        await db.SaveChangesAsync();
+        var svc = CreateService(db);
+
+        await svc.RevokeAllUserTokensAsync(UserId);
+
+        var tokens = await db.RefreshTokens.Where(t => t.UserId == UserId).ToListAsync();
+        Assert.All(tokens, t => Assert.True(t.Revoked));
+    }
+
+    [Fact]
+    public async Task RevokeAllUserTokensAsync_AlreadyRevokedTokens_AreNotAffected()
+    {
+        var db = CreateDb();
+        var otherUserId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            Id = UserId,
+            Username = "testuser",
+            Name = "Test User",
+            Email = AltEmail,
+            Phone = DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.CommuneUser,
+            CommuneId = 1,
+        });
+        db.RefreshTokens.Add(new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            TokenHash = "revoked-tok",
+            ExpiresAt = FixedUtcNow.AddDays(30),
+            CreatedAt = FixedUtcNow,
+            Revoked = true,
+        });
+        await db.SaveChangesAsync();
+        var svc = CreateService(db);
+
+        await svc.RevokeAllUserTokensAsync(UserId);
+
+        var token = await db.RefreshTokens.FirstAsync(t => t.UserId == UserId);
+        Assert.True(token.Revoked);
+    }
+
+    // ── IssueRefreshTokenAsync ──────────────────────────────────────────
+
+    [Fact]
+    public async Task IssueRefreshTokenAsync_ReturnsRawHashAndExpiry()
+    {
+        var db = CreateDb();
+        var svc = CreateService(db);
+
+        var (raw, hash, expiresAt) = await svc.IssueRefreshTokenAsync(UserId);
+
+        Assert.False(string.IsNullOrEmpty(raw));
+        Assert.False(string.IsNullOrEmpty(hash));
+        Assert.Equal(FixedUtcNow.AddDays(30), expiresAt);
+        var stored = await db.RefreshTokens.SingleAsync(t => t.TokenHash == hash);
+        Assert.Equal(UserId, stored.UserId);
+        Assert.Equal(expiresAt, stored.ExpiresAt);
+    }
+
+    [Fact]
+    public async Task IssueRefreshTokenAsync_DifferentCallsProduceDifferentTokens()
+    {
+        var db = CreateDb();
+        var callCount = 0;
+        var jwtMock = new Mock<IJwtService>();
+        jwtMock.Setup(j => j.CreateRefreshToken()).Returns(() =>
+        {
+            callCount++;
+            return ($"raw-{callCount}", $"hash-{callCount}");
+        });
+        jwtMock.Setup(j => j.AccessTokenExpiresIn).Returns(TimeSpan.FromMinutes(60));
+        var svc = CreateService(db, jwtMock.Object);
+
+        var (raw1, hash1, _) = await svc.IssueRefreshTokenAsync(UserId);
+        var (raw2, hash2, _) = await svc.IssueRefreshTokenAsync(UserId);
+
+        Assert.NotEqual(raw1, raw2);
+        Assert.NotEqual(hash1, hash2);
+        Assert.Equal(2, await db.RefreshTokens.CountAsync());
+    }
+
+    // ── FindUserByIdAsync ───────────────────────────────────────────────
+
+    [Fact]
+    public async Task FindUserByIdAsync_ExistingUser_ReturnsUser()
+    {
+        var db = CreateDb();
+        db.Users.Add(new User
+        {
+            Id = UserId,
+            Username = "testuser",
+            Name = "Test User",
+            Email = AltEmail,
+            Phone = DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.CommuneUser,
+            CommuneId = 1,
+        });
+        await db.SaveChangesAsync();
+        var svc = CreateService(db);
+
+        var found = await svc.FindUserByIdAsync(UserId);
+
+        Assert.NotNull(found);
+        Assert.Equal(UserId, found.Id);
+        Assert.Equal("testuser", found.Username);
+    }
+
+    [Fact]
+    public async Task FindUserByIdAsync_NonexistentUser_ReturnsNull()
+    {
+        var db = CreateDb();
+        var svc = CreateService(db);
+
+        var found = await svc.FindUserByIdAsync(Guid.NewGuid());
+
+        Assert.Null(found);
+    }
+
+    // ── FindUserByUsernameAsync ──────────────────────────────────────────
+
+    [Fact]
+    public async Task FindUserByUsernameAsync_ExistingUser_ReturnsUser()
+    {
+        var db = CreateDb();
+        db.Users.Add(new User
+        {
+            Id = UserId,
+            Username = "testuser",
+            Name = "Test User",
+            Email = AltEmail,
+            Phone = DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.CommuneUser,
+            CommuneId = 1,
+        });
+        await db.SaveChangesAsync();
+        var svc = CreateService(db);
+
+        var found = await svc.FindUserByUsernameAsync("testuser");
+
+        Assert.NotNull(found);
+        Assert.Equal(UserId, found.Id);
+    }
+
+    [Fact]
+    public async Task FindUserByUsernameAsync_NonexistentUser_ReturnsNull()
+    {
+        var db = CreateDb();
+        var svc = CreateService(db);
+
+        var found = await svc.FindUserByUsernameAsync("no-such-user");
+
+        Assert.Null(found);
+    }
+
+    // ── AddUserAsync ────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task AddUserAsync_PersistsNewUser()
+    {
+        var db = CreateDb();
+        var svc = CreateService(db);
+        var user = new User
+        {
+            Id = UserId,
+            Username = "newuser",
+            Name = "New User",
+            Email = DefaultEmail,
+            Phone = AltPhone,
+            PasswordHash = "pw-hash",
+            Role = UserRoles.CommuneUser,
+            CommuneId = 2,
+        };
+
+        await svc.AddUserAsync(user);
+
+        var stored = await db.Users.FindAsync(UserId);
+        Assert.NotNull(stored);
+        Assert.Equal("newuser", stored.Username);
+        Assert.Equal(DefaultEmail, stored.Email);
+    }
+
+    // ── RecordFailedLoginAsync ──────────────────────────────────────────
+
+    [Fact]
+    public async Task RecordFailedLoginAsync_IncrementsAttempts()
+    {
+        var db = CreateDb();
+        var user = new User
+        {
+            Id = UserId,
+            Username = "testuser",
+            Name = "Test User",
+            Email = AltEmail,
+            Phone = DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.CommuneUser,
+            CommuneId = 1,
+            FailedLoginAttempts = 0,
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        var svc = CreateService(db);
+
+        await svc.RecordFailedLoginAsync(user, maxFailedAttempts: 5, lockoutMinutes: 15, FixedUtcNowOffset);
+
+        Assert.Equal(1, user.FailedLoginAttempts);
+        Assert.Null(user.LockedUntil);
+    }
+
+    [Fact]
+    public async Task RecordFailedLoginAsync_AtThreshold_LocksUser()
+    {
+        var db = CreateDb();
+        var user = new User
+        {
+            Id = UserId,
+            Username = "testuser",
+            Name = "Test User",
+            Email = AltEmail,
+            Phone = DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.CommuneUser,
+            CommuneId = 1,
+            FailedLoginAttempts = 4,
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        var svc = CreateService(db);
+
+        await svc.RecordFailedLoginAsync(user, maxFailedAttempts: 5, lockoutMinutes: 15, FixedUtcNowOffset);
+
+        Assert.Equal(5, user.FailedLoginAttempts);
+        Assert.Equal(FixedUtcNowOffset.DateTime.AddMinutes(15), user.LockedUntil);
+    }
+
+    // ── ResetFailedAttemptsIfNeededAsync ────────────────────────────────
+
+    [Fact]
+    public async Task ResetFailedAttemptsIfNeededAsync_ClearsState()
+    {
+        var db = CreateDb();
+        var user = new User
+        {
+            Id = UserId,
+            Username = "testuser",
+            Name = "Test User",
+            Email = AltEmail,
+            Phone = DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.CommuneUser,
+            CommuneId = 1,
+            FailedLoginAttempts = 3,
+            LockedUntil = FixedUtcNow.AddMinutes(30),
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        var svc = CreateService(db);
+
+        await svc.ResetFailedAttemptsIfNeededAsync(user);
+
+        Assert.Equal(0, user.FailedLoginAttempts);
+        Assert.Null(user.LockedUntil);
+    }
+
+    [Fact]
+    public async Task ResetFailedAttemptsIfNeededAsync_AlreadyClean_NoSave()
+    {
+        var db = CreateDb();
+        var user = new User
+        {
+            Id = UserId,
+            Username = "testuser",
+            Name = "Test User",
+            Email = AltEmail,
+            Phone = DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.CommuneUser,
+            CommuneId = 1,
+            FailedLoginAttempts = 0,
+            LockedUntil = null,
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var svc = CreateService(db);
+
+        await svc.ResetFailedAttemptsIfNeededAsync(user);
+
+        Assert.Equal(0, user.FailedLoginAttempts);
+        Assert.Null(user.LockedUntil);
     }
 }

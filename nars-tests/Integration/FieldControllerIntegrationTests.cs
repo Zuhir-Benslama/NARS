@@ -43,9 +43,8 @@ public class FieldControllerIntegrationTests : IAsyncLifetime
 
     private FieldController CreateController()
     {
-        var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var fieldSvc = new FieldService(_db, Mock.Of<ILogger<FieldService>>());
-        var ctrl = new FieldController(_db, Mock.Of<ILogger<FieldController>>(), Options.Create(new FeatureDefaultsOptions()), timeProvider, fieldSvc, Mock.Of<IWebHostEnvironment>());
+        var ctrl = new FieldController(Mock.Of<ILogger<FieldController>>(), Options.Create(new FeatureDefaultsOptions()), fieldSvc, Mock.Of<IWebHostEnvironment>());
         var httpContext = new DefaultHttpContext
         {
             User = AuthTestHelper.CreateClaimsPrincipal(_workerId, UserRoles.FieldWorker, communeId: 1)

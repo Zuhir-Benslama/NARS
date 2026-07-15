@@ -72,7 +72,7 @@ describe("useAppStore", () => {
     const appStore = useAppStore()
     appStore.setLoading(true)
     appStore.setLoadError(true)
-    appStore.reset()
+    appStore.$reset()
     expect(appStore.isLoading).toBe(false)
     expect(appStore.loadError).toBe(false)
   })

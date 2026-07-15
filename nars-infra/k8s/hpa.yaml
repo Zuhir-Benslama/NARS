@@ -14,6 +14,9 @@ spec:
     name: nars-api
   minReplicas: 2
   maxReplicas: 4
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
   metrics:
     - type: Resource
       resource:
@@ -45,6 +48,9 @@ spec:
     name: nars-frontend
   minReplicas: 2
   maxReplicas: 4
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
   metrics:
     - type: Resource
       resource:

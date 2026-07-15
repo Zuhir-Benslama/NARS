@@ -14,6 +14,7 @@
           :class="['ctx-item', { 'ctx-danger': item.danger }]"
           role="menuitem"
           tabindex="0"
+          :aria-label="item.label"
           @click="handleClick(item)"
         >
           {{ item.label }}

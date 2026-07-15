@@ -70,49 +70,20 @@ public class SpatialController(
             return Problem(detail: "Invalid coordinate values.", statusCode: 400);
         }
 
-        // Find the nearest segment midpoint to the marker.
-        // Apply cosine correction so the Δlng component is in the same
-        // unit scale as Δlat (important at Algeria's latitudes ~28–37°N).
-        double markerLat = body.Lat, markerLng = body.Lng;
-        var cosLat = Math.Cos(markerLat * DegToRad);
-        var minDist = double.MaxValue;
-        var nearestIdx = 0;
-
-        for (var i = 0; i < roadCoords.Count - 1; i++)
-        {
-            var mid = ((roadCoords[i].Lat + roadCoords[i + 1].Lat) / 2,
-                       (roadCoords[i].Lng + roadCoords[i + 1].Lng) / 2);
-            var dLat = markerLat - mid.Item1;
-            var dLng = (markerLng - mid.Item2) * cosLat;
-            var d = Math.Sqrt(dLat * dLat + dLng * dLng);
-            if (d < minDist) { minDist = d; nearestIdx = i; }
-        }
-
+        var nearestIdx = GeometryHelper.FindNearestSegmentIndex(body.Lat, body.Lng, roadCoords);
         var (Lat, Lng) = roadCoords[nearestIdx];
         var p2 = roadCoords[nearestIdx + 1];
-
-        // Cross product: positive -> left, negative -> right
-        var cross = (p2.Lng - Lng) * (markerLat - Lat)
-                  - (p2.Lat - Lat) * (markerLng - Lng);
-
-        var side = cross >= 0 ? "left" : "right";
+        var side = GeometryHelper.DetermineSide(body.Lat, body.Lng, Lat, Lng, p2.Lat, p2.Lng);
 
         // Query used entrance numbers via dedicated service (raw ADO.NET
         // is required for JSONB field extraction that EF Core doesn't handle).
         var usedNumbers = await entranceQuery.GetUsedEntranceNumbersAsync(
             RequiredCurrentUserId, body.RoadId, cancellationToken);
 
-        // Next available odd (left) or even (right) number
-        var suggested = side == "left" ? 1 : 2;
-        while (usedNumbers.Contains(suggested) && suggested < 10_000)
-        {
-            suggested += 2;
-        }
+        var suggested = GeometryHelper.SuggestEntranceNumber(side, usedNumbers);
 
         return Ok(new RoadSideResponse(side, suggested));
     }
-
-    private const double DegToRad = Math.PI / 180.0;
 
     // ── GET /api/areas/scattered-status ─────────────────────────────────────
 

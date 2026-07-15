@@ -26,9 +26,10 @@ public class LogsController(IErrorLogService errorLogService, ILogger<LogsContro
 
     /// <summary>Accepts client-side error logs for server-side storage and analysis.</summary>
     [HttpPost("logs")]
-    [AllowAnonymous]
+    [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> SubmitLogs([FromBody] LogBatch body, CancellationToken cancellationToken = default)
     {

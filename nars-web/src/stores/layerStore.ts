@@ -12,7 +12,12 @@ export interface LayerState {
   namingPanels: LayerEntry[]
 }
 
-function createInitialState(): LayerState {
+interface LayerCache {
+  featureMapDirty: boolean
+  cachedFeatureMap: Map<string, { layer: keyof LayerState; entry: LayerEntry }> | null
+}
+
+function createInitialState(): LayerState & LayerCache {
   return {
     areas: [],
     cityCenter: [],
@@ -22,21 +27,24 @@ function createInitialState(): LayerState {
     publicBuildings: [],
     publicSpaces: [],
     namingPanels: [],
+    featureMapDirty: true,
+    cachedFeatureMap: null,
   }
 }
 
-const LAYER_KEYS = Object.keys(createInitialState()) as (keyof LayerState)[]
-
-// Module-level cache for the feature map — invalidated on mutations.
-let _featureMapDirty = true
-let _cachedFeatureMap: Map<string, { layer: keyof LayerState; entry: LayerEntry }> | null = null
-
-function invalidateFeatureMap(): void {
-  _featureMapDirty = true
-}
+const LAYER_KEYS: (keyof LayerState)[] = [
+  "areas",
+  "cityCenter",
+  "districts",
+  "roads",
+  "houseEntrances",
+  "publicBuildings",
+  "publicSpaces",
+  "namingPanels",
+]
 
 export const useLayerStore = defineStore("layer", {
-  state: (): LayerState => createInitialState(),
+  state: (): LayerState & LayerCache => createInitialState(),
 
   getters: {
     mainEntrances: (state) =>
@@ -63,8 +71,8 @@ export const useLayerStore = defineStore("layer", {
 
     /** Map of dbId → { layer, entry } for O(1) lookups via getFeature(). Cached. */
     _featureMap(state): Map<string, { layer: keyof LayerState; entry: LayerEntry }> {
-      if (!_featureMapDirty && _cachedFeatureMap) {
-        return _cachedFeatureMap
+      if (!state.featureMapDirty && state.cachedFeatureMap) {
+        return state.cachedFeatureMap
       }
       const map = new Map<string, { layer: keyof LayerState; entry: LayerEntry }>()
       for (const key of LAYER_KEYS) {
@@ -72,8 +80,8 @@ export const useLayerStore = defineStore("layer", {
           map.set(entry.dbId, { layer: key, entry })
         }
       }
-      _cachedFeatureMap = map
-      _featureMapDirty = false
+      state.cachedFeatureMap = map
+      state.featureMapDirty = false
       return map
     },
   },
@@ -81,14 +89,14 @@ export const useLayerStore = defineStore("layer", {
   actions: {
     addFeature(layer: keyof LayerState, entry: LayerEntry) {
       this[layer].push(entry)
-      invalidateFeatureMap()
+      this.featureMapDirty = true
     },
 
     removeFeature(layer: keyof LayerState, dbId: string) {
       const idx = this[layer].findIndex((e) => e.dbId === dbId)
       if (idx !== -1) {
         this[layer].splice(idx, 1)
-        invalidateFeatureMap()
+        this.featureMapDirty = true
       }
     },
 
@@ -96,13 +104,13 @@ export const useLayerStore = defineStore("layer", {
       const entry = this[layer].find((e) => e.dbId === dbId)
       if (entry) {
         Object.assign(entry.data, data)
-        invalidateFeatureMap()
+        this.featureMapDirty = true
       }
     },
 
     clearLayer(layer: keyof LayerState) {
       this[layer] = []
-      invalidateFeatureMap()
+      this.featureMapDirty = true
     },
 
     getFeature(dbId: string): LayerEntry | null {
@@ -111,7 +119,7 @@ export const useLayerStore = defineStore("layer", {
 
     reset() {
       this.$reset()
-      invalidateFeatureMap()
+      this.featureMapDirty = true
     },
   },
 })

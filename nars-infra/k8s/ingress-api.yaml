@@ -36,7 +36,7 @@ spec:
               service:
                 name: nars-api
                 port:
-                  number: 808080
+                  number: 8080
 ---
 # ─── Health Check Ingress (no mTLS) ────────────────────────────────────
 # Separate ingress for /health so external monitoring can reach it
@@ -69,7 +69,7 @@ spec:
               service:
                 name: nars-api
                 port:
-                  number: 808080
+                  number: 8080
 ---
 # ─── API Ingress (local dev) ──────────────────────────────────────────
 # Serves localhost without TLS/mTLS for local development access.

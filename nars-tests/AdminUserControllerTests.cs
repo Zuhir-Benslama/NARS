@@ -19,8 +19,7 @@ public class AdminUserControllerTests
     private static AppDbContext CreateDb() => CreateInMemoryDb("AdminUserTest");
 
     private static AdminUserController CreateController(AppDbContext db) =>
-        new(db,
-            Mock.Of<ILogger<AdminUserController>>(),
+        new(Mock.Of<ILogger<AdminUserController>>(),
             new UserAuthorizationService(db),
             AuthTestHelper.CreateUserCreationMock(db),
             Mock.Of<IWebHostEnvironment>())

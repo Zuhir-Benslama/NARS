@@ -61,6 +61,64 @@ public class RefreshTokenService(
         return new RefreshTokenResult(true, null, user.Username, newRaw, newAccessToken, refreshExpiry);
     }
 
+    public async Task RevokeAllUserTokensAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        await db.RefreshTokens
+            .Where(rt => rt.UserId == userId && !rt.Revoked)
+            .ExecuteUpdateAsync(setters =>
+                setters.SetProperty(rt => rt.Revoked, true), cancellationToken);
+    }
+
+    public async Task<(string RawToken, string Hash, DateTime ExpiresAt)> IssueRefreshTokenAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var (rawToken, hash) = jwt.CreateRefreshToken();
+        var expiresAt = timeProvider.UtcNow.AddDays(jwtOptions.Value.RefreshExpiresInDays);
+
+        db.RefreshTokens.Add(new RefreshToken
+        {
+            UserId = userId,
+            TokenHash = hash,
+            ExpiresAt = expiresAt,
+        });
+        await db.SaveChangesAsync(cancellationToken);
+
+        return (rawToken, hash, expiresAt);
+    }
+
+    public async Task<User?> FindUserByIdAsync(Guid userId, CancellationToken cancellationToken = default)
+        => await db.Users.FindAsync([userId], cancellationToken);
+
+    public async Task<User?> FindUserByUsernameAsync(string normalizedUsername, CancellationToken cancellationToken = default)
+        => await db.Users.FirstOrDefaultAsync(u => u.Username == normalizedUsername, cancellationToken);
+
+    public AppDbContext CreateDbContext() => db;
+
+    public async Task AddUserAsync(User user, CancellationToken cancellationToken = default)
+    {
+        db.Users.Add(user);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RecordFailedLoginAsync(User user, int maxFailedAttempts, int lockoutMinutes, DateTimeOffset utcNow, CancellationToken cancellationToken = default)
+    {
+        user.FailedLoginAttempts = (user.FailedLoginAttempts ?? 0) + 1;
+        if (user.FailedLoginAttempts >= maxFailedAttempts)
+        {
+            user.LockedUntil = utcNow.DateTime.AddMinutes(lockoutMinutes);
+        }
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task ResetFailedAttemptsIfNeededAsync(User user, CancellationToken cancellationToken = default)
+    {
+        if (user.FailedLoginAttempts > 0 || user.LockedUntil.HasValue)
+        {
+            user.FailedLoginAttempts = 0;
+            user.LockedUntil = null;
+            await db.SaveChangesAsync(cancellationToken);
+        }
+    }
+
     protected virtual Task<RefreshToken?> FindRefreshTokenByHashAsync(string hash, CancellationToken ct)
     {
         const string expectedTable = "refresh_tokens";

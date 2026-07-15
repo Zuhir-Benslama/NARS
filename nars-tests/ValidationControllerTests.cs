@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Controllers;
@@ -22,14 +21,14 @@ public class ValidationControllerTests
 
     private static (ValidationController, AppDbContext) CreateController(
         AppDbContext? db = null,
-        IValidationService? validationService = null)
+        IValidationService? validationService = null,
+        ValidationOptions? options = null)
     {
         var context = db ?? CreateInMemoryDb("ValidationTest");
 
         var ctrl = new ValidationController(
-            Options.Create(new ValidationOptions()),
+            Options.Create(options ?? new ValidationOptions()),
             validationService ?? new ValidationService(context),
-            Mock.Of<ILogger<ValidationController>>(),
             Mock.Of<IWebHostEnvironment>())
         {
             ControllerContext = new ControllerContext
@@ -160,10 +159,7 @@ public class ValidationControllerTests
                 It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<double>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        var ctrl2 = new ValidationController(Options.Create(new ValidationOptions { RoadTurnAngleDegrees = SharpTurnAngleDegrees }), validationMock.Object, Mock.Of<ILogger<ValidationController>>(), Mock.Of<IWebHostEnvironment>())
-        {
-            ControllerContext = ctrl.ControllerContext
-        };
+        var (ctrl2, _) = CreateController(db: db, validationService: validationMock.Object, options: new ValidationOptions { RoadTurnAngleDegrees = SharpTurnAngleDegrees });
 
         var body = new ValidateRoadRequest([
             new CoordDto(36.0, 3.0),
@@ -202,10 +198,7 @@ public class ValidationControllerTests
                 It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<double>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
-        var ctrl2 = new ValidationController(Options.Create(new ValidationOptions()), validationMock.Object, Mock.Of<ILogger<ValidationController>>(), Mock.Of<IWebHostEnvironment>())
-        {
-            ControllerContext = ctrl.ControllerContext
-        };
+        var (ctrl2, _) = CreateController(db: db, validationService: validationMock.Object);
 
         var body = new ValidateRoadRequest([
             new CoordDto(36.0, 3.0),

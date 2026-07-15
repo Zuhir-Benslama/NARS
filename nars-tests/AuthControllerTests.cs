@@ -36,12 +36,12 @@ public class AuthControllerTests
     private static AuthController CreateController(AppDbContext db)
     {
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
-        var jwtOptions = DefaultJwtOptions;
         var lockoutOptions = Options.Create(new AccountLockoutOptions());
+        var jwtService = CreateJwtService(timeProvider);
+        var refreshService = new RefreshTokenService(db, jwtService, DefaultJwtOptions, timeProvider);
         return new AuthController(
-            db,
-            CreateJwtService(timeProvider),
-            jwtOptions,
+            refreshService,
+            jwtService,
             lockoutOptions,
             Mock.Of<ILogger<AuthController>>(),
             timeProvider,
@@ -83,7 +83,7 @@ public class AuthControllerTests
             CommuneId: TestData.CommuneId1,
             DairaId: null,
             WilayaId: null
-        ));
+        ), signupToken: AdminSignupToken);
 
         var statusCodeResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, statusCodeResult.StatusCode);
@@ -110,7 +110,7 @@ public class AuthControllerTests
             CommuneId: 1,
             DairaId: null,
             WilayaId: null
-        ));
+        ), signupToken: AdminSignupToken);
 
         var objResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(400, objResult.StatusCode);
@@ -149,7 +149,7 @@ public class AuthControllerTests
             CommuneId: 1,
             DairaId: null,
             WilayaId: null
-        ));
+        ), signupToken: AdminSignupToken);
 
         var conflict = Assert.IsType<ObjectResult>(result);
         Assert.Equal(409, conflict.StatusCode);
@@ -188,7 +188,7 @@ public class AuthControllerTests
             CommuneId: 1,
             DairaId: null,
             WilayaId: null
-        ));
+        ), signupToken: AdminSignupToken);
 
         var conflict = Assert.IsType<ObjectResult>(result);
         Assert.Equal(409, conflict.StatusCode);
@@ -215,7 +215,7 @@ public class AuthControllerTests
             CommuneId: 2,
             DairaId: null,
             WilayaId: null
-        ));
+        ), signupToken: AdminSignupToken);
 
         var statusCodeResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(403, statusCodeResult.StatusCode);
@@ -259,6 +259,10 @@ public class AuthControllerTests
     {
         var db = CreateDb();
         var controller = CreateController(db);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
 
         var result = await controller.SignIn(new SignInRequest(
             Username: "nonexistent",

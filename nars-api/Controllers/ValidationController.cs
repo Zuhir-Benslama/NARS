@@ -15,7 +15,6 @@ namespace NarsApi.Controllers;
 public class ValidationController(
     IOptions<ValidationOptions> validationOptions,
     IValidationService validationService,
-    ILogger<ValidationController> logger,
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     private double DistrictBoundaryToleranceMeters => validationOptions.Value.DistrictBoundaryToleranceMeters;
@@ -60,23 +59,7 @@ public class ValidationController(
             var p2 = body.Coordinates[i + 1];
             var p3 = body.Coordinates[i + 2];
 
-            double v1x = p2.Lng - p1.Lng, v1y = p2.Lat - p1.Lat;
-            double v2x = p3.Lng - p2.Lng, v2y = p3.Lat - p2.Lat;
-
-            var len1 = Math.Sqrt(v1x * v1x + v1y * v1y);
-            var len2 = Math.Sqrt(v2x * v2x + v2y * v2y);
-
-            if (len1 < 1e-10 || len2 < 1e-10)
-            {
-                continue;
-            }
-
-            var dot = (v1x * v2x + v1y * v2y) / (len1 * len2);
-            if (dot is < -1.0 or > 1.0)
-            {
-                logger.LogDebug("Clamping dot product {Dot} at point {Index} (floating-point drift)", dot, i + 2);
-            }
-            var angle = Math.Acos(Math.Clamp(dot, -1.0, 1.0)) * (180.0 / Math.PI);
+            var angle = GeometryHelper.ComputeTurnAngle(p1.Lat, p1.Lng, p2.Lat, p2.Lng, p3.Lat, p3.Lng);
 
             if (angle > MaxRoadTurnAngleDegrees)
             {
@@ -85,7 +68,8 @@ public class ValidationController(
             }
         }
 
-        if (CurrentUserId is null || await validationService.CountUserRoadsAsync(CurrentUserId.Value, cancellationToken) == 0)
+        var userId = CurrentUserId;
+        if (userId is null || await validationService.CountUserRoadsAsync(userId.Value, cancellationToken) == 0)
         {
             return Ok(new ValidateRoadResponse(true, null));
         }
@@ -121,7 +105,8 @@ public class ValidationController(
             return Problem(detail: inputError, statusCode: 400);
         }
 
-        if (CurrentUserId is null || await validationService.CountUserDistrictsAsync(CurrentUserId.Value, cancellationToken) == 0)
+        var userId = CurrentUserId;
+        if (userId is null || await validationService.CountUserDistrictsAsync(userId.Value, cancellationToken) == 0)
         {
             return Ok(new ValidateDistrictResponse(true, null));
         }

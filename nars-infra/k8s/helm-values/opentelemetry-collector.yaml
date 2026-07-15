@@ -38,10 +38,8 @@ config:
           cors:
             allowed_origins:
               # ⚠ Update these if the deployed domain or port changes.
-              # For dynamic environments, consider using a configurable variable.
-              - http://localhost:5173
-              - http://localhost:8080
-              - http://localhost:80
+              # Localhost entries should only be included via Helm overrides for dev:
+              #   --set 'config.receivers.otlp.protocols.http.cors.allowed_origins[0]=http://localhost:5173'
               - http://nars.dz:8080
               - http://nars.dz:80
               - https://nars.dz:8443

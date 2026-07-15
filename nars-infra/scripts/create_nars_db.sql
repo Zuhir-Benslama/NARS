@@ -175,7 +175,7 @@ CREATE TABLE IF NOT EXISTS public.refresh_tokens
 
 CREATE INDEX IF NOT EXISTS ix_refresh_tokens_token_hash
     ON public.refresh_tokens (token_hash);
-CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id
+CREATE INDEX IF NOT EXISTS ix_refresh_tokens_user_id
     ON public.refresh_tokens (user_id);
 
 -- ══════════════════════════════════════════════════════════════════════════════

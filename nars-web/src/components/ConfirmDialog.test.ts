@@ -1,7 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach } from "vitest"
 import { mount } from "@vue/test-utils"
 import { nextTick } from "vue"
 import { setActivePinia, createPinia } from "pinia"
+
+vi.mock("vue-i18n", () => ({
+  useI18n: () => ({ t: (key: string) => key }),
+}))
 
 import ConfirmDialog from "./ConfirmDialog.vue"
 import { useConfirmStore } from "../stores/confirmStore"

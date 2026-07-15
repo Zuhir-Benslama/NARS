@@ -103,7 +103,9 @@ public class FeatureService(AppDbContext db) : IFeatureService
 
         foreach (var descriptor in FeatureTypeRegistry.GetAllDescriptors())
         {
-            var ids = await descriptor.GetDbSet(db)
+            var dbSet = descriptor.GetDbSet(db);
+
+            var ids = await dbSet
                 .Where(f => f.UserId == userId)
                 .Select(f => f.Id)
                 .ToListAsync(ct);
@@ -115,9 +117,7 @@ public class FeatureService(AppDbContext db) : IFeatureService
 
             deletedIds.AddRange(ids);
 
-            await descriptor.GetDbSet(db)
-                .Where(f => f.UserId == userId)
-                .ExecuteDeleteAsync(ct);
+            await dbSet.Where(f => f.UserId == userId).ExecuteDeleteAsync(ct);
         }
 
         if (deletedIds.Count > 0)
