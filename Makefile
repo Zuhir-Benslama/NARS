@@ -135,7 +135,6 @@ cluster-down: proxy-down _pre-cluster-down-backup ## Delete the kind cluster (au
 	@echo "→ Deleting cluster '$(CLUSTER_NAME)'..."
 	@kind delete cluster --name "$(CLUSTER_NAME)" 2>/dev/null || true
 	@docker rm -f kube-proxy 2>/dev/null || true
-	@rm -f /tmp/$(CLUSTER_NAME)-tls.crt /tmp/$(CLUSTER_NAME)-tls.key
 	@echo "✓ Cluster deleted (postgis data preserved at $(POSTGRES_DATA_DIR))"
 
 # Internal: auto-backup before cluster teardown. Blocks if backup fails.
@@ -212,7 +211,7 @@ cluster-logs: ## Tail logs from all pods in the namespace
 		|| echo "! Failed to tail logs — no running pods in '$(NAMESPACE)' or kubectl error"
 
 .PHONY: cluster-port-forward
-cluster-port-forward: proxy-up ## Port-forward + Docker bridge (rootless Docker). Use proxy-up directly if already running.
+cluster-port-forward: proxy-up ## Deprecated — use 'proxy-up' directly.
 
 PROXY_CONTAINER ?= kind-proxy
 
@@ -417,6 +416,7 @@ db-backup: ## Dump the PostGIS database to a local file
 	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found in namespace '$(NAMESPACE)'"; exit 1; fi
 	@PASS=$$($(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
 		-o jsonpath='{.data.postgres_password}' | base64 -d)
+	@if [ -z "$$PASS" ]; then echo "✖ Could not read DB password — is nars-secrets deployed?"; exit 1; fi
 	@echo "→ Backing up database '$(DB_NAME)' from pod $$POD..."
 	@$(_pg_dump_cmd)
 	@echo "✓ Backup saved: $${FILE}.gz"
@@ -436,6 +436,7 @@ db-restore: ## Restore a backup. Usage: make db-restore FILE=data/nars/postgis/b
 	@if [ ! -f "$(FILE)" ]; then echo "✖ File not found: $(FILE)"; exit 1; fi
 	@PASS=$$($(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
 		-o jsonpath='{.data.postgres_password}' | base64 -d)
+	@if [ -z "$$PASS" ]; then echo "✖ Could not read DB password — is nars-secrets deployed?"; exit 1; fi
 	@echo "→ Restoring '$(FILE)' into $(DB_NAME)..."
 	@echo "  ⚠ This will OVERWRITE the current database."
 	@if [ -t 0 ]; then \
@@ -548,6 +549,7 @@ kubeconfig-fix: ## Patch kubeconfig for rootless Docker (port 16443 via kube-pro
 				tcp-listen:16443,fork,reuseaddr tcp-connect:nars-control-plane:6443 > /dev/null; \
 		fi; \
 		KUBECONFIG=$$(mktemp); \
+		trap 'rm -f "$$KUBECONFIG"' EXIT; \
 		kind get kubeconfig --name "$(CLUSTER_NAME)" > "$$KUBECONFIG"; \
 		sed -i 's/127.0.0.1:[0-9]*/127.0.0.1:16443/' "$$KUBECONFIG"; \
 		mkdir -p "$$HOME/.kube"; \
@@ -617,8 +619,10 @@ tls-generate: namespace-ensure ## Generate TLS certificate for $(DOMAIN) (idempo
 		echo "→ TLS secret 'nars-tls' already exists"
 	else
 		echo "→ Generating TLS certificate for $(DOMAIN)..."
-		CERT_FILE=/tmp/$(CLUSTER_NAME)-tls.crt
-		KEY_FILE=/tmp/$(CLUSTER_NAME)-tls.key
+		TLS_TMPDIR=$$(mktemp -d); \
+		trap 'rm -rf "$$TLS_TMPDIR"' EXIT; \
+		CERT_FILE=$$TLS_TMPDIR/tls.crt; \
+		KEY_FILE=$$TLS_TMPDIR/tls.key; \
 		mkcert -cert-file "$$CERT_FILE" -key-file "$$KEY_FILE" "$(DOMAIN)"
 		CERT_B64=$$(base64 -w0 < "$$CERT_FILE")
 		KEY_B64=$$(base64 -w0 < "$$KEY_FILE")
@@ -672,7 +676,7 @@ ca-secret: ca-generate namespace-ensure ## Create mTLS CA secret from k8s/certs/
 .PHONY: secrets-validate
 secrets-validate: ## Fail if kustomize output contains placeholder values (REPLACE_ME)
 	@echo "→ Validating kustomize output for placeholder values..."
-	@output=$$(kubectl kustomize "$(K8S_DIR)" 2>/dev/null); \
+	@output=$$($(KUBECTL) kustomize "$(K8S_DIR)" 2>/dev/null); \
 	if echo "$$output" | grep -q "REPLACE_ME"; then \
 		echo "✖ ERROR: kustomize output contains REPLACE_ME placeholder values!"; \
 		echo "  Run 'make secrets-apply' to generate real secrets from .env."; \
@@ -690,10 +694,10 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 	@echo "→ Creating 'nars-secrets'..."
 	@tmpdir=$$(mktemp -d); \
 	trap 'rm -rf "$$tmpdir"' EXIT; \
-	echo -n "$(POSTGRES_PASSWORD)" > "$$tmpdir/postgres_password"; \
-	echo -n "Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=$(POSTGRES_PASSWORD)" > "$$tmpdir/ConnectionStrings__DefaultConnection"; \
-	echo -n "$(JWT_SECRET)" > "$$tmpdir/Jwt__SecretKey"; \
-	echo -n "$(GPG_PASSPHRASE)" > "$$tmpdir/gpg-passphrase"; \
+	printf '%s' '$(POSTGRES_PASSWORD)' > "$$tmpdir/postgres_password"; \
+	printf '%s' 'Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=$(POSTGRES_PASSWORD)' > "$$tmpdir/ConnectionStrings__DefaultConnection"; \
+	printf '%s' '$(JWT_SECRET)' > "$$tmpdir/Jwt__SecretKey"; \
+	printf '%s' '$(GPG_PASSPHRASE)' > "$$tmpdir/gpg-passphrase"; \
 	$(KUBECTL) create secret generic nars-secrets -n "$(NAMESPACE)" \
 		--from-file=postgres_password="$$tmpdir/postgres_password" \
 		--from-file=ConnectionStrings__DefaultConnection="$$tmpdir/ConnectionStrings__DefaultConnection" \
@@ -703,17 +707,21 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 	| $(KUBECTL) apply -f -
 	@echo "✓ nars-secrets created"
 
-	@if [ -n "$(DOCKER_TOKEN)" ]; then
-		echo "→ Creating 'regcred'..."
+	@if [ -n "$(DOCKER_TOKEN)" ]; then \
+		echo "→ Creating 'regcred'..."; \
+		TMPDIR_REGCRED=$$(mktemp -d); \
+		trap 'rm -rf "$$TMPDIR_REGCRED"' EXIT; \
+		printf '%s' '$(DOCKER_TOKEN)' > "$$TMPDIR_REGCRED/docker_password"; \
+		printf '%s' '$(DOCKER_USERNAME)' > "$$TMPDIR_REGCRED/docker_username"; \
 		$(KUBECTL) create secret docker-registry regcred -n "$(NAMESPACE)" \
 			--docker-server=https://index.docker.io/v1/ \
-			--docker-username="$(DOCKER_USERNAME)" \
-			--docker-password="$(DOCKER_TOKEN)" \
+			--docker-username-file="$$TMPDIR_REGCRED/docker_username" \
+			--docker-password-file="$$TMPDIR_REGCRED/docker_password" \
 			--dry-run=client -o yaml \
-		| $(KUBECTL) apply -f -
-		echo "✓ regcred created"
-	else
-		echo "→ Skipping regcred (DOCKER_TOKEN not set — using locally loaded images)"
+		| $(KUBECTL) apply -f -; \
+		echo "✓ regcred created"; \
+	else \
+		echo "→ Skipping regcred (DOCKER_TOKEN not set — using locally loaded images)"; \
 	fi
 
 .PHONY: kustomize-set-image-tag
@@ -733,11 +741,10 @@ kustomize-set-image-tag: ## Pin all kustomize image tags to IMAGE_TAG (e.g. IMAG
 .PHONY: kustomize-apply
 kustomize-apply: secrets-validate ## Apply k8s manifests via kustomize (pin tags with IMAGE_TAG=<sha>)
 	$(MAKE) kustomize-set-image-tag
-	@echo "→ Applying kustomization..."
-	@kubectl kustomize "$(K8S_DIR)" | $(KUBECTL) apply -f -
-	@echo "✓ Kustomization applied"
-
 	$(MAKE) postgis-pv-fix
+	@echo "→ Applying kustomization..."
+	@$(KUBECTL) kustomize "$(K8S_DIR)" | $(KUBECTL) apply -f -
+	@echo "✓ Kustomization applied"
 
 	@echo "→ Waiting for postgis..."
 	@if $(KUBECTL) get deployment postgis -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
@@ -773,7 +780,7 @@ kustomize-apply: secrets-validate ## Apply k8s manifests via kustomize (pin tags
 postgis-password-sync: ## Align postgres user password with POSTGRES_PASSWORD (for persisted volumes)
 # Password piped via stdin to avoid exposure in kubectl's remote command arguments.
 	@echo "→ Syncing postgres password..."
-	@printf '%s\n' "$(POSTGRES_PASSWORD)" | \
+	@printf '%s\n' '$(POSTGRES_PASSWORD)' | \
 		$(KUBECTL) exec -i -n "$(NAMESPACE)" deployment/postgis -- \
 		bash -c 'read -r _pgpw; printf "ALTER USER postgres WITH PASSWORD '\''%s'\'';\n" "$$_pgpw" | psql -U postgres -d postgres -v ON_ERROR_STOP=1' >/dev/null
 	@echo "✓ Postgres password synced"
@@ -831,18 +838,11 @@ postgis-migration-baseline: ## Backfill EF migration history for pre-existing sc
 
 .PHONY: postgis-pv-fix
 postgis-pv-fix: ## Fix postgis PV permissions inside kind container (rootless Docker workaround)
-	@echo "→ This will modify ownership of $(POSTGRES_DATA_DIR) inside the kind node."
-	@if [ -t 0 ]; then \
-		read -p "  Continue? (yes/no): " confirm; \
-		if [ "$$confirm" != "yes" ]; then echo "  Cancelled."; exit 0; fi; \
-	else \
-		echo "  Non-interactive shell — refusing to modify data directory."; \
-		exit 1; \
-	fi
 	@echo "→ Fixing postgis PV permissions..."
 	@docker exec nars-control-plane sh -c '
 		if [ -d /mnt/nars/postgis/data ]; then
 			chown -R 999:999 /mnt/nars/postgis/data
+			chmod 700 /mnt/nars/postgis/data
 			echo "✓ postgis data dir ownership set to 999:999"
 		else
 			echo "⚠  /mnt/nars/postgis/data not found inside kind (PV not mounted yet?)"
@@ -892,7 +892,7 @@ observability-prometheus-stack: ## Install Prometheus + Grafana + AlertManager
 	@echo "→ Installing kube-prometheus-stack..."
 	@helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
 		--namespace $(OBSERVABILITY_NAMESPACE) \
-		--set grafana.adminPassword="$(GRAFANA_PASSWORD)" \
+		--set grafana.adminPassword='$(GRAFANA_PASSWORD)' \
 		--set grafana.service.type=ClusterIP \
 		--set grafana.service.port=3000 \
 		--set grafana.additionalDataSources[0].name=Loki \
