@@ -19,9 +19,8 @@ spec:
         app.kubernetes.io/name: nars-frontend
         app.kubernetes.io/component: frontend
     spec:
-      imagePullSecrets:
-        - name: regcred
       serviceAccountName: nars-frontend
+      automountServiceAccountToken: false
       terminationGracePeriodSeconds: 10
       topologySpreadConstraints:
         - maxSkew: 1

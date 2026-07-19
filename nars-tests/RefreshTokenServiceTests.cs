@@ -53,7 +53,7 @@ public class RefreshTokenServiceTests
             => _db.RefreshTokens
                 .FirstOrDefaultAsync(rt => rt.TokenHash == hash && !rt.Revoked && rt.ExpiresAt > FixedUtcNow, ct);
 
-        public new async Task RevokeAllUserTokensAsync(Guid userId, CancellationToken cancellationToken = default)
+        public override async Task RevokeAllUserTokensAsync(Guid userId, CancellationToken cancellationToken = default)
         {
             var tokens = await _db.RefreshTokens
                 .Where(rt => rt.UserId == userId && !rt.Revoked)

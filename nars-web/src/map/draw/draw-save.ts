@@ -8,6 +8,9 @@ import { useLayerStore } from "../../stores/layerStore"
 import type { FeatureData } from "../../types"
 import { getCtx } from "../core/state"
 import { useFeaturesStore } from "../../stores/featuresStore"
+
+const CITY_CENTER_MIN_RADIUS_M = 5
+const CITY_CENTER_MAX_RADIUS_M = 50_000
 import { buildDrawControl } from "./draw-control"
 import { refreshLayerVisibility } from "../rendering/labels"
 import { computeCircleRing, computeCircleRadius, closeRing } from "../rendering/geometry"
@@ -192,7 +195,7 @@ async function updateStoresAfterSave(
 
   const layerStore = useLayerStore()
   const phaseKey = drawingPhase.key
-  layerStore.$state[phaseKey].push({
+  layerStore.addFeature(phaseKey, {
     id: featureId,
     dbId: payload.dbId,
     data: featureData,
@@ -326,12 +329,12 @@ function validateGeometry(
       const centerLng = sumLng / coords.length
       radius = computeCircleRadius(centerLat, centerLng, coords)
     }
-    if (!radius || Number.isNaN(radius) || radius < 5) {
+    if (!radius || Number.isNaN(radius) || radius < CITY_CENTER_MIN_RADIUS_M) {
       showToast("City center radius is too small (minimum 5 meters).", "error")
       cleanup()
       return false
     }
-    if (radius > 50000) {
+    if (radius > CITY_CENTER_MAX_RADIUS_M) {
       showToast("City center radius is too large (maximum 50 km).", "error")
       cleanup()
       return false

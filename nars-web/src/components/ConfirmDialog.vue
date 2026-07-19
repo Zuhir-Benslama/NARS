@@ -66,7 +66,7 @@ onUnmounted(() => {
 .confirm-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--overlay-bg);
   z-index: 10000;
   display: flex;
   align-items: center;
@@ -74,8 +74,8 @@ onUnmounted(() => {
 }
 
 .confirm-dialog {
-  background: #fff;
-  color: #1e293b;
+  background: var(--modal-bg);
+  color: var(--modal-text);
   padding: 24px;
   border-radius: 12px;
   max-width: 380px;
@@ -104,23 +104,23 @@ onUnmounted(() => {
 }
 
 .confirm-btn.cancel {
-  border: 1px solid #cbd5e1;
-  background: #f8fafc;
-  color: #475569;
+  border: 1px solid var(--btn-cancel-border);
+  background: var(--btn-cancel-bg);
+  color: var(--btn-cancel-text);
 }
 
 .confirm-btn.cancel:hover {
-  background: #e2e8f0;
+  background: var(--btn-cancel-hover);
 }
 
 .confirm-btn.ok {
-  background: #ef4444;
-  color: #fff;
+  background: var(--danger-color);
+  color: var(--text-primary);
   font-weight: 600;
 }
 
 .confirm-btn.ok:hover {
-  background: #dc2626;
+  background: var(--danger-hover);
 }
 
 .confirm-enter-active,

@@ -1,8 +1,10 @@
 <template>
   <div class="fp-panel">
     <div class="fp-header">
-      <h2 class="fp-title">Field Inspection</h2>
-      <button v-if="selectedFeature" class="fp-back" @click="clearSelection">← Back</button>
+      <h2 class="fp-title">{{ t("fp_title") }}</h2>
+      <button v-if="selectedFeature" class="fp-back" @click="clearSelection">
+        {{ t("fp_back") }}
+      </button>
     </div>
 
     <!-- Feature type selector -->
@@ -21,14 +23,17 @@
 
     <!-- Feature list (when no feature selected) -->
     <div v-if="!selectedFeature" class="fp-list-wrap">
-      <div v-if="loading" class="fp-loading">Loading features...</div>
+      <div v-if="loading" class="fp-loading">{{ t("fp_loading") }}</div>
       <div v-else-if="features.length === 0" class="fp-empty">
-        No {{ tabs.find((t) => t.key === activeTab)?.label ?? activeTab }} features found in your
-        commune.
+        {{
+          t("fp_empty_no_type", {
+            type: tabs.find((tab) => tab.key === activeTab)?.label ?? activeTab,
+          })
+        }}
       </div>
       <div v-else class="fp-list">
         <button v-for="f in features" :key="f.id" class="fp-item" @click="selectFeature(f)">
-          {{ f.label || `Unnamed ${activeTab}` }}
+          {{ f.label || t("fp_unnamed", { type: activeTab }) }}
         </button>
       </div>
     </div>
@@ -56,6 +61,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue"
+import { useI18n } from "vue-i18n"
 import { useFieldStore } from "../stores/fieldStore"
 import { apiFetch } from "../api"
 import { logError, createNetworkError } from "../lib/errors"
@@ -70,11 +76,13 @@ interface TabDef {
   apiType: string
 }
 
-const tabs: TabDef[] = [
-  { key: "road", label: "Roads", apiType: "road" },
-  { key: "house_entrance", label: "Entrances", apiType: "house_entrance" },
-  { key: "naming_panel", label: "Naming Panels", apiType: "naming_panel" },
-]
+const { t } = useI18n()
+
+const tabs = computed<TabDef[]>(() => [
+  { key: "road", label: t("fp_tab_roads"), apiType: "road" },
+  { key: "house_entrance", label: t("fp_tab_entrances"), apiType: "house_entrance" },
+  { key: "naming_panel", label: t("fp_tab_naming_panels"), apiType: "naming_panel" },
+])
 
 interface ApiFeature {
   id: string
@@ -92,7 +100,7 @@ const props = withDefaults(defineProps<FieldPanelProps>(), {
       const data = await res.json()
       return (data.features ?? []).map((f: ApiFeature) => ({
         id: f.id,
-        label: f.label || `Unnamed ${apiType}`,
+        label: f.label || "Unnamed",
       }))
     }
     return []
@@ -112,7 +120,7 @@ watch(activeTab, () => {
 })
 
 async function fetchFeatures() {
-  const tab = tabs.find((t) => t.key === activeTab.value)
+  const tab = tabs.value.find((t) => t.key === activeTab.value)
   if (!tab) return
   loading.value = true
   features.value = []

@@ -32,9 +32,8 @@ spec:
         app.kubernetes.io/name: postgis
         app.kubernetes.io/component: database
     spec:
-      imagePullSecrets:
-        - name: regcred
       serviceAccountName: postgis
+      automountServiceAccountToken: false
       terminationGracePeriodSeconds: 60
       # PostGIS runs as uid 999 (postgres) via initContainer + entrypoint override.
       # The initContainer (root) chowns the data directory, then the main container
@@ -48,6 +47,7 @@ spec:
         # container starts. Must run as root to change ownership.
         - name: init-chown
           image: zuhirbenslama/nars-postgis:latest
+          imagePullPolicy: IfNotPresent
           command:
             - /bin/bash
             - -ec

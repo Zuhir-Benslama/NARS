@@ -9,10 +9,14 @@ import { useAppStore } from "../stores/appStore"
 const CTX_MENU_WIDTH = 180
 const CTX_MENU_HEIGHT = 100
 
+let _currentBoundaryCleanup: (() => void) | null = null
+
 // ─── STATE RESET (for testing & HMR) ──────────────────────────────────────────
 
 export function resetBoundaryEvents(): void {
   useAppStore().boundaryEventsRegistered = false
+  _currentBoundaryCleanup?.()
+  _currentBoundaryCleanup = null
 }
 
 export function addBoundaryClickEvents(map: maplibregl.Map): void {
@@ -48,7 +52,8 @@ export function addBoundaryClickEvents(map: maplibregl.Map): void {
 }
 
 function showBoundaryContextMenu(x: number, y: number, communeName: string): void {
-  document.getElementById("nars-boundary-ctx-menu")?.remove()
+  _currentBoundaryCleanup?.()
+  _currentBoundaryCleanup = null
 
   const menu = document.createElement("div")
   menu.id = "nars-boundary-ctx-menu"
@@ -81,8 +86,14 @@ function showBoundaryContextMenu(x: number, y: number, communeName: string): voi
   const hide = () => {
     menu.remove()
     document.removeEventListener("click", hide)
+    document.removeEventListener("contextmenu", hide)
+    _currentBoundaryCleanup = null
   }
-  requestAnimationFrame(() => document.addEventListener("click", hide))
+  _currentBoundaryCleanup = hide
+  requestAnimationFrame(() => {
+    document.addEventListener("click", hide)
+    document.addEventListener("contextmenu", hide)
+  })
 
   copyItem.onclick = (e) => {
     e.stopPropagation()

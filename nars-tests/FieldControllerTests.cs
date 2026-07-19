@@ -53,7 +53,6 @@ public class FieldControllerTests
     [Fact]
     public async Task GetFeatures_NoCommuneId_Returns400()
     {
-        var db = CreateDb();
         var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker);
 
@@ -66,7 +65,6 @@ public class FieldControllerTests
     [Fact]
     public async Task GetFeatures_NullType_Returns400()
     {
-        var db = CreateDb();
         var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
@@ -79,7 +77,6 @@ public class FieldControllerTests
     [Fact]
     public async Task GetFeatures_InvalidType_Returns400()
     {
-        var db = CreateDb();
         var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
@@ -92,7 +89,6 @@ public class FieldControllerTests
     [Fact]
     public async Task GetFeatures_ValidRequest_ReturnsOkWithFeatures()
     {
-        var db = CreateDb();
         var mockFieldService = new Mock<IFieldService>();
         var descriptor = FeatureTypeRegistry.GetDescriptor(FeatureTypes.Road)!;
         mockFieldService.Setup(s => s.QueryFeaturesAsync(descriptor, 1, 0, 500, default))
@@ -116,7 +112,6 @@ public class FieldControllerTests
     [Fact]
     public async Task SubmitInspection_NullBody_Returns400()
     {
-        var db = CreateDb();
         var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
@@ -129,7 +124,6 @@ public class FieldControllerTests
     [Fact]
     public async Task SubmitInspection_InvalidFeatureId_Returns400()
     {
-        var db = CreateDb();
         var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
@@ -142,7 +136,6 @@ public class FieldControllerTests
     [Fact]
     public async Task SubmitInspection_InvalidType_Returns400()
     {
-        var db = CreateDb();
         var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
@@ -155,7 +148,6 @@ public class FieldControllerTests
     [Fact]
     public async Task SubmitInspection_FeatureNotFound_Returns400()
     {
-        var db = CreateDb();
         var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
@@ -239,7 +231,6 @@ public class FieldControllerTests
     [Fact]
     public async Task GetInspections_ValidRequest_ReturnsInspections()
     {
-        var db = CreateDb();
         var featureId = Guid.NewGuid();
         var mockFieldService = new Mock<IFieldService>();
         mockFieldService.Setup(s => s.GetInspectionsAsync(featureId, 0, 100, default))
@@ -261,7 +252,6 @@ public class FieldControllerTests
     [Fact]
     public async Task GetInspections_NoInspections_ReturnsEmptyList()
     {
-        var db = CreateDb();
         var featureId = Guid.NewGuid();
         var mockFieldService = new Mock<IFieldService>();
         mockFieldService.Setup(s => s.GetInspectionsAsync(featureId, 0, 100, default))
@@ -281,7 +271,6 @@ public class FieldControllerTests
     [Fact]
     public async Task CreateEntranceFromInspection_NullBody_Returns400()
     {
-        var db = CreateDb();
         var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
@@ -294,7 +283,6 @@ public class FieldControllerTests
     [Fact]
     public async Task CreateEntranceFromInspection_InvalidRoadId_Returns400()
     {
-        var db = CreateDb();
         var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
@@ -307,7 +295,6 @@ public class FieldControllerTests
     [Fact]
     public async Task CreateEntranceFromInspection_RoadNotFound_Returns400()
     {
-        var db = CreateDb();
         var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
@@ -320,7 +307,6 @@ public class FieldControllerTests
     [Fact]
     public async Task CreateEntranceFromInspection_ValidRequest_Returns201()
     {
-        var db = CreateDb();
         var userId = UserId;
         var roadId = Guid.NewGuid();
         var mockFieldService = new Mock<IFieldService>();
@@ -342,7 +328,6 @@ public class FieldControllerTests
     [Fact]
     public async Task CreateEntranceFromInspection_DifferentCommune_ReturnsForbid()
     {
-        var db = CreateDb();
         var userId = UserId;
         var roadId = Guid.NewGuid();
         var mockFieldService = new Mock<IFieldService>();

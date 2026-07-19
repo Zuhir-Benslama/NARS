@@ -197,10 +197,16 @@ public class PagesController(
                 return false;
             }
 
-            var maxAge = result.RefreshExpiry!.Value - timeProvider.UtcNow;
+            if (result.RefreshExpiry is null || result.NewAccessToken is null || result.NewRawToken is null)
+            {
+                logger.LogWarning("[Pages] Refresh succeeded but token data is missing.");
+                return false;
+            }
+
+            var maxAge = result.RefreshExpiry.Value - timeProvider.UtcNow;
             logger.LogDebug("[Pages] Silent refresh SUCCESS. Issuing new cookies for {Username}", result.Username);
-            Response.Cookies.Append("access_token", result.NewAccessToken!, MakeCookieOptions(jwt.AccessTokenExpiresIn));
-            Response.Cookies.Append("refresh_token", result.NewRawToken!, MakeCookieOptions(maxAge));
+            Response.Cookies.Append("access_token", result.NewAccessToken, MakeCookieOptions(jwt.AccessTokenExpiresIn));
+            Response.Cookies.Append("refresh_token", result.NewRawToken, MakeCookieOptions(maxAge));
 
             var principal = result.NewAccessToken is not null ? jwt.ValidateToken(result.NewAccessToken) : null;
             if (principal is not null)

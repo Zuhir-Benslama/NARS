@@ -81,7 +81,7 @@ public class ValidationController(
         if (!connected)
         {
             return Ok(new ValidateRoadResponse(false,
-                "This road must connect to at least one existing road (within 20 m of an endpoint)."));
+                $"This road must connect to at least one existing road (within {RoadConnectivityDistanceMeters:F0} m of an endpoint)."));
         }
 
         return Ok(new ValidateRoadResponse(true, null));

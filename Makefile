@@ -153,9 +153,9 @@ _pre-cluster-down-backup:
 		exit 0; \
 	fi; \
 	$(_pg_dump_cmd); \
-	if [ ! -s "$$FILE" ]; then \
+	if [ ! -s "$${FILE}.gz" ]; then \
 		echo "✖ Auto-backup FAILED — refusing to tear down cluster"; \
-		rm -f "$$FILE"; \
+		rm -f "$${FILE}.gz"; \
 		exit 1; \
 	fi; \
 	echo "✓ Auto-backup saved: $${FILE}.gz"
@@ -212,24 +212,25 @@ cluster-logs: ## Tail logs from all pods in the namespace
 
 .PHONY: cluster-port-forward
 cluster-port-forward: proxy-up ## Deprecated — use 'proxy-up' directly.
+	@echo "⚠ DEPRECATED: 'cluster-port-forward' is deprecated — use 'proxy-up' instead." >&2
 
 PROXY_CONTAINER ?= kind-proxy
 
 .PHONY: port-forward-start
 port-forward-start: ## Start kubectl port-forward inside the kind container (background)
 	@echo "→ Starting port-forward inside kind container..."
-	@docker exec nars-control-plane sh -c 'pkill -f "port-forward.*ingress-nginx" 2>/dev/null; true' 2>/dev/null || true
+	@docker exec $(CLUSTER_NAME)-control-plane sh -c 'pkill -f "port-forward.*ingress-nginx" 2>/dev/null; true' 2>/dev/null || true
 	@sleep 0.5
-	@docker exec -d nars-control-plane kubectl port-forward --address 0.0.0.0 \
+	@docker exec -d $(CLUSTER_NAME)-control-plane kubectl port-forward --address 0.0.0.0 \
 		-n ingress-nginx service/ingress-nginx-controller $(APP_PORT):80 > /dev/null 2>&1
-	@docker exec -d nars-control-plane kubectl port-forward --address 0.0.0.0 \
+	@docker exec -d $(CLUSTER_NAME)-control-plane kubectl port-forward --address 0.0.0.0 \
 		-n ingress-nginx service/ingress-nginx-controller $(APP_TLS_PORT):443 > /dev/null 2>&1
 	@sleep 2
 	@echo "✓ Port-forward started inside kind container"
 
 .PHONY: port-forward-stop
 port-forward-stop: ## Stop port-forward inside the kind container
-	@docker exec nars-control-plane sh -c 'pkill -f "port-forward.*ingress-nginx" 2>/dev/null; true' 2>/dev/null || true
+	@docker exec $(CLUSTER_NAME)-control-plane sh -c 'pkill -f "port-forward.*ingress-nginx" 2>/dev/null; true' 2>/dev/null || true
 	@echo "✓ Port-forward stopped"
 
 .PHONY: proxy-up
@@ -243,7 +244,7 @@ proxy-up: port-forward-start ## Start Docker socat bridge: host:$(APP_PORT) → 
 		--network kind \
 		--entrypoint sh \
 		alpine/socat \
-		-c "socat tcp-l:$(APP_PORT),fork,reuseaddr tcp:nars-control-plane:$(APP_PORT) & socat tcp-l:$(APP_TLS_PORT),fork,reuseaddr tcp:nars-control-plane:$(APP_TLS_PORT) & wait -n" > /dev/null
+		-c "socat tcp-l:$(APP_PORT),fork,reuseaddr tcp:$(CLUSTER_NAME)-control-plane:$(APP_PORT) & socat tcp-l:$(APP_TLS_PORT),fork,reuseaddr tcp:$(CLUSTER_NAME)-control-plane:$(APP_TLS_PORT) & wait -n" > /dev/null
 	@echo "→ Waiting for proxy to be ready..."
 	@for i in $$(seq 1 15); do \
 		running=$$(docker inspect -f '{{.State.Running}}' "$(PROXY_CONTAINER)" 2>/dev/null || echo "false"); \
@@ -285,7 +286,7 @@ adb-reverse: ## Forward phone:$(APP_PORT) → host:$(APP_PORT) via USB (for mobi
 .PHONY: proxy-status
 proxy-status: ## Show proxy status
 	@echo "=== Port-forward (kind container) ==="
-	@docker exec nars-control-plane ss -tlnp 2>/dev/null | grep -E '$(APP_PORT)|$(APP_TLS_PORT)' || echo "  NOT RUNNING"
+	@docker exec $(CLUSTER_NAME)-control-plane ss -tlnp 2>/dev/null | grep -E '$(APP_PORT)|$(APP_TLS_PORT)' || echo "  NOT RUNNING"
 	@echo ""
 	@echo "=== socat bridge container ==="
 	@docker ps --filter name=$(PROXY_CONTAINER) --format '  {{.ID}} {{.Status}} {{.Image}}' 2>/dev/null || echo "  NOT RUNNING"
@@ -392,12 +393,14 @@ cluster-restart: cluster-stop cluster-start ## Stop all pods, then start them ag
 # ─── Database Backup / Restore ──────────────────────────────
 
 # Shared pg_dump + gzip logic. Expects $$POD and $$PASS to be set in shell scope.
+# SECURITY: Password piped via stdin to avoid exposure in container's process table.
 _pg_dump_cmd = \
 	mkdir -p "$(BACKUP_DIR)"; \
 	TIMESTAMP=$$(date +"%Y%m%d_%H%M%S"); \
 	FILE="$(BACKUP_DIR)/nars_db_$${TIMESTAMP}.sql"; \
-	$(KUBECTL) exec "$$POD" -n "$(NAMESPACE)" -- env PGPASSWORD="$$PASS" \
-		pg_dump -U postgres -d "$(DB_NAME)" --no-owner > "$$FILE"; \
+	printf '%s\n' "$$PASS" | \
+		$(KUBECTL) exec -i "$$POD" -n "$(NAMESPACE)" -- \
+		bash -c 'read -r _pw; PGPASSWORD="$$_pw" pg_dump -U postgres -d "$(DB_NAME)" --no-owner' > "$$FILE"; \
 	gzip -f "$$FILE"
 
 .PHONY: db-get-pod
@@ -423,17 +426,21 @@ db-backup: ## Dump the PostGIS database to a local file
 	@ls -lh "$${FILE}.gz"
 
 .PHONY: db-restore
-db-restore: ## Restore a backup. Usage: make db-restore FILE=data/nars/postgis/backups/nars_db_20250101_120000.sql.gz
+db-restore: ## Restore a backup. Usage: make db-restore FILE=backup/nars_db_20250101_120000.sql.gz
 	@POD=$$($(POSTGIS_GET_POD_CMD))
 	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found in namespace '$(NAMESPACE)'"; exit 1; fi
 	@if [ -z "$(FILE)" ]; then \
-		echo "✖ Usage: make db-restore FILE=data/nars/postgis/backups/nars_db_<timestamp>.sql.gz"; \
+		echo "✖ Usage: make db-restore FILE=backup/nars_db_<timestamp>.sql.gz"; \
 		echo ""; \
 		echo "Available backups:"; \
 		ls -1 "$(BACKUP_DIR)"/*.sql.gz 2>/dev/null | sed 's/^/  /' || echo "  (none)"; \
 		exit 1; \
 	fi
 	@if [ ! -f "$(FILE)" ]; then echo "✖ File not found: $(FILE)"; exit 1; fi
+	@if echo "$(FILE)" | grep -qP '[^a-zA-Z0-9._/\-]'; then \
+		echo "✖ FILE='$(FILE)' contains unexpected characters"; \
+		exit 1; \
+	fi
 	@PASS=$$($(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
 		-o jsonpath='{.data.postgres_password}' | base64 -d)
 	@if [ -z "$$PASS" ]; then echo "✖ Could not read DB password — is nars-secrets deployed?"; exit 1; fi
@@ -447,11 +454,11 @@ db-restore: ## Restore a backup. Usage: make db-restore FILE=data/nars/postgis/b
 		exit 1; \
 	fi
 	@if echo "$(FILE)" | grep -q '\.gz$$'; then
-		gunzip -c "$(FILE)" | $(KUBECTL) exec -i "$$POD" -n "$(NAMESPACE)" -- \
-			env PGPASSWORD="$$PASS" psql -U postgres -d "$(DB_NAME)"
+		(builtin echo "$$PASS"; gunzip -c "$(FILE)") | $(KUBECTL) exec -i "$$POD" -n "$(NAMESPACE)" -- \
+			bash -c 'read -r _pw; PGPASSWORD="$$_pw" psql -U postgres -d "$(DB_NAME)"'
 	else
-		$(KUBECTL) exec -i "$$POD" -n "$(NAMESPACE)" -- \
-			env PGPASSWORD="$$PASS" psql -U postgres -d "$(DB_NAME)" < "$(FILE)"
+		(builtin echo "$$PASS"; cat "$(FILE)") | $(KUBECTL) exec -i "$$POD" -n "$(NAMESPACE)" -- \
+			bash -c 'read -r _pw; PGPASSWORD="$$_pw" psql -U postgres -d "$(DB_NAME)"'
 	fi
 	@echo "✓ Restore complete"
 
@@ -541,12 +548,12 @@ kubeconfig-fix: ## Patch kubeconfig for rootless Docker (port 16443 via kube-pro
 		echo "→ Rootless Docker detected — fixing kubeconfig port"; \
 		KUBE_PROXY="kube-proxy"; \
 		if ! docker ps --format "{{.Names}}" 2>/dev/null | grep -q "^$$KUBE_PROXY$$"; then \
-			echo "→ Creating socat bridge (16443 -> nars-control-plane:6443)..."; \
+			echo "→ Creating socat bridge (16443 -> $(CLUSTER_NAME)-control-plane:6443)..."; \
 			docker run -d --name "$$KUBE_PROXY" --rm \
 				-p 127.0.0.1:16443:16443 \
 				--network kind \
 				alpine/socat \
-				tcp-listen:16443,fork,reuseaddr tcp-connect:nars-control-plane:6443 > /dev/null; \
+				tcp-listen:16443,fork,reuseaddr tcp-connect:$(CLUSTER_NAME)-control-plane:6443 > /dev/null; \
 		fi; \
 		KUBECONFIG=$$(mktemp); \
 		trap 'rm -f "$$KUBECONFIG"' EXIT; \
@@ -564,7 +571,7 @@ ingress-install: ## Install NGINX Ingress Controller (idempotent)
 	@echo "→ Installing NGINX Ingress Controller..."
 	@$(KUBECTL) apply -f \
 		https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-$(INGRESS_NGINX_VERSION)/deploy/static/provider/kind/deploy.yaml
-	@$(KUBECTL) label node --overwrite nars-control-plane ingress-ready=true 2>/dev/null || true
+	@$(KUBECTL) label node --overwrite $(CLUSTER_NAME)-control-plane ingress-ready=true 2>/dev/null || true
 	@echo "✓ Ingress controller installed"
 
 .PHONY: ingress-wait
@@ -608,10 +615,13 @@ storage-provisioner-install: ## Install local-path StorageClass (dynamic provisi
 .PHONY: storage-provisioner-wait
 storage-provisioner-wait: ## Wait for local-path-provisioner to be ready
 	@echo "→ Waiting for local-path-provisioner..."
-	@$(KUBECTL) wait --namespace local-path-storage \
+	@if $(KUBECTL) wait --namespace local-path-storage \
 		--for=condition=available deployment/local-path-provisioner \
-		--timeout=120s 2>/dev/null || echo "  ⚠ local-path-provisioner not found (may use different namespace)"
-	@echo "✓ local-path-provisioner ready"
+		--timeout=120s 2>/dev/null; then \
+		echo "✓ local-path-provisioner ready"; \
+	else \
+		echo "  ⚠ local-path-provisioner not found (may use different namespace)"; \
+	fi
 
 .PHONY: tls-generate
 tls-generate: namespace-ensure ## Generate TLS certificate for $(DOMAIN) (idempotent)
@@ -726,6 +736,10 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 
 .PHONY: kustomize-set-image-tag
 kustomize-set-image-tag: ## Pin all kustomize image tags to IMAGE_TAG (e.g. IMAGE_TAG=abc1234)
+	@if echo "$(IMAGE_TAG)" | grep -qP '[^a-zA-Z0-9._-]'; then \
+		echo "✖ IMAGE_TAG='$(IMAGE_TAG)' contains invalid characters (only alphanumeric, dots, hyphens, underscores allowed)"; \
+		exit 1; \
+	fi
 	@if echo "$(IMAGE_TAG)" | grep -qi "latest"; then \
 		echo "  ⚠ IMAGE_TAG=$(IMAGE_TAG) is 'latest' — not pinning. Set IMAGE_TAG=<commit-sha> for reproducible deployments."; \
 	else \
@@ -839,16 +853,20 @@ postgis-migration-baseline: ## Backfill EF migration history for pre-existing sc
 .PHONY: postgis-pv-fix
 postgis-pv-fix: ## Fix postgis PV permissions inside kind container (rootless Docker workaround)
 	@echo "→ Fixing postgis PV permissions..."
-	@docker exec nars-control-plane sh -c '
-		if [ -d /mnt/nars/postgis/data ]; then
-			chown -R 999:999 /mnt/nars/postgis/data
-			chmod 700 /mnt/nars/postgis/data
-			echo "✓ postgis data dir ownership set to 999:999"
-		else
-			echo "⚠  /mnt/nars/postgis/data not found inside kind (PV not mounted yet?)"
-		fi
-	' 2>/dev/null || echo "⚠  Could not chown postgis data dir (non-fatal)"
-	@echo "✓ Postgis PV permission fix applied"
+	@if docker exec $(CLUSTER_NAME)-control-plane sh -c ' \
+		if [ -d /mnt/nars/postgis/data ]; then \
+			chown -R 999:999 /mnt/nars/postgis/data; \
+			chmod 700 /mnt/nars/postgis/data; \
+			echo "✓ postgis data dir ownership set to 999:999"; \
+		else \
+			echo "⚠  /mnt/nars/postgis/data not found inside kind (PV not mounted yet?)"; \
+			exit 1; \
+		fi \
+	' 2>/dev/null; then \
+		echo "✓ Postgis PV permission fix applied"; \
+	else \
+		echo "⚠  Could not chown postgis data dir (non-fatal)"; \
+	fi
 
 # ─── Observability (Grafana LGTM + OTel) ─────────────────────
 
@@ -871,7 +889,7 @@ observability-install: helm-check helm-repos ## Install LGTM stack + OpenTelemet
 	@echo "  Tempo:         http://localhost:3200"
 
 .PHONY: helm-check
-helm-check:
+helm-check: ## Check that helm is installed
 	@command -v helm >/dev/null 2>&1 || { echo "✖ helm is not installed"; exit 1; }
 
 .PHONY: helm-repos
@@ -890,9 +908,12 @@ observability-namespace:
 .PHONY: observability-prometheus-stack
 observability-prometheus-stack: ## Install Prometheus + Grafana + AlertManager
 	@echo "→ Installing kube-prometheus-stack..."
-	@helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
+	@tmpdir=$$(mktemp -d); \
+	trap 'rm -rf "$$tmpdir"' EXIT; \
+	printf '%s' '$(GRAFANA_PASSWORD)' > "$$tmpdir/grafana_password"; \
+	helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
 		--namespace $(OBSERVABILITY_NAMESPACE) \
-		--set grafana.adminPassword='$(GRAFANA_PASSWORD)' \
+		--set-file grafana.adminPassword="$$tmpdir/grafana_password" \
 		--set grafana.service.type=ClusterIP \
 		--set grafana.service.port=3000 \
 		--set grafana.additionalDataSources[0].name=Loki \

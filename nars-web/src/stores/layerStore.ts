@@ -12,12 +12,10 @@ export interface LayerState {
   namingPanels: LayerEntry[]
 }
 
-interface LayerCache {
-  featureMapDirty: boolean
-  cachedFeatureMap: Map<string, { layer: keyof LayerState; entry: LayerEntry }> | null
-}
+let _cachedFeatureMap: Map<string, { layer: keyof LayerState; entry: LayerEntry }> | null = null
+let _featureMapDirty = true
 
-function createInitialState(): LayerState & LayerCache {
+function createInitialState(): LayerState {
   return {
     areas: [],
     cityCenter: [],
@@ -27,8 +25,6 @@ function createInitialState(): LayerState & LayerCache {
     publicBuildings: [],
     publicSpaces: [],
     namingPanels: [],
-    featureMapDirty: true,
-    cachedFeatureMap: null,
   }
 }
 
@@ -44,7 +40,7 @@ export const LAYER_KEYS: (keyof LayerState)[] = [
 ]
 
 export const useLayerStore = defineStore("layer", {
-  state: (): LayerState & LayerCache => createInitialState(),
+  state: (): LayerState => createInitialState(),
 
   getters: {
     mainEntrances: (state) =>
@@ -71,8 +67,8 @@ export const useLayerStore = defineStore("layer", {
 
     /** Map of dbId → { layer, entry } for O(1) lookups via getFeature(). Cached. */
     _featureMap(state): Map<string, { layer: keyof LayerState; entry: LayerEntry }> {
-      if (!state.featureMapDirty && state.cachedFeatureMap) {
-        return state.cachedFeatureMap
+      if (!_featureMapDirty && _cachedFeatureMap) {
+        return _cachedFeatureMap
       }
       const map = new Map<string, { layer: keyof LayerState; entry: LayerEntry }>()
       for (const key of LAYER_KEYS) {
@@ -80,8 +76,8 @@ export const useLayerStore = defineStore("layer", {
           map.set(entry.dbId, { layer: key, entry })
         }
       }
-      state.cachedFeatureMap = map
-      state.featureMapDirty = false
+      _cachedFeatureMap = map
+      _featureMapDirty = false
       return map
     },
   },
@@ -89,14 +85,14 @@ export const useLayerStore = defineStore("layer", {
   actions: {
     addFeature(layer: keyof LayerState, entry: LayerEntry) {
       this[layer].push(entry)
-      this.featureMapDirty = true
+      _featureMapDirty = true
     },
 
     removeFeature(layer: keyof LayerState, dbId: string) {
       const idx = this[layer].findIndex((e) => e.dbId === dbId)
       if (idx !== -1) {
         this[layer].splice(idx, 1)
-        this.featureMapDirty = true
+        _featureMapDirty = true
       }
     },
 
@@ -104,13 +100,13 @@ export const useLayerStore = defineStore("layer", {
       const entry = this[layer].find((e) => e.dbId === dbId)
       if (entry) {
         Object.assign(entry.data, data)
-        this.featureMapDirty = true
+        _featureMapDirty = true
       }
     },
 
     clearLayer(layer: keyof LayerState) {
       this[layer] = []
-      this.featureMapDirty = true
+      _featureMapDirty = true
     },
 
     getFeature(dbId: string): LayerEntry | null {
@@ -119,7 +115,7 @@ export const useLayerStore = defineStore("layer", {
 
     reset() {
       this.$reset()
-      this.featureMapDirty = true
+      _featureMapDirty = true
     },
   },
 })

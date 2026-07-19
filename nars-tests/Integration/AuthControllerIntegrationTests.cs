@@ -274,6 +274,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             refreshService,
             jwt,
             Options.Create(new AccountLockoutOptions()),
+            Options.Create(new AdminSignupOptions()),
             Mock.Of<ILogger<AuthController>>(),
             timeProvider,
             new UserAuthorizationService(db),

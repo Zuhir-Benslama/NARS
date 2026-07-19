@@ -61,7 +61,7 @@ public class RefreshTokenService(
         return new RefreshTokenResult(true, null, user.Username, newRaw, newAccessToken, refreshExpiry);
     }
 
-    public async Task RevokeAllUserTokensAsync(Guid userId, CancellationToken cancellationToken = default)
+    public virtual async Task RevokeAllUserTokensAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         await db.RefreshTokens
             .Where(rt => rt.UserId == userId && !rt.Revoked)

@@ -8,6 +8,8 @@ import { useSelectionStore } from "../../stores/selectionStore"
 import { debugError } from "../../utils/debug"
 import { repatchMarker } from "./draw-state"
 import type { GeomanCreateEvent, ActionInstances } from "../core/geoman-types"
+
+const POINT_SNAP_THRESHOLD_PX = 20
 import type { MapMouseEvent as MapLibreMapMouseEvent } from "maplibre-gl"
 
 import { getCtx, updateSelectionHighlight } from "../core/state"
@@ -107,7 +109,7 @@ function findNearestFeatureAtPoint(
   const allFeatures = featuresStore.getAll()
   let nearestDbId: string | null = null
   let nearestPhaseKey: string | null = null
-  let nearestDist = 20
+  let nearestDist = POINT_SNAP_THRESHOLD_PX
 
   for (const f of allFeatures) {
     const fPhaseKey = f.properties?.phaseKey
@@ -183,8 +185,8 @@ function onContextMenu(e: MouseEvent): void {
     const coords: [number, number][] = lineDrawer.shapeLngLats
     if (coords.length <= 1) {
       const phase = PHASES[appStore.currentPhase]
-      geoman!
-        .disableDraw()
+      geoman
+        ?.disableDraw()
         .then(() => {
           if (phase && phase.key !== "namingPanels") {
             buildDrawControl(phase)
@@ -280,8 +282,8 @@ function onKeyDown(e: KeyboardEvent): void {
       e.preventDefault()
       e.stopImmediatePropagation()
       const phase = PHASES[appStore.currentPhase]
-      geoman!
-        .disableDraw()
+      geoman
+        ?.disableDraw()
         .then(() => {
           if (phase && phase.key !== "namingPanels") {
             buildDrawControl(phase)

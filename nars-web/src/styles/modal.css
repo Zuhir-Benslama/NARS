@@ -44,7 +44,7 @@
   letter-spacing: 0.5px;
 }
 .modal-field label span.req {
-  color: #e74c3c;
+  color: var(--danger-color);
   margin-left: 2px;
 }
 
@@ -71,7 +71,7 @@
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06) !important;
 }
 .modal-input.error {
-  border-color: #e74c3c !important;
+  border-color: var(--danger-color) !important;
 }
 
 .modal-row {
@@ -111,11 +111,11 @@
   letter-spacing: 0.3px;
 }
 .modal-btn-save {
-  background: #27ae60;
-  color: #fff;
+  background: var(--success-color);
+  color: var(--text-primary);
 }
 .modal-btn-save:hover {
-  background: #1e8449;
+  background: var(--success-hover);
 }
 .modal-btn-cancel {
   background: var(--btn-cancel-bg) !important;
@@ -126,17 +126,17 @@
   background: var(--btn-cancel-hover) !important;
 }
 .modal-btn-danger {
-  background: #dc2626;
-  color: #fff;
+  background: var(--danger-color);
+  color: var(--text-primary);
 }
 .modal-btn-danger:hover {
-  background: #b91c1c;
+  background: var(--danger-hover);
 }
 
 .modal-side-hint {
   font-weight: 400;
   text-transform: none;
-  color: #888;
+  color: var(--disabled-color);
 }
 .modal-input-row {
   display: flex;
@@ -214,11 +214,11 @@ label {
 }
 
 .dialog-btn-yes {
-  background: #27ae60;
-  color: #fff;
+  background: var(--success-color);
+  color: var(--text-primary);
 }
 .dialog-btn-yes:hover {
-  background: #1e8449;
+  background: var(--success-hover);
 }
 .dialog-btn-skip {
   background: var(--btn-cancel-bg) !important;
@@ -258,8 +258,8 @@ label {
   display: inline-block;
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.15);
-  border-top-color: #3498db;
+  border: 2px solid var(--glass-border);
+  border-top-color: var(--accent-color);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   vertical-align: middle;

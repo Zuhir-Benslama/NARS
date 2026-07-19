@@ -13,3 +13,6 @@ scripts/__pycache__/
 
 # CA private key — must NEVER be committed. Only ca.crt (public) is tracked.
 k8s/certs/ca.key
+
+# Environment files
+.env

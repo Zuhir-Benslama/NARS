@@ -151,8 +151,8 @@ onUnmounted(() => abortController?.abort())
 .spinner {
   width: 18px;
   height: 18px;
-  border: 2px solid #ccc;
-  border-top-color: #1976d2;
+  border: 2px solid var(--spinner-track);
+  border-top-color: var(--spinner-fill);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   display: inline-block;
@@ -163,11 +163,11 @@ onUnmounted(() => abortController?.abort())
   }
 }
 .admin-error {
-  background: #ffebee;
-  border: 1px solid #ef9a9a;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
   border-radius: 6px;
   padding: 0.75rem 1rem;
-  color: #c62828;
+  color: var(--danger-color);
   margin-bottom: 1rem;
   font-size: 0.875rem;
 }

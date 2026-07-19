@@ -64,8 +64,8 @@ images:
   # because the bundled kustomize (v5.5.0 in kubectl 1.32) does not support
   # the newPullPolicy field.
   - name: zuhirbenslama/nars-api
-    newTag: latest
+    newTag: dev
   - name: zuhirbenslama/nars-postgis
-    newTag: latest
+    newTag: dev
   - name: zuhirbenslama/nars-vite
-    newTag: latest
+    newTag: dev

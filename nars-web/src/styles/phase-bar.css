@@ -38,7 +38,7 @@
   font-size: 10px;
   font-weight: 700;
   background: currentColor;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .phase-connector {
@@ -58,7 +58,7 @@
 .phase-step.active {
   background: rgba(255, 255, 255, 0.28) !important;
   border-color: rgba(255, 255, 255, 0.8) !important;
-  color: #fff !important;
+  color: var(--text-primary) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
   box-shadow:

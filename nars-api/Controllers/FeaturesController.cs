@@ -50,7 +50,7 @@ public class FeaturesController(
         var dataJson = body.Data.GetRawText();
         if (dataJson.Length > _maxFeatureDataSize)
         {
-            return Problem(detail: "Feature data is too large (max 512 KB).", statusCode: 400);
+            return Problem(detail: $"Feature data is too large (max {_maxFeatureDataSize / 1024} KB).", statusCode: 400);
         }
 
         var roadId = TryExtractRoadId(body);
@@ -166,7 +166,7 @@ public class FeaturesController(
             var rawJson = dataElement.GetRawText();
             if (rawJson.Length > _maxFeatureDataSize)
             {
-                return Problem(detail: "Feature data is too large (max 512 KB).", statusCode: 400);
+                return Problem(detail: $"Feature data is too large (max {_maxFeatureDataSize / 1024} KB).", statusCode: 400);
             }
         }
 

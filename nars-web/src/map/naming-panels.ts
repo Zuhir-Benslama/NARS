@@ -108,13 +108,13 @@ async function addPanelIfMissing(
   }
 
   const layerEntry: LayerEntry = {
-    id: `panel_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    id: `panel_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`,
     dbId: "0",
     data,
     type: "marker",
   }
 
-  layerStore.$state.namingPanels.push(layerEntry)
+  layerStore.addFeature("namingPanels", layerEntry)
 
   const featuresStore = useFeaturesStore()
   featuresStore.add({

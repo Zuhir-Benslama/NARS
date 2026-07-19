@@ -92,7 +92,7 @@ defineEmits<{
   color: var(--text-primary);
 }
 .admin-missing {
-  color: #e53935;
+  color: var(--danger-color);
   font-style: italic;
 }
 .drill-btn {

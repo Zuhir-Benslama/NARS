@@ -82,7 +82,7 @@
             class="modal-input"
             :placeholder="t('su_search_wilaya')"
             autocomplete="off"
-            @focus="fetchWilayas('')"
+            @focus="wilayaSearch.run('')"
           />
           <Teleport v-if="wilayaOptions.length" to="body">
             <div class="su-dropdown" :style="wilayaDropdownStyle" @mousedown.prevent>
@@ -110,7 +110,7 @@
             :placeholder="dairaPlaceholder"
             autocomplete="off"
             :disabled="needWilayaFirst && !selectedWilayaId"
-            @focus="fetchDairas('')"
+            @focus="dairaSearch.run('')"
           />
           <Teleport v-if="dairaOptions.length" to="body">
             <div class="su-dropdown" :style="dairaDropdownStyle" @mousedown.prevent>
@@ -137,7 +137,7 @@
             class="modal-input"
             :placeholder="t('su_search_commune')"
             autocomplete="off"
-            @focus="fetchCommunes('')"
+            @focus="communeSearch.run('')"
           />
           <Teleport v-if="communeOptions.length" to="body">
             <div class="su-dropdown" :style="communeDropdownStyle" @mousedown.prevent>
@@ -192,7 +192,10 @@ import { useAppStore } from "../../stores/appStore"
 import { apiFetch } from "../../api"
 import { showToast } from "../../lib/toast"
 import { NarsError } from "../../lib/errors"
+import { debugWarn } from "../../utils/debug"
 import type { UserRole } from "../../types"
+
+const LOCATION_SEARCH_DEBOUNCE_MS = 200
 
 interface ManageableUser {
   user_id: string
@@ -252,7 +255,7 @@ async function fetchUsers() {
     const res = await apiFetch("/api/admin/users")
     users.value = (await res.json()) as ManageableUser[]
   } catch (e) {
-    console.warn("[SettingsUsers] fetchUsers failed:", e)
+    debugWarn("[SettingsUsers] fetchUsers failed:", e)
   } finally {
     loadingUsers.value = false
   }
@@ -430,18 +433,9 @@ const dairaPlaceholder = computed(() =>
 )
 
 watch(targetRole, () => {
-  if (wilayaTimer) {
-    clearTimeout(wilayaTimer)
-    wilayaTimer = null
-  }
-  if (dairaTimer) {
-    clearTimeout(dairaTimer)
-    dairaTimer = null
-  }
-  if (communeTimer) {
-    clearTimeout(communeTimer)
-    communeTimer = null
-  }
+  wilayaSearch.cleanup()
+  dairaSearch.cleanup()
+  communeSearch.cleanup()
   if (!editingUser.value) {
     wilayaQuery.value = ""
     selectedWilayaId.value = null
@@ -456,60 +450,57 @@ watch(targetRole, () => {
 })
 
 // ── Location loaders ─────────────────────────────────────────────────────
-let wilayaTimer: ReturnType<typeof setTimeout> | null = null
-async function fetchWilayas(q: string) {
-  if (wilayaTimer) clearTimeout(wilayaTimer)
-  wilayaTimer = setTimeout(async () => {
-    try {
-      const res = await apiFetch(`/api/wilayas?search=${encodeURIComponent(q)}`)
-      wilayaOptions.value = extractSearchOptions(await res.json())
-    } catch (e) {
-      console.warn("[SettingsUsers] fetchWilayas failed:", e)
-    }
-  }, 200)
+function createDebouncedSearch(fetchFn: (q: string) => Promise<void>, label: string) {
+  let timer: ReturnType<typeof setTimeout> | null = null
+  const run = (q: string) => {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(async () => {
+      try {
+        await fetchFn(q)
+      } catch (e) {
+        debugWarn(`[SettingsUsers] ${label} failed:`, e)
+      }
+    }, LOCATION_SEARCH_DEBOUNCE_MS)
+  }
+  return {
+    run,
+    cleanup: () => {
+      if (timer) clearTimeout(timer)
+    },
+  }
 }
-watch(wilayaQuery, (q) => {
-  fetchWilayas(q ?? "")
-})
 
-let dairaTimer: ReturnType<typeof setTimeout> | null = null
-async function fetchDairas(q: string) {
+const wilayaSearch = createDebouncedSearch(async (q) => {
+  const res = await apiFetch(`/api/wilayas?search=${encodeURIComponent(q)}`)
+  wilayaOptions.value = extractSearchOptions(await res.json())
+}, "fetchWilayas")
+
+const dairaSearch = createDebouncedSearch(async (q) => {
   if (needWilayaFirst.value && !selectedWilayaId.value) return
-  if (dairaTimer) clearTimeout(dairaTimer)
-  dairaTimer = setTimeout(async () => {
-    try {
-      const wilayaParam = selectedWilayaId.value ? `&wilaya_id=${selectedWilayaId.value}` : ""
-      const res = await apiFetch(`/api/dairas?search=${encodeURIComponent(q)}${wilayaParam}`)
-      dairaOptions.value = extractSearchOptions(await res.json())
-    } catch (e) {
-      console.warn("[SettingsUsers] fetchDairas failed:", e)
-    }
-  }, 200)
-}
-watch(dairaQuery, (q) => {
-  fetchDairas(q ?? "")
-})
+  const wilayaParam = selectedWilayaId.value ? `&wilaya_id=${selectedWilayaId.value}` : ""
+  const res = await apiFetch(`/api/dairas?search=${encodeURIComponent(q)}${wilayaParam}`)
+  dairaOptions.value = extractSearchOptions(await res.json())
+}, "fetchDairas")
 
-let communeTimer: ReturnType<typeof setTimeout> | null = null
-async function fetchCommunes(q: string) {
-  if (communeTimer) clearTimeout(communeTimer)
-  communeTimer = setTimeout(async () => {
-    try {
-      const res = await apiFetch(`/api/communes?search=${encodeURIComponent(q)}`)
-      communeOptions.value = extractSearchOptions(await res.json())
-    } catch (e) {
-      console.warn("[SettingsUsers] fetchCommunes failed:", e)
-    }
-  }, 200)
-}
+const communeSearch = createDebouncedSearch(async (q) => {
+  const res = await apiFetch(`/api/communes?search=${encodeURIComponent(q)}`)
+  communeOptions.value = extractSearchOptions(await res.json())
+}, "fetchCommunes")
+
+watch(wilayaQuery, (q) => {
+  wilayaSearch.run(q ?? "")
+})
+watch(dairaQuery, (q) => {
+  dairaSearch.run(q ?? "")
+})
 watch(communeQuery, (q) => {
-  fetchCommunes(q ?? "")
+  communeSearch.run(q ?? "")
 })
 
 onUnmounted(() => {
-  if (wilayaTimer) clearTimeout(wilayaTimer)
-  if (dairaTimer) clearTimeout(dairaTimer)
-  if (communeTimer) clearTimeout(communeTimer)
+  wilayaSearch.cleanup()
+  dairaSearch.cleanup()
+  communeSearch.cleanup()
 })
 
 function selectWilaya(w: { id: number; name_fr: string }) {
@@ -694,11 +685,11 @@ async function submit() {
   background: var(--glass-bg-hover);
 }
 .su-btn-delete {
-  color: #ef4444;
-  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--danger-color);
+  border-color: var(--danger-border);
 }
 .su-btn-delete:hover {
-  background: rgba(239, 68, 68, 0.12);
+  background: var(--danger-bg);
 }
 .su-divider {
   border: none;
@@ -713,14 +704,14 @@ async function submit() {
   line-height: 1.5;
 }
 .su-success {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: var(--success-bg);
+  color: var(--success-color);
+  border: 1px solid var(--success-border);
 }
 .su-error {
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: var(--danger-bg);
+  color: var(--danger-color);
+  border: 1px solid var(--danger-border);
 }
 .su-select {
   appearance: none;
@@ -761,7 +752,7 @@ async function submit() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--overlay-bg);
   backdrop-filter: blur(2px);
 }
 .su-modal {
@@ -782,29 +773,5 @@ async function submit() {
   display: flex;
   gap: 0.5rem;
   justify-content: flex-end;
-}
-</style>
-
-<style>
-.su-dropdown {
-  position: fixed;
-  background: var(--modal-bg, #1a2035);
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.15));
-  border-radius: 8px;
-  max-height: 180px;
-  overflow-y: auto;
-  z-index: 10001;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
-}
-.su-dropdown-item {
-  padding: 9px 14px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.su-dropdown-item:hover {
-  background: var(--glass-bg-hover, rgba(255, 255, 255, 0.07));
-  color: var(--text-primary);
 }
 </style>

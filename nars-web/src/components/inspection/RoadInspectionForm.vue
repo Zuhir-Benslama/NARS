@@ -1,10 +1,10 @@
 <template>
   <div class="rif-form">
-    <h3 class="rif-title">Road Inspection</h3>
-    <p class="rif-feature">{{ feature?.label ?? "Unknown road" }}</p>
+    <h3 class="rif-title">{{ t("rif_title") }}</h3>
+    <p class="rif-feature">{{ feature?.label ?? t("rif_unknown") }}</p>
 
     <div class="rif-field">
-      <label>Road Traffic</label>
+      <label>{{ t("label_road_traffic") }}</label>
       <div class="rif-options">
         <button
           v-for="opt in trafficOptions"
@@ -19,7 +19,7 @@
     </div>
 
     <div class="rif-field">
-      <label>Trad Activity</label>
+      <label>{{ t("label_trad_activity") }}</label>
       <div class="rif-options">
         <button
           v-for="opt in activityOptions"
@@ -33,12 +33,12 @@
     </div>
 
     <div class="rif-field">
-      <label>Number of Lanes</label>
+      <label>{{ t("label_num_lanes") }}</label>
       <input v-model.number="data.numLanes" type="number" min="0" class="rif-input" />
     </div>
 
     <div class="rif-field rif-toggle">
-      <span>Median Presence</span>
+      <span>{{ t("label_median_presence") }}</span>
       <label class="rif-switch">
         <input v-model="data.hasMedian" type="checkbox" />
         <span class="rif-slider" />
@@ -46,7 +46,7 @@
     </div>
 
     <div class="rif-field rif-toggle">
-      <span>Vegetation Presence</span>
+      <span>{{ t("label_vegetation_presence") }}</span>
       <label class="rif-switch">
         <input v-model="data.hasVegetation" type="checkbox" />
         <span class="rif-slider" />
@@ -54,7 +54,7 @@
     </div>
 
     <div class="rif-field rif-toggle">
-      <span>Dead-end</span>
+      <span>{{ t("label_dead_end") }}</span>
       <label class="rif-switch">
         <input v-model="data.isDeadEnd" type="checkbox" />
         <span class="rif-slider" />
@@ -62,7 +62,7 @@
     </div>
 
     <div class="rif-field rif-toggle">
-      <span>Sidewalk Presence</span>
+      <span>{{ t("label_sidewalk_presence") }}</span>
       <label class="rif-switch">
         <input v-model="data.hasSidewalk" type="checkbox" />
         <span class="rif-slider" />
@@ -70,18 +70,20 @@
     </div>
 
     <button class="rif-submit" :disabled="submitting" @click="submit">
-      {{ submitting ? "Saving..." : "Submit Inspection" }}
+      {{ submitting ? t("label_saving") : t("btn_submit_inspection") }}
     </button>
   </div>
 </template>
 
 <script setup lang="ts">
 import { reactive, ref } from "vue"
+import { useI18n } from "vue-i18n"
 import { apiFetch } from "../../api"
 import { getErrorMessage } from "../../lib/errors"
 import { showToast } from "../../lib/toast"
 import type { RoadInspectionData } from "../../types/inspection"
 
+const { t } = useI18n()
 const props = defineProps<{ feature: { id: string; label: string } | null }>()
 const emit = defineEmits<{ done: [] }>()
 
@@ -96,14 +98,14 @@ const data = reactive<RoadInspectionData>({
 })
 
 const trafficOptions = [
-  { value: "high", label: "High" },
-  { value: "medium", label: "Medium" },
-  { value: "low", label: "Low" },
+  { value: "high", label: t("label_high") },
+  { value: "medium", label: t("label_medium") },
+  { value: "low", label: t("label_low") },
 ]
 const activityOptions = [
-  { value: "high", label: "High" },
-  { value: "medium", label: "Medium" },
-  { value: "low", label: "Low" },
+  { value: "high", label: t("label_high") },
+  { value: "medium", label: t("label_medium") },
+  { value: "low", label: t("label_low") },
 ]
 
 const submitting = ref(false)
@@ -125,16 +127,16 @@ async function submit() {
     })
     if (res.ok) {
       showToast(
-        status === "good" ? "Road inspection saved." : "Issues reported.",
+        status === "good" ? t("alert_road_inspection_saved") : t("alert_issues_reported"),
         status === "good" ? "success" : "error",
       )
       emit("done")
     } else {
       const body = await res.json()
-      showToast(body.detail ?? "Failed to save", "error")
+      showToast(body.detail ?? t("error_save_failed"), "error")
     }
   } catch (e) {
-    showToast("Network error: " + getErrorMessage(e), "error")
+    showToast(t("error_network_with_msg", { message: getErrorMessage(e) }), "error")
   } finally {
     submitting.value = false
   }
@@ -191,7 +193,7 @@ function detectIssues(): boolean {
 }
 .rif-btn.active {
   background: var(--accent, #3b82f6);
-  color: #fff;
+  color: var(--text-primary);
   border-color: var(--accent, #3b82f6);
 }
 .rif-input {
@@ -238,7 +240,7 @@ function detectIssues(): boolean {
   width: 14px;
   left: 3px;
   bottom: 3px;
-  background: #fff;
+  background: var(--text-primary);
   border-radius: 50%;
   transition: 0.2s;
 }
@@ -253,7 +255,7 @@ function detectIssues(): boolean {
   border: none;
   border-radius: 8px;
   background: var(--accent, #3b82f6);
-  color: #fff;
+  color: var(--text-primary);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;

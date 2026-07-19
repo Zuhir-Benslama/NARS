@@ -44,8 +44,9 @@ async function removeGeomanFeature(): Promise<void> {
 async function readGeomanGeometry(entry: LayerEntry): Promise<boolean> {
   if (!getActiveGeomanFeatureId() || !getCtx().geoman) return true
   const { geoman } = getCtx()
+  if (!geoman) return true
   try {
-    const geomanFeatures = await geoman!.features.getAll()
+    const geomanFeatures = await geoman.features.getAll()
     const geomanFeature = (
       geomanFeatures as {
         features?: Array<{ id?: string; geometry?: unknown }>

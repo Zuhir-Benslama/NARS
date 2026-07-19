@@ -25,12 +25,12 @@ describe("FieldPanel", () => {
 
   it("renders header and tabs", () => {
     const wrapper = mount(FieldPanel, { global: globalOpts })
-    expect(wrapper.text()).toContain("Field Inspection")
+    expect(wrapper.text()).toContain("fp_title")
     const tabs = wrapper.findAll(".fp-tab")
     expect(tabs).toHaveLength(3)
-    expect(tabs[0].text()).toBe("Roads")
-    expect(tabs[1].text()).toBe("Entrances")
-    expect(tabs[2].text()).toBe("Naming Panels")
+    expect(tabs[0].text()).toBe("fp_tab_roads")
+    expect(tabs[1].text()).toBe("fp_tab_entrances")
+    expect(tabs[2].text()).toBe("fp_tab_naming_panels")
   })
 
   it("starts with roads tab active", () => {

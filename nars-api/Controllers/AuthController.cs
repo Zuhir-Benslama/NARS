@@ -19,6 +19,7 @@ public partial class AuthController(
     IRefreshTokenService refreshService,
     IJwtService jwt,
     IOptions<AccountLockoutOptions> lockoutOptions,
+    IOptions<AdminSignupOptions> adminSignupOptions,
     ILogger<AuthController> logger,
     IDateTimeProvider timeProvider,
     IUserAuthorizationService authorizationService,
@@ -117,9 +118,14 @@ public partial class AuthController(
             return Problem(detail: result.Detail, statusCode: 401);
         }
 
-        var cookieMaxAge = result.RefreshExpiry!.Value - timeProvider.UtcNow;
-        Response.Cookies.Append("access_token", result.NewAccessToken!, MakeCookieOptions(jwt.AccessTokenExpiresIn));
-        Response.Cookies.Append("refresh_token", result.NewRawToken!, MakeCookieOptions(cookieMaxAge));
+        if (result.RefreshExpiry is null || result.NewAccessToken is null || result.NewRawToken is null)
+        {
+            return Problem(detail: "Token refresh succeeded but token data is missing.", statusCode: 500);
+        }
+
+        var cookieMaxAge = result.RefreshExpiry.Value - timeProvider.UtcNow;
+        Response.Cookies.Append("access_token", result.NewAccessToken, MakeCookieOptions(jwt.AccessTokenExpiresIn));
+        Response.Cookies.Append("refresh_token", result.NewRawToken, MakeCookieOptions(cookieMaxAge));
 
         return Ok(new RefreshResponse(Success: true, TokenType: "bearer"));
     }
@@ -235,10 +241,14 @@ public partial class AuthController(
     private sealed record LocationChain(Commune? Commune, Daira? Daira, Wilaya? Wilaya);
     private sealed record CommuneWithDaira(Commune? Commune, Daira? Daira);
 
-    private async Task<LocationChain> LoadLocationChainAsync(int communeId, CancellationToken cancellationToken = default)
+    private async Task<T> WithLocationDb<T>(Func<AppDbContext, Task<T>> query)
     {
         await using var db = refreshService.CreateDbContext();
-        var row = await (
+        return await query(db);
+    }
+
+    private Task<LocationChain> LoadLocationChainAsync(int communeId, CancellationToken cancellationToken = default)
+        => WithLocationDb(db => (
             from c in db.Communes
             where c.CommuneId == communeId
             join d in db.Dairas on c.DairaId equals d.DairaId into dj
@@ -246,44 +256,37 @@ public partial class AuthController(
             join w in db.Wilayas on d.WilayaId equals w.WilayaId into wj
             from w in wj.DefaultIfEmpty()
             select new { Commune = c, Daira = (Daira?)d, Wilaya = (Wilaya?)w }
-        ).FirstOrDefaultAsync(cancellationToken);
+        ).FirstOrDefaultAsync(cancellationToken).ContinueWith(t =>
+            t.Result is null
+                ? new LocationChain(null, null, null)
+                : new LocationChain(t.Result.Commune, t.Result.Daira, t.Result.Wilaya),
+            cancellationToken));
 
-        return row is null
-            ? new LocationChain(null, null, null)
-            : new LocationChain(row.Commune, row.Daira, row.Wilaya);
-    }
-
-    private async Task<CommuneWithDaira> LoadCommuneWithDairaAsync(int communeId, CancellationToken cancellationToken = default)
-    {
-        await using var db = refreshService.CreateDbContext();
-        var row = await (
+    private Task<CommuneWithDaira> LoadCommuneWithDairaAsync(int communeId, CancellationToken cancellationToken = default)
+        => WithLocationDb(db => (
             from c in db.Communes
             where c.CommuneId == communeId
             join d in db.Dairas on c.DairaId equals d.DairaId into dj
             from d in dj.DefaultIfEmpty()
             select new { Commune = c, Daira = (Daira?)d }
-        ).FirstOrDefaultAsync(cancellationToken);
+        ).FirstOrDefaultAsync(cancellationToken).ContinueWith(t =>
+            t.Result is null
+                ? new CommuneWithDaira(null, null)
+                : new CommuneWithDaira(t.Result.Commune, t.Result.Daira),
+            cancellationToken));
 
-        return row is null
-            ? new CommuneWithDaira(null, null)
-            : new CommuneWithDaira(row.Commune, row.Daira);
-    }
-
-    private async Task<LocationChain> LoadDairaWithWilayaAsync(int dairaId, CancellationToken cancellationToken = default)
-    {
-        await using var db = refreshService.CreateDbContext();
-        var row = await (
+    private Task<LocationChain> LoadDairaWithWilayaAsync(int dairaId, CancellationToken cancellationToken = default)
+        => WithLocationDb(db => (
             from d in db.Dairas
             where d.DairaId == dairaId
             join w in db.Wilayas on d.WilayaId equals w.WilayaId into wj
             from w in wj.DefaultIfEmpty()
             select new { Daira = d, Wilaya = (Wilaya?)w }
-        ).FirstOrDefaultAsync(cancellationToken);
-
-        return row is null
-            ? new LocationChain(null, null, null)
-            : new LocationChain(null, row.Daira, row.Wilaya);
-    }
+        ).FirstOrDefaultAsync(cancellationToken).ContinueWith(t =>
+            t.Result is null
+                ? new LocationChain(null, null, null)
+                : new LocationChain(null, t.Result.Daira, t.Result.Wilaya),
+            cancellationToken));
 
     private async Task<LocationChain> LoadWilayaOnlyAsync(int? wilayaId, CancellationToken cancellationToken = default)
     {

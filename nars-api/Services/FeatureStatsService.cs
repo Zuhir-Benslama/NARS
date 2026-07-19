@@ -90,17 +90,7 @@ public class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactory) : IF
         }
 
         // Parse per-user-per-type counts from the single round-trip.
-        var counts = users.ToDictionary(u => u.Id, _ => new Dictionary<string, long>(StringComparer.Ordinal)
-        {
-            [FeatureTypes.Area] = 0,
-            [FeatureTypes.District] = 0,
-            [FeatureTypes.CityCenter] = 0,
-            [FeatureTypes.Road] = 0,
-            [FeatureTypes.HouseEntrance] = 0,
-            [FeatureTypes.PublicBuilding] = 0,
-            [FeatureTypes.PublicSpace] = 0,
-            [FeatureTypes.NamingPanel] = 0,
-        });
+        var counts = users.ToDictionary(u => u.Id, _ => _featureTypes.ToDictionary(t => t, _ => 0L, StringComparer.Ordinal));
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         while (await reader.ReadAsync(ct))

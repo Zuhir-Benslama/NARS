@@ -200,7 +200,7 @@ describe("FeatureModal", () => {
     const wrapper = mount(FeatureModal)
     await nextTick()
 
-    expect(wrapper.find(".modal-header").text()).toContain("Add")
+    expect(wrapper.find(".modal-header").text()).toContain("modal_add")
   })
 
   it("shows edit header in edit mode", async () => {
@@ -211,7 +211,7 @@ describe("FeatureModal", () => {
     const wrapper = mount(FeatureModal)
     await nextTick()
 
-    expect(wrapper.find(".modal-header").text()).toContain("Edit")
+    expect(wrapper.find(".modal-header").text()).toContain("modal_edit")
   })
 
   it("validates required fields on save", async () => {

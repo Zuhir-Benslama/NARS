@@ -44,7 +44,7 @@ public partial class AuthController
     {
         // Require a custom header to prevent automated scripts from targeting
         // this unauthenticated endpoint. The SPA sets this header on the form.
-        if (signupToken != "nars-admin-signup-v1")
+        if (signupToken != adminSignupOptions.Value.SignupToken)
         {
             return Problem(detail: "Invalid request.", statusCode: 403);
         }

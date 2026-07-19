@@ -108,11 +108,8 @@ spec:
               kubernetes.io/metadata.name: ingress-nginx
           podSelector:
             matchLabels:
-              # ⚠ Verify these labels match your actual ingress controller.
-              # The standard ingress-nginx deployment uses:
-              #   app.kubernetes.io/component: controller
-              #   app.kubernetes.io/name: ingress-nginx
               app.kubernetes.io/name: ingress-nginx
+              app.kubernetes.io/component: controller
       ports:
         - port: 8080
 ---
@@ -182,11 +179,8 @@ spec:
               kubernetes.io/metadata.name: ingress-nginx
           podSelector:
             matchLabels:
-              # ⚠ Verify these labels match your actual ingress controller.
-              # The standard ingress-nginx deployment uses:
-              #   app.kubernetes.io/component: controller
-              #   app.kubernetes.io/name: ingress-nginx
               app.kubernetes.io/name: ingress-nginx
+              app.kubernetes.io/component: controller
       ports:
         - port: 80
 ---

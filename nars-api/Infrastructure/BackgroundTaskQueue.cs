@@ -45,6 +45,7 @@ public class BackgroundTaskQueue : IBackgroundTaskQueue
 public class BackgroundQueueProcessor(
     IBackgroundTaskQueue queue,
     IServiceProvider services,
+    IOptions<BackgroundTaskOptions> options,
     ILogger<BackgroundQueueProcessor> logger) : IHostedService, IAsyncDisposable
 {
     private Task? _executingTask;
@@ -69,7 +70,7 @@ public class BackgroundQueueProcessor(
             try
             {
                 // Give in-flight task a grace period to complete before forcing shutdown.
-                using var graceCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                using var graceCts = new CancellationTokenSource(TimeSpan.FromSeconds(options.Value.GracePeriodSeconds));
                 await _executingTask.WaitAsync(graceCts.Token);
             }
             catch (OperationCanceledException)

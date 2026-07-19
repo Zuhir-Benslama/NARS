@@ -4,7 +4,10 @@ import { mockApiFetch, createMockSuccessResponse } from "../../test/setup"
 import EntranceInspectionForm from "./EntranceInspectionForm.vue"
 
 vi.mock("vue-i18n", () => ({
-  useI18n: () => ({ t: (key: string) => key }),
+  useI18n: () => ({
+    t: (key: string, params?: Record<string, unknown>) =>
+      params ? `${key}:${JSON.stringify(params)}` : key,
+  }),
 }))
 
 vi.mock("../../lib/toast", () => ({
@@ -31,12 +34,12 @@ describe("EntranceInspectionForm", () => {
 
     it("shows 'Unknown entrance' when feature is null", () => {
       const wrapper = mountForm(null)
-      expect(wrapper.text()).toContain("Unknown entrance")
+      expect(wrapper.text()).toContain("eif_unknown")
     })
 
     it("shows step 1 on mount", () => {
       const wrapper = mountForm()
-      expect(wrapper.text()).toContain("Does the entrance exist?")
+      expect(wrapper.text()).toContain("eif_q_entrance")
     })
   })
 
@@ -44,34 +47,34 @@ describe("EntranceInspectionForm", () => {
     it("step1: Yes → step2 (numbering panel)", async () => {
       const wrapper = mountForm()
       await wrapper.find(".eif-btn-yes").trigger("click")
-      expect(wrapper.text()).toContain("Does it have a numbering panel?")
+      expect(wrapper.text()).toContain("eif_q_panel")
     })
 
     it("step1: No → no_entrance result", async () => {
       const wrapper = mountForm()
       await wrapper.find(".eif-btn-no").trigger("click")
-      expect(wrapper.text()).toContain("Entrance is missing")
+      expect(wrapper.text()).toContain("eif_missing_entrance")
     })
 
     it("no_entrance: Add Entrance button shown", async () => {
       const wrapper = mountForm()
       await wrapper.find(".eif-btn-no").trigger("click")
       expect(wrapper.find(".eif-btn-primary").exists()).toBe(true)
-      expect(wrapper.find(".eif-btn-primary").text()).toContain("Add Entrance")
+      expect(wrapper.find(".eif-btn-primary").text()).toContain("btn_add_entrance")
     })
 
     it("step2: Yes → step3 (number correct)", async () => {
       const wrapper = mountForm()
       await wrapper.find(".eif-btn-yes").trigger("click")
       await wrapper.find(".eif-btn-yes").trigger("click")
-      expect(wrapper.text()).toContain("Is the number correct?")
+      expect(wrapper.text()).toContain("eif_q_number")
     })
 
     it("step2: No → no_panel result", async () => {
       const wrapper = mountForm()
       await wrapper.find(".eif-btn-yes").trigger("click")
       await wrapper.find(".eif-btn-no").trigger("click")
-      expect(wrapper.text()).toContain("Numbering panel is missing")
+      expect(wrapper.text()).toContain("eif_missing_panel")
     })
 
     it("step3: Yes → step4 (position correct)", async () => {
@@ -79,7 +82,7 @@ describe("EntranceInspectionForm", () => {
       await wrapper.find(".eif-btn-yes").trigger("click")
       await wrapper.find(".eif-btn-yes").trigger("click")
       await wrapper.find(".eif-btn-yes").trigger("click")
-      expect(wrapper.text()).toContain("Is the numbering panel position correct?")
+      expect(wrapper.text()).toContain("eif_q_position")
     })
 
     it("step3: No → wrong_number result", async () => {
@@ -87,7 +90,7 @@ describe("EntranceInspectionForm", () => {
       await wrapper.find(".eif-btn-yes").trigger("click")
       await wrapper.find(".eif-btn-yes").trigger("click")
       await wrapper.find(".eif-btn-no").trigger("click")
-      expect(wrapper.text()).toContain("Number is incorrect")
+      expect(wrapper.text()).toContain("eif_wrong_number")
     })
 
     it("step4: Yes → good result (all passed)", async () => {
@@ -96,7 +99,7 @@ describe("EntranceInspectionForm", () => {
       await wrapper.find(".eif-btn-yes").trigger("click")
       await wrapper.find(".eif-btn-yes").trigger("click")
       await wrapper.find(".eif-btn-yes").trigger("click")
-      expect(wrapper.text()).toContain("All checks passed")
+      expect(wrapper.text()).toContain("eif_all_passed")
     })
 
     it("step4: No → wrong_position result", async () => {
@@ -105,7 +108,7 @@ describe("EntranceInspectionForm", () => {
       await wrapper.find(".eif-btn-yes").trigger("click")
       await wrapper.find(".eif-btn-yes").trigger("click")
       await wrapper.find(".eif-btn-no").trigger("click")
-      expect(wrapper.text()).toContain("Numbering panel position is incorrect")
+      expect(wrapper.text()).toContain("eif_wrong_position")
     })
   })
 
@@ -142,7 +145,7 @@ describe("EntranceInspectionForm", () => {
     })
 
     it("shows loading state while submitting", async () => {
-      mockApiFetch.mockImplementationOnce(() => new Promise(() => {})) // never resolves
+      mockApiFetch.mockImplementationOnce(() => new Promise(() => {}))
       const wrapper = mountForm()
       await wrapper.find(".eif-btn-no").trigger("click")
       await wrapper.find(".eif-btn-submit").trigger("click")

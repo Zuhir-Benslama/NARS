@@ -15,6 +15,7 @@ namespace NarsApi.Tests;
 
 public class FeatureCatalogControllerTests
 {
+    private const int ExpectedTypeCount = 8;
     private static FeatureCatalogController CreateController(
         IFeatureStatsService? featureStatsService = null,
         Guid? authenticatedUserId = null)
@@ -51,7 +52,7 @@ public class FeatureCatalogControllerTests
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var types = Assert.IsType<List<FeatureTypeDefinition>>(ok.Value);
-        Assert.Equal(8, types.Count);
+        Assert.Equal(ExpectedTypeCount, types.Count);
     }
 
     [Fact]

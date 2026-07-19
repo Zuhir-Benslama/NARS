@@ -210,23 +210,23 @@ async function submitInspection(status: InspectionStatus) {
   transition: all 0.15s;
 }
 .npf-btn-yes {
-  border-color: #22c55e;
-  color: #22c55e;
+  border-color: var(--success-color);
+  color: var(--success-color);
 }
 .npf-btn-yes:hover {
-  background: rgba(34, 197, 94, 0.15);
+  background: var(--success-bg);
 }
 .npf-btn-no {
-  border-color: #ef4444;
-  color: #ef4444;
+  border-color: var(--danger-color);
+  color: var(--danger-color);
 }
 .npf-btn-no:hover {
-  background: rgba(239, 68, 68, 0.15);
+  background: var(--danger-bg);
 }
 .npf-btn-submit {
   padding: 10px;
   background: var(--accent, #3b82f6);
-  color: #fff;
+  color: var(--text-primary);
   border: none;
   border-radius: 8px;
   font-size: 13px;
@@ -251,18 +251,18 @@ async function submitInspection(status: InspectionStatus) {
   font-weight: 500;
 }
 .npf-issue {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
 }
 .npf-issue p {
-  color: #fca5a5;
+  color: var(--danger-text-light);
 }
 .npf-good {
-  background: rgba(34, 197, 94, 0.1);
-  border: 1px solid rgba(34, 197, 94, 0.25);
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
 }
 .npf-good p {
-  color: #86efac;
+  color: var(--success-text-light);
 }
 .npf-loading {
   font-size: 12px;

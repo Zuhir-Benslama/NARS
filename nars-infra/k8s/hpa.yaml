@@ -58,11 +58,3 @@ spec:
         target:
           type: Utilization
           averageUtilization: 70
-    # Memory utilization-based autoscaling is less correlated with load than CPU.
-    # Keep it for safety; consider removing if it triggers unnecessary scaling.
-    - type: Resource
-      resource:
-        name: memory
-        target:
-          type: Utilization
-          averageUtilization: 80

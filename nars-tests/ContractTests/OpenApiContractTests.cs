@@ -8,7 +8,11 @@ namespace NarsApi.Tests.ContractTests;
 public class OpenApiContractTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> _factory;
-    private static readonly string? ConnectionString = Environment.GetEnvironmentVariable("NARS_CONTRACT_CONNECTION_STRING");
+    private static readonly string ConnectionString =
+        Environment.GetEnvironmentVariable("NARS_CONTRACT_CONNECTION_STRING")
+        ?? throw new InvalidOperationException(
+            "NARS_CONTRACT_CONNECTION_STRING environment variable is required. " +
+            "Set it to a valid PostgreSQL connection string before running contract tests.");
 
     public OpenApiContractTests(WebApplicationFactory<Program> factory)
     {
@@ -17,8 +21,7 @@ public class OpenApiContractTests : IClassFixture<WebApplicationFactory<Program>
             builder.UseSetting("Jwt:SecretKey", AuthTestHelper.TestJwtSecret);
             builder.UseSetting("Jwt:Issuer", "test");
             builder.UseSetting("Jwt:Audience", "test");
-            builder.UseSetting("ConnectionStrings:DefaultConnection",
-                ConnectionString ?? "Host=localhost;Database=nars_contract_test;Username=test;Password=test");
+            builder.UseSetting("ConnectionStrings:DefaultConnection", ConnectionString);
 
             builder.UseSetting("HostOptions:Validate", "false");
 

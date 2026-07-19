@@ -2,6 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { mount } from "@vue/test-utils"
 import { nextTick } from "vue"
 
+vi.mock("vue-i18n", () => ({
+  useI18n: () => ({
+    t: (key: string, params?: Record<string, unknown>) =>
+      params ? `${key}:${JSON.stringify(params)}` : key,
+  }),
+}))
+
 const mockApiFetch = vi.hoisted(() => vi.fn())
 const mockShowToast = vi.hoisted(() => vi.fn())
 const mockGetErrorMessage = vi.hoisted(() => vi.fn((e) => String(e)))
@@ -29,7 +36,7 @@ describe("RoadInspectionForm", () => {
     const wrapper = mount(RoadInspectionForm, {
       props: { feature: { id: "1", label: "Main Road" } },
     })
-    expect(wrapper.text()).toContain("Road Inspection")
+    expect(wrapper.text()).toContain("rif_title")
     expect(wrapper.text()).toContain("Main Road")
   })
 
@@ -93,7 +100,7 @@ describe("RoadInspectionForm", () => {
     const wrapper = mount(RoadInspectionForm, { props: { feature: { id: "1", label: "R" } } })
     await wrapper.find(".rif-submit").trigger("click")
     await nextTick()
-    expect(mockShowToast).toHaveBeenCalledWith("Road inspection saved.", "success")
+    expect(mockShowToast).toHaveBeenCalledWith("alert_road_inspection_saved", "success")
   })
 
   it("shows error toast when API fails", async () => {
@@ -113,7 +120,10 @@ describe("RoadInspectionForm", () => {
     const wrapper = mount(RoadInspectionForm, { props: { feature: { id: "1", label: "R" } } })
     await wrapper.find(".rif-submit").trigger("click")
     await nextTick()
-    expect(mockShowToast).toHaveBeenCalledWith("Network error: Network failed", "error")
+    expect(mockShowToast).toHaveBeenCalledWith(
+      'error_network_with_msg:{"message":"Network failed"}',
+      "error",
+    )
   })
 
   it("disables submit button while submitting", async () => {
@@ -130,6 +140,6 @@ describe("RoadInspectionForm", () => {
     mockApiFetch.mockResolvedValueOnce({ ok: true })
     await wrapper.find(".rif-submit").trigger("click")
     await nextTick()
-    expect(mockShowToast).toHaveBeenCalledWith("Issues reported.", "error")
+    expect(mockShowToast).toHaveBeenCalledWith("alert_issues_reported", "error")
   })
 })

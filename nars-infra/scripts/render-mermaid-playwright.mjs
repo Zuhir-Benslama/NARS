@@ -18,7 +18,7 @@ const files = process.argv.length > 4
     ];
 
 async function main() {
-  const browser = await firefox.launch({ headless: true });
+  const browser = await firefox.launch({ headless: true, timeout: 30000 });
 
   try {
     for (const file of files) {

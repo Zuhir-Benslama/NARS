@@ -79,7 +79,7 @@ public class FieldController(
         var rawData = ExtractJsonData(body.Data);
         if (rawData.Length > _maxFeatureDataSize)
         {
-            return Problem(detail: "Inspection data is too large (max 512 KB).", statusCode: 400);
+            return Problem(detail: $"Inspection data is too large (max {_maxFeatureDataSize / 1024} KB).", statusCode: 400);
         }
 
         var statusError = ValidateInspectionStatus(body.Status);
@@ -145,7 +145,7 @@ public class FieldController(
 
         if (rawData.Length > _maxFeatureDataSize)
         {
-            return Problem(detail: "Feature data is too large (max 512 KB).", statusCode: 400);
+            return Problem(detail: $"Feature data is too large (max {_maxFeatureDataSize / 1024} KB).", statusCode: 400);
         }
 
         var label = body.Label ?? DefaultEntranceLabel;

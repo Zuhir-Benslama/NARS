@@ -55,7 +55,7 @@
   transition: all 0.2s;
 }
 .profile-button:hover {
-  border-color: rgba(255, 255, 255, 0.45) !important;
+  border-color: var(--input-border-focus) !important;
 }
 
 .profile-icon {
@@ -66,7 +66,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--text-primary);
   font-weight: 700;
   font-size: 13px;
 }
@@ -130,10 +130,10 @@
   background: var(--dropdown-hover) !important;
 }
 .dropdown-item.logout {
-  color: #e74c3c;
+  color: var(--danger-color);
 }
 .dropdown-item.logout:hover {
-  background: rgba(231, 76, 60, 0.1);
+  background: var(--danger-bg);
 }
 
 /* ── Right-click context menu ───────────────────────────────────────────────── */
@@ -166,13 +166,13 @@
   background: var(--dropdown-hover) !important;
 }
 .nars-ctx-danger {
-  color: #e74c3c;
+  color: var(--danger-color);
 }
 .nars-ctx-danger:hover {
-  background: rgba(231, 76, 60, 0.12);
+  background: var(--danger-bg);
 }
 .nars-ctx-disabled {
-  color: #95a5a6;
+  color: var(--disabled-color);
   cursor: default;
   font-style: italic;
   pointer-events: none;
@@ -204,7 +204,7 @@
 }
 .nars-boundary-finish-btn.nars-btn-confirm {
   background: rgba(39, 174, 96, 0.75) !important;
-  border-color: rgba(39, 174, 96, 0.9) !important;
+  border-color: var(--success-color) !important;
 }
 .nars-boundary-finish-btn:hover {
   background: var(--btn-glass-hover) !important;
@@ -290,9 +290,9 @@
 .popup-edit-btn {
   margin-top: 6px;
   padding: 5px 12px;
-  background: rgba(52, 152, 219, 0.15);
-  color: #3498db;
-  border: 1px solid rgba(52, 152, 219, 0.4);
+  background: var(--accent-bg);
+  color: var(--accent-color);
+  border: 1px solid var(--accent-border);
   border-radius: 5px;
   font-size: 12px;
   font-weight: 600;
@@ -300,7 +300,8 @@
   transition: all 0.2s;
 }
 .popup-edit-btn:hover {
-  background: rgba(52, 152, 219, 0.3);
+  background: var(--accent-bg);
+  opacity: 0.8;
 }
 
 /* ── Snap crosshair cursor ──────────────────────────────────────────────────── */
@@ -316,7 +317,7 @@
   z-index: 10000;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  border: 2px solid white;
+  border: 2px solid var(--text-primary);
   box-sizing: border-box;
 }
 
@@ -330,7 +331,7 @@
   height: 6px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: var(--snap-color, #f39c12);
+  background: var(--snap-color, var(--warning-color));
 }
 
 /* ── Edit mode save button ──────────────────────────────────────────────────── */
@@ -344,10 +345,10 @@
   z-index: 1500;
   padding: 10px 24px;
   background: rgba(39, 174, 96, 0.75) !important;
-  border: 1px solid rgba(39, 174, 96, 0.9) !important;
+  border: 1px solid var(--success-color) !important;
   backdrop-filter: var(--glass-blur) !important;
   -webkit-backdrop-filter: var(--glass-blur) !important;
-  color: #fff !important;
+  color: var(--text-primary) !important;
   font-size: 14px;
   font-weight: 600;
   border-radius: 24px;
@@ -362,7 +363,7 @@
   gap: 8px;
 }
 .nars-edit-save-btn:hover {
-  background: rgba(39, 174, 96, 0.9) !important;
+  background: var(--success-color) !important;
   transform: translateX(-50%) translateY(-2px);
   box-shadow:
     0 6px 20px rgba(0, 0, 0, 0.4),

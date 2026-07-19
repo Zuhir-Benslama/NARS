@@ -22,7 +22,7 @@
   <ConfirmDialog />
 
   <div v-if="appStore.loadError" class="load-error-banner">
-    <span>⚠ Could not load saved features. Check your connection and refresh the page.</span>
+    <span>{{ t("app_load_error") }}</span>
     <button class="load-error-dismiss" @click="appStore.loadError = false">✕</button>
   </div>
 
@@ -35,7 +35,7 @@
     >
       <div class="loading-spinner">
         <div class="spinner" />
-        <p>Loading map data…</p>
+        <p>{{ t("app_loading_map") }}</p>
       </div>
     </div>
   </Teleport>
@@ -43,6 +43,7 @@
 
 <script setup lang="ts">
 import { computed, onUnmounted } from "vue"
+import { useI18n } from "vue-i18n"
 import PhaseBar from "./components/PhaseBar.vue"
 import InfoPanel from "./components/InfoPanel.vue"
 import ProfileMenu from "./components/ProfileMenu.vue"
@@ -56,6 +57,7 @@ import ConfirmDialog from "./components/ConfirmDialog.vue"
 import { useAppStore } from "./stores/appStore"
 import { destroyMap } from "./map"
 
+const { t } = useI18n()
 const appStore = useAppStore()
 
 const isAdminUser = computed(() => appStore.isAdminUser)
@@ -77,9 +79,9 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   padding: 10px 16px;
-  background: #7f1d1d;
-  color: #fecaca;
-  border: 1px solid #991b1b;
+  background: var(--danger-bg-strong);
+  color: var(--danger-text-light);
+  border: 1px solid var(--danger-border);
   border-radius: 8px;
   font-size: 13px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
@@ -88,7 +90,7 @@ onUnmounted(() => {
 .load-error-dismiss {
   background: none;
   border: none;
-  color: #fecaca;
+  color: var(--danger-text-light);
   cursor: pointer;
   font-size: 14px;
   padding: 0 2px;
@@ -96,7 +98,7 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 .load-error-dismiss:hover {
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .loading-overlay {
@@ -106,7 +108,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--overlay-bg);
   backdrop-filter: blur(2px);
 }
 .loading-spinner {
@@ -128,8 +130,8 @@ onUnmounted(() => {
 .spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid #e5e7eb;
-  border-top-color: #3b82f6;
+  border: 3px solid var(--spinner-track);
+  border-top-color: var(--spinner-fill);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }

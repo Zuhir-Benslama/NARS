@@ -11,6 +11,9 @@ public static class SeedData
     private static readonly GeometryFactory GeoFactory =
         NtsGeometryServices.Instance.CreateGeometryFactory(4326);
 
+    private static readonly string DefaultPasswordHash =
+        BCrypt.Net.BCrypt.HashPassword(TestData.DefaultPassword);
+
     public static Polygon Rectangle(double minLon, double minLat, double maxLon, double maxLat) =>
         GeoFactory.CreatePolygon([
             new Coordinate(minLon, minLat),
@@ -102,7 +105,7 @@ public static class SeedData
             Email = $"{suffix[..12]}@test.com",
             Phone = TestData.DefaultPhone,
             Username = $"user_{suffix[..12]}",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(TestData.DefaultPassword),
+            PasswordHash = DefaultPasswordHash,
             Role = role,
             CommuneId = communeId,
             DairaId = dairaId,

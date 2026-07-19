@@ -19,9 +19,8 @@ spec:
         app.kubernetes.io/name: nars-api
         app.kubernetes.io/component: api
     spec:
-      imagePullSecrets:
-        - name: regcred
       serviceAccountName: nars-api
+      automountServiceAccountToken: false
       terminationGracePeriodSeconds: 30
       topologySpreadConstraints:
         - maxSkew: 1

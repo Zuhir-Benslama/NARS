@@ -80,14 +80,14 @@ const { t } = useI18n()
   white-space: nowrap;
 }
 .admin-assigned {
-  background: rgba(76, 175, 80, 0.2);
-  color: #4caf50;
+  background: var(--success-bg);
+  color: var(--success-color);
   border-radius: 999px;
   padding: 0.15rem 0.6rem;
 }
 .admin-missing {
-  background: rgba(244, 67, 54, 0.2);
-  color: #ef5350;
+  background: var(--danger-bg);
+  color: var(--danger-color);
   border-radius: 999px;
   padding: 0.15rem 0.6rem;
   font-style: italic;

@@ -43,7 +43,9 @@ config:
               - http://nars.dz:8080
               - http://nars.dz:80
               - https://nars.dz:8443
+              - https://nars.dz
               - https://api.nars.dz:8443
+              - https://api.nars.dz
 
   processors:
     batch:

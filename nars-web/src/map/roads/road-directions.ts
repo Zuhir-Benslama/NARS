@@ -8,6 +8,8 @@
 import { apiFetch } from "../../api"
 import { useLayerStore } from "../../stores/layerStore"
 import { useFeaturesStore } from "../../stores/featuresStore"
+
+const DEAD_END_SNAP_THRESHOLD_M = 30
 import { showToast } from "../../lib/toast"
 import { debugError } from "../../utils/debug"
 import type { LayerEntry } from "../../types"
@@ -35,7 +37,8 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
   if (cityCenters.length > 0) {
     for (const ccEntry of cityCenters) {
       const { lat, lng, radius } = ccEntry.data
-      orientFromCityCenter({ lat: lat!, lng: lng! }, radius ?? 50, graph, segs, visited)
+      if (lat == null || lng == null) continue
+      orientFromCityCenter({ lat, lng }, radius ?? 50, graph, segs, visited)
     }
   } else {
     for (const seg of segs.values()) geographicDirection(seg)
@@ -54,14 +57,18 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
 
   // ── Dead-end correction (on whole roads, after vote) ────────────────────
   for (const vote of votes.values()) {
-    const coords = vote.entry.data.coordinates!
+    const coords = vote.entry.data.coordinates
     if (!coords?.length) continue
 
     const first = coords[0]
     const last = coords[coords.length - 1]
 
-    const nodeFirst = [...graph.nodes()].find((k) => dm(fromNk(k), first) <= 30)
-    const nodeLast = [...graph.nodes()].find((k) => dm(fromNk(k), last) <= 30)
+    const nodeFirst = [...graph.nodes()].find(
+      (k) => dm(fromNk(k), first) <= DEAD_END_SNAP_THRESHOLD_M,
+    )
+    const nodeLast = [...graph.nodes()].find(
+      (k) => dm(fromNk(k), last) <= DEAD_END_SNAP_THRESHOLD_M,
+    )
 
     if (!nodeFirst || !nodeLast) continue
 
@@ -88,7 +95,9 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
   for (const [dbId, { fwd, rev, entry, needsReverse }] of votes) {
     const shouldReverse = needsReverse !== undefined ? needsReverse : rev > fwd
     if (shouldReverse) {
-      const reversed = [...entry.data.coordinates!].reverse()
+      const coords = entry.data.coordinates
+      if (!coords?.length) continue
+      const reversed = [...coords].reverse()
       featuresStore.update(entry.id, {
         geometry: {
           type: "LineString" as const,
@@ -107,7 +116,7 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
         featuresStore.update(entry.id, {
           geometry: {
             type: "LineString" as const,
-            coordinates: entry.data.coordinates!.map((c) => [c.lng, c.lat]),
+            coordinates: (entry.data.coordinates ?? []).map((c) => [c.lng, c.lat]),
           },
         })
       }

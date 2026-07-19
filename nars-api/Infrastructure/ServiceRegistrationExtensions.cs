@@ -63,6 +63,8 @@ public static class ServiceRegistrationExtensions
             .ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<BackgroundTaskOptions>().Bind(config.GetSection("BackgroundTask"))
             .ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<AdminSignupOptions>().Bind(config.GetSection("AdminSignup"))
+            .ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<CspOptions>().Bind(config.GetSection("Csp"))
             .ValidateDataAnnotations().ValidateOnStart();
     }

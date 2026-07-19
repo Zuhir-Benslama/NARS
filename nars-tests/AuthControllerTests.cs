@@ -43,11 +43,18 @@ public class AuthControllerTests
             refreshService,
             jwtService,
             lockoutOptions,
+            Options.Create(new AdminSignupOptions()),
             Mock.Of<ILogger<AuthController>>(),
             timeProvider,
             new UserAuthorizationService(db),
             AuthTestHelper.CreateUserCreationMock(db),
-            Mock.Of<IWebHostEnvironment>());
+            Mock.Of<IWebHostEnvironment>())
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext(),
+            }
+        };
     }
 
     [Fact]
@@ -240,10 +247,6 @@ public class AuthControllerTests
         await db.SaveChangesAsync();
 
         var controller = CreateController(db);
-        controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext()
-        };
 
         var result = await controller.SignIn(new SignInRequest(
             Username: "testuser",
@@ -259,10 +262,6 @@ public class AuthControllerTests
     {
         var db = CreateDb();
         var controller = CreateController(db);
-        controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext()
-        };
 
         var result = await controller.SignIn(new SignInRequest(
             Username: "nonexistent",

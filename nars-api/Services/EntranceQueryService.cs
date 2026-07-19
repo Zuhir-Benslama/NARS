@@ -13,7 +13,8 @@ public class EntranceQueryService(AppDbContext db) : IEntranceQueryService
         var conn = db.Database.GetDbConnection();
         await using var handle = await conn.EnsureOpenAsync(ct);
 
-        var heTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.HouseEntrance)?.TableName ?? "house_entrances";
+        var heTable = FeatureTypeRegistry.ValidateTableName(
+            FeatureTypeRegistry.GetDescriptor(FeatureTypes.HouseEntrance)?.TableName ?? "house_entrances");
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = $@"
             SELECT (data::jsonb->>'entranceNumber')::int

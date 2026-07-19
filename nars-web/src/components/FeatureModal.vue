@@ -20,7 +20,7 @@
       <!-- Name — hidden when editing a house entrance (set at creation, not editable) -->
       <div v-if="!isHouseEntranceEdit" class="modal-field">
         <label>
-          Name
+          {{ t("label_name") }}
           <span class="req">*</span>
         </label>
         <input
@@ -33,7 +33,9 @@
               'modal-input-readonly': isMainUrban || isZoneWithTypeName || isCityCenter,
             },
           ]"
-          :placeholder="isMainUrban || isZoneWithTypeName || isCityCenter ? '' : 'Feature name...'"
+          :placeholder="
+            isMainUrban || isZoneWithTypeName || isCityCenter ? '' : t('placeholder_feature_name')
+          "
           :readonly="isMainUrban || isZoneWithTypeName || isCityCenter"
           :disabled="isMainUrban"
           autocomplete="off"
@@ -54,20 +56,20 @@
       <div v-if="!isHouseEntranceEdit && !isCityCenter" class="modal-row">
         <div class="modal-field">
           <label>
-            Decision No.
+            {{ t("label_decision_no") }}
             <span class="req">*</span>
           </label>
           <input
             v-model="modalStore.decisionNumber"
             type="text"
             :class="['modal-input', { error: modalStore.errors.decisionNumber }]"
-            placeholder="e.g. 2024/001"
+            :placeholder="t('placeholder_decision_no')"
             autocomplete="off"
           />
         </div>
         <div class="modal-field">
           <label>
-            Decision Date
+            {{ t("label_decision_date") }}
             <span class="req">*</span>
           </label>
           <input
@@ -81,18 +83,18 @@
       <!-- City Center: radius input -->
       <div v-if="isCityCenter" class="modal-field">
         <label>
-          Radius (meters)
+          {{ t("label_radius") }}
           <span class="req">*</span>
         </label>
         <input
           v-model.number="modalStore.radius"
           type="number"
           :class="['modal-input', { error: modalStore.errors.radius }]"
-          placeholder="e.g. 200"
+          :placeholder="t('placeholder_radius')"
           min="5"
           autocomplete="off"
         />
-        <span class="modal-field-note">Minimum radius: 5 meters</span>
+        <span class="modal-field-note">{{ t("label_radius_note") }}</span>
       </div>
 
       <!-- ── Phase-specific extras ────────────────────────────────── -->
@@ -103,7 +105,7 @@
       <!-- Districts: district type selector -->
       <div v-if="phase?.key === 'districts'" class="modal-field">
         <label>
-          District Type
+          {{ t("label_district_type") }}
           <span class="req">*</span>
         </label>
         <select v-model="modalStore.districtTypeKey" class="modal-input">
@@ -116,7 +118,7 @@
       <!-- Roads: road type selector -->
       <div v-if="phase?.key === 'roads'" class="modal-field">
         <label>
-          Road Type
+          {{ t("label_road_type") }}
           <span class="req">*</span>
         </label>
         <select v-model="modalStore.roadTypeKey" class="modal-input">
@@ -135,7 +137,7 @@
       <!-- Public spaces: space type selector -->
       <div v-if="phase?.key === 'publicSpaces'" class="modal-field">
         <label>
-          Space Type
+          {{ t("label_space_type") }}
           <span class="req">*</span>
         </label>
         <select v-model="modalStore.spaceTypeKey" class="modal-input">
@@ -148,9 +150,9 @@
       <!-- Buttons -->
       <div class="modal-buttons">
         <button class="modal-btn modal-btn-save" @click="onSave">
-          {{ modalStore.isEdit ? "Update" : "Save" }}
+          {{ modalStore.isEdit ? t("btn_update") : t("btn_save") }}
         </button>
-        <button class="modal-btn modal-btn-cancel" @click="onCancel">Cancel</button>
+        <button class="modal-btn modal-btn-cancel" @click="onCancel">{{ t("btn_cancel") }}</button>
       </div>
     </div>
   </div>
@@ -165,6 +167,7 @@ import { useModalStore } from "../stores/modalStore"
 import { fetchRoadSide, computeBisNumber, prepareModalExtras } from "../map"
 import { useFeatureValidation } from "../composables/useFeatureValidation"
 import { useFocusTrap } from "../composables/useFocusTrap"
+import { debugWarn } from "../utils/debug"
 import AreaTypeSelector from "./modals/AreaTypeSelector.vue"
 import RoadAssignmentSelector from "./modals/RoadAssignmentSelector.vue"
 import BuildingTypeSelector from "./modals/BuildingTypeSelector.vue"
@@ -187,7 +190,7 @@ const { validate, buildModalResult, isMainUrban, isCityCenter, isHouseEntranceEd
 const headerText = computed(() => {
   if (!phase.value) return ""
   const name = t(phase.value.label)
-  return modalStore.isEdit ? `Edit ${name}` : `Add ${name}`
+  return modalStore.isEdit ? t("modal_edit", { name }) : t("modal_add", { name })
 })
 
 const isZoneWithTypeName = computed(
@@ -228,7 +231,7 @@ watch(
       await fetchRoadSide(roadOption.dbId, undefined, controller.signal)
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") return
-      console.warn("[FeatureModal] fetchRoadSide failed:", e)
+      debugWarn("[FeatureModal] fetchRoadSide failed:", e)
     }
   },
 )
@@ -296,7 +299,7 @@ onMounted(async () => {
     try {
       await prepareModalExtras(PHASES[modalStore.phaseIndex])
     } catch (e) {
-      console.warn("[FeatureModal] prepareModalExtras failed:", e)
+      debugWarn("[FeatureModal] prepareModalExtras failed:", e)
     }
   }
 })

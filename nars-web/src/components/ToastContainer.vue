@@ -42,7 +42,7 @@ function toastBg(type: string): string {
 }
 
 .nars-toast {
-  color: #fff;
+  color: var(--text-primary);
   padding: 10px 18px;
   border-radius: 8px;
   font-size: 14px;

@@ -7,6 +7,7 @@ namespace NarsApi.Tests;
 
 public class FeatureTypeRegistryTests
 {
+    private const int ExpectedTypeCount = 8;
     [Fact]
     public void GetAllTypes_ReturnsAllExpectedTypes()
     {
@@ -20,7 +21,7 @@ public class FeatureTypeRegistryTests
         Assert.Contains(FeatureTypes.PublicSpace, types);
         Assert.Contains(FeatureTypes.CityCenter, types);
         Assert.Contains(FeatureTypes.NamingPanel, types);
-        Assert.Equal(8, types.Count);
+        Assert.Equal(ExpectedTypeCount, types.Count);
     }
 
     [Fact]

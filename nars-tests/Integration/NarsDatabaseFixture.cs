@@ -25,23 +25,31 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await _container.StartAsync();
+        try
+        {
+            await _container.StartAsync();
 
-        // Enable PostGIS extension
-        await using var conn = new Npgsql.NpgsqlConnection(ConnectionString);
-        await conn.OpenAsync();
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "CREATE EXTENSION IF NOT EXISTS postgis;";
-        await cmd.ExecuteNonQueryAsync();
+            // Enable PostGIS extension
+            await using var conn = new Npgsql.NpgsqlConnection(ConnectionString);
+            await conn.OpenAsync();
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "CREATE EXTENSION IF NOT EXISTS postgis;";
+            await cmd.ExecuteNonQueryAsync();
 
-        // Create the schema using EF migrations
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(ConnectionString, o => o.UseNetTopologySuite())
-            .Options;
+            // Create the schema using EF migrations
+            var options = new DbContextOptionsBuilder<AppDbContext>()
+                .UseNpgsql(ConnectionString, o => o.UseNetTopologySuite())
+                .Options;
 
-        await using var db = new AppDbContext(options);
-        await db.Database.EnsureCreatedAsync();
-        _initialized = true;
+            await using var db = new AppDbContext(options);
+            await db.Database.EnsureCreatedAsync();
+            _initialized = true;
+        }
+        catch
+        {
+            await DisposeAsync();
+            throw;
+        }
     }
 
     public async Task DisposeAsync()

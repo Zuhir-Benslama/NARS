@@ -48,8 +48,8 @@ function save() {
   transform: translateX(-50%);
   z-index: 10000;
   padding: 10px 24px;
-  background: #27ae60;
-  color: #fff;
+  background: var(--success-color);
+  color: var(--text-primary);
   border: none;
   border-radius: 8px;
   font-size: 14px;
@@ -62,7 +62,7 @@ function save() {
   transition: background 0.15s;
 }
 .nars-edit-save-btn:hover {
-  background: #219a52;
+  background: var(--success-hover);
 }
 .nars-edit-save-btn svg {
   flex-shrink: 0;

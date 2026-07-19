@@ -133,7 +133,7 @@ function sum(users: UserFeatureStats[], field: keyof UserFeatureStats): number {
   font-size: 0.82rem;
 }
 .stats-table th {
-  background: rgba(25, 118, 210, 0.2);
+  background: var(--accent-bg);
   color: var(--text-primary);
   font-weight: 600;
   padding: 0.4rem 0.6rem;
@@ -159,7 +159,7 @@ function sum(users: UserFeatureStats[], field: keyof UserFeatureStats): number {
   border-bottom: none;
 }
 .row-complete td {
-  color: #4caf50;
+  color: var(--success-color);
 }
 .total-col {
   font-weight: 700;
@@ -181,8 +181,8 @@ function sum(users: UserFeatureStats[], field: keyof UserFeatureStats): number {
   display: inline-block;
   font-size: 0.6rem;
   font-weight: 700;
-  background: #ff9800;
-  color: #fff;
+  background: var(--warning-color);
+  color: var(--text-primary);
   border-radius: 3px;
   padding: 0.05rem 0.35rem;
   margin-left: 0.3rem;

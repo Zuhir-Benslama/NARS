@@ -39,7 +39,7 @@
   box-shadow: none !important;
   font-weight: 700 !important;
   font-size: 13px !important;
-  color: #fff !important;
+  color: var(--text-primary) !important;
   text-shadow:
     -1px -1px 0 #000,
     1px -1px 0 #000,
@@ -55,9 +55,9 @@
 
 .boundary-tooltip {
   background: rgba(231, 76, 60, 0.9) !important;
-  border: 2px solid #fff !important;
+  border: 2px solid var(--text-primary) !important;
   border-radius: 4px !important;
-  color: #fff !important;
+  color: var(--text-primary) !important;
   font-weight: 700 !important;
   font-size: 12px !important;
   padding: 4px 10px !important;
@@ -67,7 +67,7 @@
 /* ── House entrance marker icon ─────────────────────────────────────────────── */
 
 .entrance-icon {
-  color: #fff;
+  color: var(--text-primary);
   height: 16px;
   border-radius: 8px;
   display: flex;

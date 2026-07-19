@@ -1,96 +1,112 @@
 <template>
   <div class="eif-form">
-    <h3 class="eif-title">Entrance Inspection</h3>
-    <p class="eif-feature">{{ feature?.label ?? "Unknown entrance" }}</p>
+    <h3 class="eif-title">{{ t("eif_title") }}</h3>
+    <p class="eif-feature">{{ feature?.label ?? t("eif_unknown") }}</p>
 
     <!-- Step 1: Has entrance? -->
     <div v-if="step === 1" class="eif-step">
-      <p class="eif-question">Does the entrance exist?</p>
+      <p class="eif-question">{{ t("eif_q_entrance") }}</p>
       <div class="eif-actions">
-        <button class="eif-btn eif-btn-yes" @click="hasEntrance(true)">Yes</button>
-        <button class="eif-btn eif-btn-no" @click="hasEntrance(false)">No</button>
+        <button class="eif-btn eif-btn-yes" @click="hasEntrance(true)">{{ t("label_yes") }}</button>
+        <button class="eif-btn eif-btn-no" @click="hasEntrance(false)">{{ t("label_no") }}</button>
       </div>
     </div>
 
     <!-- Result: No entrance -->
     <div v-if="step === 'no_entrance'" class="eif-result eif-issue">
-      <p>⚠ Entrance is missing.</p>
+      <p>{{ t("eif_missing_entrance") }}</p>
       <button class="eif-btn eif-btn-primary" :disabled="creating" @click="createEntrance">
-        {{ creating ? "Adding..." : "Add Entrance" }}
+        {{ creating ? t("label_adding") : t("btn_add_entrance") }}
       </button>
       <button class="eif-btn eif-btn-submit" @click="submitInspection('issue')">
-        Log as Issue
+        {{ t("btn_log_issue") }}
       </button>
     </div>
 
     <!-- Step 2: Has numbering panel? -->
     <div v-if="step === 2" class="eif-step">
-      <p class="eif-question">Does it have a numbering panel?</p>
+      <p class="eif-question">{{ t("eif_q_panel") }}</p>
       <div class="eif-actions">
-        <button class="eif-btn eif-btn-yes" @click="hasNumberingPanel(true)">Yes</button>
-        <button class="eif-btn eif-btn-no" @click="hasNumberingPanel(false)">No</button>
+        <button class="eif-btn eif-btn-yes" @click="hasNumberingPanel(true)">
+          {{ t("label_yes") }}
+        </button>
+        <button class="eif-btn eif-btn-no" @click="hasNumberingPanel(false)">
+          {{ t("label_no") }}
+        </button>
       </div>
     </div>
 
     <!-- Result: No numbering panel -->
     <div v-if="step === 'no_panel'" class="eif-result eif-issue">
-      <p>⚠ Numbering panel is missing.</p>
+      <p>{{ t("eif_missing_panel") }}</p>
       <button class="eif-btn eif-btn-submit" @click="submitInspection('issue')">
-        Log as Issue
+        {{ t("btn_log_issue") }}
       </button>
     </div>
 
     <!-- Step 3: Number correct? -->
     <div v-if="step === 3" class="eif-step">
-      <p class="eif-question">Is the number correct?</p>
+      <p class="eif-question">{{ t("eif_q_number") }}</p>
       <div class="eif-actions">
-        <button class="eif-btn eif-btn-yes" @click="numberCorrect(true)">Yes</button>
-        <button class="eif-btn eif-btn-no" @click="numberCorrect(false)">No</button>
+        <button class="eif-btn eif-btn-yes" @click="numberCorrect(true)">
+          {{ t("label_yes") }}
+        </button>
+        <button class="eif-btn eif-btn-no" @click="numberCorrect(false)">
+          {{ t("label_no") }}
+        </button>
       </div>
     </div>
 
     <!-- Result: Wrong number -->
     <div v-if="step === 'wrong_number'" class="eif-result eif-issue">
-      <p>⚠ Number is incorrect.</p>
+      <p>{{ t("eif_wrong_number") }}</p>
       <button class="eif-btn eif-btn-submit" @click="submitInspection('issue')">
-        Log as Issue
+        {{ t("btn_log_issue") }}
       </button>
     </div>
 
     <!-- Step 4: Position correct? -->
     <div v-if="step === 4" class="eif-step">
-      <p class="eif-question">Is the numbering panel position correct?</p>
+      <p class="eif-question">{{ t("eif_q_position") }}</p>
       <div class="eif-actions">
-        <button class="eif-btn eif-btn-yes" @click="positionCorrect(true)">Yes</button>
-        <button class="eif-btn eif-btn-no" @click="positionCorrect(false)">No</button>
+        <button class="eif-btn eif-btn-yes" @click="positionCorrect(true)">
+          {{ t("label_yes") }}
+        </button>
+        <button class="eif-btn eif-btn-no" @click="positionCorrect(false)">
+          {{ t("label_no") }}
+        </button>
       </div>
     </div>
 
     <!-- Result: Wrong position -->
     <div v-if="step === 'wrong_position'" class="eif-result eif-issue">
-      <p>⚠ Numbering panel position is incorrect.</p>
+      <p>{{ t("eif_wrong_position") }}</p>
       <button class="eif-btn eif-btn-submit" @click="submitInspection('issue')">
-        Log as Issue
+        {{ t("btn_log_issue") }}
       </button>
     </div>
 
     <!-- Result: All good -->
     <div v-if="step === 'good'" class="eif-result eif-good">
-      <p>✓ All checks passed.</p>
-      <button class="eif-btn eif-btn-submit" @click="submitInspection('good')">Confirm</button>
+      <p>{{ t("eif_all_passed") }}</p>
+      <button class="eif-btn eif-btn-submit" @click="submitInspection('good')">
+        {{ t("btn_confirm") }}
+      </button>
     </div>
 
-    <div v-if="submitting" class="eif-loading">Saving...</div>
+    <div v-if="submitting" class="eif-loading">{{ t("label_saving") }}</div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from "vue"
+import { useI18n } from "vue-i18n"
 import { apiFetch } from "../../api"
 import { getErrorMessage } from "../../lib/errors"
 import { showToast } from "../../lib/toast"
 import type { EntranceStep, InspectionStatus } from "../../types/inspection"
 
+const { t } = useI18n()
 const props = defineProps<{ feature: { id: string; label: string } | null }>()
 const emit = defineEmits<{ done: [] }>()
 
@@ -156,16 +172,16 @@ async function submitInspection(status: InspectionStatus) {
     })
     if (res.ok) {
       showToast(
-        status === "good" ? "Entrance inspection complete." : "Issue reported.",
+        status === "good" ? t("alert_entrance_inspection_complete") : t("alert_issue_reported"),
         status === "good" ? "success" : "error",
       )
       emit("done")
     } else {
       const body = await res.json()
-      showToast(body.detail ?? "Failed to save", "error")
+      showToast(body.detail ?? t("error_save_failed"), "error")
     }
   } catch (e) {
-    showToast("Network error: " + getErrorMessage(e), "error")
+    showToast(t("error_network_with_msg", { message: getErrorMessage(e) }), "error")
   } finally {
     submitting.value = false
   }
@@ -180,19 +196,19 @@ async function createEntrance() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         road_id: props.feature.id,
-        label: "Entrance (field worker)",
-        data: { coordinates: [], note: "missing entrance added by field worker" },
+        label: t("label_entrance_field_worker"),
+        data: { coordinates: [], note: t("label_missing_entrance_note") },
       }),
     })
     if (res.ok) {
-      showToast("Entrance added successfully.", "success")
+      showToast(t("alert_entrance_added"), "success")
       submitInspection("issue")
     } else {
       const body = await res.json()
-      showToast(body.detail ?? "Failed to create entrance", "error")
+      showToast(body.detail ?? t("error_create_entrance_failed"), "error")
     }
   } catch (e) {
-    showToast("Network error: " + getErrorMessage(e), "error")
+    showToast(t("error_network_with_msg", { message: getErrorMessage(e) }), "error")
   } finally {
     creating.value = false
   }
@@ -242,28 +258,28 @@ async function createEntrance() {
   transition: all 0.15s;
 }
 .eif-btn-yes {
-  border-color: #22c55e;
-  color: #22c55e;
+  border-color: var(--success-color);
+  color: var(--success-color);
 }
 .eif-btn-yes:hover {
-  background: rgba(34, 197, 94, 0.15);
+  background: var(--success-bg);
 }
 .eif-btn-no {
-  border-color: #ef4444;
-  color: #ef4444;
+  border-color: var(--danger-color);
+  color: var(--danger-color);
 }
 .eif-btn-no:hover {
-  background: rgba(239, 68, 68, 0.15);
+  background: var(--danger-bg);
 }
 .eif-btn-primary {
   background: var(--accent, #3b82f6);
-  color: #fff;
+  color: var(--text-primary);
   border-color: var(--accent, #3b82f6);
 }
 .eif-btn-submit {
   padding: 10px;
   background: var(--accent, #3b82f6);
-  color: #fff;
+  color: var(--text-primary);
   border: none;
   border-radius: 8px;
   font-size: 13px;
@@ -288,18 +304,18 @@ async function createEntrance() {
   font-weight: 500;
 }
 .eif-issue {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
 }
 .eif-issue p {
-  color: #fca5a5;
+  color: var(--danger-text-light);
 }
 .eif-good {
-  background: rgba(34, 197, 94, 0.1);
-  border: 1px solid rgba(34, 197, 94, 0.25);
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
 }
 .eif-good p {
-  color: #86efac;
+  color: var(--success-text-light);
 }
 .eif-loading {
   font-size: 12px;

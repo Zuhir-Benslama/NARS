@@ -217,7 +217,7 @@ public class LogsControllerTests
     }
 
     [Fact]
-    public async Task SubmitLogs_CaseInsensitiveLevel()
+    public async Task SubmitLogs_PreservesOriginalLevelCasing()
     {
         List<ErrorLog>? captured = null;
         var mock = new Mock<IErrorLogService>();

@@ -60,6 +60,12 @@ public class OpenTelemetryOptions
 public class BackgroundTaskOptions
 {
     [Range(1, 10_000)] public int Capacity { get; set; } = 100;
+    [Range(1, 60)] public int GracePeriodSeconds { get; set; } = 5;
+}
+
+public class AdminSignupOptions
+{
+    [Required] public string SignupToken { get; set; } = "nars-admin-signup-v1";
 }
 
 public class CspOptions

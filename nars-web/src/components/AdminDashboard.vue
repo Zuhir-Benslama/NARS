@@ -230,26 +230,26 @@ onMounted(loadOverview)
 }
 .badge-national {
   background: #0d47a1;
-  color: #fff;
+  color: var(--text-primary);
 }
 .badge-wilaya {
   background: #1565c0;
-  color: #fff;
+  color: var(--text-primary);
 }
 .badge-daira {
-  background: #1976d2;
-  color: #fff;
+  background: var(--accent-color);
+  color: var(--text-primary);
 }
 .badge-commune {
   background: #64b5f6;
   color: #0d47a1;
 }
 .admin-error {
-  background: #ffebee;
-  border: 1px solid #ef9a9a;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
   border-radius: 6px;
   padding: 0.75rem 1rem;
-  color: #c62828;
+  color: var(--danger-color);
   margin-bottom: 1rem;
   font-size: 0.875rem;
 }
@@ -264,7 +264,7 @@ onMounted(loadOverview)
   font-weight: 600;
   color: var(--text-primary);
   margin: 1.25rem 0 0.75rem;
-  border-bottom: 2px solid #1976d2;
+  border-bottom: 2px solid var(--accent-color);
   padding-bottom: 0.4rem;
   display: flex;
   align-items: center;

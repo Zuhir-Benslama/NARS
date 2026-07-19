@@ -25,21 +25,24 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from "vue"
+import { computed, ref, watch, nextTick, onUnmounted } from "vue"
 import { useContextMenuStore } from "../stores/contextMenuStore"
 
 const store = useContextMenuStore()
 const menuRef = ref<HTMLElement | null>(null)
 
+const FALLBACK_WIDTH = 180
+const FALLBACK_HEIGHT = 100
+
 const adjustedX = computed(() => {
   if (!store.visible) return 0
-  const w = menuRef.value?.offsetWidth || 180
+  const w = menuRef.value?.offsetWidth || FALLBACK_WIDTH
   return store.x + w > window.innerWidth ? store.x - w : store.x
 })
 
 const adjustedY = computed(() => {
   if (!store.visible) return 0
-  const h = menuRef.value?.offsetHeight || 100
+  const h = menuRef.value?.offsetHeight || FALLBACK_HEIGHT
   return store.y + h > window.innerHeight ? store.y - h : store.y
 })
 
@@ -85,6 +88,12 @@ function handleClick(item: { onClick?: () => void }) {
   store.hide()
   item.onClick?.()
 }
+
+onUnmounted(() => {
+  document.removeEventListener("click", onDocClick, true)
+  document.removeEventListener("contextmenu", onDocClick, true)
+  document.removeEventListener("keydown", onKeyDown, true)
+})
 </script>
 
 <style scoped>
@@ -111,7 +120,7 @@ function handleClick(item: { onClick?: () => void }) {
   background: var(--dropdown-hover, #f3f4f6);
 }
 .ctx-danger {
-  color: #ef4444;
+  color: var(--danger-color);
 }
 .ctx-separator {
   border-top: 1px solid var(--dropdown-border, #eee);
