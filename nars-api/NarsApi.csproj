@@ -37,7 +37,7 @@
     <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
 
     <!-- OpenAPI (built-in .NET 10 — replaces Swashbuckle) -->
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
     <!-- Pin transitive Microsoft.OpenApi to patched version (CVE-2026-49451) -->
     <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
 
