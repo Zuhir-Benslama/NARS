@@ -224,6 +224,8 @@ public class AdminControllerTests
     [InlineData(UserRoles.DairaAdmin, UserRoles.WilayaAdmin, false)]
     public void CanCreateRole_ValidatesCorrectly(string caller, string target, bool expected)
     {
+        // CanCreateRole is a pure role-hierarchy check (no DB query).
+        // InMemory DB is only needed to satisfy the UserAuthorizationService constructor.
         var db = CreateInMemoryDb("AdminControllerRoleTest");
         var svc = new UserAuthorizationService(db);
         Assert.Equal(expected, svc.CanCreateRole(caller, target));

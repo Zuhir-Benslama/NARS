@@ -91,8 +91,6 @@ public class RefreshTokenService(
     public async Task<User?> FindUserByUsernameAsync(string normalizedUsername, CancellationToken cancellationToken = default)
         => await db.Users.FirstOrDefaultAsync(u => u.Username == normalizedUsername, cancellationToken);
 
-    public AppDbContext CreateDbContext() => db;
-
     public async Task AddUserAsync(User user, CancellationToken cancellationToken = default)
     {
         db.Users.Add(user);
@@ -104,7 +102,7 @@ public class RefreshTokenService(
         user.FailedLoginAttempts = (user.FailedLoginAttempts ?? 0) + 1;
         if (user.FailedLoginAttempts >= maxFailedAttempts)
         {
-            user.LockedUntil = utcNow.DateTime.AddMinutes(lockoutMinutes);
+            user.LockedUntil = utcNow.UtcDateTime.AddMinutes(lockoutMinutes);
         }
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -129,8 +127,9 @@ public class RefreshTokenService(
         }
 
         return db.RefreshTokens
-            .FromSqlInterpolated(
-                $"SELECT * FROM {expectedTable} WHERE token_hash = {hash} AND revoked = false AND expires_at > NOW() FOR UPDATE SKIP LOCKED")
+            .FromSqlRaw(
+                $"SELECT * FROM {expectedTable} WHERE token_hash = {{0}} AND revoked = false AND expires_at > NOW() FOR UPDATE SKIP LOCKED",
+                hash)
             .FirstOrDefaultAsync(ct);
     }
 }

@@ -65,7 +65,7 @@ async function flush(): Promise<void> {
   }
 
   flushing = false
-  if (batch.length > 0) flush()
+  if (batch.length > 0) setTimeout(flush, 0)
 }
 
 if (typeof window !== "undefined") {

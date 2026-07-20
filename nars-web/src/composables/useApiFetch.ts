@@ -40,6 +40,9 @@ export function useApiFetch<T = unknown>(): UseApiFetchReturn<T> {
 
     try {
       const response = await apiFetch(path, options)
+      if (response.status === 204 || response.headers.get("content-length") === "0") {
+        return null as T
+      }
       data.value = (await response.json()) as T
       return data.value
     } catch (err) {

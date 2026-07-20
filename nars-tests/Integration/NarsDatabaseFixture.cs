@@ -54,8 +54,14 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        await _container.StopAsync();
-        await _container.DisposeAsync();
+        try
+        {
+            await _container.StopAsync();
+        }
+        finally
+        {
+            await _container.DisposeAsync();
+        }
     }
 
     /// <summary>
@@ -91,19 +97,25 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
     }
 
     /// <summary>
-    /// Truncates all feature and auth tables.
+    /// Truncates all non-system tables in the public schema.
     /// Callers must reseed reference data and auth users afterwards.
     /// </summary>
     public async Task CleanTablesAsync()
     {
         await using var db = CreateDbContext();
-        await db.Database.ExecuteSqlRawAsync(@"
-            TRUNCATE TABLE
-                naming_panels, public_spaces, public_buildings,
-                house_entrances, roads, city_centers, districts, areas,
-                feature_registry, refresh_tokens, users
-            RESTART IDENTITY CASCADE;
-        ");
+
+        var tables = await db.Database.SqlQueryRaw<string>(
+            "SELECT table_name FROM information_schema.tables " +
+            "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
+        ).ToListAsync();
+
+        if (tables.Count == 0) return;
+
+        var tableList = string.Join(", ", tables.Select(t => $"\"{t}\""));
+#pragma warning disable EF1002 // Table names are trusted (from information_schema) and double-quoted
+        await db.Database.ExecuteSqlRawAsync(
+            $"TRUNCATE TABLE {tableList} RESTART IDENTITY CASCADE");
+#pragma warning restore EF1002
     }
 
 }

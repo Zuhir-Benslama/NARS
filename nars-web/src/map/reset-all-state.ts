@@ -31,4 +31,6 @@ export async function resetAllState(): Promise<void> {
   await safe("./rendering/geometry", "resetGeometryState")
   await safe("./map-init", "resetMapInit")
   await safe("../../lib/logger", "resetLoggerState")
+  await safe("../../stores/modalStore", "resetModalBridge")
+  await safe("../../stores/layerStore", "resetLayerCache")
 }

@@ -71,6 +71,11 @@ public class JwtService(string secret, string? issuer, string? audience, IOption
 
     public ClaimsPrincipal? ValidateToken(string token)
     {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return null;
+        }
+
         try
         {
             return TokenHandler.ValidateToken(token,

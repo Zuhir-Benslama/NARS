@@ -129,7 +129,7 @@ public static class FeatureQueryHelper
             var createdAt = reader.GetDateTime(createdAtOrdinal);
             var layerVal = await reader.IsDBNullAsync(layerOrdinal, ct) ? null : reader.GetString(layerOrdinal);
             var type = reader.GetString(typeOrdinal);
-            totalCount = (int)reader.GetInt64(totalOrdinal);
+            totalCount = Convert.ToInt32(reader.GetInt64(totalOrdinal));
 
             rows.Add(new FeatureResult(
                 Id: id.ToString(),

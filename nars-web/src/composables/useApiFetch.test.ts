@@ -23,6 +23,8 @@ describe("useApiFetch", () => {
   it("sets loading state during request", async () => {
     const mockResponse = {
       ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
       json: () => Promise.resolve({ id: 1 }),
     }
     vi.mocked(apiModule.apiFetch).mockResolvedValue(mockResponse as unknown as Response)
@@ -40,6 +42,8 @@ describe("useApiFetch", () => {
     const mockData = { id: 1, name: "test" }
     const mockResponse = {
       ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
       json: () => Promise.resolve(mockData),
     }
     vi.mocked(apiModule.apiFetch).mockResolvedValue(mockResponse as unknown as Response)
@@ -69,6 +73,8 @@ describe("useApiFetch", () => {
   it("resets state to initial values", async () => {
     const mockResponse = {
       ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
       json: () => Promise.resolve({ id: 1 }),
     }
     vi.mocked(apiModule.apiFetch).mockResolvedValue(mockResponse as unknown as Response)
@@ -93,6 +99,8 @@ describe("apiRequest", () => {
     const mockData = { success: true }
     const mockResponse = {
       ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
       json: () => Promise.resolve(mockData),
     }
     vi.mocked(apiModule.apiFetch).mockResolvedValue(mockResponse as unknown as Response)

@@ -2,9 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
@@ -24,6 +22,7 @@ public partial class AuthController(
     IDateTimeProvider timeProvider,
     IUserAuthorizationService authorizationService,
     IUserCreationService userCreationService,
+    ILocationQueryService locationQuery,
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     // Stable dummy hash so BCrypt always does the full work, even for unknown users.
@@ -72,6 +71,10 @@ public partial class AuthController(
             if (!passwordValid && user is not null)
             {
                 await refreshService.RecordFailedLoginAsync(user, MaxFailedAttempts, LockoutMinutes, timeProvider.UtcNow, cancellationToken);
+            }
+            else if (isLocked && passwordValid)
+            {
+                await refreshService.RecordFailedLoginAsync(user!, MaxFailedAttempts, LockoutMinutes, timeProvider.UtcNow, cancellationToken);
             }
 
             return Problem(detail: "Invalid username or password", statusCode: 401);
@@ -160,18 +163,26 @@ public partial class AuthController(
 
         // Load location chain — single JOIN query for commune→daira→wilaya,
         // or single JOIN for daira→wilaya when no commune is assigned.
-        LocationChain loc;
+        Models.Wilaya? wilaya = null;
+        Models.Daira? daira = null;
+        Models.Commune? commune = null;
+
         if (communeId > 0)
         {
-            loc = await LoadLocationChainAsync(communeId, cancellationToken);
+            var chain = await locationQuery.GetLocationChainAsync(communeId, cancellationToken);
+            commune = chain.Commune;
+            daira = chain.Daira;
+            wilaya = chain.Wilaya;
         }
         else if (user.DairaId.HasValue)
         {
-            loc = await LoadDairaWithWilayaAsync(user.DairaId.Value, cancellationToken);
+            var dairaResult = await locationQuery.GetDairaWithWilayaAsync(user.DairaId.Value, cancellationToken);
+            daira = dairaResult.Daira;
+            wilaya = dairaResult.Wilaya;
         }
         else
         {
-            loc = await LoadWilayaOnlyAsync(user.WilayaId, cancellationToken);
+            wilaya = await locationQuery.GetWilayaAsync(user.WilayaId, cancellationToken);
         }
 
         return Ok(new UserInfoWithLocation(
@@ -180,14 +191,14 @@ public partial class AuthController(
             Name: user.Name,
             Email: user.Email,
             Role: user.Role,
-            Wilaya: loc.Wilaya is not null
-                ? new CommuneInfo(loc.Wilaya.WilayaId, loc.Wilaya.WilayaFr, loc.Wilaya.WilayaAr, loc.Wilaya.WilayaLatitude, loc.Wilaya.WilayaLongitude)
+            Wilaya: wilaya is not null
+                ? new CommuneInfo(wilaya.WilayaId, wilaya.WilayaFr, wilaya.WilayaAr, wilaya.WilayaLatitude, wilaya.WilayaLongitude)
                 : null,
-            Daira: loc.Daira is not null
-                ? new CommuneInfo(loc.Daira.DairaId, loc.Daira.DairaFr, loc.Daira.DairaAr, loc.Daira.DairaLatitude, loc.Daira.DairaLongitude)
+            Daira: daira is not null
+                ? new CommuneInfo(daira.DairaId, daira.DairaFr, daira.DairaAr, daira.DairaLatitude, daira.DairaLongitude)
                 : null,
             Commune: communeId > 0
-                ? new CommuneInfo(communeId, loc.Commune?.CommuneFr, loc.Commune?.CommuneAr, loc.Commune?.CommuneLatitude, loc.Commune?.CommuneLongitude)
+                ? new CommuneInfo(communeId, commune?.CommuneFr, commune?.CommuneAr, commune?.CommuneLatitude, commune?.CommuneLongitude)
                 : null
         ));
     }
@@ -213,7 +224,7 @@ public partial class AuthController(
         Response.Cookies.Append("access_token", token, MakeCookieOptions(jwt.AccessTokenExpiresIn));
         Response.Cookies.Append("refresh_token", refreshRaw, MakeCookieOptions(refreshMaxAge));
 
-        var loc = await LoadCommuneWithDairaAsync(user.CommuneId ?? 0, ct);
+        var loc = await locationQuery.GetCommuneWithDairaAsync(user.CommuneId ?? 0, ct);
 
         return Ok(new SignInResponse(
             Success: true,
@@ -234,69 +245,5 @@ public partial class AuthController(
                 )
             )
         ));
-    }
-
-    // ── Private helpers ───────────────────────────────────────
-
-    private sealed record LocationChain(Commune? Commune, Daira? Daira, Wilaya? Wilaya);
-    private sealed record CommuneWithDaira(Commune? Commune, Daira? Daira);
-
-    private async Task<T> WithLocationDb<T>(Func<AppDbContext, Task<T>> query)
-    {
-        await using var db = refreshService.CreateDbContext();
-        return await query(db);
-    }
-
-    private Task<LocationChain> LoadLocationChainAsync(int communeId, CancellationToken cancellationToken = default)
-        => WithLocationDb(db => (
-            from c in db.Communes
-            where c.CommuneId == communeId
-            join d in db.Dairas on c.DairaId equals d.DairaId into dj
-            from d in dj.DefaultIfEmpty()
-            join w in db.Wilayas on d.WilayaId equals w.WilayaId into wj
-            from w in wj.DefaultIfEmpty()
-            select new { Commune = c, Daira = (Daira?)d, Wilaya = (Wilaya?)w }
-        ).FirstOrDefaultAsync(cancellationToken).ContinueWith(t =>
-            t.Result is null
-                ? new LocationChain(null, null, null)
-                : new LocationChain(t.Result.Commune, t.Result.Daira, t.Result.Wilaya),
-            cancellationToken));
-
-    private Task<CommuneWithDaira> LoadCommuneWithDairaAsync(int communeId, CancellationToken cancellationToken = default)
-        => WithLocationDb(db => (
-            from c in db.Communes
-            where c.CommuneId == communeId
-            join d in db.Dairas on c.DairaId equals d.DairaId into dj
-            from d in dj.DefaultIfEmpty()
-            select new { Commune = c, Daira = (Daira?)d }
-        ).FirstOrDefaultAsync(cancellationToken).ContinueWith(t =>
-            t.Result is null
-                ? new CommuneWithDaira(null, null)
-                : new CommuneWithDaira(t.Result.Commune, t.Result.Daira),
-            cancellationToken));
-
-    private Task<LocationChain> LoadDairaWithWilayaAsync(int dairaId, CancellationToken cancellationToken = default)
-        => WithLocationDb(db => (
-            from d in db.Dairas
-            where d.DairaId == dairaId
-            join w in db.Wilayas on d.WilayaId equals w.WilayaId into wj
-            from w in wj.DefaultIfEmpty()
-            select new { Daira = d, Wilaya = (Wilaya?)w }
-        ).FirstOrDefaultAsync(cancellationToken).ContinueWith(t =>
-            t.Result is null
-                ? new LocationChain(null, null, null)
-                : new LocationChain(null, t.Result.Daira, t.Result.Wilaya),
-            cancellationToken));
-
-    private async Task<LocationChain> LoadWilayaOnlyAsync(int? wilayaId, CancellationToken cancellationToken = default)
-    {
-        if (!wilayaId.HasValue)
-        {
-            return new LocationChain(null, null, null);
-        }
-
-        await using var db = refreshService.CreateDbContext();
-        var wilaya = await db.Wilayas.FindAsync([wilayaId.Value], cancellationToken);
-        return new LocationChain(null, null, wilaya);
     }
 }

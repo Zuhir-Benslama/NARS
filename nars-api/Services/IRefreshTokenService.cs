@@ -22,6 +22,4 @@ public interface IRefreshTokenService
     Task ResetFailedAttemptsIfNeededAsync(User user, CancellationToken cancellationToken = default);
     /// <summary>Persists a new user to the database.</summary>
     Task AddUserAsync(User user, CancellationToken cancellationToken = default);
-    /// <summary>Creates a new AppDbContext for queries that don't fit the service pattern.</summary>
-    AppDbContext CreateDbContext();
 }

@@ -8,8 +8,6 @@ NARS (National Addressing Reference System) is a full-stack geospatial applicati
 - **nars-web/** — Vue 3 + TypeScript frontend SPA (Maplibre GL JS + Geoman)
 - **nars-tests/** — xUnit unit tests + Testcontainers-based integration tests
 
-All code lives under `/home/zuhir/Workspace/`.
-
 ---
 
 ## Quick Start

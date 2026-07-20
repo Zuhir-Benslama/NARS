@@ -52,6 +52,10 @@ metadata:
     # No ssl-redirect — health checks must work over plain HTTP for monitoring
     # systems that don't support HTTPS. The /health endpoint exposes no
     # sensitive data.
+    # ⚠ These CIDRs are kind cluster defaults (pod: 10.244.0.0/16, svc: 10.96.0.0/12).
+    # MUST be overridden via kustomize patch for production clusters:
+    #   pod CIDR:  kubectl cluster-info dump | grep -m1 -oP 'cluster-cidr=\K[^ ]+'
+    #   svc CIDR:  kubectl cluster-info dump | grep -m1 -oP 'service-cluster-ip-range=\K[^ ]+'
     nginx.ingress.kubernetes.io/whitelist-source-range: "10.244.0.0/16,10.96.0.0/12"
 spec:
   ingressClassName: nginx

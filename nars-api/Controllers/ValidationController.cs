@@ -1,5 +1,3 @@
-using System.Globalization;
-using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using NarsApi.DTOs;
@@ -74,7 +72,7 @@ public class ValidationController(
             return Ok(new ValidateRoadResponse(true, null));
         }
 
-        var wkt = BuildLineStringWkt(body.Coordinates);
+        var wkt = GeometryHelper.BuildLineStringWkt(body.Coordinates);
         var connected = await validationService.CheckRoadConnectivityAsync(
             RequiredCurrentUserId, wkt, RoadConnectivityDistanceMeters, cancellationToken);
 
@@ -111,7 +109,7 @@ public class ValidationController(
             return Ok(new ValidateDistrictResponse(true, null));
         }
 
-        var wkt = BuildPolygonWkt(body.Coordinates);
+        var wkt = GeometryHelper.BuildPolygonWkt(body.Coordinates);
 
         if (await validationService.CheckDistrictOverlapAsync(RequiredCurrentUserId, wkt, cancellationToken))
         {
@@ -180,41 +178,5 @@ public class ValidationController(
         }
         error = null;
         return true;
-    }
-
-    private static string FormatDouble(double v) => v.ToString(CultureInfo.InvariantCulture);
-
-    private static void AppendWktCoords(StringBuilder sb, List<CoordDto> coords)
-    {
-        for (var i = 0; i < coords.Count; i++)
-        {
-            if (i > 0) sb.Append(',');
-            sb.Append(FormatDouble(coords[i].Lng));
-            sb.Append(' ');
-            sb.Append(FormatDouble(coords[i].Lat));
-        }
-    }
-
-    private static string BuildLineStringWkt(List<CoordDto> coords)
-    {
-        var sb = new StringBuilder("LINESTRING(");
-        AppendWktCoords(sb, coords);
-        sb.Append(')');
-        return sb.ToString();
-    }
-
-    private static string BuildPolygonWkt(List<CoordDto> coords)
-    {
-        var sb = new StringBuilder("POLYGON((");
-        AppendWktCoords(sb, coords);
-        var first = $"{FormatDouble(coords[0].Lng)} {FormatDouble(coords[0].Lat)}";
-        var last = $"{FormatDouble(coords[^1].Lng)} {FormatDouble(coords[^1].Lat)}";
-        if (first != last)
-        {
-            sb.Append(',');
-            sb.Append(first);
-        }
-        sb.Append("))");
-        return sb.ToString();
     }
 }

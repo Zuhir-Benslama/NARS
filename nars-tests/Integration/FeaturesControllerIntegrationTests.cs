@@ -176,8 +176,7 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
 
         // Delete it
         var deleteResult = await controller.DeleteFeature(featureId);
-        var deleteOk = Assert.IsType<OkObjectResult>(deleteResult);
-        Assert.Equal(200, deleteOk.StatusCode);
+        Assert.IsType<NoContentResult>(deleteResult);
 
         // Verify it's gone (use AsNoTracking to avoid change tracker caching)
         var area = await _db.Areas.AsNoTracking().FirstOrDefaultAsync(a => a.Id == featureId);

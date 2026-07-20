@@ -90,10 +90,10 @@ public class JwtServiceTests
     }
 
     [Fact]
-    public void ValidateToken_EmptyToken_ThrowsArgumentNullException()
+    public void ValidateToken_EmptyToken_ReturnsNull()
     {
         var service = CreateService();
-        Assert.Throws<ArgumentNullException>(() => service.ValidateToken(""));
+        Assert.Null(service.ValidateToken(""));
     }
 
     [Fact]

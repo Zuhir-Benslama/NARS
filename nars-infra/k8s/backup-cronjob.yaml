@@ -71,7 +71,13 @@ spec:
                   pg_dump \
                     -h "${PGHOST}" -U "${PGUSER}" -d "${PGDATABASE}" \
                     --no-owner | gzip > "$FILE.gz"
-                  echo "✓ Backup saved: ${FILE}.gz"
+                  FILESIZE=$(stat -c%s "$FILE.gz" 2>/dev/null || echo 0)
+                  if [ "$FILESIZE" -lt 100 ]; then
+                    echo "✖ Backup file is suspiciously small (${FILESIZE} bytes) — possible pg_dump failure"
+                    rm -f "$FILE.gz"
+                    exit 1
+                  fi
+                  echo "✓ Backup saved: ${FILE}.gz ($(numfmt --to=iec "$FILESIZE"))"
                   ls -lh /backup/
                   echo "→ Cleaning backups older than 30 days..."
                   find /backup -name "nars_db_*.sql*" -mtime +30 -delete

@@ -1,3 +1,8 @@
+using System.Globalization;
+using System.Text;
+using System.Text.Json.Nodes;
+using NarsApi.DTOs;
+
 namespace NarsApi.Infrastructure;
 
 /// <summary>
@@ -82,5 +87,70 @@ public static class GeometryHelper
             suggested += 2;
         }
         return suggested;
+    }
+
+    public static string FormatDoubleInvariant(double v) => v.ToString(CultureInfo.InvariantCulture);
+
+    public static void AppendWktCoords(StringBuilder sb, List<CoordDto> coords)
+    {
+        for (var i = 0; i < coords.Count; i++)
+        {
+            if (i > 0) sb.Append(',');
+            sb.Append(FormatDoubleInvariant(coords[i].Lng));
+            sb.Append(' ');
+            sb.Append(FormatDoubleInvariant(coords[i].Lat));
+        }
+    }
+
+    public static string BuildLineStringWkt(List<CoordDto> coords)
+    {
+        var sb = new StringBuilder("LINESTRING(");
+        AppendWktCoords(sb, coords);
+        sb.Append(')');
+        return sb.ToString();
+    }
+
+    public static string BuildPolygonWkt(List<CoordDto> coords)
+    {
+        var sb = new StringBuilder("POLYGON((");
+        AppendWktCoords(sb, coords);
+        var first = $"{FormatDoubleInvariant(coords[0].Lng)} {FormatDoubleInvariant(coords[0].Lat)}";
+        var last = $"{FormatDoubleInvariant(coords[^1].Lng)} {FormatDoubleInvariant(coords[^1].Lat)}";
+        if (first != last)
+        {
+            sb.Append(',');
+            sb.Append(first);
+        }
+        sb.Append("))");
+        return sb.ToString();
+    }
+
+    public static List<(double Lat, double Lng)> ParseRoadCoordinates(JsonNode coordsNode)
+    {
+        if (coordsNode is not JsonArray coordsArr || coordsArr.Count < 2)
+        {
+            throw new ArgumentException("Road data is missing coordinates.");
+        }
+
+        var roadCoords = new List<(double Lat, double Lng)>(coordsArr.Count);
+        foreach (var c in coordsArr)
+        {
+            if (c is not JsonObject obj ||
+                !obj.TryGetPropertyValue("lat", out var latNode) ||
+                !obj.TryGetPropertyValue("lng", out var lngNode) ||
+                latNode is not JsonValue latVal || !latVal.TryGetValue(out double lat) ||
+                lngNode is not JsonValue lngVal || !lngVal.TryGetValue(out double lng))
+            {
+                throw new ArgumentException("Road coordinate entry is missing 'lat' or 'lng' or has invalid values.");
+            }
+            roadCoords.Add((lat, lng));
+        }
+
+        if (roadCoords.Count < 2)
+        {
+            throw new ArgumentException("Road has insufficient coordinates.");
+        }
+
+        return roadCoords;
     }
 }

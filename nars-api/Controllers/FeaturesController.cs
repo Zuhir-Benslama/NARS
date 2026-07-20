@@ -193,7 +193,7 @@ public class FeaturesController(
 
     /// <summary>Deletes a single feature owned by the authenticated user.</summary>
     [HttpDelete("{featureId:guid}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteFeature(Guid featureId, CancellationToken cancellationToken = default)
@@ -214,7 +214,7 @@ public class FeaturesController(
             await QueueScatteredRefresh();
         }
 
-        return Ok(ApiResponse.Ok("Feature deleted successfully"));
+        return NoContent();
     }
 
     private static Guid? TryExtractRoadId(FeatureSaveRequest body)

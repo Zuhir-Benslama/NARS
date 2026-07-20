@@ -28,19 +28,37 @@ export function initTelemetry(endpoint?: string) {
   })
   provider.register()
 
+  const corsUrls = buildCorsUrls()
+
   registerInstrumentations({
     instrumentations: [
       new DocumentLoadInstrumentation(),
       new FetchInstrumentation({
-        propagateTraceHeaderCorsUrls: [
-          /http:\/\/localhost:5173\/api/,
-          /http:\/\/localhost:8080\/api/,
-          /http:\/\/nars\.dz.*\/api/,
-          /https:\/\/nars\.dz.*\/api/,
-          /https:\/\/api\.nars\.dz.*\/api/,
-        ],
+        propagateTraceHeaderCorsUrls: corsUrls,
         clearTimingResources: true,
       }),
     ],
   })
+}
+
+function buildCorsUrls(): RegExp[] {
+  const envUrls = import.meta.env.VITE_OTEL_CORS_URLS
+  if (envUrls) {
+    return envUrls.split(",").map((u) => new RegExp(u.trim()))
+  }
+
+  const apiBase = import.meta.env.VITE_API_BASE ?? ""
+  const urls: RegExp[] = []
+
+  if (apiBase) {
+    urls.push(new RegExp(`^${escapeRegExp(apiBase)}`))
+  }
+
+  urls.push(/http:\/\/localhost:\d+\/api/, /http:\/\/127\.0\.0\.1:\d+\/api/)
+
+  return urls
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }

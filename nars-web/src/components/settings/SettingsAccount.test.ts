@@ -128,14 +128,17 @@ describe("SettingsAccount", () => {
   })
 
   it("shows error toast on API failure", async () => {
-    mockApiFetch.mockResolvedValueOnce({ ok: false })
+    mockApiFetch.mockResolvedValueOnce({
+      ok: false,
+      json: vi.fn().mockResolvedValue({ detail: "Invalid credentials" }),
+    })
     const wrapper = mount(SettingsAccount, { props: { visible: true } })
     const inputs = wrapper.findAll("input")
     await inputs[0].setValue("validuser")
     await inputs[1].setValue("valid@email.com")
     await wrapper.find(".modal-btn-save").trigger("click")
     await nextTick()
-    expect(mockShowToast).toHaveBeenCalledWith("alert_account_updated_failed", "error")
+    expect(mockShowToast).toHaveBeenCalledWith("Invalid credentials", "error")
   })
 
   it("clears password field after successful update", async () => {

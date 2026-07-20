@@ -265,7 +265,7 @@ public class AdminUserControllerTests
     }
 
     [Fact]
-    public async Task DeleteAdmin_Valid_ReturnsOk()
+    public async Task DeleteAdmin_Valid_ReturnsNoContent()
     {
         var db = CreateDb();
         var userId = Guid.NewGuid();
@@ -286,9 +286,7 @@ public class AdminUserControllerTests
 
         var result = await ctrl.DeleteAdmin(userId, default);
 
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var response = Assert.IsType<ApiResponse>(ok.Value);
-        Assert.True(response.Success);
+        Assert.IsType<NoContentResult>(result);
         Assert.Null(await db.Users.FindAsync(userId));
     }
 

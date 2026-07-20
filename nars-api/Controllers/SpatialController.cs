@@ -40,28 +40,15 @@ public class SpatialController(
 
         var roadData = JsonHelper.DeserializeSafe(road.Data);
         var coordsNode = roadData?["coordinates"];
-        if (coordsNode is not JsonArray coordsArr || coordsArr.Count < 2)
-        {
-            return Problem(detail: "Road data is missing coordinates.", statusCode: 400);
-        }
 
-        var roadCoords = new List<(double Lat, double Lng)>();
-        foreach (var c in coordsArr)
+        List<(double Lat, double Lng)> roadCoords;
+        try
         {
-            if (c is not JsonObject obj ||
-                !obj.TryGetPropertyValue("lat", out var latNode) ||
-                !obj.TryGetPropertyValue("lng", out var lngNode) ||
-                latNode is not JsonValue latVal || !latVal.TryGetValue(out double lat) ||
-                lngNode is not JsonValue lngVal || !lngVal.TryGetValue(out double lng))
-            {
-                return Problem(detail: "Road coordinate entry is missing 'lat' or 'lng' or has invalid values.", statusCode: 400);
-            }
-            roadCoords.Add((lat, lng));
+            roadCoords = GeometryHelper.ParseRoadCoordinates(coordsNode!);
         }
-
-        if (roadCoords.Count < 2)
+        catch (ArgumentException ex)
         {
-            return Problem(detail: "Road has insufficient coordinates.", statusCode: 400);
+            return Problem(detail: ex.Message, statusCode: 400);
         }
 
         if (double.IsNaN(body.Lat) || double.IsInfinity(body.Lat) ||
@@ -95,7 +82,7 @@ public class SpatialController(
         var error = scatteredService.LastError;
         return Ok(new ScatteredStatusResponse(
             LastErrorTime: error?.Timestamp.ToString(FeatureDtoConverter.IsoDateFormat),
-            LastErrorMessage: error?.Message,
+            LastErrorMessage: error.HasValue ? "An error occurred during computation." : null,
             HasError: error.HasValue
         ));
     }

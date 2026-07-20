@@ -10,9 +10,9 @@ let DOMPurifyInstance: ReturnType<typeof createDOMPurify>
 if (typeof window !== "undefined") {
   DOMPurifyInstance = createDOMPurify(window)
 } else {
-  // Fallback for SSR environments - passthrough
+  // Fallback for SSR environments — strip all HTML tags for safety
   DOMPurifyInstance = {
-    sanitize: (dirty: string) => String(dirty),
+    sanitize: (dirty: string) => dirty.replace(/<[^>]*>/g, ""),
   } as ReturnType<typeof createDOMPurify>
 }
 

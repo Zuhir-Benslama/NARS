@@ -164,7 +164,7 @@ async function switchBaseLayer(
   })
   const styleTimeout = new Promise<void>((_, reject) =>
     setTimeout(() => reject(new Error("Style load timeout")), MAP_CONFIG.styleLoadTimeout),
-  )
+  ).catch(() => {})
 
   map.setStyle(next)
   await Promise.race([styleLoaded, styleTimeout])

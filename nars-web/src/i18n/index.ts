@@ -50,9 +50,17 @@ function humanizeKey(key: string): string {
 
 // ─── INSTANCE ─────────────────────────────────────────────────────────────────
 
+function safeLocalStorageGet(key: string): string | null {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
 export const i18n = createI18n({
   legacy: false,
-  locale: localStorage.getItem("nars_lang") || "en",
+  locale: safeLocalStorageGet("nars_lang") || "en",
   fallbackLocale: "en",
   messages: { en },
   missing: (_locale: string, key: string) => humanizeKey(key),
@@ -83,7 +91,7 @@ export async function setLang(lang: string): Promise<void> {
   // English already loaded statically - just set it
   if (lang === "en") {
     ;(i18n.global.locale as Ref<string>).value = "en"
-    localStorage.setItem("nars_lang", lang)
+    try { localStorage.setItem("nars_lang", lang) } catch {}
     document.documentElement.dir = "ltr"
     document.documentElement.lang = "en"
     return
@@ -104,12 +112,12 @@ export async function setLang(lang: string): Promise<void> {
   }
 
   ;(i18n.global.locale as Ref<string>).value = lang
-  localStorage.setItem("nars_lang", lang)
+  try { localStorage.setItem("nars_lang", lang) } catch {}
   document.documentElement.dir = lang === "ar" ? "rtl" : "ltr"
   document.documentElement.lang = lang
 }
 
 export function applyInitialLang(): Promise<void> {
-  const lang = localStorage.getItem("nars_lang") || "en"
+  const lang = safeLocalStorageGet("nars_lang") || "en"
   return setLang(lang)
 }

@@ -36,7 +36,7 @@ public class UsersController(IUserProfileService userProfile, ILogger<UsersContr
         // Validate username uniqueness if changed (store normalized lowercase)
         if (!string.IsNullOrWhiteSpace(body.Username))
         {
-            var normalized = body.Username.ToLowerInvariant();
+            var normalized = body.Username.Trim().ToLowerInvariant();
             if (normalized != user.Username)
             {
                 if (await userProfile.IsUsernameTakenAsync(normalized, cancellationToken))

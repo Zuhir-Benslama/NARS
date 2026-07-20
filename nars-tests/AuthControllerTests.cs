@@ -43,11 +43,12 @@ public class AuthControllerTests
             refreshService,
             jwtService,
             lockoutOptions,
-            Options.Create(new AdminSignupOptions()),
+            Options.Create(new AdminSignupOptions { SignupToken = TestData.AdminSignupToken }),
             Mock.Of<ILogger<AuthController>>(),
             timeProvider,
             new UserAuthorizationService(db),
             AuthTestHelper.CreateUserCreationMock(db),
+            Mock.Of<ILocationQueryService>(),
             Mock.Of<IWebHostEnvironment>())
         {
             ControllerContext = new ControllerContext

@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NarsApi.Infrastructure;
@@ -68,4 +69,35 @@ public abstract class NarsControllerBase(
         Path = "/",
         IsEssential = true,
     };
+
+    /// <summary>Validates that a feature data JSON payload does not exceed the size limit.</summary>
+    protected static IActionResult? ValidateFeatureDataSize(JsonElement data, int maxSizeBytes)
+    {
+        var rawJson = data.GetRawText();
+        if (rawJson.Length > maxSizeBytes)
+        {
+            return new ObjectResult(new ProblemDetails
+            {
+                Detail = $"Feature data is too large (max {maxSizeBytes / 1024} KB).",
+                Status = 400,
+                Title = "Bad Request",
+            });
+        }
+        return null;
+    }
+
+    /// <summary>Validates that a string data payload does not exceed the size limit.</summary>
+    protected static IActionResult? ValidateFeatureDataSize(string rawData, int maxSizeBytes)
+    {
+        if (rawData.Length > maxSizeBytes)
+        {
+            return new ObjectResult(new ProblemDetails
+            {
+                Detail = $"Feature data is too large (max {maxSizeBytes / 1024} KB).",
+                Status = 400,
+                Title = "Bad Request",
+            });
+        }
+        return null;
+    }
 }

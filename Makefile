@@ -20,6 +20,7 @@ POSTGRES_DATA_DIR  ?= data/nars/postgis
 REGISTRY_IMAGES    := nars-api nars-postgis nars-vite
 SCALABLE_DEPLOYS   := postgis nars-api nars-frontend
 INGRESS_NGINX_VERSION ?= v1.12.0
+METRICS_SERVER_VERSION ?= v0.7.2
 LOCAL_PATH_PROVISIONER_VERSION ?= v0.0.30
 YAMLLINT_IMAGE     ?= cytopia/yamllint:1.36.0
 POSTGIS_GET_POD_CMD = $(KUBECTL) get pod -n "$(NAMESPACE)" -l app.kubernetes.io/name=postgis -o jsonpath='{.items[0].metadata.name}' 2>/dev/null
@@ -586,7 +587,7 @@ ingress-wait: ## Wait for ingress controller to be ready
 metrics-install: ## Install metrics-server for HPA autoscaling (idempotent)
 	@echo "→ Installing metrics-server..."
 	@$(KUBECTL) apply -f \
-		https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+		https://github.com/kubernetes-sigs/metrics-server/releases/download/$(METRICS_SERVER_VERSION)/components.yaml
 	@if $(KUBECTL) get deployment metrics-server -n kube-system \
 		-o jsonpath='{.spec.template.spec.containers[0].args}' 2>/dev/null \
 		| grep -q -- '--kubelet-insecure-tls'; then
@@ -686,7 +687,17 @@ ca-secret: ca-generate namespace-ensure ## Create mTLS CA secret from k8s/certs/
 .PHONY: secrets-validate
 secrets-validate: ## Fail if kustomize output contains placeholder values (REPLACE_ME)
 	@echo "→ Validating kustomize output for placeholder values..."
-	@output=$$($(KUBECTL) kustomize "$(K8S_DIR)" 2>/dev/null); \
+	@output=$$($(KUBECTL) kustomize "$(K8S_DIR)" 2>&1); \
+	exit_code=$$?; \
+	if [ "$$exit_code" -ne 0 ]; then \
+		echo "✖ ERROR: kustomize failed (exit $$exit_code):"; \
+		echo "$$output" | head -5; \
+		exit 1; \
+	fi; \
+	if [ -z "$$output" ]; then \
+		echo "✖ ERROR: kustomize produced empty output"; \
+		exit 1; \
+	fi; \
 	if echo "$$output" | grep -q "REPLACE_ME"; then \
 		echo "✖ ERROR: kustomize output contains REPLACE_ME placeholder values!"; \
 		echo "  Run 'make secrets-apply' to generate real secrets from .env."; \
@@ -793,6 +804,9 @@ kustomize-apply: secrets-validate ## Apply k8s manifests via kustomize (pin tags
 .PHONY: postgis-password-sync
 postgis-password-sync: ## Align postgres user password with POSTGRES_PASSWORD (for persisted volumes)
 # Password piped via stdin to avoid exposure in kubectl's remote command arguments.
+# Uses SQL string literal ('...') — safe because POSTGRES_PASSWORD is rand-generated
+# (openssl rand -base64 32) and never contains single quotes. If non-generated
+# passwords are ever used, switch to psql -v pgpw="..." with :'pgpw' dollar-quoting.
 	@echo "→ Syncing postgres password..."
 	@printf '%s\n' '$(POSTGRES_PASSWORD)' | \
 		$(KUBECTL) exec -i -n "$(NAMESPACE)" deployment/postgis -- \

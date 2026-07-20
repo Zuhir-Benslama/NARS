@@ -34,6 +34,10 @@ public class RefreshTokenServiceTests
     /// <summary>
     /// A testable subclass that replaces the PostgreSQL-specific FOR UPDATE SKIP LOCKED
     /// query with a standard LINQ query usable with the InMemory provider.
+    ///
+    /// This means unit tests exercise different code paths than production.
+    /// Integration tests (AuthControllerIntegrationTests, FeatureStatsServiceTests, etc.)
+    /// cover the real PostgreSQL code paths via Testcontainers.
     /// </summary>
     private sealed class TestableRefreshTokenService : RefreshTokenService
     {

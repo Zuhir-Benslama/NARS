@@ -145,7 +145,7 @@ public class AdminUserController(
 
     /// <summary>Deletes a managed user account.</summary>
     [HttpDelete("admin/users/{userId:guid}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -168,7 +168,7 @@ public class AdminUserController(
         logger.LogInformation("[Admin] {CallerRole} {CallerId} deleted user {UserId} ({Username})",
             CurrentUserRole, CurrentUserId, userId, target.Username);
 
-        return Ok(ApiResponse.Ok());
+        return NoContent();
     }
 
     private async Task<IActionResult?> ValidateAdminUpdatePermissionAsync(

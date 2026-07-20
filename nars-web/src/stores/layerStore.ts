@@ -15,6 +15,11 @@ export interface LayerState {
 let _cachedFeatureMap: Map<string, { layer: keyof LayerState; entry: LayerEntry }> | null = null
 let _featureMapDirty = true
 
+export function resetLayerCache(): void {
+  _cachedFeatureMap = null
+  _featureMapDirty = true
+}
+
 function createInitialState(): LayerState {
   return {
     areas: [],

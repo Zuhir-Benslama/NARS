@@ -80,11 +80,9 @@ export async function updateFeature(
   return res.json()
 }
 
-export async function deleteFeature(
-  featureId: string,
-): Promise<Json<paths["/api/features/{featureId}"]["delete"]["responses"][200]>> {
+export async function deleteFeature(featureId: string): Promise<void> {
   const res = await apiFetch(`/api/features/${featureId}`, { method: "DELETE" })
-  return res.json()
+  if (res.status !== 204) await res.json()
 }
 
 // ─── USER / ACCOUNT ───────────────────────────────────────────────────────
@@ -125,9 +123,9 @@ export async function updateAdminUser(
   return res.json()
 }
 
-export async function deleteAdminUser(userId: string): Promise<ActionResponse> {
+export async function deleteAdminUser(userId: string): Promise<void> {
   const res = await apiFetch(`/api/admin/users/${userId}`, { method: "DELETE" })
-  return res.json()
+  if (res.status !== 204) await res.json()
 }
 
 export async function getWilayaReport(

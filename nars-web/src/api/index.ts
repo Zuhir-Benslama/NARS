@@ -148,11 +148,18 @@ export async function apiFetch(path: string, options: ApiFetchOptions = {}): Pro
     const csrfHeaders: Record<string, string> = {}
     if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
       if (!csrfToken) {
-        // CSRF token is missing — log a warning but proceed.
-        // This can happen during SPA navigation or server misconfiguration.
-        debugLog(
-          "[API] CSRF token is missing for state-changing request. Proceeding without token.",
-        )
+        // CSRF token is missing — this can happen during SPA navigation or
+        // server misconfiguration. In production this is a security concern.
+        if (import.meta.env.PROD) {
+          console.error(
+            "[API] CSRF token is missing for state-changing request. " +
+            "This may indicate a security issue.",
+          )
+        } else {
+          debugLog(
+            "[API] CSRF token is missing for state-changing request. Proceeding without token.",
+          )
+        }
       } else {
         csrfHeaders["X-CSRF-Token"] = csrfToken
       }

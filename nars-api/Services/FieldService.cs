@@ -56,8 +56,8 @@ public class FieldService(
             items.Add(new FieldFeatureResult(
                 Id: id.ToString(),
                 UserId: reader.GetGuid(1).ToString(),
-                Layer: reader.GetString(2),
-                Label: reader.GetString(3),
+                Layer: await reader.IsDBNullAsync(2, ct) ? "" : reader.GetString(2),
+                Label: await reader.IsDBNullAsync(3, ct) ? "" : reader.GetString(3),
                 Data: data,
                 CreatedAt: reader.GetDateTime(5),
                 UpdatedAt: await reader.IsDBNullAsync(6, ct) ? null : (DateTime?)reader.GetDateTime(6)

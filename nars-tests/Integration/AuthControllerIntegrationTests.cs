@@ -258,7 +258,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
 
     private AuthController CreateController() => CreateController(_db);
 
-    private static AuthController CreateController(AppDbContext db)
+    private AuthController CreateController(AppDbContext db)
     {
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var jwtOpts = DefaultJwtOptions;
@@ -274,11 +274,12 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             refreshService,
             jwt,
             Options.Create(new AccountLockoutOptions()),
-            Options.Create(new AdminSignupOptions()),
+            Options.Create(new AdminSignupOptions { SignupToken = TestData.AdminSignupToken }),
             Mock.Of<ILogger<AuthController>>(),
             timeProvider,
             new UserAuthorizationService(db),
             AuthTestHelper.CreateUserCreationMock(db),
+            Mock.Of<ILocationQueryService>(),
             Mock.Of<IWebHostEnvironment>());
     }
 

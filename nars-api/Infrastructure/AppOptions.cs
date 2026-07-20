@@ -65,7 +65,7 @@ public class BackgroundTaskOptions
 
 public class AdminSignupOptions
 {
-    [Required] public string SignupToken { get; set; } = "nars-admin-signup-v1";
+    [Required] public string SignupToken { get; set; } = string.Empty;
 }
 
 public class CspOptions

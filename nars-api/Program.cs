@@ -44,6 +44,21 @@ if (new[] { hasLower, hasUpper, hasDigit, hasSpecial }.Count(v => v) < 3)
         "Jwt:SecretKey must contain at least 3 of the following: lowercase, uppercase, digits, special characters.");
 }
 
+var signupToken = builder.Configuration["AdminSignup:SignupToken"];
+var envSignupToken = Environment.GetEnvironmentVariable("NARS_ADMIN_SIGNUP_TOKEN");
+if (!string.IsNullOrEmpty(envSignupToken))
+{
+    builder.Configuration["AdminSignup:SignupToken"] = envSignupToken;
+    signupToken = envSignupToken;
+}
+
+if (string.IsNullOrWhiteSpace(signupToken) || signupToken.StartsWith("${"))
+{
+    throw new InvalidOperationException(
+        "AdminSignup:SignupToken is not configured. " +
+        "Set the NARS_ADMIN_SIGNUP_TOKEN environment variable or configure AdminSignup:SignupToken in appsettings.json.");
+}
+
 var jwtIssuer = builder.Configuration["Jwt:Issuer"];
 var jwtAudience = builder.Configuration["Jwt:Audience"];
 

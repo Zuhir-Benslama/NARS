@@ -164,7 +164,7 @@ public static class ServiceRegistrationExtensions
             options.HeaderName = "X-CSRF-Token";
             options.Cookie.Name = "X-CSRF-TOKEN-COOKIE";
             options.Cookie.HttpOnly = false;
-            options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
         });
     }
 

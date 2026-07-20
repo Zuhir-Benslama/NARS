@@ -146,6 +146,18 @@ function resolveModalPromise(result: ModalResult | null): void {
   }
 }
 
+/**
+ * Reset the modal promise bridge state. Call during HMR disposal or test
+ * cleanup to prevent stale resolvers from leaking across reloads.
+ */
+export function resetModalBridge(): void {
+  if (_modalResolver) {
+    _modalResolver(null)
+    _modalResolver = null
+  }
+  _modalResult = null
+}
+
 // ─── LEGACY HELPER FUNCTIONS ───────────────────────────────────────────────────
 // Moved from the legacy store proxy layer. These wrap modal store actions with
 // awaitModalResult() for backward compatibility.

@@ -152,13 +152,13 @@ public static class PipelineExtensions
                 var name = ctx.File.Name;
                 if (name is "index.html" or "login.html")
                 {
-                    ctx.Context.Response.Headers.Append("Cache-Control", "no-store, no-cache, must-revalidate");
-                    ctx.Context.Response.Headers.Append("Pragma", "no-cache");
+                    ctx.Context.Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
+                    ctx.Context.Response.Headers["Pragma"] = "no-cache";
                     return;
                 }
                 if (name.EndsWith(".js") || name.EndsWith(".mjs") || name.EndsWith(".css") || name.EndsWith(".woff2"))
                 {
-                    ctx.Context.Response.Headers.Append("Cache-Control", "public, max-age=31536000, immutable");
+                    ctx.Context.Response.Headers["Cache-Control"] = "public, max-age=31536000, immutable";
                 }
             }
         });
@@ -166,7 +166,10 @@ public static class PipelineExtensions
 
     private static void UseSecurityMiddleware(WebApplication app)
     {
-        app.UseHsts();
+        if (!app.Environment.IsDevelopment())
+        {
+            app.UseHsts();
+        }
         app.UseForwardedHeaders(new ForwardedHeadersOptions
         {
             ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto

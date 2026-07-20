@@ -29,7 +29,7 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
 
             var areaTable = FeatureTypeRegistry.ValidateTableName(
                 FeatureTypeRegistry.GetDescriptor(FeatureTypes.Area)?.TableName ?? "areas");
-            using var cmd = conn.CreateCommand();
+            await using var cmd = conn.CreateCommand();
             cmd.CommandText = $@"
                 WITH
                 boundary AS (
@@ -57,7 +57,7 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
 
             // CommandBehavior.SequentialAccess streams the large GeoJSON column
             // instead of buffering it in Npgsql's internal buffer.
-            using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken);
+            await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken);
             if (await reader.ReadAsync(cancellationToken) && !await reader.IsDBNullAsync(0, cancellationToken))
             {
                 scatteredGeoJson = await reader.GetTextReader(0).ReadToEndAsync(cancellationToken);

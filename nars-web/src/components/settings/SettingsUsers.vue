@@ -3,7 +3,8 @@
     <!-- Existing users list -->
     <div class="su-section">
       <h3 class="su-section-title">{{ t("su_user_list_title") }} ({{ users.length }})</h3>
-      <div v-if="users.length === 0" class="su-empty">{{ t("admin.no_data") }}</div>
+      <div v-if="fetchUsersError" class="su-feedback su-error">{{ fetchUsersError }}</div>
+      <div v-else-if="users.length === 0" class="su-empty">{{ t("admin.no_data") }}</div>
       <div v-for="u in users" :key="u.user_id" class="su-user-row">
         <div class="su-user-info">
           <span class="su-user-name">{{ u.name }}</span>
@@ -248,14 +249,21 @@ function extractSearchOptions(payload: unknown): SearchOption[] {
 // ── User list ────────────────────────────────────────────────────────────
 const users = ref<ManageableUser[]>([])
 const loadingUsers = ref(false)
+const fetchUsersError = ref<string | null>(null)
 
 async function fetchUsers() {
   loadingUsers.value = true
+  fetchUsersError.value = null
   try {
     const res = await apiFetch("/api/admin/users")
-    users.value = (await res.json()) as ManageableUser[]
+    if (res.ok) {
+      users.value = (await res.json()) as ManageableUser[]
+    } else {
+      fetchUsersError.value = t("admin.load_error")
+    }
   } catch (e) {
     debugWarn("[SettingsUsers] fetchUsers failed:", e)
+    fetchUsersError.value = t("admin.load_error")
   } finally {
     loadingUsers.value = false
   }
@@ -291,6 +299,8 @@ async function doDelete() {
       showToast(t("su_delete_success"), "success")
       users.value = users.value.filter((u) => u.user_id !== deleteTarget.value!.user_id)
       deleteTarget.value = null
+    } else {
+      showToast(t("su_err_network"), "error")
     }
   } catch (err) {
     showToast(err instanceof NarsError ? err.message : t("su_err_network"), "error")
@@ -571,13 +581,13 @@ async function submit() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       })
-      const data = await res.json()
       if (res.ok) {
         successMsg.value = t("su_update_success")
         showToast(successMsg.value, "success")
         cancelEdit()
         await fetchUsers()
       } else {
+        const data = await res.json().catch(() => ({}))
         errorMsg.value = data.detail || data.error || t("su_err_update_generic")
       }
     } else {
@@ -597,7 +607,6 @@ async function submit() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       })
-      const data = await res.json()
       if (res.ok) {
         successMsg.value = t("su_success")
         showToast(successMsg.value, "success")
@@ -610,6 +619,7 @@ async function submit() {
         selectedCommuneId.value = null
         await fetchUsers()
       } else {
+        const data = await res.json().catch(() => ({}))
         errorMsg.value = data.detail || data.error || t("su_err_generic")
       }
     }

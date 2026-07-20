@@ -16,6 +16,11 @@ public class DtoValidationTests
     /// constructor parameters — the same way .NET 10 MVC model binding
     /// validates record DTOs.  Validator.TryValidateObject only inspects
     /// properties, which misses parameter-level attributes on records.
+    ///
+    /// WARNING: This uses reflection on constructor parameters. If a DTO
+    /// record adds a required parameter without a matching property, or
+    /// changes parameter order, this validator may give wrong results.
+    /// Keep in sync with the actual DTO constructors.
     /// </summary>
     private static List<ValidationResult> ValidateRecord<T>(T record)
     {

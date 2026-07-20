@@ -20,7 +20,7 @@ public class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactory) : IF
     public async Task<Dictionary<string, long>> GetFeatureCountsAsync(Guid userId, CancellationToken ct = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var conn = (NpgsqlConnection)db.Database.GetDbConnection();
+        var conn = (NpgsqlConnection)db.Database.GetDbConnection();
         if (conn.State != ConnectionState.Open) await conn.OpenAsync(ct);
 
         var sb = new StringBuilder();
@@ -65,7 +65,7 @@ public class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactory) : IF
             .Where(u => userIds.Contains(u.Id))
             .ToListAsync(ct);
 
-        await using var conn = (NpgsqlConnection)db.Database.GetDbConnection();
+        var conn = (NpgsqlConnection)db.Database.GetDbConnection();
         if (conn.State != ConnectionState.Open) await conn.OpenAsync(ct);
 
         // Build a single UNION ALL query across all tables, grouped by user_id.

@@ -56,7 +56,7 @@ export async function fetchRoadSide(
     ;[lng, lat] = geometry[geometry.length - 1]
   }
 
-  if (lat && lng) {
+  if (lat != null && lng != null) {
     const result = await getRoadSide(roadDbId, lat, lng, signal)
     if (token !== modalStore.roadSideToken) return
     if (result) {
