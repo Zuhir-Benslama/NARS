@@ -153,7 +153,7 @@ export async function apiFetch(path: string, options: ApiFetchOptions = {}): Pro
         if (import.meta.env.PROD) {
           console.error(
             "[API] CSRF token is missing for state-changing request. " +
-            "This may indicate a security issue.",
+              "This may indicate a security issue.",
           )
         } else {
           debugLog(

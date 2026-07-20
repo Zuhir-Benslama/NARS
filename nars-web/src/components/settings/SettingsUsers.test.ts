@@ -230,12 +230,10 @@ describe("SettingsUsers", () => {
 
     it("shows error on API failure", async () => {
       mockAppStore.mockReturnValue({ user: { role: "commune_user" } })
-      mockApiFetch
-        .mockResolvedValueOnce(createMockSuccessResponse([]))
-        .mockResolvedValueOnce({
-          ok: false,
-          json: vi.fn().mockResolvedValue({ detail: "Email already exists" }),
-        })
+      mockApiFetch.mockResolvedValueOnce(createMockSuccessResponse([])).mockResolvedValueOnce({
+        ok: false,
+        json: vi.fn().mockResolvedValue({ detail: "Email already exists" }),
+      })
       const wrapper = mount(SettingsUsers)
       await new Promise((resolve) => setTimeout(resolve, 0))
 

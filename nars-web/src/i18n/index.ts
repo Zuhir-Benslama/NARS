@@ -91,7 +91,9 @@ export async function setLang(lang: string): Promise<void> {
   // English already loaded statically - just set it
   if (lang === "en") {
     ;(i18n.global.locale as Ref<string>).value = "en"
-    try { localStorage.setItem("nars_lang", lang) } catch {}
+    try {
+      localStorage.setItem("nars_lang", lang)
+    } catch {}
     document.documentElement.dir = "ltr"
     document.documentElement.lang = "en"
     return
@@ -112,7 +114,9 @@ export async function setLang(lang: string): Promise<void> {
   }
 
   ;(i18n.global.locale as Ref<string>).value = lang
-  try { localStorage.setItem("nars_lang", lang) } catch {}
+  try {
+    localStorage.setItem("nars_lang", lang)
+  } catch {}
   document.documentElement.dir = lang === "ar" ? "rtl" : "ltr"
   document.documentElement.lang = lang
 }
