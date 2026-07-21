@@ -68,6 +68,8 @@ jobs:
 
       - name: GitLeaks — secret scanning
         uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
       - name: .NET dependency audit
