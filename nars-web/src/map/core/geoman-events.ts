@@ -63,8 +63,7 @@ function onDblClick(e: MapLibreMapMouseEvent): void {
   const [hitLng, hitLat] = hitCoord
 
   const featureStore = (gm.features as GeomanFeatures | undefined)?.featureStore as
-    | Map<string, GeomanFeatureStoreEntry>
-    | undefined
+    Map<string, GeomanFeatureStoreEntry> | undefined
   if (!featureStore) return
   for (const [, featureData] of featureStore) {
     if (!featureData?.markers) continue
