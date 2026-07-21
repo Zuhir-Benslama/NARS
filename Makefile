@@ -438,7 +438,7 @@ db-restore: ## Restore a backup. Usage: make db-restore FILE=backup/nars_db_2025
 		exit 1; \
 	fi
 	@if [ ! -f "$(FILE)" ]; then echo "✖ File not found: $(FILE)"; exit 1; fi
-	@if echo "$(FILE)" | grep -qP '[^a-zA-Z0-9._/\-]'; then \
+	@if echo "$(FILE)" | grep -qE '[^a-zA-Z0-9._/-]'; then \
 		echo "✖ FILE='$(FILE)' contains unexpected characters"; \
 		exit 1; \
 	fi
@@ -503,6 +503,8 @@ cluster-create: ## Create the kind cluster with host-mounted postgis data (idemp
 		if echo "$$DATA_DIR" | grep -qv '^/'; then
 			DATA_DIR="$$(cd "$$DATA_DIR" && pwd)"
 		fi
+		KIND_CFG=$$(mktemp /tmp/kind-$(CLUSTER_NAME)-XXXXXX.yaml); \
+		trap 'rm -f "$$KIND_CFG"' EXIT; \
 		{ \
 			echo 'kind: Cluster'; \
 			echo 'apiVersion: kind.x-k8s.io/v1alpha4'; \
@@ -520,9 +522,9 @@ cluster-create: ## Create the kind cluster with host-mounted postgis data (idemp
 			echo '    extraMounts:'; \
 			echo "      - hostPath: $$DATA_DIR"; \
 			echo '        containerPath: /mnt/nars/postgis'; \
-		} > /tmp/kind-$(CLUSTER_NAME).yaml
+		} > "$$KIND_CFG"
 		echo "→ Creating kind cluster '$(CLUSTER_NAME)'..."
-		kind create cluster --name "$(CLUSTER_NAME)" --config /tmp/kind-$(CLUSTER_NAME).yaml
+		kind create cluster --name "$(CLUSTER_NAME)" --config "$$KIND_CFG"
 		echo "✓ Cluster created"
 	fi
 	$(MAKE) cluster-wait
@@ -747,7 +749,7 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 
 .PHONY: kustomize-set-image-tag
 kustomize-set-image-tag: ## Pin all kustomize image tags to IMAGE_TAG (e.g. IMAGE_TAG=abc1234)
-	@if echo "$(IMAGE_TAG)" | grep -qP '[^a-zA-Z0-9._-]'; then \
+	@if echo "$(IMAGE_TAG)" | grep -qE '[^a-zA-Z0-9._-]'; then \
 		echo "✖ IMAGE_TAG='$(IMAGE_TAG)' contains invalid characters (only alphanumeric, dots, hyphens, underscores allowed)"; \
 		exit 1; \
 	fi
