@@ -156,21 +156,24 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
         Assert.IsType<ForbidResult>(result);
     }
 
-    public static IEnumerable<object[]> DisallowedRolePairs()
+    public static TheoryData<string, string> DisallowedRolePairs()
     {
-        yield return [UserRoles.NationalAdmin, UserRoles.NationalAdmin];
-        yield return [UserRoles.NationalAdmin, UserRoles.DairaAdmin];
-        yield return [UserRoles.NationalAdmin, UserRoles.CommuneUser];
-        yield return [UserRoles.WilayaAdmin, UserRoles.WilayaAdmin];
-        yield return [UserRoles.WilayaAdmin, UserRoles.CommuneUser];
-        yield return [UserRoles.WilayaAdmin, UserRoles.NationalAdmin];
-        yield return [UserRoles.DairaAdmin, UserRoles.DairaAdmin];
-        yield return [UserRoles.DairaAdmin, UserRoles.WilayaAdmin];
-        yield return [UserRoles.DairaAdmin, UserRoles.NationalAdmin];
-        yield return [UserRoles.CommuneUser, UserRoles.CommuneUser];
-        yield return [UserRoles.CommuneUser, UserRoles.DairaAdmin];
-        yield return [UserRoles.CommuneUser, UserRoles.WilayaAdmin];
-        yield return [UserRoles.CommuneUser, UserRoles.NationalAdmin];
+        return new TheoryData<string, string>
+        {
+            { UserRoles.NationalAdmin, UserRoles.NationalAdmin },
+            { UserRoles.NationalAdmin, UserRoles.DairaAdmin },
+            { UserRoles.NationalAdmin, UserRoles.CommuneUser },
+            { UserRoles.WilayaAdmin, UserRoles.WilayaAdmin },
+            { UserRoles.WilayaAdmin, UserRoles.CommuneUser },
+            { UserRoles.WilayaAdmin, UserRoles.NationalAdmin },
+            { UserRoles.DairaAdmin, UserRoles.DairaAdmin },
+            { UserRoles.DairaAdmin, UserRoles.WilayaAdmin },
+            { UserRoles.DairaAdmin, UserRoles.NationalAdmin },
+            { UserRoles.CommuneUser, UserRoles.CommuneUser },
+            { UserRoles.CommuneUser, UserRoles.DairaAdmin },
+            { UserRoles.CommuneUser, UserRoles.WilayaAdmin },
+            { UserRoles.CommuneUser, UserRoles.NationalAdmin },
+        };
     }
 
     // ── CommuneUser → FieldWorker ─────────────────────────────────────────────

@@ -258,7 +258,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
 
     private AuthController CreateController() => CreateController(_db);
 
-    private AuthController CreateController(AppDbContext db)
+    private static AuthController CreateController(AppDbContext db)
     {
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var jwtOpts = DefaultJwtOptions;

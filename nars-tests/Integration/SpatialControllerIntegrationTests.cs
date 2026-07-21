@@ -60,7 +60,7 @@ public class SpatialControllerIntegrationTests : IAsyncLifetime
         return user.Id;
     }
 
-    private async Task<Guid> AddRoadAsync(AppDbContext db, Guid ownerId, string coordsJson)
+    private static async Task<Guid> AddRoadAsync(AppDbContext db, Guid ownerId, string coordsJson)
     {
         var id = Guid.NewGuid();
         db.Roads.Add(new Road

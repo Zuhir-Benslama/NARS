@@ -33,7 +33,7 @@ public static class AuthTestHelper
             {
                 if (db is not null)
                 {
-                    if (db.Users.Any(u => u.Username == username.ToLowerInvariant()))
+                    if (db.Users.Any(u => string.Equals(u.Username, username, StringComparison.OrdinalIgnoreCase)))
                         return ((User?)null, "Username already exists.");
                     if (db.Users.Any(u => u.Email == email))
                         return ((User?)null, "Email already exists.");
