@@ -33,7 +33,9 @@ public static class AuthTestHelper
             {
                 if (db is not null)
                 {
-                    if (db.Users.Any(u => string.Equals(u.Username, username, StringComparison.OrdinalIgnoreCase)))
+#pragma warning disable CA1862 // EF Core cannot translate string.Equals with StringComparison to SQL
+                    if (db.Users.Any(u => u.Username == username.ToLowerInvariant()))
+#pragma warning restore CA1862
                         return ((User?)null, "Username already exists.");
                     if (db.Users.Any(u => u.Email == email))
                         return ((User?)null, "Email already exists.");
