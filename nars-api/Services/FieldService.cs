@@ -20,6 +20,7 @@ public class FieldService(
         await using var handle = await conn.EnsureOpenAsync(ct);
 
         await using var cmd = conn.CreateCommand();
+#pragma warning disable S2077 // Table name is allowlist-validated; parameters used for values
         cmd.CommandText = $"""
             SELECT f.id, f.user_id, f.layer, f.label, f.data, f.created_at, f.updated_at,
                    COUNT(*) OVER() AS total
@@ -30,6 +31,7 @@ public class FieldService(
             OFFSET @skip
             LIMIT @take
             """;
+#pragma warning restore S2077
 
         SqlFragments.AddParam(cmd, "@commune_id", communeId);
         SqlFragments.AddParam(cmd, "@skip", skip);
@@ -80,12 +82,14 @@ public class FieldService(
         await using var handle = await conn.EnsureOpenAsync(ct);
 
         await using var cmd = conn.CreateCommand();
+#pragma warning disable S2077 // Table name is allowlist-validated; parameters used for values
         cmd.CommandText = $"""
             SELECT f.user_id, u.commune_id
             FROM {tableName} f
             JOIN users u ON u.id = f.user_id
             WHERE f.id = @id
             """;
+#pragma warning restore S2077
         SqlFragments.AddParam(cmd, "@id", featureId);
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);

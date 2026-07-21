@@ -60,6 +60,7 @@ public abstract class NarsControllerBase(
             : null;
 
     /// <summary>Creates a consistent CookieOptions with secure defaults for auth cookies.</summary>
+#pragma warning disable S2092 // Intentional: Secure is conditional on IsProduction() || IsHttps
     protected CookieOptions MakeCookieOptions(TimeSpan maxAge) => new()
     {
         HttpOnly = true,
@@ -69,6 +70,7 @@ public abstract class NarsControllerBase(
         Path = "/",
         IsEssential = true,
     };
+#pragma warning restore S2092
 
     /// <summary>Validates that a feature data JSON payload does not exceed the size limit.</summary>
     protected static IActionResult? ValidateFeatureDataSize(JsonElement data, int maxSizeBytes)

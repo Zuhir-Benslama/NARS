@@ -30,6 +30,7 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
             var areaTable = FeatureTypeRegistry.ValidateTableName(
                 FeatureTypeRegistry.GetDescriptor(FeatureTypes.Area)?.TableName ?? "areas");
             await using var cmd = conn.CreateCommand();
+#pragma warning disable S2077 // Table name is allowlist-validated; parameters used for values
             cmd.CommandText = $@"
                 WITH
                 boundary AS (
@@ -51,6 +52,7 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
                     6
                 )
                 FROM boundary LEFT JOIN urban ON true";
+#pragma warning restore S2077
 
             SqlFragments.AddParam(cmd, "@cid", communeId);
             SqlFragments.AddParam(cmd, "@uid", userId);

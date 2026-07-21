@@ -54,7 +54,10 @@ public class AccountLockoutOptions
 
 public class OpenTelemetryOptions
 {
+    // OTLP default is internal cluster HTTP; overridden via env var in production.
+#pragma warning disable S5332 // Intentional: internal gRPC/HTTP collector endpoint
     [Required] public string OtlpEndpoint { get; set; } = "http://otel-collector.observability:4317";
+#pragma warning restore S5332
 }
 
 public class BackgroundTaskOptions

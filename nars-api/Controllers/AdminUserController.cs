@@ -231,7 +231,7 @@ public class AdminUserController(
         return null;
     }
 
-    private IActionResult? ApplyRoleAndGeography(User target, UpdateAdminRequest body)
+    private ObjectResult? ApplyRoleAndGeography(User target, UpdateAdminRequest body)
     {
         if (body.Role is not null)
         {

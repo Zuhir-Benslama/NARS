@@ -202,7 +202,7 @@ public class FieldController(
 
     private static readonly string[] ValidInspectionStatuses = ["good", "issue"];
 
-    private IActionResult? ValidateInspectionStatus(string status)
+    private ObjectResult? ValidateInspectionStatus(string status)
     {
         if (!ValidInspectionStatuses.Contains(status))
         {

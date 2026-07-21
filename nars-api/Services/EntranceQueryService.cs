@@ -16,6 +16,7 @@ public class EntranceQueryService(AppDbContext db) : IEntranceQueryService
         var heTable = FeatureTypeRegistry.ValidateTableName(
             FeatureTypeRegistry.GetDescriptor(FeatureTypes.HouseEntrance)?.TableName ?? "house_entrances");
         await using var cmd = conn.CreateCommand();
+#pragma warning disable S2077 // Table name is allowlist-validated; parameters used for values
         cmd.CommandText = $@"
             SELECT (data::jsonb->>'entranceNumber')::int
             FROM {heTable}
@@ -23,6 +24,7 @@ public class EntranceQueryService(AppDbContext db) : IEntranceQueryService
               AND layer   = @layer
               AND road_id = @rid
               AND data::jsonb->>'entranceNumber' IS NOT NULL";
+#pragma warning restore S2077
         SqlFragments.AddParam(cmd, "@uid", userId);
         SqlFragments.AddParam(cmd, "@rid", roadId);
         SqlFragments.AddParam(cmd, "@layer", FeatureTypes.HouseEntranceLayers.Main);

@@ -3,6 +3,12 @@
 
 root = true
 
+# ── Code analysis suppressions ─────────────────────────────────────────────────
+[*.cs]
+# CA1873: Known false positive in .NET 10 SDK (dotnet/sdk#53411).
+# All flagged calls use simple structured logging with non-expensive arguments.
+dotnet_diagnostic.CA1873.severity = none
+
 # ── All files ──────────────────────────────────────────────────────────────────
 [*]
 indent_style = space
