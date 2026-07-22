@@ -65,8 +65,7 @@ export function useApiFetch<T = unknown>(): UseApiFetchReturn<T> {
 }
 
 export type ApiRequestResult<T> =
-  | { success: true; data: T }
-  | { success: false; error: Error; status?: number }
+  { success: true; data: T } | { success: false; error: Error; status?: number }
 
 /**
  * Execute a one-off API request and return a result object that

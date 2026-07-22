@@ -60,7 +60,7 @@ GPG_PASSPHRASE     ?=
 GRAFANA_PASSWORD   ?=
 export POSTGRES_PASSWORD JWT_SECRET GPG_PASSPHRASE GRAFANA_PASSWORD
 
-.PHONY: help _build-nars-api _build-nars-postgis _build-nars-vite db-get-pod db-get-password
+.PHONY: help
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| sort \
@@ -183,14 +183,14 @@ cluster-clean: ## Delete cluster AND wipe postgis data (irreversible!)
 	# cluster-down auto-backs up pg_dump before teardown — order is intentional
 	$(MAKE) cluster-down
 	@echo "→ Wiping postgis data..."
-	if [[ "$(POSTGRES_DATA_DIR)" == /* ]]; then
-		rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null \
-			|| sudo -n rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null \
-			|| true
-	else
-		rm -rf "$(POSTGRES_DATA_DIR)"
+	@if rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null; then \
+		echo "✓ Data wiped"; \
+	elif sudo -n rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null; then \
+		echo "✓ Data wiped (via sudo)"; \
+	else \
+		echo "✖ Failed to remove $(POSTGRES_DATA_DIR) — check permissions"; \
+		exit 1; \
 	fi
-	@echo "✓ Data wiped"
 
 .PHONY: cluster-status
 cluster-status: ## Show cluster resources
@@ -717,10 +717,10 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 	@echo "→ Creating 'nars-secrets'..."
 	@tmpdir=$$(mktemp -d); \
 	trap 'rm -rf "$$tmpdir"' EXIT; \
-	printf '%s' '$(POSTGRES_PASSWORD)' > "$$tmpdir/postgres_password"; \
-	printf '%s' 'Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=$(POSTGRES_PASSWORD)' > "$$tmpdir/ConnectionStrings__DefaultConnection"; \
-	printf '%s' '$(JWT_SECRET)' > "$$tmpdir/Jwt__SecretKey"; \
-	printf '%s' '$(GPG_PASSPHRASE)' > "$$tmpdir/gpg-passphrase"; \
+	printf '%s' "$$POSTGRES_PASSWORD" > "$$tmpdir/postgres_password"; \
+	printf '%s' "Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=$$POSTGRES_PASSWORD" > "$$tmpdir/ConnectionStrings__DefaultConnection"; \
+	printf '%s' "$$JWT_SECRET" > "$$tmpdir/Jwt__SecretKey"; \
+	printf '%s' "$$GPG_PASSPHRASE" > "$$tmpdir/gpg-passphrase"; \
 	$(KUBECTL) create secret generic nars-secrets -n "$(NAMESPACE)" \
 		--from-file=postgres_password="$$tmpdir/postgres_password" \
 		--from-file=ConnectionStrings__DefaultConnection="$$tmpdir/ConnectionStrings__DefaultConnection" \
@@ -734,8 +734,8 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 		echo "→ Creating 'regcred'..."; \
 		TMPDIR_REGCRED=$$(mktemp -d); \
 		trap 'rm -rf "$$TMPDIR_REGCRED"' EXIT; \
-		printf '%s' '$(DOCKER_TOKEN)' > "$$TMPDIR_REGCRED/docker_password"; \
-		printf '%s' '$(DOCKER_USERNAME)' > "$$TMPDIR_REGCRED/docker_username"; \
+		printf '%s' "$$DOCKER_TOKEN" > "$$TMPDIR_REGCRED/docker_password"; \
+		printf '%s' "$$DOCKER_USERNAME" > "$$TMPDIR_REGCRED/docker_username"; \
 		$(KUBECTL) create secret docker-registry regcred -n "$(NAMESPACE)" \
 			--docker-server=https://index.docker.io/v1/ \
 			--docker-username-file="$$TMPDIR_REGCRED/docker_username" \
@@ -806,11 +806,10 @@ kustomize-apply: secrets-validate ## Apply k8s manifests via kustomize (pin tags
 .PHONY: postgis-password-sync
 postgis-password-sync: ## Align postgres user password with POSTGRES_PASSWORD (for persisted volumes)
 # Password piped via stdin to avoid exposure in kubectl's remote command arguments.
-# Uses SQL string literal ('...') — safe because POSTGRES_PASSWORD is rand-generated
-# (openssl rand -base64 32) and never contains single quotes. If non-generated
-# passwords are ever used, switch to psql -v pgpw="..." with :'pgpw' dollar-quoting.
+# Uses $$POSTGRES_PASSWORD (shell env var) instead of $(POSTGRES_PASSWORD) (Make expansion)
+# to avoid breakage if the value contains shell metacharacters like single quotes.
 	@echo "→ Syncing postgres password..."
-	@printf '%s\n' '$(POSTGRES_PASSWORD)' | \
+	@printf '%s\n' "$$POSTGRES_PASSWORD" | \
 		$(KUBECTL) exec -i -n "$(NAMESPACE)" deployment/postgis -- \
 		bash -c 'read -r _pgpw; printf "ALTER USER postgres WITH PASSWORD '\''%s'\'';\n" "$$_pgpw" | psql -U postgres -d postgres -v ON_ERROR_STOP=1' >/dev/null
 	@echo "✓ Postgres password synced"
@@ -918,7 +917,7 @@ helm-repos: ## Ensure required Helm chart repos are configured
 	@echo "✓ Helm repositories ready"
 
 .PHONY: observability-namespace
-observability-namespace:
+observability-namespace: ## Ensure observability namespace exists (idempotent)
 	@$(KUBECTL) create namespace $(OBSERVABILITY_NAMESPACE) --dry-run=client -o yaml | $(KUBECTL) apply -f -
 
 .PHONY: observability-prometheus-stack
@@ -926,7 +925,7 @@ observability-prometheus-stack: ## Install Prometheus + Grafana + AlertManager
 	@echo "→ Installing kube-prometheus-stack..."
 	@tmpdir=$$(mktemp -d); \
 	trap 'rm -rf "$$tmpdir"' EXIT; \
-	printf '%s' '$(GRAFANA_PASSWORD)' > "$$tmpdir/grafana_password"; \
+	printf '%s' "$$GRAFANA_PASSWORD" > "$$tmpdir/grafana_password"; \
 	helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
 		--namespace $(OBSERVABILITY_NAMESPACE) \
 		--set-file grafana.adminPassword="$$tmpdir/grafana_password" \
