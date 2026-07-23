@@ -118,7 +118,6 @@ describe("ProfileMenu", () => {
   it("calls logout API on logout click", async () => {
     mockApiFetch.mockResolvedValueOnce({ ok: true })
     const store = useAppStore()
-    store.currentPhase = 2
     store.user = {
       id: 1,
       username: "jdoe",
@@ -131,7 +130,6 @@ describe("ProfileMenu", () => {
     await wrapper.find(".profile-button").trigger("click")
     await wrapper.findAll(".dropdown-item")[1].trigger("click")
     expect(mockApiFetch).toHaveBeenCalledWith("/api/logout", expect.any(Object))
-    expect(localStorage.getItem("nars_resume_phase")).toBe("2")
   })
 
   it("redirects on successful logout", async () => {

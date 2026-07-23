@@ -25,6 +25,10 @@ public class RefreshTokenService(
             System.Security.Cryptography.SHA256.HashData(
                 System.Text.Encoding.UTF8.GetBytes(rawRefreshToken)));
 
+        // ReadCommitted is sufficient here because the SELECT ... FOR UPDATE SKIP LOCKED
+        // in FindRefreshTokenByHashAsync already serializes concurrent rotation attempts:
+        // two concurrent refresh requests will each lock a different row (or skip if locked),
+        // preventing double-spend of the same refresh token.
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
 
         var stored = await FindRefreshTokenByHashAsync(hash, cancellationToken);
@@ -126,10 +130,12 @@ public class RefreshTokenService(
             throw new InvalidOperationException($"Unexpected table name '{tableName}' for RefreshToken entity.");
         }
 
+#pragma warning disable S2077 // Table name is allowlist-validated; parameter used for token_hash
         return db.RefreshTokens
             .FromSqlRaw(
                 $"SELECT * FROM {expectedTable} WHERE token_hash = {{0}} AND revoked = false AND expires_at > NOW() FOR UPDATE SKIP LOCKED",
                 hash)
             .FirstOrDefaultAsync(ct);
+#pragma warning restore S2077
     }
 }

@@ -40,12 +40,13 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        await _db.DisposeAsync();
-        await _fixture.CleanTablesAsync();
+        try { await _db.DisposeAsync(); }
+        finally { await _fixture.CleanTablesAsync(); }
     }
 
     private FeaturesController CreateController()
     {
+        _db.ChangeTracker.Clear();
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var bgQueueMock = Mock.Of<IBackgroundTaskQueue>();
         var ctrl = new FeaturesController(
@@ -155,7 +156,7 @@ public class FeaturesControllerIntegrationTests : IAsyncLifetime
 
         var okResult = Assert.IsType<OkObjectResult>(result);
         var loadResponse = Assert.IsType<LoadFeaturesResponse<FeatureResult>>(okResult.Value);
-        Assert.True(loadResponse.Count >= 2);
+        Assert.Equal(2, loadResponse.Count);
     }
 
     [Fact]

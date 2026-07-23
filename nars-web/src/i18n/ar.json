@@ -288,5 +288,21 @@
   "theme_auto_hint": "يتبع إعدادات نظام التشغيل.",
   "theme_dark": "داكن",
   "theme_white": "فاتح",
-  "tile_layers": "الطبقات"
+  "tile_layers": "الطبقات",
+  "npf_title": "تفتيش لوحة التسمية",
+  "npf_unknown": "لوحة تسمية غير معروفة",
+  "npf_question_location": "هل موقع لوحة التسمية موجود؟",
+  "npf_question_panel": "هل لوحة التسمية موجودة؟",
+  "npf_question_naming": "هل التسمية صحيحة؟",
+  "npf_question_position": "هل موضع اللوحة صحيح؟",
+  "npf_missing_location": "⚠ موقع لوحة التسمية مفقود.",
+  "npf_missing_panel": "⚠ لوحة التسمية مفقودة.",
+  "npf_wrong_naming": "⚠ التسمية على اللوحة غير صحيحة.",
+  "npf_wrong_position": "⚠ موضع لوحة التسمية غير صحيح.",
+  "npf_all_good": "✓ تجاوزت جميع الفحوصات.",
+  "npf_log_issue": "تسجيل مشكلة",
+  "npf_confirm": "تأكيد",
+  "npf_saving": "جارٍ الحفظ...",
+  "npf_complete": "تم الانتهاء من تفتيش لوحة التسمية.",
+  "npf_issue_reported": "تم الإبلاغ عن مشكلة."
 }

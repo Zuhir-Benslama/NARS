@@ -3,7 +3,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: nars
 labels:
-  - includeSelectors: false
+  - includeSelectors: true
     pairs:
       app.kubernetes.io/part-of: nars
       app.kubernetes.io/managed-by: kustomize

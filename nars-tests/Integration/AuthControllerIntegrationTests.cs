@@ -36,8 +36,8 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        await _db.DisposeAsync();
-        await _fixture.CleanTablesAsync();
+        try { await _db.DisposeAsync(); }
+        finally { await _fixture.CleanTablesAsync(); }
     }
 
     [Fact]
@@ -149,8 +149,8 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
         // Fire both concurrently — both pass the SELECT uniqueness check,
         // then one INSERT succeeds while the other hits the unique constraint.
         var results = await Task.WhenAll(
-            ctrl1.AuthorizedAdminSignup(request, signupToken: "nars-admin-signup-v1", CancellationToken.None),
-            ctrl2.AuthorizedAdminSignup(request, signupToken: "nars-admin-signup-v1", CancellationToken.None)
+            ctrl1.AuthorizedAdminSignup(request, signupToken: TestData.AdminSignupToken, CancellationToken.None),
+            ctrl2.AuthorizedAdminSignup(request, signupToken: TestData.AdminSignupToken, CancellationToken.None)
         );
 
         var statusCodes = results
@@ -218,7 +218,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
         ));
 
         await using var db = _fixture.CreateDbContext();
-        var tokenCount = await db.RefreshTokens.CountAsync(rt => rt.UserId == user.Id && !rt.Revoked);
+        var tokenCount = await db.RefreshTokens.AsNoTracking().CountAsync(rt => rt.UserId == user.Id && !rt.Revoked);
         Assert.True(tokenCount > 0);
 
         var claims = new List<Claim> { new(ClaimNames.UserId, user.Id.ToString()) };
@@ -230,7 +230,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(200, okResult.StatusCode);
 
-        var revokedCount = await db.RefreshTokens.CountAsync(rt => rt.UserId == user.Id && rt.Revoked);
+        var revokedCount = await db.RefreshTokens.AsNoTracking().CountAsync(rt => rt.UserId == user.Id && rt.Revoked);
         Assert.True(revokedCount > 0);
     }
 

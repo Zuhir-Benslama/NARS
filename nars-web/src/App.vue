@@ -23,7 +23,7 @@
 
   <div v-if="appStore.loadError" class="load-error-banner">
     <span>{{ t("app_load_error") }}</span>
-    <button class="load-error-dismiss" @click="appStore.loadError = false">✕</button>
+    <button class="load-error-dismiss" @click="appStore.setLoadError(false)">✕</button>
   </div>
 
   <Teleport to="body">

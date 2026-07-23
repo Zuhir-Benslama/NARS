@@ -56,15 +56,14 @@ public class UsersControllerTests
     // ── UpdateCredentials ───────────────────────────────────────────────
 
     [Fact]
-    public async Task UpdateCredentials_NoAuth_Returns401()
+    public async Task UpdateCredentials_NoAuth_ThrowsUnauthorized()
     {
         var ctrl = CreateController(authenticated: false);
 
-        var result = await ctrl.UpdateCredentials(
-            new UpdateUserRequest("newuser", null, null), default);
-
-        var obj = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(401, obj.StatusCode);
+        // [Authorize] on NarsControllerBase returns 401 via middleware in production.
+        // Unit tests bypass the middleware pipeline, so RequiredCurrentUserId throws.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            ctrl.UpdateCredentials(new UpdateUserRequest("newuser", null, null), default));
     }
 
     [Fact]

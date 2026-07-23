@@ -288,5 +288,21 @@
   "theme_auto_hint": "Suit les préférences de votre système.",
   "theme_dark": "Sombre",
   "theme_white": "Clair",
-  "tile_layers": "Couches"
+  "tile_layers": "Couches",
+  "npf_title": "Inspection du panneau de nomination",
+  "npf_unknown": "Panneau de nomination inconnu",
+  "npf_question_location": "L'emplacement du panneau de nomination est-il présent ?",
+  "npf_question_panel": "Le panneau de nomination est-il présent ?",
+  "npf_question_naming": "La nomination est-elle correcte ?",
+  "npf_question_position": "La position du panneau est-elle correcte ?",
+  "npf_missing_location": "⚠ L'emplacement du panneau de nomination est manquant.",
+  "npf_missing_panel": "⚠ Le panneau de nomination est manquant.",
+  "npf_wrong_naming": "⚠ La nomination sur le panneau est incorrecte.",
+  "npf_wrong_position": "⚠ La position du panneau de nomination est incorrecte.",
+  "npf_all_good": "✓ Toutes les vérifications ont réussi.",
+  "npf_log_issue": "Signaler un problème",
+  "npf_confirm": "Confirmer",
+  "npf_saving": "Enregistrement...",
+  "npf_complete": "Inspection du panneau de nomination terminée.",
+  "npf_issue_reported": "Problème signalé."
 }

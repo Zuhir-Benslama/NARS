@@ -26,6 +26,10 @@ namespace NarsApi.Controllers;
 public partial class AuthController
 {
     // ── POST /api/admin/authorized-signup ─────────────────────────────────────
+    // CSRF protection is provided implicitly by the X-Admin-Signup custom header:
+    // browsers auto-include cookies on cross-origin requests but cannot set custom
+    // headers without JavaScript, so this endpoint is safe from CSRF form attacks.
+    // Rate limiting (RateLimitPolicies.Auth) provides additional brute-force protection.
 
     [HttpPost("admin/authorized-signup")]
     [AllowAnonymous]
@@ -69,7 +73,9 @@ public partial class AuthController
             return Problem(detail: "Admin credentials are invalid.", statusCode: 401);
         }
 
-        // 2. Lockout check (after password verify to preserve timing-attack resistance).
+        // 2. Lockout check — run after BCrypt to preserve timing-attack resistance.
+        //    If the password was correct but the account is locked, return 423
+        //    instead of 401 so the caller knows the credentials were valid.
         if (admin.LockedUntil.HasValue && admin.LockedUntil > timeProvider.UtcNow)
         {
             return Problem(detail: "Admin account is temporarily locked.", statusCode: 423);

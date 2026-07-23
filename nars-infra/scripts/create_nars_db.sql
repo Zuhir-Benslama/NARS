@@ -84,7 +84,10 @@ CREATE TABLE IF NOT EXISTS public.communes_boundaries
 (
     commune_id integer NOT NULL,
     geometry   geometry NOT NULL,
-    CONSTRAINT communes_boundaries_pkey PRIMARY KEY (commune_id)
+    CONSTRAINT communes_boundaries_pkey PRIMARY KEY (commune_id),
+    CONSTRAINT communes_boundaries_commune_fk FOREIGN KEY (commune_id)
+        REFERENCES public.communes (commune_id)
+        ON UPDATE NO ACTION ON DELETE CASCADE
 );
 
 -- Spatial index — required for ST_Intersects / ST_Covers performance
@@ -114,8 +117,8 @@ CREATE TABLE IF NOT EXISTS public.users
     commune_id            integer,
     daira_id              integer,
     wilaya_id             integer,
-    created_at            timestamp without time zone NOT NULL DEFAULT now(),
-    failed_login_attempts integer          DEFAULT 0,
+    created_at            timestamp with time zone NOT NULL DEFAULT now(),
+    failed_login_attempts integer NOT NULL DEFAULT 0,
     locked_until          timestamp with time zone,
     CONSTRAINT users_pkey        PRIMARY KEY (id),
     CONSTRAINT users_email_key   UNIQUE (email),
@@ -162,7 +165,7 @@ CREATE INDEX IF NOT EXISTS ix_users_wilaya_id
 CREATE TABLE IF NOT EXISTS public.refresh_tokens
 (
     id          uuid                     NOT NULL,
-    user_id     uuid,
+    user_id     uuid                     NOT NULL,
     token_hash  text                     NOT NULL,  -- SHA-256 hex (64 chars); use TEXT to avoid overflow if algorithm changes
     expires_at  timestamp with time zone NOT NULL,
     created_at  timestamp with time zone NOT NULL DEFAULT now(),

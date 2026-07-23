@@ -34,12 +34,13 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        await _db.DisposeAsync();
-        await _fixture.CleanTablesAsync();
+        try { await _db.DisposeAsync(); }
+        finally { await _fixture.CleanTablesAsync(); }
     }
 
     private AdminController CreateOverviewController()
     {
+        _db.ChangeTracker.Clear();
         var featureStats = new FeatureStatsService(_fixture.CreateDbContextFactory());
         return new AdminController(new AdminOverviewService(_db, featureStats), Mock.Of<IWebHostEnvironment>());
     }

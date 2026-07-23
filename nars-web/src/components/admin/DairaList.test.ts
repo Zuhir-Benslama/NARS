@@ -17,12 +17,12 @@ describe("DairaList", () => {
   }
 
   it("renders daira name", () => {
-    const wrapper = mount(DairaList, { props: { dairas: [baseDaira], role: "national_admin" } })
+    const wrapper = mount(DairaList, { props: { dairas: [baseDaira] } })
     expect(wrapper.text()).toContain("Sidi M'Hamed")
   })
 
   it("shows no-daira-admin badge when admin is null", () => {
-    const wrapper = mount(DairaList, { props: { dairas: [baseDaira], role: "national_admin" } })
+    const wrapper = mount(DairaList, { props: { dairas: [baseDaira] } })
     expect(wrapper.text()).toContain("admin.no_daira_admin")
   })
 
@@ -37,7 +37,7 @@ describe("DairaList", () => {
         role: "daira_admin" as const,
       },
     }
-    const wrapper = mount(DairaList, { props: { dairas: [daira], role: "national_admin" } })
+    const wrapper = mount(DairaList, { props: { dairas: [daira] } })
     expect(wrapper.text()).toContain("Admin User")
   })
 
@@ -49,7 +49,7 @@ describe("DairaList", () => {
       users: [],
     })
     const daira = { ...baseDaira, communes: [commune(1), commune(2)] }
-    const wrapper = mount(DairaList, { props: { dairas: [daira], role: "national_admin" } })
+    const wrapper = mount(DairaList, { props: { dairas: [daira] } })
     expect(wrapper.text()).toContain("2 admin.communes")
   })
 })

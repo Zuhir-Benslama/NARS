@@ -47,15 +47,19 @@ const form = reactive({ category: "districts", label: "" })
 
 async function add() {
   if (!form.label.trim()) return
-  const res = await apiFetch("/api/feature-types/custom", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(form),
-  })
-  if (res.ok) {
-    showToast(`Added "${form.label}" to ${form.category}`, "success")
-    form.label = ""
-  } else {
+  try {
+    const res = await apiFetch("/api/feature-types/custom", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    })
+    if (res.ok) {
+      showToast(`Added "${form.label}" to ${form.category}`, "success")
+      form.label = ""
+    } else {
+      showToast("Failed to add feature type", "error")
+    }
+  } catch {
     showToast("Failed to add feature type", "error")
   }
 }

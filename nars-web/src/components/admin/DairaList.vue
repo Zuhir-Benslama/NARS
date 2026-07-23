@@ -21,9 +21,9 @@
 
 <script setup lang="ts">
 import { useI18n } from "vue-i18n"
-import type { DairaReport, UserRole } from "../../types"
+import type { DairaReport } from "../../types"
 import CommuneList from "./CommuneList.vue"
-defineProps<{ dairas: DairaReport[]; role: UserRole }>()
+defineProps<{ dairas: DairaReport[] }>()
 const { t } = useI18n()
 </script>
 

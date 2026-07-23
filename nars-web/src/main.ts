@@ -149,10 +149,14 @@ async function initializeApp(): Promise<void> {
       modalStore: ReturnType<typeof useModalStore>
       layerStore: ReturnType<typeof useLayerStore>
     }
-    ;(window as unknown as { __TEST__: TestStores }).__TEST__ = {
-      appStore: useAppStore(),
-      modalStore: useModalStore(),
-      layerStore: useLayerStore(),
-    }
+    Object.defineProperty(window, "__TEST__", {
+      value: {
+        appStore: useAppStore(),
+        modalStore: useModalStore(),
+        layerStore: useLayerStore(),
+      } satisfies TestStores,
+      writable: false,
+      configurable: import.meta.env.DEV,
+    })
   }
 })()

@@ -50,7 +50,7 @@ spec:
               service:
                 name: nars-frontend
                 port:
-                  number: 80
+                  number: 8080
 ---
 # ─── Frontend Ingress (local dev) ──────────────────────────────────────
 # Serves localhost without TLS for local development access.
@@ -97,7 +97,7 @@ spec:
               service:
                 name: nars-frontend
                 port:
-                  number: 80
+                  number: 8080
     - http:
         paths:
           - path: /health
@@ -127,4 +127,4 @@ spec:
               service:
                 name: nars-frontend
                 port:
-                  number: 80
+                  number: 8080

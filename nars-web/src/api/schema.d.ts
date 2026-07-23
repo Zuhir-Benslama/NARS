@@ -725,7 +725,6 @@ export interface components {
 
     SignInResponse: {
       success: boolean
-      token: string
       token_type: string
       user: components["schemas"]["UserInfo"]
     }

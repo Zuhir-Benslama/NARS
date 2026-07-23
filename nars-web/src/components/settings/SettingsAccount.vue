@@ -88,6 +88,9 @@ async function save() {
     body: JSON.stringify(body),
   })
   if (res.ok) {
+    if (appStore.user) {
+      appStore.user = { ...appStore.user, ...body }
+    }
     showToast(t("alert_account_updated"), "success")
     form.password = ""
   } else {

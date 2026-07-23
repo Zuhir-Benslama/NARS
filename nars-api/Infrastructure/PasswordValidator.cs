@@ -17,6 +17,14 @@ public static class PasswordValidator
         "princess", "sunshine", "trustno1", "baseball", "football",
         "starwars", "whatever", "password!", "Passw0rd123", "changeme",
         "summer2023", "winter2024", "spring2025", "autumn2022", "test123!",
+        "1q2w3e4r", "abc12345", "admin", "root", "toor",
+        "passpass", "1qaz2wsx", "zaq1xsw2", "aa123456", "1234qwer",
+        "admin2024", "password12", "P@ssword1", "Qwerty123!", "Abcd1234!",
+        "N0tS3cur3!", "Summer2024!", "Winter2023!", "Welcome123!", "Changeme1!",
+        "P@ssw0rd123", "Admin1234!", "Test@1234", "Qwer1234!", "Asdf1234!",
+        "Zxcv1234!", "Pass@1234", "Hello123!", "Charli1!", "Daniel12!",
+        "Michael1!", "Jessica1!", "Ashley12!", "Matthew1!", "Joshua12!",
+        "Password123!", "P@ssw0rd!", "Welcome1234", "Spring2024!", "Summer2023!",
     ];
 
     public static string? Validate(string password)

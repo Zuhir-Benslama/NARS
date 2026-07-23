@@ -24,12 +24,13 @@ public class FeaturesControllerTests
         AppDbContext? db = null,
         IBackgroundTaskQueue? bgQueue = null,
         IDateTimeProvider? timeProvider = null,
-        IFeatureStatsService? featureStatsService = null)
+        IFeatureStatsService? featureStatsService = null,
+        IFeatureService? featureService = null)
     {
         var context = db ?? CreateInMemoryDb("FeaturesTest");
 
         var ctrl = new FeaturesController(
-            new FeatureService(context),
+            featureService ?? new FeatureService(context),
             bgQueue ?? Mock.Of<IBackgroundTaskQueue>(),
             Mock.Of<ILogger<FeaturesController>>(),
             Options.Create(new FeatureDefaultsOptions()),
@@ -210,6 +211,19 @@ public class FeaturesControllerTests
         Assert.Equal(400, objResult.StatusCode);
     }
 
+    [Fact]
+    public async Task ClearFeatures_Confirmed_Returns200()
+    {
+        var featureServiceMock = new Mock<IFeatureService>();
+        featureServiceMock.Setup(s => s.ClearAllFeaturesAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((2, new List<Guid>()));
+        var (ctrl, _) = CreateController(featureService: featureServiceMock.Object);
+
+        var result = await ctrl.ClearFeatures(new ClearFeaturesRequest(Confirm: true));
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(200, ok.StatusCode);
+    }
+
     // ── POST /api/update/{id} ─────────────────────────────────────────────
 
     [Fact]
@@ -279,6 +293,21 @@ public class FeaturesControllerTests
     }
 
     // ── DELETE /api/delete/{id} ───────────────────────────────────────────
+
+    [Fact]
+    public async Task DeleteFeature_HappyPath_Returns204()
+    {
+        var fid = Guid.NewGuid();
+        var featureServiceMock = new Mock<IFeatureService>();
+        featureServiceMock.Setup(s => s.GetFeatureTypeAsync(fid, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(FeatureTypes.Area);
+        featureServiceMock.Setup(s => s.DeleteFeatureAsync(fid, UserId, FeatureTypes.Area, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        var (ctrl, _) = CreateController(featureService: featureServiceMock.Object);
+
+        var result = await ctrl.DeleteFeature(fid);
+        Assert.IsType<NoContentResult>(result);
+    }
 
     [Fact]
     public async Task DeleteFeature_NotFound_Returns404()

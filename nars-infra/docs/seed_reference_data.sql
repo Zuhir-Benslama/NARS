@@ -1,6 +1,17 @@
 SET client_encoding = 'UTF8';
 -- SET standard_conforming_strings = on;  -- default since PG 9.1, commented for clarity
 
+-- Idempotency: clear existing reference data before re-seeding.
+-- TRUNCATE CASCADE handles FK dependencies (communes → dairas → wilayas).
+-- Only runs if data already exists (first run inserts cleanly).
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM public.wilayas LIMIT 1) THEN
+        RAISE NOTICE 'Seed data already present — truncating and re-seeding.';
+        TRUNCATE public.communes, public.dairas, public.wilayas CASCADE;
+    END IF;
+END $$;
+
 BEGIN;
 
 COPY public.wilayas (wilaya_id, wilaya_ar, wilaya_fr, wilaya_latitude, wilaya_longitude) FROM stdin;

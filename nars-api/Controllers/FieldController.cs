@@ -112,6 +112,25 @@ public class FieldController(
         CancellationToken cancellationToken = default)
     {
         take = Math.Clamp(take, 1, 500);
+
+        var communeId = CurrentCommuneId;
+        if (communeId is null)
+        {
+            return Problem(detail: "Field worker has no assigned commune.", statusCode: 400);
+        }
+
+        var registryType = await fieldService.GetFeatureRegistryTypeAsync(featureId, cancellationToken);
+        if (registryType is null)
+        {
+            return Problem(detail: "Feature not found.", statusCode: 404);
+        }
+
+        var owner = await fieldService.GetFeatureOwnerAsync(registryType, featureId, cancellationToken);
+        if (owner is null || owner.Value.CommuneId != communeId)
+        {
+            return Forbid();
+        }
+
         var inspections = await fieldService.GetInspectionsAsync(featureId, skip, take, cancellationToken);
         return Ok(new FieldInspectionsResponse(inspections));
     }

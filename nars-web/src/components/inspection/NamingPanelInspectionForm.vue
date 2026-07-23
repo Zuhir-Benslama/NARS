@@ -1,11 +1,11 @@
 <template>
   <div class="npf-form">
-    <h3 class="npf-title">Naming Panel Inspection</h3>
-    <p class="npf-feature">{{ feature?.label ?? "Unknown naming panel" }}</p>
+    <h3 class="npf-title">{{ t("npf_title") }}</h3>
+    <p class="npf-feature">{{ feature?.label ?? t("npf_unknown") }}</p>
 
     <!-- Step 1: Has location? -->
     <div v-if="step === 1" class="npf-step">
-      <p class="npf-question">Is the naming panel location present?</p>
+      <p class="npf-question">{{ t("npf_question_location") }}</p>
       <div class="npf-actions">
         <button class="npf-btn npf-btn-yes" @click="hasLocation(true)">Yes</button>
         <button class="npf-btn npf-btn-no" @click="hasLocation(false)">No</button>
@@ -14,15 +14,15 @@
 
     <!-- Result: No location -->
     <div v-if="step === 'no_location'" class="npf-result npf-issue">
-      <p>⚠ Naming panel location is missing.</p>
+      <p>{{ t("npf_missing_location") }}</p>
       <button class="npf-btn npf-btn-submit" @click="submitInspection('issue')">
-        Log as Issue
+        {{ t("npf_log_issue") }}
       </button>
     </div>
 
     <!-- Step 2: Has panel? -->
     <div v-if="step === 2" class="npf-step">
-      <p class="npf-question">Is the naming panel present?</p>
+      <p class="npf-question">{{ t("npf_question_panel") }}</p>
       <div class="npf-actions">
         <button class="npf-btn npf-btn-yes" @click="hasPanel(true)">Yes</button>
         <button class="npf-btn npf-btn-no" @click="hasPanel(false)">No</button>
@@ -31,15 +31,15 @@
 
     <!-- Result: No panel -->
     <div v-if="step === 'no_panel'" class="npf-result npf-issue">
-      <p>⚠ Naming panel is missing.</p>
+      <p>{{ t("npf_missing_panel") }}</p>
       <button class="npf-btn npf-btn-submit" @click="submitInspection('issue')">
-        Log as Issue
+        {{ t("npf_log_issue") }}
       </button>
     </div>
 
     <!-- Step 3: Naming correct? -->
     <div v-if="step === 3" class="npf-step">
-      <p class="npf-question">Is the naming correct?</p>
+      <p class="npf-question">{{ t("npf_question_naming") }}</p>
       <div class="npf-actions">
         <button class="npf-btn npf-btn-yes" @click="namingCorrect(true)">Yes</button>
         <button class="npf-btn npf-btn-no" @click="namingCorrect(false)">No</button>
@@ -48,15 +48,15 @@
 
     <!-- Result: Wrong naming -->
     <div v-if="step === 'wrong_naming'" class="npf-result npf-issue">
-      <p>⚠ Naming on the panel is incorrect.</p>
+      <p>{{ t("npf_wrong_naming") }}</p>
       <button class="npf-btn npf-btn-submit" @click="submitInspection('issue')">
-        Log as Issue
+        {{ t("npf_log_issue") }}
       </button>
     </div>
 
     <!-- Step 4: Position correct? -->
     <div v-if="step === 4" class="npf-step">
-      <p class="npf-question">Is the panel position correct?</p>
+      <p class="npf-question">{{ t("npf_question_position") }}</p>
       <div class="npf-actions">
         <button class="npf-btn npf-btn-yes" @click="positionCorrect(true)">Yes</button>
         <button class="npf-btn npf-btn-no" @click="positionCorrect(false)">No</button>
@@ -65,28 +65,33 @@
 
     <!-- Result: Wrong position -->
     <div v-if="step === 'wrong_position'" class="npf-result npf-issue">
-      <p>⚠ Naming panel position is incorrect.</p>
+      <p>{{ t("npf_wrong_position") }}</p>
       <button class="npf-btn npf-btn-submit" @click="submitInspection('issue')">
-        Log as Issue
+        {{ t("npf_log_issue") }}
       </button>
     </div>
 
     <!-- Result: All good -->
     <div v-if="step === 'good'" class="npf-result npf-good">
-      <p>✓ All checks passed.</p>
-      <button class="npf-btn npf-btn-submit" @click="submitInspection('good')">Confirm</button>
+      <p>{{ t("npf_all_good") }}</p>
+      <button class="npf-btn npf-btn-submit" @click="submitInspection('good')">
+        {{ t("npf_confirm") }}
+      </button>
     </div>
 
-    <div v-if="submitting" class="npf-loading">Saving...</div>
+    <div v-if="submitting" class="npf-loading">{{ t("npf_saving") }}</div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from "vue"
+import { useI18n } from "vue-i18n"
 import { apiFetch } from "../../api"
 import { getErrorMessage } from "../../lib/errors"
 import { showToast } from "../../lib/toast"
 import type { NamingPanelStep, InspectionStatus } from "../../types/inspection"
+
+const { t } = useI18n()
 
 const props = defineProps<{ feature: { id: string; label: string } | null }>()
 const emit = defineEmits<{ done: [] }>()
@@ -151,7 +156,7 @@ async function submitInspection(status: InspectionStatus) {
     })
     if (res.ok) {
       showToast(
-        status === "good" ? "Naming panel inspection complete." : "Issue reported.",
+        status === "good" ? t("npf_complete") : t("npf_issue_reported"),
         status === "good" ? "success" : "error",
       )
       emit("done")

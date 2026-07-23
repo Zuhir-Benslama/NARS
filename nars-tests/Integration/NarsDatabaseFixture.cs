@@ -20,6 +20,7 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
         .Build();
 
     private bool _initialized;
+    private IDbContextFactory<AppDbContext>? _sharedFactory;
 
     public string ConnectionString => _container.GetConnectionString();
 
@@ -90,10 +91,14 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
             throw new InvalidOperationException("Database not initialized");
         }
 
+        if (_sharedFactory is not null)
+            return _sharedFactory;
+
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(ConnectionString, o => o.UseNetTopologySuite())
             .Options;
-        return new PooledDbContextFactory<AppDbContext>(options);
+        _sharedFactory = new PooledDbContextFactory<AppDbContext>(options);
+        return _sharedFactory;
     }
 
     /// <summary>

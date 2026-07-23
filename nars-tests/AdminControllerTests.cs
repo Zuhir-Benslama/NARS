@@ -201,8 +201,10 @@ public class AdminControllerTests
     public async Task GetDaira_WilayaAdmin_WrongWilaya_ReturnsNotFound()
     {
         var overview = new Mock<IAdminOverviewService>();
+        // Return a Daira that belongs to a DIFFERENT wilaya (1) than the user's (2).
+        // This exercises the authorization branch at AdminController.cs:67.
         overview.Setup(s => s.GetDairaByIdAsync(1, default))
-            .ReturnsAsync((NarsApi.Models.Daira?)null);
+            .ReturnsAsync(new NarsApi.Models.Daira { DairaId = 1, WilayaId = 1, DairaAr = "test", DairaFr = "test" });
         var ctrl = CreateController(overview.Object);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.WilayaAdmin, wilayaId: 2);
 
@@ -226,7 +228,7 @@ public class AdminControllerTests
     {
         // CanCreateRole is a pure role-hierarchy check (no DB query).
         // InMemory DB is only needed to satisfy the UserAuthorizationService constructor.
-        var db = CreateInMemoryDb("AdminControllerRoleTest");
+        using var db = CreateInMemoryDb("AdminControllerRoleTest");
         var svc = new UserAuthorizationService(db);
         Assert.Equal(expected, svc.CanCreateRole(caller, target));
     }

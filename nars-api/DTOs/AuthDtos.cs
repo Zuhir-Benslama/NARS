@@ -68,7 +68,7 @@ public record AuthorizedAdminSignupRequest(
     [property: JsonPropertyName("wilaya_id")] int? WilayaId
 );
 public record SignInRequest(
-    [Required(AllowEmptyStrings = false)] string Username,
+    [Required(AllowEmptyStrings = false), MaxLength(100)] string Username,
     [Required(AllowEmptyStrings = false)] string Password
 );
 
@@ -113,7 +113,6 @@ public record UserInfoWithLocation(
 
 public record SignInResponse(
     [property: JsonPropertyName("success")] bool Success,
-    [property: JsonPropertyName("token")] string Token,
     [property: JsonPropertyName("token_type")] string TokenType,
     [property: JsonPropertyName("user")] UserInfo User
 );

@@ -1,4 +1,3 @@
-using System.Data;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -21,7 +20,7 @@ public class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactory) : IF
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var conn = (NpgsqlConnection)db.Database.GetDbConnection();
-        if (conn.State != ConnectionState.Open) await conn.OpenAsync(ct);
+        await using var connHandle = await conn.EnsureOpenAsync(ct);
 
         var sb = new StringBuilder();
         var paramIndex = 0;
@@ -66,7 +65,7 @@ public class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactory) : IF
             .ToListAsync(ct);
 
         var conn = (NpgsqlConnection)db.Database.GetDbConnection();
-        if (conn.State != ConnectionState.Open) await conn.OpenAsync(ct);
+        await using var connHandle = await conn.EnsureOpenAsync(ct);
 
         // Build a single UNION ALL query across all tables, grouped by user_id.
         var sb = new StringBuilder();

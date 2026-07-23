@@ -54,7 +54,7 @@ function buildCorsUrls(): RegExp[] {
     urls.push(new RegExp(`^${escapeRegExp(apiBase)}`))
   }
 
-  urls.push(/http:\/\/localhost:\d+\/api/, /http:\/\/127\.0\.0\.1:\d+\/api/)
+  urls.push(/https?:\/\/localhost:\d+\/api/, /https?:\/\/127\.0\.0\.1:\d+\/api/)
 
   return urls
 }

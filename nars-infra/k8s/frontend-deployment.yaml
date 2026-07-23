@@ -7,8 +7,14 @@ metadata:
   labels:
     app.kubernetes.io/name: nars-frontend
     app.kubernetes.io/component: frontend
+    app.kubernetes.io/version: "latest"
 spec:
   replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: nars-frontend
@@ -54,26 +60,27 @@ spec:
           image: zuhirbenslama/nars-vite:latest
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 80
+            - containerPort: 8080
           startupProbe:
             httpGet:
               path: /
-              port: 80
+              port: 8080
             initialDelaySeconds: 3
             periodSeconds: 5
             failureThreshold: 10
           readinessProbe:
             httpGet:
               path: /
-              port: 80
+              port: 8080
             initialDelaySeconds: 3
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /
-              port: 80
+              port: 8080
             initialDelaySeconds: 10
             periodSeconds: 20
+            failureThreshold: 3
           resources:
             requests:
               cpu: 50m

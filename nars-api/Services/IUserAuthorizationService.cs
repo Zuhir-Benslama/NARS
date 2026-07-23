@@ -17,6 +17,7 @@ public interface IUserAuthorizationService
     /// <summary>Returns users that the caller has authority to manage.</summary>
     Task<List<AdminUserSummary>> GetManageableUsersAsync(
         string callerRole, Guid callerUserId, int? communeId, int? dairaId, int? wilayaId,
+        int skip = 0, int take = 100,
         CancellationToken ct = default);
     /// <summary>Finds a user by ID.</summary>
     Task<User?> FindUserByIdAsync(Guid userId, CancellationToken ct = default);

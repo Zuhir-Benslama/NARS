@@ -110,13 +110,14 @@ describe("apiRequest", () => {
   })
 
   it("returns error result on failed response", async () => {
-    const mockResponse = { ok: false, status: 404 }
-    vi.mocked(apiModule.apiFetch).mockResolvedValue(mockResponse as unknown as Response)
+    vi.mocked(apiModule.apiFetch).mockRejectedValue(
+      Object.assign(new Error("HTTP 404"), { status: 404 }),
+    )
 
     const result = await apiRequest("/api/test")
     expect(result.success).toBe(false)
     if (!result.success) {
-      expect(result.status).toBe(404)
+      expect(result.error).toBeInstanceOf(Error)
     }
   })
 

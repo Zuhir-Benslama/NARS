@@ -182,7 +182,7 @@ spec:
               app.kubernetes.io/name: ingress-nginx
               app.kubernetes.io/component: controller
       ports:
-        - port: 80
+        - port: 8080
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -205,3 +205,48 @@ spec:
           protocol: TCP
   policyTypes:
     - Egress
+---
+# Allow backup CronJob to reach PostGIS (complements the egress rule above)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-postgis-from-backup
+  namespace: nars
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgis
+      app.kubernetes.io/component: database
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgis-backup
+              app.kubernetes.io/component: backup
+      ports:
+        - port: 5432
+---
+# Allow Prometheus (monitoring namespace) to scrape metrics from nars pods
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-scrape-from-monitoring
+  namespace: nars
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 8080
+          protocol: TCP
+        - port: 8888
+          protocol: TCP
+        - port: 8889
+          protocol: TCP

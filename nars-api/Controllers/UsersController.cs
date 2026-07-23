@@ -22,12 +22,7 @@ public class UsersController(IUserProfileService userProfile, ILogger<UsersContr
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateCredentials([FromBody] UpdateUserRequest body, CancellationToken cancellationToken = default)
     {
-        if (CurrentUserId is null)
-        {
-            return Problem(detail: "Authentication required.", statusCode: 401);
-        }
-
-        var user = await userProfile.GetUserByIdAsync(CurrentUserId.Value, cancellationToken);
+        var user = await userProfile.GetUserByIdAsync(RequiredCurrentUserId, cancellationToken);
         if (user is null)
         {
             return Problem(detail: "User not found.", statusCode: 404);

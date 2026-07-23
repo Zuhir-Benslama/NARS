@@ -25,6 +25,13 @@ public class ValidationService : IValidationService
             ?? throw new InvalidOperationException("FeatureTypeRegistry missing District descriptor");
     }
 
+    /// <summary>
+    /// Executes a raw SQL scalar query with strongly-named parameters.
+    /// Parameters must be passed as (name, value) tuples where value is the
+    /// boxed CLR type expected by Npgsql (e.g. Guid for UUID, string for text,
+    /// double for float8). Table names in the SQL string are pre-validated
+    /// against the FeatureTypeRegistry allowlist.
+    /// </summary>
     private async Task<object?> ExecuteScalarAsync(string sql, List<(string name, object value)> parameters, CancellationToken ct)
     {
         var conn = _db.Database.GetDbConnection();

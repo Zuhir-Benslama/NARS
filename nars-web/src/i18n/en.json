@@ -288,5 +288,21 @@
   "theme_auto_hint": "Follows your operating system preference.",
   "theme_dark": "Dark",
   "theme_white": "Light",
-  "tile_layers": "Tile Layers"
+  "tile_layers": "Tile Layers",
+  "npf_title": "Naming Panel Inspection",
+  "npf_unknown": "Unknown naming panel",
+  "npf_question_location": "Is the naming panel location present?",
+  "npf_question_panel": "Is the naming panel present?",
+  "npf_question_naming": "Is the naming correct?",
+  "npf_question_position": "Is the panel position correct?",
+  "npf_missing_location": "⚠ Naming panel location is missing.",
+  "npf_missing_panel": "⚠ Naming panel is missing.",
+  "npf_wrong_naming": "⚠ Naming on the panel is incorrect.",
+  "npf_wrong_position": "⚠ Naming panel position is incorrect.",
+  "npf_all_good": "✓ All checks passed.",
+  "npf_log_issue": "Log as Issue",
+  "npf_confirm": "Confirm",
+  "npf_saving": "Saving...",
+  "npf_complete": "Naming panel inspection complete.",
+  "npf_issue_reported": "Issue reported."
 }

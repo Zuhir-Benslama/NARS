@@ -176,6 +176,11 @@ public class ValidationController(
             error = "Invalid coordinate values (NaN or Infinity).";
             return false;
         }
+        if (coords.Any(c => c.Lat < -90 || c.Lat > 90 || c.Lng < -180 || c.Lng > 180))
+        {
+            error = "Coordinate out of range (lat must be -90..90, lng must be -180..180).";
+            return false;
+        }
         error = null;
         return true;
     }

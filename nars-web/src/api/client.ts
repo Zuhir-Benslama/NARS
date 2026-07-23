@@ -257,25 +257,3 @@ export async function createCustomFeatureType(
   const res = await apiFetch("/api/feature-types/custom", { method: "POST", ...jsonBody(body) })
   return res.json()
 }
-
-// ─── LOGS (raw fetch — no retry, CSRF via query fallback) ────────────────
-//
-// Intentionally bypasses apiFetch because:
-//   - Log sending is fire-and-forget; we don't want retry loops when the
-//     app itself is in a broken state (the failure is the signal).
-//   - Avoids cascading failures where error → log → retry → more errors.
-// CSRF token is included as a query parameter since sendBeacon (used in
-// beforeunload) cannot set custom headers.
-
-import { getCsrfToken } from "../lib/csrf"
-
-export async function sendLogs(body: components["schemas"]["LogBatch"]): Promise<void> {
-  const csrfToken = getCsrfToken()
-  const qs = csrfToken ? `?csrf=${encodeURIComponent(csrfToken)}` : ""
-  await fetch(`/api/logs${qs}`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  })
-}

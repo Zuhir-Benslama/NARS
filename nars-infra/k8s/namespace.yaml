@@ -15,3 +15,5 @@ metadata:
     # Or integrate with kube-audit + Loki to alert on violations.
     pod-security.kubernetes.io/audit: restricted
     pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest

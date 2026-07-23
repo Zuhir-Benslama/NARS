@@ -100,7 +100,6 @@ function onSettings() {
 
 async function onLogout() {
   try {
-    localStorage.setItem("nars_resume_phase", String(appStore.currentPhase))
     const res = await apiFetch("/api/logout", { method: "POST" })
     if (res.ok) window.location.href = getLoginPath()
     else showToast(t("alert_logout_failed"), "error")

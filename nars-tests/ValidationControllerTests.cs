@@ -142,7 +142,7 @@ public class ValidationControllerTests
     [Fact]
     public async Task ValidateRoad_SharpTurn_ReturnsInvalid()
     {
-        var (ctrl, db) = CreateController();
+        var (_, db) = CreateController();
         db.Roads.Add(new Road
         {
             Id = Guid.NewGuid(),
@@ -178,7 +178,7 @@ public class ValidationControllerTests
     [Fact]
     public async Task ValidateRoad_NotConnected_ReturnsInvalid()
     {
-        var (ctrl, db) = CreateController();
+        var (_, db) = CreateController();
 
         db.Roads.Add(new Road
         {
@@ -252,7 +252,7 @@ public class ValidationControllerTests
     [Fact]
     public async Task ValidateDistrict_Overlap_ReturnsInvalid()
     {
-        var (ctrl, db) = CreateController();
+        var (_, db) = CreateController();
         db.Districts.Add(new District
         {
             Id = Guid.NewGuid(),

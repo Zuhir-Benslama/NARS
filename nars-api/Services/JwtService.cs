@@ -16,6 +16,7 @@ namespace NarsApi.Services;
 /// </summary>
 public class JwtService(string secret, string? issuer, string? audience, IOptions<JwtOptions> jwtOptions, ILogger<JwtService> logger, IDateTimeProvider timeProvider) : IJwtService
 {
+    // Thread-safe: JwtSecurityTokenHandler is safe for concurrent reads after initialization.
     private static readonly JwtSecurityTokenHandler TokenHandler = new();
     private readonly int _expiresMinutes = jwtOptions.Value.ExpiresInMinutes;
     private readonly SymmetricSecurityKey _key = new(Encoding.UTF8.GetBytes(secret));

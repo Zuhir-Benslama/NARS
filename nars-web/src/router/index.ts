@@ -1,4 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router"
+import { useAppStore } from "../stores/appStore"
+import { getLoginPath } from "../config"
 
 // Routes are used only for admin views. Commune_user and field_worker
 // UIs are rendered by App.vue based on role, outside <router-view>.
@@ -26,6 +28,13 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+})
+
+router.beforeEach(() => {
+  const appStore = useAppStore()
+  if (!appStore.isAuthenticated) {
+    return getLoginPath()
+  }
 })
 
 export default router

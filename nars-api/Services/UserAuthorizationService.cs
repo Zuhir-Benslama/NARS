@@ -59,12 +59,15 @@ public class UserAuthorizationService(AppDbContext db) : IUserAuthorizationServi
 
     public async Task<List<AdminUserSummary>> GetManageableUsersAsync(
         string callerRole, Guid callerUserId, int? communeId, int? dairaId, int? wilayaId,
+        int skip = 0, int take = 100,
         CancellationToken ct = default)
     {
         return callerRole switch
         {
             UserRoles.NationalAdmin => await db.Users
                 .Where(u => u.Role == UserRoles.WilayaAdmin)
+                .OrderBy(u => u.Username)
+                .Skip(skip).Take(take)
                 .Select(u => new AdminUserSummary(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role, u.Phone ?? "", u.CommuneId, u.DairaId, u.WilayaId))
                 .ToListAsync(ct),
 
@@ -72,6 +75,8 @@ public class UserAuthorizationService(AppDbContext db) : IUserAuthorizationServi
                 .Where(u => u.Role == UserRoles.DairaAdmin && u.DairaId.HasValue)
                 .Join(db.Dairas.Where(d => d.WilayaId == wilayaId.Value),
                     u => u.DairaId!.Value, d => d.DairaId, (u, _) => u)
+                .OrderBy(u => u.Username)
+                .Skip(skip).Take(take)
                 .Select(u => new AdminUserSummary(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role, u.Phone ?? "", u.CommuneId, u.DairaId, u.WilayaId))
                 .ToListAsync(ct),
 
@@ -79,11 +84,15 @@ public class UserAuthorizationService(AppDbContext db) : IUserAuthorizationServi
                 .Where(u => u.Role == UserRoles.CommuneUser && u.CommuneId.HasValue)
                 .Join(db.Communes.Where(c => c.DairaId == dairaId.Value),
                     u => u.CommuneId!.Value, c => c.CommuneId, (u, _) => u)
+                .OrderBy(u => u.Username)
+                .Skip(skip).Take(take)
                 .Select(u => new AdminUserSummary(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role, u.Phone ?? "", u.CommuneId, u.DairaId, u.WilayaId))
                 .ToListAsync(ct),
 
             UserRoles.CommuneUser when communeId.HasValue => await db.Users
                 .Where(u => u.Role == UserRoles.FieldWorker && u.CommuneId == communeId)
+                .OrderBy(u => u.Username)
+                .Skip(skip).Take(take)
                 .Select(u => new AdminUserSummary(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role, u.Phone ?? "", u.CommuneId, u.DairaId, u.WilayaId))
                 .ToListAsync(ct),
 

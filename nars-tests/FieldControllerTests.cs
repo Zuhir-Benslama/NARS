@@ -233,6 +233,10 @@ public class FieldControllerTests
     {
         var featureId = Guid.NewGuid();
         var mockFieldService = new Mock<IFieldService>();
+        mockFieldService.Setup(s => s.GetFeatureRegistryTypeAsync(featureId, default))
+            .ReturnsAsync(FeatureTypes.Road);
+        mockFieldService.Setup(s => s.GetFeatureOwnerAsync(FeatureTypes.Road, featureId, default))
+            .ReturnsAsync((UserId, (int?)1));
         mockFieldService.Setup(s => s.GetInspectionsAsync(featureId, 0, 100, default))
             .ReturnsAsync(new List<FieldInspectionResponse>
             {
@@ -254,6 +258,10 @@ public class FieldControllerTests
     {
         var featureId = Guid.NewGuid();
         var mockFieldService = new Mock<IFieldService>();
+        mockFieldService.Setup(s => s.GetFeatureRegistryTypeAsync(featureId, default))
+            .ReturnsAsync(FeatureTypes.Road);
+        mockFieldService.Setup(s => s.GetFeatureOwnerAsync(FeatureTypes.Road, featureId, default))
+            .ReturnsAsync((UserId, (int?)1));
         mockFieldService.Setup(s => s.GetInspectionsAsync(featureId, 0, 100, default))
             .ReturnsAsync(new List<FieldInspectionResponse>());
         var ctrl = CreateController(fieldService: mockFieldService.Object);

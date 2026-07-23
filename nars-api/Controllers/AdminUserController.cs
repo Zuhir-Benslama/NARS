@@ -1,6 +1,7 @@
 using BCrypt.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
@@ -67,7 +68,7 @@ public class AdminUserController(
         {
             await authorizationService.AddUserAsync(newUser!, cancellationToken);
         }
-        catch (InvalidOperationException ex)
+        catch (DbUpdateException ex)
         {
             logger.LogWarning(ex, "Duplicate user during admin signup (username={Username}, email={Email})",
                 body.Username, body.Email);
@@ -88,10 +89,14 @@ public class AdminUserController(
     [HttpGet("admin/users")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetManageableUsers(CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetManageableUsers(
+        [FromQuery] int skip = 0, [FromQuery] int take = 100,
+        CancellationToken cancellationToken = default)
     {
+        take = Math.Clamp(take, 1, 500);
         var users = await authorizationService.GetManageableUsersAsync(
             CurrentUserRole, RequiredCurrentUserId, CurrentCommuneId, CurrentDairaId, CurrentWilayaId,
+            skip, take,
             cancellationToken);
 
         return Ok(users);

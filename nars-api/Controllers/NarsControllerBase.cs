@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -76,7 +77,7 @@ public abstract class NarsControllerBase(
     protected static IActionResult? ValidateFeatureDataSize(JsonElement data, int maxSizeBytes)
     {
         var rawJson = data.GetRawText();
-        if (rawJson.Length > maxSizeBytes)
+        if (Encoding.UTF8.GetByteCount(rawJson) > maxSizeBytes)
         {
             return new ObjectResult(new ProblemDetails
             {
@@ -91,7 +92,7 @@ public abstract class NarsControllerBase(
     /// <summary>Validates that a string data payload does not exceed the size limit.</summary>
     protected static IActionResult? ValidateFeatureDataSize(string rawData, int maxSizeBytes)
     {
-        if (rawData.Length > maxSizeBytes)
+        if (Encoding.UTF8.GetByteCount(rawData) > maxSizeBytes)
         {
             return new ObjectResult(new ProblemDetails
             {

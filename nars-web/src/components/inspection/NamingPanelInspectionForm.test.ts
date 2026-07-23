@@ -6,6 +6,10 @@ const mockApiFetch = vi.hoisted(() => vi.fn())
 const mockShowToast = vi.hoisted(() => vi.fn())
 const mockGetErrorMessage = vi.hoisted(() => vi.fn((e) => String(e)))
 
+vi.mock("vue-i18n", () => ({
+  useI18n: () => ({ t: (key: string) => key }),
+}))
+
 vi.mock("../../api", () => ({
   apiFetch: mockApiFetch,
 }))
@@ -29,7 +33,7 @@ describe("NamingPanelInspectionForm", () => {
     const wrapper = mount(NamingPanelInspectionForm, {
       props: { feature: { id: "1", label: "Panel A" } },
     })
-    expect(wrapper.text()).toContain("Naming Panel Inspection")
+    expect(wrapper.text()).toContain("npf_title")
     expect(wrapper.text()).toContain("Panel A")
   })
 
@@ -37,7 +41,7 @@ describe("NamingPanelInspectionForm", () => {
     const wrapper = mount(NamingPanelInspectionForm, {
       props: { feature: { id: "1", label: "P" } },
     })
-    expect(wrapper.text()).toContain("Is the naming panel location present?")
+    expect(wrapper.text()).toContain("npf_question_location")
   })
 
   it("moves to step 2 on yes for location", async () => {
@@ -45,7 +49,7 @@ describe("NamingPanelInspectionForm", () => {
       props: { feature: { id: "1", label: "P" } },
     })
     await wrapper.find(".npf-btn-yes").trigger("click")
-    expect(wrapper.text()).toContain("Is the naming panel present?")
+    expect(wrapper.text()).toContain("npf_question_panel")
   })
 
   it("shows no_location result on no for location", async () => {
@@ -53,7 +57,7 @@ describe("NamingPanelInspectionForm", () => {
       props: { feature: { id: "1", label: "P" } },
     })
     await wrapper.find(".npf-btn-no").trigger("click")
-    expect(wrapper.text()).toContain("Naming panel location is missing")
+    expect(wrapper.text()).toContain("npf_missing_location")
   })
 
   it("moves through all steps to good", async () => {
@@ -64,7 +68,7 @@ describe("NamingPanelInspectionForm", () => {
     await wrapper.find(".npf-btn-yes").trigger("click")
     await wrapper.find(".npf-btn-yes").trigger("click")
     await wrapper.find(".npf-btn-yes").trigger("click")
-    expect(wrapper.text()).toContain("All checks passed")
+    expect(wrapper.text()).toContain("npf_all_good")
   })
 
   it("reaches wrong_naming on no for naming", async () => {
@@ -74,7 +78,7 @@ describe("NamingPanelInspectionForm", () => {
     await wrapper.find(".npf-btn-yes").trigger("click")
     await wrapper.find(".npf-btn-yes").trigger("click")
     await wrapper.find(".npf-btn-no").trigger("click")
-    expect(wrapper.text()).toContain("Naming on the panel is incorrect")
+    expect(wrapper.text()).toContain("npf_wrong_naming")
   })
 
   it("calls API on submit", async () => {
@@ -105,6 +109,6 @@ describe("NamingPanelInspectionForm", () => {
     })
     await wrapper.find(".npf-btn-no").trigger("click")
     await wrapper.find(".npf-btn-submit").trigger("click")
-    expect(wrapper.text()).toContain("Saving")
+    expect(wrapper.text()).toContain("npf_saving")
   })
 })

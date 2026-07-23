@@ -7,8 +7,14 @@ metadata:
   labels:
     app.kubernetes.io/name: nars-api
     app.kubernetes.io/component: api
+    app.kubernetes.io/version: "latest"
 spec:
   replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: nars-api
@@ -92,6 +98,7 @@ spec:
                   value: nars.dz
             initialDelaySeconds: 15
             periodSeconds: 20
+            failureThreshold: 3
           resources:
             requests:
               cpu: 100m

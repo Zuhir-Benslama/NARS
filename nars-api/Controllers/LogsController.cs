@@ -27,6 +27,7 @@ public class LogsController(IErrorLogService errorLogService, ILogger<LogsContro
     /// <summary>Accepts client-side error logs for server-side storage and analysis.</summary>
     [HttpPost("logs")]
     [Authorize]
+    [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

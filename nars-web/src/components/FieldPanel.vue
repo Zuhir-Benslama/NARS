@@ -96,14 +96,11 @@ export interface FieldPanelProps {
 const props = withDefaults(defineProps<FieldPanelProps>(), {
   fetchFeaturesFn: async (apiType: string) => {
     const res = await apiFetch(`/api/field/features?type=${apiType}`)
-    if (res.ok) {
-      const data = await res.json()
-      return (data.features ?? []).map((f: ApiFeature) => ({
-        id: f.id,
-        label: f.label || "Unnamed",
-      }))
-    }
-    return []
+    const data = await res.json()
+    return (data.features ?? []).map((f: ApiFeature) => ({
+      id: f.id,
+      label: f.label || "Unnamed",
+    }))
   },
 })
 

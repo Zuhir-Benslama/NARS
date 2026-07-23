@@ -16,6 +16,18 @@ resources:
     cpu: 200m
     memory: 512Mi
 
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  runAsGroup: 65534
+  fsGroup: 65534
+  seccompProfile:
+    type: RuntimeDefault
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
 presets:
   kubernetesEvents:
     enabled: true

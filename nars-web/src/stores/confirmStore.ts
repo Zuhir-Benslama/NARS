@@ -1,11 +1,12 @@
 import { defineStore } from "pinia"
 
+let _resolve: ((value: boolean) => void) | null = null
+
 export const useConfirmStore = defineStore("confirm", {
   state: () => ({
     visible: false,
     message: "",
     okText: "Confirm",
-    resolve: null as ((value: boolean) => void) | null,
   }),
 
   actions: {
@@ -13,21 +14,21 @@ export const useConfirmStore = defineStore("confirm", {
       return new Promise((resolve) => {
         this.message = message
         this.okText = okText
-        this.resolve = resolve
+        _resolve = resolve
         this.visible = true
       })
     },
 
     confirm(): void {
       this.visible = false
-      this.resolve?.(true)
-      this.resolve = null
+      _resolve?.(true)
+      _resolve = null
     },
 
     cancel(): void {
       this.visible = false
-      this.resolve?.(false)
-      this.resolve = null
+      _resolve?.(false)
+      _resolve = null
     },
   },
 })

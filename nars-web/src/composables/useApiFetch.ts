@@ -87,12 +87,8 @@ export async function apiRequest<T = unknown>(
 ): Promise<ApiRequestResult<T>> {
   try {
     const response = await apiFetch(path, options)
-    if (!response.ok) {
-      return {
-        success: false,
-        error: new Error(`HTTP ${response.status}`),
-        status: response.status,
-      }
+    if (response.status === 204 || response.headers.get("content-length") === "0") {
+      return { success: true, data: null as T }
     }
     const data = (await response.json()) as T
     return { success: true, data }

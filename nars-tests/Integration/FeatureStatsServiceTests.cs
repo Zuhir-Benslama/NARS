@@ -40,8 +40,8 @@ public class FeatureStatsServiceTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        await _db.DisposeAsync();
-        await _fixture.CleanTablesAsync();
+        try { await _db.DisposeAsync(); }
+        finally { await _fixture.CleanTablesAsync(); }
     }
 
     [Fact]

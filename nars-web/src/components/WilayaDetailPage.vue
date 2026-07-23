@@ -13,7 +13,7 @@
         <h1>{{ wilaya.wilaya_name_fr }} — {{ wilaya.wilaya_name_ar }}</h1>
       </div>
       <div class="content-scroll">
-        <DairaList :dairas="wilaya.dairas" :role="userRole" />
+        <DairaList :dairas="wilaya.dairas" />
       </div>
     </template>
 

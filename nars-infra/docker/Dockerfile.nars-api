@@ -34,7 +34,8 @@ RUN dotnet publish "nars-api/NarsApi.csproj" --configuration Release -o /app/pub
 
 FROM base AS final
 WORKDIR /app
-COPY --from=publish /app/publish /app/
+COPY --from=publish --chown=1654:1654 /app/publish /app/
+STOPSIGNAL SIGTERM
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f --connect-timeout 3 --max-time 5 http://localhost:8080/health
 ENTRYPOINT ["dotnet", "NarsApi.dll"]

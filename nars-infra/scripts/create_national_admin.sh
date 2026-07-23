@@ -154,7 +154,7 @@ else
     [[ -n "${ADMIN_NAME}" ]] || die "Name cannot be empty."
 
     read -r -p "  Email:         " ADMIN_EMAIL
-    [[ "${ADMIN_EMAIL}" == *"@"* ]] || die "Invalid email address."
+    [[ "${ADMIN_EMAIL}" =~ ^[^@]+@[^@]+\.[^@]+$ ]] || die "Invalid email address."
 
     read -r -p "  Phone:         " ADMIN_PHONE
     [[ -n "${ADMIN_PHONE}" ]] || die "Phone cannot be empty."
@@ -263,9 +263,10 @@ echo -e "${BOLD}Account details:${RESET}"
 echo "  UUID:     ${NEW_UUID}"
 echo "  Username: ${ADMIN_USERNAME}"
 if [[ "${NON_INTERACTIVE:-0}" == "1" ]]; then
-    echo "  Password: ${ADMIN_PASSWORD}"
-    echo ""
-    echo -e "${YELLOW}⚠  Save these credentials now. They will not be shown again.${RESET}"
+    # Print password to stderr so it isn't captured if stdout is piped/logged.
+    echo "  Password: ${ADMIN_PASSWORD}" >&2
+    echo "" >&2
+    echo -e "${YELLOW}⚠  Save these credentials now. They will not be shown again.${RESET}" >&2
 fi
 echo "  Role:     national_admin"
 echo ""

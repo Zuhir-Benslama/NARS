@@ -228,7 +228,6 @@ public partial class AuthController(
 
         return Ok(new SignInResponse(
             Success: true,
-            Token: token,
             TokenType: "bearer",
             User: new UserInfo(
                 Id: user.Id.ToString(),

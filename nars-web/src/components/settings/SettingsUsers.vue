@@ -1,5 +1,5 @@
 <template>
-  <div class="settings-users">
+  <div ref="rootRef" class="settings-users">
     <!-- Existing users list -->
     <div class="su-section">
       <h3 class="su-section-title">{{ t("su_user_list_title") }} ({{ users.length }})</h3>
@@ -404,6 +404,7 @@ const selectedCommuneId = ref<number | null>(null)
 const wilayaInputRef = ref<HTMLInputElement | null>(null)
 const dairaInputRef = ref<HTMLInputElement | null>(null)
 const communeInputRef = ref<HTMLInputElement | null>(null)
+const rootRef = ref<HTMLElement | null>(null)
 
 const positionTick = ref(0)
 function updatePositions() {
@@ -426,13 +427,13 @@ const communeDropdownStyle = computed(() => getDropdownStyle(communeInputRef.val
 
 onMounted(() => {
   window.addEventListener("resize", updatePositions)
-  const main = document.querySelector(".settings-main")
+  const main = rootRef.value?.closest<HTMLElement>(".settings-main")
   if (main) main.addEventListener("scroll", updatePositions)
   fetchUsers()
 })
 onUnmounted(() => {
   window.removeEventListener("resize", updatePositions)
-  const main = document.querySelector(".settings-main")
+  const main = rootRef.value?.closest<HTMLElement>(".settings-main")
   if (main) main.removeEventListener("scroll", updatePositions)
 })
 

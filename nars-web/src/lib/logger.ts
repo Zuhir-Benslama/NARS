@@ -72,10 +72,11 @@ if (typeof window !== "undefined") {
   window.addEventListener("beforeunload", () => {
     if (timer) clearTimeout(timer)
     if (batch.length > 0) {
+      const pending = batch.splice(0)
       const csrfToken = getCsrfToken()
       const qs = csrfToken ? `?csrf=${encodeURIComponent(csrfToken)}` : ""
 
-      const blob = new Blob([JSON.stringify({ logs: batch })], { type: "application/json" })
+      const blob = new Blob([JSON.stringify({ logs: pending })], { type: "application/json" })
       navigator.sendBeacon(`${getApiBaseUrl()}/api/logs${qs}`, blob)
     }
   })
