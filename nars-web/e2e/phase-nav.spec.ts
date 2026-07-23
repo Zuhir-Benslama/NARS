@@ -5,7 +5,7 @@ test.describe("Phase Navigation", () => {
   test.beforeEach(async ({ page }) => {
     await setupAuthMocks(page)
     await page.goto("/")
-    await page.waitForLoadState("networkidle")
+    await page.waitForLoadState("load")
   })
 
   test("renders PhaseBar with all 8 phases", async ({ page }) => {
@@ -38,7 +38,7 @@ test.describe("Phase Navigation", () => {
     page.on("pageerror", (err) => errors.push(err.message))
 
     await page.goto("/")
-    await page.waitForLoadState("networkidle")
+    await page.waitForLoadState("load")
     await page.waitForTimeout(2000)
 
     const filtered = errors.filter(

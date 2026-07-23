@@ -16,13 +16,14 @@ import { getLoginPath } from "./config"
 import { debugLog, debugError } from "./utils/debug"
 import { initTelemetry } from "./lib/telemetry"
 import { vClickOutside } from "./directives/clickOutside"
+import type { UserInfo } from "./types"
 
 initTelemetry()
 initTheme()
 
 // ─── Auth guard (before Vue mounts) ──────────────────────────────────────────
 
-async function checkAuth(): Promise<boolean> {
+async function checkAuth(): Promise<{ ok: boolean; user?: UserInfo }> {
   let authCheck = await fetch(apiUrl("/api/current_user"), {
     credentials: "include",
   })
@@ -43,18 +44,17 @@ async function checkAuth(): Promise<boolean> {
   }
 
   if (!authCheck.ok) {
-    window.location.href = getLoginPath()
-    return false
+    return { ok: false }
   }
 
-  return true
+  const user = (await authCheck.json()) as UserInfo
+  return { ok: true, user }
 }
 
 // ─── Vue bootstrap ───────────────────────────────────────────────────────────
 
-function createVueApp() {
+function createVueApp(pinia: ReturnType<typeof createPinia>) {
   const app = createApp(App)
-  const pinia = createPinia()
 
   app.use(pinia)
   app.use(i18n)
@@ -110,24 +110,36 @@ async function initializeApp(): Promise<void> {
 // ─── Startup sequence ────────────────────────────────────────────────────────
 
 ;(async () => {
-  let authenticated: boolean
+  let authResult: { ok: boolean; user?: UserInfo }
   try {
-    authenticated = await checkAuth()
+    authResult = await checkAuth()
   } catch (error) {
     logError(
       createServerError(
         "Auth check failed during app initialization",
         { action: "auth-guard" },
-        error,
+        error instanceof Error ? error : new Error(String(error)),
       ),
     )
     window.location.href = getLoginPath()
     return
   }
 
-  if (!authenticated) return
+  if (!authResult.ok) {
+    window.location.href = getLoginPath()
+    return
+  }
 
-  createVueApp()
+  // Create Pinia and populate user BEFORE Vue app mounts.
+  // The router guard checks appStore.isAuthenticated, so the user
+  // must be set before the router is installed.
+  const pinia = createPinia()
+  const appStore = useAppStore(pinia)
+  if (authResult.user) {
+    appStore.setUser(authResult.user)
+  }
+
+  createVueApp(pinia)
 
   try {
     await initializeApp()

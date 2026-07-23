@@ -5,7 +5,7 @@ test.describe("Map flows — draw, edit, save", () => {
   test.beforeEach(async ({ page }) => {
     await setupAuthMocks(page)
     await page.goto("/")
-    await page.waitForLoadState("networkidle")
+    await page.waitForLoadState("load")
   })
 
   test("FeatureModal opens via store", async ({ page }) => {
@@ -75,7 +75,7 @@ test.describe("Map flows — draw, edit, save", () => {
       })
     })
     await page.reload()
-    await page.waitForLoadState("networkidle")
+    await page.waitForLoadState("load")
 
     await expect(page.locator(".fp-panel")).toBeVisible({ timeout: 20000 })
   })
