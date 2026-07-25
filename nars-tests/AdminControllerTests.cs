@@ -205,6 +205,10 @@ public class AdminControllerTests
         // This exercises the authorization branch at AdminController.cs:67.
         overview.Setup(s => s.GetDairaByIdAsync(1, default))
             .ReturnsAsync(new NarsApi.Models.Daira { DairaId = 1, WilayaId = 1, DairaAr = "test", DairaFr = "test" });
+        // Also mock the report — if the auth check were removed, the controller
+        // would proceed here and return Ok, proving the 404 comes from authorization.
+        overview.Setup(s => s.GetDairaReportAsync(1, default))
+            .ReturnsAsync(new DairaReport(1, "test", "", null, []));
         var ctrl = CreateController(overview.Object);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.WilayaAdmin, wilayaId: 2);
 

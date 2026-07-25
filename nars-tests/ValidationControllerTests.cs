@@ -43,6 +43,8 @@ public class ValidationControllerTests
         return (ctrl, context);
     }
 
+    private static AppDbContext CreateDb() => CreateInMemoryDb("ValidationTest");
+
     // ── GET /api/validate/area/main-urban-exists ──────────────────────────
 
     [Fact]
@@ -142,7 +144,7 @@ public class ValidationControllerTests
     [Fact]
     public async Task ValidateRoad_SharpTurn_ReturnsInvalid()
     {
-        var (_, db) = CreateController();
+        var db = CreateDb();
         db.Roads.Add(new Road
         {
             Id = Guid.NewGuid(),
@@ -178,7 +180,7 @@ public class ValidationControllerTests
     [Fact]
     public async Task ValidateRoad_NotConnected_ReturnsInvalid()
     {
-        var (_, db) = CreateController();
+        var db = CreateDb();
 
         db.Roads.Add(new Road
         {
@@ -252,7 +254,7 @@ public class ValidationControllerTests
     [Fact]
     public async Task ValidateDistrict_Overlap_ReturnsInvalid()
     {
-        var (_, db) = CreateController();
+        var db = CreateDb();
         db.Districts.Add(new District
         {
             Id = Guid.NewGuid(),

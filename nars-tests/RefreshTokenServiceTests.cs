@@ -55,7 +55,7 @@ public class RefreshTokenServiceTests
 
         protected override Task<RefreshToken?> FindRefreshTokenByHashAsync(string hash, CancellationToken ct)
             => _db.RefreshTokens
-                .FirstOrDefaultAsync(rt => rt.TokenHash == hash && !rt.Revoked && rt.ExpiresAt > FixedUtcNow, ct);
+                .FirstOrDefaultAsync(rt => rt.TokenHash == hash && !rt.Revoked && rt.ExpiresAt > TimeProvider.UtcNow, ct);
 
         public override async Task RevokeAllUserTokensAsync(Guid userId, CancellationToken cancellationToken = default)
         {
@@ -443,13 +443,12 @@ public class RefreshTokenServiceTests
         Assert.Null(found);
     }
 
-    // ── AddUserAsync ────────────────────────────────────────────────────
+    // ── SaveUserAsync (via UserCreationService) ──────────────────────────
 
     [Fact]
-    public async Task AddUserAsync_PersistsNewUser()
+    public async Task SaveUserAsync_PersistsNewUser()
     {
         var db = CreateDb();
-        var svc = CreateService(db);
         var user = new User
         {
             Id = UserId,
@@ -462,7 +461,8 @@ public class RefreshTokenServiceTests
             CommuneId = 2,
         };
 
-        await svc.AddUserAsync(user);
+        var svc = new UserCreationService(db);
+        await svc.SaveUserAsync(user);
 
         var stored = await db.Users.FindAsync(UserId);
         Assert.NotNull(stored);

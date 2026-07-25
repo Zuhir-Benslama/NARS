@@ -58,15 +58,15 @@ public class AdminUserController(
             body.Name, body.Email, body.Phone, body.Username, body.Password,
             body.Role, communeId, body.DairaId, body.WilayaId,
             cancellationToken);
-        if (error is not null)
+        if (error is not null || newUser is null)
         {
-            var statusCode = error.Contains("already exists") ? 409 : 400;
-            return Problem(detail: error, statusCode: statusCode);
+            var statusCode = error?.Contains("already exists") == true ? 409 : 400;
+            return Problem(detail: error ?? "User creation failed.", statusCode: statusCode);
         }
 
         try
         {
-            await authorizationService.AddUserAsync(newUser!, cancellationToken);
+            await userCreationService.SaveUserAsync(newUser, cancellationToken);
         }
         catch (DbUpdateException ex)
         {
@@ -76,7 +76,7 @@ public class AdminUserController(
         }
 
         logger.LogInformation("[Admin] {CallerRole} {CallerId} created {Role} {UserId}",
-            callerRole, CurrentUserId, body.Role, newUser!.Id);
+            callerRole, CurrentUserId, body.Role, newUser.Id);
 
         return StatusCode(201, new CreateAdminResponse(
             Success: true,

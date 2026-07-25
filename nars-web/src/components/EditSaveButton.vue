@@ -3,8 +3,8 @@
     v-if="visible"
     id="nars-edit-save"
     class="nars-edit-save-btn"
-    aria-label="Save edited geometry"
-    title="Save edited geometry"
+    :aria-label="t('btn_save_geometry')"
+    :title="t('btn_save_geometry')"
     @click="save"
   >
     <svg
@@ -19,16 +19,18 @@
     >
       <polyline points="20 6 9 17 4 12" />
     </svg>
-    Save Geometry
+    {{ t('btn_save_geometry') }}
   </button>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue"
+import { useI18n } from "vue-i18n"
 import { useEditStore } from "../stores/editStore"
 import { commitEditMode } from "../map/edit/edit-mode"
 import { showToast } from "../lib/toast"
 
+const { t } = useI18n()
 const store = useEditStore()
 const visible = computed(() => store.isEditMode)
 

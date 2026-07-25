@@ -67,7 +67,7 @@ export function useFocusTrap(containerRef: Ref<HTMLElement | null>, isActive: ()
     window.removeEventListener("keydown", onKeydown)
     observer?.disconnect()
     observer = null
-    if (previousActiveElement && isActive()) {
+    if (previousActiveElement && previousActiveElement.isConnected) {
       previousActiveElement.focus()
     }
   })

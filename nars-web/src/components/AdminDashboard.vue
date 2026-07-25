@@ -113,7 +113,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue"
+import { ref, computed, onMounted, onUnmounted } from "vue"
 import { useI18n } from "vue-i18n"
 import { apiFetch } from "../api"
 import { useAppStore } from "../stores/appStore"
@@ -164,6 +164,8 @@ const roleLabel = computed(() => {
 
 const roleBadgeClass = computed(() => ROLE_BADGES[userRole.value] ?? "")
 
+let abortCtrl: AbortController | null = null
+
 async function loadOverview() {
   loading.value = true
   error.value = null
@@ -171,21 +173,28 @@ async function loadOverview() {
   wilayaData.value = null
   dairaData.value = null
 
+  abortCtrl?.abort()
+  abortCtrl = new AbortController()
+  const { signal } = abortCtrl
+
   try {
-    const res = await apiFetch("/api/admin/overview")
+    const res = await apiFetch("/api/admin/overview", { signal })
     const data = await res.json()
 
+    if (signal.aborted) return
     if (isNational.value) nationalData.value = data as NationalOverview
     else if (isWilaya.value) wilayaData.value = data as WilayaReport
     else if (isDaira.value) dairaData.value = data as DairaReport
   } catch (err) {
+    if (signal.aborted) return
     error.value = err instanceof Error ? err.message : t("admin.load_error")
   } finally {
-    loading.value = false
+    if (!signal.aborted) loading.value = false
   }
 }
 
 onMounted(loadOverview)
+onUnmounted(() => abortCtrl?.abort())
 </script>
 
 <style scoped>

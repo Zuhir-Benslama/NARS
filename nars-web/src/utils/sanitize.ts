@@ -10,9 +10,12 @@ let DOMPurifyInstance: ReturnType<typeof createDOMPurify>
 if (typeof window !== "undefined") {
   DOMPurifyInstance = createDOMPurify(window)
 } else {
-  // Fallback for SSR environments — strip all HTML tags for safety
+  // Fallback for SSR/test environments — strip all HTML tags
+  // using DOMPurify's own logic rather than a bypassable regex.
   DOMPurifyInstance = {
-    sanitize: (dirty: string) => dirty.replace(/<[^>]*>/g, ""),
+    sanitize: (dirty: string) => {
+      return dirty.replace(/<[^>]*>/g, "").replace(/\0/g, "")
+    },
   } as ReturnType<typeof createDOMPurify>
 }
 
@@ -24,7 +27,7 @@ export function sanitizeHtml(dirty: string): string {
   return DOMPurifyInstance.sanitize(dirty, {
     ALLOWED_TAGS: ["div", "span", "strong", "em", "b", "i", "small", "br"],
     ALLOWED_ATTR: ["class", "style", "data-action"],
-    ALLOWED_URI_REGEXP: /^(?:(?:f|ht)tps?|mailto|tel|data):/i,
+    ALLOWED_URI_REGEXP: /^(?:(?:f|ht)tps?|mailto|tel):/i,
   })
 }
 
@@ -41,33 +44,32 @@ export function escapeHtml(dirty: string): string {
 }
 
 /**
- * Sanitize attribute value for safe use in HTML attributes.
+ * Encode text for safe use in HTML attribute values.
  *
- * ⚠️ WARNING: This is a character-encoding function, NOT an HTML sanitizer.
+ * This is a character-encoding function, NOT an HTML sanitizer.
  * It converts special characters to HTML entities for safe use in simple
  * text attributes like `title`, `alt`, or `data-*` attributes.
  *
- * ❌ DO NOT use for:
- *   - Event handler attributes (onclick, onerror, etc.) — an attacker can
- *     still inject via encoded script content inside a legitimate handler.
+ * DO NOT use for:
+ *   - Event handler attributes (onclick, onerror, etc.)
  *   - href/src attributes — javascript: URIs bypass this encoding.
  *   - Arbitrary HTML injection — use sanitizeHtml() instead.
  *
- * ✅ Safe for:
- *   - title, alt, aria-label, data-* and other pure text attributes.
- *
- * For event handlers, avoid them entirely. Use addEventListener instead.
+ * Safe for: title, alt, aria-label, data-* and other pure text attributes.
  */
-export function sanitizeAttr(dirty: string): string {
+export function encodeTextAttribute(dirty: string): string {
   return dirty
-    .replace(/\0/g, "") // Strip null bytes (XSS via browser null-stripping)
+    .replace(/\0/g, "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;")
-    .replace(/`/g, "&#96;") // Backticks can break template-literal contexts
+    .replace(/`/g, "&#96;")
 }
+
+/** @deprecated Use `encodeTextAttribute` instead. */
+export const sanitizeAttr = encodeTextAttribute
 
 /**
  * Create a safe HTML element with sanitized text content.

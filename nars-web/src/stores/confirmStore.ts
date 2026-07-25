@@ -1,6 +1,6 @@
 import { defineStore } from "pinia"
 
-let _resolve: ((value: boolean) => void) | null = null
+let _resolver: ((value: boolean) => void) | null = null
 
 export const useConfirmStore = defineStore("confirm", {
   state: () => ({
@@ -11,24 +11,24 @@ export const useConfirmStore = defineStore("confirm", {
 
   actions: {
     show(message: string, okText = "Confirm"): Promise<boolean> {
-      return new Promise((resolve) => {
-        this.message = message
-        this.okText = okText
-        _resolve = resolve
-        this.visible = true
+      this.visible = true
+      this.message = message
+      this.okText = okText
+      return new Promise<boolean>((resolve) => {
+        _resolver = resolve
       })
     },
 
     confirm(): void {
       this.visible = false
-      _resolve?.(true)
-      _resolve = null
+      _resolver?.(true)
+      _resolver = null
     },
 
     cancel(): void {
       this.visible = false
-      _resolve?.(false)
-      _resolve = null
+      _resolver?.(false)
+      _resolver = null
     },
   },
 })

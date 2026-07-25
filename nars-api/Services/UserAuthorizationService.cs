@@ -119,12 +119,6 @@ public class UserAuthorizationService(AppDbContext db) : IUserAuthorizationServi
     public async Task SaveChangesAsync(CancellationToken ct = default)
         => await db.SaveChangesAsync(ct);
 
-    public async Task AddUserAsync(User user, CancellationToken ct = default)
-    {
-        db.Users.Add(user);
-        await db.SaveChangesAsync(ct);
-    }
-
     private static ScopeValidationResult Valid() => new(null, false);
     private static ScopeValidationResult Error(string msg) => new(msg, false);
     private static ScopeValidationResult Forbid(string msg) => new(msg, true);

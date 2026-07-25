@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { mount } from "@vue/test-utils"
 import { setActivePinia, createPinia } from "pinia"
 
+vi.mock("vue-i18n", () => ({
+  useI18n: () => ({ t: (key: string) => key }),
+}))
+
 const mockCommitEditMode = vi.hoisted(() => vi.fn())
 
 vi.mock("../map/edit/edit-mode", () => ({
@@ -33,7 +37,7 @@ describe("EditSaveButton", () => {
     const store = useEditStore()
     store.isEditMode = true
     const wrapper = mount(EditSaveButton)
-    expect(wrapper.text()).toContain("Save Geometry")
+    expect(wrapper.text()).toContain("btn_save_geometry")
   })
 
   it("calls commitEditMode on click", async () => {

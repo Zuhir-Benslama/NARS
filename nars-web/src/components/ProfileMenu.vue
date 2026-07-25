@@ -101,8 +101,12 @@ function onSettings() {
 async function onLogout() {
   try {
     const res = await apiFetch("/api/logout", { method: "POST" })
-    if (res.ok) window.location.href = getLoginPath()
-    else showToast(t("alert_logout_failed"), "error")
+    if (res.ok) {
+      appStore.setUser(null)
+      window.location.href = getLoginPath()
+    } else {
+      showToast(t("alert_logout_failed"), "error")
+    }
   } catch {
     showToast(t("alert_logout_failed"), "error")
   }

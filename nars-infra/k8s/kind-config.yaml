@@ -1,6 +1,9 @@
 ---
 # Reference config — Makefile generates the actual config dynamically
 # using the POSTGRES_DATA_DIR variable. See `make cluster-create`.
+#
+# ⚠ DO NOT apply this file directly. The hostPath below is a placeholder.
+# Use `make cluster-up` which generates the real config with your POSTGRES_DATA_DIR.
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: nars
@@ -16,5 +19,5 @@ kubeadmConfigPatches:
 nodes:
   - role: control-plane
     extraMounts:
-      - hostPath: /absolute/path/to/data/nars/postgis
+      - hostPath: REPLACE_WITH_POSTGRES_DATA_DIR
         containerPath: /mnt/nars/postgis

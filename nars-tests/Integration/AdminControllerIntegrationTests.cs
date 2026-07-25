@@ -50,7 +50,7 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
         return new AdminUserController(
             Mock.Of<Microsoft.Extensions.Logging.ILogger<AdminUserController>>(),
             new UserAuthorizationService(_db),
-            AuthTestHelper.CreateUserCreationMock(),
+            AuthTestHelper.CreateUserCreationMock(_db),
             Mock.Of<IWebHostEnvironment>());
     }
 

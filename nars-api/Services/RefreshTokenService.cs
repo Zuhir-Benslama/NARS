@@ -14,6 +14,7 @@ public class RefreshTokenService(
     IOptions<JwtOptions> jwtOptions,
     IDateTimeProvider timeProvider) : IRefreshTokenService
 {
+    protected IDateTimeProvider TimeProvider => timeProvider;
     public async Task<RefreshTokenResult> RotateRefreshTokenAsync(string? rawRefreshToken, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(rawRefreshToken))
@@ -94,12 +95,6 @@ public class RefreshTokenService(
 
     public async Task<User?> FindUserByUsernameAsync(string normalizedUsername, CancellationToken cancellationToken = default)
         => await db.Users.FirstOrDefaultAsync(u => u.Username == normalizedUsername, cancellationToken);
-
-    public async Task AddUserAsync(User user, CancellationToken cancellationToken = default)
-    {
-        db.Users.Add(user);
-        await db.SaveChangesAsync(cancellationToken);
-    }
 
     public async Task RecordFailedLoginAsync(User user, int maxFailedAttempts, int lockoutMinutes, DateTimeOffset utcNow, CancellationToken cancellationToken = default)
     {

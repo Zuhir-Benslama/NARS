@@ -60,7 +60,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue"
+import { ref, computed, watch, onMounted, onUnmounted } from "vue"
 import { useI18n } from "vue-i18n"
 import { useFieldStore } from "../stores/fieldStore"
 import { apiFetch } from "../api"
@@ -122,11 +122,12 @@ async function fetchFeatures() {
   loading.value = true
   features.value = []
   try {
-    features.value = await props.fetchFeaturesFn(tab.apiType)
+    const result = await props.fetchFeaturesFn(tab.apiType)
+    if (_mounted) features.value = result
   } catch (err) {
-    logError(createNetworkError("Failed to load field features", { action: "fetchFeatures" }, err))
+    if (_mounted) logError(createNetworkError("Failed to load field features", { action: "fetchFeatures" }, err))
   } finally {
-    loading.value = false
+    if (_mounted) loading.value = false
   }
 }
 
@@ -139,7 +140,14 @@ function clearSelection() {
   fetchFeatures()
 }
 
-onMounted(() => fetchFeatures())
+let _mounted = true
+onMounted(() => {
+  _mounted = true
+  fetchFeatures()
+})
+onUnmounted(() => {
+  _mounted = false
+})
 </script>
 
 <style scoped>

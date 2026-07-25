@@ -1,8 +1,12 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_API_BASE: string
-  readonly VITE_OTEL_CORS_URLS: string
+  readonly VITE_API_BASE: string | undefined
+  readonly VITE_OTEL_CORS_URLS: string | undefined
+  readonly VITE_TILE_SATELLITE: string | undefined
+  readonly VITE_TILE_STREET: string | undefined
+  readonly VITE_TILE_LIGHT: string | undefined
+  readonly VITE_TILE_DARK: string | undefined
 }
 
 interface ImportMeta {

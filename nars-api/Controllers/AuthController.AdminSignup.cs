@@ -109,16 +109,16 @@ public partial class AuthController
             body.Name, body.Email, body.Phone, body.Username, body.Password,
             body.Role, body.CommuneId, body.DairaId, body.WilayaId,
             cancellationToken);
-        if (error is not null)
+        if (error is not null || newUser is null)
         {
-            var statusCode = error.Contains("already exists") ? 409 : 400;
-            return Problem(detail: error, statusCode: statusCode);
+            var statusCode = error?.Contains("already exists") == true ? 409 : 400;
+            return Problem(detail: error ?? "User creation failed.", statusCode: statusCode);
         }
 
         // 6. Persist (catch DB-level unique constraint races).
         try
         {
-            await refreshService.AddUserAsync(newUser!, cancellationToken);
+            await userCreationService.SaveUserAsync(newUser, cancellationToken);
         }
         catch (DbUpdateException)
         {
@@ -129,7 +129,7 @@ public partial class AuthController
 
         logger.LogInformation(
             "[Auth] {AdminUser} ({AdminRole}) created {NewRole} account {NewUser} via login page",
-            admin.Username, admin.Role, newUser!.Role, newUser.Username);
+            admin.Username, admin.Role, newUser.Role, newUser.Username);
 
         return StatusCode(201, ApiResponse.Ok($"{body.Role} account created successfully."));
     }

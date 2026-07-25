@@ -1,6 +1,4 @@
 using System.Security.Claims;
-using System.Text;
-using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NarsApi.Infrastructure;
@@ -72,35 +70,4 @@ public abstract class NarsControllerBase(
         IsEssential = true,
     };
 #pragma warning restore S2092
-
-    /// <summary>Validates that a feature data JSON payload does not exceed the size limit.</summary>
-    protected static IActionResult? ValidateFeatureDataSize(JsonElement data, int maxSizeBytes)
-    {
-        var rawJson = data.GetRawText();
-        if (Encoding.UTF8.GetByteCount(rawJson) > maxSizeBytes)
-        {
-            return new ObjectResult(new ProblemDetails
-            {
-                Detail = $"Feature data is too large (max {maxSizeBytes / 1024} KB).",
-                Status = 400,
-                Title = "Bad Request",
-            });
-        }
-        return null;
-    }
-
-    /// <summary>Validates that a string data payload does not exceed the size limit.</summary>
-    protected static IActionResult? ValidateFeatureDataSize(string rawData, int maxSizeBytes)
-    {
-        if (Encoding.UTF8.GetByteCount(rawData) > maxSizeBytes)
-        {
-            return new ObjectResult(new ProblemDetails
-            {
-                Detail = $"Feature data is too large (max {maxSizeBytes / 1024} KB).",
-                Status = 400,
-                Title = "Bad Request",
-            });
-        }
-        return null;
-    }
 }

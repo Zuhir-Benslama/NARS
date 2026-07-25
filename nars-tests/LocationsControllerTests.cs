@@ -5,6 +5,7 @@ using NarsApi.Controllers;
 using NarsApi.Infrastructure;
 using NarsApi.Data;
 using NarsApi.DTOs;
+using NarsApi.Models;
 using NarsApi.Services;
 using static NarsApi.Tests.TestData;
 using Xunit;
@@ -15,12 +16,22 @@ public class LocationsControllerTests
 {
     private static LocationsController CreateController(
         AppDbContext db,
-        IBoundaryService? boundaryService = null) =>
+        IBoundaryService? boundaryService = null,
+        ILocationQueryService? locationQuery = null) =>
         new(
             db,
             Options.Create(new LocationsOptions()),
             boundaryService ?? Mock.Of<IBoundaryService>(),
-            Mock.Of<ILocationQueryService>());
+            locationQuery ?? Mock.Of<ILocationQueryService>());
+
+    private static ILocationQueryService CreateLocationQueryMock(AppDbContext db)
+    {
+        var mock = new Mock<ILocationQueryService>();
+        mock.Setup(s => s.GetCommuneByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int communeId, CancellationToken _) =>
+                db.Communes.FirstOrDefault(c => c.CommuneId == communeId));
+        return mock.Object;
+    }
 
     private static AppDbContext CreateDb(string name) => CreateInMemoryDb($"LocationsTest_{name}");
 
@@ -204,7 +215,8 @@ public class LocationsControllerTests
         boundaryMock.Setup(b => b.GetBoundaryGeoJsonAsync(1001, It.IsAny<CancellationToken>()))
             .ReturnsAsync("{\"type\":\"Polygon\"}");
 
-        var ctrl = CreateController(db, boundaryService: boundaryMock.Object);
+        var locationQueryMock = CreateLocationQueryMock(db);
+        var ctrl = CreateController(db, boundaryService: boundaryMock.Object, locationQuery: locationQueryMock);
 
         var result = await ctrl.GetCommuneBoundary(1001);
 

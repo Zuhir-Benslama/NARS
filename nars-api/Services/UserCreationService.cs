@@ -60,4 +60,10 @@ public class UserCreationService(AppDbContext db) : IUserCreationService
 
         return (newUser, null);
     }
+
+    public async Task SaveUserAsync(User user, CancellationToken cancellationToken = default)
+    {
+        db.Users.Add(user);
+        await db.SaveChangesAsync(cancellationToken);
+    }
 }

@@ -7,7 +7,10 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFactory, ILogger<ScatteredAreaService> logger)
+public sealed class ScatteredAreaService(
+    IDbContextFactory<AppDbContext> dbFactory,
+    IDateTimeProvider timeProvider,
+    ILogger<ScatteredAreaService> logger)
     : IScatteredAreaService
 {
     private const string DefaultLabel = "Scattered Area";
@@ -107,7 +110,10 @@ public sealed class ScatteredAreaService(IDbContextFactory<AppDbContext> dbFacto
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            lock (_errorLock) _lastError = (DateTimeOffset.UtcNow, ex.Message);
+            var errorMessage = ex.InnerException is not null
+                ? $"{ex.Message} → {ex.InnerException.Message}"
+                : ex.Message;
+            lock (_errorLock) _lastError = (timeProvider.UtcNow, errorMessage);
             logger.LogError(ex, "ScatteredAreaService refresh failed for user {UserId}, commune {CommuneId}", userId, communeId);
         }
     }

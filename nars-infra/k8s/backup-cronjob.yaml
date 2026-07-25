@@ -79,19 +79,30 @@ spec:
                 - -ec
                 - |
                   set -o pipefail
+
+                  # Install GPG if not present (Alpine doesn't bundle it)
+                  if ! command -v gpg &>/dev/null; then
+                    echo "→ Installing gnupg..."
+                    apk add --no-cache gnupg >/dev/null 2>&1
+                  fi
+
                   TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
                   FILE="/backup/nars_db_${TIMESTAMP}.sql"
-                  echo "→ Backing up database 'nars_db'..."
+                  echo "→ Backing up database 'nars_db' (encrypted)..."
                   pg_dump \
                     -h "${PGHOST}" -U "${PGUSER}" -d "${PGDATABASE}" \
-                    --no-owner | gzip > "$FILE.gz"
-                  FILESIZE=$(stat -c%s "$FILE.gz" 2>/dev/null || echo 0)
+                    --no-owner \
+                  | gzip \
+                  | gpg --batch --yes --passphrase "$GPG_PASSPHRASE" \
+                        --symmetric --cipher-algo AES256 \
+                        -o "${FILE}.gz.gpg"
+                  FILESIZE=$(stat -c%s "${FILE}.gz.gpg" 2>/dev/null || echo 0)
                   if [ "$FILESIZE" -lt 100 ]; then
                     echo "✖ Backup file is suspiciously small (${FILESIZE} bytes) — possible pg_dump failure"
-                    rm -f "$FILE.gz"
+                    rm -f "${FILE}.gz.gpg"
                     exit 1
                   fi
-                  echo "✓ Backup saved: ${FILE}.gz ($(numfmt --to=iec "$FILESIZE"))"
+                  echo "✓ Backup saved: ${FILE}.gz.gpg ($(numfmt --to=iec "$FILESIZE"))"
                   ls -lh /backup/
                   echo "→ Cleaning backups older than 30 days..."
                   find /backup -name "nars_db_*.sql*" -mtime +30 -delete
@@ -128,6 +139,11 @@ spec:
                     secretKeyRef:
                       name: nars-secrets
                       key: postgres_password
+                - name: GPG_PASSPHRASE
+                  valueFrom:
+                    secretKeyRef:
+                      name: nars-secrets
+                      key: gpg-passphrase
               volumeMounts:
                 - name: backup-storage
                   mountPath: /backup

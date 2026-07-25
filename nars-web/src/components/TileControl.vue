@@ -1,13 +1,15 @@
 <template>
   <div ref="containerRef" v-click-outside="handleClickOutside" class="tile-control">
-    <button class="tile-toggle" :title="t('tile_layers')" @click="toggle">
+    <button class="tile-toggle" :title="t('tile_layers')" :aria-expanded="open" aria-haspopup="listbox" @click="toggle">
       <img src="/tiles.svg" class="tile-icon" alt="layers" />
     </button>
-    <div v-if="open" class="tile-dropdown">
+    <div v-if="open" class="tile-dropdown" role="listbox" :aria-label="t('tile_layers')">
       <div
         v-for="layer in layers"
         :key="layer.key"
         :class="['tile-item', { active: activeKey === layer.key }]"
+        role="option"
+        :aria-selected="activeKey === layer.key"
         @click="select(layer.key)"
       >
         <span class="tile-dot" :style="{ background: layer.color }" />

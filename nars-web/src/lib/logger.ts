@@ -37,7 +37,7 @@ async function flush(): Promise<void> {
   }
   if (batch.length === 0 || flushing) return
 
-  const entries = batch.splice(0, BATCH_LIMIT)
+  const entries = batch.slice(0, BATCH_LIMIT)
   flushing = true
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -57,7 +57,10 @@ async function flush(): Promise<void> {
         signal: controller.signal,
       })
       clearTimeout(timeoutId)
-      if (res.ok) break
+      if (res.ok) {
+        batch.splice(0, entries.length)
+        break
+      }
     } catch (err) {
       // Silently ignore in production — don't create a feedback loop by logging the logger
       if (isDev()) debugWarn("[Logger] Failed to send log batch:", err)

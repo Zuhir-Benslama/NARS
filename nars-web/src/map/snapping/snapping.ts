@@ -13,6 +13,7 @@ import {
   setSnappingEnabled,
 } from "../draw/draw-complete"
 import { findNearestSnap } from "./snap-search"
+import { debugWarn } from "../../utils/debug"
 export { findNearestSnap, mergeExternalSnapWithDrawFirstVertex } from "./snap-search"
 export type { SnapResult } from "./snap-search"
 
@@ -39,7 +40,9 @@ if (import.meta.hot) {
 export function resetSnapState(): void {
   const store = useSnapStore()
   store.resetSnap()
+  snapMarker?.remove()
   snapMarker = null
+  snapCursor?.remove()
   snapCursor = null
 }
 
@@ -307,8 +310,8 @@ export function installSnapInterceptors(): void {
         writable: true,
         configurable: true,
       })
-    } catch {
-      // Property is non-configurable in this MapLibre version — skip safely.
+    } catch (err) {
+      debugWarn("[SNAP] Could not override lngLat on event:", err)
     }
   }
 

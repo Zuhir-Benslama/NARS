@@ -92,7 +92,7 @@ function processFeature(
       appStore.cityCenterLatLng = { lat: data.lat, lng: data.lng }
     }
   } catch (err) {
-    debugError("[LOAD] Error loading feature:", err)
+    debugError("[LOAD] Error loading feature", feature.id, ":", err)
   }
   return "ok"
 }

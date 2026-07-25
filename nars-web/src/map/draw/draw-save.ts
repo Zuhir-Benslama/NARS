@@ -58,6 +58,17 @@ export function normalizeGeometry(
     const ring = geometry.coordinates.map((c) => [c[0], c[1]] as [number, number])
     return { type: "Polygon", coordinates: [closeRing(ring)] }
   }
+  if (
+    geometry.type === "MultiPolygon" ||
+    geometry.type === "MultiLineString"
+  ) {
+    debugError("[NORMALIZE] Unexpected geometry type:", geometry.type)
+    if (geometry.type === "MultiLineString") {
+      return { type: "LineString", coordinates: geometry.coordinates[0] ?? [] }
+    }
+    const outer = (geometry as GeoJSON.MultiPolygon).coordinates[0]?.[0] ?? []
+    return { type: "Polygon", coordinates: [outer.map((c) => [c[0], c[1]] as [number, number])] }
+  }
   return geometry as GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon
 }
 
@@ -134,8 +145,9 @@ function applyCityCenterOverride(
   style: Record<string, unknown>,
   storeGeometry: GeoJSON.Geometry,
 ): { style: Record<string, unknown>; storeGeometry: GeoJSON.Geometry } {
-  if (!featureData.radius) return { style, storeGeometry }
-  const ring = closeRing(computeCircleRing(featureData.lat!, featureData.lng!, featureData.radius))
+  if (!featureData.radius || featureData.lat == null || featureData.lng == null)
+    return { style, storeGeometry }
+  const ring = closeRing(computeCircleRing(featureData.lat, featureData.lng, featureData.radius))
   return {
     storeGeometry: { type: "LineString", coordinates: ring },
     style: {

@@ -27,6 +27,7 @@ export function initRotationControls(): void {
   const ccw = document.createElement("button")
   ccw.textContent = "↺"
   ccw.title = t("rotate_ccw")
+  ccw.setAttribute("aria-label", t("rotate_ccw"))
   ccw.className = "nars-map-btn"
   ccw.style.cssText = "width:30px;height:30px;cursor:pointer;"
   ccw.onclick = () => setBearing(useRotationStore().currentBearing - STEP)
@@ -34,6 +35,7 @@ export function initRotationControls(): void {
   const cw = document.createElement("button")
   cw.textContent = "↻"
   cw.title = t("rotate_cw")
+  cw.setAttribute("aria-label", t("rotate_cw"))
   cw.className = "nars-map-btn"
   cw.style.cssText = "width:30px;height:30px;cursor:pointer;"
   cw.onclick = () => setBearing(useRotationStore().currentBearing + STEP)

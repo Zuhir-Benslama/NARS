@@ -30,10 +30,13 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach(() => {
+router.beforeEach((to) => {
   const appStore = useAppStore()
   if (!appStore.isAuthenticated) {
     return getLoginPath()
+  }
+  if ((to.name === "admin" || to.name === "wilaya-detail") && !appStore.isAdminUser) {
+    return false
   }
 })
 

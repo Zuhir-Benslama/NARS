@@ -27,6 +27,4 @@ public interface IUserAuthorizationService
     Task<bool> DeleteUserAsync(Guid userId, CancellationToken ct = default);
     /// <summary>Saves all pending changes to the database.</summary>
     Task SaveChangesAsync(CancellationToken ct = default);
-    /// <summary>Persists a new user to the database.</summary>
-    Task AddUserAsync(User user, CancellationToken ct = default);
 }

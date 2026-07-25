@@ -30,10 +30,13 @@ public class LocationsController(
     ILocationQueryService locationQuery) : ControllerBase
 {
 
+    private static string EscapeLikeWildcards(string input)
+        => input.Replace("%", "\\%").Replace("_", "\\_", StringComparison.Ordinal);
+
     private async Task<IActionResult> PaginateAsync<TEntity, TDto>(
         string search, int skip, int take,
         Func<IQueryable<TEntity>> baseQuery,
-        Func<IQueryable<TEntity>, IQueryable<TEntity>>? searchFilter,
+        Func<string, IQueryable<TEntity>, IQueryable<TEntity>>? searchFilter,
         Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>> orderBy,
         Func<TEntity, TDto> mapper,
         CancellationToken cancellationToken)
@@ -50,7 +53,7 @@ public class LocationsController(
         var q = baseQuery();
         if (!string.IsNullOrEmpty(search) && searchFilter is not null)
         {
-            q = searchFilter(q);
+            q = searchFilter(EscapeLikeWildcards(search), q);
         }
 
         var total = await q.CountAsync(cancellationToken);
@@ -73,8 +76,8 @@ public class LocationsController(
         CancellationToken cancellationToken = default) => await PaginateAsync(
             search, skip, take,
             () => db.Wilayas.AsQueryable(),
-            q => q.Where(w => EF.Functions.ILike(w.WilayaFr ?? "", $"%{search}%")
-                           || EF.Functions.ILike(w.WilayaAr ?? "", $"%{search}%")),
+            (escaped, q) => q.Where(w => EF.Functions.ILike(w.WilayaFr ?? "", $"%{escaped}%")
+                           || EF.Functions.ILike(w.WilayaAr ?? "", $"%{escaped}%")),
             q => q.OrderBy(w => w.WilayaFr),
             w => new WilayaItem(w.WilayaId, w.WilayaFr ?? "", w.WilayaAr ?? "", w.WilayaLatitude, w.WilayaLongitude),
             cancellationToken);
@@ -100,8 +103,8 @@ public class LocationsController(
         return await PaginateAsync(
             search, skip, take,
             () => db.Dairas.Where(d => d.WilayaId == wilaya_id),
-            q => q.Where(d => EF.Functions.ILike(d.DairaFr, $"%{search}%")
-                           || EF.Functions.ILike(d.DairaAr, $"%{search}%")),
+            (escaped, q) => q.Where(d => EF.Functions.ILike(d.DairaFr, $"%{escaped}%")
+                           || EF.Functions.ILike(d.DairaAr, $"%{escaped}%")),
             q => q.OrderBy(d => d.DairaFr),
             d => new DairaItem(d.DairaId, d.DairaFr, d.DairaAr, d.DairaLatitude, d.DairaLongitude, d.DairaName ?? ""),
             cancellationToken);
@@ -128,8 +131,8 @@ public class LocationsController(
         return await PaginateAsync(
             search, skip, take,
             () => db.Communes.Where(c => c.DairaId == daira_id),
-            q => q.Where(c => EF.Functions.ILike(c.CommuneFr, $"%{search}%")
-                           || EF.Functions.ILike(c.CommuneAr, $"%{search}%")),
+            (escaped, q) => q.Where(c => EF.Functions.ILike(c.CommuneFr, $"%{escaped}%")
+                           || EF.Functions.ILike(c.CommuneAr, $"%{escaped}%")),
             q => q.OrderBy(c => c.CommuneFr),
             c => new CommuneItem(c.CommuneId, c.CommuneFr, c.CommuneAr, c.CommuneCode?.ToString(), c.CommuneLatitude, c.CommuneLongitude, c.CommuneName ?? ""),
             cancellationToken);
@@ -144,6 +147,10 @@ public class LocationsController(
     public async Task<IActionResult> GetCommuneBoundary(int communeId, CancellationToken cancellationToken = default)
     {
         var commune = await locationQuery.GetCommuneByIdAsync(communeId, cancellationToken);
+        if (commune is null)
+        {
+            return Problem(detail: "Commune not found.", statusCode: 404);
+        }
 
         // Raw ADO.NET required — ST_AsGeoJSON returns a text result that
         // EF Core's Npgsql mapper mis-handles under UseSnakeCaseNamingConvention().
@@ -151,7 +158,7 @@ public class LocationsController(
 
         if (geoJson is null)
         {
-            if (commune?.CommuneLatitude is not null && commune.CommuneLongitude is not null)
+            if (commune.CommuneLatitude is not null && commune.CommuneLongitude is not null)
             {
                 geoJson = JsonSerializer.Serialize(new
                 {
@@ -168,7 +175,7 @@ public class LocationsController(
         return Ok(new
         {
             communeId,
-            communeName = commune?.CommuneFr,
+            communeName = commune.CommuneFr,
             geometry = geoJson,
         });
     }

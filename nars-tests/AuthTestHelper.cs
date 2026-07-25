@@ -60,6 +60,17 @@ public static class AuthTestHelper
                 };
                 return (user, (string?)null);
             });
+        mock.Setup(s => s.SaveUserAsync(
+                It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .Returns((User user, CancellationToken _) =>
+            {
+                if (db is not null)
+                {
+                    db.Users.Add(user);
+                    return db.SaveChangesAsync();
+                }
+                return Task.CompletedTask;
+            });
         return mock.Object;
     }
 

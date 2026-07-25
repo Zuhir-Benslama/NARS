@@ -20,6 +20,4 @@ public interface IRefreshTokenService
     Task RecordFailedLoginAsync(User user, int maxFailedAttempts, int lockoutMinutes, DateTimeOffset utcNow, CancellationToken cancellationToken = default);
     /// <summary>Resets failed login attempts and clears lockout.</summary>
     Task ResetFailedAttemptsIfNeededAsync(User user, CancellationToken cancellationToken = default);
-    /// <summary>Persists a new user to the database.</summary>
-    Task AddUserAsync(User user, CancellationToken cancellationToken = default);
 }
