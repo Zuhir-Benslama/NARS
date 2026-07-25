@@ -58,10 +58,7 @@ export function normalizeGeometry(
     const ring = geometry.coordinates.map((c) => [c[0], c[1]] as [number, number])
     return { type: "Polygon", coordinates: [closeRing(ring)] }
   }
-  if (
-    geometry.type === "MultiPolygon" ||
-    geometry.type === "MultiLineString"
-  ) {
+  if (geometry.type === "MultiPolygon" || geometry.type === "MultiLineString") {
     debugError("[NORMALIZE] Unexpected geometry type:", geometry.type)
     if (geometry.type === "MultiLineString") {
       return { type: "LineString", coordinates: geometry.coordinates[0] ?? [] }

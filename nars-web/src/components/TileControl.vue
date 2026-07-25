@@ -1,6 +1,12 @@
 <template>
   <div ref="containerRef" v-click-outside="handleClickOutside" class="tile-control">
-    <button class="tile-toggle" :title="t('tile_layers')" :aria-expanded="open" aria-haspopup="listbox" @click="toggle">
+    <button
+      class="tile-toggle"
+      :title="t('tile_layers')"
+      :aria-expanded="open"
+      aria-haspopup="listbox"
+      @click="toggle"
+    >
       <img src="/tiles.svg" class="tile-icon" alt="layers" />
     </button>
     <div v-if="open" class="tile-dropdown" role="listbox" :aria-label="t('tile_layers')">

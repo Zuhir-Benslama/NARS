@@ -125,7 +125,10 @@ async function fetchFeatures() {
     const result = await props.fetchFeaturesFn(tab.apiType)
     if (_mounted) features.value = result
   } catch (err) {
-    if (_mounted) logError(createNetworkError("Failed to load field features", { action: "fetchFeatures" }, err))
+    if (_mounted)
+      logError(
+        createNetworkError("Failed to load field features", { action: "fetchFeatures" }, err),
+      )
   } finally {
     if (_mounted) loading.value = false
   }

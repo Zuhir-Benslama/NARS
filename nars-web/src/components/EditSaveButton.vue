@@ -19,7 +19,7 @@
     >
       <polyline points="20 6 9 17 4 12" />
     </svg>
-    {{ t('btn_save_geometry') }}
+    {{ t("btn_save_geometry") }}
   </button>
 </template>
 
