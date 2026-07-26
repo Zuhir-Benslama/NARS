@@ -113,7 +113,15 @@ export async function initMap(): Promise<void> {
 
   _setBaseLayer = (key: string) => switchBaseLayer(key, geomanOptions)
 
-  await new Promise<void>((resolve) => ctx.map.once("load", resolve))
+  await new Promise<void>((resolve) => {
+    const onLoad = () => resolve()
+    ctx.map.once("load", onLoad)
+    setTimeout(() => {
+      ctx.map.off("load", onLoad)
+      debugWarn("[MAP] Map load event timed out after 15 s")
+      resolve()
+    }, 15_000)
+  })
 
   await initGeoman(ctx.map, geomanOptions)
   initSources()
