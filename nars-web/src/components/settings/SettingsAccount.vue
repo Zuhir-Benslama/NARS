@@ -86,7 +86,11 @@ async function save() {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+  }).catch(() => {
+    showToast(t("alert_account_updated_failed") || "Update failed", "error")
+    return null
   })
+  if (!res) return
   if (res.ok) {
     if (appStore.user) {
       appStore.user = { ...appStore.user, ...body }

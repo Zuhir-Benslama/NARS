@@ -63,10 +63,7 @@ export async function initMap(): Promise<void> {
     MAP_CONFIG.tileMaxZoomSatellite,
   )
 
-  const ctx: MapContext = {} as MapContext
-  _setCtx(ctx)
-
-  ctx.map = new maplibregl.Map({
+  const map = new maplibregl.Map({
     container: "map",
     style: satelliteStyle,
     center: MAP_CONFIG.defaultCenter,
@@ -77,12 +74,7 @@ export async function initMap(): Promise<void> {
     maxZoom: MAP_CONFIG.maxZoom,
   })
 
-  if (import.meta.env.DEV) {
-    ;(window as unknown as Record<string, unknown>).__narsMap = ctx.map
-  }
-
-  ctx.satelliteStyle = satelliteStyle
-  ctx.streetStyle = buildRasterStyle(
+  const streetStyle = buildRasterStyle(
     MAP_CONFIG.tileUrls.street,
     "osm",
     MAP_CONFIG.tileMaxZoomStreet,
@@ -91,12 +83,29 @@ export async function initMap(): Promise<void> {
         '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     },
   )
-  ctx.lightStyle = buildRasterStyle(MAP_CONFIG.tileUrls.light, "carto", MAP_CONFIG.tileMaxZoomLight)
-  ctx.darkStyle = buildRasterStyle(
+  const lightStyle = buildRasterStyle(
+    MAP_CONFIG.tileUrls.light,
+    "carto",
+    MAP_CONFIG.tileMaxZoomLight,
+  )
+  const darkStyle = buildRasterStyle(
     MAP_CONFIG.tileUrls.dark,
     "carto-dark",
     MAP_CONFIG.tileMaxZoomDark,
   )
+
+  const ctx: MapContext = {
+    map,
+    satelliteStyle,
+    streetStyle,
+    lightStyle,
+    darkStyle,
+  }
+  _setCtx(ctx)
+
+  if (import.meta.env.DEV) {
+    ;(window as unknown as Record<string, unknown>).__narsMap = ctx.map
+  }
 
   currentActiveStyle = satelliteStyle
 
@@ -162,12 +171,16 @@ async function switchBaseLayer(
   const styleLoaded = new Promise<void>((resolve) => {
     map.once("style.load", () => resolve())
   })
-  const styleTimeout = new Promise<void>((_, reject) =>
+  const styleTimeout = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error("Style load timeout")), MAP_CONFIG.styleLoadTimeout),
-  ).catch(() => {})
+  )
 
   map.setStyle(next)
-  await Promise.race([styleLoaded, styleTimeout])
+  try {
+    await Promise.race([styleLoaded, styleTimeout])
+  } catch (err) {
+    debugWarn("[MAP] Style load failed:", err)
+  }
 
   initSources()
   const featuresStore = useFeaturesStore()

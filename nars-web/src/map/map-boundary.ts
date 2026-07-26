@@ -97,8 +97,10 @@ function showBoundaryContextMenu(x: number, y: number, communeName: string): voi
 
   copyItem.onclick = (e) => {
     e.stopPropagation()
-    navigator.clipboard.writeText(communeName)
-    showToast(`Copied: ${communeName}`, "success")
+    navigator.clipboard.writeText(communeName).then(
+      () => showToast(`Copied: ${communeName}`, "success"),
+      () => showToast("Failed to copy to clipboard", "error"),
+    )
     hide()
   }
 }

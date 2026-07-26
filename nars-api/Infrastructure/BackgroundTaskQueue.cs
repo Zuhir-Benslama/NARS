@@ -10,9 +10,11 @@ namespace NarsApi.Infrastructure;
 public class BackgroundTaskQueue : IBackgroundTaskQueue
 {
     private readonly Channel<Func<IServiceProvider, CancellationToken, Task>> _queue;
+    private readonly ILogger<BackgroundTaskQueue> _logger;
 
-    public BackgroundTaskQueue(IOptions<BackgroundTaskOptions> options)
+    public BackgroundTaskQueue(IOptions<BackgroundTaskOptions> options, ILogger<BackgroundTaskQueue> logger)
     {
+        _logger = logger;
         var capacity = options.Value.Capacity;
         var channelOptions = new BoundedChannelOptions(capacity)
         {
@@ -28,7 +30,15 @@ public class BackgroundTaskQueue : IBackgroundTaskQueue
     {
         ArgumentNullException.ThrowIfNull(workItem);
 
-        return _queue.Writer.WriteAsync(workItem);
+        // TryWrite returns false when the bounded channel is full and DropOldest
+        // cannot make room (e.g. the channel is actively being drained). Log the
+        // dropped item so operational visibility is maintained.
+        if (!_queue.Writer.TryWrite(workItem))
+        {
+            _logger.LogWarning("Background task queue is full — work item was dropped.");
+        }
+
+        return ValueTask.CompletedTask;
     }
 
     public async ValueTask<Func<IServiceProvider, CancellationToken, Task>> DequeueAsync(CancellationToken ct)

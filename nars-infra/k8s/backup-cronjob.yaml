@@ -62,7 +62,7 @@ spec:
           activeDeadlineSeconds: 600
           containers:
             - name: pg-dump
-              image: postgres:17-alpine@sha256:af194ccf3e2d7fe367012c7b88ce8b816c5c889b18a5b316799a1f0d7eac746a
+              image: zuhirbenslama/nars-backup:latest
               imagePullPolicy: IfNotPresent
               securityContext:
                 allowPrivilegeEscalation: false
@@ -79,12 +79,6 @@ spec:
                 - -ec
                 - |
                   set -o pipefail
-
-                  # Install GPG if not present (Alpine doesn't bundle it)
-                  if ! command -v gpg &>/dev/null; then
-                    echo "→ Installing gnupg..."
-                    apk add --no-cache gnupg >/dev/null 2>&1
-                  fi
 
                   TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
                   FILE="/backup/nars_db_${TIMESTAMP}.sql"

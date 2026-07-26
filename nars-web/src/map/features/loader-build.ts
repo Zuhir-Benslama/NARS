@@ -33,7 +33,7 @@ export function buildGeoJsonFeature(
     data.coordinates?.length ?? "none",
   )
 
-  if (data.lat && data.lng) {
+  if (data.lat != null && data.lng != null) {
     if (phase.key === "cityCenter") {
       const radius = data.radius
       if (radius && radius > 0) {

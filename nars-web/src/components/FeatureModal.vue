@@ -1,6 +1,6 @@
 <template>
   <div
-    v-show="modalStore.visible"
+    v-if="modalStore.visible"
     ref="modalRef"
     class="modal"
     role="dialog"
@@ -283,6 +283,8 @@ function onCancel() {
 function onKeydown(e: KeyboardEvent) {
   if (!modalStore.visible) return
   if (e.key === "Enter") {
+    const tag = (e.target as HTMLElement)?.tagName
+    if (tag === "SELECT" || tag === "TEXTAREA") return
     e.preventDefault()
     onSave()
   }

@@ -16,7 +16,7 @@ namespace NarsApi.Tests;
 
 public class LogsControllerTests
 {
-    private static readonly LoggingOptions DefaultLogOptions = new() { MaxBatchSize = 100, MaxEntryLength = 1000 };
+    private static readonly LoggingOptions DefaultLogOptions = new() { MaxBatchSize = DefaultMaxBatchSize, MaxEntryLength = DefaultMaxEntryLength };
 
     private static IDateTimeProvider CreateFixedTime() =>
         Mock.Of<IDateTimeProvider>(p => p.UtcNow == FixedUtcNow);
@@ -88,7 +88,7 @@ public class LogsControllerTests
     [Fact]
     public async Task SubmitLogs_ExceedsMaxBatch_Returns400()
     {
-        var ctrl = CreateController(logOptions: new LoggingOptions { MaxBatchSize = 5, MaxEntryLength = 1000 });
+        var ctrl = CreateController(logOptions: new LoggingOptions { MaxBatchSize = 5, MaxEntryLength = DefaultMaxEntryLength });
         var entries = Enumerable.Range(0, 10)
             .Select(i => new LogEntry("error", null, $"msg{i}", null, null, null))
             .ToList();
@@ -183,7 +183,7 @@ public class LogsControllerTests
     [Fact]
     public async Task SubmitLogs_MessageTooLong_SkipsEntry()
     {
-        var ctrl = CreateController(logOptions: new LoggingOptions { MaxBatchSize = 100, MaxEntryLength = 50 });
+        var ctrl = CreateController(logOptions: new LoggingOptions { MaxBatchSize = DefaultMaxBatchSize, MaxEntryLength = 50 });
         var body = new LogBatch(new List<LogEntry>
         {
             new("error", null, new string('x', 51), null, null, null),

@@ -121,6 +121,7 @@
   "error_network_with_msg": "Network error: {message}",
   "error_password_min_length": "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل.",
   "error_save_failed": "Failed to save",
+  "error_add_feature_failed": "فشل في إضافة نوع الميزة",
   "error_username_invalid_chars": "يمكن أن يحتوي اسم المستخدم على أحرف وأرقام ونقاط وشرطات سفلية فقط.",
   "error_username_max_length": "يجب ألا يتجاوز اسم المستخدم 50 حرفاً.",
   "error_username_min_length": "يجب أن يكون اسم المستخدم 3 أحرف على الأقل.",

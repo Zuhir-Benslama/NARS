@@ -106,5 +106,8 @@ export function toApiSaveShape(fd: FeatureData): ApiSaveShape {
       return { type: "public_space", layer: fd.spaceTypeKey ?? "garden" }
     case "namingPanels":
       return { type: "naming_panel", layer: "naming_panel" }
+    default:
+      debugError("[SAVE] toApiSaveShape: unknown feature type:", fd.type)
+      return { type: "unknown", layer: "unknown" }
   }
 }

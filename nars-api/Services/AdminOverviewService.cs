@@ -8,10 +8,13 @@ namespace NarsApi.Services;
 
 public class AdminOverviewService(AppDbContext db, IFeatureStatsService featureStatsService) : IAdminOverviewService
 {
-    public async Task<List<WilayaSummary>> GetNationalOverviewAsync(CancellationToken cancellationToken = default)
+    public async Task<(List<WilayaSummary> Items, int Total)> GetNationalOverviewAsync(int skip = 0, int take = 500, CancellationToken cancellationToken = default)
     {
-        var wilayas = await db.Wilayas.OrderBy(w => w.WilayaId).ToListAsync(cancellationToken);
-        var wilayaIds = wilayas.Select(w => w.WilayaId).ToArray();
+        var allWilayas = await db.Wilayas.OrderBy(w => w.WilayaId).ToListAsync(cancellationToken);
+        var total = allWilayas.Count;
+
+        var pagedWilayas = allWilayas.Skip(skip).Take(take).ToList();
+        var wilayaIds = pagedWilayas.Select(w => w.WilayaId).ToArray();
 
         // Run sequentially — DbContext is not thread-safe.
         var admins = await db.Users
@@ -41,7 +44,7 @@ public class AdminOverviewService(AppDbContext db, IFeatureStatsService featureS
             .Select(g => new { CommuneId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.CommuneId, x => x.Count, cancellationToken);
 
-        return [.. wilayas.Select(wilaya =>
+        var items = pagedWilayas.Select(wilaya =>
         {
             var admin = admins.GetValueOrDefault(wilaya.WilayaId);
             var wilayaDairas = dairas.Where(d => d.WilayaId == wilaya.WilayaId).ToList();
@@ -59,7 +62,9 @@ public class AdminOverviewService(AppDbContext db, IFeatureStatsService featureS
                 CommuneCount: communeIds.Length,
                 CommuneUserCount: communeIds.Sum(cid => userCountByCommune.GetValueOrDefault(cid))
             );
-        })];
+        }).ToList();
+
+        return (items, total);
     }
 
     public async Task<WilayaReport?> GetWilayaReportAsync(int wilayaId, CancellationToken cancellationToken = default)

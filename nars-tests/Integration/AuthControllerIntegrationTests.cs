@@ -278,7 +278,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
             Mock.Of<ILogger<AuthController>>(),
             timeProvider,
             new UserAuthorizationService(db),
-            AuthTestHelper.CreateUserCreationMock(db),
+            new UserCreationService(db),
             Mock.Of<ILocationQueryService>(),
             Mock.Of<IWebHostEnvironment>());
     }

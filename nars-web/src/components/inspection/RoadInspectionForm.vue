@@ -76,7 +76,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from "vue"
+import { reactive, ref, computed } from "vue"
 import { useI18n } from "vue-i18n"
 import { apiFetch } from "../../api"
 import { getErrorMessage } from "../../lib/errors"
@@ -97,16 +97,16 @@ const data = reactive<RoadInspectionData>({
   hasSidewalk: false,
 })
 
-const trafficOptions = [
+const trafficOptions = computed(() => [
   { value: "high", label: t("label_high") },
   { value: "medium", label: t("label_medium") },
   { value: "low", label: t("label_low") },
-]
-const activityOptions = [
+])
+const activityOptions = computed(() => [
   { value: "high", label: t("label_high") },
   { value: "medium", label: t("label_medium") },
   { value: "low", label: t("label_low") },
-]
+])
 
 const submitting = ref(false)
 

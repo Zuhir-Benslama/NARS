@@ -6,8 +6,9 @@ vi.mock("vue-i18n", () => ({
 }))
 
 import CommuneList from "./CommuneList.vue"
+import type { UserFeatureStats } from "../../types/admin"
 
-const mockUser = (overrides: Record<string, any> = {}) => ({
+const mockUser = (overrides: Partial<UserFeatureStats> = {}): UserFeatureStats => ({
   user_id: "1",
   username: "jdoe",
   name: "John Doe",
@@ -71,7 +72,7 @@ describe("CommuneList", () => {
   })
 
   it("hides FW badge for non-field-worker roles", () => {
-    const user = mockUser({ role: "commune_admin" })
+    const user = mockUser({ role: "commune_user" })
     const communes = [
       { commune_id: 1, commune_name_fr: "Test", commune_name_ar: "", users: [user] },
     ]
@@ -81,8 +82,8 @@ describe("CommuneList", () => {
 
   it("renders totals row when multiple users", () => {
     const users = [
-      mockUser({ user_id: 1, username: "a", areas: 2 }),
-      mockUser({ user_id: 2, username: "b", areas: 3 }),
+      mockUser({ user_id: "1", username: "a", areas: 2 }),
+      mockUser({ user_id: "2", username: "b", areas: 3 }),
     ]
     const communes = [{ commune_id: 1, commune_name_fr: "Test", commune_name_ar: "", users }]
     const wrapper = mount(CommuneList, { props: { communes } })
@@ -112,8 +113,8 @@ describe("CommuneList", () => {
 
   it("sum function produces correct totals", () => {
     const users = [
-      mockUser({ user_id: 1, username: "a", areas: 2 }),
-      mockUser({ user_id: 2, username: "b", areas: 3, roads: 5 }),
+      mockUser({ user_id: "1", username: "a", areas: 2 }),
+      mockUser({ user_id: "2", username: "b", areas: 3, roads: 5 }),
     ]
     const communes = [{ commune_id: 1, commune_name_fr: "Test", commune_name_ar: "", users }]
     const wrapper = mount(CommuneList, { props: { communes } })

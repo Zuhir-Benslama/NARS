@@ -45,7 +45,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, watch } from "vue"
+import { ref, computed, nextTick, watch, onMounted, onUnmounted } from "vue"
 import { useI18n } from "vue-i18n"
 import { useAppStore } from "../stores/appStore"
 import { apiFetch } from "../api"
@@ -97,6 +97,15 @@ function onSettings() {
   settingsVisible.value = true
   closeDropdown()
 }
+
+function onWindowKeydown(e: KeyboardEvent) {
+  if (e.key === "Escape" && dropdownOpen.value) {
+    e.preventDefault()
+    closeDropdown()
+  }
+}
+onMounted(() => window.addEventListener("keydown", onWindowKeydown))
+onUnmounted(() => window.removeEventListener("keydown", onWindowKeydown))
 
 async function onLogout() {
   try {

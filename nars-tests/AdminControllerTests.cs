@@ -31,8 +31,8 @@ public class AdminControllerTests
     public async Task Overview_NationalAdmin_ReturnsNationalOverview()
     {
         var overview = new Mock<IAdminOverviewService>();
-        overview.Setup(s => s.GetNationalOverviewAsync(default))
-            .ReturnsAsync([]);
+        overview.Setup(s => s.GetNationalOverviewAsync(0, 500, default))
+            .ReturnsAsync((new List<WilayaSummary>(), 0));
         var ctrl = CreateController(overview.Object);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 

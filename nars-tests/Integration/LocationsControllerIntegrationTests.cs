@@ -36,11 +36,13 @@ public class LocationsControllerIntegrationTests : IAsyncLifetime
 
     private LocationsController CreateController()
     {
+        var factory = _fixture.CreateDbContextFactory();
+        var searchService = new LocationSearchService(factory);
         return new LocationsController(
-            _db,
             Options.Create(new LocationsOptions()),
             Mock.Of<IBoundaryService>(),
-            Mock.Of<ILocationQueryService>());
+            Mock.Of<ILocationQueryService>(),
+            searchService);
     }
 
     [Fact]

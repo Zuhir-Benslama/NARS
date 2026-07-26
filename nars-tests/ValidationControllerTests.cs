@@ -62,22 +62,25 @@ public class ValidationControllerTests
     public async Task MainUrbanExists_WhenAreaExists_ReturnsTrue()
     {
         var (ctrl, db) = CreateController();
-        db.Areas.Add(new Area
+        using (db)
         {
-            Id = Guid.NewGuid(),
-            UserId = UserId,
-            Layer = FeatureTypes.AreaLayers.CentralUrban,
-            Data = "{}",
-            Label = "urban",
-            UpdatedAt = FixedUtcNow
-        });
-        await db.SaveChangesAsync();
+            db.Areas.Add(new Area
+            {
+                Id = Guid.NewGuid(),
+                UserId = UserId,
+                Layer = FeatureTypes.AreaLayers.CentralUrban,
+                Data = "{}",
+                Label = "urban",
+                UpdatedAt = FixedUtcNow
+            });
+            await db.SaveChangesAsync();
 
-        var result = await ctrl.MainUrbanExists();
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var json = System.Text.Json.JsonSerializer.Serialize(ok.Value);
-        var doc = System.Text.Json.JsonDocument.Parse(json);
-        Assert.True(doc.RootElement.GetProperty("exists").GetBoolean());
+            var result = await ctrl.MainUrbanExists();
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var json = System.Text.Json.JsonSerializer.Serialize(ok.Value);
+            var doc = System.Text.Json.JsonDocument.Parse(json);
+            Assert.True(doc.RootElement.GetProperty("exists").GetBoolean());
+        }
     }
 
     // ── POST /api/validate/road ───────────────────────────────────────────
@@ -144,7 +147,7 @@ public class ValidationControllerTests
     [Fact]
     public async Task ValidateRoad_SharpTurn_ReturnsInvalid()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         db.Roads.Add(new Road
         {
             Id = Guid.NewGuid(),
@@ -180,7 +183,7 @@ public class ValidationControllerTests
     [Fact]
     public async Task ValidateRoad_NotConnected_ReturnsInvalid()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
 
         db.Roads.Add(new Road
         {
@@ -254,7 +257,7 @@ public class ValidationControllerTests
     [Fact]
     public async Task ValidateDistrict_Overlap_ReturnsInvalid()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         db.Districts.Add(new District
         {
             Id = Guid.NewGuid(),
@@ -305,20 +308,23 @@ public class ValidationControllerTests
     public async Task DistrictsCoverage_NoDistricts_ReturnsNotCovered()
     {
         var (ctrl, db) = CreateController();
-        db.Areas.Add(new Area
+        using (db)
         {
-            Id = Guid.NewGuid(),
-            UserId = UserId,
-            Layer = FeatureTypes.AreaLayers.CentralUrban,
-            Data = "{}",
-            Label = "urban",
-            UpdatedAt = FixedUtcNow
-        });
-        await db.SaveChangesAsync();
+            db.Areas.Add(new Area
+            {
+                Id = Guid.NewGuid(),
+                UserId = UserId,
+                Layer = FeatureTypes.AreaLayers.CentralUrban,
+                Data = "{}",
+                Label = "urban",
+                UpdatedAt = FixedUtcNow
+            });
+            await db.SaveChangesAsync();
 
-        var result = await ctrl.DistrictsCoverage();
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<DistrictCoverageResponse>(ok.Value);
-        Assert.False(resp.Covered);
+            var result = await ctrl.DistrictsCoverage();
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<DistrictCoverageResponse>(ok.Value);
+            Assert.False(resp.Covered);
+        }
     }
 }

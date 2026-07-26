@@ -47,7 +47,7 @@ public class AuthControllerTests
             Mock.Of<ILogger<AuthController>>(),
             timeProvider,
             new UserAuthorizationService(db),
-            AuthTestHelper.CreateUserCreationMock(db),
+            new UserCreationService(db),
             Mock.Of<ILocationQueryService>(),
             Mock.Of<IWebHostEnvironment>())
         {
@@ -61,7 +61,7 @@ public class AuthControllerTests
     [Fact]
     public void SignUp_PublicEndpointIsDisabled_Returns410()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var controller = CreateController(db);
 
         var result = controller.SignUp();
@@ -73,7 +73,7 @@ public class AuthControllerTests
     [Fact]
     public async Task AuthorizedAdminSignup_ValidRequest_Returns201()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         await SeedLocationDataAsync(db);
         await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
 
@@ -100,7 +100,7 @@ public class AuthControllerTests
     [Fact]
     public async Task AuthorizedAdminSignup_WeakPassword_Returns400()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         await SeedLocationDataAsync(db);
         await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
 
@@ -127,7 +127,7 @@ public class AuthControllerTests
     [Fact]
     public async Task AuthorizedAdminSignup_DuplicateUsername_Returns409()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         await SeedLocationDataAsync(db);
         await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
         await db.Users.AddAsync(new User
@@ -166,7 +166,7 @@ public class AuthControllerTests
     [Fact]
     public async Task AuthorizedAdminSignup_DuplicateEmail_Returns409()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         await SeedLocationDataAsync(db);
         await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
         await db.Users.AddAsync(new User
@@ -205,7 +205,7 @@ public class AuthControllerTests
     [Fact]
     public async Task AuthorizedAdminSignup_CommuneOutsideAdminScope_Returns403()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         await SeedLocationDataAsync(db);
         await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
 
@@ -232,7 +232,7 @@ public class AuthControllerTests
     [Fact]
     public async Task SignIn_WrongPassword_Returns401()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         await SeedLocationDataAsync(db);
         await db.Users.AddAsync(new User
         {
@@ -261,7 +261,7 @@ public class AuthControllerTests
     [Fact]
     public async Task SignIn_UserNotFound_Returns401()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var controller = CreateController(db);
 
         var result = await controller.SignIn(new SignInRequest(

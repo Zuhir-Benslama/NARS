@@ -17,7 +17,7 @@ DOCKER_TOKEN       ?=
 BACKUP_DIR         ?= backup
 DB_NAME            ?= nars_db
 POSTGRES_DATA_DIR  ?= data/nars/postgis
-REGISTRY_IMAGES    := nars-api nars-postgis nars-vite
+REGISTRY_IMAGES    := nars-api nars-postgis nars-vite nars-backup
 SCALABLE_DEPLOYS   := postgis nars-api nars-frontend
 INGRESS_NGINX_VERSION ?= v1.12.0
 METRICS_SERVER_VERSION ?= v0.7.2
@@ -170,6 +170,7 @@ cluster-rebuild-full: cluster-down cluster-up-full ## Delete and recreate the cl
 .PHONY: cluster-reset
 cluster-reset: cluster-clean cluster-up-full ## Wipe data, recreate cluster with observability
 
+# cluster-down auto-backs up pg_dump before teardown — order is intentional
 .PHONY: cluster-clean
 cluster-clean: ## Delete cluster AND wipe postgis data (irreversible!)
 	@echo "⚠  WARNING: This will DESTROY all postgis data at $(POSTGRES_DATA_DIR)"
@@ -180,7 +181,6 @@ cluster-clean: ## Delete cluster AND wipe postgis data (irreversible!)
 		echo "  Non-interactive shell — refusing destructive operation."; \
 		exit 1; \
 	fi
-	# cluster-down auto-backs up pg_dump before teardown — order is intentional
 	$(MAKE) cluster-down
 	@echo "→ Wiping postgis data..."
 	@if rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null; then \
@@ -455,10 +455,10 @@ db-restore: ## Restore a backup. Usage: make db-restore FILE=backup/nars_db_2025
 		exit 1; \
 	fi
 	@if echo "$(FILE)" | grep -q '\.gz$$'; then
-		(builtin echo "$$PASS"; gunzip -c "$(FILE)") | $(KUBECTL) exec -i "$$POD" -n "$(NAMESPACE)" -- \
+		(echo "$$PASS"; gunzip -c "$(FILE)") | $(KUBECTL) exec -i "$$POD" -n "$(NAMESPACE)" -- \
 			bash -c 'read -r _pw; PGPASSWORD="$$_pw" psql -U postgres -d "$(DB_NAME)"'
 	else
-		(builtin echo "$$PASS"; cat "$(FILE)") | $(KUBECTL) exec -i "$$POD" -n "$(NAMESPACE)" -- \
+		(echo "$$PASS"; cat "$(FILE)") | $(KUBECTL) exec -i "$$POD" -n "$(NAMESPACE)" -- \
 			bash -c 'read -r _pw; PGPASSWORD="$$_pw" psql -U postgres -d "$(DB_NAME)"'
 	fi
 	@echo "✓ Restore complete"
@@ -1073,13 +1073,13 @@ infra-lint-shell: ## Shell-check nars-infra/scripts/*.sh
 .PHONY: infra-lint-docker
 infra-lint-docker: ## Lint Dockerfiles with hadolint
 	@if command -v hadolint >/dev/null 2>&1; then
-		hadolint nars-infra/docker/Dockerfile.*
+		hadolint --failure-threshold error nars-infra/docker/Dockerfile.*
 	else
 		docker run --rm \
 			-v "$$(pwd):/mnt" \
 			-v "$$(pwd)/nars-infra/.hadolint.yaml:/home/hadolint/.hadolint.yaml:ro" \
 			hadolint/hadolint \
-			/mnt/nars-infra/docker/Dockerfile.*
+			hadolint --failure-threshold error /mnt/nars-infra/docker/Dockerfile.*
 	fi
 
 .PHONY: infra-lint-yaml
@@ -1106,6 +1106,7 @@ images-build: ## Build all Docker images
 	$(MAKE) _build-nars-api
 	$(MAKE) _build-nars-postgis
 	$(MAKE) _build-nars-vite
+	$(MAKE) _build-nars-backup
 	@echo "✓ All images built"
 
 .PHONY: _build-nars-api
@@ -1125,6 +1126,12 @@ _build-nars-vite:
 	@echo "  → $(DOCKER_ORG)/nars-vite:$(IMAGE_TAG)"
 	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-vite" \
 		-t "$(DOCKER_ORG)/nars-vite:$(IMAGE_TAG)" .
+
+.PHONY: _build-nars-backup
+_build-nars-backup:
+	@echo "  → $(DOCKER_ORG)/nars-backup:$(IMAGE_TAG)"
+	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-backup" \
+		-t "$(DOCKER_ORG)/nars-backup:$(IMAGE_TAG)" .
 
 .PHONY: images-push
 images-push: ## Push all Docker images to registry

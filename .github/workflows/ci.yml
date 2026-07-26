@@ -217,3 +217,22 @@ jobs:
           push: true
           tags: ${{ steps.meta-postgis.outputs.tags }}
           labels: ${{ steps.meta-postgis.outputs.labels }}
+
+      - name: Generate nars-backup metadata
+        id: meta-backup
+        uses: docker/metadata-action@v5
+        with:
+          images: zuhirbenslama/nars-backup
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push backup image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: nars-infra/docker/Dockerfile.nars-backup
+          push: true
+          tags: ${{ steps.meta-backup.outputs.tags }}
+          labels: ${{ steps.meta-backup.outputs.labels }}

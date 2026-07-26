@@ -151,9 +151,9 @@ export async function apiFetch(path: string, options: ApiFetchOptions = {}): Pro
         // CSRF token is missing — this can happen during SPA navigation or
         // server misconfiguration. In production this is a security concern.
         if (import.meta.env.PROD) {
-          console.error(
-            "[API] CSRF token is missing for state-changing request. " +
-              "This may indicate a security issue.",
+          throw createNetworkError(
+            "[API] CSRF token is missing for state-changing request. Request aborted.",
+            context,
           )
         } else {
           debugLog(

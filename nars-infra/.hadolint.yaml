@@ -17,6 +17,12 @@ override:
     # for every patch bump.
     - dl3008
 
+    # DL3018: Pin versions in apk add.
+    # Alpine packages in utility/backup images (e.g., gnupg in nars-backup)
+    # are intentionally unpinned to pick up security fixes. Pinning would
+    # require per-release updates for no practical benefit in these images.
+    - dl3018
+
     # DL3045: COPY to a non-root user directory without chown.
     # The nars-postgis Dockerfile copies init SQL to
     # /docker-entrypoint-initdb.d/ which is handled by the official

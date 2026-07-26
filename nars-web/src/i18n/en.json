@@ -121,6 +121,7 @@
   "error_network_with_msg": "Network error: {message}",
   "error_password_min_length": "Password must be at least 8 characters.",
   "error_save_failed": "Failed to save",
+  "error_add_feature_failed": "Failed to add feature type",
   "error_username_invalid_chars": "Username can only contain letters, numbers, dots, hyphens and underscores.",
   "error_username_max_length": "Username must be at most 50 characters.",
   "error_username_min_length": "Username must be at least 3 characters.",

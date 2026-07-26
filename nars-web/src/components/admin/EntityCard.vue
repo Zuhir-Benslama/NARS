@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n"
 import StatPill from "./StatPill.vue"
+
+const { t } = useI18n()
 
 export interface CardStat {
   label: string
@@ -38,9 +41,9 @@ defineEmits<{
     <div v-if="adminLabel" class="entity-admin-row">
       <span class="admin-label">{{ adminLabel }}:</span>
       <span v-if="adminName" class="admin-name">{{ adminName }}</span>
-      <span v-else class="admin-missing">None assigned</span>
+      <span v-else class="admin-missing">{{ t("admin.none_assigned") }}</span>
     </div>
-    <button class="drill-btn">View detail →</button>
+    <button class="drill-btn">{{ t("admin.view_detail") }} →</button>
   </div>
 </template>
 

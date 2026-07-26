@@ -15,14 +15,14 @@ namespace NarsApi.Tests;
 public class LocationsControllerTests
 {
     private static LocationsController CreateController(
-        AppDbContext db,
+        ILocationSearchService? searchService = null,
         IBoundaryService? boundaryService = null,
         ILocationQueryService? locationQuery = null) =>
         new(
-            db,
             Options.Create(new LocationsOptions()),
             boundaryService ?? Mock.Of<IBoundaryService>(),
-            locationQuery ?? Mock.Of<ILocationQueryService>());
+            locationQuery ?? Mock.Of<ILocationQueryService>(),
+            searchService ?? Mock.Of<ILocationSearchService>());
 
     private static ILocationQueryService CreateLocationQueryMock(AppDbContext db)
     {
@@ -33,7 +33,11 @@ public class LocationsControllerTests
         return mock.Object;
     }
 
-    private static AppDbContext CreateDb(string name) => CreateInMemoryDb($"LocationsTest_{name}");
+    private static (AppDbContext db, ILocationSearchService search) CreateDbWithSearch(string name)
+    {
+        var (db, factory) = CreateInMemoryDbPair($"LocationsTest_{name}");
+        return (db, new LocationSearchService(factory));
+    }
 
     private static async Task SeedWilayas(AppDbContext db)
     {
@@ -72,9 +76,9 @@ public class LocationsControllerTests
     [Fact]
     public async Task GetWilayas_NoSearch_ReturnsAllWilayas()
     {
-        var db = CreateDb(nameof(GetWilayas_NoSearch_ReturnsAllWilayas));
+        var (db, search) = CreateDbWithSearch(nameof(GetWilayas_NoSearch_ReturnsAllWilayas));
         await SeedWilayas(db);
-        var ctrl = CreateController(db);
+        var ctrl = CreateController(searchService: search);
 
         var result = await ctrl.GetWilayas(search: "", skip: 0, take: 100);
 
@@ -87,9 +91,7 @@ public class LocationsControllerTests
     [Fact]
     public async Task GetWilayas_SearchTooLong_Returns400()
     {
-        var db = CreateDb(nameof(GetWilayas_SearchTooLong_Returns400));
-        await SeedWilayas(db);
-        var ctrl = CreateController(db);
+        var ctrl = CreateController();
 
         var result = await ctrl.GetWilayas(search: new string('x', 201), skip: 0, take: 100);
 
@@ -100,9 +102,9 @@ public class LocationsControllerTests
     [Fact]
     public async Task GetWilayas_TakeClampedTo500()
     {
-        var db = CreateDb(nameof(GetWilayas_TakeClampedTo500));
+        var (db, search) = CreateDbWithSearch(nameof(GetWilayas_TakeClampedTo500));
         await SeedWilayas(db);
-        var ctrl = CreateController(db);
+        var ctrl = CreateController(searchService: search);
 
         var result = await ctrl.GetWilayas(search: "", skip: 0, take: 1000);
 
@@ -115,16 +117,16 @@ public class LocationsControllerTests
     [Fact]
     public async Task GetWilayas_NoSearchSkip0Take500_QueriesDbDirectly()
     {
-        var db = CreateDb(nameof(GetWilayas_NoSearchSkip0Take500_QueriesDbDirectly));
+        var (db, search) = CreateDbWithSearch(nameof(GetWilayas_NoSearchSkip0Take500_QueriesDbDirectly));
         await SeedWilayas(db);
-        var ctrl = CreateController(db);
+        var ctrl = CreateController(searchService: search);
 
         var result1 = await ctrl.GetWilayas(search: "", skip: 0, take: 500);
         var ok1 = Assert.IsType<OkObjectResult>(result1);
         var resp1 = Assert.IsType<PagedResponse<WilayaItem>>(ok1.Value);
         Assert.Equal(3, resp1.Total);
 
-        // Add a new wilaya to DB (should NOT appear because cached)
+        // Add a new wilaya to DB (should appear — no caching)
         db.Wilayas.Add(new Models.Wilaya { WilayaId = 4, WilayaFr = "New" });
         await db.SaveChangesAsync();
 
@@ -139,8 +141,7 @@ public class LocationsControllerTests
     [Fact]
     public async Task GetDairas_NoWilayaId_Returns400()
     {
-        var db = CreateDb(nameof(GetDairas_NoWilayaId_Returns400));
-        var ctrl = CreateController(db);
+        var ctrl = CreateController();
 
         var result = await ctrl.GetDairas(wilaya_id: 0);
 
@@ -151,10 +152,10 @@ public class LocationsControllerTests
     [Fact]
     public async Task GetDairas_ValidWilaya_ReturnsDairas()
     {
-        var db = CreateDb(nameof(GetDairas_ValidWilaya_ReturnsDairas));
+        var (db, search) = CreateDbWithSearch(nameof(GetDairas_ValidWilaya_ReturnsDairas));
         await SeedDairas(db, wilayaId: 1);
         await SeedDairas(db, wilayaId: 2);
-        var ctrl = CreateController(db);
+        var ctrl = CreateController(searchService: search);
 
         var result = await ctrl.GetDairas(wilaya_id: 1);
 
@@ -168,8 +169,7 @@ public class LocationsControllerTests
     [Fact]
     public async Task GetCommunes_NoDairaId_Returns400()
     {
-        var db = CreateDb(nameof(GetCommunes_NoDairaId_Returns400));
-        var ctrl = CreateController(db);
+        var ctrl = CreateController();
 
         var result = await ctrl.GetCommunes(daira_id: null);
 
@@ -180,8 +180,7 @@ public class LocationsControllerTests
     [Fact]
     public async Task GetCommunes_DairaIdZero_Returns400()
     {
-        var db = CreateDb(nameof(GetCommunes_DairaIdZero_Returns400));
-        var ctrl = CreateController(db);
+        var ctrl = CreateController();
 
         var result = await ctrl.GetCommunes(daira_id: 0);
 
@@ -192,9 +191,9 @@ public class LocationsControllerTests
     [Fact]
     public async Task GetCommunes_ValidDaira_ReturnsCommunes()
     {
-        var db = CreateDb(nameof(GetCommunes_ValidDaira_ReturnsCommunes));
+        var (db, search) = CreateDbWithSearch(nameof(GetCommunes_ValidDaira_ReturnsCommunes));
         await SeedCommunes(db, dairaId: 10);
-        var ctrl = CreateController(db);
+        var ctrl = CreateController(searchService: search);
 
         var result = await ctrl.GetCommunes(daira_id: 10);
 
@@ -208,7 +207,7 @@ public class LocationsControllerTests
     [Fact]
     public async Task GetCommuneBoundary_Found_Returns200()
     {
-        var db = CreateDb(nameof(GetCommuneBoundary_Found_Returns200));
+        var (db, _) = CreateDbWithSearch(nameof(GetCommuneBoundary_Found_Returns200));
         await SeedCommunes(db, dairaId: 10);
 
         var boundaryMock = new Mock<IBoundaryService>();
@@ -216,7 +215,7 @@ public class LocationsControllerTests
             .ReturnsAsync("{\"type\":\"Polygon\"}");
 
         var locationQueryMock = CreateLocationQueryMock(db);
-        var ctrl = CreateController(db, boundaryService: boundaryMock.Object, locationQuery: locationQueryMock);
+        var ctrl = CreateController(boundaryService: boundaryMock.Object, locationQuery: locationQueryMock);
 
         var result = await ctrl.GetCommuneBoundary(1001);
 
@@ -226,12 +225,11 @@ public class LocationsControllerTests
     [Fact]
     public async Task GetCommuneBoundary_NotFound_Returns404()
     {
-        var db = CreateDb(nameof(GetCommuneBoundary_NotFound_Returns404));
         var boundaryMock = new Mock<IBoundaryService>();
         boundaryMock.Setup(b => b.GetBoundaryGeoJsonAsync(999, It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
 
-        var ctrl = CreateController(db, boundaryService: boundaryMock.Object);
+        var ctrl = CreateController(boundaryService: boundaryMock.Object);
 
         var result = await ctrl.GetCommuneBoundary(999);
 
@@ -244,8 +242,7 @@ public class LocationsControllerTests
     [Fact]
     public async Task DebugCommuneBoundary_NonDevEnv_Returns404()
     {
-        var db = CreateDb(nameof(DebugCommuneBoundary_NonDevEnv_Returns404));
-        var ctrl = CreateController(db);
+        var ctrl = CreateController();
         var env = Mock.Of<Microsoft.Extensions.Hosting.IHostEnvironment>(e => e.EnvironmentName == "Production");
 
         var result = await ctrl.DebugCommuneBoundary(100, env);
@@ -258,8 +255,7 @@ public class LocationsControllerTests
     [Fact]
     public async Task GetWilayas_NegativeSkip_ReturnsOk()
     {
-        var db = CreateDb(nameof(GetWilayas_NegativeSkip_ReturnsOk));
-        var ctrl = CreateController(db);
+        var ctrl = CreateController();
 
         var result = await ctrl.GetWilayas(skip: -1, take: 10);
 
@@ -269,9 +265,9 @@ public class LocationsControllerTests
     [Fact]
     public async Task GetWilayas_SmallTake_ReturnsOk()
     {
-        var db = CreateDb(nameof(GetWilayas_SmallTake_ReturnsOk));
+        var (db, search) = CreateDbWithSearch(nameof(GetWilayas_SmallTake_ReturnsOk));
         await SeedWilayas(db);
-        var ctrl = CreateController(db);
+        var ctrl = CreateController(searchService: search);
 
         var result = await ctrl.GetWilayas(skip: 0, take: 1);
 

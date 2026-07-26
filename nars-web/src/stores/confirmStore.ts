@@ -11,6 +11,11 @@ export const useConfirmStore = defineStore("confirm", {
 
   actions: {
     show(message: string, okText = "Confirm"): Promise<boolean> {
+      // If a previous confirm is still pending, resolve it as rejected
+      if (_resolver) {
+        _resolver(false)
+        _resolver = null
+      }
       this.visible = true
       this.message = message
       this.okText = okText

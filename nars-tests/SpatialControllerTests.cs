@@ -40,41 +40,31 @@ public class SpatialControllerTests
         return (ctrl, db);
     }
 
-    private static async Task<Guid> AddRoadAsync(AppDbContext db, Guid userId, string coordsJson)
-    {
-        var id = Guid.NewGuid();
-        db.Roads.Add(new Road
-        {
-            Id = id,
-            UserId = userId,
-            Data = coordsJson,
-            Label = "Test Road",
-            Layer = "main",
-            UpdatedAt = FixedUtcNow
-        });
-        await db.SaveChangesAsync();
-        return id;
-    }
-
     // ── POST /api/road-side ───────────────────────────────────────────────
 
     [Fact]
     public async Task GetRoadSide_NullBody_Returns400()
     {
-        var (ctrl, _) = CreateController();
-        var result = await ctrl.GetRoadSide(null!);
-        var objResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, objResult.StatusCode);
+        var (ctrl, db) = CreateController();
+        using (db)
+        {
+            var result = await ctrl.GetRoadSide(null!);
+            var objResult = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(400, objResult.StatusCode);
+        }
     }
 
     [Fact]
     public async Task GetRoadSide_RoadNotFound_Returns404()
     {
-        var (ctrl, _) = CreateController();
-        var result = await ctrl.GetRoadSide(new RoadSideRequest(
-            RoadId: Guid.NewGuid(), Lat: 36.0, Lng: 3.0));
-        var objResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(404, objResult.StatusCode);
+        var (ctrl, db) = CreateController();
+        using (db)
+        {
+            var result = await ctrl.GetRoadSide(new RoadSideRequest(
+                RoadId: Guid.NewGuid(), Lat: 36.0, Lng: 3.0));
+            var objResult = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(404, objResult.StatusCode);
+        }
     }
 
     [Fact]
@@ -82,12 +72,14 @@ public class SpatialControllerTests
     {
         var uid = Guid.NewGuid();
         var (ctrl, db) = CreateController(userId: uid);
+        using (db)
+        {
+            var roadId = await AddRoadAsync(db, uid, /* single point */ """{"coordinates":[{"lat":36.0,"lng":3.0}]}""");
 
-        var roadId = await AddRoadAsync(db, uid, /* single point */ """{"coordinates":[{"lat":36.0,"lng":3.0}]}""");
-
-        var result = await ctrl.GetRoadSide(new RoadSideRequest(RoadId: roadId, Lat: 36.0, Lng: 3.0));
-        var objResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, objResult.StatusCode);
+            var result = await ctrl.GetRoadSide(new RoadSideRequest(RoadId: roadId, Lat: 36.0, Lng: 3.0));
+            var objResult = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(400, objResult.StatusCode);
+        }
     }
 
     [Theory]
@@ -102,12 +94,15 @@ public class SpatialControllerTests
             entranceQuery: Mock.Of<IEntranceQueryService>(x =>
                 x.GetUsedEntranceNumbersAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())
                 == Task.FromResult(new HashSet<int>())));
-        var roadId = await AddRoadAsync(db, uid, """{"coordinates":[{"lat":36.4,"lng":2.9},{"lat":36.4,"lng":3.1}]}""");
+        using (db)
+        {
+            var roadId = await AddRoadAsync(db, uid, """{"coordinates":[{"lat":36.4,"lng":2.9},{"lat":36.4,"lng":3.1}]}""");
 
-        var result = await ctrl.GetRoadSide(new RoadSideRequest(
-            RoadId: roadId, Lat: lat, Lng: lng));
-        var objResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, objResult.StatusCode);
+            var result = await ctrl.GetRoadSide(new RoadSideRequest(
+                RoadId: roadId, Lat: lat, Lng: lng));
+            var objResult = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(400, objResult.StatusCode);
+        }
     }
 
     [Fact]
@@ -115,13 +110,15 @@ public class SpatialControllerTests
     {
         var uid = Guid.NewGuid();
         var (ctrl, db) = CreateController(userId: uid);
+        using (db)
+        {
+            // Road data without a "coordinates" property
+            var roadId = await AddRoadAsync(db, uid, """{"foo":"bar"}""");
 
-        // Road data without a "coordinates" property
-        var roadId = await AddRoadAsync(db, uid, """{"foo":"bar"}""");
-
-        var result = await ctrl.GetRoadSide(new RoadSideRequest(RoadId: roadId, Lat: 36.0, Lng: 3.0));
-        var objResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, objResult.StatusCode);
+            var result = await ctrl.GetRoadSide(new RoadSideRequest(RoadId: roadId, Lat: 36.0, Lng: 3.0));
+            var objResult = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(400, objResult.StatusCode);
+        }
     }
 
     [Theory]
@@ -135,16 +132,18 @@ public class SpatialControllerTests
             entranceQuery: Mock.Of<IEntranceQueryService>(x =>
                 x.GetUsedEntranceNumbersAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())
                 == Task.FromResult(new HashSet<int>())));
+        using (db)
+        {
+            // Horizontal segment from (36.4, 2.9) to (36.4, 3.1)
+            var coords = """{"coordinates":[{"lat":36.4,"lng":2.9},{"lat":36.4,"lng":3.1}]}""";
+            var roadId = await AddRoadAsync(db, uid, coords);
 
-        // Horizontal segment from (36.4, 2.9) to (36.4, 3.1)
-        var coords = """{"coordinates":[{"lat":36.4,"lng":2.9},{"lat":36.4,"lng":3.1}]}""";
-        var roadId = await AddRoadAsync(db, uid, coords);
+            var result = await ctrl.GetRoadSide(new RoadSideRequest(RoadId: roadId, Lat: markerLat, Lng: markerLng));
 
-        var result = await ctrl.GetRoadSide(new RoadSideRequest(RoadId: roadId, Lat: markerLat, Lng: markerLng));
-
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<RoadSideResponse>(ok.Value);
-        Assert.Equal(expectedSide, resp.Side);
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<RoadSideResponse>(ok.Value);
+            Assert.Equal(expectedSide, resp.Side);
+        }
     }
 
     [Fact]
@@ -157,17 +156,19 @@ public class SpatialControllerTests
             entranceQuery: Mock.Of<IEntranceQueryService>(x =>
                 x.GetUsedEntranceNumbersAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())
                 == Task.FromResult(usedNumbers)));
+        using (db)
+        {
+            var coords = """{"coordinates":[{"lat":36.4,"lng":2.9},{"lat":36.4,"lng":3.1}]}""";
+            var roadId = await AddRoadAsync(db, uid, coords);
 
-        var coords = """{"coordinates":[{"lat":36.4,"lng":2.9},{"lat":36.4,"lng":3.1}]}""";
-        var roadId = await AddRoadAsync(db, uid, coords);
+            // Marker above the segment -> left -> odd numbers
+            var result = await ctrl.GetRoadSide(new RoadSideRequest(RoadId: roadId, Lat: 36.5, Lng: 3.0));
 
-        // Marker above the segment -> left -> odd numbers
-        var result = await ctrl.GetRoadSide(new RoadSideRequest(RoadId: roadId, Lat: 36.5, Lng: 3.0));
-
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<RoadSideResponse>(ok.Value);
-        Assert.Equal("left", resp.Side);
-        Assert.Equal(7, resp.SuggestedNumber); // 1,3,5 used, next odd is 7
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<RoadSideResponse>(ok.Value);
+            Assert.Equal("left", resp.Side);
+            Assert.Equal(7, resp.SuggestedNumber); // 1,3,5 used, next odd is 7
+        }
     }
 
     // ── POST /api/areas/refresh-scattered ─────────────────────────────────
@@ -176,20 +177,22 @@ public class SpatialControllerTests
     public async Task RefreshScattered_NoCommuneId_Returns400()
     {
         var uid = Guid.NewGuid();
-        var (ctrl, _) = CreateController(userId: uid);
-
-        // Override claims — no commune_id
-        ctrl.ControllerContext = new ControllerContext
+        var (ctrl, db) = CreateController(userId: uid);
+        using (db)
         {
-            HttpContext = new DefaultHttpContext
+            // Override claims — no commune_id
+            ctrl.ControllerContext = new ControllerContext
             {
-                User = AuthTestHelper.CreateClaimsPrincipal(uid, UserRoles.NationalAdmin, communeId: null)
-            }
-        };
+                HttpContext = new DefaultHttpContext
+                {
+                    User = AuthTestHelper.CreateClaimsPrincipal(uid, UserRoles.NationalAdmin, communeId: null)
+                }
+            };
 
-        var result = await ctrl.RefreshScattered();
-        var objResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, objResult.StatusCode);
+            var result = await ctrl.RefreshScattered();
+            var objResult = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(400, objResult.StatusCode);
+        }
     }
 
     [Fact]
@@ -199,12 +202,14 @@ public class SpatialControllerTests
         var scatteredMock = new Mock<IScatteredAreaService>();
         scatteredMock.Setup(s => s.RefreshAsync(uid, 1, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        var (ctrl, _) = CreateController(userId: uid, scatteredService: scatteredMock.Object);
+        var (ctrl, db) = CreateController(userId: uid, scatteredService: scatteredMock.Object);
+        using (db)
+        {
+            var result = await ctrl.RefreshScattered();
 
-        var result = await ctrl.RefreshScattered();
-
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<ScatteredRefreshResponse>(ok.Value);
-        Assert.True(resp.Success);
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<ScatteredRefreshResponse>(ok.Value);
+            Assert.True(resp.Success);
+        }
     }
 }

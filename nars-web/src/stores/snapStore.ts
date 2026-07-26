@@ -7,7 +7,7 @@ export const useSnapStore = defineStore("snap", {
     snapLatLng: null as { lat: number; lng: number } | null,
     snapFrozen: false,
     snapRafId: null as number | null,
-    snapPendingEvent: null as MouseEvent | null,
+    snapPendingCoords: null as { x: number; y: number } | null,
     editModeActive: false,
     editDragActive: false,
     snapExclude: null as string | null,
@@ -23,24 +23,17 @@ export const useSnapStore = defineStore("snap", {
   },
 
   actions: {
-    enableCrosshair(): void {
-      if (this.crosshairActive) return
-      this.crosshairActive = true
-    },
-    disableCrosshair(): void {
-      if (!this.crosshairActive) return
-      this.crosshairActive = false
-    },
     setEditModeActive(v: boolean): void {
       this.editModeActive = v
     },
     setEditDragActive(v: boolean): void {
       this.editDragActive = v
     },
-    clearPendingEvent(): void {
-      this.snapPendingEvent = null
+    clearPendingCoords(): void {
+      this.snapPendingCoords = null
     },
     resetSnap(): void {
+      if (this.snapRafId !== null) cancelAnimationFrame(this.snapRafId)
       this.$reset()
     },
   },

@@ -173,7 +173,7 @@ export async function generateNamingPanels(): Promise<void> {
     }
   }
 
-  await Promise.all(tasks)
+  await Promise.allSettled(tasks)
 }
 
 if (import.meta.env.DEV) {

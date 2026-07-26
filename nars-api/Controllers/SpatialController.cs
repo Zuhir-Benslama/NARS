@@ -41,10 +41,15 @@ public class SpatialController(
         var roadData = JsonHelper.DeserializeSafe(road.Data);
         var coordsNode = roadData?["coordinates"];
 
+        if (coordsNode is null)
+        {
+            return Problem(detail: "Road has no coordinates data.", statusCode: 400);
+        }
+
         List<(double Lat, double Lng)> roadCoords;
         try
         {
-            roadCoords = GeometryHelper.ParseRoadCoordinates(coordsNode!);
+            roadCoords = GeometryHelper.ParseRoadCoordinates(coordsNode);
         }
         catch (ArgumentException ex)
         {

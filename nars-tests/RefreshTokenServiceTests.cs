@@ -112,72 +112,84 @@ public class RefreshTokenServiceTests
     [Fact]
     public async Task RotateRefreshTokenAsync_NullToken_ReturnsFailure()
     {
-        var (svc, _, _) = await SeedWithValidTokenAsync();
+        var (svc, db, _) = await SeedWithValidTokenAsync();
+        using (db)
+        {
+            var result = await svc.RotateRefreshTokenAsync(null);
 
-        var result = await svc.RotateRefreshTokenAsync(null);
-
-        Assert.False(result.Success);
-        Assert.Equal("No refresh token.", result.Detail);
+            Assert.False(result.Success);
+            Assert.Equal("No refresh token.", result.Detail);
+        }
     }
 
     [Fact]
     public async Task RotateRefreshTokenAsync_EmptyToken_ReturnsFailure()
     {
-        var (svc, _, _) = await SeedWithValidTokenAsync();
+        var (svc, db, _) = await SeedWithValidTokenAsync();
+        using (db)
+        {
+            var result = await svc.RotateRefreshTokenAsync("");
 
-        var result = await svc.RotateRefreshTokenAsync("");
-
-        Assert.False(result.Success);
-        Assert.Equal("No refresh token.", result.Detail);
+            Assert.False(result.Success);
+            Assert.Equal("No refresh token.", result.Detail);
+        }
     }
 
     [Fact]
     public async Task RotateRefreshTokenAsync_InvalidToken_ReturnsFailure()
     {
-        var (svc, _, _) = await SeedWithValidTokenAsync();
+        var (svc, db, _) = await SeedWithValidTokenAsync();
+        using (db)
+        {
+            var result = await svc.RotateRefreshTokenAsync("invalid-token");
 
-        var result = await svc.RotateRefreshTokenAsync("invalid-token");
-
-        Assert.False(result.Success);
-        Assert.Equal("Invalid or expired refresh token.", result.Detail);
+            Assert.False(result.Success);
+            Assert.Equal("Invalid or expired refresh token.", result.Detail);
+        }
     }
 
     [Fact]
     public async Task RotateRefreshTokenAsync_ValidToken_ReturnsSuccessWithNewToken()
     {
-        var (svc, _, raw) = await SeedWithValidTokenAsync();
+        var (svc, db, raw) = await SeedWithValidTokenAsync();
+        using (db)
+        {
+            var result = await svc.RotateRefreshTokenAsync(raw);
 
-        var result = await svc.RotateRefreshTokenAsync(raw);
-
-        Assert.True(result.Success);
-        Assert.NotNull(result.NewAccessToken);
-        Assert.NotNull(result.NewRawToken);
-        Assert.Equal("testuser", result.Username);
+            Assert.True(result.Success);
+            Assert.NotNull(result.NewAccessToken);
+            Assert.NotNull(result.NewRawToken);
+            Assert.Equal("testuser", result.Username);
+        }
     }
 
     [Fact]
     public async Task RotateRefreshTokenAsync_RevokesOldToken()
     {
         var (svc, db, raw) = await SeedWithValidTokenAsync();
+        using (db)
+        {
+            await svc.RotateRefreshTokenAsync(raw);
 
-        await svc.RotateRefreshTokenAsync(raw);
-
-        var hash = Convert.ToBase64String(
-            System.Security.Cryptography.SHA256.HashData(
-                System.Text.Encoding.UTF8.GetBytes(raw)));
-        var oldToken = await db.RefreshTokens.FirstAsync(rt => rt.TokenHash == hash);
-        Assert.True(oldToken.Revoked);
+            var hash = Convert.ToBase64String(
+                System.Security.Cryptography.SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(raw)));
+            var oldToken = await db.RefreshTokens.FirstAsync(rt => rt.TokenHash == hash);
+            Assert.True(oldToken.Revoked);
+        }
     }
 
     [Fact]
     public async Task RotateRefreshTokenAsync_IssuesNewRefreshToken()
     {
         var (svc, db, raw) = await SeedWithValidTokenAsync();
+        using (db)
+        {
+            await svc.RotateRefreshTokenAsync(raw);
 
-        await svc.RotateRefreshTokenAsync(raw);
-
-        var unrevoked = await db.RefreshTokens.CountAsync(rt => !rt.Revoked);
-        Assert.Equal(1, unrevoked);
+            var unrevoked = await db.RefreshTokens.CountAsync(rt => !rt.Revoked);
+            Assert.Equal(1, unrevoked);
+        }
     }
 
     private static async Task<(AppDbContext Db, string RawToken)> SeedTokenAsync(
@@ -220,36 +232,45 @@ public class RefreshTokenServiceTests
     public async Task RotateRefreshTokenAsync_ExpiredToken_ReturnsFailure()
     {
         var (db, raw) = await SeedTokenAsync(FixedUtcNow.AddDays(-1));
-        var svc = CreateService(db);
+        using (db)
+        {
+            var svc = CreateService(db);
 
-        var result = await svc.RotateRefreshTokenAsync(raw);
+            var result = await svc.RotateRefreshTokenAsync(raw);
 
-        Assert.False(result.Success);
-        Assert.Equal("Invalid or expired refresh token.", result.Detail);
+            Assert.False(result.Success);
+            Assert.Equal("Invalid or expired refresh token.", result.Detail);
+        }
     }
 
     [Fact]
     public async Task RotateRefreshTokenAsync_RevokedToken_ReturnsFailure()
     {
         var (db, raw) = await SeedTokenAsync(FixedUtcNow.AddDays(30), revoked: true);
-        var svc = CreateService(db);
+        using (db)
+        {
+            var svc = CreateService(db);
 
-        var result = await svc.RotateRefreshTokenAsync(raw);
+            var result = await svc.RotateRefreshTokenAsync(raw);
 
-        Assert.False(result.Success);
-        Assert.Equal("Invalid or expired refresh token.", result.Detail);
+            Assert.False(result.Success);
+            Assert.Equal("Invalid or expired refresh token.", result.Detail);
+        }
     }
 
     [Fact]
     public async Task RotateRefreshTokenAsync_DeletedUser_ReturnsFailure()
     {
         var (db, raw) = await SeedTokenAsync(FixedUtcNow.AddDays(30), userId: Guid.NewGuid(), skipUser: true);
-        var svc = CreateService(db);
+        using (db)
+        {
+            var svc = CreateService(db);
 
-        var result = await svc.RotateRefreshTokenAsync(raw);
+            var result = await svc.RotateRefreshTokenAsync(raw);
 
-        Assert.False(result.Success);
-        Assert.Equal("User no longer exists.", result.Detail);
+            Assert.False(result.Success);
+            Assert.Equal("User no longer exists.", result.Detail);
+        }
     }
 
     // ── RevokeAllUserTokensAsync ────────────────────────────────────────
@@ -257,7 +278,7 @@ public class RefreshTokenServiceTests
     [Fact]
     public async Task RevokeAllUserTokensAsync_RevokesUnrevokedTokens()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         db.Users.Add(new User
         {
             Id = UserId,
@@ -297,8 +318,7 @@ public class RefreshTokenServiceTests
     [Fact]
     public async Task RevokeAllUserTokensAsync_AlreadyRevokedTokens_AreNotAffected()
     {
-        var db = CreateDb();
-        var otherUserId = Guid.NewGuid();
+        using var db = CreateDb();
         db.Users.Add(new User
         {
             Id = UserId,
@@ -333,7 +353,7 @@ public class RefreshTokenServiceTests
     [Fact]
     public async Task IssueRefreshTokenAsync_ReturnsRawHashAndExpiry()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var svc = CreateService(db);
 
         var (raw, hash, expiresAt) = await svc.IssueRefreshTokenAsync(UserId);
@@ -349,7 +369,7 @@ public class RefreshTokenServiceTests
     [Fact]
     public async Task IssueRefreshTokenAsync_DifferentCallsProduceDifferentTokens()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var callCount = 0;
         var jwtMock = new Mock<IJwtService>();
         jwtMock.Setup(j => j.CreateRefreshToken()).Returns(() =>
@@ -373,7 +393,7 @@ public class RefreshTokenServiceTests
     [Fact]
     public async Task FindUserByIdAsync_ExistingUser_ReturnsUser()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         db.Users.Add(new User
         {
             Id = UserId,
@@ -398,7 +418,7 @@ public class RefreshTokenServiceTests
     [Fact]
     public async Task FindUserByIdAsync_NonexistentUser_ReturnsNull()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var svc = CreateService(db);
 
         var found = await svc.FindUserByIdAsync(Guid.NewGuid());
@@ -411,7 +431,7 @@ public class RefreshTokenServiceTests
     [Fact]
     public async Task FindUserByUsernameAsync_ExistingUser_ReturnsUser()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         db.Users.Add(new User
         {
             Id = UserId,
@@ -435,7 +455,7 @@ public class RefreshTokenServiceTests
     [Fact]
     public async Task FindUserByUsernameAsync_NonexistentUser_ReturnsNull()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var svc = CreateService(db);
 
         var found = await svc.FindUserByUsernameAsync("no-such-user");
@@ -448,7 +468,7 @@ public class RefreshTokenServiceTests
     [Fact]
     public async Task SaveUserAsync_PersistsNewUser()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var user = new User
         {
             Id = UserId,
@@ -475,7 +495,7 @@ public class RefreshTokenServiceTests
     [Fact]
     public async Task RecordFailedLoginAsync_IncrementsAttempts()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var user = new User
         {
             Id = UserId,
@@ -501,7 +521,7 @@ public class RefreshTokenServiceTests
     [Fact]
     public async Task RecordFailedLoginAsync_AtThreshold_LocksUser()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var user = new User
         {
             Id = UserId,
@@ -529,7 +549,7 @@ public class RefreshTokenServiceTests
     [Fact]
     public async Task ResetFailedAttemptsIfNeededAsync_ClearsState()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var user = new User
         {
             Id = UserId,
@@ -556,7 +576,7 @@ public class RefreshTokenServiceTests
     [Fact]
     public async Task ResetFailedAttemptsIfNeededAsync_AlreadyClean_NoSave()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var user = new User
         {
             Id = UserId,

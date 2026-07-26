@@ -137,7 +137,7 @@ export function awaitModalResult(): Promise<ModalResult | null> {
 
 function resolveModalPromise(result: ModalResult | null): void {
   const modalStore = useModalStore()
-  modalStore.currentModalFeatureId = null
+  modalStore.$patch({ currentModalFeatureId: null })
   if (_modalResolver) {
     _modalResolver(result)
     _modalResolver = null

@@ -36,5 +36,9 @@ export function showConfirm(message: string, okText = "Confirm"): Promise<boolea
     })
   }
 
-  return useConfirmStore().show(message, okText)
+  try {
+    return useConfirmStore().show(message, okText)
+  } catch {
+    return Promise.resolve(false)
+  }
 }

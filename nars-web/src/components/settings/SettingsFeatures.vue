@@ -54,13 +54,13 @@ async function add() {
       body: JSON.stringify(form),
     })
     if (res.ok) {
-      showToast(`Added "${form.label}" to ${form.category}`, "success")
+      showToast(t("alert_feature_added", { label: form.label, category: form.category }), "success")
       form.label = ""
     } else {
-      showToast("Failed to add feature type", "error")
+      showToast(t("error_add_feature_failed"), "error")
     }
   } catch {
-    showToast("Failed to add feature type", "error")
+    showToast(t("error_add_feature_failed"), "error")
   }
 }
 </script>

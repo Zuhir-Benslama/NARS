@@ -12,12 +12,16 @@ public class AdminController(
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     /// <summary>Returns a role-scoped administrative overview of the hierarchy.</summary>
+    /// <param name="skip">Number of wilayas to skip (national overview only, default 0).</param>
+    /// <param name="take">Maximum wilayas to return (national overview only, clamped 1-500, default 500).</param>
     [HttpGet("admin/overview")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Overview(CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Overview(
+        [FromQuery] int skip = 0, [FromQuery] int take = 500,
+        CancellationToken cancellationToken = default)
     {
         var role = CurrentUserRole;
         var dairaId = CurrentDairaId;
@@ -29,7 +33,7 @@ public class AdminController(
                 Problem(detail: "wilaya_id missing on account. Contact your administrator.", statusCode: 403),
             UserRoles.DairaAdmin => await DairaOverview(dairaId!.Value, cancellationToken),
             UserRoles.WilayaAdmin => await WilayaOverview(CurrentWilayaId!.Value, cancellationToken),
-            UserRoles.NationalAdmin => await NationalOverview(cancellationToken),
+            UserRoles.NationalAdmin => await NationalOverview(skip, take, cancellationToken),
             _ => Forbid(),
         };
     }
@@ -81,10 +85,11 @@ public class AdminController(
         return result is null ? Problem(detail: "Daira not found.", statusCode: 404) : Ok(result);
     }
 
-    private async Task<IActionResult> NationalOverview(CancellationToken cancellationToken)
+    private async Task<IActionResult> NationalOverview(int skip, int take, CancellationToken cancellationToken)
     {
-        var wilayas = await overviewService.GetNationalOverviewAsync(cancellationToken);
-        return Ok(new { level = "national", wilayas });
+        take = Math.Clamp(take, 1, 500);
+        var (wilayas, total) = await overviewService.GetNationalOverviewAsync(skip, take, cancellationToken);
+        return Ok(new { level = "national", wilayas, total, skip, take });
     }
 
     private async Task<IActionResult> WilayaOverview(int wilayaId, CancellationToken cancellationToken)

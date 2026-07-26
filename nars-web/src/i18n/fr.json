@@ -121,6 +121,7 @@
   "error_network_with_msg": "Network error: {message}",
   "error_password_min_length": "Le mot de passe doit comporter au moins 8 caractères.",
   "error_save_failed": "Failed to save",
+  "error_add_feature_failed": "Échec de l'ajout du type de fonctionnalité",
   "error_username_invalid_chars": "Le nom d'utilisateur ne peut contenir que des lettres, chiffres, points, tirets et underscores.",
   "error_username_max_length": "Le nom d'utilisateur ne peut pas dépasser 50 caractères.",
   "error_username_min_length": "Le nom d'utilisateur doit comporter au moins 3 caractères.",

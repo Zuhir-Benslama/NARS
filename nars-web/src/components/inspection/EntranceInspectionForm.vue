@@ -202,7 +202,7 @@ async function createEntrance() {
     })
     if (res.ok) {
       showToast(t("alert_entrance_added"), "success")
-      submitInspection("issue")
+      await submitInspection("issue")
     } else {
       const body = await res.json()
       showToast(body.detail ?? t("error_create_entrance_failed"), "error")

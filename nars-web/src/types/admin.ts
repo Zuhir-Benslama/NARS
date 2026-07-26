@@ -5,7 +5,7 @@ export interface UserFeatureStats {
   username: string
   name: string
   email: string
-  role: string
+  role: UserRole
   areas: number
   districts: number
   city_centers: number

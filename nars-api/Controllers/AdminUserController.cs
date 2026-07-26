@@ -157,6 +157,11 @@ public class AdminUserController(
     public async Task<IActionResult> DeleteAdmin(
         Guid userId, CancellationToken cancellationToken = default)
     {
+        if (userId == RequiredCurrentUserId)
+        {
+            return Problem(detail: "Cannot delete your own account.", statusCode: 400);
+        }
+
         var target = await authorizationService.FindUserByIdAsync(userId, cancellationToken);
         if (target is null)
         {

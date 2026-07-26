@@ -41,7 +41,11 @@ export function setTheme(mode: ThemeMode): void {
 export function initTheme(): void {
   applyTheme(theme.value) // apply immediately, before mount
   watch(theme, (mode) => {
-    localStorage.setItem(STORAGE_KEY, mode)
+    try {
+      localStorage.setItem(STORAGE_KEY, mode)
+    } catch {
+      // localStorage may be unavailable (private browsing quota exceeded)
+    }
     applyTheme(mode)
   })
 }

@@ -1,4 +1,6 @@
+using System.Net;
 using System.Security.Claims;
+using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
@@ -56,7 +58,7 @@ public class PagesController(
         var html = template
             // Inject the CSRF token into the <meta name="csrf-token"> placeholder
             .Replace("<meta name=\"csrf-token\" content=\"\">",
-                $"<meta name=\"csrf-token\" content=\"{tokens.RequestToken}\">")
+                $"<meta name=\"csrf-token\" content=\"{HtmlEncoder.Default.Encode(tokens.RequestToken ?? string.Empty)}\">")
             // Inject nonce into every <script> tag so they pass the CSP check
             .Replace("<script>", $"<script nonce=\"{nonce}\">");
 
@@ -84,7 +86,7 @@ public class PagesController(
         var html = template
             // Inject CSRF token into the meta placeholder
             .Replace("<meta name=\"csrf-token\" content=\"\">",
-                $"<meta name=\"csrf-token\" content=\"{tokens.RequestToken}\">")
+                $"<meta name=\"csrf-token\" content=\"{HtmlEncoder.Default.Encode(tokens.RequestToken ?? string.Empty)}\">")
             // Inject nonce into every <script> tag so they pass the CSP check
             .Replace("<script ", $"<script nonce=\"{nonce}\" ");
 
@@ -216,9 +218,14 @@ public class PagesController(
 
             return true;
         }
-        catch (Exception ex)
+        catch (InvalidOperationException ex)
         {
             logger.LogError(ex, "[Pages] Error during silent refresh");
+            return false;
+        }
+        catch (IOException ex)
+        {
+            logger.LogError(ex, "[Pages] IO error during silent refresh");
             return false;
         }
     }

@@ -1,5 +1,5 @@
 <template>
-  <div ref="containerRef" v-click-outside="handleClickOutside" class="tile-control">
+  <div v-click-outside="handleClickOutside" class="tile-control">
     <button
       class="tile-toggle"
       :title="t('tile_layers')"

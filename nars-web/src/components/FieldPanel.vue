@@ -107,6 +107,7 @@ const props = withDefaults(defineProps<FieldPanelProps>(), {
 const activeTab = ref<InspectionType>("road")
 const features = ref<ApiFeature[]>([])
 const loading = ref(false)
+let _fetchController: AbortController | null = null
 
 const fieldStore = useFieldStore()
 const selectedFeature = computed(() => fieldStore.selectedFeature)
@@ -117,20 +118,23 @@ watch(activeTab, () => {
 })
 
 async function fetchFeatures() {
+  _fetchController?.abort()
   const tab = tabs.value.find((t) => t.key === activeTab.value)
   if (!tab) return
   loading.value = true
   features.value = []
+  const controller = new AbortController()
+  _fetchController = controller
   try {
     const result = await props.fetchFeaturesFn(tab.apiType)
-    if (_mounted) features.value = result
+    if (!controller.signal.aborted) features.value = result
   } catch (err) {
-    if (_mounted)
+    if (!controller.signal.aborted)
       logError(
         createNetworkError("Failed to load field features", { action: "fetchFeatures" }, err),
       )
   } finally {
-    if (_mounted) loading.value = false
+    if (!controller.signal.aborted) loading.value = false
   }
 }
 
@@ -143,13 +147,11 @@ function clearSelection() {
   fetchFeatures()
 }
 
-let _mounted = true
 onMounted(() => {
-  _mounted = true
   fetchFeatures()
 })
 onUnmounted(() => {
-  _mounted = false
+  _fetchController?.abort()
 })
 </script>
 

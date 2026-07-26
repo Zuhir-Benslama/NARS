@@ -12,7 +12,7 @@ namespace NarsApi.DTOs;
 public record CreateAdminRequest(
     [Required(AllowEmptyStrings = false)][property: JsonRequired][property: JsonPropertyName("name")] string Name,
     [Required(AllowEmptyStrings = false), EmailAddress][property: JsonRequired][property: JsonPropertyName("email")] string Email,
-    [Required(AllowEmptyStrings = false)][property: JsonRequired][property: JsonPropertyName("phone")] string Phone,
+    [Required(AllowEmptyStrings = false), Phone][property: JsonRequired][property: JsonPropertyName("phone")] string Phone,
     [Required(AllowEmptyStrings = false)][property: JsonRequired][property: JsonPropertyName("username")] string Username,
     [Required(AllowEmptyStrings = false)][property: JsonRequired][property: JsonPropertyName("password")] string Password,
     [Required(AllowEmptyStrings = false)][property: JsonRequired][property: JsonPropertyName("role")] string Role,

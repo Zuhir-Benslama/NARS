@@ -28,9 +28,15 @@ export const useDrawStore = defineStore("draw", {
     },
     unpatchGeomanMarker(): void {
       this.snappingEnabled = false
-      if (this.geomanMarkerPointer?.marker && this.originalGeomanMarkerSetLngLat) {
-        this.geomanMarkerPointer.marker.setLngLat = this.originalGeomanMarkerSetLngLat
-        this.geomanMarkerPointer.marker._narsSnapPatchedInstance = false
+      const marker = this.geomanMarkerPointer?.marker as Record<string, unknown> | null | undefined
+      if (marker && this.originalGeomanMarkerSetLngLat) {
+        marker.setLngLat = this.originalGeomanMarkerSetLngLat
+        const origGet = marker["_narsOrigGetLngLat"] as
+          ((...args: unknown[]) => unknown) | undefined
+        if (origGet) {
+          marker.getLngLat = origGet
+        }
+        marker._narsSnapPatchedInstance = false
       }
     },
     setSnappingEnabled(v: boolean): void {
@@ -58,6 +64,9 @@ export const useDrawStore = defineStore("draw", {
       this.cleanupDrawWatcher = fn
     },
     resetDraw(): void {
+      if (this.edgePollId !== null) clearInterval(this.edgePollId)
+      if (this.edgeTimeoutId !== null) clearTimeout(this.edgeTimeoutId)
+      this.cleanupDrawWatcher?.()
       this.$reset()
     },
   },

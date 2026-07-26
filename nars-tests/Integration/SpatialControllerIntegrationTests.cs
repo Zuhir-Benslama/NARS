@@ -60,29 +60,12 @@ public class SpatialControllerIntegrationTests : IAsyncLifetime
         return user.Id;
     }
 
-    private static async Task<Guid> AddRoadAsync(AppDbContext db, Guid ownerId, string coordsJson)
-    {
-        var id = Guid.NewGuid();
-        db.Roads.Add(new Road
-        {
-            Id = id,
-            UserId = ownerId,
-            Data = coordsJson,
-            Label = "Test Integration Road",
-            Layer = "street",
-            UpdatedAt = FixedUtcNow,
-        });
-        db.FeatureRegistry.Add(new FeatureRegistry { Id = id, FeatureType = FeatureTypes.Road });
-        await db.SaveChangesAsync();
-        return id;
-    }
-
     [Fact]
     public async Task GetRoadSide_ValidRequest_ReturnsCorrectSide()
     {
         var controller = CreateController();
         var coords = """{"coordinates":[{"lat":36.4,"lng":2.9},{"lat":36.4,"lng":3.1}]}""";
-        var roadId = await AddRoadAsync(_db, _userId, coords);
+        var roadId = await TestData.AddRoadAsync(_db, _userId, coords, registerInFeatureRegistry: true);
 
         var result = await controller.GetRoadSide(new RoadSideRequest(
             RoadId: roadId, Lat: 36.5, Lng: 3.0));

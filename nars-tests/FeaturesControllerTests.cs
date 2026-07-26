@@ -97,7 +97,7 @@ public class FeaturesControllerTests
     public async Task SaveFeature_DataTooLarge_Returns400()
     {
         var (ctrl, _) = CreateController();
-        var largeData = new string('x', 600_000);
+        var largeData = new string('x', OversizedDataLength);
         var body = new FeatureSaveRequest(FeatureTypes.Road, FeatureTypes.RoadLayers.Street, "label", Json($"\"{largeData}\""));
         var result = await ctrl.SaveFeature(body);
         var objResult = Assert.IsType<ObjectResult>(result);
@@ -119,40 +119,45 @@ public class FeaturesControllerTests
     public async Task SaveFeature_ValidRoad_Returns201()
     {
         var (ctrl, db) = CreateController();
-
-        var roadId = Guid.NewGuid();
-        db.Roads.Add(new Road
+        using (db)
         {
-            Id = roadId,
-            UserId = UserId,
-            Layer = FeatureTypes.RoadLayers.Street,
-            Data = "{}",
-            Label = "road",
-            UpdatedAt = FixedUtcNow
-        });
-        await db.SaveChangesAsync();
+            var roadId = Guid.NewGuid();
+            db.Roads.Add(new Road
+            {
+                Id = roadId,
+                UserId = UserId,
+                Layer = FeatureTypes.RoadLayers.Street,
+                Data = "{}",
+                Label = "road",
+                UpdatedAt = FixedUtcNow
+            });
+            await db.SaveChangesAsync();
 
-        var data = Json($$"""{"coordinates":[{"lat":36.0,"lng":3.0}],"roadDbId":"{{roadId}}"}""");
-        var body = new FeatureSaveRequest(FeatureTypes.HouseEntrance, FeatureTypes.HouseEntranceLayers.Main, "entrance", data);
+            var data = Json($$"""{"coordinates":[{"lat":36.0,"lng":3.0}],"roadDbId":"{{roadId}}"}""");
+            var body = new FeatureSaveRequest(FeatureTypes.HouseEntrance, FeatureTypes.HouseEntranceLayers.Main, "entrance", data);
 
-        var result = await ctrl.SaveFeature(body);
+            var result = await ctrl.SaveFeature(body);
 
-        var created = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(201, created.StatusCode);
+            var created = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(201, created.StatusCode);
+        }
     }
 
     [Fact]
     public async Task SaveFeature_ValidArea_Returns201()
     {
         var (ctrl, db) = CreateController();
-        var data = Json("""{"coordinates":[[{"lat":36.0,"lng":3.0}]]}""");
-        var body = new FeatureSaveRequest(FeatureTypes.Area, FeatureTypes.AreaLayers.CentralUrban, "area", data);
+        using (db)
+        {
+            var data = Json("""{"coordinates":[[{"lat":36.0,"lng":3.0}]]}""");
+            var body = new FeatureSaveRequest(FeatureTypes.Area, FeatureTypes.AreaLayers.CentralUrban, "area", data);
 
-        var result = await ctrl.SaveFeature(body);
+            var result = await ctrl.SaveFeature(body);
 
-        var created = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(201, created.StatusCode);
-        Assert.Equal(1, await db.Areas.CountAsync());
+            var created = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(201, created.StatusCode);
+            Assert.Equal(1, await db.Areas.CountAsync());
+        }
     }
 
     [Fact]
@@ -249,47 +254,53 @@ public class FeaturesControllerTests
     public async Task UpdateFeature_NotOwned_Returns404()
     {
         var (ctrl, db) = CreateController();
-        var otherId = Guid.NewGuid();
-        db.Roads.Add(new Road
+        using (db)
         {
-            Id = otherId,
-            UserId = Guid.NewGuid(),
-            Layer = FeatureTypes.RoadLayers.Street,
-            Data = "{}",
-            Label = "other",
-            UpdatedAt = FixedUtcNow
-        });
-        db.FeatureRegistry.Add(new FeatureRegistry { Id = otherId, FeatureType = FeatureTypes.Road });
-        await db.SaveChangesAsync();
+            var otherId = Guid.NewGuid();
+            db.Roads.Add(new Road
+            {
+                Id = otherId,
+                UserId = Guid.NewGuid(),
+                Layer = FeatureTypes.RoadLayers.Street,
+                Data = "{}",
+                Label = "other",
+                UpdatedAt = FixedUtcNow
+            });
+            db.FeatureRegistry.Add(new FeatureRegistry { Id = otherId, FeatureType = FeatureTypes.Road });
+            await db.SaveChangesAsync();
 
-        var body = new FeatureUpdateRequest(Label: "new_label", Data: null);
-        var result = await ctrl.UpdateFeature(otherId, body);
-        var objResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(404, objResult.StatusCode);
+            var body = new FeatureUpdateRequest(Label: "new_label", Data: null);
+            var result = await ctrl.UpdateFeature(otherId, body);
+            var objResult = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(404, objResult.StatusCode);
+        }
     }
 
     [Fact]
     public async Task UpdateFeature_DataTooLarge_Returns400()
     {
         var (ctrl, db) = CreateController();
-        var fid = Guid.NewGuid();
-        db.Roads.Add(new Road
+        using (db)
         {
-            Id = fid,
-            UserId = UserId,
-            Layer = FeatureTypes.RoadLayers.Street,
-            Data = "{}",
-            Label = "road",
-            UpdatedAt = FixedUtcNow
-        });
-        db.FeatureRegistry.Add(new FeatureRegistry { Id = fid, FeatureType = FeatureTypes.Road });
-        await db.SaveChangesAsync();
+            var fid = Guid.NewGuid();
+            db.Roads.Add(new Road
+            {
+                Id = fid,
+                UserId = UserId,
+                Layer = FeatureTypes.RoadLayers.Street,
+                Data = "{}",
+                Label = "road",
+                UpdatedAt = FixedUtcNow
+            });
+            db.FeatureRegistry.Add(new FeatureRegistry { Id = fid, FeatureType = FeatureTypes.Road });
+            await db.SaveChangesAsync();
 
-        var largeData = new string('x', 600_000);
-        var body = new FeatureUpdateRequest(Label: null, Data: System.Text.Json.JsonSerializer.Deserialize<JsonElement>($"\"{largeData}\""));
-        var result = await ctrl.UpdateFeature(fid, body);
-        var objResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, objResult.StatusCode);
+            var largeData = new string('x', OversizedDataLength);
+            var body = new FeatureUpdateRequest(Label: null, Data: System.Text.Json.JsonSerializer.Deserialize<JsonElement>($"\"{largeData}\""));
+            var result = await ctrl.UpdateFeature(fid, body);
+            var objResult = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(400, objResult.StatusCode);
+        }
     }
 
     // ── DELETE /api/delete/{id} ───────────────────────────────────────────

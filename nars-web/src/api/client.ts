@@ -115,9 +115,19 @@ export async function getManageableUsers(): Promise<AdminUserSummary[]> {
   return res.json()
 }
 
+export interface AdminUserUpdate {
+  name?: string
+  email?: string
+  role?: string
+  phone?: string
+  communeId?: number | null
+  dairaId?: number | null
+  wilayaId?: number | null
+}
+
 export async function updateAdminUser(
   userId: string,
-  body: Record<string, unknown>,
+  body: AdminUserUpdate,
 ): Promise<ActionResponse> {
   const res = await apiFetch(`/api/admin/users/${userId}`, { method: "PUT", ...jsonBody(body) })
   return res.json()

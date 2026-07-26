@@ -435,6 +435,9 @@ onUnmounted(() => {
   window.removeEventListener("resize", updatePositions)
   const main = rootRef.value?.closest<HTMLElement>(".settings-main")
   if (main) main.removeEventListener("scroll", updatePositions)
+  wilayaSearch.cleanup()
+  dairaSearch.cleanup()
+  communeSearch.cleanup()
 })
 
 const dairaPlaceholder = computed(() =>
@@ -506,12 +509,6 @@ watch(dairaQuery, (q) => {
 })
 watch(communeQuery, (q) => {
   communeSearch.run(q ?? "")
-})
-
-onUnmounted(() => {
-  wilayaSearch.cleanup()
-  dairaSearch.cleanup()
-  communeSearch.cleanup()
 })
 
 function selectWilaya(w: { id: number; name_fr: string }) {

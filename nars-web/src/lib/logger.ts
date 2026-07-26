@@ -68,7 +68,7 @@ async function flush(): Promise<void> {
   }
 
   flushing = false
-  if (batch.length > 0) setTimeout(flush, 0)
+  if (batch.length > 0) setTimeout(flush, FLUSH_INTERVAL_MS)
 }
 
 if (typeof window !== "undefined") {
@@ -76,11 +76,11 @@ if (typeof window !== "undefined") {
     if (timer) clearTimeout(timer)
     if (batch.length > 0) {
       const pending = batch.splice(0)
-      const csrfToken = getCsrfToken()
-      const qs = csrfToken ? `?csrf=${encodeURIComponent(csrfToken)}` : ""
 
       const blob = new Blob([JSON.stringify({ logs: pending })], { type: "application/json" })
-      navigator.sendBeacon(`${getApiBaseUrl()}/api/logs${qs}`, blob)
+      // sendBeacon cannot set headers, so CSRF is passed via a cookie (SameSite=Lax).
+      // Do NOT pass the token as a query parameter — it leaks via Referer, logs, and CDNs.
+      navigator.sendBeacon(`${getApiBaseUrl()}/api/logs`, blob)
     }
   })
 }

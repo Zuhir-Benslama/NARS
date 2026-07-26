@@ -49,13 +49,15 @@ export async function setHouseNumbers(options?: { syncCounts?: boolean }): Promi
 
   const roadLine = turfHelpers.lineString(roadEntry.data.coordinates.map((c) => [c.lng, c.lat]))
 
-  const withDist = unassigned.map((e) => {
-    const lng = e.data.lng ?? 0
-    const lat = e.data.lat ?? 0
-    const pt = turfHelpers.point([lng, lat])
-    const snapped = turfNearest.default(roadLine, pt, { units: "meters" })
-    return { entry: e, dist: snapped.properties.location ?? 0 }
-  })
+  const withDist = unassigned
+    .filter((e) => e.data.lng != null && e.data.lat != null)
+    .map((e) => {
+      const lng = e.data.lng!
+      const lat = e.data.lat!
+      const pt = turfHelpers.point([lng, lat])
+      const snapped = turfNearest.default(roadLine, pt, { units: "meters" })
+      return { entry: e, dist: snapped.properties.location ?? 0 }
+    })
   withDist.sort((a, b) => a.dist - b.dist)
 
   let oddNext = 1,

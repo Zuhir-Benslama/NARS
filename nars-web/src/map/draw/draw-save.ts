@@ -228,6 +228,7 @@ async function saveAndUpdateStore(
   geomanFeatureData: Record<string, unknown>,
 ): Promise<void> {
   setSavingFeature(true)
+  let saveOk = false
   try {
     const featureData = buildFeatureData(geometry, drawingPhase, modalResult)
     const saveResult = await saveToDatabase(featureData)
@@ -244,6 +245,7 @@ async function saveAndUpdateStore(
       featureData,
     )
     await updateStoresAfterSave(featureId, payload, drawingPhase, featureData, narsDrawType)
+    saveOk = true
 
     await delay(DRAW_CONFIG.geomanCleanupDelayMs)
     deleteGeomanFeature(geomanFeatureData)
@@ -252,8 +254,10 @@ async function saveAndUpdateStore(
     showToast("Save failed: " + getErrorMessage(err), "error")
   } finally {
     setSavingFeature(false)
-    await delay(DRAW_CONFIG.drawModeResetDelayMs)
-    await resetDrawMode()
+    if (saveOk) {
+      await delay(DRAW_CONFIG.drawModeResetDelayMs)
+      await resetDrawMode()
+    }
   }
 }
 

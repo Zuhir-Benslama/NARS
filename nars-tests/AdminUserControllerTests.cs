@@ -21,7 +21,7 @@ public class AdminUserControllerTests
     private static AdminUserController CreateController(AppDbContext db) =>
         new(Mock.Of<ILogger<AdminUserController>>(),
             new UserAuthorizationService(db),
-            AuthTestHelper.CreateUserCreationMock(db),
+            new UserCreationService(db),
             Mock.Of<IWebHostEnvironment>())
         {
             ControllerContext = new ControllerContext
@@ -35,7 +35,7 @@ public class AdminUserControllerTests
     [Fact]
     public async Task CreateAdmin_NullBody_Returns400()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var ctrl = CreateController(db);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
@@ -48,7 +48,7 @@ public class AdminUserControllerTests
     [Fact]
     public async Task CreateAdmin_NationalToWilaya_Returns201()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var ctrl = CreateController(db);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
@@ -70,7 +70,7 @@ public class AdminUserControllerTests
     [Fact]
     public async Task CreateAdmin_DuplicateUsername_Returns409()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         db.Users.Add(new User
         {
             Id = Guid.NewGuid(),
@@ -104,7 +104,7 @@ public class AdminUserControllerTests
     [Fact]
     public async Task CreateAdmin_DisallowedRolePair_ReturnsForbid()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var ctrl = CreateController(db);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.CommuneUser, communeId: 1);
 
@@ -125,7 +125,7 @@ public class AdminUserControllerTests
     [Fact]
     public async Task CreateAdmin_DairaAdminOutsideScope_ReturnsForbid()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         db.Communes.Add(new Commune { CommuneId = 99, DairaId = 99, CommuneFr = "Other" });
         await db.SaveChangesAsync();
         var ctrl = CreateController(db);
@@ -150,7 +150,7 @@ public class AdminUserControllerTests
     [Fact]
     public async Task GetManageableUsers_NationalAdmin_ReturnsWilayaAdmins()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         db.Users.Add(new User
         {
             Id = Guid.NewGuid(),
@@ -190,7 +190,7 @@ public class AdminUserControllerTests
     [Fact]
     public async Task UpdateAdmin_UserNotFound_Returns404()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var ctrl = CreateController(db);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
@@ -207,7 +207,7 @@ public class AdminUserControllerTests
     [Fact]
     public async Task UpdateAdmin_NullBody_Returns400()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var ctrl = CreateController(db);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
@@ -220,7 +220,7 @@ public class AdminUserControllerTests
     [Fact]
     public async Task UpdateAdmin_ValidNameUpdate_ReturnsOk()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var userId = Guid.NewGuid();
         db.Users.Add(new User
         {
@@ -254,7 +254,7 @@ public class AdminUserControllerTests
     [Fact]
     public async Task DeleteAdmin_UserNotFound_Returns404()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var ctrl = CreateController(db);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
@@ -267,7 +267,7 @@ public class AdminUserControllerTests
     [Fact]
     public async Task DeleteAdmin_Valid_ReturnsNoContent()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var userId = Guid.NewGuid();
         db.Users.Add(new User
         {
@@ -293,7 +293,7 @@ public class AdminUserControllerTests
     [Fact]
     public async Task DeleteAdmin_ForbiddenRoleHierarchy_ReturnsForbid()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var userId = Guid.NewGuid();
         db.Users.Add(new User
         {

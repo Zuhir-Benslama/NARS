@@ -44,7 +44,17 @@ export function initTelemetry(endpoint?: string) {
 function buildCorsUrls(): RegExp[] {
   const envUrls = import.meta.env.VITE_OTEL_CORS_URLS
   if (envUrls) {
-    return envUrls.split(",").map((u) => new RegExp(u.trim()))
+    return envUrls
+      .split(",")
+      .map((u) => {
+        try {
+          return new RegExp(u.trim())
+        } catch {
+          console.warn(`[Telemetry] Invalid regex in VITE_OTEL_CORS_URLS: "${u.trim()}"`)
+          return null
+        }
+      })
+      .filter((r): r is RegExp => r !== null)
   }
 
   const apiBase = import.meta.env.VITE_API_BASE ?? ""

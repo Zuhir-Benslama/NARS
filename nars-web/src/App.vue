@@ -42,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted } from "vue"
+import { computed, onMounted, onUnmounted } from "vue"
 import { useI18n } from "vue-i18n"
 import PhaseBar from "./components/PhaseBar.vue"
 import InfoPanel from "./components/InfoPanel.vue"
@@ -63,9 +63,11 @@ const appStore = useAppStore()
 const isAdminUser = computed(() => appStore.isAdminUser)
 const isFieldWorker = computed(() => appStore.user?.role === "field_worker")
 
-onUnmounted(() => {
+function onBeforeUnload() {
   destroyMap()
-})
+}
+onMounted(() => window.addEventListener("beforeunload", onBeforeUnload))
+onUnmounted(() => window.removeEventListener("beforeunload", onBeforeUnload))
 </script>
 
 <style scoped>

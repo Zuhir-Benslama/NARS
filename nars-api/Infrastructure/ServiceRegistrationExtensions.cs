@@ -111,6 +111,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IUserAuthorizationService, UserAuthorizationService>();
         services.AddScoped<IErrorLogService, ErrorLogService>();
         services.AddScoped<ILocationQueryService, LocationQueryService>();
+        services.AddScoped<ILocationSearchService, LocationSearchService>();
         services.AddScoped<IRoadQueryService, RoadQueryService>();
         services.AddScoped<IUserProfileService, UserProfileService>();
         services.AddScoped<IUserCreationService, UserCreationService>();

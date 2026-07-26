@@ -12,6 +12,15 @@ const REFERENCE_COLOR = "#f39c12"
 const DEFAULT_ROAD_COLOR = "#3498db"
 const DEFAULT_ENTRANCE_COLOR = "#27ae60"
 
+function parseGeometry(raw: string | undefined): GeoJSON.Geometry | undefined {
+  if (!raw) return undefined
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return undefined
+  }
+}
+
 function highlightFeature(phaseKey: string, dbId: string, active: boolean): void {
   const featuresStore = useFeaturesStore()
   const layerStore = useLayerStore()
@@ -20,9 +29,11 @@ function highlightFeature(phaseKey: string, dbId: string, active: boolean): void
   const entry = entries.find((e) => e.dbId === dbId)
   if (!entry) return
 
+  const geometry = parseGeometry(entry.data.geometry as string | undefined)
+
   if (phaseKey === "roads") {
     featuresStore.update(entry.id, {
-      geometry: entry.data.geometry ? JSON.parse(entry.data.geometry) : undefined,
+      geometry,
       properties: {
         ...entry.data,
         phaseKey,
@@ -31,7 +42,7 @@ function highlightFeature(phaseKey: string, dbId: string, active: boolean): void
     })
   } else if (phaseKey === "houseEntrances") {
     featuresStore.update(entry.id, {
-      geometry: entry.data.geometry ? JSON.parse(entry.data.geometry) : undefined,
+      geometry,
       properties: {
         ...entry.data,
         phaseKey,

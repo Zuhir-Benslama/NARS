@@ -310,24 +310,32 @@ function onKeyDown(e: KeyboardEvent): void {
 
 let contextMenuCleanup: (() => void) | null = null
 let keydownCleanup: (() => void) | null = null
+let mapGmCreateCleanup: (() => void) | null = null
+let mapClickCleanup: (() => void) | null = null
 
 export function registerDrawHandlers(): void {
   const map = getCtx().map
 
   map.on("gm:create", onFeatureCreated)
+  mapGmCreateCleanup = () => map.off("gm:create", onFeatureCreated)
 
   window.addEventListener("contextmenu", onContextMenu, true)
   contextMenuCleanup = () => window.removeEventListener("contextmenu", onContextMenu, true)
 
   map.on("click", onClick)
+  mapClickCleanup = () => map.off("click", onClick)
 
   document.addEventListener("keydown", onKeyDown, true)
   keydownCleanup = () => document.removeEventListener("keydown", onKeyDown, true)
 }
 
 export function destroyDrawHandlers(): void {
+  mapGmCreateCleanup?.()
+  mapGmCreateCleanup = null
   contextMenuCleanup?.()
   contextMenuCleanup = null
+  mapClickCleanup?.()
+  mapClickCleanup = null
   keydownCleanup?.()
   keydownCleanup = null
 }

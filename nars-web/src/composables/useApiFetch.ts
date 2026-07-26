@@ -4,7 +4,7 @@
 
 import { ref, type Ref } from "vue"
 import { apiFetch, type ApiFetchOptions } from "../api"
-import { isNarsError, logError, createNetworkError } from "../lib/errors"
+import { isNarsError } from "../lib/errors"
 
 export interface UseApiFetchReturn<T> {
   /** Reactive response data, or null if not yet loaded / error occurred. */
@@ -41,14 +41,14 @@ export function useApiFetch<T = unknown>(): UseApiFetchReturn<T> {
     try {
       const response = await apiFetch(path, options)
       if (response.status === 204 || response.headers.get("content-length") === "0") {
-        return null as T
+        return null
       }
       data.value = (await response.json()) as T
       return data.value
     } catch (err) {
+      // apiFetch / handleResponse already logs the error — avoid double-logging
       const e = err instanceof Error ? err : new Error(String(err))
       error.value = e
-      logError(createNetworkError(`apiRequest failed: ${path}`, { url: path }, e))
       return null
     } finally {
       isLoading.value = false
@@ -88,13 +88,14 @@ export async function apiRequest<T = unknown>(
   try {
     const response = await apiFetch(path, options)
     if (response.status === 204 || response.headers.get("content-length") === "0") {
+      // 204 = success with no body — return null; callers should check for it
       return { success: true, data: null as T }
     }
     const data = (await response.json()) as T
     return { success: true, data }
   } catch (err) {
+    // apiFetch / handleResponse already logs the error
     const error = err instanceof Error ? err : new Error(String(err))
-    logError(createNetworkError(`apiRequest failed: ${path}`, { url: path }, error))
     return { success: false, error }
   }
 }

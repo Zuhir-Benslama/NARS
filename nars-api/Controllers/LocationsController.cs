@@ -1,11 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using NarsApi.Data;
-using NarsApi.DTOs;
 using NarsApi.Infrastructure;
-using NarsApi.Models;
 using NarsApi.Services;
 
 namespace NarsApi.Controllers;
@@ -24,43 +20,24 @@ namespace NarsApi.Controllers;
 [Tags("Locations")]
 #pragma warning disable S6960 // LocationsController intentionally serves paginated reference data + boundary endpoints
 public class LocationsController(
-    AppDbContext db,
     IOptions<LocationsOptions> locationsOptions,
     IBoundaryService boundaryService,
-    ILocationQueryService locationQuery) : ControllerBase
+    ILocationQueryService locationQuery,
+    ILocationSearchService locationSearch) : ControllerBase
 {
 
     private static string EscapeLikeWildcards(string input)
         => input.Replace("%", "\\%").Replace("_", "\\_", StringComparison.Ordinal);
 
-    private async Task<IActionResult> PaginateAsync<TEntity, TDto>(
-        string search, int skip, int take,
-        Func<IQueryable<TEntity>> baseQuery,
-        Func<string, IQueryable<TEntity>, IQueryable<TEntity>>? searchFilter,
-        Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>> orderBy,
-        Func<TEntity, TDto> mapper,
-        CancellationToken cancellationToken)
+    private string ValidateSearch(string? search)
     {
-        take = Math.Clamp(take, 1, 500);
-
         search ??= "";
         var maxSearchLength = locationsOptions.Value.MaxSearchLength;
         if (search.Length > maxSearchLength)
         {
-            return Problem(detail: $"Search query is too long (max {maxSearchLength} characters).", statusCode: 400);
+            throw new InvalidOperationException($"Search query is too long (max {maxSearchLength} characters).");
         }
-
-        var q = baseQuery();
-        if (!string.IsNullOrEmpty(search) && searchFilter is not null)
-        {
-            q = searchFilter(EscapeLikeWildcards(search), q);
-        }
-
-        var total = await q.CountAsync(cancellationToken);
-        var result = await orderBy(q).Skip(skip).Take(take).ToListAsync(cancellationToken);
-        var items = result.Select(mapper).ToList();
-
-        return Ok(new PagedResponse<TDto>(items, total, skip, take));
+        return EscapeLikeWildcards(search);
     }
 
     // ── GET /api/wilayas ──────────────────────────────────────
@@ -73,14 +50,20 @@ public class LocationsController(
         [FromQuery] string search = "",
         [FromQuery] int skip = 0,
         [FromQuery] int take = 100,
-        CancellationToken cancellationToken = default) => await PaginateAsync(
-            search, skip, take,
-            () => db.Wilayas.AsQueryable(),
-            (escaped, q) => q.Where(w => EF.Functions.ILike(w.WilayaFr ?? "", $"%{escaped}%")
-                           || EF.Functions.ILike(w.WilayaAr ?? "", $"%{escaped}%")),
-            q => q.OrderBy(w => w.WilayaFr),
-            w => new WilayaItem(w.WilayaId, w.WilayaFr ?? "", w.WilayaAr ?? "", w.WilayaLatitude, w.WilayaLongitude),
-            cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        take = Math.Clamp(take, 1, 500);
+        try
+        {
+            var sanitized = ValidateSearch(search);
+            var result = await locationSearch.SearchWilayasAsync(sanitized, skip, take, cancellationToken);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(detail: ex.Message, statusCode: 400);
+        }
+    }
 
     // ── GET /api/dairas ───────────────────────────────────────
 
@@ -100,14 +83,17 @@ public class LocationsController(
             return Problem(detail: "wilaya_id is required.", statusCode: 400);
         }
 
-        return await PaginateAsync(
-            search, skip, take,
-            () => db.Dairas.Where(d => d.WilayaId == wilaya_id),
-            (escaped, q) => q.Where(d => EF.Functions.ILike(d.DairaFr, $"%{escaped}%")
-                           || EF.Functions.ILike(d.DairaAr, $"%{escaped}%")),
-            q => q.OrderBy(d => d.DairaFr),
-            d => new DairaItem(d.DairaId, d.DairaFr, d.DairaAr, d.DairaLatitude, d.DairaLongitude, d.DairaName ?? ""),
-            cancellationToken);
+        take = Math.Clamp(take, 1, 500);
+        try
+        {
+            var sanitized = ValidateSearch(search);
+            var result = await locationSearch.SearchDairasAsync(wilaya_id, sanitized, skip, take, cancellationToken);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(detail: ex.Message, statusCode: 400);
+        }
     }
 
     // ── GET /api/communes ─────────────────────────────────────
@@ -128,14 +114,17 @@ public class LocationsController(
             return Problem(detail: "daira_id is required.", statusCode: 400);
         }
 
-        return await PaginateAsync(
-            search, skip, take,
-            () => db.Communes.Where(c => c.DairaId == daira_id),
-            (escaped, q) => q.Where(c => EF.Functions.ILike(c.CommuneFr, $"%{escaped}%")
-                           || EF.Functions.ILike(c.CommuneAr, $"%{escaped}%")),
-            q => q.OrderBy(c => c.CommuneFr),
-            c => new CommuneItem(c.CommuneId, c.CommuneFr, c.CommuneAr, c.CommuneCode?.ToString(), c.CommuneLatitude, c.CommuneLongitude, c.CommuneName ?? ""),
-            cancellationToken);
+        take = Math.Clamp(take, 1, 500);
+        try
+        {
+            var sanitized = ValidateSearch(search);
+            var result = await locationSearch.SearchCommunesAsync(daira_id.Value, sanitized, skip, take, cancellationToken);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(detail: ex.Message, statusCode: 400);
+        }
     }
 
     // ── GET /api/commune/{id}/boundary ────────────────────────

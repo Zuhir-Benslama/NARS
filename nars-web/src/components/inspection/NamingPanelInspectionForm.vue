@@ -7,8 +7,8 @@
     <div v-if="step === 1" class="npf-step">
       <p class="npf-question">{{ t("npf_question_location") }}</p>
       <div class="npf-actions">
-        <button class="npf-btn npf-btn-yes" @click="hasLocation(true)">Yes</button>
-        <button class="npf-btn npf-btn-no" @click="hasLocation(false)">No</button>
+        <button class="npf-btn npf-btn-yes" @click="hasLocation(true)">{{ t("label_yes") }}</button>
+        <button class="npf-btn npf-btn-no" @click="hasLocation(false)">{{ t("label_no") }}</button>
       </div>
     </div>
 
@@ -24,8 +24,8 @@
     <div v-if="step === 2" class="npf-step">
       <p class="npf-question">{{ t("npf_question_panel") }}</p>
       <div class="npf-actions">
-        <button class="npf-btn npf-btn-yes" @click="hasPanel(true)">Yes</button>
-        <button class="npf-btn npf-btn-no" @click="hasPanel(false)">No</button>
+        <button class="npf-btn npf-btn-yes" @click="hasPanel(true)">{{ t("label_yes") }}</button>
+        <button class="npf-btn npf-btn-no" @click="hasPanel(false)">{{ t("label_no") }}</button>
       </div>
     </div>
 
@@ -41,8 +41,12 @@
     <div v-if="step === 3" class="npf-step">
       <p class="npf-question">{{ t("npf_question_naming") }}</p>
       <div class="npf-actions">
-        <button class="npf-btn npf-btn-yes" @click="namingCorrect(true)">Yes</button>
-        <button class="npf-btn npf-btn-no" @click="namingCorrect(false)">No</button>
+        <button class="npf-btn npf-btn-yes" @click="namingCorrect(true)">
+          {{ t("label_yes") }}
+        </button>
+        <button class="npf-btn npf-btn-no" @click="namingCorrect(false)">
+          {{ t("label_no") }}
+        </button>
       </div>
     </div>
 
@@ -58,8 +62,12 @@
     <div v-if="step === 4" class="npf-step">
       <p class="npf-question">{{ t("npf_question_position") }}</p>
       <div class="npf-actions">
-        <button class="npf-btn npf-btn-yes" @click="positionCorrect(true)">Yes</button>
-        <button class="npf-btn npf-btn-no" @click="positionCorrect(false)">No</button>
+        <button class="npf-btn npf-btn-yes" @click="positionCorrect(true)">
+          {{ t("label_yes") }}
+        </button>
+        <button class="npf-btn npf-btn-no" @click="positionCorrect(false)">
+          {{ t("label_no") }}
+        </button>
       </div>
     </div>
 
@@ -162,10 +170,10 @@ async function submitInspection(status: InspectionStatus) {
       emit("done")
     } else {
       const body = await res.json()
-      showToast(body.detail ?? "Failed to save", "error")
+      showToast(body.detail ?? t("error_save_failed"), "error")
     }
   } catch (e) {
-    showToast("Network error: " + getErrorMessage(e), "error")
+    showToast(t("error_network_with_msg", { message: getErrorMessage(e) }), "error")
   } finally {
     submitting.value = false
   }

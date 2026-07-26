@@ -61,7 +61,11 @@ export async function undo(): Promise<void> {
         data: entry.data,
       }),
     }).then((r) => r.json())
-    const newDbId = json.id as string
+    const newDbId = json.id as string | undefined
+    if (!newDbId) {
+      showToast("Failed to restore feature: server returned no ID.", "error")
+      return
+    }
 
     const newId = crypto.randomUUID()
 

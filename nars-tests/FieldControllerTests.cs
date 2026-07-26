@@ -160,7 +160,7 @@ public class FieldControllerTests
     [Fact]
     public async Task SubmitInspection_WrongCommune_ReturnsForbid()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var roadId = Guid.NewGuid();
         var fieldService = new Mock<IFieldService>();
         fieldService.Setup(s => s.GetFeatureRegistryTypeAsync(roadId, default))
@@ -181,7 +181,7 @@ public class FieldControllerTests
     [Fact]
     public async Task SubmitInspection_ValidRequest_Returns201()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var roadId = Guid.NewGuid();
         var fieldService = new Mock<IFieldService>();
         fieldService.Setup(s => s.GetFeatureRegistryTypeAsync(roadId, default))
@@ -207,7 +207,7 @@ public class FieldControllerTests
     [Fact]
     public async Task SubmitInspection_InvalidStatus_Returns400()
     {
-        var db = CreateDb();
+        using var db = CreateDb();
         var roadId = Guid.NewGuid();
         var fieldService = new Mock<IFieldService>();
         fieldService.Setup(s => s.GetFeatureRegistryTypeAsync(roadId, default))

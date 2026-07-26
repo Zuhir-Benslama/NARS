@@ -111,6 +111,41 @@ public class UserAuthorizationService(AppDbContext db) : IUserAuthorizationServi
         var user = await db.Users.FindAsync([userId], ct);
         if (user is null) return false;
 
+        // Revoke all active refresh tokens.
+        var tokens = await db.RefreshTokens
+            .Where(rt => rt.UserId == userId && !rt.Revoked)
+            .ToListAsync(ct);
+        foreach (var token in tokens)
+        {
+            token.Revoked = true;
+        }
+
+        // Delete all features across all feature tables and collect their IDs.
+        var deletedFeatureIds = new List<Guid>();
+        foreach (var descriptor in FeatureTypeRegistry.GetAllDescriptors())
+        {
+            var dbSet = descriptor.GetDbSet(db);
+            var entities = await dbSet.Where(f => f.UserId == userId).ToListAsync(ct);
+            if (entities.Count > 0)
+            {
+                deletedFeatureIds.AddRange(entities.Select(e => e.Id));
+                db.RemoveRange(entities);
+            }
+        }
+
+        if (deletedFeatureIds.Count > 0)
+        {
+            var registryEntries = await db.FeatureRegistry.Where(r => deletedFeatureIds.Contains(r.Id)).ToListAsync(ct);
+            db.FeatureRegistry.RemoveRange(registryEntries);
+        }
+
+        // Delete inspections and error logs.
+        var inspections = await db.Inspections.Where(i => i.UserId == userId).ToListAsync(ct);
+        db.Inspections.RemoveRange(inspections);
+
+        var errorLogs = await db.ErrorLogs.Where(el => el.UserId == userId).ToListAsync(ct);
+        db.ErrorLogs.RemoveRange(errorLogs);
+
         db.Users.Remove(user);
         await db.SaveChangesAsync(ct);
         return true;

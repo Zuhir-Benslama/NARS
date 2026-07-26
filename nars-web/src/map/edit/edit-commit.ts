@@ -25,6 +25,8 @@ import {
   disableEditMode,
 } from "./edit-state"
 
+let _commitInProgress = false
+
 // ─── GEOMAN FEATURE REMOVAL ──────────────────────────────────────────────────
 
 async function removeGeomanFeature(): Promise<void> {
@@ -158,31 +160,37 @@ function updateFeatureGeometry(entry: LayerEntry): void {
 }
 
 export async function commitEditMode(): Promise<void> {
-  const entry = getActiveEditEntry()
-  if (!entry) {
+  if (_commitInProgress) return
+  _commitInProgress = true
+  try {
+    const entry = getActiveEditEntry()
+    if (!entry) {
+      disableEditMode()
+      return
+    }
+
+    if (getActiveGeomanFeatureId() && getCtx().geoman) {
+      const ok = await readGeomanGeometry(entry)
+      if (!ok) return
+    }
+
+    const saved = await saveGeometry(entry)
+    if (!saved) return
+
+    // Update the NARS visual source so the change shows immediately
+    // (without requiring a hard refresh to reload from the API)
+    updateFeatureGeometry(entry)
+
+    await removeGeomanFeature()
     disableEditMode()
-    return
-  }
 
-  if (getActiveGeomanFeatureId() && getCtx().geoman) {
-    const ok = await readGeomanGeometry(entry)
-    if (!ok) return
-  }
-
-  const saved = await saveGeometry(entry)
-  if (!saved) return
-
-  // Update the NARS visual source so the change shows immediately
-  // (without requiring a hard refresh to reload from the API)
-  updateFeatureGeometry(entry)
-
-  await removeGeomanFeature()
-  disableEditMode()
-
-  const phase = PHASES.find((p) => p.key === entry.data.type)
-  if (phase) {
-    buildDrawControl(phase)
-    repatchMarker()
+    const phase = PHASES.find((p) => p.key === entry.data.type)
+    if (phase) {
+      buildDrawControl(phase)
+      repatchMarker()
+    }
+  } finally {
+    _commitInProgress = false
   }
 }
 

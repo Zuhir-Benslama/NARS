@@ -18,30 +18,10 @@ describe("snapStore", () => {
     expect(store.snapLatLng).toBeNull()
     expect(store.snapFrozen).toBe(false)
     expect(store.snapRafId).toBeNull()
-    expect(store.snapPendingEvent).toBeNull()
+    expect(store.snapPendingCoords).toBeNull()
     expect(store.editModeActive).toBe(false)
     expect(store.editDragActive).toBe(false)
     expect(store.snapExclude).toBeNull()
-  })
-
-  it("enableCrosshair sets crosshairActive", () => {
-    const store = useSnapStore()
-    store.enableCrosshair()
-    expect(store.crosshairActive).toBe(true)
-  })
-
-  it("enableCrosshair is idempotent", () => {
-    const store = useSnapStore()
-    store.enableCrosshair()
-    store.enableCrosshair()
-    expect(store.crosshairActive).toBe(true)
-  })
-
-  it("disableCrosshair clears crosshairActive", () => {
-    const store = useSnapStore()
-    store.enableCrosshair()
-    store.disableCrosshair()
-    expect(store.crosshairActive).toBe(false)
   })
 
   it("setEditModeActive updates state", () => {
@@ -56,11 +36,11 @@ describe("snapStore", () => {
     expect(store.editDragActive).toBe(true)
   })
 
-  it("clearPendingEvent resets snapPendingEvent", () => {
+  it("clearPendingCoords resets snapPendingCoords", () => {
     const store = useSnapStore()
-    store.snapPendingEvent = {} as any
-    store.clearPendingEvent()
-    expect(store.snapPendingEvent).toBeNull()
+    store.snapPendingCoords = { x: 100, y: 200 }
+    store.clearPendingCoords()
+    expect(store.snapPendingCoords).toBeNull()
   })
 
   it("resetSnap resets to initial state", () => {

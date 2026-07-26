@@ -101,6 +101,20 @@ export function findNearestSnap(
     lng >= bounds.getWest() - CULL_PAD &&
     lng <= bounds.getEast() + CULL_PAD
 
+  /** True if segment (a→b) could cross the viewport even though both endpoints are outside. */
+  const nearViewportEdge = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+    const minLat = Math.min(a.lat, b.lat)
+    const maxLat = Math.max(a.lat, b.lat)
+    const minLng = Math.min(a.lng, b.lng)
+    const maxLng = Math.max(a.lng, b.lng)
+    return (
+      maxLat >= bounds.getSouth() - CULL_PAD &&
+      minLat <= bounds.getNorth() + CULL_PAD &&
+      maxLng >= bounds.getWest() - CULL_PAD &&
+      minLng <= bounds.getEast() + CULL_PAD
+    )
+  }
+
   // ── Pre-project all snap vertices once ──────────────────────────
   const projectedVertices: ProjectedVertex[] = []
   const projectedSegments: ProjectedSegment[] = []
@@ -108,35 +122,16 @@ export function findNearestSnap(
   const addRing = (ring: { lat: number; lng: number }[]): void => {
     for (let i = 0; i < ring.length; i++) {
       const v = ring[i]
-      const p = project([v.lng, v.lat])
-      if (inCullBox(v.lat, v.lng)) {
-        projectedVertices.push({ lat: v.lat, lng: v.lng, px: p.x, py: p.y })
-      }
       const j = (i + 1) % ring.length
       const b = ring[j]
-      const pb = project([b.lng, b.lat])
-      projectedSegments.push({
-        ax: p.x,
-        ay: p.y,
-        bx: pb.x,
-        by: pb.y,
-        alat: v.lat,
-        alng: v.lng,
-        blat: b.lat,
-        blng: b.lng,
-      })
-    }
-  }
-
-  const addChain = (chain: { lat: number; lng: number }[]): void => {
-    for (let i = 0; i < chain.length; i++) {
-      const v = chain[i]
-      const p = project([v.lng, v.lat])
+      const bothOut =
+        !inCullBox(v.lat, v.lng) && !inCullBox(b.lat, b.lng) && !nearViewportEdge(v, b)
       if (inCullBox(v.lat, v.lng)) {
+        const p = project([v.lng, v.lat])
         projectedVertices.push({ lat: v.lat, lng: v.lng, px: p.x, py: p.y })
       }
-      if (i < chain.length - 1) {
-        const b = chain[i + 1]
+      if (!bothOut) {
+        const p = project([v.lng, v.lat])
         const pb = project([b.lng, b.lat])
         projectedSegments.push({
           ax: p.x,
@@ -148,6 +143,35 @@ export function findNearestSnap(
           blat: b.lat,
           blng: b.lng,
         })
+      }
+    }
+  }
+
+  const addChain = (chain: { lat: number; lng: number }[]): void => {
+    for (let i = 0; i < chain.length; i++) {
+      const v = chain[i]
+      if (inCullBox(v.lat, v.lng)) {
+        const p = project([v.lng, v.lat])
+        projectedVertices.push({ lat: v.lat, lng: v.lng, px: p.x, py: p.y })
+      }
+      if (i < chain.length - 1) {
+        const b = chain[i + 1]
+        const bothOut =
+          !inCullBox(v.lat, v.lng) && !inCullBox(b.lat, b.lng) && !nearViewportEdge(v, b)
+        if (!bothOut) {
+          const p = project([v.lng, v.lat])
+          const pb = project([b.lng, b.lat])
+          projectedSegments.push({
+            ax: p.x,
+            ay: p.y,
+            bx: pb.x,
+            by: pb.y,
+            alat: v.lat,
+            alng: v.lng,
+            blat: b.lat,
+            blng: b.lng,
+          })
+        }
       }
     }
   }

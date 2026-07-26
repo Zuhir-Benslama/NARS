@@ -140,7 +140,7 @@ export function disableSnapping(): void {
     cancelAnimationFrame(store.snapRafId)
     store.snapRafId = null
   }
-  store.snapPendingEvent = null
+  store.snapPendingCoords = null
   map.getContainer().removeEventListener("mousemove", onSnapMove, true)
   map.getContainer().removeEventListener("mousedown", onMouseDown, true)
   map.getContainer().removeEventListener("mouseup", onMouseUp, true)
@@ -180,7 +180,7 @@ export function isSnappingActive(): boolean {
 
 function onSnapMove(e: MouseEvent): void {
   const store = useSnapStore()
-  store.snapPendingEvent = e
+  store.snapPendingCoords = { x: e.clientX, y: e.clientY }
   if (store.snapRafId !== null) return
   store.snapRafId = requestAnimationFrame(processSnapMove)
 }
@@ -196,50 +196,53 @@ if (import.meta.hot) {
 }
 
 function processSnapMove(): void {
-  const { map } = getCtx()
   const store = useSnapStore()
   store.snapRafId = null
-  const e = store.snapPendingEvent
-  store.snapPendingEvent = null
-  if (!e || store.snapFrozen) return
+  const coords = store.snapPendingCoords
+  store.snapPendingCoords = null
+  if (!coords || store.snapFrozen) return
 
-  if (!map.getContainer().contains(e.target as Node)) return
+  try {
+    const { map } = getCtx()
 
-  if (store.editModeActive && !store.editDragActive) {
-    if (store.snapActive) {
+    if (store.editModeActive && !store.editDragActive) {
+      if (store.snapActive) {
+        store.snapActive = false
+        store.snapLatLng = null
+        snapMarker?.remove()
+        snapMarker = null
+        snapCursor?.remove()
+        snapCursor = null
+      }
+      return
+    }
+
+    const activePhases = getActiveSnapPhases()
+    if (activePhases.length === 0) return
+
+    const rect = map.getContainer().getBoundingClientRect()
+    const x = coords.x - rect.left
+    const y = coords.y - rect.top
+
+    const snap = findNearestSnap(x, y, activePhases, true)
+    if (snap) {
+      store.snapActive = true
+      store.snapLatLng = { lat: snap.lat, lng: snap.lng }
+      const pos = map.project([snap.lng, snap.lat])
+      showSnapIndicator(pos.x, pos.y, snap.type)
+      if (import.meta.env.DEV) window.__narsSnapLatLng = store.snapLatLng
+    } else {
       store.snapActive = false
       store.snapLatLng = null
+      if (import.meta.env.DEV) window.__narsSnapLatLng = null
       snapMarker?.remove()
       snapMarker = null
       snapCursor?.remove()
       snapCursor = null
+      map.getCanvas().style.cursor = store.crosshairActive ? "crosshair" : ""
     }
-    return
-  }
-
-  const activePhases = getActiveSnapPhases()
-  if (activePhases.length === 0) return
-
-  const rect = map.getContainer().getBoundingClientRect()
-  const x = e.clientX - rect.left
-  const y = e.clientY - rect.top
-
-  const snap = findNearestSnap(x, y, activePhases, true)
-  if (snap) {
-    store.snapActive = true
-    store.snapLatLng = { lat: snap.lat, lng: snap.lng }
-    const pos = map.project([snap.lng, snap.lat])
-    showSnapIndicator(pos.x, pos.y, snap.type)
-    if (import.meta.env.DEV) window.__narsSnapLatLng = store.snapLatLng
-  } else {
-    store.snapActive = false
-    store.snapLatLng = null
-    if (import.meta.env.DEV) window.__narsSnapLatLng = null
-    snapMarker?.remove()
-    snapMarker = null
-    snapCursor?.remove()
-    snapCursor = null
-    map.getCanvas().style.cursor = store.crosshairActive ? "crosshair" : ""
+  } catch {
+    // Map context destroyed between scheduling and execution — safe to ignore
   }
 }
 

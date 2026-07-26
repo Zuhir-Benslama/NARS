@@ -62,7 +62,7 @@ export class NarsError extends Error {
       case ErrorCode.NETWORK:
         return "Network error. Please check your connection and try again."
       case ErrorCode.VALIDATION:
-        return `Validation error: ${this.message}`
+        return "Please check your input and try again."
       case ErrorCode.AUTH:
         return "Authentication required. Please log in again."
       case ErrorCode.NOT_FOUND:
@@ -74,9 +74,9 @@ export class NarsError extends Error {
       case ErrorCode.PERMISSION:
         return "You do not have permission to perform this action."
       case ErrorCode.CONFLICT:
-        return `Conflict: ${this.message}`
+        return "This resource has been modified by another user. Please refresh."
       default:
-        return this.message
+        return "An unexpected error occurred. Please try again."
     }
   }
 

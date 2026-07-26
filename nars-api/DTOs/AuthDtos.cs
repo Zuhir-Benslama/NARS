@@ -55,7 +55,7 @@ public record AuthorizedAdminSignupRequest(
     [property: JsonPropertyName("email")]
     [Required(AllowEmptyStrings = false), EmailAddress] string Email,
     [property: JsonPropertyName("phone")]
-    [Required(AllowEmptyStrings = false)] string Phone,
+    [Required(AllowEmptyStrings = false), Phone] string Phone,
     [property: JsonPropertyName("username")]
     [Required(AllowEmptyStrings = false)] string Username,
     [property: JsonPropertyName("password")]
