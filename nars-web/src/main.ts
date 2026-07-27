@@ -141,18 +141,9 @@ async function initializeApp(): Promise<void> {
 
   createVueApp(pinia)
 
-  try {
-    await initializeApp()
-  } catch (error) {
-    logError(
-      createServerError(
-        "App initialization failed",
-        { action: "app-init" },
-        error instanceof Error ? error : new Error(String(error)),
-      ),
-    )
-  }
-
+  // Expose stores for E2E tests *before* initializeApp() so tests can
+  // interact with the UI immediately — map/feature loading is slow and
+  // irrelevant for store-level assertions.
   if (import.meta.env.DEV) {
     const { useModalStore } = await import("./stores/modalStore")
     const { useLayerStore } = await import("./stores/layerStore")
@@ -170,5 +161,17 @@ async function initializeApp(): Promise<void> {
       writable: false,
       configurable: import.meta.env.DEV,
     })
+  }
+
+  try {
+    await initializeApp()
+  } catch (error) {
+    logError(
+      createServerError(
+        "App initialization failed",
+        { action: "app-init" },
+        error instanceof Error ? error : new Error(String(error)),
+      ),
+    )
   }
 })()
