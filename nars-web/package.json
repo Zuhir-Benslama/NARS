@@ -30,7 +30,7 @@
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
     "@opentelemetry/instrumentation-document-load": "^0.64.0",
-    "@opentelemetry/instrumentation-fetch": "^0.219.0",
+    "@opentelemetry/instrumentation-fetch": "^0.221.0",
     "@opentelemetry/sdk-trace-web": "^2.8.0",
     "@turf/distance": "^7.3.5",
     "@turf/helpers": "^7.3.5",
