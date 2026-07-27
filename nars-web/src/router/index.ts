@@ -36,7 +36,7 @@ router.beforeEach((to) => {
     return getLoginPath()
   }
   if ((to.name === "admin" || to.name === "wilaya-detail") && !appStore.isAdminUser) {
-    return "/"
+    return false
   }
 })
 

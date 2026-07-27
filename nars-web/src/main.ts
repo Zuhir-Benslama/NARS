@@ -139,11 +139,8 @@ async function initializeApp(): Promise<void> {
     appStore.setUser(authResult.user)
   }
 
-  createVueApp(pinia)
-
-  // Expose stores for E2E tests *before* initializeApp() so tests can
-  // interact with the UI immediately — map/feature loading is slow and
-  // irrelevant for store-level assertions.
+  // Expose stores for E2E tests BEFORE Vue app mounts so that tests
+  // can interact with stores even if the router or map init fails.
   if (import.meta.env.DEV) {
     const { useModalStore } = await import("./stores/modalStore")
     const { useLayerStore } = await import("./stores/layerStore")
@@ -162,6 +159,8 @@ async function initializeApp(): Promise<void> {
       configurable: import.meta.env.DEV,
     })
   }
+
+  createVueApp(pinia)
 
   try {
     await initializeApp()
