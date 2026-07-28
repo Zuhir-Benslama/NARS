@@ -54,7 +54,9 @@ function onKey(e: KeyboardEvent) {
   }
 }
 useWindowKeydown({
-  Escape: (e) => { if (store.visible) onKey(e) },
+  Escape: (e) => {
+    if (store.visible) onKey(e)
+  },
 })
 </script>
 

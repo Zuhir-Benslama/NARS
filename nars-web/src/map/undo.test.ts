@@ -40,7 +40,13 @@ function makeEntry(overrides: Partial<LayerEntry> = {}): LayerEntry {
     id: "feat-1",
     dbId: "db-1",
     type: "polygon",
-    data: { type: "areas", label: "Test Area", decisionNumber: "", decisionDate: "", areaTypeKey: "central_urban" },
+    data: {
+      type: "areas",
+      label: "Test Area",
+      decisionNumber: "",
+      decisionDate: "",
+      areaTypeKey: "central_urban",
+    },
     ...overrides,
   }
 }
@@ -84,7 +90,13 @@ describe("undo", () => {
     it("returns label of the last deleted feature", () => {
       recordDelete(
         makeEntry({
-          data: { type: "areas", label: "My Area", decisionNumber: "", decisionDate: "", areaTypeKey: "central_urban" },
+          data: {
+            type: "areas",
+            label: "My Area",
+            decisionNumber: "",
+            decisionDate: "",
+            areaTypeKey: "central_urban",
+          },
         }),
         "areas",
       )

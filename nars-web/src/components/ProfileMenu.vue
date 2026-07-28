@@ -106,7 +106,9 @@ function onWindowKeydown(e: KeyboardEvent) {
   }
 }
 useWindowKeydown({
-  Escape: (e) => { if (dropdownOpen.value) onWindowKeydown(e) },
+  Escape: (e) => {
+    if (dropdownOpen.value) onWindowKeydown(e)
+  },
 })
 
 async function onLogout() {

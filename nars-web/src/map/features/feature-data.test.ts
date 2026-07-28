@@ -8,12 +8,40 @@ function makePhase(key: string): (typeof PHASES)[number] {
   return { key } as (typeof PHASES)[number]
 }
 
-function areaModal(overrides: Partial<{ label: string; decisionNumber: string; decisionDate: string; areaTypeKey: string }> = {}): ModalResult {
-  return { type: "areas", label: "Test Feature", decisionNumber: "123/45", decisionDate: "2024-01-15", areaTypeKey: "central_urban", ...overrides }
+function areaModal(
+  overrides: Partial<{
+    label: string
+    decisionNumber: string
+    decisionDate: string
+    areaTypeKey: string
+  }> = {},
+): ModalResult {
+  return {
+    type: "areas",
+    label: "Test Feature",
+    decisionNumber: "123/45",
+    decisionDate: "2024-01-15",
+    areaTypeKey: "central_urban",
+    ...overrides,
+  }
 }
 
-function roadsModal(overrides: Partial<{ label: string; decisionNumber: string; decisionDate: string; roadTypeKey: string }> = {}): ModalResult {
-  return { type: "roads", label: "Test Feature", decisionNumber: "123/45", decisionDate: "2024-01-15", roadTypeKey: "street", ...overrides }
+function roadsModal(
+  overrides: Partial<{
+    label: string
+    decisionNumber: string
+    decisionDate: string
+    roadTypeKey: string
+  }> = {},
+): ModalResult {
+  return {
+    type: "roads",
+    label: "Test Feature",
+    decisionNumber: "123/45",
+    decisionDate: "2024-01-15",
+    roadTypeKey: "street",
+    ...overrides,
+  }
 }
 
 function houseEntranceModal(overrides: Partial<{ label: string }> = {}): ModalResult {
@@ -31,7 +59,11 @@ describe("feature-data", () => {
         type: "Point",
         coordinates: [127.5, 36.0],
       }
-      const result = buildFeatureData(geometry, makePhase("houseEntrances"), houseEntranceModal()) as FeatureData
+      const result = buildFeatureData(
+        geometry,
+        makePhase("houseEntrances"),
+        houseEntranceModal(),
+      ) as FeatureData
 
       expect(result.lat).toBe(36.0)
       expect(result.lng).toBe(127.5)
@@ -111,7 +143,11 @@ describe("feature-data", () => {
         type: "Point",
         coordinates: [127.5, 36.0],
       }
-      const modal = roadsModal({ decisionNumber: "456/78", decisionDate: "2024-06-01", roadTypeKey: "highway" })
+      const modal = roadsModal({
+        decisionNumber: "456/78",
+        decisionDate: "2024-06-01",
+        roadTypeKey: "highway",
+      })
       const result = buildFeatureData(geometry, makePhase("roads"), modal) as FeatureData
 
       expect(result.decisionNumber).toBe("456/78")

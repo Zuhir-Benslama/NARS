@@ -15,7 +15,13 @@ import { getFeatureType } from "../house-numbering"
 import { debugError, debugLog } from "../../utils/debug"
 import { updateEndpointMarkers } from "../roads/road-directions"
 import { loadPhase } from "../../phases-nav/storage"
-import type { FeatureData, FeatureDataByType, FeatureTypeKey, LayerEntry, DbFeature } from "../../types"
+import type {
+  FeatureData,
+  FeatureDataByType,
+  FeatureTypeKey,
+  LayerEntry,
+  DbFeature,
+} from "../../types"
 import { buildGeoJsonFeature } from "./loader-build"
 
 // ─── PER-FEATURE PROCESSING ──────────────────────────────────────

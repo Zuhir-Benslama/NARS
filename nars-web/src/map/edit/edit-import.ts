@@ -22,12 +22,7 @@ export function buildGeomanImportFeature(entry: LayerEntry): GeoJSON.Feature | n
 
   const d = entry.data as { lat?: number; lng?: number; radius?: number; coordinates?: LatLng[] }
 
-  if (
-    entry.type === "circle" &&
-    d.lat != null &&
-    d.lng != null &&
-    d.radius
-  ) {
+  if (entry.type === "circle" && d.lat != null && d.lng != null && d.radius) {
     const ring = computeCircleRingForEdit(d.lat, d.lng, d.radius)
     ring.push([ring[0][0], ring[0][1]])
     return {

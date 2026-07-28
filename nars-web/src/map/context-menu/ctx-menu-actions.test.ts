@@ -118,10 +118,7 @@ describe("enableEditGeometry", () => {
 
     mod.enableEditGeometry("myfeature")
 
-    expect(mockShowToast).toHaveBeenCalledWith(
-      "map_select_feature_first",
-      "info",
-    )
+    expect(mockShowToast).toHaveBeenCalledWith("map_select_feature_first", "info")
   })
 
   it("selects feature when none is selected", () => {
@@ -165,10 +162,7 @@ describe("enableEditGeometry", () => {
     mod.enableEditGeometry("g1")
 
     expect(mockEnableEditMode).toHaveBeenCalledWith("feat_g1")
-    expect(mockShowToast).toHaveBeenCalledWith(
-      "map_edit_mode_hint",
-      "info",
-    )
+    expect(mockShowToast).toHaveBeenCalledWith("map_edit_mode_hint", "info")
   })
 })
 

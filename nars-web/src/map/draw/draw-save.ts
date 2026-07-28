@@ -148,8 +148,7 @@ function applyCityCenterOverride(
   storeGeometry: GeoJSON.Geometry,
 ): { style: Record<string, unknown>; storeGeometry: GeoJSON.Geometry } {
   const d = featureData as { radius?: number; lat?: number; lng?: number }
-  if (!d.radius || d.lat == null || d.lng == null)
-    return { style, storeGeometry }
+  if (!d.radius || d.lat == null || d.lng == null) return { style, storeGeometry }
   const ring = closeRing(computeCircleRing(d.lat, d.lng, d.radius))
   return {
     storeGeometry: { type: "LineString", coordinates: ring },
@@ -239,7 +238,10 @@ async function saveAndUpdateStore(
     const featureData = buildFeatureData(geometry, drawingPhase, modalResult)
     const saveResult = await saveToDatabase(featureData)
     if (!saveResult.ok || !saveResult.data) {
-      showToast(t("map_save_failed", { error: saveResult.error ?? t("map_save_failed_fallback") }), "error")
+      showToast(
+        t("map_save_failed", { error: saveResult.error ?? t("map_save_failed_fallback") }),
+        "error",
+      )
       return
     }
 

@@ -113,7 +113,10 @@ describe("buildFeatureData", () => {
       coordinates: [3.058, 36.753],
     }
 
-    const result = buildFeatureData(pointGeometry, areaPhase, { type: "areas", ...baseModalResult }) as FeatureData
+    const result = buildFeatureData(pointGeometry, areaPhase, {
+      type: "areas",
+      ...baseModalResult,
+    }) as FeatureData
 
     expect(result.roadDbId).toBeUndefined()
     expect(result.entranceTypeKey).toBeUndefined()

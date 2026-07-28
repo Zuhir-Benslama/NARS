@@ -103,7 +103,13 @@ describe("edit-state", () => {
         id: "e1",
         dbId: "db-1",
         type: "polygon",
-        data: { type: "areas", label: "Test", decisionNumber: "", decisionDate: "", areaTypeKey: "central_urban" },
+        data: {
+          type: "areas",
+          label: "Test",
+          decisionNumber: "",
+          decisionDate: "",
+          areaTypeKey: "central_urban",
+        },
       }
       useEditStore().setActiveEditEntry(entry)
       expect(getActiveEditEntry()).toStrictEqual(entry)
@@ -136,7 +142,13 @@ describe("edit-state", () => {
         id: "e2",
         dbId: "db-2",
         type: "line",
-        data: { type: "roads", label: "Road", decisionNumber: "", decisionDate: "", roadTypeKey: "street" },
+        data: {
+          type: "roads",
+          label: "Road",
+          decisionNumber: "",
+          decisionDate: "",
+          roadTypeKey: "street",
+        },
       }
       setActiveEditEntry(entry)
       expect(useEditStore().activeEditEntry).toStrictEqual(entry)
@@ -169,7 +181,13 @@ describe("edit-state", () => {
         id: "e1",
         dbId: "db-1",
         type: "polygon",
-        data: { type: "areas", label: "X", decisionNumber: "", decisionDate: "", areaTypeKey: "central_urban" },
+        data: {
+          type: "areas",
+          label: "X",
+          decisionNumber: "",
+          decisionDate: "",
+          areaTypeKey: "central_urban",
+        },
       })
       store.setActiveEditCoordsSnapshot([{ lat: 1, lng: 2 }])
 
@@ -202,7 +220,13 @@ describe("edit-state", () => {
         id: "feat-roads-1",
         dbId: "db-roads-1",
         type: "line",
-        data: { type: "roads", label: "Main Road", decisionNumber: "", decisionDate: "", roadTypeKey: "street" },
+        data: {
+          type: "roads",
+          label: "Main Road",
+          decisionNumber: "",
+          decisionDate: "",
+          roadTypeKey: "street",
+        },
       }
       store.addFeature("roads", entry)
 

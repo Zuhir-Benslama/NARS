@@ -295,8 +295,12 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 useWindowKeydown({
-  Enter: (e) => { if (modalStore.visible) onKeydown(e) },
-  Escape: (e) => { if (modalStore.visible) onKeydown(e) },
+  Enter: (e) => {
+    if (modalStore.visible) onKeydown(e)
+  },
+  Escape: (e) => {
+    if (modalStore.visible) onKeydown(e)
+  },
 })
 
 onMounted(async () => {

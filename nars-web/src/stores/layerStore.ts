@@ -62,21 +62,16 @@ export const useLayerStore = defineStore("layer", {
     mainEntrances: (state) =>
       state.houseEntrances.filter((e) => e.data.entranceTypeKey === "main_entrance"),
     secondaryEntrances: (state) =>
-      state.houseEntrances.filter(
-        (e) => e.data.entranceTypeKey === "secondary_entrance",
-      ),
+      state.houseEntrances.filter((e) => e.data.entranceTypeKey === "secondary_entrance"),
 
     areaCount: (state) => state.areas.length,
     cityCenterCount: (state) => state.cityCenter.length,
     districtCount: (state) => state.districts.length,
     roadCount: (state) => state.roads.length,
     mainEntranceCount: (state) =>
-      state.houseEntrances.filter((e) => e.data.entranceTypeKey === "main_entrance")
-        .length,
+      state.houseEntrances.filter((e) => e.data.entranceTypeKey === "main_entrance").length,
     secondaryEntranceCount: (state) =>
-      state.houseEntrances.filter(
-        (e) => e.data.entranceTypeKey === "secondary_entrance",
-      ).length,
+      state.houseEntrances.filter((e) => e.data.entranceTypeKey === "secondary_entrance").length,
     publicBuildingCount: (state) => state.publicBuildings.length,
     publicSpaceCount: (state) => state.publicSpaces.length,
     namingPanelCount: (state) => state.namingPanels.length,

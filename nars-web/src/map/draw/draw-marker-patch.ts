@@ -80,7 +80,9 @@ function applyMarkerPatch(mp: GeomanMarkerPointer): void {
   registerGeomanMarker(mp, marker, orig)
   marker.setLngLat = makeSnapSetLngLat(mp, orig)
 
-  const markerEl = (marker as { markerInstance?: { getElement?(): HTMLElement } }).markerInstance?.getElement?.()
+  const markerEl = (
+    marker as { markerInstance?: { getElement?(): HTMLElement } }
+  ).markerInstance?.getElement?.()
   if (markerEl) {
     markerEl.style.pointerEvents = "none"
   }

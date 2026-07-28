@@ -12,10 +12,7 @@ import { onMounted, onUnmounted, type Ref } from "vue"
 
 type KeyHandler = (e: KeyboardEvent) => void
 
-export function useWindowKeydown(
-  keyMap: Record<string, KeyHandler>,
-  enabled?: Ref<boolean>,
-): void {
+export function useWindowKeydown(keyMap: Record<string, KeyHandler>, enabled?: Ref<boolean>): void {
   function handler(e: KeyboardEvent) {
     if (enabled && !enabled.value) return
     const fn = keyMap[e.key]

@@ -8,7 +8,13 @@ function makeEntry(overrides: Partial<LayerEntry> = {}): LayerEntry {
     id: "id-1",
     dbId: "db-1",
     type: "polygon",
-    data: { type: "areas", label: "Test", decisionNumber: "", decisionDate: "", areaTypeKey: "central_urban" },
+    data: {
+      type: "areas",
+      label: "Test",
+      decisionNumber: "",
+      decisionDate: "",
+      areaTypeKey: "central_urban",
+    },
     ...overrides,
   }
 }
@@ -58,7 +64,13 @@ describe("layerStore", () => {
       "areas",
       makeEntry({
         dbId: "abc",
-        data: { type: "areas", label: "Old", decisionNumber: "", decisionDate: "", areaTypeKey: "central_urban" },
+        data: {
+          type: "areas",
+          label: "Old",
+          decisionNumber: "",
+          decisionDate: "",
+          areaTypeKey: "central_urban",
+        },
       }),
     )
     store.updateFeature("areas", "abc", { label: "New" })
@@ -116,12 +128,19 @@ describe("layerStore", () => {
       })
 
     it("mainEntrances filters by main_entrance", () => {
-      store.houseEntrances = [main("1"), main("2"), secondary("3")] as unknown as LayerEntry<HouseEntranceFeatureData>[]
+      store.houseEntrances = [
+        main("1"),
+        main("2"),
+        secondary("3"),
+      ] as unknown as LayerEntry<HouseEntranceFeatureData>[]
       expect(store.mainEntrances).toHaveLength(2)
     })
 
     it("secondaryEntrances filters by secondary_entrance", () => {
-      store.houseEntrances = [main("1"), secondary("2")] as unknown as LayerEntry<HouseEntranceFeatureData>[]
+      store.houseEntrances = [
+        main("1"),
+        secondary("2"),
+      ] as unknown as LayerEntry<HouseEntranceFeatureData>[]
       expect(store.secondaryEntrances).toHaveLength(1)
     })
   })
