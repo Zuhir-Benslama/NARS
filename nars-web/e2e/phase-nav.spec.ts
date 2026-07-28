@@ -29,6 +29,23 @@ test.describe("Phase Navigation", () => {
     const count = await phases.count()
     expect(count).toBeGreaterThanOrEqual(2)
 
+    // Seed an area so the phase can advance (navigatePhase requires >0 areas)
+    await page.evaluate(() => {
+      const store = (window as unknown as { __TEST__?: { layerStore: { addFeature: Function } } }).__TEST__
+      store?.layerStore.addFeature("areas", {
+        id: "e2e-area-1",
+        dbId: "e2e-area-1",
+        type: "polygon",
+        data: {
+          type: "areas",
+          label: "E2E Area",
+          decisionNumber: "001",
+          decisionDate: "2024-01-01",
+          areaTypeKey: "central_urban",
+        },
+      })
+    })
+
     await phases.nth(1).click()
     // Wait for Vue reactivity to settle after click
     await expect(page.locator(".phase-step").nth(1)).toHaveClass(/active/, { timeout: 5000 })
