@@ -1,6 +1,5 @@
 import { computed } from "vue"
-import type { ModalState } from "../types"
-import type { FeatureData } from "../types"
+import type { ModalState, ModalResult } from "../types"
 import { PHASES } from "../phases"
 
 export function useFeatureValidation(modalStore: ModalState & { phaseIndex: number | null }) {
@@ -61,44 +60,98 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
     return errors
   }
 
-  function buildModalResult(communeName: string): Partial<FeatureData> {
+  function buildModalResult(communeName: string): ModalResult {
     const key = phase.value?.key
-    const result: Partial<FeatureData> = {
-      label: isMainUrban.value ? communeName : modalStore.label.trim(),
+
+    if (key === "areas") {
+      return {
+        type: "areas",
+        label: isMainUrban.value ? communeName : modalStore.label.trim(),
+        decisionNumber: modalStore.decisionNumber.trim(),
+        decisionDate: modalStore.decisionDate.trim(),
+        areaTypeKey: modalStore.areaTypeKey,
+      }
+    }
+
+    if (key === "districts") {
+      return {
+        type: "districts",
+        label: modalStore.label.trim(),
+        decisionNumber: modalStore.decisionNumber.trim(),
+        decisionDate: modalStore.decisionDate.trim(),
+        districtTypeKey: modalStore.districtTypeKey,
+      }
+    }
+
+    if (key === "cityCenter") {
+      return {
+        type: "cityCenter",
+        label: modalStore.label.trim(),
+        radius: modalStore.radius ?? undefined,
+      }
+    }
+
+    if (key === "roads") {
+      return {
+        type: "roads",
+        label: modalStore.label.trim(),
+        decisionNumber: modalStore.decisionNumber.trim(),
+        decisionDate: modalStore.decisionDate.trim(),
+        roadTypeKey: modalStore.roadTypeKey,
+      }
+    }
+
+    if (key === "houseEntrances") {
+      if (modalStore.entranceTypeKey === "main_entrance") {
+        const roadOption = modalStore.roadOptions[Number(modalStore.selectedRoadIdx)]
+        return {
+          type: "houseEntrances",
+          label: modalStore.label.trim(),
+          entranceTypeKey: "main_entrance",
+          roadDbId: roadOption?.dbId,
+          roadLabel: roadOption?.label,
+          side: modalStore.entranceSide ?? undefined,
+          entranceNumber: modalStore.entranceNumber ?? undefined,
+        }
+      }
+      const mainOption = modalStore.mainEntranceOptions[Number(modalStore.selectedMainIdx)]
+      return {
+        type: "houseEntrances",
+        label: modalStore.label.trim(),
+        entranceTypeKey: "secondary_entrance",
+        mainEntranceDbId: mainOption?.dbId,
+        mainEntranceLabel: mainOption?.label,
+        bisNumber: modalStore.bisNumber ?? undefined,
+      }
+    }
+
+    if (key === "publicBuildings") {
+      return {
+        type: "publicBuildings",
+        label: modalStore.label.trim(),
+        decisionNumber: modalStore.decisionNumber.trim(),
+        decisionDate: modalStore.decisionDate.trim(),
+        sectorKey: modalStore.sectorKey,
+        buildingTypeKey: modalStore.buildingTypeKey,
+      }
+    }
+
+    if (key === "publicSpaces") {
+      return {
+        type: "publicSpaces",
+        label: modalStore.label.trim(),
+        decisionNumber: modalStore.decisionNumber.trim(),
+        decisionDate: modalStore.decisionDate.trim(),
+        spaceTypeKey: modalStore.spaceTypeKey,
+      }
+    }
+
+    return {
+      type: "namingPanels",
+      label: modalStore.label.trim(),
       decisionNumber: modalStore.decisionNumber.trim(),
       decisionDate: modalStore.decisionDate.trim(),
     }
-
-    if (key === "areas") {
-      result.areaTypeKey = modalStore.areaTypeKey
-    } else if (key === "districts") {
-      result.districtTypeKey = modalStore.districtTypeKey
-    } else if (key === "roads") {
-      result.roadTypeKey = modalStore.roadTypeKey
-    } else if (key === "houseEntrances") {
-      result.entranceTypeKey = modalStore.entranceTypeKey
-      if (modalStore.entranceTypeKey === "main_entrance") {
-        const roadOption = modalStore.roadOptions[Number(modalStore.selectedRoadIdx)]
-        result.roadDbId = roadOption?.dbId
-        result.roadLabel = roadOption?.label
-        result.side = modalStore.entranceSide ?? undefined
-        result.entranceNumber = modalStore.entranceNumber ?? undefined
-      } else {
-        const mainOption = modalStore.mainEntranceOptions[Number(modalStore.selectedMainIdx)]
-        result.mainEntranceDbId = mainOption?.dbId
-        result.mainEntranceLabel = mainOption?.label
-        result.bisNumber = modalStore.bisNumber ?? undefined
-      }
-    } else if (key === "publicBuildings") {
-      result.sectorKey = modalStore.sectorKey
-      result.buildingTypeKey = modalStore.buildingTypeKey
-    } else if (key === "publicSpaces") {
-      result.spaceTypeKey = modalStore.spaceTypeKey
-    } else if (key === "cityCenter") {
-      result.radius = modalStore.radius ?? undefined
-    }
-
-    return result
   }
 
   return { validate, buildModalResult, isMainUrban, isCityCenter, isHouseEntranceEdit }

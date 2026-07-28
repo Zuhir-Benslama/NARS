@@ -8,9 +8,35 @@ export type { DrawType, Phase } from "./types/phases"
 
 export type { AreaType, DistrictType, RoadType, PublicSpaceType } from "./types/feature-types"
 
-export type { FeatureTypeKey, FeatureData, LayerEntry } from "./types/features"
+export type {
+  FeatureTypeKey,
+  FeatureData,
+  FeatureDataByType,
+  AreaFeatureData,
+  DistrictFeatureData,
+  CityCenterFeatureData,
+  RoadFeatureData,
+  HouseEntranceFeatureData,
+  PublicBuildingFeatureData,
+  PublicSpaceFeatureData,
+  NamingPanelFeatureData,
+  LayerEntry,
+} from "./types/features"
 
-export type { RoadOption, EntranceOption, ModalState, ModalResult } from "./types/modal"
+export type {
+  RoadOption,
+  EntranceOption,
+  ModalState,
+  ModalResult,
+  AreaModalResult,
+  DistrictModalResult,
+  CityCenterModalResult,
+  RoadModalResult,
+  HouseEntranceModalResult,
+  PublicBuildingModalResult,
+  PublicSpaceModalResult,
+  NamingPanelModalResult,
+} from "./types/modal"
 
 export type { UserRole, CommuneInfo, DairaInfo, WilayaInfo, UserInfo } from "./types/user"
 

@@ -14,7 +14,7 @@ import * as turfDistance from "@turf/distance"
 
 import type { LayerEntry } from "../../types"
 
-const CONNECT_M = 30 // Junction detection threshold in meters
+export const CONNECT_M = 30 // Junction detection threshold in meters
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -76,10 +76,31 @@ export function buildConnectionGraph(roads: LayerEntry[]): {
   const graph = new Graph({ multi: true, type: "undirected" })
   const segs = new Map<string, Seg>()
 
+  // Spatial index for graph nodes — avoids O(n) scan per resolveNode call
+  const nodeGrid = new Map<string, Set<string>>()
+
   const resolveNode = (c: Coord): string => {
-    for (const k of graph.nodes()) if (dm(c, fromNk(k)) <= CONNECT_M) return k
+    const cr = Math.floor(c.lat / CELL_SIZE)
+    const cc = Math.floor(c.lng / CELL_SIZE)
+    // Check self cell + 8 neighbors (cell size = 2×CONNECT_M, so this covers all matches within CONNECT_M)
+    for (let r = cr - 1; r <= cr + 1; r++) {
+      for (let c2 = cc - 1; c2 <= cc + 1; c2++) {
+        const cell = nodeGrid.get(`${r},${c2}`)
+        if (!cell) continue
+        for (const k of cell) {
+          if (dm(c, fromNk(k)) <= CONNECT_M) return k
+        }
+      }
+    }
     const k = nk(c)
     graph.addNode(k)
+    const ck = `${cr},${cc}`
+    let bucket = nodeGrid.get(ck)
+    if (!bucket) {
+      bucket = new Set()
+      nodeGrid.set(ck, bucket)
+    }
+    bucket.add(k)
     return k
   }
 

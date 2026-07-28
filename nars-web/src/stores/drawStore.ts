@@ -31,12 +31,6 @@ export const useDrawStore = defineStore("draw", {
       const marker = this.geomanMarkerPointer?.marker as Record<string, unknown> | null | undefined
       if (marker && this.originalGeomanMarkerSetLngLat) {
         marker.setLngLat = this.originalGeomanMarkerSetLngLat
-        const origGet = marker["_narsOrigGetLngLat"] as
-          ((...args: unknown[]) => unknown) | undefined
-        if (origGet) {
-          marker.getLngLat = origGet
-        }
-        marker._narsSnapPatchedInstance = false
       }
     },
     setSnappingEnabled(v: boolean): void {

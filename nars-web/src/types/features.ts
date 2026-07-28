@@ -15,8 +15,8 @@ export type FeatureTypeKey =
 export interface FeatureData {
   type: FeatureTypeKey
   label: string
-  decisionNumber: string
-  decisionDate: string
+  decisionNumber?: string
+  decisionDate?: string
   coordinates?: LatLng[]
   lat?: number
   lng?: number
@@ -83,6 +83,8 @@ export interface HouseEntranceFeatureData extends CommonFields {
   mainEntranceDbId?: string
   mainEntranceLabel?: string
   bisNumber?: number
+  lat?: number
+  lng?: number
 }
 export interface PublicBuildingFeatureData extends CommonFields {
   type: "publicBuildings"
@@ -99,6 +101,8 @@ export interface PublicSpaceFeatureData extends CommonFields {
 }
 export interface NamingPanelFeatureData extends CommonFields {
   type: "namingPanels"
+  lat?: number
+  lng?: number
 }
 
 export type FeatureDataByType =
@@ -111,9 +115,9 @@ export type FeatureDataByType =
   | PublicSpaceFeatureData
   | NamingPanelFeatureData
 
-export interface LayerEntry {
+export interface LayerEntry<T = FeatureDataByType> {
   id: string
   dbId: string
-  data: FeatureData
+  data: T
   type: "polygon" | "line" | "circle" | "marker"
 }

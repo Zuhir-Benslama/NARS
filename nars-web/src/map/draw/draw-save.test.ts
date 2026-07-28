@@ -148,7 +148,7 @@ describe("completeDrawingWithGeometry", () => {
     )
 
     expect(mockDisableDraw).toHaveBeenCalled()
-    expect(mockToast).toHaveBeenCalledWith("Feature saved.", "success")
+    expect(mockToast).toHaveBeenCalledWith("map_feature_saved", "success")
   })
 
   it("handles modal cancellation gracefully", async () => {
@@ -183,7 +183,7 @@ describe("completeDrawingWithGeometry", () => {
 
     expect(layerStore.areas).toHaveLength(0)
     expect(mockFeaturesStoreAdd).not.toHaveBeenCalled()
-    expect(mockToast).toHaveBeenCalledWith(expect.stringContaining("Save failed"), "error")
+    expect(mockToast).toHaveBeenCalledWith("map_save_failed", "error")
   })
 
   it("saves a road LineString and updates the layer store", async () => {

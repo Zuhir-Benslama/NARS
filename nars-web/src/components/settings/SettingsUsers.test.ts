@@ -195,8 +195,7 @@ describe("SettingsUsers", () => {
       await inputs[3].setValue("johndoe")
       await inputs[4].setValue("password123")
 
-      // Select a daira by directly setting state (Teleport dropdown is complex)
-      ;(wrapper.vm as any).dairaQuery = "Sidi M'Hamed"
+      // Select a daira by directly setting state
       ;(wrapper.vm as any).selectedDairaId = 1
 
       await wrapper.find(".modal-btn-save").trigger("click")
@@ -277,24 +276,23 @@ describe("SettingsUsers", () => {
   })
 
   describe("daira selector interaction", () => {
-    it("can select a daira from options", async () => {
+    it("sets selectedDairaId on v-model change", async () => {
       mockAppStore.mockReturnValue({ user: { role: "wilaya_admin" } })
       const wrapper = mount(SettingsUsers)
-      ;(wrapper.vm as any).dairaOptions = [{ id: 5, name_fr: "Sidi M'Hamed" }]
-      ;(wrapper.vm as any).dairaQuery = "Sidi"
-      await new Promise((resolve) => setTimeout(resolve, 0))
-
-      expect(document.body.querySelector(".su-dropdown")).toBeTruthy()
-    })
-
-    it("selecting a daira populates the query", async () => {
-      mockAppStore.mockReturnValue({ user: { role: "wilaya_admin" } })
-      const wrapper = mount(SettingsUsers)
-      ;(wrapper.vm as any).selectDaira({ id: 5, name_fr: "Sidi M'Hamed" })
+      ;(wrapper.vm as any).selectedDairaId = 5
       await new Promise((resolve) => setTimeout(resolve, 0))
 
       expect((wrapper.vm as any).selectedDairaId).toBe(5)
-      expect((wrapper.vm as any).dairaQuery).toBe("Sidi M'Hamed")
+    })
+
+    it("cascades daira change to reset commune", async () => {
+      mockAppStore.mockReturnValue({ user: { role: "wilaya_admin" } })
+      const wrapper = mount(SettingsUsers)
+      ;(wrapper.vm as any).selectedDairaId = 5
+      ;(wrapper.vm as any).selectedCommuneId = 10
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect((wrapper.vm as any).selectedCommuneId).toBeNull()
     })
   })
 })

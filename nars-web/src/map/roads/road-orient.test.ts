@@ -17,6 +17,7 @@ function makeSeg(coords: Coord[], dbId = "db-1"): Seg {
         label: "",
         decisionNumber: "",
         decisionDate: "",
+        roadTypeKey: "street",
         coordinates: coords,
       },
     },

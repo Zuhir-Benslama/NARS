@@ -65,9 +65,8 @@ function openSecondaryEntranceModal(state: LayerState): ModalResult | null {
   const bisNumber = bisCount + 1
 
   return {
+    type: "houseEntrances",
     label: "BIS" + String(bisNumber).padStart(2, "0"),
-    decisionNumber: "",
-    decisionDate: "",
     entranceTypeKey: "secondary_entrance",
     mainEntranceDbId: appStore.referenceEntranceDbId ?? undefined,
     mainEntranceLabel: mainEntry.data.label,
@@ -95,9 +94,8 @@ async function openMainEntranceModal(
   }
 
   return {
+    type: "houseEntrances",
     label: "?",
-    decisionNumber: "",
-    decisionDate: "",
     entranceTypeKey: "main_entrance",
     roadDbId: appStore.referenceRoadDbId ?? undefined,
     roadLabel: roadEntry.data.label,

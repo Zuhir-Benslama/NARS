@@ -12,11 +12,12 @@ import {
   computeCircleCenter,
 } from "../rendering/geometry"
 import { showToast } from "../../lib/toast"
+import { t } from "../../i18n"
 import { debugError } from "../../utils/debug"
 import { PHASES } from "../../phases"
 import { buildDrawControl } from "../draw/draw-control"
 import { repatchMarker } from "../draw/draw-complete"
-import type { LayerEntry } from "../../types"
+import type { LayerEntry, LatLng } from "../../types"
 import {
   getActiveEditEntry,
   getActiveGeomanFeatureId,
@@ -62,7 +63,7 @@ async function readGeomanGeometry(entry: LayerEntry): Promise<boolean> {
     if (geometry.type === "LineString") {
       const lineCoords = geometry.coordinates as [number, number][] | undefined
       if (!lineCoords || lineCoords.length < 2) {
-        showToast("Road must have at least 2 points.", "error")
+        showToast(t("map_road_min_points"), "error")
         await cancelEditMode()
         return false
       }
@@ -70,29 +71,31 @@ async function readGeomanGeometry(entry: LayerEntry): Promise<boolean> {
     if (geometry.type === "Polygon") {
       const polygonCoords = geometry.coordinates as [number, number][][] | undefined
       if (!polygonCoords?.[0] || polygonCoords[0].length < 3) {
-        showToast("Area must have at least 3 points.", "error")
+        showToast(t("map_area_min_points"), "error")
         await cancelEditMode()
         return false
       }
     }
 
+    const d = entry.data as { lat?: number; lng?: number; radius?: number; coordinates?: LatLng[] }
+
     if (geometry.type === "Point") {
       const c = geometry.coordinates as [number, number]
-      entry.data.lat = c[1]
-      entry.data.lng = c[0]
+      d.lat = c[1]
+      d.lng = c[0]
     } else if (geometry.type === "Polygon") {
       const coords = (geometry.coordinates as [number, number][][])[0]
-      entry.data.coordinates = coords.map((c) => ({ lat: c[1], lng: c[0] }))
+      d.coordinates = coords.map((c) => ({ lat: c[1], lng: c[0] }))
       if (entry.type === "circle" && coords.length >= 3) {
         const { lat, lng } = computeCircleCenter(coords)
-        entry.data.lat = lat
-        entry.data.lng = lng
-        entry.data.radius = computeCircleRadius(entry.data.lat, entry.data.lng, coords)
+        d.lat = lat
+        d.lng = lng
+        d.radius = computeCircleRadius(d.lat, d.lng, coords)
       }
     } else {
       // LineString
       const coords = geometry.coordinates as [number, number][]
-      entry.data.coordinates = coords.map((c) => ({ lat: c[1], lng: c[0] }))
+      d.coordinates = coords.map((c) => ({ lat: c[1], lng: c[0] }))
     }
   } catch (err) {
     debugError("Failed to read Geoman geometry:", err)
@@ -109,11 +112,11 @@ async function saveGeometry(entry: LayerEntry): Promise<boolean> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ data: entry.data }),
     })
-    showToast("Geometry saved.", "success")
+    showToast(t("map_geometry_saved"), "success")
     return true
   } catch (err) {
     debugError("Failed to save geometry:", err)
-    showToast("Failed to save geometry changes", "error")
+    showToast(t("map_geometry_save_failed"), "error")
     return false
   }
 }
@@ -122,21 +125,22 @@ async function saveGeometry(entry: LayerEntry): Promise<boolean> {
 
 function updateFeatureGeometry(entry: LayerEntry): void {
   const featuresStore = useFeaturesStore()
-  if (entry.data.lat != null && entry.data.lng != null) {
-    if (entry.type === "circle" && entry.data.radius) {
-      const ring = closeRing(computeCircleRing(entry.data.lat, entry.data.lng, entry.data.radius))
+  const d = entry.data as { lat?: number; lng?: number; radius?: number; coordinates?: LatLng[] }
+  if (d.lat != null && d.lng != null) {
+    if (entry.type === "circle" && d.radius) {
+      const ring = closeRing(computeCircleRing(d.lat, d.lng, d.radius))
       featuresStore.update(entry.id, {
         geometry: { type: "LineString", coordinates: ring },
       })
     } else {
       const geom: GeoJSON.Point = {
         type: "Point",
-        coordinates: [entry.data.lng, entry.data.lat],
+        coordinates: [d.lng, d.lat],
       }
       featuresStore.update(entry.id, { geometry: geom })
     }
-  } else if (entry.data.coordinates && entry.data.coordinates.length > 0) {
-    const coords = entry.data.coordinates.map((c) => [c.lng, c.lat])
+  } else if (d.coordinates && d.coordinates.length > 0) {
+    const coords = d.coordinates.map((c) => [c.lng, c.lat])
     if (entry.type === "line") {
       featuresStore.update(entry.id, {
         geometry: { type: "LineString" as const, coordinates: coords },
@@ -211,7 +215,7 @@ export async function cancelEditMode(): Promise<void> {
 
   await removeGeomanFeature()
   disableEditMode()
-  showToast("Edit cancelled.", "info")
+  showToast(t("map_edit_cancelled"), "info")
 
   const phase = PHASES.find((p) => p.key === entry.data.type)
   if (phase) {

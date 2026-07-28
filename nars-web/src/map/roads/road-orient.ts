@@ -6,7 +6,7 @@ import Graph from "graphology"
 import * as turfDistance from "@turf/distance"
 
 import type { Coord, Seg } from "./road-graph"
-import { dm, toPt, fromNk } from "./road-graph"
+import { dm, toPt, fromNk, CONNECT_M } from "./road-graph"
 
 // ─── PHASE 2A: GEOGRAPHIC FALLBACK ───────────────────────────────────────────
 
@@ -77,7 +77,7 @@ export function orientFromCityCenter(
 ): void {
   const seeds = graph.nodes().filter((k: string) => {
     const d = turfDistance.distance(toPt(center), toPt(fromNk(k)))
-    return Math.abs(d - radius) <= 30
+    return Math.abs(d - radius) <= CONNECT_M
   })
   if (!seeds.length) return
 

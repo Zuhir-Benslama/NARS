@@ -3,8 +3,6 @@ import { useAppStore } from "../../stores/appStore"
 import { useModalStore } from "../../stores/modalStore"
 import { useLayerStore } from "../../stores/layerStore"
 import { checkMainUrbanExists, getRoadSide } from "../../lib/validation"
-import type { LayerEntry } from "../../types"
-
 export async function prepareModalExtras(phase: (typeof PHASES)[number]): Promise<void> {
   const modalStore = useModalStore()
   const appStore = useAppStore()
@@ -28,7 +26,7 @@ export async function prepareModalExtras(phase: (typeof PHASES)[number]): Promis
       dbId: String(r.dbId),
     }))
     modalStore.mainEntranceOptions = (state.houseEntrances || [])
-      .filter((e: LayerEntry) => e.data.entranceTypeKey === "main_entrance")
+      .filter((e) => e.data.entranceTypeKey === "main_entrance")
       .map((e, i) => ({
         idx: i,
         label: e.data.label || `Entrance ${i + 1}`,
@@ -73,7 +71,7 @@ export function computeBisNumber(mainEntranceDbId: string): void {
   const layerStore = useLayerStore()
   const st = layerStore.$state
   const count = (st.houseEntrances || []).filter(
-    (e: LayerEntry) =>
+    (e) =>
       e.data.entranceTypeKey === "secondary_entrance" &&
       e.data.mainEntranceDbId === mainEntranceDbId,
   ).length

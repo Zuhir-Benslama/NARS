@@ -1,9 +1,8 @@
 import { PHASES } from "../../phases"
 import { useDrawStore } from "../../stores/drawStore"
 import type { GeomanMarkerPointer } from "../core/geoman-types"
-
-type LngLatInput = [number, number] | { lng: number; lat: number }
-type SetLngLatFn = (lngLat: LngLatInput) => void
+import type { SetLngLatFn } from "./types"
+import { getNarsLastSnap } from "./draw-marker-patch"
 
 export function registerGeomanMarker(
   mp: GeomanMarkerPointer,
@@ -21,13 +20,14 @@ export function unpatchGeomanMarker(): void {
   const marker = store.geomanMarkerPointer?.marker as Record<string, unknown> | null | undefined
   if (marker && store.originalGeomanMarkerSetLngLat) {
     marker.setLngLat = store.originalGeomanMarkerSetLngLat
-    const origGet = marker["_narsOrigGetLngLat"] as ((...args: unknown[]) => unknown) | undefined
-    if (origGet) {
-      marker.getLngLat = origGet
-    }
-    marker._narsSnapPatchedInstance = false
   }
 }
+
+/**
+ * Expose the last snapped position for consumers that need it (e.g. editing
+ * modes that read cursor position after the marker moves).
+ */
+export { getNarsLastSnap }
 
 export function isSnappingEnabled(): boolean {
   return useDrawStore().snappingEnabled

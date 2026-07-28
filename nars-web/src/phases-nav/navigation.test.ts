@@ -9,7 +9,7 @@ function makeEntry(overrides: Partial<LayerEntry> = {}): LayerEntry {
     id: "id-1",
     dbId: "db-1",
     type: "polygon",
-    data: { type: "areas", label: "Test", decisionNumber: "", decisionDate: "" },
+    data: { type: "areas", label: "Test", decisionNumber: "", decisionDate: "", areaTypeKey: "central_urban" },
     ...overrides,
   }
 }

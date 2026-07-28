@@ -30,7 +30,8 @@ test.describe("Phase Navigation", () => {
     expect(count).toBeGreaterThanOrEqual(2)
 
     await phases.nth(1).click()
-    await page.waitForTimeout(500)
+    // Wait for Vue reactivity to settle after click
+    await expect(page.locator(".phase-step").nth(1)).toHaveClass(/active/, { timeout: 5000 })
   })
 
   test("loads without console errors", async ({ page }) => {
@@ -39,7 +40,8 @@ test.describe("Phase Navigation", () => {
 
     await page.goto("/")
     await page.waitForLoadState("load")
-    await page.waitForTimeout(2000)
+    // Wait for async initialization (phase bar rendering) before collecting errors
+    await expect(page.locator("#phaseBar")).toBeVisible({ timeout: 20000 })
 
     const filtered = errors.filter(
       (e) => !e.includes("manifest") && !e.includes("favicon") && !e.includes("ECONNREFUSED"),

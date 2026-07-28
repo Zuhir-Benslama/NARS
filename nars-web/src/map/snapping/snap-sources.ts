@@ -132,7 +132,7 @@ export function getSnapPoints(
     if (!entries) continue
     for (const entry of entries) {
       if (entry.id === exclude) continue
-      const d = entry.data
+      const d = entry.data as { lat?: number; lng?: number }
       if (d.lat != null && d.lng != null) {
         points.push({ lat: d.lat, lng: d.lng })
       }

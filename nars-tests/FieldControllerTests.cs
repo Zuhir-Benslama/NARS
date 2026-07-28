@@ -18,7 +18,6 @@ namespace NarsApi.Tests;
 
 public class FieldControllerTests
 {
-    private static readonly Guid UserId = Guid.NewGuid();
     private static readonly Guid OtherUserId = Guid.NewGuid();
     private static AppDbContext CreateDb() => CreateInMemoryDb("FieldTest");
 

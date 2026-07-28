@@ -119,7 +119,7 @@ describe("enableEditGeometry", () => {
     mod.enableEditGeometry("myfeature")
 
     expect(mockShowToast).toHaveBeenCalledWith(
-      "Click the feature to select it first, then right-click to edit.",
+      "map_select_feature_first",
       "info",
     )
   })
@@ -135,7 +135,7 @@ describe("enableEditGeometry", () => {
   it("shows error toast when entry not found", () => {
     mod.enableEditGeometry("nonexistent")
 
-    expect(mockShowToast).toHaveBeenCalledWith("Feature not found", "error")
+    expect(mockShowToast).toHaveBeenCalledWith("map_feature_not_found", "error")
   })
 
   it("delegates to editFeatureInfo for circle type", () => {
@@ -147,7 +147,7 @@ describe("enableEditGeometry", () => {
 
     mod.enableEditGeometry("circle1")
 
-    expect(mockShowToast).not.toHaveBeenCalledWith("Edit mode not available", "error")
+    expect(mockShowToast).not.toHaveBeenCalledWith("map_edit_mode_unavailable", "error")
   })
 
   it("shows error when geoman not available", () => {
@@ -155,7 +155,7 @@ describe("enableEditGeometry", () => {
 
     mod.enableEditGeometry("g1")
 
-    expect(mockShowToast).toHaveBeenCalledWith("Edit mode not available", "error")
+    expect(mockShowToast).toHaveBeenCalledWith("map_edit_mode_unavailable", "error")
   })
 
   it("enables edit mode when geoman is available", () => {
@@ -166,7 +166,7 @@ describe("enableEditGeometry", () => {
 
     expect(mockEnableEditMode).toHaveBeenCalledWith("feat_g1")
     expect(mockShowToast).toHaveBeenCalledWith(
-      "Edit mode: drag vertices to reshape. Right-click to cancel.",
+      "map_edit_mode_hint",
       "info",
     )
   })
@@ -176,7 +176,7 @@ describe("editFeatureInfo", () => {
   it("shows error when entry not found", async () => {
     await mod.editFeatureInfo("nonexistent")
 
-    expect(mockShowToast).toHaveBeenCalledWith("Feature not found", "error")
+    expect(mockShowToast).toHaveBeenCalledWith("map_feature_not_found", "error")
   })
 
   it("returns early for houseEntrances type", async () => {
@@ -192,7 +192,7 @@ describe("removeFeature", () => {
   it("shows error when entry not found", async () => {
     await mod.removeFeature("nonexistent")
 
-    expect(mockShowToast).toHaveBeenCalledWith("Feature not found", "error")
+    expect(mockShowToast).toHaveBeenCalledWith("map_feature_not_found", "error")
   })
 
   it("returns early when confirm is denied", async () => {
@@ -214,7 +214,7 @@ describe("removeFeature", () => {
     expect(mockRecordDelete).toHaveBeenCalled()
     expect(mockApiFetch).toHaveBeenCalledWith("/api/features/del1", { method: "DELETE" })
     expect(mockFeaturesStoreRemove).toHaveBeenCalledWith("feat_del1")
-    expect(mockShowToast).toHaveBeenCalledWith("Feature deleted.", "success")
+    expect(mockShowToast).toHaveBeenCalledWith("map_feature_deleted", "success")
   })
 
   it("clears cityCenter on cityCenter feature delete", async () => {

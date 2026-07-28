@@ -24,22 +24,21 @@ import { registerGeomanMarker } from "./draw-complete"
 import { debugLog, debugWarn } from "../../utils/debug"
 import type { GeomanMarkerPointer } from "../core/geoman-types"
 
-// ─── SNAP SET-LNG-LAT FACTORY ─────────────────────────────────────────────────
+import type { SetLngLatFn } from "./types"
 
-type LngLatInput = [number, number] | { lng: number; lat: number; toArray?(): [number, number] }
-type SetLngLatFn = (lngLat: LngLatInput) => void
+// ─── MODULE-LEVEL SNAP STATE ───────────────────────────────────────────────────
+// Stored here instead of on the marker object so we don't pollute MapLibre
+// marker instances with NARS-internal properties.
 
-interface PatchedMarker {
-  setLngLat: SetLngLatFn
-  getLngLat: () => [number, number]
-  _narsSnapPatchedInstance?: true
-  _narsOrigGetLngLat?: () => [number, number]
-  _narsLastSnap?: { lng: number; lat: number } | null
-  markerInstance?: { getElement(): HTMLElement }
+let narsLastSnap: { lng: number; lat: number } | null = null
+
+export function getNarsLastSnap(): { lng: number; lat: number } | null {
+  return narsLastSnap
 }
 
+// ─── SNAP SET-LNG-LAT FACTORY ─────────────────────────────────────────────────
+
 export function makeSnapSetLngLat(mp: GeomanMarkerPointer, orig: SetLngLatFn): SetLngLatFn {
-  const marker = mp.marker as unknown as PatchedMarker
   return function (lngLat) {
     const rawPair = Array.isArray(lngLat)
       ? lngLat
@@ -50,8 +49,8 @@ export function makeSnapSetLngLat(mp: GeomanMarkerPointer, orig: SetLngLatFn): S
 
     const frozen = getFrozenSnapPos()
     if (frozen) {
-      marker._narsLastSnap = { lng: frozen.lng, lat: frozen.lat }
-      orig.call(marker, [frozen.lng, frozen.lat])
+      narsLastSnap = { lng: frozen.lng, lat: frozen.lat }
+      orig.call(mp.marker, [frozen.lng, frozen.lat])
       return
     }
 
@@ -60,31 +59,28 @@ export function makeSnapSetLngLat(mp: GeomanMarkerPointer, orig: SetLngLatFn): S
     const external = phases.length > 0 ? findNearestSnap(rawPx.x, rawPx.y, phases, true) : null
     const snap = mergeExternalSnapWithDrawFirstVertex(rawPx.x, rawPx.y, external, project)
     if (snap) {
-      marker._narsLastSnap = { lng: snap.lng, lat: snap.lat }
-      orig.call(marker, [snap.lng, snap.lat])
+      narsLastSnap = { lng: snap.lng, lat: snap.lat }
+      orig.call(mp.marker, [snap.lng, snap.lat])
     } else {
-      marker._narsLastSnap = null
-      orig.call(marker, lngLat)
+      narsLastSnap = null
+      orig.call(mp.marker, lngLat)
     }
   }
 }
 
-// ─── SHARED PATCH LOGIC ───────────────────────────────────────────────────────
+// ─── PATCH LOGIC ──────────────────────────────────────────────────────────────
+// Patches marker.setLngLat to intercept cursor positions and apply NARS snapping.
+// The original getLngLat is not patched — since we always call the original
+// setLngLat with the snapped coordinates, the marker's internal position is
+// already correct and getLngLat returns the right value naturally.
 
 function applyMarkerPatch(mp: GeomanMarkerPointer): void {
-  const marker = mp.marker as unknown as PatchedMarker
-  const orig = marker.setLngLat.bind(marker)
-  const origGet = marker.getLngLat.bind(marker)
+  const marker = mp.marker as Record<string, unknown>
+  const orig = marker.setLngLat as SetLngLatFn
   registerGeomanMarker(mp, marker, orig)
-  marker._narsSnapPatchedInstance = true
-  marker._narsOrigGetLngLat = origGet
   marker.setLngLat = makeSnapSetLngLat(mp, orig)
-  marker.getLngLat = () => {
-    const snap = marker._narsLastSnap
-    return snap ? [snap.lng, snap.lat] : origGet.call(marker)
-  }
 
-  const markerEl = marker.markerInstance?.getElement?.()
+  const markerEl = (marker as { markerInstance?: { getElement?(): HTMLElement } }).markerInstance?.getElement?.()
   if (markerEl) {
     markerEl.style.pointerEvents = "none"
   }
@@ -103,12 +99,6 @@ function startPolling(
 
   const tryPatch = () => {
     if (mp.marker && typeof mp.marker.setLngLat === "function") {
-      if (mp.marker._narsSnapPatchedInstance) {
-        if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
-        rafRef.current = null
-        return
-      }
-
       applyMarkerPatch(mp)
       onPatched()
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
@@ -151,7 +141,7 @@ export function patchGeomanMarkerPointerSnap(): void {
     mp,
     15_000,
     rafRef,
-    () => debugLog("[SNAP] marker setLngLat + getLngLat patched"),
+    () => debugLog("[SNAP] marker setLngLat patched"),
     () => debugWarn("[SNAP] Timed out waiting for Geoman marker — snapping disabled"),
   )
   debugLog("[SNAP] Snap patching started (rAF polling for marker)")
@@ -182,6 +172,7 @@ export function repatchMarkerPointer(): void {
 
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
+    narsLastSnap = null
     const store = useDrawStore()
     if (store.patchRafRef.current !== null) {
       cancelAnimationFrame(store.patchRafRef.current)

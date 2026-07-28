@@ -77,15 +77,18 @@ public class LocationsControllerTests
     public async Task GetWilayas_NoSearch_ReturnsAllWilayas()
     {
         var (db, search) = CreateDbWithSearch(nameof(GetWilayas_NoSearch_ReturnsAllWilayas));
-        await SeedWilayas(db);
-        var ctrl = CreateController(searchService: search);
+        using (db)
+        {
+            await SeedWilayas(db);
+            var ctrl = CreateController(searchService: search);
 
-        var result = await ctrl.GetWilayas(search: "", skip: 0, take: 100);
+            var result = await ctrl.GetWilayas(search: "", skip: 0, take: 100);
 
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<PagedResponse<WilayaItem>>(ok.Value);
-        Assert.Equal(3, resp.Total);
-        Assert.Equal(3, resp.Items.Count);
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<PagedResponse<WilayaItem>>(ok.Value);
+            Assert.Equal(3, resp.Total);
+            Assert.Equal(3, resp.Items.Count);
+        }
     }
 
     [Fact]
@@ -103,37 +106,43 @@ public class LocationsControllerTests
     public async Task GetWilayas_TakeClampedTo500()
     {
         var (db, search) = CreateDbWithSearch(nameof(GetWilayas_TakeClampedTo500));
-        await SeedWilayas(db);
-        var ctrl = CreateController(searchService: search);
+        using (db)
+        {
+            await SeedWilayas(db);
+            var ctrl = CreateController(searchService: search);
 
-        var result = await ctrl.GetWilayas(search: "", skip: 0, take: 1000);
+            var result = await ctrl.GetWilayas(search: "", skip: 0, take: 1000);
 
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<PagedResponse<WilayaItem>>(ok.Value);
-        Assert.Equal(3, resp.Items.Count);
-        Assert.Equal(500, resp.Take); // clamped to max page size
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<PagedResponse<WilayaItem>>(ok.Value);
+            Assert.Equal(3, resp.Items.Count);
+            Assert.Equal(500, resp.Take); // clamped to max page size
+        }
     }
 
     [Fact]
     public async Task GetWilayas_NoSearchSkip0Take500_QueriesDbDirectly()
     {
         var (db, search) = CreateDbWithSearch(nameof(GetWilayas_NoSearchSkip0Take500_QueriesDbDirectly));
-        await SeedWilayas(db);
-        var ctrl = CreateController(searchService: search);
+        using (db)
+        {
+            await SeedWilayas(db);
+            var ctrl = CreateController(searchService: search);
 
-        var result1 = await ctrl.GetWilayas(search: "", skip: 0, take: 500);
-        var ok1 = Assert.IsType<OkObjectResult>(result1);
-        var resp1 = Assert.IsType<PagedResponse<WilayaItem>>(ok1.Value);
-        Assert.Equal(3, resp1.Total);
+            var result1 = await ctrl.GetWilayas(search: "", skip: 0, take: 500);
+            var ok1 = Assert.IsType<OkObjectResult>(result1);
+            var resp1 = Assert.IsType<PagedResponse<WilayaItem>>(ok1.Value);
+            Assert.Equal(3, resp1.Total);
 
-        // Add a new wilaya to DB (should appear — no caching)
-        db.Wilayas.Add(new Models.Wilaya { WilayaId = 4, WilayaFr = "New" });
-        await db.SaveChangesAsync();
+            // Add a new wilaya to DB (should appear — no caching)
+            db.Wilayas.Add(new Models.Wilaya { WilayaId = 4, WilayaFr = "New" });
+            await db.SaveChangesAsync();
 
-        var result2 = await ctrl.GetWilayas(search: "", skip: 0, take: 500);
-        var ok2 = Assert.IsType<OkObjectResult>(result2);
-        var resp2 = Assert.IsType<PagedResponse<WilayaItem>>(ok2.Value);
-        Assert.Equal(4, resp2.Total); // No caching — queries DB directly
+            var result2 = await ctrl.GetWilayas(search: "", skip: 0, take: 500);
+            var ok2 = Assert.IsType<OkObjectResult>(result2);
+            var resp2 = Assert.IsType<PagedResponse<WilayaItem>>(ok2.Value);
+            Assert.Equal(4, resp2.Total); // No caching — queries DB directly
+        }
     }
 
     // ── GET /api/dairas ───────────────────────────────────────────────────
@@ -153,15 +162,18 @@ public class LocationsControllerTests
     public async Task GetDairas_ValidWilaya_ReturnsDairas()
     {
         var (db, search) = CreateDbWithSearch(nameof(GetDairas_ValidWilaya_ReturnsDairas));
-        await SeedDairas(db, wilayaId: 1);
-        await SeedDairas(db, wilayaId: 2);
-        var ctrl = CreateController(searchService: search);
+        using (db)
+        {
+            await SeedDairas(db, wilayaId: 1);
+            await SeedDairas(db, wilayaId: 2);
+            var ctrl = CreateController(searchService: search);
 
-        var result = await ctrl.GetDairas(wilaya_id: 1);
+            var result = await ctrl.GetDairas(wilaya_id: 1);
 
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<PagedResponse<DairaItem>>(ok.Value);
-        Assert.Equal(2, resp.Total);
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<PagedResponse<DairaItem>>(ok.Value);
+            Assert.Equal(2, resp.Total);
+        }
     }
 
     // ── GET /api/communes ─────────────────────────────────────────────────
@@ -192,14 +204,17 @@ public class LocationsControllerTests
     public async Task GetCommunes_ValidDaira_ReturnsCommunes()
     {
         var (db, search) = CreateDbWithSearch(nameof(GetCommunes_ValidDaira_ReturnsCommunes));
-        await SeedCommunes(db, dairaId: 10);
-        var ctrl = CreateController(searchService: search);
+        using (db)
+        {
+            await SeedCommunes(db, dairaId: 10);
+            var ctrl = CreateController(searchService: search);
 
-        var result = await ctrl.GetCommunes(daira_id: 10);
+            var result = await ctrl.GetCommunes(daira_id: 10);
 
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<PagedResponse<CommuneItem>>(ok.Value);
-        Assert.Equal(2, resp.Total);
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<PagedResponse<CommuneItem>>(ok.Value);
+            Assert.Equal(2, resp.Total);
+        }
     }
 
     // ── GET /api/commune/{id}/boundary ────────────────────────────────────
@@ -208,18 +223,21 @@ public class LocationsControllerTests
     public async Task GetCommuneBoundary_Found_Returns200()
     {
         var (db, _) = CreateDbWithSearch(nameof(GetCommuneBoundary_Found_Returns200));
-        await SeedCommunes(db, dairaId: 10);
+        using (db)
+        {
+            await SeedCommunes(db, dairaId: 10);
 
-        var boundaryMock = new Mock<IBoundaryService>();
-        boundaryMock.Setup(b => b.GetBoundaryGeoJsonAsync(1001, It.IsAny<CancellationToken>()))
-            .ReturnsAsync("{\"type\":\"Polygon\"}");
+            var boundaryMock = new Mock<IBoundaryService>();
+            boundaryMock.Setup(b => b.GetBoundaryGeoJsonAsync(1001, It.IsAny<CancellationToken>()))
+                .ReturnsAsync("{\"type\":\"Polygon\"}");
 
-        var locationQueryMock = CreateLocationQueryMock(db);
-        var ctrl = CreateController(boundaryService: boundaryMock.Object, locationQuery: locationQueryMock);
+            var locationQueryMock = CreateLocationQueryMock(db);
+            var ctrl = CreateController(boundaryService: boundaryMock.Object, locationQuery: locationQueryMock);
 
-        var result = await ctrl.GetCommuneBoundary(1001);
+            var result = await ctrl.GetCommuneBoundary(1001);
 
-        Assert.IsType<OkObjectResult>(result);
+            Assert.IsType<OkObjectResult>(result);
+        }
     }
 
     [Fact]
@@ -266,13 +284,16 @@ public class LocationsControllerTests
     public async Task GetWilayas_SmallTake_ReturnsOk()
     {
         var (db, search) = CreateDbWithSearch(nameof(GetWilayas_SmallTake_ReturnsOk));
-        await SeedWilayas(db);
-        var ctrl = CreateController(searchService: search);
+        using (db)
+        {
+            await SeedWilayas(db);
+            var ctrl = CreateController(searchService: search);
 
-        var result = await ctrl.GetWilayas(skip: 0, take: 1);
+            var result = await ctrl.GetWilayas(skip: 0, take: 1);
 
-        var ok = Assert.IsType<OkObjectResult>(result);
-        Assert.NotNull(ok.Value);
+            var ok = Assert.IsType<OkObjectResult>(result);
+            Assert.NotNull(ok.Value);
+        }
     }
 
 }

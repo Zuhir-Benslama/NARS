@@ -3,6 +3,7 @@
 
 import { describe, it, expect } from "vitest"
 import { buildFeatureData, toApiSaveShape } from "./map/features/feature-data"
+import type { FeatureData } from "./types"
 import { PHASES } from "./phases"
 
 describe("buildFeatureData", () => {
@@ -21,9 +22,10 @@ describe("buildFeatureData", () => {
     }
 
     const result = buildFeatureData(pointGeometry, areaPhase, {
+      type: "areas",
       ...baseModalResult,
       areaTypeKey: "central_urban",
-    })
+    }) as FeatureData
 
     expect(result.type).toBe("areas")
     expect(result.label).toBe("Test Feature")
@@ -45,6 +47,7 @@ describe("buildFeatureData", () => {
     const roadPhase = PHASES.find((p) => p.key === "roads")!
 
     const result = buildFeatureData(lineGeometry, roadPhase, {
+      type: "roads",
       ...baseModalResult,
       roadTypeKey: "street",
     })
@@ -69,6 +72,7 @@ describe("buildFeatureData", () => {
     }
 
     const result = buildFeatureData(polygonGeometry, areaPhase, {
+      type: "areas",
       ...baseModalResult,
       areaTypeKey: "secondary_urban",
     })
@@ -87,13 +91,14 @@ describe("buildFeatureData", () => {
     const entrancePhase = PHASES.find((p) => p.key === "houseEntrances")!
 
     const result = buildFeatureData(pointGeometry, entrancePhase, {
-      ...baseModalResult,
+      type: "houseEntrances",
+      label: "Test Feature",
       entranceTypeKey: "main_entrance",
       roadDbId: "test-uuid-42",
       roadLabel: "Main Street",
       side: "left" as const,
       entranceNumber: 5,
-    })
+    }) as FeatureData
 
     expect(result.entranceTypeKey).toBe("main_entrance")
     expect(result.roadDbId).toBe("test-uuid-42")
@@ -108,7 +113,7 @@ describe("buildFeatureData", () => {
       coordinates: [3.058, 36.753],
     }
 
-    const result = buildFeatureData(pointGeometry, areaPhase, baseModalResult)
+    const result = buildFeatureData(pointGeometry, areaPhase, { type: "areas", ...baseModalResult }) as FeatureData
 
     expect(result.roadDbId).toBeUndefined()
     expect(result.entranceTypeKey).toBeUndefined()

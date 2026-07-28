@@ -9,6 +9,7 @@ import { getCtx } from "../core/state"
 import { PHASES } from "../../phases"
 import { debugLog, debugWarn } from "../../utils/debug"
 import type { Coord } from "./road-graph"
+import { haversineDistance } from "../rendering/geometry"
 
 /** Update the endpoint source with start/end-of-road markers. */
 export function updateEndpointMarkers(): void {
@@ -82,13 +83,6 @@ function computeSegmentAngle(a: Coord, b: Coord): number {
   return Math.atan2(tp.y - fp.y, tp.x - fp.x) * (180 / Math.PI)
 }
 
-/** Haversine distance in meters between two Coord objects. */
 function haversineMeters(a: Coord, b: Coord): number {
-  const R = 6371000
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180
-  const dLng = ((b.lng - a.lng) * Math.PI) / 180
-  const x =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
-  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x))
+  return haversineDistance(a.lat, a.lng, b.lat, b.lng)
 }

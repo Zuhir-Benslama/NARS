@@ -45,6 +45,7 @@ function makeRoad(id: string, dbId: string, coords: { lat: number; lng: number }
       label: "",
       decisionNumber: "",
       decisionDate: "",
+      roadTypeKey: "street",
       coordinates: coords,
     },
   }

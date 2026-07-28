@@ -10,18 +10,22 @@ import maplibregl from "maplibre-gl"
 import type { ScatteredRefreshResponse } from "../../types"
 
 // ─── MUNICIPALITY BOUNDARY ────────────────────────────────────────────────────
+// Module-level state mutated by loadMunicipalLimit() / loadScatteredPolygons().
+// Call resetGeometryState() between tests to avoid cross-test contamination.
 
-let municipalLimitRings: number[][][] = []
+let _municipalLimitRings: number[][][] = []
+let _scatteredPolygons: ScatteredPoly[] = []
+
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
-    municipalLimitRings = []
-    scatteredPolygons = []
+    _municipalLimitRings = []
+    _scatteredPolygons = []
   })
 }
 
 export function resetGeometryState(): void {
-  municipalLimitRings = []
-  scatteredPolygons = []
+  _municipalLimitRings = []
+  _scatteredPolygons = []
 }
 
 function pointInRing(lat: number, lng: number, ring: number[][]): boolean {
@@ -39,8 +43,8 @@ function pointInRing(lat: number, lng: number, ring: number[][]): boolean {
 }
 
 export function pointInMunicipalLimit(lat: number, lng: number): boolean {
-  if (municipalLimitRings.length === 0) return true
-  return municipalLimitRings.some((r) => pointInRing(lat, lng, r))
+  if (_municipalLimitRings.length === 0) return true
+  return _municipalLimitRings.some((r) => pointInRing(lat, lng, r))
 }
 
 // ─── SCATTERED AREAS ──────────────────────────────────────────────────────────
@@ -49,17 +53,16 @@ interface ScatteredPoly {
   outer: [number, number][]
   holes: [number, number][][]
 }
-let scatteredPolygons: ScatteredPoly[] = []
 
 export function pointInScatteredArea(lat: number, lng: number): boolean {
-  return scatteredPolygons.some(
+  return _scatteredPolygons.some(
     ({ outer, holes }) =>
       pointInRing(lat, lng, outer) && !holes.some((h) => pointInRing(lat, lng, h)),
   )
 }
 
 export function renderScatteredAreas(geoJsonStr: string | GeoJSON.Geometry): void {
-  scatteredPolygons = []
+  _scatteredPolygons = []
   if (!geoJsonStr) return
   try {
     const geojson: GeoJSON.Geometry =
@@ -69,13 +72,13 @@ export function renderScatteredAreas(geoJsonStr: string | GeoJSON.Geometry): voi
     // Extract scattered polygons for spatial hit-testing
     if (geojson.type === "Polygon") {
       const coords = geojson.coordinates
-      scatteredPolygons.push({
+      _scatteredPolygons.push({
         outer: coords[0] as [number, number][],
         holes: coords.slice(1) as [number, number][][],
       })
     } else if (geojson.type === "MultiPolygon") {
       for (const poly of geojson.coordinates) {
-        scatteredPolygons.push({
+        _scatteredPolygons.push({
           outer: poly[0] as [number, number][],
           holes: poly.slice(1) as [number, number][][],
         })
@@ -97,12 +100,12 @@ export async function displayCommuneBoundary(communeId: number): Promise<void> {
     if (!geojson?.type) return
 
     // Extract rings for point-in-polygon hit testing
-    municipalLimitRings = []
+    _municipalLimitRings = []
     if (geojson.type === "Polygon") {
-      municipalLimitRings.push(...geojson.coordinates)
+      _municipalLimitRings.push(...geojson.coordinates)
     } else if (geojson.type === "MultiPolygon") {
       for (const poly of geojson.coordinates) {
-        municipalLimitRings.push(...poly)
+        _municipalLimitRings.push(...poly)
       }
     }
 

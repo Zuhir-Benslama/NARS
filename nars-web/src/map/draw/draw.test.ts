@@ -120,7 +120,7 @@ describe("draw-save.ts", () => {
 
     it("returns areas style with areaTypeKey", () => {
       const phase = phases.find((p) => p.key === "areas")!
-      const modalResult = { areaTypeKey: "central_urban" } as ModalResult
+      const modalResult = { type: "areas", areaTypeKey: "central_urban" } as ModalResult
       const style = getFeatureStyle(phase, modalResult)
       expect(style.fillColor).toBeDefined()
       expect(style.lineColor).toBeDefined()
@@ -129,7 +129,7 @@ describe("draw-save.ts", () => {
 
     it("returns districts style", () => {
       const phase = phases.find((p) => p.key === "districts")!
-      const modalResult = {} as ModalResult
+      const modalResult = { type: "districts" } as ModalResult
       const style = getFeatureStyle(phase, modalResult)
       expect(style.lineColor).toBe("#f39c12")
       expect(style.lineWidth).toBe(3)
@@ -137,7 +137,7 @@ describe("draw-save.ts", () => {
 
     it("returns publicBuildings style", () => {
       const phase = phases.find((p) => p.key === "publicBuildings")!
-      const modalResult = {} as ModalResult
+      const modalResult = { type: "publicBuildings" } as ModalResult
       const style = getFeatureStyle(phase, modalResult)
       expect(style.fillColor).toBe("#e67e22")
       expect(style.fillOpacity).toBe(0.25)
@@ -146,7 +146,7 @@ describe("draw-save.ts", () => {
 
     it("returns publicSpaces style", () => {
       const phase = phases.find((p) => p.key === "publicSpaces")!
-      const modalResult = {} as ModalResult
+      const modalResult = { type: "publicSpaces" } as ModalResult
       const style = getFeatureStyle(phase, modalResult)
       expect(style.fillColor).toBe("#2ecc71")
       expect(style.fillOpacity).toBe(0.2)
@@ -155,7 +155,7 @@ describe("draw-save.ts", () => {
 
     it("returns polyline style for road phase", () => {
       const phase = phases.find((p) => p.key === "roads")!
-      const modalResult = {} as ModalResult
+      const modalResult = { type: "roads" } as ModalResult
       const style = getFeatureStyle(phase, modalResult)
       expect(style.lineColor).toBe("#3498db")
       expect(style.lineWidth).toBe(8)
@@ -164,7 +164,7 @@ describe("draw-save.ts", () => {
 
     it("returns houseEntrances marker style", () => {
       const phase = phases.find((p) => p.key === "houseEntrances")!
-      const modalResult = {} as ModalResult
+      const modalResult = { type: "houseEntrances" } as ModalResult
       const style = getFeatureStyle(phase, modalResult)
       expect(style.circleColor).toBe("#27ae60")
       expect(style.circleRadius).toBe(10)
@@ -173,7 +173,7 @@ describe("draw-save.ts", () => {
 
     it("returns default style for unknown phase", () => {
       const phase = phases.find((p) => p.key === "namingPanels")!
-      const modalResult = {} as ModalResult
+      const modalResult = { type: "namingPanels" } as ModalResult
       const style = getFeatureStyle(phase, modalResult)
       expect(style.fillColor).toBe("#9b59b6")
       expect(style.fillOpacity).toBe(0.1)

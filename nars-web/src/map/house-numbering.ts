@@ -108,7 +108,7 @@ export async function setHouseNumbers(options?: { syncCounts?: boolean }): Promi
     appStore.syncCounts()
   }
 
-  showToast(`Assigned numbers to ${unassigned.length} entrances.`, "success")
+  showToast(t("map_assigned_numbers", { count: unassigned.length }), "success")
 }
 
 // ─── FEATURE TYPE MAPPING ─────────────────────────────────────────────────────

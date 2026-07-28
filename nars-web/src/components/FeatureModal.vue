@@ -167,6 +167,7 @@ import { useModalStore } from "../stores/modalStore"
 import { fetchRoadSide, computeBisNumber, prepareModalExtras } from "../map"
 import { useFeatureValidation } from "../composables/useFeatureValidation"
 import { useFocusTrap } from "../composables/useFocusTrap"
+import { useWindowKeydown } from "../composables/useWindowKeydown"
 import { debugWarn } from "../utils/debug"
 import AreaTypeSelector from "./modals/AreaTypeSelector.vue"
 import RoadAssignmentSelector from "./modals/RoadAssignmentSelector.vue"
@@ -272,7 +273,7 @@ function onSave() {
   modalStore.errors = errors
   if (Object.keys(errors).length > 0) return
   const result = buildModalResult(appStore.communeName)
-  modalStore.close(result as import("../types").ModalResult)
+  modalStore.close(result)
 }
 
 function onCancel() {
@@ -293,8 +294,12 @@ function onKeydown(e: KeyboardEvent) {
     onCancel()
   }
 }
+useWindowKeydown({
+  Enter: (e) => { if (modalStore.visible) onKeydown(e) },
+  Escape: (e) => { if (modalStore.visible) onKeydown(e) },
+})
+
 onMounted(async () => {
-  window.addEventListener("keydown", onKeydown)
   // Populate phase-specific extras (e.g. mainUrbanExists, roadOptions) after
   // the modal store is initialized by openCreate/openEdit.
   if (modalStore.phaseIndex !== null) {
@@ -305,5 +310,4 @@ onMounted(async () => {
     }
   }
 })
-onUnmounted(() => window.removeEventListener("keydown", onKeydown))
 </script>

@@ -12,7 +12,7 @@ import distance from "@turf/distance"
 import { useLayerStore } from "../stores/layerStore"
 import { useFeaturesStore } from "../stores/featuresStore"
 import { debugError } from "../utils/debug"
-import type { FeatureData, LayerEntry, LatLng } from "../types"
+import type { NamingPanelFeatureData, LayerEntry, LatLng } from "../types"
 import { PHASES } from "../phases"
 
 const DEDUPE_METERS = 3
@@ -98,11 +98,9 @@ async function addPanelIfMissing(
   if (nearExisting({ lat, lng })) return
 
   const layerStore = useLayerStore()
-  const data: FeatureData = {
+  const data: NamingPanelFeatureData = {
     type: "namingPanels",
     label,
-    decisionNumber: "",
-    decisionDate: "",
     lat,
     lng,
   }
@@ -184,5 +182,5 @@ if (import.meta.env.DEV) {
       debugError("Generate naming panels error:", err)
     }
   }
-  Object.assign(window, { __narsSetNamingPanels: devFn })
+  ;(window as unknown as Record<string, unknown>).__narsSetNamingPanels = devFn
 }

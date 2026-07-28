@@ -181,7 +181,7 @@ public class LogsControllerTests
     }
 
     [Fact]
-    public async Task SubmitLogs_MessageTooLong_SkipsEntry()
+    public async Task SubmitLogs_MessageTooLong_RejectsEntry()
     {
         var ctrl = CreateController(logOptions: new LoggingOptions { MaxBatchSize = DefaultMaxBatchSize, MaxEntryLength = 50 });
         var body = new LogBatch(new List<LogEntry>

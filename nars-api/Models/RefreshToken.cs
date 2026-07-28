@@ -19,7 +19,7 @@ public class RefreshToken
 
     [Column("expires_at")] public DateTime ExpiresAt { get; set; }
 
-    [Column("created_at")] public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    [Column("created_at")] public DateTime CreatedAt { get; set; }
 
     [Column("revoked")] public bool Revoked { get; set; }
 }

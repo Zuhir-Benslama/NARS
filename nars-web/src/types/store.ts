@@ -1,6 +1,9 @@
 import type { LatLng } from "./coordinates"
 import type { UserInfo } from "./user"
 
+// FeatureCounts deliberately splits houseEntrances into mainEntrances +
+// secondaryEntrances since they are counted separately in the UI.
+// All other PHASES keys have a 1:1 field here.
 export interface FeatureCounts {
   areas: number
   cityCenter: number

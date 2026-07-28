@@ -39,6 +39,9 @@ public static class TestData
     // ── Feature data sizes ─────────────────────────────────────────────
     public const int OversizedDataLength = 600_000;
 
+    // ── User IDs ───────────────────────────────────────────────────────
+    public static readonly Guid UserId = Guid.NewGuid();
+
     // ── Location IDs ───────────────────────────────────────────────────
     public const int CommuneId1 = 1;
 

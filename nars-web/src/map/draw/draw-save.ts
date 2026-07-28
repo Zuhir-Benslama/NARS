@@ -5,7 +5,7 @@
 import { PHASES } from "../../phases"
 import { useAppStore } from "../../stores/appStore"
 import { useLayerStore } from "../../stores/layerStore"
-import type { FeatureData } from "../../types"
+import type { FeatureDataByType, ModalResult } from "../../types"
 import { getCtx } from "../core/state"
 import { useFeaturesStore } from "../../stores/featuresStore"
 
@@ -18,7 +18,7 @@ import { getFeatureType } from "../house-numbering"
 import { getErrorMessage } from "../../lib/errors"
 import { showToast } from "../../lib/toast"
 import { debugError } from "../../utils/debug"
-import type { ModalResult } from "../../types"
+import { t } from "../../i18n"
 import { updateEndpointMarkers } from "../roads/road-directions"
 import { buildFeatureData } from "../features/feature-data"
 import { DRAW_CONFIG } from "../../config"
@@ -71,22 +71,27 @@ export function normalizeGeometry(
 
 // ─── FEATURE STYLE ────────────────────────────────────────────────────────────
 
+export function getDefaultStyle(color: string): Record<string, unknown> {
+  return {
+    fillColor: color,
+    fillOpacity: 0.1,
+    lineColor: color,
+    lineWidth: 2,
+    circleColor: color,
+    circleRadius: 8,
+    textColor: "#333333",
+  }
+}
+
 export function getFeatureStyle(
   phase: (typeof PHASES)[number],
   modalResult: ModalResult,
 ): Record<string, unknown> {
-  const style: Record<string, unknown> = {
-    fillColor: phase.color,
-    fillOpacity: 0.1,
-    lineColor: phase.color,
-    lineWidth: 2,
-    circleColor: phase.color,
-    circleRadius: 8,
-    textColor: "#333333",
-  }
+  const style = getDefaultStyle(phase.color)
 
   if (phase.key === "areas") {
-    const s = areaStyle(modalResult.areaTypeKey ?? "central_urban")
+    const areaType = modalResult.type === "areas" ? modalResult.areaTypeKey : undefined
+    const s = areaStyle(areaType ?? "central_urban")
     style.fillColor = s.lineColor
     style.fillOpacity = 0
     style.lineColor = s.lineColor
@@ -130,7 +135,7 @@ async function checkExistingCityCenter(
   const state = layerStore.$state
   if ((state.cityCenter?.length ?? 0) === 0) return true
 
-  showToast("A city center already exists. Delete it first to create a new one.", "error")
+  showToast(t("map_city_center_exists"), "error")
   deleteGeomanFeature(geomanFeatureData)
   return false
 }
@@ -138,20 +143,21 @@ async function checkExistingCityCenter(
 // ─── CITY CENTER GEOMETRY OVERRIDE ─────────────────────────────────
 
 function applyCityCenterOverride(
-  featureData: FeatureData,
+  featureData: FeatureDataByType,
   style: Record<string, unknown>,
   storeGeometry: GeoJSON.Geometry,
 ): { style: Record<string, unknown>; storeGeometry: GeoJSON.Geometry } {
-  if (!featureData.radius || featureData.lat == null || featureData.lng == null)
+  const d = featureData as { radius?: number; lat?: number; lng?: number }
+  if (!d.radius || d.lat == null || d.lng == null)
     return { style, storeGeometry }
-  const ring = closeRing(computeCircleRing(featureData.lat, featureData.lng, featureData.radius))
+  const ring = closeRing(computeCircleRing(d.lat, d.lng, d.radius))
   return {
     storeGeometry: { type: "LineString", coordinates: ring },
     style: {
       lineColor: "#e74c3c",
       lineWidth: 6,
       textColor: "#333333",
-      radius: featureData.radius,
+      radius: d.radius,
     },
   }
 }
@@ -169,7 +175,7 @@ function buildStorePayload(
   geometry: GeoJSON.Geometry,
   drawingPhase: (typeof PHASES)[number],
   modalResult: ModalResult,
-  featureData: FeatureData,
+  featureData: FeatureDataByType,
 ): StorePayload {
   const style = getFeatureStyle(drawingPhase, modalResult)
   const storeGeometry = normalizeGeometry(geometry, drawingPhase.drawType)
@@ -186,7 +192,7 @@ async function updateStoresAfterSave(
   featureId: string,
   payload: StorePayload,
   drawingPhase: (typeof PHASES)[number],
-  featureData: FeatureData,
+  featureData: FeatureDataByType,
   narsDrawType: string,
 ): Promise<void> {
   const featuresStore = useFeaturesStore()
@@ -214,7 +220,7 @@ async function updateStoresAfterSave(
   useAppStore().syncCounts()
   refreshLayerVisibility()
   if (drawingPhase.key === "roads") updateEndpointMarkers()
-  showToast("Feature saved.", "success")
+  showToast(t("map_feature_saved"), "success")
 }
 
 // ─── SAVE & UPDATE STORE ──────────────────────────────────────────
@@ -233,7 +239,7 @@ async function saveAndUpdateStore(
     const featureData = buildFeatureData(geometry, drawingPhase, modalResult)
     const saveResult = await saveToDatabase(featureData)
     if (!saveResult.ok || !saveResult.data) {
-      showToast("Save failed: " + (saveResult.error ?? "Please try again."), "error")
+      showToast(t("map_save_failed", { error: saveResult.error ?? t("map_save_failed_fallback") }), "error")
       return
     }
 
@@ -251,7 +257,7 @@ async function saveAndUpdateStore(
     deleteGeomanFeature(geomanFeatureData)
   } catch (err) {
     debugError("[COMPLETE] Save error:", err)
-    showToast("Save failed: " + getErrorMessage(err), "error")
+    showToast(t("map_save_failed", { error: getErrorMessage(err) }), "error")
   } finally {
     setSavingFeature(false)
     if (saveOk) {
@@ -316,7 +322,7 @@ function validateGeometry(
   const cleanup = () => deleteGeomanFeature(geomanFeatureData)
 
   if (geometry.type === "LineString" && geometry.coordinates.length < 2) {
-    showToast("Road must have at least 2 points.", "error")
+    showToast(t("map_road_min_points"), "error")
     cleanup()
     return false
   }
@@ -324,7 +330,7 @@ function validateGeometry(
     geometry.type === "Polygon" &&
     (!geometry.coordinates[0] || geometry.coordinates[0].length < 3)
   ) {
-    showToast("Area must have at least 3 points.", "error")
+    showToast(t("map_area_min_points"), "error")
     cleanup()
     return false
   }
@@ -343,12 +349,12 @@ function validateGeometry(
       radius = computeCircleRadius(centerLat, centerLng, coords)
     }
     if (!radius || Number.isNaN(radius) || radius < CITY_CENTER_MIN_RADIUS_M) {
-      showToast("City center radius is too small (minimum 5 meters).", "error")
+      showToast(t("map_city_center_too_small"), "error")
       cleanup()
       return false
     }
     if (radius > CITY_CENTER_MAX_RADIUS_M) {
-      showToast("City center radius is too large (maximum 50 km).", "error")
+      showToast(t("map_city_center_too_large"), "error")
       cleanup()
       return false
     }

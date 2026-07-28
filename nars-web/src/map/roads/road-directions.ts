@@ -9,12 +9,13 @@ import { apiFetch } from "../../api"
 import { useLayerStore } from "../../stores/layerStore"
 import { useFeaturesStore } from "../../stores/featuresStore"
 
-const DEAD_END_SNAP_THRESHOLD_M = 30
 import { showToast } from "../../lib/toast"
 import { debugError } from "../../utils/debug"
 import type { LayerEntry } from "../../types"
+import { t } from "../../i18n"
 
-import { buildConnectionGraph, dm, fromNk } from "./road-graph"
+import { buildConnectionGraph, dm, fromNk, CONNECT_M } from "./road-graph"
+const DEAD_END_SNAP_THRESHOLD_M = CONNECT_M
 import { geographicDirection, orientFromCityCenter } from "./road-orient"
 import { updateEndpointMarkers } from "./road-markers"
 
@@ -118,7 +119,7 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
   }
 
   updateEndpointMarkers()
-  showToast(`Road directions applied to ${votes.size} roads.`, "success")
+  showToast(t("map_road_directions_applied", { count: votes.size }), "success")
 }
 
 export { updateEndpointMarkers } from "./road-markers"

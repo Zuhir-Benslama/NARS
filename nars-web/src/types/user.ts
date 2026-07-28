@@ -1,7 +1,7 @@
 export type UserRole =
   "commune_user" | "field_worker" | "daira_admin" | "wilaya_admin" | "national_admin"
 
-export interface CommuneInfo {
+export interface LocationInfo {
   id: number | null
   name_fr: string | null
   name_ar: string | null
@@ -9,21 +9,12 @@ export interface CommuneInfo {
   longitude: number | null
 }
 
-export interface DairaInfo {
-  id: number | null
-  name_fr: string | null
-  name_ar: string | null
-  latitude: number | null
-  longitude: number | null
-}
-
-export interface WilayaInfo {
-  id: number | null
-  name_fr: string | null
-  name_ar: string | null
-  latitude: number | null
-  longitude: number | null
-}
+/** @deprecated Use LocationInfo */
+export type CommuneInfo = LocationInfo
+/** @deprecated Use LocationInfo */
+export type DairaInfo = LocationInfo
+/** @deprecated Use LocationInfo */
+export type WilayaInfo = LocationInfo
 
 export interface UserInfo {
   id: number
@@ -31,7 +22,7 @@ export interface UserInfo {
   name: string
   email: string
   role: UserRole
-  commune: CommuneInfo
-  daira?: DairaInfo
-  wilaya?: WilayaInfo
+  commune: LocationInfo
+  daira?: LocationInfo
+  wilaya?: LocationInfo
 }

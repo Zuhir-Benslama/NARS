@@ -10,10 +10,12 @@ public class AdminOverviewService(AppDbContext db, IFeatureStatsService featureS
 {
     public async Task<(List<WilayaSummary> Items, int Total)> GetNationalOverviewAsync(int skip = 0, int take = 500, CancellationToken cancellationToken = default)
     {
-        var allWilayas = await db.Wilayas.OrderBy(w => w.WilayaId).ToListAsync(cancellationToken);
-        var total = allWilayas.Count;
+        var total = await db.Wilayas.CountAsync(cancellationToken);
 
-        var pagedWilayas = allWilayas.Skip(skip).Take(take).ToList();
+        var pagedWilayas = await db.Wilayas
+            .OrderBy(w => w.WilayaId)
+            .Skip(skip).Take(take)
+            .ToListAsync(cancellationToken);
         var wilayaIds = pagedWilayas.Select(w => w.WilayaId).ToArray();
 
         // Run sequentially — DbContext is not thread-safe.

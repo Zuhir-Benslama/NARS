@@ -12,6 +12,8 @@ import { useFeaturesStore } from "../stores/featuresStore"
 import { toApiSaveShape } from "./features/feature-data"
 import { PHASES } from "../phases"
 import { computeCircleRing, closeRing } from "./rendering/geometry"
+import { getDefaultStyle } from "./draw/draw-save"
+import { t } from "../i18n"
 import { debugLog, debugError, debugWarn } from "../utils/debug"
 import type { FeatureTypeKey, LayerEntry } from "../types"
 
@@ -41,7 +43,7 @@ export function recordDelete(entry: LayerEntry, phaseKey: FeatureTypeKey): void 
 export async function undo(): Promise<void> {
   const action = useUndoStore().popUndo()
   if (!action) {
-    showToast("Nothing to restore.", "info")
+    showToast(t("map_nothing_to_restore"), "info")
     return
   }
 
@@ -63,7 +65,7 @@ export async function undo(): Promise<void> {
     }).then((r) => r.json())
     const newDbId = json.id as string | undefined
     if (!newDbId) {
-      showToast("Failed to restore feature: server returned no ID.", "error")
+      showToast(t("map_restore_no_id"), "error")
       return
     }
 
@@ -86,7 +88,7 @@ export async function undo(): Promise<void> {
     const state = layerStore.$state
 
     if (state[phaseKey]) {
-      state[phaseKey].push(restoredEntry)
+      ;(state[phaseKey] as unknown as LayerEntry[]).push(restoredEntry)
     }
 
     // Repair cross-references: update any features that pointed to the old
@@ -114,15 +116,7 @@ export async function undo(): Promise<void> {
     }
 
     const phase = PHASES.find((p) => p.key === phaseKey)
-    const style: Record<string, unknown> = {
-      fillColor: phase?.color ?? "#8e44ad",
-      fillOpacity: 0.1,
-      lineColor: phase?.color ?? "#8e44ad",
-      lineWidth: 2,
-      circleColor: phase?.color ?? "#8e44ad",
-      circleRadius: 8,
-      textColor: "#333333",
-    }
+    const style = getDefaultStyle(phase?.color ?? "#8e44ad")
 
     const geometry = entryDataToGeometry(entry.data, entry.type)
     const featuresStore = useFeaturesStore()
@@ -139,10 +133,10 @@ export async function undo(): Promise<void> {
     })
 
     useAppStore().syncCounts()
-    showToast(`Restored "${entry.data.label}".`, "success")
+    showToast(t("map_restored", { label: entry.data.label }), "success")
   } catch (err) {
     debugError("[UNDO] Restore failed:", err)
-    showToast("Failed to restore feature: " + getErrorMessage(err), "error")
+    showToast(t("map_restore_failed", { error: getErrorMessage(err) }), "error")
   }
 }
 

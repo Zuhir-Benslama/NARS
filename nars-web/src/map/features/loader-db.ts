@@ -15,7 +15,7 @@ import { getFeatureType } from "../house-numbering"
 import { debugError, debugLog } from "../../utils/debug"
 import { updateEndpointMarkers } from "../roads/road-directions"
 import { loadPhase } from "../../phases-nav/storage"
-import type { FeatureData, FeatureTypeKey, LayerEntry, DbFeature } from "../../types"
+import type { FeatureData, FeatureDataByType, FeatureTypeKey, LayerEntry, DbFeature } from "../../types"
 import { buildGeoJsonFeature } from "./loader-build"
 
 // ─── PER-FEATURE PROCESSING ──────────────────────────────────────
@@ -48,11 +48,11 @@ function processFeature(
   maplibreFeatures: MaplibreFeature[],
 ): "ok" | "scattered" {
   try {
-    const data: FeatureData =
+    const rawData: FeatureData =
       typeof feature.data === "string" ? JSON.parse(feature.data) : feature.data
 
     if (feature.layer === "scattered") {
-      if (data.geometry) renderScatteredAreas(data.geometry)
+      if (rawData.geometry) renderScatteredAreas(rawData.geometry)
       return "scattered"
     }
 
@@ -64,10 +64,12 @@ function processFeature(
         feature.id,
         "- unknown layer/type:",
         feature.layer,
-        data?.type,
+        rawData?.type,
       )
       return "ok"
     }
+
+    const data = rawData as FeatureDataByType
 
     const layerEntry: LayerEntry = {
       id: `feat_${feature.id}`,
@@ -75,7 +77,7 @@ function processFeature(
       data,
       type: getFeatureType(phase.drawType),
     }
-    state[phaseKey].push(layerEntry)
+    ;(state[phaseKey] as unknown as LayerEntry[]).push(layerEntry)
 
     const geojsonFeature = buildGeoJsonFeature(feature.id, data, phase)
     if (geojsonFeature) {
@@ -86,10 +88,13 @@ function processFeature(
       })
     }
 
-    if (phase.key === "cityCenter" && data.lat != null && data.lng != null) {
-      const appStore = useAppStore()
-      appStore.cityCenterMode = "city_center"
-      appStore.cityCenterLatLng = { lat: data.lat, lng: data.lng }
+    if (phase.key === "cityCenter") {
+      const cc = data as { lat?: number; lng?: number }
+      if (cc.lat != null && cc.lng != null) {
+        const appStore = useAppStore()
+        appStore.cityCenterMode = "city_center"
+        appStore.cityCenterLatLng = { lat: cc.lat, lng: cc.lng }
+      }
     }
   } catch (err) {
     debugError("[LOAD] Error loading feature", feature.id, ":", err)

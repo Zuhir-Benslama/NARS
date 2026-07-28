@@ -3,6 +3,7 @@
 // commit/cancel from edit-commit for backward compatibility.
 
 import type { GeoJsonImportFeature } from "@geoman-io/maplibre-geoman-free"
+import type { LatLng } from "../../types"
 import { getCtx } from "../core/state"
 import {
   disableCrosshair,
@@ -40,11 +41,12 @@ export async function enableEditMode(featureId?: string): Promise<void> {
     const entry = findLayerEntryByFeatureId(featureId)
     if (entry) {
       setActiveEditEntry(entry)
+      const d = entry.data as { coordinates?: LatLng[]; lat?: number; lng?: number }
       setActiveEditCoordsSnapshot(
-        entry.data.coordinates
-          ? entry.data.coordinates.map((c) => ({ lat: c.lat, lng: c.lng }))
-          : entry.data.lat != null && entry.data.lng != null
-            ? [{ lat: entry.data.lat, lng: entry.data.lng }]
+        d.coordinates
+          ? d.coordinates.map((c) => ({ lat: c.lat, lng: c.lng }))
+          : d.lat != null && d.lng != null
+            ? [{ lat: d.lat, lng: d.lng }]
             : null,
       )
       const gj = buildGeomanImportFeature(entry)

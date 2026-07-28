@@ -201,7 +201,7 @@ describe("showContextMenu / bindContextMenu", () => {
 
     const store = useContextMenuStore()
     const lastItem = store.items[store.items.length - 1]
-    expect(lastItem.label).toContain("Snapping")
+    expect(lastItem.label).toContain("snapping")
   })
 })
 
@@ -248,7 +248,7 @@ describe("showMapContextMenu", () => {
 
     const store = useContextMenuStore()
     expect(store.items.length).toBe(1)
-    expect(store.items[0].label).toContain("Snapping")
+    expect(store.items[0].label).toContain("snapping")
   })
 
   it("always includes snap toggle", async () => {
@@ -257,7 +257,7 @@ describe("showMapContextMenu", () => {
     await mod.showMapContextMenu(0, 0, mkPhase("areas"))
 
     const store = useContextMenuStore()
-    const snapItem = store.items.find((i: any) => i.label && i.label.includes("Snapping"))
+    const snapItem = store.items.find((i: any) => i.label && i.label.includes("snapping"))
     expect(snapItem).toBeDefined()
   })
 })

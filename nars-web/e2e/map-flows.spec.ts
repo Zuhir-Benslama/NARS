@@ -16,7 +16,6 @@ test.describe("Map flows — draw, edit, save", () => {
       store.openCreate(0)
     })
 
-    await page.waitForTimeout(500)
     const modal = page.locator(".modal")
     await expect(modal).toBeVisible({ timeout: 5000 })
   })
@@ -44,10 +43,10 @@ test.describe("Map flows — draw, edit, save", () => {
     const saveBtn = page.locator("button:has-text('Save'), button:has-text('Confirm'), .modal-btn-save").first()
     if (await saveBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await saveBtn.click()
-      await page.waitForTimeout(500)
     }
 
-    await page.waitForTimeout(500)
+    // Wait for Vue reactivity to settle after the state mutations
+    await page.waitForTimeout(200)
   })
 
   test("renders the map canvas", async ({ page }) => {

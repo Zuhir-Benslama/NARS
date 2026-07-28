@@ -11,6 +11,7 @@ import { useFeaturesStore } from "../../stores/featuresStore"
 import { showToast, showConfirm } from "../../lib/toast"
 import type { FeatureTypeKey } from "../../types"
 import { getErrorMessage } from "../../lib/errors"
+import { t } from "../../i18n"
 import { recordDelete } from "../undo"
 import { enableEditMode } from "../draw/draw-events"
 import { useLayerStore, LAYER_KEYS } from "../../stores/layerStore"
@@ -38,7 +39,7 @@ export function enableEditGeometry(dbId: string): void {
   const selectionStore = useSelectionStore()
 
   if (selectionStore.selectedFeatureDbId !== null && dbId !== selectionStore.selectedFeatureDbId) {
-    showToast("Click the feature to select it first, then right-click to edit.", "info")
+    showToast(t("map_select_feature_first"), "info")
     return
   }
 
@@ -48,7 +49,7 @@ export function enableEditGeometry(dbId: string): void {
 
   const entry = findLayerEntryByDbId(dbId)
   if (!entry) {
-    showToast("Feature not found", "error")
+    showToast(t("map_feature_not_found"), "error")
     return
   }
 
@@ -58,12 +59,12 @@ export function enableEditGeometry(dbId: string): void {
   }
 
   if (!getCtx().geoman) {
-    showToast("Edit mode not available", "error")
+    showToast(t("map_edit_mode_unavailable"), "error")
     return
   }
 
   enableEditMode(entry.id)
-  showToast("Edit mode: drag vertices to reshape. Right-click to cancel.", "info")
+  showToast(t("map_edit_mode_hint"), "info")
 }
 
 // ─── EDIT INFO ────────────────────────────────────────────────────────────────
@@ -71,7 +72,7 @@ export function enableEditGeometry(dbId: string): void {
 export async function editFeatureInfo(dbId: string): Promise<void> {
   const entry = findLayerEntryByDbId(dbId)
   if (!entry) {
-    showToast("Feature not found", "error")
+    showToast(t("map_feature_not_found"), "error")
     return
   }
 
@@ -79,7 +80,7 @@ export async function editFeatureInfo(dbId: string): Promise<void> {
 
   const phaseIndex = PHASES.findIndex((p) => p.key === entry.data.type)
   if (phaseIndex === -1) {
-    showToast("Unknown feature type", "error")
+    showToast(t("map_unknown_feature_type"), "error")
     return
   }
 
@@ -96,8 +97,9 @@ export async function editFeatureInfo(dbId: string): Promise<void> {
     Object.assign(entry.data, result)
 
     const featuresStore = useFeaturesStore()
-    if (entry.type === "circle" && entry.data.radius && entry.data.lat && entry.data.lng) {
-      const ring = closeRing(computeCircleRing(entry.data.lat, entry.data.lng, entry.data.radius))
+    const d = entry.data as { radius?: number; lat?: number; lng?: number; label: string }
+    if (entry.type === "circle" && d.radius && d.lat && d.lng) {
+      const ring = closeRing(computeCircleRing(d.lat, d.lng, d.radius))
       featuresStore.update(entry.id, {
         geometry: { type: "LineString", coordinates: ring },
         properties: {
@@ -117,9 +119,9 @@ export async function editFeatureInfo(dbId: string): Promise<void> {
       })
     }
 
-    showToast("Feature updated.", "success")
+    showToast(t("map_feature_updated"), "success")
   } catch (err) {
-    showToast("Save failed: " + getErrorMessage(err), "error")
+    showToast(t("map_save_failed", { error: getErrorMessage(err) }), "error")
   }
 }
 
@@ -128,11 +130,11 @@ export async function editFeatureInfo(dbId: string): Promise<void> {
 export async function removeFeature(dbId: string): Promise<void> {
   const entry = findLayerEntryByDbId(dbId)
   if (!entry) {
-    showToast("Feature not found", "error")
+    showToast(t("map_feature_not_found"), "error")
     return
   }
 
-  const confirmed = await showConfirm(`Delete "${entry.data.label}"?`)
+  const confirmed = await showConfirm(t("map_delete_confirm", { label: entry.data.label }))
   if (!confirmed) return
 
   const layerStore = useLayerStore()
@@ -166,8 +168,8 @@ export async function removeFeature(dbId: string): Promise<void> {
       updateEndpointMarkers()
     }
 
-    showToast("Feature deleted.", "success")
+    showToast(t("map_feature_deleted"), "success")
   } catch (err) {
-    showToast("Delete failed: " + getErrorMessage(err), "error")
+    showToast(t("map_delete_failed", { error: getErrorMessage(err) }), "error")
   }
 }

@@ -6,7 +6,7 @@ import { computeCircleRing, closeRing } from "../rendering/geometry"
 import { getFeatureStyle } from "../draw/draw-save"
 import { sanitizeApiText } from "../../utils/sanitize"
 import { debugLog } from "../../utils/debug"
-import type { FeatureData } from "../../types"
+import type { FeatureData, ModalResult } from "../../types"
 
 interface GeoJsonFeatureWithStyle {
   type: "Feature"
@@ -19,7 +19,7 @@ export function buildGeoJsonFeature(
   data: FeatureData,
   phase: (typeof PHASES)[number],
 ): GeoJsonFeatureWithStyle | null {
-  const style = getFeatureStyle(phase, data)
+  const style = getFeatureStyle(phase, data as unknown as ModalResult)
   const sanitizedLabel = sanitizeApiText(data.label)
 
   debugLog(

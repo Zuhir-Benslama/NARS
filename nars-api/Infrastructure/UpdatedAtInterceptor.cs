@@ -41,6 +41,11 @@ public sealed class UpdatedAtInterceptor : SaveChangesInterceptor
             {
                 entry.Entity.CreatedAt = now;
             }
+            foreach (var entry in eventData.Context.ChangeTracker.Entries<RefreshToken>()
+                .Where(e => e.State is EntityState.Added && e.Entity.CreatedAt == default))
+            {
+                entry.Entity.CreatedAt = now;
+            }
         }
         return base.SavingChangesAsync(eventData, result, cancellationToken);
     }

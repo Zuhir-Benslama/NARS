@@ -5,7 +5,7 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: 1,
+  workers: 1, // E2E tests manipulate global Pinia state — parallel workers would race
   reporter: [["html", { outputFolder: "../playwright-report" }], ["list"]],
   timeout: 30000,
   expect: { timeout: 10000 },

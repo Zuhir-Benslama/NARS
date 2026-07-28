@@ -25,9 +25,10 @@
 </template>
 
 <script setup lang="ts">
-import { watch, ref, nextTick, onMounted, onUnmounted } from "vue"
+import { watch, ref, nextTick } from "vue"
 import { useI18n } from "vue-i18n"
 import { useConfirmStore } from "../stores/confirmStore"
+import { useWindowKeydown } from "../composables/useWindowKeydown"
 import { useFocusTrap } from "../composables/useFocusTrap"
 
 const { t } = useI18n()
@@ -52,13 +53,8 @@ function onKey(e: KeyboardEvent) {
     store.cancel()
   }
 }
-
-onMounted(() => {
-  window.addEventListener("keydown", onKey)
-})
-
-onUnmounted(() => {
-  window.removeEventListener("keydown", onKey)
+useWindowKeydown({
+  Escape: (e) => { if (store.visible) onKey(e) },
 })
 </script>
 

@@ -1,6 +1,6 @@
 import { PHASES } from "../../phases"
 import { debugLog, debugError } from "../../utils/debug"
-import type { FeatureData, FeatureTypeKey, ModalResult } from "../../types"
+import type { FeatureData, FeatureDataByType, FeatureTypeKey, ModalResult } from "../../types"
 
 export type ApiSaveShape = { type: string; layer: string }
 
@@ -20,41 +20,49 @@ function extractCoords(geometry: GeoJSON.Geometry): { lat: number; lng: number }
   }
 }
 
+function modalResultToBase(modalResult: ModalResult): FeatureData {
+  const type = modalResult.type as FeatureTypeKey
+  const label = modalResult.label
+  if (modalResult.type === "areas") {
+    return { type, label, decisionNumber: modalResult.decisionNumber, decisionDate: modalResult.decisionDate, areaTypeKey: modalResult.areaTypeKey } as FeatureData
+  }
+  if (modalResult.type === "districts") {
+    return { type, label, decisionNumber: modalResult.decisionNumber, decisionDate: modalResult.decisionDate, districtTypeKey: modalResult.districtTypeKey } as FeatureData
+  }
+  if (modalResult.type === "cityCenter") {
+    return { type, label, radius: modalResult.radius } as FeatureData
+  }
+  if (modalResult.type === "roads") {
+    return { type, label, decisionNumber: modalResult.decisionNumber, decisionDate: modalResult.decisionDate, roadTypeKey: modalResult.roadTypeKey } as FeatureData
+  }
+  if (modalResult.type === "houseEntrances") {
+    return { type, label, entranceTypeKey: modalResult.entranceTypeKey, roadDbId: modalResult.roadDbId, roadLabel: modalResult.roadLabel, side: modalResult.side, entranceNumber: modalResult.entranceNumber, mainEntranceDbId: modalResult.mainEntranceDbId, mainEntranceLabel: modalResult.mainEntranceLabel, bisNumber: modalResult.bisNumber } as FeatureData
+  }
+  if (modalResult.type === "publicBuildings") {
+    return { type, label, decisionNumber: modalResult.decisionNumber, decisionDate: modalResult.decisionDate, sectorKey: modalResult.sectorKey, buildingTypeKey: modalResult.buildingTypeKey } as FeatureData
+  }
+  if (modalResult.type === "publicSpaces") {
+    return { type, label, decisionNumber: modalResult.decisionNumber, decisionDate: modalResult.decisionDate, spaceTypeKey: modalResult.spaceTypeKey } as FeatureData
+  }
+  return { type, label, decisionNumber: modalResult.decisionNumber, decisionDate: modalResult.decisionDate } as FeatureData
+}
+
 export function buildFeatureData(
   geometry: GeoJSON.Geometry,
   phase: (typeof PHASES)[number],
   modalResult: ModalResult,
-): FeatureData {
-  const base: FeatureData = {
-    type: phase.key as FeatureTypeKey,
-    label: modalResult.label,
-    decisionNumber: modalResult.decisionNumber,
-    decisionDate: modalResult.decisionDate,
-    areaTypeKey: modalResult.areaTypeKey,
-    districtTypeKey: modalResult.districtTypeKey,
-    roadTypeKey: modalResult.roadTypeKey,
-    entranceTypeKey: modalResult.entranceTypeKey,
-    roadDbId: modalResult.roadDbId,
-    roadLabel: modalResult.roadLabel,
-    side: modalResult.side,
-    entranceNumber: modalResult.entranceNumber,
-    mainEntranceDbId: modalResult.mainEntranceDbId,
-    mainEntranceLabel: modalResult.mainEntranceLabel,
-    bisNumber: modalResult.bisNumber,
-    spaceTypeKey: modalResult.spaceTypeKey,
-    sectorKey: modalResult.sectorKey,
-    buildingTypeKey: modalResult.buildingTypeKey,
-  }
+): FeatureDataByType {
+  const base = modalResultToBase(modalResult)
 
   if (phase.key === "cityCenter") {
-    base.radius = modalResult.radius
+    base.radius = modalResult.type === "cityCenter" ? modalResult.radius : base.radius
   }
 
   const coords = extractCoords(geometry)
 
   if (!coords) {
     debugError("[SAVE] Unknown geometry type:", geometry.type, geometry)
-    return base
+    return base as FeatureDataByType
   }
 
   const result: FeatureData = {
@@ -79,7 +87,7 @@ export function buildFeatureData(
     Object.keys(result),
   )
 
-  return result
+  return result as FeatureDataByType
 }
 
 export function toApiSaveShape(fd: FeatureData): ApiSaveShape {

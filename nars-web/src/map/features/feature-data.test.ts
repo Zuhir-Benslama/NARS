@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { buildFeatureData, toApiSaveShape } from "./feature-data"
+import type { FeatureData } from "../../types"
 import type { ModalResult } from "../../types/modal"
 import type { PHASES } from "../../phases"
 
@@ -7,28 +8,20 @@ function makePhase(key: string): (typeof PHASES)[number] {
   return { key } as (typeof PHASES)[number]
 }
 
-function makeModal(overrides: Partial<ModalResult> = {}): ModalResult {
-  return {
-    label: "Test Feature",
-    decisionNumber: "123/45",
-    decisionDate: "2024-01-15",
-    areaTypeKey: undefined,
-    districtTypeKey: undefined,
-    roadTypeKey: undefined,
-    entranceTypeKey: undefined,
-    roadDbId: undefined,
-    roadLabel: undefined,
-    side: undefined,
-    entranceNumber: undefined,
-    mainEntranceDbId: undefined,
-    mainEntranceLabel: undefined,
-    bisNumber: undefined,
-    spaceTypeKey: undefined,
-    sectorKey: undefined,
-    buildingTypeKey: undefined,
-    radius: undefined,
-    ...overrides,
-  }
+function areaModal(overrides: Partial<{ label: string; decisionNumber: string; decisionDate: string; areaTypeKey: string }> = {}): ModalResult {
+  return { type: "areas", label: "Test Feature", decisionNumber: "123/45", decisionDate: "2024-01-15", areaTypeKey: "central_urban", ...overrides }
+}
+
+function roadsModal(overrides: Partial<{ label: string; decisionNumber: string; decisionDate: string; roadTypeKey: string }> = {}): ModalResult {
+  return { type: "roads", label: "Test Feature", decisionNumber: "123/45", decisionDate: "2024-01-15", roadTypeKey: "street", ...overrides }
+}
+
+function houseEntranceModal(overrides: Partial<{ label: string }> = {}): ModalResult {
+  return { type: "houseEntrances", label: "Test Feature", ...overrides }
+}
+
+function cityCenterModal(overrides: Partial<{ label: string; radius: number }> = {}): ModalResult {
+  return { type: "cityCenter", label: "Test Feature", ...overrides }
 }
 
 describe("feature-data", () => {
@@ -38,7 +31,7 @@ describe("feature-data", () => {
         type: "Point",
         coordinates: [127.5, 36.0],
       }
-      const result = buildFeatureData(geometry, makePhase("houseEntrances"), makeModal())
+      const result = buildFeatureData(geometry, makePhase("houseEntrances"), houseEntranceModal()) as FeatureData
 
       expect(result.lat).toBe(36.0)
       expect(result.lng).toBe(127.5)
@@ -54,7 +47,7 @@ describe("feature-data", () => {
           [127.1, 36.1],
         ],
       }
-      const result = buildFeatureData(geometry, makePhase("roads"), makeModal())
+      const result = buildFeatureData(geometry, makePhase("roads"), roadsModal())
 
       expect(result.coordinates).toEqual([
         { lat: 36.0, lng: 127.0 },
@@ -75,7 +68,7 @@ describe("feature-data", () => {
           ],
         ],
       }
-      const result = buildFeatureData(geometry, makePhase("areas"), makeModal())
+      const result = buildFeatureData(geometry, makePhase("areas"), areaModal())
 
       expect(result.coordinates).toHaveLength(4)
       expect(result.coordinates![0]).toEqual({ lat: 36.0, lng: 127.0 })
@@ -96,7 +89,7 @@ describe("feature-data", () => {
           ],
         ],
       }
-      const result = buildFeatureData(geometry, makePhase("areas"), makeModal())
+      const result = buildFeatureData(geometry, makePhase("areas"), areaModal())
 
       expect(result.coordinates).toHaveLength(4)
     })
@@ -106,7 +99,7 @@ describe("feature-data", () => {
         type: "UnknownType",
         coordinates: [],
       } as unknown as GeoJSON.Geometry
-      const result = buildFeatureData(geometry, makePhase("areas"), makeModal())
+      const result = buildFeatureData(geometry, makePhase("areas"), areaModal())
 
       expect(result.coordinates).toBeUndefined()
       expect(result.type).toBe("areas")
@@ -118,12 +111,8 @@ describe("feature-data", () => {
         type: "Point",
         coordinates: [127.5, 36.0],
       }
-      const modal = makeModal({
-        decisionNumber: "456/78",
-        decisionDate: "2024-06-01",
-        roadTypeKey: "highway",
-      })
-      const result = buildFeatureData(geometry, makePhase("roads"), modal)
+      const modal = roadsModal({ decisionNumber: "456/78", decisionDate: "2024-06-01", roadTypeKey: "highway" })
+      const result = buildFeatureData(geometry, makePhase("roads"), modal) as FeatureData
 
       expect(result.decisionNumber).toBe("456/78")
       expect(result.decisionDate).toBe("2024-06-01")
@@ -135,8 +124,8 @@ describe("feature-data", () => {
         type: "Point",
         coordinates: [127.5, 36.0],
       }
-      const modal = makeModal({ radius: 500 })
-      const result = buildFeatureData(geometry, makePhase("cityCenter"), modal)
+      const modal = cityCenterModal({ radius: 500 })
+      const result = buildFeatureData(geometry, makePhase("cityCenter"), modal) as FeatureData
 
       expect(result.radius).toBe(500)
     })

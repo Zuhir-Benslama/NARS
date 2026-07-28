@@ -33,11 +33,10 @@ describe("drawStore", () => {
   it("unpatchGeomanMarker restores original setLngLat", () => {
     const store = useDrawStore()
     const orig = vi.fn()
-    const marker = { setLngLat: vi.fn(), _narsSnapPatchedInstance: true as any }
+    const marker = { setLngLat: vi.fn() }
     store.registerGeomanMarker({ marker }, null, orig)
     store.unpatchGeomanMarker()
     expect(marker.setLngLat).toBe(orig)
-    expect(marker._narsSnapPatchedInstance).toBe(false)
     expect(store.snappingEnabled).toBe(false)
   })
 

@@ -38,10 +38,10 @@ interface DrawContextEvent {
 function buildSnapToggleItem(): CtxMenuItem {
   const snapOn = isSnappingEnabled()
   return {
-    label: snapOn ? "\u2298 Disable Snapping" : "\u229E Enable Snapping",
+    label: snapOn ? "\u2298 " + t("map_disable_snapping") : "\u229E " + t("map_enable_snapping"),
     onClick: () => {
       const e = toggleSnapping()
-      showToast(`Snapping ${e ? "enabled" : "disabled"}`, "info")
+      showToast(t(e ? "map_snapping_enabled" : "map_snapping_disabled"), "info")
     },
   }
 }

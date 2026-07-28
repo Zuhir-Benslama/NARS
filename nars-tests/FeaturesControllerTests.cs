@@ -19,18 +19,15 @@ namespace NarsApi.Tests;
 
 public class FeaturesControllerTests
 {
-    private static readonly Guid UserId = Guid.NewGuid();
-    private static (FeaturesController, AppDbContext) CreateController(
-        AppDbContext? db = null,
+    private static FeaturesController CreateController(
+        AppDbContext db,
         IBackgroundTaskQueue? bgQueue = null,
         IDateTimeProvider? timeProvider = null,
         IFeatureStatsService? featureStatsService = null,
         IFeatureService? featureService = null)
     {
-        var context = db ?? CreateInMemoryDb("FeaturesTest");
-
         var ctrl = new FeaturesController(
-            featureService ?? new FeatureService(context),
+            featureService ?? new FeatureService(db),
             bgQueue ?? Mock.Of<IBackgroundTaskQueue>(),
             Mock.Of<ILogger<FeaturesController>>(),
             Options.Create(new FeatureDefaultsOptions()),
@@ -47,7 +44,7 @@ public class FeaturesControllerTests
             }
         };
 
-        return (ctrl, context);
+        return ctrl;
     }
 
     private static JsonElement Json(string raw) => System.Text.Json.JsonSerializer.Deserialize<JsonElement>(raw);
@@ -57,7 +54,8 @@ public class FeaturesControllerTests
     [Fact]
     public async Task SaveFeature_NullBody_Returns400()
     {
-        var (ctrl, _) = CreateController();
+        using var db = CreateInMemoryDb("FeaturesTest");
+        var ctrl = CreateController(db);
         var result = await ctrl.SaveFeature(null!);
         var objResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(400, objResult.StatusCode);
@@ -66,7 +64,8 @@ public class FeaturesControllerTests
     [Fact]
     public async Task SaveFeature_UnknownType_Returns400()
     {
-        var (ctrl, _) = CreateController();
+        using var db = CreateInMemoryDb("FeaturesTest");
+        var ctrl = CreateController(db);
         var body = new FeatureSaveRequest("invalid_type", "main", "label", Json("{}"));
         var result = await ctrl.SaveFeature(body);
         var objResult = Assert.IsType<ObjectResult>(result);
@@ -76,7 +75,8 @@ public class FeaturesControllerTests
     [Fact]
     public async Task SaveFeature_InvalidLayerForType_Returns400()
     {
-        var (ctrl, _) = CreateController();
+        using var db = CreateInMemoryDb("FeaturesTest");
+        var ctrl = CreateController(db);
         var body = new FeatureSaveRequest(FeatureTypes.Road, "invalid_layer", "label", Json("{}"));
         var result = await ctrl.SaveFeature(body);
         var objResult = Assert.IsType<ObjectResult>(result);
@@ -86,7 +86,8 @@ public class FeaturesControllerTests
     [Fact]
     public async Task SaveFeature_ScatteredArea_Returns400()
     {
-        var (ctrl, _) = CreateController();
+        using var db = CreateInMemoryDb("FeaturesTest");
+        var ctrl = CreateController(db);
         var body = new FeatureSaveRequest(FeatureTypes.Area, FeatureTypes.AreaLayers.Scattered, "label", Json("{}"));
         var result = await ctrl.SaveFeature(body);
         var objResult = Assert.IsType<ObjectResult>(result);
@@ -96,7 +97,8 @@ public class FeaturesControllerTests
     [Fact]
     public async Task SaveFeature_DataTooLarge_Returns400()
     {
-        var (ctrl, _) = CreateController();
+        using var db = CreateInMemoryDb("FeaturesTest");
+        var ctrl = CreateController(db);
         var largeData = new string('x', OversizedDataLength);
         var body = new FeatureSaveRequest(FeatureTypes.Road, FeatureTypes.RoadLayers.Street, "label", Json($"\"{largeData}\""));
         var result = await ctrl.SaveFeature(body);
@@ -107,7 +109,8 @@ public class FeaturesControllerTests
     [Fact]
     public async Task SaveFeature_RoadRefNotFound_Returns400()
     {
-        var (ctrl, _) = CreateController();
+        using var db = CreateInMemoryDb("FeaturesTest");
+        var ctrl = CreateController(db);
         var data = Json("""{"coordinates":[{"lat":36.0,"lng":3.0}],"roadDbId":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}""");
         var body = new FeatureSaveRequest(FeatureTypes.HouseEntrance, FeatureTypes.HouseEntranceLayers.Main, "label", data);
         var result = await ctrl.SaveFeature(body);
@@ -118,46 +121,44 @@ public class FeaturesControllerTests
     [Fact]
     public async Task SaveFeature_ValidRoad_Returns201()
     {
-        var (ctrl, db) = CreateController();
-        using (db)
+        using var db = CreateInMemoryDb("FeaturesTest");
+
+        var roadId = Guid.NewGuid();
+        db.Roads.Add(new Road
         {
-            var roadId = Guid.NewGuid();
-            db.Roads.Add(new Road
-            {
-                Id = roadId,
-                UserId = UserId,
-                Layer = FeatureTypes.RoadLayers.Street,
-                Data = "{}",
-                Label = "road",
-                UpdatedAt = FixedUtcNow
-            });
-            await db.SaveChangesAsync();
+            Id = roadId,
+            UserId = UserId,
+            Layer = FeatureTypes.RoadLayers.Street,
+            Data = "{}",
+            Label = "road",
+            UpdatedAt = FixedUtcNow
+        });
+        await db.SaveChangesAsync();
 
-            var data = Json($$"""{"coordinates":[{"lat":36.0,"lng":3.0}],"roadDbId":"{{roadId}}"}""");
-            var body = new FeatureSaveRequest(FeatureTypes.HouseEntrance, FeatureTypes.HouseEntranceLayers.Main, "entrance", data);
+        var ctrl = CreateController(db);
+        var data = Json($$"""{"coordinates":[{"lat":36.0,"lng":3.0}],"roadDbId":"{{roadId}}"}""");
+        var body = new FeatureSaveRequest(FeatureTypes.HouseEntrance, FeatureTypes.HouseEntranceLayers.Main, "entrance", data);
 
-            var result = await ctrl.SaveFeature(body);
+        var result = await ctrl.SaveFeature(body);
 
-            var created = Assert.IsType<ObjectResult>(result);
-            Assert.Equal(201, created.StatusCode);
-        }
+        var created = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(201, created.StatusCode);
     }
 
     [Fact]
     public async Task SaveFeature_ValidArea_Returns201()
     {
-        var (ctrl, db) = CreateController();
-        using (db)
-        {
-            var data = Json("""{"coordinates":[[{"lat":36.0,"lng":3.0}]]}""");
-            var body = new FeatureSaveRequest(FeatureTypes.Area, FeatureTypes.AreaLayers.CentralUrban, "area", data);
+        using var db = CreateInMemoryDb("FeaturesTest");
+        var ctrl = CreateController(db);
 
-            var result = await ctrl.SaveFeature(body);
+        var data = Json("""{"coordinates":[[{"lat":36.0,"lng":3.0}]]}""");
+        var body = new FeatureSaveRequest(FeatureTypes.Area, FeatureTypes.AreaLayers.CentralUrban, "area", data);
 
-            var created = Assert.IsType<ObjectResult>(result);
-            Assert.Equal(201, created.StatusCode);
-            Assert.Equal(1, await db.Areas.CountAsync());
-        }
+        var result = await ctrl.SaveFeature(body);
+
+        var created = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(201, created.StatusCode);
+        Assert.Equal(1, await db.Areas.CountAsync());
     }
 
     [Fact]
@@ -167,7 +168,8 @@ public class FeaturesControllerTests
         bgQueueMock.Setup(x => x.QueueBackgroundWorkItemAsync(It.IsAny<Func<IServiceProvider, CancellationToken, Task>>()))
             .Returns(ValueTask.CompletedTask);
 
-        var (ctrl, _) = CreateController(bgQueue: bgQueueMock.Object);
+        using var db = CreateInMemoryDb("FeaturesTest");
+        var ctrl = CreateController(db, bgQueue: bgQueueMock.Object);
         var data = Json("""{"coordinates":[[{"lat":36.0,"lng":3.0}]]}""");
         var body = new FeatureSaveRequest(FeatureTypes.Area, FeatureTypes.AreaLayers.CentralUrban, "area", data);
 
@@ -185,7 +187,8 @@ public class FeaturesControllerTests
         bgQueueMock.Setup(x => x.QueueBackgroundWorkItemAsync(It.IsAny<Func<IServiceProvider, CancellationToken, Task>>()))
             .Returns(ValueTask.CompletedTask);
 
-        var (ctrl, _) = CreateController(bgQueue: bgQueueMock.Object);
+        using var db = CreateInMemoryDb("FeaturesTest");
+        var ctrl = CreateController(db, bgQueue: bgQueueMock.Object);
         var data = Json("""{"coordinates":[{"lat":36.0,"lng":3.0}]}""");
         var body = new FeatureSaveRequest(FeatureTypes.Road, FeatureTypes.RoadLayers.Street, "road", data);
 
@@ -201,7 +204,8 @@ public class FeaturesControllerTests
     [Fact]
     public async Task ClearFeatures_NullBody_Returns400()
     {
-        var (ctrl, _) = CreateController();
+        using var db = CreateInMemoryDb("FeaturesTest");
+        var ctrl = CreateController(db);
         var result = await ctrl.ClearFeatures(null!);
         var objResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(400, objResult.StatusCode);
@@ -210,7 +214,8 @@ public class FeaturesControllerTests
     [Fact]
     public async Task ClearFeatures_NotConfirmed_Returns400()
     {
-        var (ctrl, _) = CreateController();
+        using var db = CreateInMemoryDb("FeaturesTest");
+        var ctrl = CreateController(db);
         var result = await ctrl.ClearFeatures(new ClearFeaturesRequest(Confirm: false));
         var objResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(400, objResult.StatusCode);
@@ -222,7 +227,8 @@ public class FeaturesControllerTests
         var featureServiceMock = new Mock<IFeatureService>();
         featureServiceMock.Setup(s => s.ClearAllFeaturesAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((2, new List<Guid>()));
-        var (ctrl, _) = CreateController(featureService: featureServiceMock.Object);
+        using var db = CreateInMemoryDb("FeaturesTest");
+        var ctrl = CreateController(db, featureService: featureServiceMock.Object);
 
         var result = await ctrl.ClearFeatures(new ClearFeaturesRequest(Confirm: true));
         var ok = Assert.IsType<OkObjectResult>(result);
@@ -234,7 +240,8 @@ public class FeaturesControllerTests
     [Fact]
     public async Task UpdateFeature_NullBody_Returns400()
     {
-        var (ctrl, _) = CreateController();
+        using var db = CreateInMemoryDb("FeaturesTest");
+        var ctrl = CreateController(db);
         var result = await ctrl.UpdateFeature(Guid.NewGuid(), null!);
         var objResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(400, objResult.StatusCode);
@@ -243,7 +250,8 @@ public class FeaturesControllerTests
     [Fact]
     public async Task UpdateFeature_NotFound_Returns404()
     {
-        var (ctrl, _) = CreateController();
+        using var db = CreateInMemoryDb("FeaturesTest");
+        var ctrl = CreateController(db);
         var body = new FeatureUpdateRequest(Label: "new", Data: null);
         var result = await ctrl.UpdateFeature(Guid.NewGuid(), body);
         var objResult = Assert.IsType<ObjectResult>(result);
@@ -253,54 +261,52 @@ public class FeaturesControllerTests
     [Fact]
     public async Task UpdateFeature_NotOwned_Returns404()
     {
-        var (ctrl, db) = CreateController();
-        using (db)
-        {
-            var otherId = Guid.NewGuid();
-            db.Roads.Add(new Road
-            {
-                Id = otherId,
-                UserId = Guid.NewGuid(),
-                Layer = FeatureTypes.RoadLayers.Street,
-                Data = "{}",
-                Label = "other",
-                UpdatedAt = FixedUtcNow
-            });
-            db.FeatureRegistry.Add(new FeatureRegistry { Id = otherId, FeatureType = FeatureTypes.Road });
-            await db.SaveChangesAsync();
+        using var db = CreateInMemoryDb("FeaturesTest");
 
-            var body = new FeatureUpdateRequest(Label: "new_label", Data: null);
-            var result = await ctrl.UpdateFeature(otherId, body);
-            var objResult = Assert.IsType<ObjectResult>(result);
-            Assert.Equal(404, objResult.StatusCode);
-        }
+        var otherId = Guid.NewGuid();
+        db.Roads.Add(new Road
+        {
+            Id = otherId,
+            UserId = Guid.NewGuid(),
+            Layer = FeatureTypes.RoadLayers.Street,
+            Data = "{}",
+            Label = "other",
+            UpdatedAt = FixedUtcNow
+        });
+        db.FeatureRegistry.Add(new FeatureRegistry { Id = otherId, FeatureType = FeatureTypes.Road });
+        await db.SaveChangesAsync();
+
+        var ctrl = CreateController(db);
+        var body = new FeatureUpdateRequest(Label: "new_label", Data: null);
+        var result = await ctrl.UpdateFeature(otherId, body);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(404, objResult.StatusCode);
     }
 
     [Fact]
     public async Task UpdateFeature_DataTooLarge_Returns400()
     {
-        var (ctrl, db) = CreateController();
-        using (db)
-        {
-            var fid = Guid.NewGuid();
-            db.Roads.Add(new Road
-            {
-                Id = fid,
-                UserId = UserId,
-                Layer = FeatureTypes.RoadLayers.Street,
-                Data = "{}",
-                Label = "road",
-                UpdatedAt = FixedUtcNow
-            });
-            db.FeatureRegistry.Add(new FeatureRegistry { Id = fid, FeatureType = FeatureTypes.Road });
-            await db.SaveChangesAsync();
+        using var db = CreateInMemoryDb("FeaturesTest");
 
-            var largeData = new string('x', OversizedDataLength);
-            var body = new FeatureUpdateRequest(Label: null, Data: System.Text.Json.JsonSerializer.Deserialize<JsonElement>($"\"{largeData}\""));
-            var result = await ctrl.UpdateFeature(fid, body);
-            var objResult = Assert.IsType<ObjectResult>(result);
-            Assert.Equal(400, objResult.StatusCode);
-        }
+        var fid = Guid.NewGuid();
+        db.Roads.Add(new Road
+        {
+            Id = fid,
+            UserId = UserId,
+            Layer = FeatureTypes.RoadLayers.Street,
+            Data = "{}",
+            Label = "road",
+            UpdatedAt = FixedUtcNow
+        });
+        db.FeatureRegistry.Add(new FeatureRegistry { Id = fid, FeatureType = FeatureTypes.Road });
+        await db.SaveChangesAsync();
+
+        var ctrl = CreateController(db);
+        var largeData = new string('x', OversizedDataLength);
+        var body = new FeatureUpdateRequest(Label: null, Data: System.Text.Json.JsonSerializer.Deserialize<JsonElement>($"\"{largeData}\""));
+        var result = await ctrl.UpdateFeature(fid, body);
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
     }
 
     // ── DELETE /api/delete/{id} ───────────────────────────────────────────
@@ -314,7 +320,8 @@ public class FeaturesControllerTests
             .ReturnsAsync(FeatureTypes.Area);
         featureServiceMock.Setup(s => s.DeleteFeatureAsync(fid, UserId, FeatureTypes.Area, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
-        var (ctrl, _) = CreateController(featureService: featureServiceMock.Object);
+        using var db = CreateInMemoryDb("FeaturesTest");
+        var ctrl = CreateController(db, featureService: featureServiceMock.Object);
 
         var result = await ctrl.DeleteFeature(fid);
         Assert.IsType<NoContentResult>(result);
@@ -323,7 +330,8 @@ public class FeaturesControllerTests
     [Fact]
     public async Task DeleteFeature_NotFound_Returns404()
     {
-        var (ctrl, _) = CreateController();
+        using var db = CreateInMemoryDb("FeaturesTest");
+        var ctrl = CreateController(db);
         var result = await ctrl.DeleteFeature(Guid.NewGuid());
         var objResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(404, objResult.StatusCode);
@@ -342,7 +350,8 @@ public class FeaturesControllerTests
                 [FeatureTypes.Road] = 3
             });
 
-        var (ctrl, _) = CreateController(featureStatsService: statsMock.Object);
+        using var db = CreateInMemoryDb("FeaturesTest");
+        var ctrl = CreateController(db, featureStatsService: statsMock.Object);
 
         var result = await ctrl.GetStats();
 

@@ -250,7 +250,7 @@ describe("onRemove", () => {
 
     await handler({ feature: { _geoJson: { properties: {} } } })
 
-    expect(mockShowToast).toHaveBeenCalledWith("Cannot delete: feature ID not found", "error")
+    expect(mockShowToast).toHaveBeenCalledWith("map_cannot_delete_no_id", "error")
   })
 
   it("disables edit mode when active entry matches", async () => {
@@ -274,7 +274,7 @@ describe("onRemove", () => {
 
     expect(mockApiFetch).toHaveBeenCalledWith("/api/features/del1", { method: "DELETE" })
     expect(mockFeaturesStoreRemove).toHaveBeenCalledWith("feat_del1")
-    expect(mockShowToast).toHaveBeenCalledWith("Feature deleted.", "success")
+    expect(mockShowToast).toHaveBeenCalledWith("map_feature_deleted", "success")
   })
 
   it("shows error on failed API response", async () => {
@@ -286,6 +286,6 @@ describe("onRemove", () => {
 
     await handler({ feature: { _geoJson: { properties: { dbId: "fail1" } } } })
 
-    expect(mockShowToast).toHaveBeenCalledWith("Delete failed: HTTP 500", "error")
+    expect(mockShowToast).toHaveBeenCalledWith("map_delete_http_failed", "error")
   })
 })

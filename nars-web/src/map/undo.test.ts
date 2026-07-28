@@ -40,7 +40,7 @@ function makeEntry(overrides: Partial<LayerEntry> = {}): LayerEntry {
     id: "feat-1",
     dbId: "db-1",
     type: "polygon",
-    data: { type: "areas", label: "Test Area", decisionNumber: "", decisionDate: "" },
+    data: { type: "areas", label: "Test Area", decisionNumber: "", decisionDate: "", areaTypeKey: "central_urban" },
     ...overrides,
   }
 }
@@ -84,7 +84,7 @@ describe("undo", () => {
     it("returns label of the last deleted feature", () => {
       recordDelete(
         makeEntry({
-          data: { type: "areas", label: "My Area", decisionNumber: "", decisionDate: "" },
+          data: { type: "areas", label: "My Area", decisionNumber: "", decisionDate: "", areaTypeKey: "central_urban" },
         }),
         "areas",
       )
@@ -104,7 +104,7 @@ describe("undo", () => {
   describe("undo", () => {
     it("shows info toast when stack is empty", async () => {
       await undo()
-      expect(mockToast).toHaveBeenCalledWith("Nothing to restore.", "info")
+      expect(mockToast).toHaveBeenCalledWith("map_nothing_to_restore", "info")
     })
 
     it("restores a deleted polygon feature", async () => {
@@ -114,6 +114,7 @@ describe("undo", () => {
           label: "Restored Area",
           decisionNumber: "",
           decisionDate: "",
+          areaTypeKey: "central_urban",
           coordinates: [
             { lat: 1, lng: 2 },
             { lat: 3, lng: 4 },
@@ -127,7 +128,7 @@ describe("undo", () => {
 
       await undo()
 
-      expect(mockToast).toHaveBeenCalledWith('Restored "Restored Area".', "success")
+      expect(mockToast).toHaveBeenCalledWith("map_restored", "success")
     })
 
     it("shows error toast on API failure", async () => {
@@ -138,7 +139,7 @@ describe("undo", () => {
 
       await undo()
 
-      expect(mockToast).toHaveBeenCalledWith(expect.stringContaining("Failed to restore"), "error")
+      expect(mockToast).toHaveBeenCalledWith("map_restore_failed", "error")
     })
 
     it("repairs cross-references for houseEntrances", async () => {
@@ -151,8 +152,7 @@ describe("undo", () => {
         data: {
           type: "houseEntrances",
           label: "Main Entrance",
-          decisionNumber: "",
-          decisionDate: "",
+          entranceTypeKey: "main_entrance",
         },
       })
 
@@ -162,8 +162,6 @@ describe("undo", () => {
         data: {
           type: "houseEntrances",
           label: "Secondary",
-          decisionNumber: "",
-          decisionDate: "",
           entranceTypeKey: "secondary_entrance",
           mainEntranceDbId: oldDbId,
           mainEntranceLabel: "Main Entrance",
@@ -196,8 +194,6 @@ describe("undo", () => {
             label: "Marker",
             lat: 5,
             lng: 10,
-            decisionNumber: "",
-            decisionDate: "",
           },
         }),
         "areas",

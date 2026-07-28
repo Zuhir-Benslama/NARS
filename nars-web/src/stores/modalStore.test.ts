@@ -10,24 +10,10 @@ import {
 import type { ModalResult } from "../types/modal"
 
 const emptyResult: ModalResult = {
+  type: "namingPanels",
   label: "",
   decisionNumber: "",
   decisionDate: "",
-  areaTypeKey: "",
-  districtTypeKey: "",
-  roadTypeKey: "",
-  entranceTypeKey: undefined,
-  roadDbId: undefined,
-  roadLabel: undefined,
-  side: undefined,
-  entranceNumber: undefined,
-  mainEntranceDbId: undefined,
-  mainEntranceLabel: undefined,
-  bisNumber: undefined,
-  spaceTypeKey: undefined,
-  sectorKey: undefined,
-  buildingTypeKey: undefined,
-  radius: undefined,
 }
 
 describe("modalStore", () => {
@@ -102,8 +88,9 @@ describe("modalStore", () => {
     it("awaitModalResult resolves when close is called", async () => {
       const store = useModalStore()
       const promise = awaitModalResult()
-      store.close({ label: "Done", decisionNumber: "", decisionDate: "" })
+      store.close({ type: "namingPanels", label: "Done", decisionNumber: "", decisionDate: "" })
       await expect(promise).resolves.toEqual({
+        type: "namingPanels",
         label: "Done",
         decisionNumber: "",
         decisionDate: "",

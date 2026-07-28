@@ -1,15 +1,26 @@
 import { defineStore } from "pinia"
-import type { LayerEntry } from "../types"
+import type {
+  AreaFeatureData,
+  CityCenterFeatureData,
+  DistrictFeatureData,
+  FeatureDataByType,
+  HouseEntranceFeatureData,
+  LayerEntry,
+  NamingPanelFeatureData,
+  PublicBuildingFeatureData,
+  PublicSpaceFeatureData,
+  RoadFeatureData,
+} from "../types"
 
 export interface LayerState {
-  areas: LayerEntry[]
-  cityCenter: LayerEntry[]
-  districts: LayerEntry[]
-  roads: LayerEntry[]
-  houseEntrances: LayerEntry[]
-  publicBuildings: LayerEntry[]
-  publicSpaces: LayerEntry[]
-  namingPanels: LayerEntry[]
+  areas: LayerEntry<AreaFeatureData>[]
+  cityCenter: LayerEntry<CityCenterFeatureData>[]
+  districts: LayerEntry<DistrictFeatureData>[]
+  roads: LayerEntry<RoadFeatureData>[]
+  houseEntrances: LayerEntry<HouseEntranceFeatureData>[]
+  publicBuildings: LayerEntry<PublicBuildingFeatureData>[]
+  publicSpaces: LayerEntry<PublicSpaceFeatureData>[]
+  namingPanels: LayerEntry<NamingPanelFeatureData>[]
 }
 
 let _cachedFeatureMap: Map<string, { layer: keyof LayerState; entry: LayerEntry }> | null = null
@@ -49,10 +60,10 @@ export const useLayerStore = defineStore("layer", {
 
   getters: {
     mainEntrances: (state) =>
-      state.houseEntrances.filter((e: LayerEntry) => e.data.entranceTypeKey === "main_entrance"),
+      state.houseEntrances.filter((e) => e.data.entranceTypeKey === "main_entrance"),
     secondaryEntrances: (state) =>
       state.houseEntrances.filter(
-        (e: LayerEntry) => e.data.entranceTypeKey === "secondary_entrance",
+        (e) => e.data.entranceTypeKey === "secondary_entrance",
       ),
 
     areaCount: (state) => state.areas.length,
@@ -60,11 +71,11 @@ export const useLayerStore = defineStore("layer", {
     districtCount: (state) => state.districts.length,
     roadCount: (state) => state.roads.length,
     mainEntranceCount: (state) =>
-      state.houseEntrances.filter((e: LayerEntry) => e.data.entranceTypeKey === "main_entrance")
+      state.houseEntrances.filter((e) => e.data.entranceTypeKey === "main_entrance")
         .length,
     secondaryEntranceCount: (state) =>
       state.houseEntrances.filter(
-        (e: LayerEntry) => e.data.entranceTypeKey === "secondary_entrance",
+        (e) => e.data.entranceTypeKey === "secondary_entrance",
       ).length,
     publicBuildingCount: (state) => state.publicBuildings.length,
     publicSpaceCount: (state) => state.publicSpaces.length,
@@ -89,20 +100,20 @@ export const useLayerStore = defineStore("layer", {
 
   actions: {
     addFeature(layer: keyof LayerState, entry: LayerEntry) {
-      this[layer].push(entry)
+      ;(this[layer] as unknown as LayerEntry[]).push(entry)
       _featureMapDirty = true
     },
 
     removeFeature(layer: keyof LayerState, dbId: string) {
-      const idx = this[layer].findIndex((e) => e.dbId === dbId)
+      const idx = (this[layer] as unknown as LayerEntry[]).findIndex((e) => e.dbId === dbId)
       if (idx !== -1) {
-        this[layer].splice(idx, 1)
+        ;(this[layer] as unknown as LayerEntry[]).splice(idx, 1)
         _featureMapDirty = true
       }
     },
 
-    updateFeature(layer: keyof LayerState, dbId: string, data: Partial<LayerEntry["data"]>) {
-      const entry = this[layer].find((e) => e.dbId === dbId)
+    updateFeature(layer: keyof LayerState, dbId: string, data: Partial<FeatureDataByType>) {
+      const entry = (this[layer] as unknown as LayerEntry[]).find((e) => e.dbId === dbId)
       if (entry) {
         Object.assign(entry.data, data)
         _featureMapDirty = true

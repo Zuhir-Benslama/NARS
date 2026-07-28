@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach } from "vitest"
 import { createPinia, setActivePinia } from "pinia"
 import { useLayerStore } from "./layerStore"
-import type { LayerEntry } from "../types/features"
+import type { HouseEntranceFeatureData, LayerEntry } from "../types/features"
 
 function makeEntry(overrides: Partial<LayerEntry> = {}): LayerEntry {
   return {
     id: "id-1",
     dbId: "db-1",
     type: "polygon",
-    data: { type: "areas", label: "Test", decisionNumber: "", decisionDate: "" },
+    data: { type: "areas", label: "Test", decisionNumber: "", decisionDate: "", areaTypeKey: "central_urban" },
     ...overrides,
   }
 }
@@ -58,7 +58,7 @@ describe("layerStore", () => {
       "areas",
       makeEntry({
         dbId: "abc",
-        data: { type: "areas", label: "Old", decisionNumber: "", decisionDate: "" },
+        data: { type: "areas", label: "Old", decisionNumber: "", decisionDate: "", areaTypeKey: "central_urban" },
       }),
     )
     store.updateFeature("areas", "abc", { label: "New" })
@@ -103,8 +103,6 @@ describe("layerStore", () => {
           type: "houseEntrances",
           label: `Main ${dbId}`,
           entranceTypeKey: "main_entrance",
-          decisionNumber: "",
-          decisionDate: "",
         },
       })
     const secondary = (dbId: string) =>
@@ -114,18 +112,16 @@ describe("layerStore", () => {
           type: "houseEntrances",
           label: `Sec ${dbId}`,
           entranceTypeKey: "secondary_entrance",
-          decisionNumber: "",
-          decisionDate: "",
         },
       })
 
     it("mainEntrances filters by main_entrance", () => {
-      store.houseEntrances = [main("1"), main("2"), secondary("3")]
+      store.houseEntrances = [main("1"), main("2"), secondary("3")] as unknown as LayerEntry<HouseEntranceFeatureData>[]
       expect(store.mainEntrances).toHaveLength(2)
     })
 
     it("secondaryEntrances filters by secondary_entrance", () => {
-      store.houseEntrances = [main("1"), secondary("2")]
+      store.houseEntrances = [main("1"), secondary("2")] as unknown as LayerEntry<HouseEntranceFeatureData>[]
       expect(store.secondaryEntrances).toHaveLength(1)
     })
   })
@@ -142,8 +138,6 @@ describe("layerStore", () => {
             type: "houseEntrances",
             label: "M",
             entranceTypeKey: "main_entrance",
-            decisionNumber: "",
-            decisionDate: "",
           },
         }),
       )

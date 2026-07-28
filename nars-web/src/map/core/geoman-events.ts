@@ -16,6 +16,7 @@ import { recordDelete } from "../undo"
 import { refreshLayerVisibility } from "../rendering/labels"
 import { getErrorMessage } from "../../lib/errors"
 import { showToast } from "../../lib/toast"
+import { t } from "../../i18n"
 import { debugError } from "../../utils/debug"
 import type { FeatureTypeKey, LayerEntry } from "../../types"
 import type {
@@ -93,8 +94,8 @@ function onEditEnd(e: GeomanEditEvent): void {
 
   if (geometry.type === "Point") {
     const c = geometry.coordinates as [number, number]
-    layerEntry.data.lat = c[1]
-    layerEntry.data.lng = c[0]
+    ;(layerEntry.data as { lat: number; lng: number }).lat = c[1]
+    ;(layerEntry.data as { lat: number; lng: number }).lng = c[0]
   } else if (
     geometry.type === "LineString" ||
     geometry.type === "MultiLineString" ||
@@ -146,7 +147,7 @@ async function onRemove(e: GeomanRemoveEvent): Promise<void> {
 
   const dbId: string | undefined = feature._geoJson?.properties?.dbId
   if (!dbId) {
-    showToast("Cannot delete: feature ID not found", "error")
+    showToast(t("map_cannot_delete_no_id"), "error")
     return
   }
 
@@ -176,7 +177,7 @@ async function onRemove(e: GeomanRemoveEvent): Promise<void> {
       method: "DELETE",
     })
     if (!response.ok) {
-      showToast(`Delete failed: HTTP ${response.status}`, "error")
+      showToast(t("map_delete_http_failed", { status: response.status }), "error")
       return
     }
 
@@ -185,9 +186,9 @@ async function onRemove(e: GeomanRemoveEvent): Promise<void> {
     useAppStore().syncCounts()
     refreshLayerVisibility()
 
-    showToast("Feature deleted.", "success")
+    showToast(t("map_feature_deleted"), "success")
   } catch (err) {
-    showToast("Delete failed: " + getErrorMessage(err), "error")
+    showToast(t("map_delete_failed", { error: getErrorMessage(err) }), "error")
   }
 }
 

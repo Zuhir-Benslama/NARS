@@ -1,5 +1,5 @@
 <template>
-  <div ref="rootRef" class="settings-users">
+  <div class="settings-users">
     <!-- Existing users list -->
     <div class="su-section">
       <h3 class="su-section-title">{{ t("su_user_list_title") }} ({{ users.length }})</h3>
@@ -73,87 +73,33 @@
         />
       </div>
 
-      <div v-if="showWilayaSelect" class="modal-field">
-        <label>{{ t("su_wilaya") }}</label>
-        <div class="su-search-wrap">
-          <input
-            ref="wilayaInputRef"
-            v-model="wilayaQuery"
-            type="text"
-            class="modal-input"
-            :placeholder="t('su_search_wilaya')"
-            autocomplete="off"
-            @focus="wilayaSearch.run('')"
-          />
-          <Teleport v-if="wilayaOptions.length" to="body">
-            <div class="su-dropdown" :style="wilayaDropdownStyle" @mousedown.prevent>
-              <div
-                v-for="w in wilayaOptions"
-                :key="w.id"
-                class="su-dropdown-item"
-                @click="selectWilaya(w)"
-              >
-                {{ w.name_fr }}
-              </div>
-            </div>
-          </Teleport>
-        </div>
-      </div>
+      <LocationSearchSelect
+        v-if="showWilayaSelect"
+        ref="wilayaRef"
+        v-model="selectedWilayaId"
+        :label="t('su_wilaya')"
+        :placeholder="t('su_search_wilaya')"
+        endpoint="/api/wilayas"
+      />
 
-      <div v-if="showDairaSelect" class="modal-field">
-        <label>{{ t("su_daira") }}</label>
-        <div class="su-search-wrap">
-          <input
-            ref="dairaInputRef"
-            v-model="dairaQuery"
-            type="text"
-            class="modal-input"
-            :placeholder="dairaPlaceholder"
-            autocomplete="off"
-            :disabled="needWilayaFirst && !selectedWilayaId"
-            @focus="dairaSearch.run('')"
-          />
-          <Teleport v-if="dairaOptions.length" to="body">
-            <div class="su-dropdown" :style="dairaDropdownStyle" @mousedown.prevent>
-              <div
-                v-for="d in dairaOptions"
-                :key="d.id"
-                class="su-dropdown-item"
-                @click="selectDaira(d)"
-              >
-                {{ d.name_fr }}
-              </div>
-            </div>
-          </Teleport>
-        </div>
-      </div>
+      <LocationSearchSelect
+        v-if="showDairaSelect"
+        ref="dairaRef"
+        v-model="selectedDairaId"
+        :label="t('su_daira')"
+        :placeholder="dairaPlaceholder"
+        :disabled="needWilayaFirst && !selectedWilayaId"
+        :endpoint="dairaEndpoint"
+      />
 
-      <div v-if="showCommuneSelect" class="modal-field">
-        <label>{{ t("su_commune") }}</label>
-        <div class="su-search-wrap">
-          <input
-            ref="communeInputRef"
-            v-model="communeQuery"
-            type="text"
-            class="modal-input"
-            :placeholder="t('su_search_commune')"
-            autocomplete="off"
-            @focus="communeSearch.run('')"
-          />
-          <Teleport v-if="communeOptions.length" to="body">
-            <div class="su-dropdown" :style="communeDropdownStyle" @mousedown.prevent>
-              <div
-                v-for="c in communeOptions"
-                :key="c.id"
-                class="su-dropdown-item"
-                @click="selectCommune(c)"
-              >
-                {{ c.name_fr }}
-              </div>
-            </div>
-          </Teleport>
-        </div>
-      </div>
+      <LocationSearchSelect
+        v-if="showCommuneSelect"
+        ref="communeRef"
+        v-model="selectedCommuneId"
+        :label="t('su_commune')"
+        :placeholder="t('su_search_commune')"
+        endpoint="/api/communes"
+      />
 
       <div class="su-form-actions">
         <button class="modal-btn modal-btn-save" :disabled="loading" @click="submit">
@@ -187,7 +133,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from "vue"
+import { ref, computed, watch, onMounted } from "vue"
 import { useI18n } from "vue-i18n"
 import { useAppStore } from "../../stores/appStore"
 import { apiFetch } from "../../api"
@@ -195,8 +141,7 @@ import { showToast } from "../../lib/toast"
 import { NarsError } from "../../lib/errors"
 import { debugWarn } from "../../utils/debug"
 import type { UserRole } from "../../types"
-
-const LOCATION_SEARCH_DEBOUNCE_MS = 200
+import LocationSearchSelect from "./LocationSearchSelect.vue"
 
 interface ManageableUser {
   user_id: string
@@ -214,37 +159,6 @@ const { t } = useI18n()
 const appStore = useAppStore()
 
 const role = computed<UserRole>(() => appStore.user?.role ?? "commune_user")
-type SearchOption = { id: number; name_fr: string }
-
-function extractSearchOptions(payload: unknown): SearchOption[] {
-  if (!payload || typeof payload !== "object") return []
-  const items = (payload as { items?: unknown }).items
-  if (!Array.isArray(items)) return []
-  return items
-    .map((item): SearchOption | null => {
-      if (!item || typeof item !== "object") return null
-      const id = Number((item as { id?: unknown }).id)
-      const raw = item as {
-        name_fr?: unknown
-        nameFr?: unknown
-        name_ar?: unknown
-        nameAr?: unknown
-        full_name?: unknown
-        fullName?: unknown
-      }
-      const label =
-        (typeof raw.name_fr === "string" && raw.name_fr.trim()) ||
-        (typeof raw.nameFr === "string" && raw.nameFr.trim()) ||
-        (typeof raw.name_ar === "string" && raw.name_ar.trim()) ||
-        (typeof raw.nameAr === "string" && raw.nameAr.trim()) ||
-        (typeof raw.full_name === "string" && raw.full_name.trim()) ||
-        (typeof raw.fullName === "string" && raw.fullName.trim()) ||
-        null
-      if (!Number.isInteger(id) || !label) return null
-      return { id, name_fr: label }
-    })
-    .filter((item): item is SearchOption => item !== null)
-}
 
 // ── User list ────────────────────────────────────────────────────────────
 const users = ref<ManageableUser[]>([])
@@ -360,6 +274,51 @@ const showCommuneSelect = computed(
 )
 const needWilayaFirst = computed(() => role.value === "national_admin")
 
+// ── Location state ───────────────────────────────────────────────────────
+const selectedWilayaId = ref<number | null>(null)
+const selectedDairaId = ref<number | null>(null)
+const selectedCommuneId = ref<number | null>(null)
+
+const wilayaRef = ref<InstanceType<typeof LocationSearchSelect> | null>(null)
+const dairaRef = ref<InstanceType<typeof LocationSearchSelect> | null>(null)
+const communeRef = ref<InstanceType<typeof LocationSearchSelect> | null>(null)
+
+const dairaPlaceholder = computed(() =>
+  needWilayaFirst.value && !selectedWilayaId.value
+    ? t("su_select_wilaya_first")
+    : t("su_search_daira"),
+)
+
+const dairaEndpoint = computed(() => (q: string) => {
+  const wilayaParam = selectedWilayaId.value ? `&wilaya_id=${selectedWilayaId.value}` : ""
+  return `/api/dairas?search=${encodeURIComponent(q)}${wilayaParam}`
+})
+
+watch(selectedWilayaId, () => {
+  selectedDairaId.value = null
+  selectedCommuneId.value = null
+  dairaRef.value?.reset()
+  communeRef.value?.reset()
+})
+
+watch(selectedDairaId, () => {
+  selectedCommuneId.value = null
+  communeRef.value?.reset()
+})
+
+watch(targetRole, () => {
+  if (!editingUser.value) {
+    selectedWilayaId.value = null
+    selectedDairaId.value = null
+    selectedCommuneId.value = null
+    wilayaRef.value?.reset()
+    dairaRef.value?.reset()
+    communeRef.value?.reset()
+  }
+})
+
+onMounted(fetchUsers)
+
 // ── Form state ───────────────────────────────────────────────────────────
 const form = ref({ name: "", email: "", phone: "", username: "", password: "" })
 const loading = ref(false)
@@ -388,146 +347,6 @@ function cancelEdit() {
   selectedCommuneId.value = null
   successMsg.value = ""
   errorMsg.value = ""
-}
-
-// ── Location state ───────────────────────────────────────────────────────
-const wilayaQuery = ref("")
-const wilayaOptions = ref<SearchOption[]>([])
-const selectedWilayaId = ref<number | null>(null)
-const dairaQuery = ref("")
-const dairaOptions = ref<SearchOption[]>([])
-const selectedDairaId = ref<number | null>(null)
-const communeQuery = ref("")
-const communeOptions = ref<SearchOption[]>([])
-const selectedCommuneId = ref<number | null>(null)
-
-const wilayaInputRef = ref<HTMLInputElement | null>(null)
-const dairaInputRef = ref<HTMLInputElement | null>(null)
-const communeInputRef = ref<HTMLInputElement | null>(null)
-const rootRef = ref<HTMLElement | null>(null)
-
-const positionTick = ref(0)
-function updatePositions() {
-  positionTick.value++
-}
-function getDropdownStyle(el: HTMLInputElement | null): Record<string, string> | null {
-  void positionTick.value
-  if (!el) return null
-  const rect = el.getBoundingClientRect()
-  return {
-    position: "fixed",
-    top: `${rect.bottom + 2}px`,
-    left: `${rect.left}px`,
-    width: `${rect.width}px`,
-  }
-}
-const wilayaDropdownStyle = computed(() => getDropdownStyle(wilayaInputRef.value))
-const dairaDropdownStyle = computed(() => getDropdownStyle(dairaInputRef.value))
-const communeDropdownStyle = computed(() => getDropdownStyle(communeInputRef.value))
-
-onMounted(() => {
-  window.addEventListener("resize", updatePositions)
-  const main = rootRef.value?.closest<HTMLElement>(".settings-main")
-  if (main) main.addEventListener("scroll", updatePositions)
-  fetchUsers()
-})
-onUnmounted(() => {
-  window.removeEventListener("resize", updatePositions)
-  const main = rootRef.value?.closest<HTMLElement>(".settings-main")
-  if (main) main.removeEventListener("scroll", updatePositions)
-  wilayaSearch.cleanup()
-  dairaSearch.cleanup()
-  communeSearch.cleanup()
-})
-
-const dairaPlaceholder = computed(() =>
-  needWilayaFirst.value && !selectedWilayaId.value
-    ? t("su_select_wilaya_first")
-    : t("su_search_daira"),
-)
-
-watch(targetRole, () => {
-  wilayaSearch.cleanup()
-  dairaSearch.cleanup()
-  communeSearch.cleanup()
-  if (!editingUser.value) {
-    wilayaQuery.value = ""
-    selectedWilayaId.value = null
-    wilayaOptions.value = []
-    dairaQuery.value = ""
-    selectedDairaId.value = null
-    dairaOptions.value = []
-    communeQuery.value = ""
-    selectedCommuneId.value = null
-    communeOptions.value = []
-  }
-})
-
-// ── Location loaders ─────────────────────────────────────────────────────
-function createDebouncedSearch(fetchFn: (q: string) => Promise<void>, label: string) {
-  let timer: ReturnType<typeof setTimeout> | null = null
-  const run = (q: string) => {
-    if (timer) clearTimeout(timer)
-    timer = setTimeout(async () => {
-      try {
-        await fetchFn(q)
-      } catch (e) {
-        debugWarn(`[SettingsUsers] ${label} failed:`, e)
-      }
-    }, LOCATION_SEARCH_DEBOUNCE_MS)
-  }
-  return {
-    run,
-    cleanup: () => {
-      if (timer) clearTimeout(timer)
-    },
-  }
-}
-
-const wilayaSearch = createDebouncedSearch(async (q) => {
-  const res = await apiFetch(`/api/wilayas?search=${encodeURIComponent(q)}`)
-  wilayaOptions.value = extractSearchOptions(await res.json())
-}, "fetchWilayas")
-
-const dairaSearch = createDebouncedSearch(async (q) => {
-  if (needWilayaFirst.value && !selectedWilayaId.value) return
-  const wilayaParam = selectedWilayaId.value ? `&wilaya_id=${selectedWilayaId.value}` : ""
-  const res = await apiFetch(`/api/dairas?search=${encodeURIComponent(q)}${wilayaParam}`)
-  dairaOptions.value = extractSearchOptions(await res.json())
-}, "fetchDairas")
-
-const communeSearch = createDebouncedSearch(async (q) => {
-  const res = await apiFetch(`/api/communes?search=${encodeURIComponent(q)}`)
-  communeOptions.value = extractSearchOptions(await res.json())
-}, "fetchCommunes")
-
-watch(wilayaQuery, (q) => {
-  wilayaSearch.run(q ?? "")
-})
-watch(dairaQuery, (q) => {
-  dairaSearch.run(q ?? "")
-})
-watch(communeQuery, (q) => {
-  communeSearch.run(q ?? "")
-})
-
-function selectWilaya(w: { id: number; name_fr: string }) {
-  selectedWilayaId.value = w.id
-  wilayaQuery.value = w.name_fr
-  wilayaOptions.value = []
-  dairaQuery.value = ""
-  selectedDairaId.value = null
-  dairaOptions.value = []
-}
-function selectDaira(d: { id: number; name_fr: string }) {
-  selectedDairaId.value = d.id
-  dairaQuery.value = d.name_fr
-  dairaOptions.value = []
-}
-function selectCommune(c: { id: number; name_fr: string }) {
-  selectedCommuneId.value = c.id
-  communeQuery.value = c.name_fr
-  communeOptions.value = []
 }
 
 // ── Validation ───────────────────────────────────────────────────────────
@@ -609,11 +428,8 @@ async function submit() {
         successMsg.value = t("su_success")
         showToast(successMsg.value, "success")
         form.value = { name: "", email: "", phone: "", username: "", password: "" }
-        wilayaQuery.value = ""
         selectedWilayaId.value = null
-        dairaQuery.value = ""
         selectedDairaId.value = null
-        communeQuery.value = ""
         selectedCommuneId.value = null
         await fetchUsers()
       } else {
@@ -724,29 +540,6 @@ async function submit() {
 .su-select {
   appearance: none;
   cursor: pointer;
-}
-.su-search-wrap {
-  position: relative;
-}
-.su-dropdown {
-  background: var(--modal-bg, #1a2035);
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.15));
-  border-radius: 8px;
-  max-height: 180px;
-  overflow-y: auto;
-  z-index: 10001;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
-}
-.su-dropdown-item {
-  padding: 9px 14px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.su-dropdown-item:hover {
-  background: var(--glass-bg-hover, rgba(255, 255, 255, 0.07));
-  color: var(--text-primary);
 }
 .su-form-actions {
   display: flex;

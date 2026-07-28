@@ -5,6 +5,7 @@ import maplibregl from "maplibre-gl"
 import { showToast } from "../lib/toast"
 import { escapeHtml } from "../utils/sanitize"
 import { useAppStore } from "../stores/appStore"
+import { t } from "../i18n"
 
 const CTX_MENU_WIDTH = 180
 const CTX_MENU_HEIGHT = 100
@@ -25,10 +26,10 @@ export function addBoundaryClickEvents(map: maplibregl.Map): void {
   store.boundaryEventsRegistered = true
 
   map.on("click", "nars-boundaries", (e: maplibregl.MapLayerMouseEvent) => {
-    const name = escapeHtml(e.features?.[0]?.properties?.communeName || "Commune")
+    const name = escapeHtml(e.features?.[0]?.properties?.communeName || t("map_commune_label"))
     new maplibregl.Popup({ closeButton: true, closeOnClick: true })
       .setLngLat(e.lngLat)
-      .setHTML(`<strong>${name}</strong><br><small>Commune Boundary</small>`)
+      .setHTML(`<strong>${name}</strong><br><small>${t("map_commune_boundary")}</small>`)
       .addTo(map)
   })
 
@@ -46,7 +47,7 @@ export function addBoundaryClickEvents(map: maplibregl.Map): void {
     showBoundaryContextMenu(
       e.point.x,
       e.point.y,
-      e.features?.[0]?.properties?.communeName || "Commune",
+      e.features?.[0]?.properties?.communeName || t("map_commune_label"),
     )
   })
 }
@@ -75,7 +76,7 @@ function showBoundaryContextMenu(x: number, y: number, communeName: string): voi
   const copyItem = document.createElement("div")
   copyItem.className = "nars-ctx-item"
   copyItem.dataset.action = "copy-name"
-  copyItem.textContent = "\uD83D\uDCCB Copy Name"
+  copyItem.textContent = "\uD83D\uDCCB " + t("map_copy_name")
   menu.appendChild(copyItem)
 
   document.body.appendChild(menu)
@@ -98,8 +99,8 @@ function showBoundaryContextMenu(x: number, y: number, communeName: string): voi
   copyItem.onclick = (e) => {
     e.stopPropagation()
     navigator.clipboard.writeText(communeName).then(
-      () => showToast(`Copied: ${communeName}`, "success"),
-      () => showToast("Failed to copy to clipboard", "error"),
+      () => showToast(t("map_copied_name", { name: communeName }), "success"),
+      () => showToast(t("map_copy_failed"), "error"),
     )
     hide()
   }

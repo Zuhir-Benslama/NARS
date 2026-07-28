@@ -13,8 +13,6 @@ namespace NarsApi.Tests;
 
 public class RefreshTokenServiceTests
 {
-    private static readonly Guid UserId = Guid.NewGuid();
-
     private static AppDbContext CreateDb() => CreateInMemoryDb("RefreshTokenTest");
 
     private static Mock<IJwtService> CreateJwtMock()
@@ -32,10 +30,10 @@ public class RefreshTokenServiceTests
         Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
 
     /// <summary>
-    /// A testable subclass that replaces the PostgreSQL-specific FOR UPDATE SKIP LOCKED
-    /// query with a standard LINQ query usable with the InMemory provider.
+    /// A testable subclass that replaces PostgreSQL-specific queries (FOR UPDATE SKIP LOCKED,
+    /// ExecuteUpdateAsync) with standard LINQ equivalents usable with the InMemory provider.
     ///
-    /// This means unit tests exercise different code paths than production.
+    /// This means unit tests exercise slightly different code paths than production.
     /// Integration tests (AuthControllerIntegrationTests, FeatureStatsServiceTests, etc.)
     /// cover the real PostgreSQL code paths via Testcontainers.
     /// </summary>

@@ -45,9 +45,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, watch, onMounted, onUnmounted } from "vue"
+import { ref, computed, nextTick, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useAppStore } from "../stores/appStore"
+import { useWindowKeydown } from "../composables/useWindowKeydown"
 import { apiFetch } from "../api"
 import { getLoginPath } from "../config"
 import { showToast } from "../lib/toast"
@@ -104,8 +105,9 @@ function onWindowKeydown(e: KeyboardEvent) {
     closeDropdown()
   }
 }
-onMounted(() => window.addEventListener("keydown", onWindowKeydown))
-onUnmounted(() => window.removeEventListener("keydown", onWindowKeydown))
+useWindowKeydown({
+  Escape: (e) => { if (dropdownOpen.value) onWindowKeydown(e) },
+})
 
 async function onLogout() {
   try {

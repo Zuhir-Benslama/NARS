@@ -30,6 +30,7 @@ vi.mock("../../utils/debug", () => ({
 }))
 
 vi.mock("./road-graph", () => ({
+  CONNECT_M: 30,
   buildConnectionGraph: mockBuildConnectionGraph,
   dm: vi.fn(
     (a, b) =>
@@ -64,6 +65,7 @@ function makeRoad(id: string, dbId: string, coords: { lat: number; lng: number }
       label: "",
       decisionNumber: "",
       decisionDate: "",
+      roadTypeKey: "street",
       coordinates: coords,
     },
   }

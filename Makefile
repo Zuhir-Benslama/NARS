@@ -23,6 +23,7 @@ INGRESS_NGINX_VERSION ?= v1.12.0
 METRICS_SERVER_VERSION ?= v0.7.2
 LOCAL_PATH_PROVISIONER_VERSION ?= v0.0.30
 YAMLLINT_IMAGE     ?= cytopia/yamllint:1.36.0
+OBSERVABILITY_NAMESPACE ?= observability
 POSTGIS_GET_POD_CMD = $(KUBECTL) get pod -n "$(NAMESPACE)" -l app.kubernetes.io/name=postgis -o jsonpath='{.items[0].metadata.name}' 2>/dev/null
 
 # ─── Secrets ──────────────────────────────────────────────────
@@ -749,11 +750,15 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 
 .PHONY: kustomize-set-image-tag
 kustomize-set-image-tag: ## Pin all kustomize image tags to IMAGE_TAG (e.g. IMAGE_TAG=abc1234)
+	@if [ -z "$(IMAGE_TAG)" ]; then \
+		echo "✖ IMAGE_TAG is empty — specify a tag (e.g. IMAGE_TAG=abc1234)"; \
+		exit 1; \
+	fi
 	@if echo "$(IMAGE_TAG)" | grep -qE '[^a-zA-Z0-9._-]'; then \
 		echo "✖ IMAGE_TAG='$(IMAGE_TAG)' contains invalid characters (only alphanumeric, dots, hyphens, underscores allowed)"; \
 		exit 1; \
 	fi
-	@if echo "$(IMAGE_TAG)" | grep -qi "latest"; then \
+	@if echo "$(IMAGE_TAG)" | grep -qi "^latest$$"; then \
 		echo "  ⚠ IMAGE_TAG=$(IMAGE_TAG) is 'latest' — not pinning. Set IMAGE_TAG=<commit-sha> for reproducible deployments."; \
 	else \
 		echo "→ Pinning kustomize image tags to $(IMAGE_TAG)..."; \
@@ -885,8 +890,6 @@ postgis-pv-fix: ## Fix postgis PV permissions inside kind container (rootless Do
 
 # ─── Observability (Grafana LGTM + OTel) ─────────────────────
 
-OBSERVABILITY_NAMESPACE ?= observability
-
 .PHONY: observability-install
 observability-install: helm-check helm-repos ## Install LGTM stack + OpenTelemetry Collector
 	$(MAKE) observability-namespace
@@ -949,7 +952,7 @@ observability-prometheus-stack: ## Install Prometheus + Grafana + AlertManager
 		--set defaultRules.create=false \
 		--set nodeExporter.enabled=false \
 		--set kubeStateMetrics.enabled=false \
-		--reuse-values --timeout 10m
+		--timeout 10m
 
 .PHONY: observability-loki
 observability-loki: ## Install Loki (logs)
@@ -978,7 +981,7 @@ observability-loki: ## Install Loki (logs)
 		--set test.enabled=false \
 		--set monitoring.lokiCanary.enabled=false \
 		--set monitoring.selfMonitoring.enabled=false \
-		--reuse-values --timeout 10m
+		--timeout 10m
 
 .PHONY: observability-tempo
 observability-tempo: ## Install Tempo (traces)
@@ -1000,7 +1003,7 @@ observability-tempo: ## Install Tempo (traces)
 		--set tempo.livenessProbe.failureThreshold=10 \
 		--set memBallastSizeMbs=128 \
 		--set test.enabled=false \
-		--reuse-values --timeout 10m
+		--timeout 10m
 
 .PHONY: observability-otel-collector
 observability-otel-collector: ## Install OpenTelemetry Collector
@@ -1008,7 +1011,7 @@ observability-otel-collector: ## Install OpenTelemetry Collector
 	@helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
 		--namespace $(OBSERVABILITY_NAMESPACE) \
 		--values $(K8S_DIR)/helm-values/opentelemetry-collector.yaml \
-		--reuse-values --timeout 10m
+		--timeout 10m
 
 .PHONY: observability-servicemonitor
 observability-servicemonitor: ## Apply OTel metrics Service + ServiceMonitor (requires prometheus CRDs)
@@ -1067,7 +1070,7 @@ infra-lint-shell: ## Shell-check nars-infra/scripts/*.sh
 		shellcheck nars-infra/scripts/*.sh
 	else
 		docker run --rm -v "$$(pwd):/mnt" koalaman/shellcheck:stable \
-			nars-infra/scripts/*.sh
+			/mnt/nars-infra/scripts/*.sh
 	fi
 
 .PHONY: infra-lint-docker
@@ -1088,7 +1091,7 @@ infra-lint-yaml: ## Lint k8s YAML with yamllint (uses .yamllint.yaml config)
 		yamllint -c nars-infra/.yamllint.yaml nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml
 	else
 		docker run --rm -v "$$(pwd):/mnt" $(YAMLLINT_IMAGE) \
-			-c nars-infra/.yamllint.yaml nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml
+			-c /mnt/nars-infra/.yamllint.yaml /mnt/nars-infra/k8s/*.yaml /mnt/nars-infra/k8s/helm-values/*.yaml
 	fi
 
 # ─── Docker Images ───────────────────────────────────────────
@@ -1099,8 +1102,8 @@ IMAGE_TAG ?= latest
 
 .PHONY: images-build
 images-build: ## Build all Docker images
-	@if echo "$(IMAGE_TAG)" | grep -qi "latest"; then \
-		echo "  ⚠ IMAGE_TAG=$(IMAGE_TAG) — set IMAGE_TAG=<commit-sha> for CI/CD builds"; \
+	@if echo "$(IMAGE_TAG)" | grep -qi "^latest$$"; then \
+		echo "  ⚠ IMAGE_TAG=latest — set IMAGE_TAG=<commit-sha> for CI/CD builds"; \
 	fi
 	@echo "→ Building images..."
 	$(MAKE) _build-nars-api
@@ -1135,7 +1138,7 @@ _build-nars-backup:
 
 .PHONY: images-push
 images-push: ## Push all Docker images to registry
-	@if echo "$(IMAGE_TAG)" | grep -qi "latest"; then \
+	@if echo "$(IMAGE_TAG)" | grep -qi "^latest$$"; then \
 		echo "  ⚠ Pushing 'latest' tag — set IMAGE_TAG=<commit-sha> for CI/CD builds"; \
 	fi
 	@	for img in $(REGISTRY_IMAGES); do
@@ -1146,7 +1149,7 @@ images-push: ## Push all Docker images to registry
 
 .PHONY: images-load
 images-load: ## Load locally built Docker images into the kind cluster
-	@if echo "$(IMAGE_TAG)" | grep -qi "latest"; then \
+	@if echo "$(IMAGE_TAG)" | grep -qi "^latest$$"; then \
 		echo "  ⚠ Loading 'latest' tag — set IMAGE_TAG=<commit-sha> for CI/CD builds"; \
 	fi
 	@for img in $(REGISTRY_IMAGES); do
