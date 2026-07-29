@@ -123,10 +123,13 @@ public class LogsController(IErrorLogService errorLogService, ILogger<LogsContro
     /// </summary>
     private static string SanitizeLogField(string value, int maxLen)
     {
-        if (string.IsNullOrEmpty(value)) return value;
+        if (string.IsNullOrEmpty(value))
+        {
+            return value;
+        }
 
         Span<char> buffer = stackalloc char[value.Length];
-        int written = 0;
+        var written = 0;
         foreach (var c in value)
         {
             if (c is '\n' or '\r' or '\t' || !char.IsControl(c))

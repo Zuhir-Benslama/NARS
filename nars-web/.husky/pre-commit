@@ -1,0 +1,1 @@
+npx --prefix "$(dirname "$0")/.." lint-staged

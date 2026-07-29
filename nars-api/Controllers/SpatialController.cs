@@ -29,7 +29,10 @@ public class SpatialController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetRoadSide([FromBody] RoadSideRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
+        if (body is null)
+        {
+            return Problem(detail: "Request body is required.", statusCode: 400);
+        }
 
         var road = await roadQuery.GetUserRoadByIdAsync(body.RoadId, RequiredCurrentUserId, cancellationToken);
 

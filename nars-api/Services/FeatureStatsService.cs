@@ -27,9 +27,16 @@ public class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactory) : IF
         foreach (var type in _featureTypes)
         {
             var descriptor = FeatureTypeRegistry.GetDescriptor(type);
-            if (descriptor is null) continue;
+            if (descriptor is null)
+            {
+                continue;
+            }
 
-            if (sb.Length > 0) sb.AppendLine(" UNION ALL");
+            if (sb.Length > 0)
+            {
+                sb.AppendLine(" UNION ALL");
+            }
+
             sb.Append($"SELECT @t{paramIndex} AS Type, COUNT(*)::bigint AS Count FROM {descriptor.TableName} WHERE user_id = @u{paramIndex}");
             paramIndex++;
         }
@@ -73,9 +80,16 @@ public class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactory) : IF
         foreach (var type in _featureTypes)
         {
             var descriptor = FeatureTypeRegistry.GetDescriptor(type);
-            if (descriptor is null) continue;
+            if (descriptor is null)
+            {
+                continue;
+            }
 
-            if (sb.Length > 0) sb.AppendLine(" UNION ALL");
+            if (sb.Length > 0)
+            {
+                sb.AppendLine(" UNION ALL");
+            }
+
             sb.Append($"SELECT user_id, @tp{paramIndex} AS Type, COUNT(*)::bigint AS Count FROM {descriptor.TableName} WHERE user_id = ANY(@u{paramIndex}) GROUP BY user_id");
             paramIndex++;
         }

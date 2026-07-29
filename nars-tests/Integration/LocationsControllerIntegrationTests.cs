@@ -12,15 +12,10 @@ using Xunit;
 namespace NarsApi.Tests.Integration;
 
 [Collection(PostgreSqlCollection.CollectionName)]
-public class LocationsControllerIntegrationTests : IAsyncLifetime
+public class LocationsControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsyncLifetime
 {
-    private readonly NarsDatabaseFixture _fixture;
+    private readonly NarsDatabaseFixture _fixture = fixture;
     private AppDbContext _db = null!;
-
-    public LocationsControllerIntegrationTests(NarsDatabaseFixture fixture)
-    {
-        _fixture = fixture;
-    }
 
     public async Task InitializeAsync()
     {

@@ -7,23 +7,15 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public class ValidationService : IValidationService
+public class ValidationService(AppDbContext db) : IValidationService
 {
-    private readonly AppDbContext _db;
-    private readonly string _roadTable;
-    private readonly string _areaTable;
-    private readonly string _districtTable;
-
-    public ValidationService(AppDbContext db)
-    {
-        _db = db;
-        _roadTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.Road)?.TableName
+    private readonly AppDbContext _db = db;
+    private readonly string _roadTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.Road)?.TableName
             ?? throw new InvalidOperationException("FeatureTypeRegistry missing Road descriptor");
-        _areaTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.Area)?.TableName
+    private readonly string _areaTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.Area)?.TableName
             ?? throw new InvalidOperationException("FeatureTypeRegistry missing Area descriptor");
-        _districtTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.District)?.TableName
+    private readonly string _districtTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.District)?.TableName
             ?? throw new InvalidOperationException("FeatureTypeRegistry missing District descriptor");
-    }
 
     /// <summary>
     /// Executes a raw SQL scalar query with strongly-named parameters.

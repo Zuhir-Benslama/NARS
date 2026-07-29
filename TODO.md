@@ -1,18 +1,19 @@
 # TODO
 
-## nars-tests
-
-### High
-
-- [ ] **`BackgroundQueueProcessorTests` — 4 tests with no assertions** (`ProcessesQueuedWorkItem`, `ContinuesAfterWorkItemThrows`, `StopAsync_CompletesGracefully`, `DisposeAsync_DisposesTokenSource`) rely on `TaskCompletionSource.WaitAsync` timeout or absence of exception as implicit pass. Add explicit `Assert` calls or replace with observable side effects. (`BackgroundQueueProcessorTests.cs:114,132,154,165`)
+## nars-web
 
 ### Medium
 
-- [ ] **Undisposed `AppDbContext` in controller tests** — `CreateController()` returns a context that ~30 callers across `FeaturesControllerTests`, `ValidationControllerTests`, and `LocationsControllerTests` discard with `_` instead of `using`/`Dispose`. InMemory EF Core has minimal resources, but the pattern is inconsistent with `RefreshTokenServiceTests` which disposes correctly.
-- [ ] **`ScatteredAreaServiceTests.RefreshAsync_DbFailure_SetsLastError` fragile error path** — Relies on InMemory EF Core lacking raw SQL support to trigger error handling. If InMemory ever gains SQL support, the test silently passes without exercising the error path. (`ScatteredAreaServiceTests.cs:27`)
-- [ ] **`RefreshTokenServiceTests` production-vs-test code path divergence** — `TestableRefreshTokenService` replaces PostgreSQL `FOR UPDATE SKIP LOCKED` with standard LINQ. Unit tests exercise different query paths than production. (`RefreshTokenServiceTests.cs:42-69`)
+- [ ] **npm audit: 7 high-severity vulnerabilities in transitive dev deps** — `brace-expansion` DoS via `openapi-typescript` → `@redocly/openapi-core` → `minimatch` and `@vue/test-utils` → `js-beautify` → `editorconfig` → `minimatch`. Fix requires `--force` which downgrades `openapi-typescript` from v7 to v6. Consider pinning or replacing. (`npm audit --audit-level=high`)
+- [ ] **Husky installed but not configured** — `husky` v9.1.7 is in `devDependencies` and `lint-staged` is configured (runs eslint + prettier + stylelint on staged files), but `prepare` script is empty and no `.husky/` directory exists. Set up pre-commit hooks to run lint-staged.
 
 ### Low
 
-- [ ] **`LogsControllerTests.SubmitLogs_MessageTooLong_SkipsEntry` misleading name** — Expects HTTP 400 (batch rejected), name implies skip/204 behavior. Rename or fix expectation. (`LogsControllerTests.cs:183`)
-- [ ] **`static readonly Guid UserId` in `FeaturesControllerTests` and `FieldControllerTests`** — Harmless (xUnit creates new instance per test) but inconsistent with the `using var db = CreateDb()` pattern used elsewhere. (`FeaturesControllerTests.cs:22`, `FieldControllerTests.cs:21`)
+- [ ] **lint-staged runs on `*.{ts,vue}` but not `*.ts` files in `e2e/`** — Playwright test files under `e2e/` are not covered by ESLint or Prettier checks in CI (`npm run lint` only scans `src/`). Add e2e coverage or document as intentional.
+
+## nars-api
+
+### Low
+
+- [ ] **`IDE0330: Use System.Threading.Lock`** — `ScatteredAreaService.cs:18` uses `object` for locking. .NET 10 provides `System.Threading.Lock` for better clarity and potential perf. (`Services/ScatteredAreaService.cs`)
+- [ ] **`IDE0059: Unnecessary assignment** — `AuthController.cs:166` assigns to `wilaya` but never reads it. Dead store. (`Controllers/AuthController.cs`)

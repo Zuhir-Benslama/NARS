@@ -161,12 +161,13 @@ public partial class AuthController(
             communeId = user.CommuneId ?? 0;
         }
 
-        // Load location chain — single JOIN query for commune→daira→wilaya,
-        // or single JOIN for daira→wilaya when no commune is assigned.
-        Models.Wilaya? wilaya = null;
         Models.Daira? daira = null;
         Models.Commune? commune = null;
 
+
+        // Load location chain — single JOIN query for commune→daira→wilaya,
+        // or single JOIN for daira→wilaya when no commune is assigned.
+        Wilaya? wilaya;
         if (communeId > 0)
         {
             var chain = await locationQuery.GetLocationChainAsync(communeId, cancellationToken);

@@ -31,7 +31,8 @@ test.describe("Phase Navigation", () => {
 
     // Seed an area so the phase can advance (navigatePhase requires >0 areas)
     await page.evaluate(() => {
-      const store = (window as unknown as { __TEST__?: { layerStore: { addFeature: Function } } }).__TEST__
+      const store = (window as unknown as { __TEST__?: { layerStore: { addFeature: Function } } })
+        .__TEST__
       store?.layerStore.addFeature("areas", {
         id: "e2e-area-1",
         dbId: "e2e-area-1",

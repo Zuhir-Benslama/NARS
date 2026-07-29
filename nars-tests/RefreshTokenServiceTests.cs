@@ -37,19 +37,13 @@ public class RefreshTokenServiceTests
     /// Integration tests (AuthControllerIntegrationTests, FeatureStatsServiceTests, etc.)
     /// cover the real PostgreSQL code paths via Testcontainers.
     /// </summary>
-    private sealed class TestableRefreshTokenService : RefreshTokenService
+    private sealed class TestableRefreshTokenService(
+        AppDbContext db,
+        IJwtService jwt,
+        IOptions<JwtOptions> jwtOptions,
+        IDateTimeProvider timeProvider) : RefreshTokenService(db, jwt, jwtOptions, timeProvider)
     {
-        private readonly AppDbContext _db;
-
-        public TestableRefreshTokenService(
-            AppDbContext db,
-            IJwtService jwt,
-            IOptions<JwtOptions> jwtOptions,
-            IDateTimeProvider timeProvider)
-            : base(db, jwt, jwtOptions, timeProvider)
-        {
-            _db = db;
-        }
+        private readonly AppDbContext _db = db;
 
         protected override Task<RefreshToken?> FindRefreshTokenByHashAsync(string hash, CancellationToken ct)
             => _db.RefreshTokens
@@ -61,7 +55,10 @@ public class RefreshTokenServiceTests
                 .Where(rt => rt.UserId == userId && !rt.Revoked)
                 .ToListAsync(cancellationToken);
             foreach (var t in tokens)
+            {
                 t.Revoked = true;
+            }
+
             await _db.SaveChangesAsync(cancellationToken);
         }
     }

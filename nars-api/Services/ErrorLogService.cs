@@ -17,7 +17,7 @@ public class ErrorLogService(AppDbContext db, IOptions<LoggingOptions> loggingOp
         var maxSize = loggingOptions.Value.MaxBatchSize;
         if (entries.Count > maxSize)
         {
-            entries = entries.Take(maxSize).ToList();
+            entries = [.. entries.Take(maxSize)];
         }
 
         db.ErrorLogs.AddRange(entries);

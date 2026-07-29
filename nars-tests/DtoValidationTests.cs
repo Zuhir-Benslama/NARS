@@ -28,7 +28,10 @@ public class DtoValidationTests
         foreach (var param in ctor.GetParameters())
         {
             var required = param.GetCustomAttribute<RequiredAttribute>();
-            if (required is null) continue;
+            if (required is null)
+            {
+                continue;
+            }
 
             var value = record!
                 .GetType()

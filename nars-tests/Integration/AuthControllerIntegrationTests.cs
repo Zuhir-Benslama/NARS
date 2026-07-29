@@ -18,15 +18,10 @@ using Xunit;
 namespace NarsApi.Tests.Integration;
 
 [Collection(PostgreSqlCollection.CollectionName)]
-public class AuthControllerIntegrationTests : IAsyncLifetime
+public class AuthControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsyncLifetime
 {
-    private readonly NarsDatabaseFixture _fixture;
+    private readonly NarsDatabaseFixture _fixture = fixture;
     private AppDbContext _db = null!;
-
-    public AuthControllerIntegrationTests(NarsDatabaseFixture fixture)
-    {
-        _fixture = fixture;
-    }
 
     public async Task InitializeAsync()
     {
@@ -46,7 +41,6 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
         await CreateAdminAsync(
             username: "daira_admin_1",
             role: UserRoles.DairaAdmin,
-            password: DefaultPassword,
             dairaId: 1);
 
         var controller = CreateController();
@@ -79,7 +73,6 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
         await CreateAdminAsync(
             username: "daira_admin_1",
             role: UserRoles.DairaAdmin,
-            password: DefaultPassword,
             dairaId: 1);
 
         var first = CreateController();
@@ -123,7 +116,6 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
         await CreateAdminAsync(
             username: "race_admin",
             role: UserRoles.DairaAdmin,
-            password: DefaultPassword,
             dairaId: 1);
 
         // Two independent contexts + controllers simulating concurrent requests
@@ -172,7 +164,6 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
     {
         await CreateCommuneUserAsync(
             username: "signin_user",
-            password: DefaultPassword,
             communeId: 1);
 
         var controller = CreateSignInController();
@@ -190,7 +181,6 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
     {
         await CreateCommuneUserAsync(
             username: "wrong_pass",
-            password: DefaultPassword,
             communeId: 1);
 
         var controller = CreateSignInController();
@@ -208,7 +198,6 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
     {
         var user = await CreateCommuneUserAsync(
             username: "logout_user",
-            password: DefaultPassword,
             communeId: 1);
 
         var signInController = CreateSignInController();
@@ -239,7 +228,6 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
     {
         var user = await CreateCommuneUserAsync(
             username: "current_user",
-            password: DefaultPassword,
             communeId: 1);
 
         var claims = new List<Claim>
@@ -288,7 +276,6 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
     private async Task<User> CreateAdminAsync(
         string username,
         string role,
-        string password,
         int? dairaId = null,
         int? wilayaId = null)
     {
@@ -300,7 +287,7 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
         return user;
     }
 
-    private async Task<User> CreateCommuneUserAsync(string username, string password, int communeId)
+    private async Task<User> CreateCommuneUserAsync(string username, int communeId)
     {
         var user = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: communeId, name: $"User {username}");
         user.Username = username;

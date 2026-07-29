@@ -103,9 +103,7 @@ public class FieldService(
         return (ownerId, communeId);
     }
 
-    public async Task<List<FieldInspectionResponse>> GetInspectionsAsync(Guid featureId, int skip, int take, CancellationToken ct = default)
-    {
-        return await db.Inspections
+    public async Task<List<FieldInspectionResponse>> GetInspectionsAsync(Guid featureId, int skip, int take, CancellationToken ct = default) => await db.Inspections
             .Where(i => i.FeatureId == featureId)
             .OrderByDescending(i => i.CreatedAt)
             .Skip(skip)
@@ -119,7 +117,6 @@ public class FieldService(
                 CreatedAt: i.CreatedAt
             ))
             .ToListAsync(ct);
-    }
 
     public async Task<(Guid OwnerUserId, int? CommuneId)?> GetRoadOwnerAsync(Guid roadId, CancellationToken ct = default)
     {

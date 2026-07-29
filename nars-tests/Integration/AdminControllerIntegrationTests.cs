@@ -16,15 +16,10 @@ using Xunit;
 namespace NarsApi.Tests.Integration;
 
 [Collection(PostgreSqlCollection.CollectionName)]
-public class AdminControllerIntegrationTests : IAsyncLifetime
+public class AdminControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsyncLifetime
 {
-    private readonly NarsDatabaseFixture _fixture;
+    private readonly NarsDatabaseFixture _fixture = fixture;
     private AppDbContext _db = null!;
-
-    public AdminControllerIntegrationTests(NarsDatabaseFixture fixture)
-    {
-        _fixture = fixture;
-    }
 
     public async Task InitializeAsync()
     {
@@ -45,14 +40,11 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
         return new AdminController(new AdminOverviewService(_db, featureStats), Mock.Of<IWebHostEnvironment>());
     }
 
-    private AdminUserController CreateUserManagementController()
-    {
-        return new AdminUserController(
+    private AdminUserController CreateUserManagementController() => new(
             Mock.Of<Microsoft.Extensions.Logging.ILogger<AdminUserController>>(),
             new UserAuthorizationService(_db),
             new UserCreationService(_db),
             Mock.Of<IWebHostEnvironment>());
-    }
 
     // ── CreateAdmin ─────────────────────────────────────────────────────
 
@@ -157,10 +149,8 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
         Assert.IsType<ForbidResult>(result);
     }
 
-    public static TheoryData<string, string> DisallowedRolePairs()
+    public static TheoryData<string, string> DisallowedRolePairs() => new()
     {
-        return new TheoryData<string, string>
-        {
             { UserRoles.NationalAdmin, UserRoles.NationalAdmin },
             { UserRoles.NationalAdmin, UserRoles.DairaAdmin },
             { UserRoles.NationalAdmin, UserRoles.CommuneUser },
@@ -175,7 +165,6 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
             { UserRoles.CommuneUser, UserRoles.WilayaAdmin },
             { UserRoles.CommuneUser, UserRoles.NationalAdmin },
         };
-    }
 
     // ── CommuneUser → FieldWorker ─────────────────────────────────────────────
 
@@ -383,10 +372,7 @@ public class AdminControllerIntegrationTests : IAsyncLifetime
         string role,
         int? communeId = null,
         int? dairaId = null,
-        int? wilayaId = null)
-    {
-        return await SeedData.CreateUserAsync(_db, role, communeId, dairaId, wilayaId, name: $"Creator {Guid.NewGuid().ToString("N")[..8]}");
-    }
+        int? wilayaId = null) => await SeedData.CreateUserAsync(_db, role, communeId, dairaId, wilayaId, name: $"Creator {Guid.NewGuid().ToString("N")[..8]}");
 
     private static void SetAuthenticatedUser(AdminController controller, User user)
     {

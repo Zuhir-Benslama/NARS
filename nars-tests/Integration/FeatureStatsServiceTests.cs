@@ -9,17 +9,12 @@ using Xunit;
 namespace NarsApi.Tests.Integration;
 
 [Collection(PostgreSqlCollection.CollectionName)]
-public class FeatureStatsServiceTests : IAsyncLifetime
+public class FeatureStatsServiceTests(NarsDatabaseFixture fixture) : IAsyncLifetime
 {
-    private readonly NarsDatabaseFixture _fixture;
+    private readonly NarsDatabaseFixture _fixture = fixture;
     private AppDbContext _db = null!;
     private Guid _userId1;
     private Guid _userId2;
-
-    public FeatureStatsServiceTests(NarsDatabaseFixture fixture)
-    {
-        _fixture = fixture;
-    }
 
     public async Task InitializeAsync()
     {

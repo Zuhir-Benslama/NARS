@@ -29,27 +29,48 @@ public class UserAuthorizationService(AppDbContext db) : IUserAuthorizationServi
 
             case (UserRoles.DairaAdmin, UserRoles.CommuneUser):
                 if (!communeId.HasValue)
+                {
                     return Error("commune_id is required when creating a commune_user.");
+                }
+
                 var commune = await db.Communes.FindAsync([communeId.Value], ct);
                 if (commune is null)
+                {
                     return Error("Commune not found.");
+                }
+
                 if (commune.DairaId != callerDairaId)
+                {
                     return Forbid("That commune does not belong to your daira.");
+                }
+
                 return Valid();
 
             case (UserRoles.WilayaAdmin, UserRoles.DairaAdmin):
                 if (!dairaId.HasValue)
+                {
                     return Error("daira_id is required when creating a daira_admin.");
+                }
+
                 var daira = await db.Dairas.FindAsync([dairaId.Value], ct);
                 if (daira is null)
+                {
                     return Error("Daira not found.");
+                }
+
                 if (daira.WilayaId != callerWilayaId)
+                {
                     return Forbid("That daira does not belong to your wilaya.");
+                }
+
                 return Valid();
 
             case (UserRoles.NationalAdmin, UserRoles.WilayaAdmin):
                 if (!wilayaId.HasValue)
+                {
                     return Error("wilaya_id is required when creating a wilaya_admin.");
+                }
+
                 return Valid();
 
             default:
@@ -60,9 +81,7 @@ public class UserAuthorizationService(AppDbContext db) : IUserAuthorizationServi
     public async Task<List<AdminUserSummary>> GetManageableUsersAsync(
         string callerRole, Guid callerUserId, int? communeId, int? dairaId, int? wilayaId,
         int skip = 0, int take = 100,
-        CancellationToken ct = default)
-    {
-        return callerRole switch
+        CancellationToken ct = default) => callerRole switch
         {
             UserRoles.NationalAdmin => await db.Users
                 .Where(u => u.Role == UserRoles.WilayaAdmin)
@@ -98,7 +117,6 @@ public class UserAuthorizationService(AppDbContext db) : IUserAuthorizationServi
 
             _ => [],
         };
-    }
 
     public async Task<User?> FindUserByIdAsync(Guid userId, CancellationToken ct = default)
         => await db.Users.FindAsync([userId], ct);
@@ -109,7 +127,10 @@ public class UserAuthorizationService(AppDbContext db) : IUserAuthorizationServi
     public async Task<bool> DeleteUserAsync(Guid userId, CancellationToken ct = default)
     {
         var user = await db.Users.FindAsync([userId], ct);
-        if (user is null) return false;
+        if (user is null)
+        {
+            return false;
+        }
 
         // Revoke all active refresh tokens.
         var tokens = await db.RefreshTokens

@@ -92,7 +92,9 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
         }
 
         if (_sharedFactory is not null)
+        {
             return _sharedFactory;
+        }
 
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(ConnectionString, o => o.UseNetTopologySuite())
@@ -114,7 +116,10 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
             "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
         ).ToListAsync();
 
-        if (tables.Count == 0) return;
+        if (tables.Count == 0)
+        {
+            return;
+        }
 
         var tableList = string.Join(", ", tables.Select(t => $"\"{t}\""));
 #pragma warning disable EF1002 // Table names are trusted (from information_schema) and double-quoted

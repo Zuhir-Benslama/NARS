@@ -15,13 +15,10 @@ public class ScatteredAreaServiceTests
 {
     private static ScatteredAreaService CreateService(
         IDbContextFactory<AppDbContext>? dbFactory = null,
-        IDateTimeProvider? timeProvider = null)
-    {
-        return new ScatteredAreaService(
+        IDateTimeProvider? timeProvider = null) => new(
             dbFactory ?? Mock.Of<IDbContextFactory<AppDbContext>>(),
             timeProvider ?? Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow),
             Mock.Of<ILogger<ScatteredAreaService>>());
-    }
 
     [Fact]
     public async Task RefreshAsync_DbFailure_SetsLastError()

@@ -20,15 +20,10 @@ namespace NarsApi.Tests.Integration;
 /// Tests spatial validation logic that cannot be tested with InMemory provider.
 /// </summary>
 [Collection(PostgreSqlCollection.CollectionName)]
-public class ValidationControllerIntegrationTests : IAsyncLifetime
+public class ValidationControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsyncLifetime
 {
-    private readonly NarsDatabaseFixture _fixture;
+    private readonly NarsDatabaseFixture _fixture = fixture;
     private AppDbContext _db = null!;
-
-    public ValidationControllerIntegrationTests(NarsDatabaseFixture fixture)
-    {
-        _fixture = fixture;
-    }
 
     public async Task InitializeAsync()
     {

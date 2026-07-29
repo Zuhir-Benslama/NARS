@@ -9,18 +9,18 @@
     "build:deploy": "vue-tsc --noEmit && vite build && rm -rf ../../nars-api/wwwroot/assets && cp -r dist/* ../../nars-api/wwwroot/",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
-    "lint": "eslint src/ --report-unused-disable-directives --max-warnings 0 && prettier --check \"src/**/*.{ts,vue,css}\"",
-    "lint:fix": "eslint src/ --fix",
+    "lint": "eslint src/ e2e/ --report-unused-disable-directives --max-warnings 0 && prettier --check \"src/**/*.{ts,vue,css}\" \"e2e/**/*.ts\"",
+    "lint:fix": "eslint src/ e2e/ --fix",
     "lint:css": "stylelint \"src/**/*.css\"",
     "lint:css:fix": "stylelint --fix \"src/**/*.css\"",
-    "format": "prettier --write \"src/**/*.{ts,vue,css}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,vue,css}\"",
+    "format": "prettier --write \"src/**/*.{ts,vue,css}\" \"e2e/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.{ts,vue,css}\" \"e2e/**/*.ts\"",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test --config=e2e/playwright.config.ts",
     "audit": "npm audit --audit-level=high",
-    "prepare": "",
+    "prepare": "husky",
     "codegen:fetch-spec": "curl -s http://localhost:5000/openapi/v1.json -o api-spec/openapi.json",
     "codegen:types": "openapi-typescript api-spec/openapi.json -o src/api/schema.d.ts",
     "codegen": "npm run codegen:fetch-spec && npm run codegen:types"
@@ -89,6 +89,7 @@
   "overrides": {
     "glob": "^11.0.0",
     "js-yaml": "^4.2.0",
+    "brace-expansion": "^5.0.8",
     "openapi-typescript": {
       "typescript": "^6.0.3"
     }

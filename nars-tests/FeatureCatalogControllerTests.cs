@@ -107,7 +107,7 @@ public class FeatureCatalogControllerTests
         var mock = new Mock<IFeatureStatsService>();
         mock.Setup(s => s.LoadByLayerAsync(
                 userId, FeatureTypes.RoadLayers.Boulevard, 0, It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((new List<FeatureResult>(), 0));
+            .ReturnsAsync(([], 0));
 
         var ctrl = CreateController(featureStatsService: mock.Object, authenticatedUserId: userId);
 

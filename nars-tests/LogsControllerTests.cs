@@ -77,7 +77,7 @@ public class LogsControllerTests
     public async Task SubmitLogs_EmptyLogs_Returns400()
     {
         var ctrl = CreateController();
-        var body = new LogBatch(new List<LogEntry>());
+        var body = new LogBatch([]);
 
         var result = await ctrl.SubmitLogs(body);
 
@@ -105,11 +105,11 @@ public class LogsControllerTests
     {
         var mock = new Mock<IErrorLogService>();
         var ctrl = CreateController(errorLogService: mock.Object, authenticated: true, userId: Guid.NewGuid());
-        var body = new LogBatch(new List<LogEntry>
-        {
+        var body = new LogBatch(
+        [
             new("error", "E001", "Something broke", null, "/page", "GET"),
             new("warn", "W001", "Deprecated usage", null, null, null),
-        });
+        ]);
 
         var result = await ctrl.SubmitLogs(body);
 
@@ -124,12 +124,12 @@ public class LogsControllerTests
     {
         var mock = new Mock<IErrorLogService>();
         var ctrl = CreateController(errorLogService: mock.Object, authenticated: false);
-        var body = new LogBatch(new List<LogEntry>
-        {
+        var body = new LogBatch(
+        [
             new(null, null, "", null, null, null),          // empty message → skip
             new("bogus", null, "bad level", null, null, null), // invalid level → skip
             new("info", null, "valid entry", null, null, null),
-        });
+        ]);
 
         var result = await ctrl.SubmitLogs(body);
 
@@ -143,11 +143,11 @@ public class LogsControllerTests
     public async Task SubmitLogs_AllInvalid_Returns400()
     {
         var ctrl = CreateController();
-        var body = new LogBatch(new List<LogEntry>
-        {
+        var body = new LogBatch(
+        [
             new(null, null, "", null, null, null),
             new("bogus", null, "", null, null, null),
-        });
+        ]);
 
         var result = await ctrl.SubmitLogs(body);
 
@@ -165,10 +165,10 @@ public class LogsControllerTests
             .Returns(Task.CompletedTask);
 
         var ctrl = CreateController(errorLogService: mock.Object, authenticated: false);
-        var body = new LogBatch(new List<LogEntry>
-        {
+        var body = new LogBatch(
+        [
             new("error", "code\x00with\u0007control", "msg", "ctx\u0001value", "http://test.com/p\u0002q", "PO\u0003ST"),
-        });
+        ]);
 
         await ctrl.SubmitLogs(body);
 
@@ -184,10 +184,10 @@ public class LogsControllerTests
     public async Task SubmitLogs_MessageTooLong_RejectsEntry()
     {
         var ctrl = CreateController(logOptions: new LoggingOptions { MaxBatchSize = DefaultMaxBatchSize, MaxEntryLength = 50 });
-        var body = new LogBatch(new List<LogEntry>
-        {
+        var body = new LogBatch(
+        [
             new("error", null, new string('x', 51), null, null, null),
-        });
+        ]);
 
         var result = await ctrl.SubmitLogs(body);
 
@@ -205,10 +205,10 @@ public class LogsControllerTests
             .Returns(Task.CompletedTask);
 
         var ctrl = CreateController(errorLogService: mock.Object);
-        var body = new LogBatch(new List<LogEntry>
-        {
+        var body = new LogBatch(
+        [
             new(null, null, "no level specified", null, null, null),
-        });
+        ]);
 
         await ctrl.SubmitLogs(body);
 
@@ -226,10 +226,10 @@ public class LogsControllerTests
             .Returns(Task.CompletedTask);
 
         var ctrl = CreateController(errorLogService: mock.Object);
-        var body = new LogBatch(new List<LogEntry>
-        {
+        var body = new LogBatch(
+        [
             new("ERROR", null, "upper case level", null, null, null),
-        });
+        ]);
 
         await ctrl.SubmitLogs(body);
 

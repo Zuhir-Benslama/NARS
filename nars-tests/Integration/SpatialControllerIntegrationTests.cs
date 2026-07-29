@@ -15,16 +15,11 @@ using Xunit;
 namespace NarsApi.Tests.Integration;
 
 [Collection(PostgreSqlCollection.CollectionName)]
-public class SpatialControllerIntegrationTests : IAsyncLifetime
+public class SpatialControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsyncLifetime
 {
-    private readonly NarsDatabaseFixture _fixture;
+    private readonly NarsDatabaseFixture _fixture = fixture;
     private AppDbContext _db = null!;
     private Guid _userId;
-
-    public SpatialControllerIntegrationTests(NarsDatabaseFixture fixture)
-    {
-        _fixture = fixture;
-    }
 
     public async Task InitializeAsync()
     {
@@ -127,8 +122,10 @@ public class SpatialControllerIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task RefreshScattered_NoCommuneId_Returns400()
     {
-        var httpContext = new DefaultHttpContext();
-        httpContext.User = AuthTestHelper.CreateClaimsPrincipal(_userId, UserRoles.NationalAdmin, communeId: null);
+        var httpContext = new DefaultHttpContext
+        {
+            User = AuthTestHelper.CreateClaimsPrincipal(_userId, UserRoles.NationalAdmin, communeId: null)
+        };
         var controller = new SpatialController(
             new RoadQueryService(_db),
             Mock.Of<IScatteredAreaService>(),

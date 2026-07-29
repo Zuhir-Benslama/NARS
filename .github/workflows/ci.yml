@@ -1,3 +1,4 @@
+---
 name: CI
 
 on:
@@ -33,7 +34,10 @@ jobs:
         run: dotnet format Workspace.sln --verify-no-changes --no-restore
 
       - name: Run tests
-        run: dotnet test Workspace.sln --no-build --configuration Release --verbosity normal --filter "FullyQualifiedName!~Integration"
+        run: >
+          dotnet test Workspace.sln --no-build --configuration Release
+          --verbosity normal
+          --filter "FullyQualifiedName!~Integration"
 
   infra-lint:
     name: Infra — Shell, Docker & YAML Lint
@@ -45,7 +49,8 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq shellcheck yamllint
-          wget -qO /tmp/hadolint "https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64"
+          wget -qO /tmp/hadolint \
+            "https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64"
           chmod +x /tmp/hadolint
           sudo mv /tmp/hadolint /usr/local/bin/hadolint
 
@@ -57,6 +62,9 @@ jobs:
 
       - name: Lint K8s YAML
         run: make infra-lint-yaml
+
+      - name: Lint Makefile
+        run: make infra-lint-makefile
 
   security-scan:
     name: Security — Gitleaks + Audit
@@ -93,7 +101,11 @@ jobs:
         run: dotnet build Workspace.sln --no-restore --configuration Release
 
       - name: Run integration tests
-        run: dotnet test Workspace.sln --no-build --configuration Release --verbosity normal --filter "FullyQualifiedName~Integration" --logger "trx"
+        run: >
+          dotnet test Workspace.sln --no-build --configuration Release
+          --verbosity normal
+          --filter "FullyQualifiedName~Integration"
+          --logger "trx"
 
       - name: Publish test results
         uses: dorny/test-reporter@v1
@@ -128,9 +140,6 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Format check
-        run: npm run format:check
-
       - name: Run tests (with coverage threshold enforcement)
         run: npm run test:coverage
 
@@ -150,8 +159,15 @@ jobs:
   docker-build:
     name: Build & Push Docker Images
     runs-on: ubuntu-latest
-    needs: [backend-lint, frontend-lint, integration-tests, security-scan, infra-lint]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    needs:
+      - backend-lint
+      - frontend-lint
+      - integration-tests
+      - security-scan
+      - infra-lint
+    if: >
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     steps:
       - uses: actions/checkout@v4
 

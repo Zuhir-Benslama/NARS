@@ -152,22 +152,16 @@ public static class ServiceRegistrationExtensions
         });
     }
 
-    private static void AddNarsHealthChecks(this IServiceCollection services, string connectionString)
-    {
-        services.AddHealthChecks()
+    private static void AddNarsHealthChecks(this IServiceCollection services, string connectionString) => services.AddHealthChecks()
             .AddNarsDatabaseHealthCheck(connectionString);
-    }
 
-    private static void AddNarsAntiforgery(this IServiceCollection services)
-    {
-        services.AddAntiforgery(options =>
-        {
-            options.HeaderName = "X-CSRF-Token";
-            options.Cookie.Name = "X-CSRF-TOKEN-COOKIE";
-            options.Cookie.HttpOnly = false;
-            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-        });
-    }
+    private static void AddNarsAntiforgery(this IServiceCollection services) => services.AddAntiforgery(options =>
+                                                                                     {
+                                                                                         options.HeaderName = "X-CSRF-Token";
+                                                                                         options.Cookie.Name = "X-CSRF-TOKEN-COOKIE";
+                                                                                         options.Cookie.HttpOnly = false;
+                                                                                         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                                                                                     });
 
     private static void AddNarsFormOptions(this IServiceCollection services, IConfiguration config)
     {

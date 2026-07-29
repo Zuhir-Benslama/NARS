@@ -63,7 +63,10 @@ public class FieldController(
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> SubmitInspection([FromBody] FieldInspectRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
+        if (body is null)
+        {
+            return Problem(detail: "Request body is required.", statusCode: 400);
+        }
 
         if (!Guid.TryParse(body.FeatureId, out var featureId))
         {
@@ -142,7 +145,10 @@ public class FieldController(
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> CreateEntranceFromInspection([FromBody] FieldEntranceCreateRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
+        if (body is null)
+        {
+            return Problem(detail: "Request body is required.", statusCode: 400);
+        }
 
         if (!Guid.TryParse(body.RoadId, out var roadId))
         {
@@ -212,12 +218,9 @@ public class FieldController(
         return null;
     }
 
-    private static string ExtractJsonData(JsonNode data)
-    {
-        return data is JsonValue value && value.TryGetValue<string>(out var str)
+    private static string ExtractJsonData(JsonNode data) => data is JsonValue value && value.TryGetValue<string>(out var str)
             ? str
             : data.ToJsonString();
-    }
 
     private static readonly string[] ValidInspectionStatuses = ["good", "issue"];
 

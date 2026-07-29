@@ -40,7 +40,9 @@ test.describe("Map flows — draw, edit, save", () => {
       store.decisionDate = "2025-01-15"
     })
 
-    const saveBtn = page.locator("button:has-text('Save'), button:has-text('Confirm'), .modal-btn-save").first()
+    const saveBtn = page
+      .locator("button:has-text('Save'), button:has-text('Confirm'), .modal-btn-save")
+      .first()
     if (await saveBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await saveBtn.click()
     }

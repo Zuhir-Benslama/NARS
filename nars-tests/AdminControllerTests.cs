@@ -32,7 +32,7 @@ public class AdminControllerTests
     {
         var overview = new Mock<IAdminOverviewService>();
         overview.Setup(s => s.GetNationalOverviewAsync(0, 500, default))
-            .ReturnsAsync((new List<WilayaSummary>(), 0));
+            .ReturnsAsync(([], 0));
         var ctrl = CreateController(overview.Object);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 

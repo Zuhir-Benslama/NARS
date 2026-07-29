@@ -21,16 +21,11 @@ namespace NarsApi.Tests.Integration;
 /// Tests the full CRUD pipeline with spatial data.
 /// </summary>
 [Collection(PostgreSqlCollection.CollectionName)]
-public class FeaturesControllerIntegrationTests : IAsyncLifetime
+public class FeaturesControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsyncLifetime
 {
-    private readonly NarsDatabaseFixture _fixture;
+    private readonly NarsDatabaseFixture _fixture = fixture;
     private AppDbContext _db = null!;
     private Guid _userId;
-
-    public FeaturesControllerIntegrationTests(NarsDatabaseFixture fixture)
-    {
-        _fixture = fixture;
-    }
 
     public async Task InitializeAsync()
     {

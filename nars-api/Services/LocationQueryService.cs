@@ -79,7 +79,11 @@ public class LocationQueryService(IDbContextFactory<AppDbContext> dbFactory) : I
 
     public async Task<Wilaya?> GetWilayaAsync(int? wilayaId, CancellationToken ct = default)
     {
-        if (!wilayaId.HasValue) return null;
+        if (!wilayaId.HasValue)
+        {
+            return null;
+        }
+
         await using var context = await dbFactory.CreateDbContextAsync(ct);
         return await context.Wilayas.FindAsync([wilayaId.Value], ct);
     }

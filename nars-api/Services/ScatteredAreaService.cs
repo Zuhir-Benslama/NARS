@@ -15,13 +15,17 @@ public sealed class ScatteredAreaService(
 {
     private const string DefaultLabel = "Scattered Area";
 
-    private readonly object _errorLock = new();
+    private readonly Lock _errorLock = new();
     private (DateTimeOffset Timestamp, string Message)? _lastError;
-    public (DateTimeOffset Timestamp, string Message)? LastError { get { lock (_errorLock) return _lastError; } }
+    public (DateTimeOffset Timestamp, string Message)? LastError { get { lock (_errorLock) { return _lastError; } } }
 
     public async Task RefreshAsync(Guid userId, int communeId, CancellationToken cancellationToken = default)
     {
-        lock (_errorLock) _lastError = null;
+        lock (_errorLock)
+        {
+            _lastError = null;
+        }
+
         try
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
@@ -113,7 +117,11 @@ public sealed class ScatteredAreaService(
             var errorMessage = ex.InnerException is not null
                 ? $"{ex.Message} → {ex.InnerException.Message}"
                 : ex.Message;
-            lock (_errorLock) _lastError = (timeProvider.UtcNow, errorMessage);
+            lock (_errorLock)
+            {
+                _lastError = (timeProvider.UtcNow, errorMessage);
+            }
+
             logger.LogError(ex, "ScatteredAreaService refresh failed for user {UserId}, commune {CommuneId}", userId, communeId);
         }
     }

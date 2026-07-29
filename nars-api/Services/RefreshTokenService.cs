@@ -66,13 +66,10 @@ public class RefreshTokenService(
         return new RefreshTokenResult(true, null, user.Username, newRaw, newAccessToken, refreshExpiry);
     }
 
-    public virtual async Task RevokeAllUserTokensAsync(Guid userId, CancellationToken cancellationToken = default)
-    {
-        await db.RefreshTokens
+    public virtual async Task RevokeAllUserTokensAsync(Guid userId, CancellationToken cancellationToken = default) => await db.RefreshTokens
             .Where(rt => rt.UserId == userId && !rt.Revoked)
             .ExecuteUpdateAsync(setters =>
                 setters.SetProperty(rt => rt.Revoked, true), cancellationToken);
-    }
 
     public async Task<(string RawToken, string Hash, DateTime ExpiresAt)> IssueRefreshTokenAsync(Guid userId, CancellationToken cancellationToken = default)
     {

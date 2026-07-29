@@ -15,8 +15,5 @@ public class UserProfileService(AppDbContext db) : IUserProfileService
     public Task<bool> IsEmailTakenAsync(string email, CancellationToken ct = default) =>
         db.Users.AnyAsync(u => u.Email == email, ct);
 
-    public async Task UpdateUserAsync(User user, CancellationToken ct = default)
-    {
-        await db.SaveChangesAsync(ct);
-    }
+    public async Task UpdateUserAsync(User user, CancellationToken ct = default) => await db.SaveChangesAsync(ct);
 }

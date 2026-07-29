@@ -44,14 +44,11 @@ public static class AuthTestHelper
 
     public static void SetUser<T>(T controller, Guid userId, string role,
         int? communeId = null, int? dairaId = null, int? wilayaId = null, string? username = null)
-        where T : ControllerBase
-    {
-        controller.ControllerContext = new ControllerContext
+        where T : ControllerBase => controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext
             {
                 User = CreateClaimsPrincipal(userId, role, communeId, dairaId, wilayaId, username ?? "testuser")
             }
         };
-    }
 }

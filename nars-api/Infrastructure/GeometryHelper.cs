@@ -70,7 +70,9 @@ public static class GeometryHelper
         var len2 = Math.Sqrt(v2x * v2x + v2y * v2y);
 
         if (len1 < 1e-10 || len2 < 1e-10)
+        {
             return 0;
+        }
 
         var dot = (v1x * v2x + v1y * v2y) / (len1 * len2);
         return Math.Acos(Math.Clamp(dot, -1.0, 1.0)) * (180.0 / Math.PI);
@@ -95,7 +97,11 @@ public static class GeometryHelper
     {
         for (var i = 0; i < coords.Count; i++)
         {
-            if (i > 0) sb.Append(',');
+            if (i > 0)
+            {
+                sb.Append(',');
+            }
+
             sb.Append(FormatDoubleInvariant(coords[i].Lng));
             sb.Append(' ');
             sb.Append(FormatDoubleInvariant(coords[i].Lat));

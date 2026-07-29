@@ -226,7 +226,7 @@ public class FeaturesControllerTests
     {
         var featureServiceMock = new Mock<IFeatureService>();
         featureServiceMock.Setup(s => s.ClearAllFeaturesAsync(UserId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((2, new List<Guid>()));
+            .ReturnsAsync((2, []));
         using var db = CreateInMemoryDb("FeaturesTest");
         var ctrl = CreateController(db, featureService: featureServiceMock.Object);
 

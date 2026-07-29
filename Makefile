@@ -24,6 +24,7 @@ METRICS_SERVER_VERSION ?= v0.7.2
 LOCAL_PATH_PROVISIONER_VERSION ?= v0.0.30
 YAMLLINT_IMAGE     ?= cytopia/yamllint:1.36.0
 OBSERVABILITY_NAMESPACE ?= observability
+LOG_DIR                ?= /tmp/nars
 POSTGIS_GET_POD_CMD = $(KUBECTL) get pod -n "$(NAMESPACE)" -l app.kubernetes.io/name=postgis -o jsonpath='{.items[0].metadata.name}' 2>/dev/null
 
 # ─── Secrets ──────────────────────────────────────────────────
@@ -138,6 +139,17 @@ cluster-down: proxy-down _pre-cluster-down-backup ## Delete the kind cluster (au
 	@kind delete cluster --name "$(CLUSTER_NAME)" 2>/dev/null || true
 	@docker rm -f kube-proxy 2>/dev/null || true
 	@echo "✓ Cluster deleted (postgis data preserved at $(POSTGRES_DATA_DIR))"
+
+# Shared pg_dump + gzip logic. Expects $$POD and $$PASS to be set in shell scope.
+# SECURITY: Password piped via stdin to avoid exposure in container's process table.
+_pg_dump_cmd = \
+	mkdir -p "$(BACKUP_DIR)"; \
+	TIMESTAMP=$$(date +"%Y%m%d_%H%M%S"); \
+	FILE="$(BACKUP_DIR)/nars_db_$${TIMESTAMP}.sql"; \
+	printf '%s\n' "$$PASS" | \
+		$(KUBECTL) exec -i "$$POD" -n "$(NAMESPACE)" -- \
+		bash -c 'read -r _pw; PGPASSWORD="$$_pw" pg_dump -U postgres -d "$(DB_NAME)" --no-owner' > "$$FILE"; \
+	gzip -f "$$FILE"
 
 # Internal: auto-backup before cluster teardown. Blocks if backup fails.
 .PHONY: _pre-cluster-down-backup
@@ -391,19 +403,6 @@ cluster-start: ## Scale all deployments back to their original replica count
 
 .PHONY: cluster-restart
 cluster-restart: cluster-stop cluster-start ## Stop all pods, then start them again
-
-# ─── Database Backup / Restore ──────────────────────────────
-
-# Shared pg_dump + gzip logic. Expects $$POD and $$PASS to be set in shell scope.
-# SECURITY: Password piped via stdin to avoid exposure in container's process table.
-_pg_dump_cmd = \
-	mkdir -p "$(BACKUP_DIR)"; \
-	TIMESTAMP=$$(date +"%Y%m%d_%H%M%S"); \
-	FILE="$(BACKUP_DIR)/nars_db_$${TIMESTAMP}.sql"; \
-	printf '%s\n' "$$PASS" | \
-		$(KUBECTL) exec -i "$$POD" -n "$(NAMESPACE)" -- \
-		bash -c 'read -r _pw; PGPASSWORD="$$_pw" pg_dump -U postgres -d "$(DB_NAME)" --no-owner' > "$$FILE"; \
-	gzip -f "$$FILE"
 
 .PHONY: db-get-pod
 db-get-pod: ## Get the postgis pod name
@@ -1022,25 +1021,26 @@ observability-servicemonitor: ## Apply OTel metrics Service + ServiceMonitor (re
 
 .PHONY: observability-port-forward
 observability-port-forward: ## Port-forward Grafana, Loki, Tempo (background)
-	@echo "→ Starting observability port-forwards (background)..."
-	@pkill -f "port-forward.*observability.*grafana" 2>/dev/null || true
-	@pkill -f "port-forward.*observability.*loki-gateway" 2>/dev/null || true
-	@pkill -f "port-forward.*observability.*tempo" 2>/dev/null || true
-	@sleep 0.5
-	@nohup $(KUBECTL) port-forward -n $(OBSERVABILITY_NAMESPACE) \
+	@mkdir -p "$(LOG_DIR)"; \
+	echo "→ Starting observability port-forwards (background)..."; \
+	pkill -f "port-forward.*observability.*grafana" 2>/dev/null || true; \
+	pkill -f "port-forward.*observability.*loki-gateway" 2>/dev/null || true; \
+	pkill -f "port-forward.*observability.*tempo" 2>/dev/null || true; \
+	sleep 0.5; \
+	nohup $(KUBECTL) port-forward -n $(OBSERVABILITY_NAMESPACE) \
 		service/prometheus-stack-grafana 3000:3000 \
-		> /tmp/port-forward-grafana.log 2>&1 &
-	@nohup $(KUBECTL) port-forward -n $(OBSERVABILITY_NAMESPACE) \
+		> "$(LOG_DIR)/port-forward-grafana.log" 2>&1 & \
+	nohup $(KUBECTL) port-forward -n $(OBSERVABILITY_NAMESPACE) \
 		service/loki-gateway 3100:80 \
-		> /tmp/port-forward-loki.log 2>&1 &
-	@nohup $(KUBECTL) port-forward -n $(OBSERVABILITY_NAMESPACE) \
+		> "$(LOG_DIR)/port-forward-loki.log" 2>&1 & \
+	nohup $(KUBECTL) port-forward -n $(OBSERVABILITY_NAMESPACE) \
 		service/tempo 3200:3200 \
-		> /tmp/port-forward-tempo.log 2>&1 &
-	@echo "✓ Port-forwards running"
-	@echo "  Grafana: http://localhost:3000 (run \`make grafana-password\` to retrieve credentials)"
-	@echo "  Loki:    http://localhost:3100"
-	@echo "  Tempo:   http://localhost:3200"
-	@echo "  Logs:    tail -f /tmp/port-forward-{grafana,loki,tempo}.log"
+		> "$(LOG_DIR)/port-forward-tempo.log" 2>&1 & \
+	echo "✓ Port-forwards running"; \
+	echo "  Grafana: http://localhost:3000 (run \`make grafana-password\` to retrieve credentials)"; \
+	echo "  Loki:    http://localhost:3100"; \
+	echo "  Tempo:   http://localhost:3200"; \
+	echo "  Logs:    tail -f $(LOG_DIR)/port-forward-{grafana,loki,tempo}.log"
 
 .PHONY: observability-stop
 observability-stop: ## Stop observability port-forwards
@@ -1063,6 +1063,7 @@ infra-lint: ## Run all nars-infra linters (shell, docker, yaml)
 	$(MAKE) infra-lint-shell
 	$(MAKE) infra-lint-docker
 	$(MAKE) infra-lint-yaml
+	$(MAKE) infra-lint-makefile
 
 .PHONY: infra-lint-shell
 infra-lint-shell: ## Shell-check nars-infra/scripts/*.sh
@@ -1093,6 +1094,14 @@ infra-lint-yaml: ## Lint k8s YAML with yamllint (uses .yamllint.yaml config)
 		docker run --rm -v "$$(pwd):/mnt" $(YAMLLINT_IMAGE) \
 			-c /mnt/nars-infra/.yamllint.yaml /mnt/nars-infra/k8s/*.yaml /mnt/nars-infra/k8s/helm-values/*.yaml
 	fi
+
+.PHONY: infra-lint-makefile
+infra-lint-makefile: ## Validate Makefile syntax with dry-run
+	@echo "→ Checking Makefile syntax..."
+	@make -n help > /dev/null 2>&1 && echo "✓ Makefile syntax OK" \
+		|| { echo "✖ Makefile syntax error"; exit 1; }
+	@echo "→ Checking undefined variable references..."
+	@make -Rr --warn-undefined-variables -n help 2>&1 | grep -i 'warning.*undefined' || true
 
 # ─── Docker Images ───────────────────────────────────────────
 

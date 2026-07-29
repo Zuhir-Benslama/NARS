@@ -9,12 +9,9 @@ namespace NarsApi.Tests;
 
 public class BackgroundTaskQueueTests
 {
-    private static BackgroundTaskQueue CreateQueue(int capacity = 10)
-    {
-        return new BackgroundTaskQueue(
+    private static BackgroundTaskQueue CreateQueue(int capacity = 10) => new(
             Options.Create(new BackgroundTaskOptions { Capacity = capacity, GracePeriodSeconds = 5 }),
             Mock.Of<ILogger<BackgroundTaskQueue>>());
-    }
 
     [Fact]
     public async Task DequeueAsync_ReturnsQueuedItem()
@@ -28,13 +25,15 @@ public class BackgroundTaskQueueTests
         Assert.Same(workItem, dequeued);
     }
 
+    private static readonly int[] expected = [0, 1, 2];
+
     [Fact]
     public async Task DequeueAsync_FIFO_Order()
     {
         var queue = CreateQueue();
         var order = new List<int>();
 
-        for (int i = 0; i < 3; i++)
+        for (var i = 0; i < 3; i++)
         {
             var captured = i;
             await queue.QueueBackgroundWorkItemAsync((_, _) =>
@@ -44,13 +43,13 @@ public class BackgroundTaskQueueTests
             });
         }
 
-        for (int i = 0; i < 3; i++)
+        for (var i = 0; i < 3; i++)
         {
             var item = await queue.DequeueAsync(CancellationToken.None);
             await item(Mock.Of<IServiceProvider>(), CancellationToken.None);
         }
 
-        Assert.Equal(new[] { 0, 1, 2 }, order);
+        Assert.Equal(expected, order);
     }
 
     [Fact]

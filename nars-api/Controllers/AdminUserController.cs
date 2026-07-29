@@ -28,7 +28,10 @@ public class AdminUserController(
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateAdmin([FromBody] CreateAdminRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
+        if (body is null)
+        {
+            return Problem(detail: "Request body is required.", statusCode: 400);
+        }
 
         var callerRole = CurrentUserRole;
 
@@ -114,7 +117,10 @@ public class AdminUserController(
         Guid userId, [FromBody] UpdateAdminRequest body,
         CancellationToken cancellationToken = default)
     {
-        if (body is null) return Problem(detail: "Request body is required.", statusCode: 400);
+        if (body is null)
+        {
+            return Problem(detail: "Request body is required.", statusCode: 400);
+        }
 
         var target = await authorizationService.FindUserByIdAsync(userId, cancellationToken);
         if (target is null)
