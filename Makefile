@@ -470,11 +470,11 @@ db-shell: ## Open an interactive psql shell inside the postgis pod
 	@$(KUBECTL) exec -it "$$POD" -n "$(NAMESPACE)" -- psql -U postgres -d "$(DB_NAME)"
 
 .PHONY: db-admin
-db-admin: export NON_INTERACTIVE := 1
-db-admin: export ADMIN_NAME := National Admin
-db-admin: export ADMIN_EMAIL := admin@nars.dz
-db-admin: export ADMIN_PHONE := +213000000000
 db-admin: .env prerequisites ## Create national admin with one-time generated credentials
+	@export NON_INTERACTIVE=1
+	@export ADMIN_NAME="National Admin"
+	@export ADMIN_EMAIL="admin@nars.dz"
+	@export ADMIN_PHONE="+213000000000"
 	@echo ""
 	@echo "→ Generating one-time national admin credentials..."
 	@command -v openssl >/dev/null 2>&1 || { echo "✖ openssl is not installed"; exit 1; }
@@ -1179,3 +1179,13 @@ frontend-update: ## Rebuild nars-vite, load into kind, and rollout restart
 	@$(KUBECTL) rollout restart deployment nars-frontend -n "$(NAMESPACE)"
 	@$(KUBECTL) rollout status deployment nars-frontend -n "$(NAMESPACE)" --timeout=120s
 	@echo "✓ nars-vite rebuilt and deployed"
+
+.PHONY: all
+all: cluster-up ## Bring up the full cluster (default: help)
+
+.PHONY: test
+test: ## Run all tests
+	dotnet test nars-tests/NarsApi.Tests.csproj
+
+.PHONY: clean
+clean: cluster-clean ## Tear down the cluster
