@@ -253,11 +253,16 @@ public static class PipelineExtensions
 
     private static void UseApiEndpoints(WebApplication app)
     {
-        app.MapOpenApi();
-        app.MapScalarApiReference(options =>
+        // OpenAPI/Scalar are development tooling. Never expose the API surface
+        // in production — discovery aids an attacker's reconnaissance.
+        if (app.Environment.IsDevelopment())
         {
-            options.WithTheme(ScalarTheme.Purple);
-        });
+            app.MapOpenApi();
+            app.MapScalarApiReference(options =>
+            {
+                options.WithTheme(ScalarTheme.Purple);
+            });
+        }
 
         app.MapControllers();
         app.MapHealthChecks("/health");

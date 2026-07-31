@@ -43,7 +43,9 @@ export default defineConfig(({ command, mode }) => {
     build: {
       outDir: "dist",
       emptyOutDir: true,
-      sourcemap: true,
+      // Source maps only for non-production builds — shipping maps publicly
+      // exposes the full original TS/Vue source. Keep them for dev/staging.
+      sourcemap: mode !== "production",
       // Maplibre GL JS is ~1MB - separated into its own chunk
       chunkSizeWarningLimit: 1500,
       rollupOptions: {

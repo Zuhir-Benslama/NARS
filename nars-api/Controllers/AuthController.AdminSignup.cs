@@ -48,7 +48,7 @@ public partial class AuthController
     {
         // Require a custom header to prevent automated scripts from targeting
         // this unauthenticated endpoint. The SPA sets this header on the form.
-        if (signupToken != adminSignupOptions.Value.SignupToken)
+        if (!TokenMatches(signupToken, adminSignupOptions.Value.SignupToken))
         {
             return Problem(detail: "Invalid request.", statusCode: 403);
         }
@@ -134,4 +134,16 @@ public partial class AuthController
         return StatusCode(201, ApiResponse.Ok($"{body.Role} account created successfully."));
     }
 
+    /// <summary>
+    /// Constant-time comparison of the signup token. Both inputs are SHA-256
+    /// hashed first so token length is not revealed via timing.
+    /// </summary>
+    private static bool TokenMatches(string? provided, string expected)
+    {
+        var providedHash = System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(provided ?? string.Empty));
+        var expectedHash = System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(expected));
+        return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(providedHash, expectedHash);
+    }
 }
