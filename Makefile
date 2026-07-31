@@ -64,7 +64,7 @@ export POSTGRES_PASSWORD JWT_SECRET GPG_PASSPHRASE GRAFANA_PASSWORD
 
 .PHONY: help
 help: ## Show available targets
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
+	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| sort \
 		| awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-28s\033[0m %s\n", $$1, $$2}'
 
@@ -733,7 +733,7 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 	@if [ -n "$(DOCKER_TOKEN)" ]; then \
 		echo "→ Creating 'regcred'..."; \
 		TMPDIR_REGCRED=$$(mktemp -d); \
-		trap 'rm -rf "$$TMPDIR_REGCRED"' EXIT; \
+		trap 'rm -rf "$$tmpdir" "$$TMPDIR_REGCRED"' EXIT; \
 		printf '%s' "$$DOCKER_TOKEN" > "$$TMPDIR_REGCRED/docker_password"; \
 		printf '%s' "$$DOCKER_USERNAME" > "$$TMPDIR_REGCRED/docker_username"; \
 		$(KUBECTL) create secret docker-registry regcred -n "$(NAMESPACE)" \
@@ -1101,7 +1101,9 @@ infra-lint-makefile: ## Validate Makefile syntax with dry-run
 	@make -n help > /dev/null 2>&1 && echo "✓ Makefile syntax OK" \
 		|| { echo "✖ Makefile syntax error"; exit 1; }
 	@echo "→ Checking undefined variable references..."
-	@make -Rr --warn-undefined-variables -n help 2>&1 | grep -i 'warning.*undefined' || true
+	# GNUMAKEFLAGS is a GNU Make internal variable spuriously flagged by
+	# --warn-undefined-variables -Rr (make 4.4+); filter it out.
+	@make -Rr --warn-undefined-variables -n help 2>&1 | grep -i 'warning.*undefined' | grep -v GNUMAKEFLAGS || true
 
 # ─── Docker Images ───────────────────────────────────────────
 
@@ -1188,4 +1190,4 @@ test: ## Run all tests
 	dotnet test nars-tests/NarsApi.Tests.csproj
 
 .PHONY: clean
-clean: cluster-clean ## Tear down the cluster
+clean: cluster-down ## Tear down the cluster (data preserved — use 'cluster-clean' to also wipe data)
