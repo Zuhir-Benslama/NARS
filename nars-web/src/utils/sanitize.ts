@@ -10,11 +10,17 @@ let DOMPurifyInstance: ReturnType<typeof createDOMPurify>
 if (typeof window !== "undefined") {
   DOMPurifyInstance = createDOMPurify(window)
 } else {
-  // Fallback for SSR/test environments — strip all HTML tags
-  // using DOMPurify's own logic rather than a bypassable regex.
+  // Fallback for SSR/test environments — strip all HTML tags without a DOM.
+  // Removes script/style blocks first (their content may contain ">"), then
+  // strips remaining tags. Requiring a tag name after "<" avoids treating a
+  // lone ">" in text as markup, which the naive `<[^>]*>` regex mishandled.
   DOMPurifyInstance = {
     sanitize: (dirty: string) => {
-      return dirty.replace(/<[^>]*>/g, "").replace(/\0/g, "")
+      let out = dirty.replace(/\0/g, "")
+      out = out.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "")
+      out = out.replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, "")
+      out = out.replace(/<\/?[a-z][^>]*>/gi, "")
+      return out
     },
   } as ReturnType<typeof createDOMPurify>
 }

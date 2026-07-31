@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest"
+import { describe, it, expect, beforeEach, vi } from "vitest"
 import {
   pointInMunicipalLimit,
   pointInScatteredArea,
@@ -8,8 +8,14 @@ import {
   closeRing,
   haversineDistance,
   computeCircleRadius,
+  computeCircleCenter,
   makeGeoJsonFeature,
+  resetGeometryState,
+  displayCommuneBoundary,
+  refreshScatteredAreas,
 } from "./geometry"
+import { mockApiFetch, createMockSuccessResponse } from "../../test/setup"
+import { _setCtx } from "../core/state"
 
 const TOLERANCE_M = 50
 
@@ -239,6 +245,177 @@ describe("geometry", () => {
       expect(feature.type).toBe("Feature")
       expect(feature.geometry).toEqual(geometry)
       expect(feature.properties).toEqual(properties)
+    })
+  })
+
+  describe("computeCircleCenter", () => {
+    it("averages the ring coordinates", () => {
+      const coords: [number, number][] = [
+        [0, 10],
+        [10, 0],
+        [10, 20],
+        [0, 10],
+      ]
+      expect(computeCircleCenter(coords)).toEqual({ lat: 10, lng: 5 })
+    })
+  })
+
+  describe("displayCommuneBoundary", () => {
+    const mockMap = {
+      fitBounds: vi.fn(),
+      getCanvas: vi.fn(() => ({ style: { cursor: "" } })),
+    }
+    const boundariesSource = { setData: vi.fn() }
+
+    beforeEach(() => {
+      mockApiFetch.mockReset()
+      mockMap.fitBounds.mockReset()
+      boundariesSource.setData.mockReset()
+      _setCtx({ map: mockMap as any, boundariesSource: boundariesSource as any })
+      resetGeometryState()
+    })
+
+    it("loads a Polygon boundary, updates the source and fits bounds", async () => {
+      const geometry = {
+        type: "Polygon",
+        coordinates: [
+          [
+            [36.6, 3.1],
+            [36.6, 3.2],
+            [36.8, 3.2],
+            [36.8, 3.1],
+            [36.6, 3.1],
+          ],
+        ],
+      }
+      mockApiFetch.mockResolvedValue(
+        createMockSuccessResponse({ geometry: JSON.stringify(geometry) }),
+      )
+
+      await displayCommuneBoundary(1)
+
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/commune/1/boundary")
+      expect(boundariesSource.setData).toHaveBeenCalledTimes(1)
+      expect(mockMap.fitBounds).toHaveBeenCalledTimes(1)
+      expect(pointInMunicipalLimit(36.7, 3.15)).toBe(true)
+      expect(pointInMunicipalLimit(0, 0)).toBe(false)
+    })
+
+    it("loads a MultiPolygon boundary", async () => {
+      const geometry = {
+        type: "MultiPolygon",
+        coordinates: [
+          [
+            [
+              [0, 0],
+              [10, 0],
+              [10, 10],
+              [0, 0],
+            ],
+          ],
+        ],
+      }
+      mockApiFetch.mockResolvedValue(
+        createMockSuccessResponse({ geometry: JSON.stringify(geometry) }),
+      )
+
+      await displayCommuneBoundary(2)
+
+      expect(mockMap.fitBounds).toHaveBeenCalledTimes(1)
+      expect(pointInMunicipalLimit(5, 5)).toBe(true)
+    })
+
+    it("does not fit bounds when the geometry has no coordinates", async () => {
+      mockApiFetch.mockResolvedValue(
+        createMockSuccessResponse({
+          geometry: JSON.stringify({ type: "Polygon", coordinates: [] }),
+        }),
+      )
+
+      await displayCommuneBoundary(3)
+
+      expect(boundariesSource.setData).toHaveBeenCalledTimes(1)
+      expect(mockMap.fitBounds).not.toHaveBeenCalled()
+    })
+
+    it("ignores geometry without a type", async () => {
+      mockApiFetch.mockResolvedValue(createMockSuccessResponse({ geometry: JSON.stringify({}) }))
+
+      await displayCommuneBoundary(4)
+
+      expect(boundariesSource.setData).not.toHaveBeenCalled()
+    })
+
+    it("handles fetch failures gracefully", async () => {
+      mockApiFetch.mockRejectedValue(new Error("boom"))
+
+      await expect(displayCommuneBoundary(5)).resolves.toBeUndefined()
+    })
+
+    it("works before the boundaries source is created", async () => {
+      _setCtx({ map: mockMap as any, boundariesSource: undefined })
+      const geometry = {
+        type: "Polygon",
+        coordinates: [
+          [
+            [0, 0],
+            [1, 0],
+            [1, 1],
+            [0, 0],
+          ],
+        ],
+      }
+      mockApiFetch.mockResolvedValue(
+        createMockSuccessResponse({ geometry: JSON.stringify(geometry) }),
+      )
+
+      await displayCommuneBoundary(6)
+
+      expect(mockMap.fitBounds).toHaveBeenCalledTimes(1)
+      expect(pointInMunicipalLimit(0.5, 0.5)).toBe(true)
+    })
+  })
+
+  describe("refreshScatteredAreas", () => {
+    beforeEach(() => {
+      mockApiFetch.mockReset()
+      resetGeometryState()
+    })
+
+    it("renders scattered polygons from the response", async () => {
+      const geojson = {
+        type: "Polygon",
+        coordinates: [
+          [
+            [0, 0],
+            [10, 0],
+            [5, 10],
+            [0, 0],
+          ],
+        ],
+      }
+      mockApiFetch.mockResolvedValue(
+        createMockSuccessResponse({ geojson: JSON.stringify(geojson) }),
+      )
+
+      await refreshScatteredAreas()
+
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/areas/refresh-scattered", { method: "POST" })
+      expect(pointInScatteredArea(5, 2)).toBe(true)
+    })
+
+    it("skips rendering when the response has no geojson", async () => {
+      mockApiFetch.mockResolvedValue(createMockSuccessResponse({ geojson: null }))
+
+      await refreshScatteredAreas()
+
+      expect(pointInScatteredArea(5, 2)).toBe(false)
+    })
+
+    it("handles fetch failures gracefully", async () => {
+      mockApiFetch.mockRejectedValue(new Error("boom"))
+
+      await expect(refreshScatteredAreas()).resolves.toBeUndefined()
     })
   })
 })

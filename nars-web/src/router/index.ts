@@ -33,7 +33,10 @@ const router = createRouter({
 router.beforeEach((to) => {
   const appStore = useAppStore()
   if (!appStore.isAuthenticated) {
-    return getLoginPath()
+    // The login page is not a SPA route (served statically / by the backend),
+    // so do not re-trigger this guard for it — that would cause a redirect loop.
+    if (to.fullPath !== getLoginPath()) return getLoginPath()
+    return
   }
   if ((to.name === "admin" || to.name === "wilaya-detail") && !appStore.isAdminUser) {
     return false

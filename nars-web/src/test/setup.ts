@@ -49,16 +49,24 @@ vi.mock("../i18n", () => ({
 // ─── MOCK MAPLIBRE ────────────────────────────────────────────────────────────
 
 // Mock Maplibre GL JS
-vi.mock("maplibre-gl", () => ({
-  default: class MockMap {
+vi.mock("maplibre-gl", () => {
+  class MockLngLatBounds {
+    extend = vi.fn(() => this)
+  }
+
+  class MockMap {
     constructor() {
       this.sources = new Map()
       this.layers = new Map()
       this.handlers = new Map()
+      this._canvas = { style: { cursor: "" } }
+      this._container = document.createElement("div")
     }
     sources: Map<string, unknown>
     layers: Map<string, unknown>
     handlers: Map<string, unknown[]>
+    _canvas: { style: { cursor: string } }
+    _container: HTMLDivElement
 
     on = vi.fn((event: string, handler: unknown) => {
       if (!this.handlers.has(event)) {
@@ -77,24 +85,43 @@ vi.mock("maplibre-gl", () => ({
     getStyle = vi.fn(() => ({ layers: [] }))
     queryRenderedFeatures = vi.fn(() => [])
     fitBounds = vi.fn()
-    getCanvas = vi.fn(() => ({ style: { cursor: "" } }))
+    getCanvas = vi.fn(() => this._canvas)
+    getContainer = vi.fn(() => this._container)
+    project = vi.fn(() => ({ x: 0, y: 0 }))
+    unproject = vi.fn(() => ({ lng: 0, lat: 0 }))
     once = vi.fn((_event: string, callback: () => void) => {
       setTimeout(callback, 0)
     })
-  },
-  Popup: class MockPopup {
+  }
+
+  class MockPopup {
     constructor() {}
     setLngLat = vi.fn(() => this)
     setHTML = vi.fn(() => this)
     addTo = vi.fn(() => this)
-  },
-  Marker: class MockMarker {
+  }
+
+  class MockMarker {
     constructor() {}
     setLngLat = vi.fn(() => this)
     addTo = vi.fn(() => this)
     remove = vi.fn()
-  },
-}))
+    getElement = vi.fn(() => document.createElement("div"))
+  }
+
+  // Real maplibre-gl exposes Map/Marker/Popup/LngLatBounds on the default
+  // namespace export, so code can call `new maplibregl.Marker(...)`.
+  ;(MockMap as any).Marker = MockMarker
+  ;(MockMap as any).Popup = MockPopup
+  ;(MockMap as any).LngLatBounds = MockLngLatBounds
+
+  return {
+    default: MockMap,
+    Popup: MockPopup,
+    Marker: MockMarker,
+    LngLatBounds: MockLngLatBounds,
+  }
+})
 
 // ─── HELPER FUNCTIONS ─────────────────────────────────────────────────────────
 

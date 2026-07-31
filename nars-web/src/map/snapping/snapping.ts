@@ -83,7 +83,8 @@ export function getActiveSnapPhases(): string[] {
 
   const completedPhaseKeys = new Set<string>()
   for (let i = 0; i <= useAppStore().currentPhase; i++) {
-    completedPhaseKeys.add(PHASES[i].key)
+    const phaseKey = PHASES[i]?.key
+    if (phaseKey) completedPhaseKeys.add(phaseKey)
   }
 
   return [...allowedTargets].filter((key) => completedPhaseKeys.has(key))

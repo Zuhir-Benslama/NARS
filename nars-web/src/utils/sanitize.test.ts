@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi, afterEach } from "vitest"
 import {
   sanitizeHtml,
   escapeHtml,
@@ -125,6 +125,36 @@ describe("sanitize", () => {
     it("creates element without className", () => {
       const el = createSafeTextElement("p", "paragraph")
       expect(el.className).toBe("")
+    })
+  })
+
+  describe("SSR fallback (no window)", () => {
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    async function importWithoutWindow(): Promise<typeof import("./sanitize")> {
+      vi.stubGlobal("window", undefined)
+      vi.resetModules()
+      return await import("./sanitize")
+    }
+
+    it("strips all tags without a window", async () => {
+      const mod = await importWithoutWindow()
+      expect(mod.sanitizeApiText("<b>bold</b>")).toBe("bold")
+      expect(mod.sanitizeHtml("<strong>bold</strong> <em>italic</em>")).toBe("bold italic")
+    })
+
+    it("removes script/style blocks entirely, including content with angle brackets", async () => {
+      const mod = await importWithoutWindow()
+      const payload = '<script>document.write("<img src=x onerror=alert(1)>")</script>safe'
+      expect(mod.sanitizeApiText(payload)).toBe("safe")
+      expect(mod.sanitizeApiText('<style>a { content: ">" }</style>')).toBe("")
+    })
+
+    it("strips null bytes and leaves text intact", async () => {
+      const mod = await importWithoutWindow()
+      expect(mod.sanitizeApiText("he\0llo")).toBe("hello")
     })
   })
 })
