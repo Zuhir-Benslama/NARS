@@ -49,13 +49,15 @@ resources:
 #   kustomize build k8s/overlays/production | kubectl apply -f -
 images:
   # ⚠ `latest` tags are for local dev only — they produce non-reproducible
-  # deployments. CI/CD pipelines MUST override newTag with a pinned SHA:
+  # deployments. CI/CD pipelines MUST override with a pinned SHA:
   #
   #   make kustomize-apply IMAGE_TAG=<commit-sha>
   #
-  # Or via kustomize directly:
-  #   kustomize edit set image \
-  #     zuhirbenslama/nars-api=zuhirbenslama/nars-api:<commit-sha>
+  # 'make kustomize-apply' rewrites the four image tags at build time, so the
+  # values here are just the default (this file is never mutated). To persist
+  # a pin in this file manually, use:
+  #   make kustomize-set-image-tag IMAGE_TAG=<commit-sha>
+  #   (requires the standalone 'kustomize' binary)
   #
   # For production, use a specific commit SHA. Example:
   #   make kustomize-apply IMAGE_TAG=abc1234
@@ -64,8 +66,10 @@ images:
   # because the bundled kustomize (v5.5.0 in kubectl 1.32) does not support
   # the newPullPolicy field.
   - name: zuhirbenslama/nars-api
-    newTag: dev
+    newTag: latest
   - name: zuhirbenslama/nars-postgis
-    newTag: dev
+    newTag: latest
   - name: zuhirbenslama/nars-vite
-    newTag: dev
+    newTag: latest
+  - name: zuhirbenslama/nars-backup
+    newTag: latest

@@ -13,7 +13,9 @@ data:
   Cors__AllowedOrigins__1: "https://api.nars.dz"
   # Restricted to known domains. The httpGet probes in app-deployment.yaml
   # set a Host header matching one of these values via httpHeaders.
-  AllowedHosts: "nars.dz;api.nars.dz"
+  # localhost is included for the local-dev ingresses (nars-api-local /
+  # nars-frontend-local) which serve traffic on http://localhost.
+  AllowedHosts: "nars.dz;api.nars.dz;localhost"
   # Shared between backup-cronjob and any other DB-consuming pods.
   PGHOST: "postgis"
   PGPORT: "5432"

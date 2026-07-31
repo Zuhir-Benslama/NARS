@@ -47,6 +47,7 @@ fi
 	echo "JWT_SECRET=$$(_RND 32)" >> $@; \
 	echo "GPG_PASSPHRASE=$$(_RND 32)" >> $@; \
 	echo "GRAFANA_PASSWORD=$$(_RND 12)" >> $@; \
+	echo "NARS_ADMIN_SIGNUP_TOKEN=$$(_RND 32)" >> $@; \
 	chmod 600 $@; \
 	echo "→ Created $@ with fresh secrets (permissions: 600)"
 
@@ -60,7 +61,8 @@ POSTGRES_PASSWORD  ?=
 JWT_SECRET         ?=
 GPG_PASSPHRASE     ?=
 GRAFANA_PASSWORD   ?=
-export POSTGRES_PASSWORD JWT_SECRET GPG_PASSPHRASE GRAFANA_PASSWORD
+NARS_ADMIN_SIGNUP_TOKEN ?=
+export POSTGRES_PASSWORD JWT_SECRET GPG_PASSPHRASE GRAFANA_PASSWORD NARS_ADMIN_SIGNUP_TOKEN
 
 .PHONY: help
 help: ## Show available targets
@@ -87,6 +89,10 @@ _check-secrets: ## Fail fast if critical secrets are empty (prevents deploying w
 	fi
 	@if [ -z "$(GPG_PASSPHRASE)" ] || [ -z "$(GRAFANA_PASSWORD)" ]; then \
 		echo "✖ GPG_PASSPHRASE or GRAFANA_PASSWORD not set — run 'make .env' to generate them"; \
+		exit 1; \
+	fi
+	@if [ -z "$(NARS_ADMIN_SIGNUP_TOKEN)" ]; then \
+		echo "✖ NARS_ADMIN_SIGNUP_TOKEN not set — run 'make .env' to generate it"; \
 		exit 1; \
 	fi
 
@@ -154,7 +160,7 @@ _pg_dump_cmd = \
 # Internal: auto-backup before cluster teardown. Blocks if backup fails.
 .PHONY: _pre-cluster-down-backup
 _pre-cluster-down-backup:
-	@POD=$$($(POSTGIS_GET_POD_CMD) 2>/dev/null); \
+	@POD=$$($(POSTGIS_GET_POD_CMD) || true); \
 	if [ -z "$$POD" ]; then \
 		echo "→ No postgis pod running — skipping auto-backup"; \
 		exit 0; \
@@ -416,7 +422,7 @@ db-get-password: ## Get the postgis password from k8s secret
 
 .PHONY: db-backup
 db-backup: ## Dump the PostGIS database to a local file
-	@POD=$$($(POSTGIS_GET_POD_CMD))
+	@POD=$$($(POSTGIS_GET_POD_CMD) || true)
 	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found in namespace '$(NAMESPACE)'"; exit 1; fi
 	@PASS=$$($(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
 		-o jsonpath='{.data.postgres_password}' | base64 -d)
@@ -428,7 +434,7 @@ db-backup: ## Dump the PostGIS database to a local file
 
 .PHONY: db-restore
 db-restore: ## Restore a backup. Usage: make db-restore FILE=backup/nars_db_20250101_120000.sql.gz
-	@POD=$$($(POSTGIS_GET_POD_CMD))
+	@POD=$$($(POSTGIS_GET_POD_CMD) || true)
 	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found in namespace '$(NAMESPACE)'"; exit 1; fi
 	@if [ -z "$(FILE)" ]; then \
 		echo "✖ Usage: make db-restore FILE=backup/nars_db_<timestamp>.sql.gz"; \
@@ -465,7 +471,7 @@ db-restore: ## Restore a backup. Usage: make db-restore FILE=backup/nars_db_2025
 
 .PHONY: db-shell
 db-shell: ## Open an interactive psql shell inside the postgis pod
-	@POD=$$($(POSTGIS_GET_POD_CMD))
+	@POD=$$($(POSTGIS_GET_POD_CMD) || true)
 	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found"; exit 1; fi
 	@$(KUBECTL) exec -it "$$POD" -n "$(NAMESPACE)" -- psql -U postgres -d "$(DB_NAME)"
 
@@ -721,11 +727,13 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 	printf '%s' "Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=$$POSTGRES_PASSWORD" > "$$tmpdir/ConnectionStrings__DefaultConnection"; \
 	printf '%s' "$$JWT_SECRET" > "$$tmpdir/Jwt__SecretKey"; \
 	printf '%s' "$$GPG_PASSPHRASE" > "$$tmpdir/gpg-passphrase"; \
+	printf '%s' "$$NARS_ADMIN_SIGNUP_TOKEN" > "$$tmpdir/AdminSignup__SignupToken"; \
 	$(KUBECTL) create secret generic nars-secrets -n "$(NAMESPACE)" \
 		--from-file=postgres_password="$$tmpdir/postgres_password" \
 		--from-file=ConnectionStrings__DefaultConnection="$$tmpdir/ConnectionStrings__DefaultConnection" \
 		--from-file=Jwt__SecretKey="$$tmpdir/Jwt__SecretKey" \
 		--from-file=gpg-passphrase="$$tmpdir/gpg-passphrase" \
+		--from-file=AdminSignup__SignupToken="$$tmpdir/AdminSignup__SignupToken" \
 		--dry-run=client -o yaml \
 	| $(KUBECTL) apply -f -
 	@echo "✓ nars-secrets created"
@@ -748,7 +756,7 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 	fi
 
 .PHONY: kustomize-set-image-tag
-kustomize-set-image-tag: ## Pin all kustomize image tags to IMAGE_TAG (e.g. IMAGE_TAG=abc1234)
+kustomize-set-image-tag: ## Persistently pin image tags in kustomization.yaml (manual; kustomize-apply rewrites tags per-run)
 	@if [ -z "$(IMAGE_TAG)" ]; then \
 		echo "✖ IMAGE_TAG is empty — specify a tag (e.g. IMAGE_TAG=abc1234)"; \
 		exit 1; \
@@ -760,21 +768,29 @@ kustomize-set-image-tag: ## Pin all kustomize image tags to IMAGE_TAG (e.g. IMAG
 	@if echo "$(IMAGE_TAG)" | grep -qi "^latest$$"; then \
 		echo "  ⚠ IMAGE_TAG=$(IMAGE_TAG) is 'latest' — not pinning. Set IMAGE_TAG=<commit-sha> for reproducible deployments."; \
 	else \
+		if ! command -v kustomize >/dev/null 2>&1; then \
+			echo "✖ standalone 'kustomize' binary is not installed (needed for 'edit set image')."; \
+			echo "  Use 'make kustomize-apply IMAGE_TAG=$(IMAGE_TAG)' instead — it applies the pin without modifying files."; \
+			exit 1; \
+		fi; \
 		echo "→ Pinning kustomize image tags to $(IMAGE_TAG)..."; \
 		(cd "$(K8S_DIR)" && \
 		kustomize edit set image \
 			$(DOCKER_ORG)/nars-api=$(DOCKER_ORG)/nars-api:$(IMAGE_TAG) \
 			$(DOCKER_ORG)/nars-postgis=$(DOCKER_ORG)/nars-postgis:$(IMAGE_TAG) \
-			$(DOCKER_ORG)/nars-vite=$(DOCKER_ORG)/nars-vite:$(IMAGE_TAG)); \
+			$(DOCKER_ORG)/nars-vite=$(DOCKER_ORG)/nars-vite:$(IMAGE_TAG) \
+			$(DOCKER_ORG)/nars-backup=$(DOCKER_ORG)/nars-backup:$(IMAGE_TAG)); \
 		echo "✓ Image tags pinned to $(IMAGE_TAG)"; \
 	fi
 
 .PHONY: kustomize-apply
 kustomize-apply: secrets-validate ## Apply k8s manifests via kustomize (pin tags with IMAGE_TAG=<sha>)
-	$(MAKE) kustomize-set-image-tag
 	$(MAKE) postgis-pv-fix
-	@echo "→ Applying kustomization..."
-	@$(KUBECTL) kustomize "$(K8S_DIR)" | $(KUBECTL) apply -f -
+	@echo "→ Applying kustomization (images: $(DOCKER_ORG)/*:$(IMAGE_TAG))..."
+	@$(KUBECTL) kustomize "$(K8S_DIR)" \
+		| awk -v tag="$(IMAGE_TAG)" \
+			'/^ *-? *image: zuhirbenslama\/(nars-api|nars-postgis|nars-vite|nars-backup):/ { sub(/:[^ ]*$$/, ":" tag) } { print }' \
+		| $(KUBECTL) apply -f -
 	@echo "✓ Kustomization applied"
 
 	@echo "→ Waiting for postgis..."
@@ -930,27 +946,8 @@ observability-prometheus-stack: ## Install Prometheus + Grafana + AlertManager
 	printf '%s' "$$GRAFANA_PASSWORD" > "$$tmpdir/grafana_password"; \
 	helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
 		--namespace $(OBSERVABILITY_NAMESPACE) \
+		--values $(K8S_DIR)/helm-values/kube-prometheus-stack.yaml \
 		--set-file grafana.adminPassword="$$tmpdir/grafana_password" \
-		--set grafana.service.type=ClusterIP \
-		--set grafana.service.port=3000 \
-		--set grafana.additionalDataSources[0].name=Loki \
-		--set grafana.additionalDataSources[0].type=loki \
-		--set grafana.additionalDataSources[0].url=http://loki-gateway:80 \
-		--set grafana.additionalDataSources[0].access=proxy \
-		--set grafana.additionalDataSources[1].name=Tempo \
-		--set grafana.additionalDataSources[1].type=tempo \
-		--set grafana.additionalDataSources[1].url=http://tempo:3200 \
-		--set grafana.additionalDataSources[1].access=proxy \
-		--set grafana.additionalDataSources[1].jsonData.tracesToLogsV2.datasourceUid=loki \
-		--set grafana.additionalDataSources[1].jsonData.lokiSearch.datasourceUid=loki \
-		--set prometheus.prometheusSpec.resources.requests.cpu=100m \
-		--set prometheus.prometheusSpec.resources.requests.memory=256Mi \
-		--set prometheus.prometheusSpec.resources.limits.cpu=500m \
-		--set prometheus.prometheusSpec.resources.limits.memory=1Gi \
-		--set alertmanager.enabled=false \
-		--set defaultRules.create=false \
-		--set nodeExporter.enabled=false \
-		--set kubeStateMetrics.enabled=false \
 		--timeout 10m
 
 .PHONY: observability-loki
