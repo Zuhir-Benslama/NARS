@@ -61,20 +61,31 @@ public class BackgroundTaskQueueTests
     }
 
     [Fact]
-    public async Task QueueBackgroundWorkItemAsync_Full_DoesNotThrow()
+    public async Task QueueBackgroundWorkItemAsync_Full_DropsOldest()
     {
         var queue = CreateQueue(capacity: 2);
+        var executed = new List<int>();
+
+        Func<IServiceProvider, CancellationToken, Task>[] workItems = [
+            (_, _) => { executed.Add(1); return Task.CompletedTask; },
+            (_, _) => { executed.Add(2); return Task.CompletedTask; },
+            (_, _) => { executed.Add(3); return Task.CompletedTask; },
+        ];
 
         // Fill the queue to capacity.
-        await queue.QueueBackgroundWorkItemAsync((_, _) => Task.CompletedTask);
-        await queue.QueueBackgroundWorkItemAsync((_, _) => Task.CompletedTask);
+        await queue.QueueBackgroundWorkItemAsync(workItems[0]);
+        await queue.QueueBackgroundWorkItemAsync(workItems[1]);
 
-        // Third write should be dropped (DropOldest) but not throw.
-        await queue.QueueBackgroundWorkItemAsync((_, _) => Task.CompletedTask);
+        // Third write must not throw — DropOldest makes room by evicting
+        // the FIRST item, so items 2 and 3 survive.
+        await queue.QueueBackgroundWorkItemAsync(workItems[2]);
 
-        // Verify we can still dequeue.
-        var item = await queue.DequeueAsync(CancellationToken.None);
-        Assert.NotNull(item);
+        var first = await queue.DequeueAsync(CancellationToken.None);
+        var second = await queue.DequeueAsync(CancellationToken.None);
+        await first(Mock.Of<IServiceProvider>(), CancellationToken.None);
+        await second(Mock.Of<IServiceProvider>(), CancellationToken.None);
+
+        Assert.Equal([2, 3], executed);
     }
 
     [Fact]

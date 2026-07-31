@@ -149,30 +149,14 @@ public class ValidationControllerTests
     public async Task ValidateRoad_SharpTurn_ReturnsInvalid()
     {
         using var db = CreateDb();
-        db.Roads.Add(new Road
-        {
-            Id = Guid.NewGuid(),
-            UserId = UserId,
-            Layer = FeatureTypes.RoadLayers.Street,
-            Data = "{}",
-            Label = "r",
-            UpdatedAt = FixedUtcNow
-        });
-        await db.SaveChangesAsync();
-
-        var validationMock = new Mock<IValidationService>();
-        validationMock.Setup(v => v.CheckRoadConnectivityAsync(
-                It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<double>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
-
-        var ctrl2 = CreateController(db, validationService: validationMock.Object, options: new ValidationOptions { RoadTurnAngleDegrees = SharpTurnAngleDegrees });
+        var ctrl = CreateController(db, options: new ValidationOptions { RoadTurnAngleDegrees = SharpTurnAngleDegrees });
 
         var body = new ValidateRoadRequest([
             new CoordDto(36.0, 3.0),
             new CoordDto(36.0, 3.1),
             new CoordDto(36.1, 3.1)
         ]);
-        var result = await ctrl2.ValidateRoad(body);
+        var result = await ctrl.ValidateRoad(body);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<ValidateRoadResponse>(ok.Value);

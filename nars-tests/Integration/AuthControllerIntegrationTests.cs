@@ -162,7 +162,7 @@ public class AuthControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsyn
     [Fact]
     public async Task SignIn_CorrectCredentials_ReturnsTokens()
     {
-        await CreateCommuneUserAsync(
+        var user = await CreateCommuneUserAsync(
             username: "signin_user",
             communeId: 1);
 
@@ -173,7 +173,23 @@ public class AuthControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsyn
         ));
 
         var okResult = Assert.IsType<OkObjectResult>(result);
-        Assert.NotNull(okResult.Value);
+        var response = Assert.IsType<SignInResponse>(okResult.Value);
+        Assert.True(response.Success);
+        Assert.Equal("signin_user", response.User.Username);
+        Assert.Equal(UserRoles.CommuneUser, response.User.Role);
+
+        // Auth cookies must be set on the response.
+        var setCookie = controller.Response.Headers["Set-Cookie"].ToString();
+        Assert.Contains("access_token=", setCookie, StringComparison.Ordinal);
+        Assert.Contains("refresh_token=", setCookie, StringComparison.Ordinal);
+
+        // The refresh token must be persisted (and usable for rotation).
+        await using var verifyDb = _fixture.CreateDbContext();
+        var stored = await verifyDb.RefreshTokens.AsNoTracking()
+            .FirstOrDefaultAsync(rt => rt.UserId == user.Id);
+        Assert.NotNull(stored);
+        Assert.False(stored.Revoked);
+        Assert.True(stored.ExpiresAt > FixedUtcNow);
     }
 
     [Fact]
