@@ -5,6 +5,18 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <RootNamespace>NarsApi.Tests</RootNamespace>
+    <!--
+      Coverage thresholds for coverlet.msbuild, applied only when coverage is
+      collected (`dotnet test /p:CollectCoverage=true` — see `make test-coverage`).
+      These are a REGRESSION FLOOR, not a target: measured 2026-08-01 was
+      ~32.7% line / 46.1% branch (full suite) and ~23.1% line / 33.6% branch
+      (unit tests only, as CI runs them). Raise as coverage improves — do not lower.
+      Defined here (not on the CLI) because the vstest command-line parser
+      splits comma-separated /p: values (e.g. ThresholdType=line,branch).
+    -->
+    <Threshold Condition="'$(CollectCoverage)' == 'true'">20</Threshold>
+    <ThresholdType Condition="'$(CollectCoverage)' == 'true'">line,branch</ThresholdType>
+    <ThresholdStat Condition="'$(CollectCoverage)' == 'true'">total</ThresholdStat>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,7 +35,7 @@
     <PackageReference Include="Moq" Version="4.20.72" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
-    <PackageReference Include="coverlet.collector" Version="6.0.2">
+    <PackageReference Include="coverlet.msbuild" Version="6.0.2">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>

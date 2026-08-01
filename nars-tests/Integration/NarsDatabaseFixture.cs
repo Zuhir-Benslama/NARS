@@ -16,7 +16,7 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgis/postgis:17-3.5-alpine")
         .WithDatabase("nars_test")
         .WithUsername("nars")
-        .WithPassword("nars_password")
+        .WithPassword(Guid.NewGuid().ToString("N"))
         .Build();
 
     private bool _initialized;

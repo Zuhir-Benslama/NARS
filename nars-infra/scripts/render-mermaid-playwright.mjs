@@ -5,7 +5,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const inputDir = process.argv[2] || join(__dirname, 'docs', 'uml');
+const inputDir = process.argv[2] || join(__dirname, '..', 'docs', 'uml');
 const outputDir = process.argv[3] || inputDir;
 
 const files = process.argv.length > 4

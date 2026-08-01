@@ -33,11 +33,14 @@ jobs:
       - name: Check formatting
         run: dotnet format Workspace.sln --verify-no-changes --no-restore
 
-      - name: Run tests
+      - name: Run tests (with coverage threshold enforcement)
         run: >
-          dotnet test Workspace.sln --no-build --configuration Release
+          dotnet test nars-tests/NarsApi.Tests.csproj --no-build --configuration Release
           --verbosity normal
           --filter "FullyQualifiedName!~Integration"
+          /p:CollectCoverage=true
+          /p:CoverletOutputFormat=cobertura
+          /p:CoverletOutput=TestResults/ci-coverage.cobertura.xml
 
   infra-lint:
     name: Infra — Shell, Docker & YAML Lint

@@ -788,8 +788,8 @@ kustomize-apply: secrets-validate ## Apply k8s manifests via kustomize (pin tags
 	$(MAKE) postgis-pv-fix
 	@echo "→ Applying kustomization (images: $(DOCKER_ORG)/*:$(IMAGE_TAG))..."
 	@$(KUBECTL) kustomize "$(K8S_DIR)" \
-		| awk -v tag="$(IMAGE_TAG)" \
-			'/^ *-? *image: zuhirbenslama\/(nars-api|nars-postgis|nars-vite|nars-backup):/ { sub(/:[^ ]*$$/, ":" tag) } { print }' \
+		| awk -v org="$(DOCKER_ORG)" -v tag="$(IMAGE_TAG)" \
+			'BEGIN { esc = org; gsub(/\//, "\\/", esc); pat = "^ *-? *image: " esc "\\/(nars-api|nars-postgis|nars-vite|nars-backup):" } $$0 ~ pat { sub(/:[^ ]*$$/, ":" tag) } { print }' \
 		| $(KUBECTL) apply -f -
 	@echo "✓ Kustomization applied"
 
@@ -1055,6 +1055,11 @@ grafana-password: ## Show the generated Grafana admin password (stderr only, non
 
 # ─── Code Quality (nars-infra) ──────────────────────────────
 
+.PHONY: lint
+lint: ## Run cross-project linting (.NET format + infra linters)
+	dotnet format Workspace.sln --verify-no-changes --no-restore
+	$(MAKE) infra-lint
+
 .PHONY: infra-lint
 infra-lint: ## Run all nars-infra linters (shell, docker, yaml)
 	$(MAKE) infra-lint-shell
@@ -1185,6 +1190,13 @@ all: cluster-up ## Bring up the full cluster (default: help)
 .PHONY: test
 test: ## Run all tests
 	dotnet test nars-tests/NarsApi.Tests.csproj
+
+.PHONY: test-coverage
+test-coverage: ## Run backend tests with coverage and enforce thresholds (coverlet.msbuild)
+	dotnet test nars-tests/NarsApi.Tests.csproj \
+		/p:CollectCoverage=true \
+		/p:CoverletOutputFormat=cobertura \
+		/p:CoverletOutput=TestResults/coverage.cobertura.xml
 
 .PHONY: clean
 clean: cluster-down ## Tear down the cluster (data preserved — use 'cluster-clean' to also wipe data)

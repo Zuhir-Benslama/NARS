@@ -6,6 +6,7 @@ import {
   openModal,
   openEditModal,
   resolveModal,
+  resetModalBridge,
 } from "./modalStore"
 import type { ModalResult } from "../types/modal"
 
@@ -51,6 +52,49 @@ describe("modalStore", () => {
       expect(store.editDbId).toBe("db-123")
       expect(store.label).toBe("Edit Me")
       expect(store.areaTypeKey).toBe("peri_urban")
+    })
+
+    it("openEdit defaults entranceTypeKey to main_entrance when a road is assigned", () => {
+      const store = useModalStore()
+      store.openEdit(0, "db-123", {
+        type: "houseEntrances",
+        label: "Entrance",
+        roadDbId: "road-1",
+      } as any)
+      expect(store.entranceTypeKey).toBe("main_entrance")
+    })
+
+    it("openEdit defaults entranceTypeKey to secondary_entrance without a road", () => {
+      const store = useModalStore()
+      store.openEdit(0, "db-123", {
+        type: "houseEntrances",
+        label: "Entrance",
+      } as any)
+      expect(store.entranceTypeKey).toBe("secondary_entrance")
+    })
+
+    it("openEdit preserves entrance-side and numbering fields", () => {
+      const store = useModalStore()
+      store.openEdit(0, "db-123", {
+        type: "houseEntrances",
+        label: "Entrance",
+        side: "right",
+        entranceNumber: 12,
+        bisNumber: 3,
+        radius: 500,
+        spaceTypeKey: "square",
+        sectorKey: "commerce",
+        buildingTypeKey: "store",
+        entranceTypeKey: "secondary_entrance",
+      } as any)
+      expect(store.entranceSide).toBe("right")
+      expect(store.entranceNumber).toBe(12)
+      expect(store.bisNumber).toBe(3)
+      expect(store.radius).toBe(500)
+      expect(store.spaceTypeKey).toBe("square")
+      expect(store.sectorKey).toBe("commerce")
+      expect(store.buildingTypeKey).toBe("store")
+      expect(store.entranceTypeKey).toBe("secondary_entrance")
     })
 
     it("close hides the modal", () => {
@@ -111,6 +155,27 @@ describe("modalStore", () => {
       store.close(emptyResult)
       await expect(secondPromise).resolves.toEqual(emptyResult)
     })
+
+    it("awaitModalResult resolves immediately with a result cached while no resolver was pending", async () => {
+      const store = useModalStore()
+      store.close(emptyResult)
+      await expect(awaitModalResult()).resolves.toEqual(emptyResult)
+    })
+
+    it("resetModalBridge resolves any pending promise with null", async () => {
+      const promise = awaitModalResult()
+      resetModalBridge()
+      await expect(promise).resolves.toBeNull()
+    })
+
+    it("resetModalBridge clears a cached result", async () => {
+      const store = useModalStore()
+      store.close(emptyResult)
+      resetModalBridge()
+      const promise = awaitModalResult()
+      resolveModal(null)
+      await expect(promise).resolves.toBeNull()
+    })
   })
 
   describe("legacy wrappers", () => {
@@ -119,6 +184,24 @@ describe("modalStore", () => {
       const store = useModalStore()
       expect(store.visible).toBe(true)
       expect(store.currentModalFeatureId).toBe("feat-1")
+      resolveModal(emptyResult)
+      await expect(promise).resolves.toEqual(emptyResult)
+    })
+
+    it("openModal sets the city-center label for the cityCenter phase", async () => {
+      const promise = openModal(2, "feat-cc")
+      const store = useModalStore()
+      // t() is stubbed to return the key in tests — the assertion proves the
+      // cityCenter branch actually calls t() to label the modal.
+      expect(store.label).toBe("phase_cityCenter_label")
+      resolveModal(emptyResult)
+      await expect(promise).resolves.toEqual(emptyResult)
+    })
+
+    it("openModal leaves the label empty for non-cityCenter phases", async () => {
+      const promise = openModal(0, "feat-1")
+      const store = useModalStore()
+      expect(store.label).toBe("")
       resolveModal(emptyResult)
       await expect(promise).resolves.toEqual(emptyResult)
     })

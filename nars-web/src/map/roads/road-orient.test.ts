@@ -106,5 +106,94 @@ describe("road-orient", () => {
         orientFromCityCenter({ lat: 36.0, lng: 127.0 }, 100, graph, segs, visited),
       ).not.toThrow()
     })
+
+    it("orients a multi-segment road outward from the seed and marks every edge visited", () => {
+      const graph = new Graph({ multi: true, type: "undirected" })
+      const segs = new Map<string, Seg>()
+
+      // A sits ~1km from the center (seed); B and C are farther out.
+      const a = nk({ lat: 36.009, lng: 127.0 })
+      const b = nk({ lat: 36.02, lng: 127.0 })
+      const c = nk({ lat: 36.03, lng: 127.0 })
+      graph.addNode(a)
+      graph.addNode(b)
+      graph.addNode(c)
+
+      // seg1 stored B→A so it must be reversed to orient A→B.
+      const seg1 = makeSeg(
+        [
+          { lat: 36.02, lng: 127.0 },
+          { lat: 36.009, lng: 127.0 },
+        ],
+        "road-1",
+      )
+      const seg2 = makeSeg(
+        [
+          { lat: 36.02, lng: 127.0 },
+          { lat: 36.03, lng: 127.0 },
+        ],
+        "road-1",
+      )
+      graph.addEdgeWithKey("seg1", a, b)
+      graph.addEdgeWithKey("seg2", b, c)
+      segs.set("seg1", seg1)
+      segs.set("seg2", seg2)
+
+      const visited = new Set<string>()
+      orientFromCityCenter({ lat: 36.0, lng: 127.0 }, 1, graph, segs, visited)
+
+      expect(seg1.reversed).toBe(true)
+      expect(seg2.reversed).toBe(false)
+      expect(visited.has("seg1")).toBe(true)
+      expect(visited.has("seg2")).toBe(true)
+    })
+
+    it("ignores graph edges that have no matching segment", () => {
+      const graph = new Graph({ multi: true, type: "undirected" })
+      const segs = new Map<string, Seg>()
+
+      const a = nk({ lat: 36.009, lng: 127.0 })
+      const b = nk({ lat: 36.02, lng: 127.0 })
+      graph.addNode(a)
+      graph.addNode(b)
+
+      const seg = makeSeg([
+        { lat: 36.009, lng: 127.0 },
+        { lat: 36.02, lng: 127.0 },
+      ])
+      graph.addEdgeWithKey("seg1", a, b)
+      graph.addEdgeWithKey("ghost", a, b) // not present in segs map
+      segs.set("seg1", seg)
+
+      const visited = new Set<string>()
+      orientFromCityCenter({ lat: 36.0, lng: 127.0 }, 1, graph, segs, visited)
+
+      expect(visited.has("ghost")).toBe(false)
+      expect(visited.has("seg1")).toBe(true)
+    })
+
+    it("skips seedless graphs when no node is near the radius", () => {
+      const graph = new Graph({ multi: true, type: "undirected" })
+      const segs = new Map<string, Seg>()
+
+      const a = nk({ lat: 36.009, lng: 127.0 })
+      const b = nk({ lat: 36.02, lng: 127.0 })
+      graph.addNode(a)
+      graph.addNode(b)
+
+      const seg = makeSeg([
+        { lat: 36.009, lng: 127.0 },
+        { lat: 36.02, lng: 127.0 },
+      ])
+      graph.addEdgeWithKey("seg1", a, b)
+      segs.set("seg1", seg)
+
+      const visited = new Set<string>()
+      // radius far larger than any node distance → no seeds
+      orientFromCityCenter({ lat: 36.0, lng: 127.0 }, 100, graph, segs, visited)
+
+      expect(visited.size).toBe(0)
+      expect(seg.reversed).toBe(false)
+    })
   })
 })

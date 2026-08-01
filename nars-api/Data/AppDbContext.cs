@@ -6,7 +6,6 @@ namespace NarsApi.Data;
 
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
-
     // ── Feature tables ────────────────────────────────────────────────────────
     public DbSet<FeatureRegistry> FeatureRegistry { get; set; }
     public DbSet<Area> Areas { get; set; }

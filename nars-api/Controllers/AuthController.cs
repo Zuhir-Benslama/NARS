@@ -164,7 +164,6 @@ public partial class AuthController(
         Models.Daira? daira = null;
         Models.Commune? commune = null;
 
-
         // Load location chain — single JOIN query for commune→daira→wilaya,
         // or single JOIN for daira→wilaya when no commune is assigned.
         Wilaya? wilaya;

@@ -76,7 +76,7 @@ function makeGraphMock() {
   return {
     nodes: () => nodes,
     addNode: (k: string) => nodes.add(k),
-    degree: vi.fn(() => 1),
+    degree: vi.fn((_k: string) => 1),
     order: 0,
     size: 0,
     edges: vi.fn(() => []),
@@ -294,6 +294,233 @@ describe("road-directions", () => {
       await computeAndApplyRoadDirections()
 
       expect(mockDebugError).toHaveBeenCalled()
+      expect(mockUpdateEndpointMarkers).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe("dead-end correction", () => {
+    function roadWithNodes(segs: Map<string, unknown>, coords: { lat: number; lng: number }[]) {
+      const road = makeRoad("r1", "db-1", coords)
+      segs.set("s1", {
+        coords,
+        entry: road,
+        dbId: "db-1",
+        reversed: false,
+      })
+      const nodes = coords.map((c) => `${c.lat.toFixed(5)},${c.lng.toFixed(5)}`)
+      return { road, nodes }
+    }
+
+    it("does not reverse a road whose far endpoint is the dead end", async () => {
+      const segs = new Map()
+      const { nodes } = roadWithNodes(segs, [
+        { lat: 36.0, lng: 127.0 },
+        { lat: 36.01, lng: 127.01 },
+      ])
+      const graph = makeGraphMock()
+      graph.nodes().add(nodes[0])
+      graph.nodes().add(nodes[1])
+      graph.degree.mockImplementation((k: string) => (k === nodes[0] ? 2 : 1))
+      mockBuildConnectionGraph.mockReturnValue({ graph, segs })
+
+      const { useLayerStore } = await import("../../stores/layerStore")
+      const store = useLayerStore()
+      store.addFeature(
+        "roads",
+        makeRoad("r1", "db-1", [
+          { lat: 36.0, lng: 127.0 },
+          { lat: 36.01, lng: 127.01 },
+        ]),
+      )
+
+      await computeAndApplyRoadDirections()
+
+      expect(mockApiFetch).not.toHaveBeenCalled()
+      expect(mockFeaturesStoreUpdate).not.toHaveBeenCalled()
+    })
+
+    it("reverses a road whose near endpoint is the dead end", async () => {
+      const segs = new Map()
+      const { nodes } = roadWithNodes(segs, [
+        { lat: 36.0, lng: 127.0 },
+        { lat: 36.01, lng: 127.01 },
+      ])
+      const graph = makeGraphMock()
+      graph.nodes().add(nodes[0])
+      graph.nodes().add(nodes[1])
+      graph.degree.mockImplementation((k: string) => (k === nodes[0] ? 1 : 2))
+      mockBuildConnectionGraph.mockReturnValue({ graph, segs })
+
+      const { useLayerStore } = await import("../../stores/layerStore")
+      const store = useLayerStore()
+      store.addFeature(
+        "roads",
+        makeRoad("r1", "db-1", [
+          { lat: 36.0, lng: 127.0 },
+          { lat: 36.01, lng: 127.01 },
+        ]),
+      )
+
+      await computeAndApplyRoadDirections()
+
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        "/api/features/db-1",
+        expect.objectContaining({ method: "PUT" }),
+      )
+      expect(mockFeaturesStoreUpdate).toHaveBeenCalled()
+    })
+
+    it("keeps orientation when both endpoints are dead ends and no city center exists", async () => {
+      const segs = new Map()
+      const { nodes } = roadWithNodes(segs, [
+        { lat: 36.0, lng: 127.0 },
+        { lat: 36.01, lng: 127.01 },
+      ])
+      const graph = makeGraphMock()
+      graph.nodes().add(nodes[0])
+      graph.nodes().add(nodes[1])
+      graph.degree.mockReturnValue(1)
+      mockBuildConnectionGraph.mockReturnValue({ graph, segs })
+
+      const { useLayerStore } = await import("../../stores/layerStore")
+      const store = useLayerStore()
+      store.addFeature(
+        "roads",
+        makeRoad("r1", "db-1", [
+          { lat: 36.0, lng: 127.0 },
+          { lat: 36.01, lng: 127.01 },
+        ]),
+      )
+
+      await computeAndApplyRoadDirections()
+
+      expect(mockApiFetch).not.toHaveBeenCalled()
+    })
+
+    it("reverses when both endpoints are dead ends and the city center sits near the far endpoint", async () => {
+      const segs = new Map()
+      const { nodes } = roadWithNodes(segs, [
+        { lat: 36.0, lng: 127.0 },
+        { lat: 36.01, lng: 127.01 },
+      ])
+      const graph = makeGraphMock()
+      graph.nodes().add(nodes[0])
+      graph.nodes().add(nodes[1])
+      graph.degree.mockReturnValue(1)
+      mockBuildConnectionGraph.mockReturnValue({ graph, segs })
+
+      const { useLayerStore } = await import("../../stores/layerStore")
+      const store = useLayerStore()
+      store.addFeature(
+        "roads",
+        makeRoad("r1", "db-1", [
+          { lat: 36.0, lng: 127.0 },
+          { lat: 36.01, lng: 127.01 },
+        ]),
+      )
+      store.addFeature("cityCenter", {
+        id: "cc-1",
+        dbId: "db-cc-1",
+        type: "circle",
+        data: {
+          type: "cityCenter",
+          label: "C",
+          decisionNumber: "",
+          decisionDate: "",
+          lat: 36.01,
+          lng: 127.01,
+          radius: 50,
+        },
+      })
+
+      await computeAndApplyRoadDirections()
+
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        "/api/features/db-1",
+        expect.objectContaining({ method: "PUT" }),
+      )
+    })
+
+    it("ignores a city center with null coordinates when resolving dead ends", async () => {
+      const segs = new Map()
+      const { nodes } = roadWithNodes(segs, [
+        { lat: 36.0, lng: 127.0 },
+        { lat: 36.01, lng: 127.01 },
+      ])
+      const graph = makeGraphMock()
+      graph.nodes().add(nodes[0])
+      graph.nodes().add(nodes[1])
+      graph.degree.mockReturnValue(1)
+      mockBuildConnectionGraph.mockReturnValue({ graph, segs })
+
+      const { useLayerStore } = await import("../../stores/layerStore")
+      const store = useLayerStore()
+      store.addFeature(
+        "roads",
+        makeRoad("r1", "db-1", [
+          { lat: 36.0, lng: 127.0 },
+          { lat: 36.01, lng: 127.01 },
+        ]),
+      )
+      store.addFeature("cityCenter", {
+        id: "cc-1",
+        dbId: "db-cc-1",
+        type: "circle",
+        data: {
+          type: "cityCenter",
+          label: "C",
+          decisionNumber: "",
+          decisionDate: "",
+          lat: undefined,
+          lng: undefined,
+          radius: 50,
+        },
+      })
+
+      await computeAndApplyRoadDirections()
+
+      expect(mockApiFetch).not.toHaveBeenCalled()
+    })
+
+    it("skips dead-end correction when the road endpoints are not graph nodes", async () => {
+      const segs = new Map()
+      roadWithNodes(segs, [
+        { lat: 36.0, lng: 127.0 },
+        { lat: 36.01, lng: 127.01 },
+      ])
+      const graph = makeGraphMock() // empty nodes → nodeFirst/nodeLast not found
+      mockBuildConnectionGraph.mockReturnValue({ graph, segs })
+
+      const { useLayerStore } = await import("../../stores/layerStore")
+      const store = useLayerStore()
+      store.addFeature(
+        "roads",
+        makeRoad("r1", "db-1", [
+          { lat: 36.0, lng: 127.0 },
+          { lat: 36.01, lng: 127.01 },
+        ]),
+      )
+
+      await computeAndApplyRoadDirections()
+
+      expect(mockApiFetch).not.toHaveBeenCalled()
+      expect(mockFeaturesStoreUpdate).not.toHaveBeenCalled()
+    })
+
+    it("skips roads without coordinates during dead-end correction", async () => {
+      const segs = new Map()
+      const road = makeRoad("r1", "db-1", [])
+      segs.set("s1", { coords: [], entry: road, dbId: "db-1", reversed: false })
+      const graph = makeGraphMock()
+      mockBuildConnectionGraph.mockReturnValue({ graph, segs })
+
+      const { useLayerStore } = await import("../../stores/layerStore")
+      const store = useLayerStore()
+      store.addFeature("roads", road)
+
+      await computeAndApplyRoadDirections()
+
+      expect(mockApiFetch).not.toHaveBeenCalled()
       expect(mockUpdateEndpointMarkers).toHaveBeenCalledOnce()
     })
   })

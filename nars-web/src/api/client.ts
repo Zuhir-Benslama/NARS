@@ -82,7 +82,7 @@ export async function updateFeature(
 
 export async function deleteFeature(featureId: string): Promise<void> {
   const res = await apiFetch(`/api/features/${featureId}`, { method: "DELETE" })
-  if (res.status !== 204) await res.json()
+  if (res.status !== 204) await res.text()
 }
 
 // ─── USER / ACCOUNT ───────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ export async function updateAdminUser(
 
 export async function deleteAdminUser(userId: string): Promise<void> {
   const res = await apiFetch(`/api/admin/users/${userId}`, { method: "DELETE" })
-  if (res.status !== 204) await res.json()
+  if (res.status !== 204) await res.text()
 }
 
 export async function getWilayaReport(
