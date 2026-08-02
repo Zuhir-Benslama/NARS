@@ -51,7 +51,10 @@ images:
   # ⚠ `latest` tags are for local dev only — they produce non-reproducible
   # deployments. CI/CD pipelines MUST override with a pinned SHA:
   #
-  #   make kustomize-apply IMAGE_TAG=<commit-sha>
+  #   make kustomize-apply IMAGE_TAG=<commit-sha> DEPLOY_ENV=production
+  #
+  # Enforced: `make kustomize-apply` refuses IMAGE_TAG=latest when
+  # DEPLOY_ENV != dev (see the _check-pinned-tag Makefile guard).
   #
   # 'make kustomize-apply' rewrites the four image tags at build time, so the
   # values here are just the default (this file is never mutated). To persist
@@ -60,7 +63,7 @@ images:
   #   (requires the standalone 'kustomize' binary)
   #
   # For production, use a specific commit SHA. Example:
-  #   make kustomize-apply IMAGE_TAG=abc1234
+  #   make kustomize-apply IMAGE_TAG=abc1234 DEPLOY_ENV=production
   #
   # imagePullPolicy is set to IfNotPresent directly in each Deployment YAML
   # because the bundled kustomize (v5.5.0 in kubectl 1.32) does not support

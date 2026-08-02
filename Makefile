@@ -3,6 +3,13 @@ SHELL := /bin/bash
 .ONESHELL:
 .DEFAULT_GOAL := help
 
+# Indirection for recursive make. Under .ONESHELL, make treats the whole
+# recipe as a single line: if it contains $(MAKE), `make -n` (dry-run) actually
+# EXECUTES the entire recipe instead of just printing it — which ran real
+# `kubectl apply`/`kubectl wait`/`docker run` commands. Using $(SUBMAKE) keeps
+# normal recursion (and the -j jobserver) intact but makes `-n` a true dry-run.
+SUBMAKE := $(MAKE)
+
 CLUSTER_NAME       ?= nars
 NAMESPACE          ?= nars
 DOMAIN             ?= nars.dz
@@ -41,14 +48,14 @@ fi
 
 # _RND shell function + $$(_RND N) expansion rely on .ONESHELL.
 .env:
-	@echo "# Auto-generated — DO NOT COMMIT" > $@; \
-	_RND() { $(_rnd_cmd); }; \
-	echo "POSTGRES_PASSWORD=$$(_RND 32)" >> $@; \
-	echo "JWT_SECRET=$$(_RND 32)" >> $@; \
-	echo "GPG_PASSPHRASE=$$(_RND 32)" >> $@; \
-	echo "GRAFANA_PASSWORD=$$(_RND 12)" >> $@; \
-	echo "NARS_ADMIN_SIGNUP_TOKEN=$$(_RND 32)" >> $@; \
-	chmod 600 $@; \
+	@echo "# Auto-generated — DO NOT COMMIT" > $@;
+	_RND() { $(_rnd_cmd); };
+	echo "POSTGRES_PASSWORD=$$(_RND 32)" >> $@;
+	echo "JWT_SECRET=$$(_RND 32)" >> $@;
+	echo "GPG_PASSPHRASE=$$(_RND 32)" >> $@;
+	echo "GRAFANA_PASSWORD=$$(_RND 12)" >> $@;
+	echo "NARS_ADMIN_SIGNUP_TOKEN=$$(_RND 32)" >> $@;
+	chmod 600 $@;
 	echo "→ Created $@ with fresh secrets (permissions: 600)"
 
 -include .env
@@ -83,37 +90,37 @@ prerequisites: ## Check that all required tools are installed
 
 .PHONY: _check-secrets
 _check-secrets: ## Fail fast if critical secrets are empty (prevents deploying with insecure defaults)
-	@if [ -z "$(POSTGRES_PASSWORD)" ] || [ -z "$(JWT_SECRET)" ]; then \
-		echo "✖ Secrets not configured — run 'make .env' to generate them"; \
-		exit 1; \
+	@if [ -z "$(POSTGRES_PASSWORD)" ] || [ -z "$(JWT_SECRET)" ]; then
+		echo "✖ Secrets not configured — run 'make .env' to generate them";
+		exit 1;
 	fi
-	@if [ -z "$(GPG_PASSPHRASE)" ] || [ -z "$(GRAFANA_PASSWORD)" ]; then \
-		echo "✖ GPG_PASSPHRASE or GRAFANA_PASSWORD not set — run 'make .env' to generate them"; \
-		exit 1; \
+	@if [ -z "$(GPG_PASSPHRASE)" ] || [ -z "$(GRAFANA_PASSWORD)" ]; then
+		echo "✖ GPG_PASSPHRASE or GRAFANA_PASSWORD not set — run 'make .env' to generate them";
+		exit 1;
 	fi
-	@if [ -z "$(NARS_ADMIN_SIGNUP_TOKEN)" ]; then \
-		echo "✖ NARS_ADMIN_SIGNUP_TOKEN not set — run 'make .env' to generate it"; \
-		exit 1; \
+	@if [ -z "$(NARS_ADMIN_SIGNUP_TOKEN)" ]; then
+		echo "✖ NARS_ADMIN_SIGNUP_TOKEN not set — run 'make .env' to generate it";
+		exit 1;
 	fi
 
 # ─── Cluster Lifecycle ──────────────────────────────────────
 
 .PHONY: cluster-up
 cluster-up: prerequisites _check-secrets ## Full bootstrap: create cluster, build images, deploy everything
-	$(MAKE) cluster-create
-	$(MAKE) kubeconfig-fix
-	$(MAKE) ingress-install
-	$(MAKE) ingress-wait
-	$(MAKE) metrics-install
-	$(MAKE) metrics-wait
-	$(MAKE) storage-provisioner-install
-	$(MAKE) storage-provisioner-wait
-	$(MAKE) images-build
-	$(MAKE) tls-generate
-	$(MAKE) ca-secret
-	$(MAKE) secrets-apply
-	$(MAKE) images-load
-	$(MAKE) kustomize-apply
+	$(SUBMAKE) cluster-create
+	$(SUBMAKE) kubeconfig-fix
+	$(SUBMAKE) ingress-install
+	$(SUBMAKE) ingress-wait
+	$(SUBMAKE) metrics-install
+	$(SUBMAKE) metrics-wait
+	$(SUBMAKE) storage-provisioner-install
+	$(SUBMAKE) storage-provisioner-wait
+	$(SUBMAKE) images-build
+	$(SUBMAKE) tls-generate
+	$(SUBMAKE) ca-secret
+	$(SUBMAKE) secrets-apply
+	$(SUBMAKE) images-load
+	$(SUBMAKE) kustomize-apply
 	@echo ""
 	@echo "✓ Cluster '$(CLUSTER_NAME)' is ready!"
 	@echo ""
@@ -128,8 +135,8 @@ cluster-up: prerequisites _check-secrets ## Full bootstrap: create cluster, buil
 
 .PHONY: cluster-up-full
 cluster-up-full: ## Full bootstrap including observability stack
-	$(MAKE) cluster-up
-	$(MAKE) observability-install
+	$(SUBMAKE) cluster-up
+	$(SUBMAKE) observability-install
 	@echo ""
 	@echo "✓ Cluster '$(CLUSTER_NAME)' with observability is ready!"
 	@echo "  Port-forward:  make observability-port-forward"
@@ -160,24 +167,24 @@ _pg_dump_cmd = \
 # Internal: auto-backup before cluster teardown. Blocks if backup fails.
 .PHONY: _pre-cluster-down-backup
 _pre-cluster-down-backup:
-	@POD=$$($(POSTGIS_GET_POD_CMD) || true); \
-	if [ -z "$$POD" ]; then \
-		echo "→ No postgis pod running — skipping auto-backup"; \
-		exit 0; \
-	fi; \
-	echo "→ Auto-backing up database before cluster teardown..."; \
+	@POD=$$($(POSTGIS_GET_POD_CMD) || true);
+	if [ -z "$$POD" ]; then
+		echo "→ No postgis pod running — skipping auto-backup";
+		exit 0;
+	fi;
+	echo "→ Auto-backing up database before cluster teardown...";
 	PASS=$$($(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
-		-o jsonpath='{.data.postgres_password}' 2>/dev/null | base64 -d 2>/dev/null); \
-	if [ -z "$$PASS" ]; then \
-		echo "  ⚠ Could not read DB password — skipping backup"; \
-		exit 0; \
-	fi; \
-	$(_pg_dump_cmd); \
-	if [ ! -s "$${FILE}.gz" ]; then \
-		echo "✖ Auto-backup FAILED — refusing to tear down cluster"; \
-		rm -f "$${FILE}.gz"; \
-		exit 1; \
-	fi; \
+		-o jsonpath='{.data.postgres_password}' 2>/dev/null | base64 -d 2>/dev/null);
+	if [ -z "$$PASS" ]; then
+		echo "  ⚠ Could not read DB password — skipping backup";
+		exit 0;
+	fi;
+	$(_pg_dump_cmd);
+	if [ ! -s "$${FILE}.gz" ]; then
+		echo "✖ Auto-backup FAILED — refusing to tear down cluster";
+		rm -f "$${FILE}.gz";
+		exit 1;
+	fi;
 	echo "✓ Auto-backup saved: $${FILE}.gz"
 
 .PHONY: cluster-rebuild
@@ -193,22 +200,22 @@ cluster-reset: cluster-clean cluster-up-full ## Wipe data, recreate cluster with
 .PHONY: cluster-clean
 cluster-clean: ## Delete cluster AND wipe postgis data (irreversible!)
 	@echo "⚠  WARNING: This will DESTROY all postgis data at $(POSTGRES_DATA_DIR)"
-	@if [ -t 0 ]; then \
-		read -p "  Type the cluster name '$(CLUSTER_NAME)' to confirm: " confirm; \
-		if [ "$$confirm" != "$(CLUSTER_NAME)" ]; then echo "  Cancelled."; exit 1; fi; \
-	else \
-		echo "  Non-interactive shell — refusing destructive operation."; \
-		exit 1; \
+	@if [ -t 0 ]; then
+		read -p "  Type the cluster name '$(CLUSTER_NAME)' to confirm: " confirm;
+		if [ "$$confirm" != "$(CLUSTER_NAME)" ]; then echo "  Cancelled."; exit 1; fi;
+	else
+		echo "  Non-interactive shell — refusing destructive operation.";
+		exit 1;
 	fi
-	$(MAKE) cluster-down
+	$(SUBMAKE) cluster-down
 	@echo "→ Wiping postgis data..."
-	@if rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null; then \
-		echo "✓ Data wiped"; \
-	elif sudo -n rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null; then \
-		echo "✓ Data wiped (via sudo)"; \
-	else \
-		echo "✖ Failed to remove $(POSTGRES_DATA_DIR) — check permissions"; \
-		exit 1; \
+	@if rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null; then
+		echo "✓ Data wiped";
+	elif sudo -n rm -rf "$(POSTGRES_DATA_DIR)" 2>/dev/null; then
+		echo "✓ Data wiped (via sudo)";
+	else
+		echo "✖ Failed to remove $(POSTGRES_DATA_DIR) — check permissions";
+		exit 1;
 	fi
 
 .PHONY: cluster-status
@@ -266,22 +273,22 @@ proxy-up: port-forward-start ## Start Docker socat bridge: host:$(APP_PORT) → 
 		alpine/socat \
 		-c "socat tcp-l:$(APP_PORT),fork,reuseaddr tcp:$(CLUSTER_NAME)-control-plane:$(APP_PORT) & socat tcp-l:$(APP_TLS_PORT),fork,reuseaddr tcp:$(CLUSTER_NAME)-control-plane:$(APP_TLS_PORT) & wait -n" > /dev/null
 	@echo "→ Waiting for proxy to be ready..."
-	@for i in $$(seq 1 15); do \
-		running=$$(docker inspect -f '{{.State.Running}}' "$(PROXY_CONTAINER)" 2>/dev/null || echo "false"); \
-		if [ "$$running" != "true" ]; then \
-			echo "✖ socat container '$(PROXY_CONTAINER)' exited unexpectedly"; \
-			docker logs "$(PROXY_CONTAINER)" 2>&1 | tail -5; \
-			exit 1; \
-		fi; \
-		status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:$(APP_PORT)/ 2>/dev/null || echo "000"); \
-		if [ "$$status" != "000" ]; then break; fi; \
-		sleep 1; \
-	done; \
-	status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:$(APP_PORT)/ 2>/dev/null || echo "000"); \
-	if [ "$$status" = "200" ] || [ "$$status" = "302" ]; then \
-		echo "✓ Proxy ready ($$status)"; \
-	else \
-		echo "⚠ Proxy may not be reachable (status: $$status — check port-forward or rootless Docker networking)"; \
+	@for i in $$(seq 1 15); do
+		running=$$(docker inspect -f '{{.State.Running}}' "$(PROXY_CONTAINER)" 2>/dev/null || echo "false");
+		if [ "$$running" != "true" ]; then
+			echo "✖ socat container '$(PROXY_CONTAINER)' exited unexpectedly";
+			docker logs "$(PROXY_CONTAINER)" 2>&1 | tail -5;
+			exit 1;
+		fi;
+		status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:$(APP_PORT)/ 2>/dev/null || echo "000");
+		if [ "$$status" != "000" ]; then break; fi;
+		sleep 1;
+	done;
+	status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:$(APP_PORT)/ 2>/dev/null || echo "000");
+	if [ "$$status" = "200" ] || [ "$$status" = "302" ]; then
+		echo "✓ Proxy ready ($$status)";
+	else
+		echo "⚠ Proxy may not be reachable (status: $$status — check port-forward or rootless Docker networking)";
 	fi
 	@echo ""
 	@echo "✓ App accessible at http://localhost:$(APP_PORT)/"
@@ -322,50 +329,46 @@ SMOKE_BASE_URL ?= http://localhost:$(APP_PORT)
 smoke-test: ## Post-deploy smoke test: verify /health, frontend, and API auth
 	@echo "→ Running smoke tests against $(SMOKE_BASE_URL)..."
 	@echo ""
-	@failed=0; \
-	pass() { echo "  ✓ $$1"; }; \
-	fail() { echo "  ✖ $$1"; failed=$$((failed + 1)); }; \
-	\
-	echo "  1. Health endpoint..."; \
-	health=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/health" 2>/dev/null || echo "000"); \
-	if [ "$$health" = "200" ]; then \
-		body=$$(curl -s --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/health" 2>/dev/null); \
-		if echo "$$body" | grep -q "^Healthy$$"; then \
-			pass "/health → 200 Healthy"; \
-		else \
-			fail "/health → 200 but body unexpected: $$body"; \
-		fi; \
-	else \
-		fail "/health → $$health (expected 200)"; \
-	fi; \
-	\
-	echo "  2. Frontend reachability..."; \
-	frontend=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/" 2>/dev/null || echo "000"); \
-	if [ "$$frontend" = "200" ]; then \
-		pass "/ → 200"; \
-	elif [ "$$frontend" = "302" ] || [ "$$frontend" = "301" ]; then \
-		pass "/ → $$frontend (redirect — SPA serving correctly)"; \
-	else \
-		fail "/ → $$frontend (expected 200 or redirect)"; \
-	fi; \
-	\
-	echo "  3. API auth endpoint..."; \
+	@failed=0;
+	pass() { echo "  ✓ $$1"; };
+	fail() { echo "  ✖ $$1"; failed=$$((failed + 1)); };
+	echo "  1. Health endpoint...";
+	health=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/health" 2>/dev/null || echo "000");
+	if [ "$$health" = "200" ]; then
+		body=$$(curl -s --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/health" 2>/dev/null);
+		if echo "$$body" | grep -q "^Healthy$$"; then
+			pass "/health → 200 Healthy";
+		else
+			fail "/health → 200 but body unexpected: $$body";
+		fi;
+	else
+		fail "/health → $$health (expected 200)";
+	fi;
+	echo "  2. Frontend reachability...";
+	frontend=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/" 2>/dev/null || echo "000");
+	if [ "$$frontend" = "200" ]; then
+		pass "/ → 200";
+	elif [ "$$frontend" = "302" ] || [ "$$frontend" = "301" ]; then
+		pass "/ → $$frontend (redirect — SPA serving correctly)";
+	else
+		fail "/ → $$frontend (expected 200 or redirect)";
+	fi;
+	echo "  3. API auth endpoint...";
 	auth=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 \
 		-X POST "$(SMOKE_BASE_URL)/api/signin" \
 		-H "Content-Type: application/json" \
-		-d '{"username":"nonexistent","password":"bad"}' 2>/dev/null || echo "000"); \
-	if [ "$$auth" = "401" ]; then \
-		pass "POST /api/signin → 401 (auth endpoint alive, bad creds rejected)"; \
-	else \
-		fail "POST /api/signin → $$auth (expected 401)"; \
-	fi; \
-	\
-	echo ""; \
-	if [ "$$failed" -eq 0 ]; then \
-		echo "✓ All smoke tests passed!"; \
-	else \
-		echo "✖ $$failed smoke test(s) failed"; \
-		exit 1; \
+		-d '{"username":"nonexistent","password":"bad"}' 2>/dev/null || echo "000");
+	if [ "$$auth" = "401" ]; then
+		pass "POST /api/signin → 401 (auth endpoint alive, bad creds rejected)";
+	else
+		fail "POST /api/signin → $$auth (expected 401)";
+	fi;
+	echo "";
+	if [ "$$failed" -eq 0 ]; then
+		echo "✓ All smoke tests passed!";
+	else
+		echo "✖ $$failed smoke test(s) failed";
+		exit 1;
 	fi
 
 .PHONY: cluster-stop
@@ -415,10 +418,17 @@ db-get-pod: ## Get the postgis pod name
 	@$(POSTGIS_GET_POD_CMD) || echo ""
 
 .PHONY: db-get-password
-db-get-password: ## Get the postgis password from k8s secret
-	@$(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
-		-o jsonpath='{.data.postgres_password}' 2>/dev/null \
-		| base64 -d 2>/dev/null || echo ""
+db-get-password: ## Get the postgis password from k8s secret (stderr only, non-CI safe)
+	@pass=$$($(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
+		-o jsonpath='{.data.postgres_password}' 2>/dev/null | base64 -d 2>/dev/null || true)
+	@if [ -z "$$pass" ]; then
+		echo "⚠ No postgis password found in secret 'nars-secrets'" >&2
+	elif [ -t 2 ]; then
+		echo "$$pass" >&2
+	else
+		echo "⚠ Refusing to print password to non-tty stderr (use 'make db-get-password' interactively)" >&2
+		exit 1
+	fi
 
 .PHONY: db-backup
 db-backup: ## Dump the PostGIS database to a local file
@@ -436,29 +446,29 @@ db-backup: ## Dump the PostGIS database to a local file
 db-restore: ## Restore a backup. Usage: make db-restore FILE=backup/nars_db_20250101_120000.sql.gz
 	@POD=$$($(POSTGIS_GET_POD_CMD) || true)
 	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found in namespace '$(NAMESPACE)'"; exit 1; fi
-	@if [ -z "$(FILE)" ]; then \
-		echo "✖ Usage: make db-restore FILE=backup/nars_db_<timestamp>.sql.gz"; \
-		echo ""; \
-		echo "Available backups:"; \
-		ls -1 "$(BACKUP_DIR)"/*.sql.gz 2>/dev/null | sed 's/^/  /' || echo "  (none)"; \
-		exit 1; \
+	@if [ -z "$(FILE)" ]; then
+		echo "✖ Usage: make db-restore FILE=backup/nars_db_<timestamp>.sql.gz";
+		echo "";
+		echo "Available backups:";
+		ls -1 "$(BACKUP_DIR)"/*.sql.gz 2>/dev/null | sed 's/^/  /' || echo "  (none)";
+		exit 1;
 	fi
 	@if [ ! -f "$(FILE)" ]; then echo "✖ File not found: $(FILE)"; exit 1; fi
-	@if echo "$(FILE)" | grep -qE '[^a-zA-Z0-9._/-]'; then \
-		echo "✖ FILE='$(FILE)' contains unexpected characters"; \
-		exit 1; \
+	@if echo "$(FILE)" | grep -qE '[^a-zA-Z0-9._/-]'; then
+		echo "✖ FILE='$(FILE)' contains unexpected characters";
+		exit 1;
 	fi
 	@PASS=$$($(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
 		-o jsonpath='{.data.postgres_password}' | base64 -d)
 	@if [ -z "$$PASS" ]; then echo "✖ Could not read DB password — is nars-secrets deployed?"; exit 1; fi
 	@echo "→ Restoring '$(FILE)' into $(DB_NAME)..."
 	@echo "  ⚠ This will OVERWRITE the current database."
-	@if [ -t 0 ]; then \
-		read -p "  Continue? (yes/no): " confirm; \
-		if [ "$$confirm" != "yes" ]; then echo "  Cancelled."; exit 0; fi; \
-	else \
-		echo "  Non-interactive shell — refusing restore."; \
-		exit 1; \
+	@if [ -t 0 ]; then
+		read -p "  Continue? (yes/no): " confirm;
+		if [ "$$confirm" != "yes" ]; then echo "  Cancelled."; exit 0; fi;
+	else
+		echo "  Non-interactive shell — refusing restore.";
+		exit 1;
 	fi
 	@if echo "$(FILE)" | grep -q '\.gz$$'; then
 		(echo "$$PASS"; gunzip -c "$(FILE)") | $(KUBECTL) exec -i "$$POD" -n "$(NAMESPACE)" -- \
@@ -509,70 +519,70 @@ cluster-create: ## Create the kind cluster with host-mounted postgis data (idemp
 		if echo "$$DATA_DIR" | grep -qv '^/'; then
 			DATA_DIR="$$(cd "$$DATA_DIR" && pwd)"
 		fi
-		KIND_CFG=$$(mktemp /tmp/kind-$(CLUSTER_NAME)-XXXXXX.yaml); \
-		trap 'rm -f "$$KIND_CFG"' EXIT; \
-		{ \
-			echo 'kind: Cluster'; \
-			echo 'apiVersion: kind.x-k8s.io/v1alpha4'; \
-			echo "name: $(CLUSTER_NAME)"; \
-			echo 'kubeadmConfigPatches:'; \
-			echo '  - |'; \
-			echo '    kind: ClusterConfiguration'; \
-			echo '    apiServer:'; \
-			echo '      certSANs:'; \
-			echo '        - localhost'; \
-			echo '        - 127.0.0.1'; \
-			echo '        - 0.0.0.0'; \
-			echo 'nodes:'; \
-			echo '  - role: control-plane'; \
-			echo '    extraMounts:'; \
-			echo "      - hostPath: $$DATA_DIR"; \
-			echo '        containerPath: /mnt/nars/postgis'; \
+		KIND_CFG=$$(mktemp /tmp/kind-$(CLUSTER_NAME)-XXXXXX.yaml);
+		trap 'rm -f "$$KIND_CFG"' EXIT;
+		{
+			echo 'kind: Cluster';
+			echo 'apiVersion: kind.x-k8s.io/v1alpha4';
+			echo "name: $(CLUSTER_NAME)";
+			echo 'kubeadmConfigPatches:';
+			echo '  - |';
+			echo '    kind: ClusterConfiguration';
+			echo '    apiServer:';
+			echo '      certSANs:';
+			echo '        - localhost';
+			echo '        - 127.0.0.1';
+			echo '        - 0.0.0.0';
+			echo 'nodes:';
+			echo '  - role: control-plane';
+			echo '    extraMounts:';
+			echo "      - hostPath: $$DATA_DIR";
+			echo '        containerPath: /mnt/nars/postgis';
 		} > "$$KIND_CFG"
 		echo "→ Creating kind cluster '$(CLUSTER_NAME)'..."
 		kind create cluster --name "$(CLUSTER_NAME)" --config "$$KIND_CFG"
 		echo "✓ Cluster created"
 	fi
-	$(MAKE) cluster-wait
+	$(SUBMAKE) cluster-wait
 
 .PHONY: cluster-wait
 cluster-wait: ## Wait for API server and nodes to be ready
 	@echo "→ Waiting for API server and nodes..."
-	@if ! $(KUBECTL) get nodes >/dev/null 2>&1; then \
-		if docker info 2>/dev/null | grep -q "rootless"; then \
-			echo "→ Rootless Docker detected — fixing kubeconfig first"; \
-			$(MAKE) kubeconfig-fix; \
-		fi; \
-		i=0; until $(KUBECTL) get nodes 2>/dev/null; do \
-			sleep 2; i=$$((i + 1)); \
-			[ "$$i" -ge 60 ] && { echo "Timed out waiting for nodes"; exit 1; }; \
-		done; \
-	fi; \
+	@if ! $(KUBECTL) get nodes >/dev/null 2>&1; then
+		if docker info 2>/dev/null | grep -q "rootless"; then
+			echo "→ Rootless Docker detected — fixing kubeconfig first";
+			$(SUBMAKE) kubeconfig-fix;
+		fi;
+		i=0; until $(KUBECTL) get nodes 2>/dev/null; do
+			sleep 2; i=$$((i + 1));
+			[ "$$i" -ge 60 ] && { echo "Timed out waiting for nodes"; exit 1; };
+		done;
+	fi;
 	$(KUBECTL) wait --for=condition=Ready node --all --timeout=120s
 	@echo "✓ Cluster ready"
 
 .PHONY: kubeconfig-fix
 kubeconfig-fix: ## Patch kubeconfig for rootless Docker (port 16443 via kube-proxy socat)
-	@if docker info 2>/dev/null | grep -q "rootless"; then \
-		echo "→ Rootless Docker detected — fixing kubeconfig port"; \
-		KUBE_PROXY="kube-proxy"; \
-		if ! docker ps --format "{{.Names}}" 2>/dev/null | grep -q "^$$KUBE_PROXY$$"; then \
-			echo "→ Creating socat bridge (16443 -> $(CLUSTER_NAME)-control-plane:6443)..."; \
+	@if docker info 2>/dev/null | grep -q "rootless"; then
+		echo "→ Rootless Docker detected — fixing kubeconfig port";
+		KUBE_PROXY="kube-proxy";
+		if ! docker ps --format "{{.Names}}" 2>/dev/null | grep -q "^$$KUBE_PROXY$$"; then
+			echo "→ Creating socat bridge (16443 -> $(CLUSTER_NAME)-control-plane:6443)...";
 			docker run -d --name "$$KUBE_PROXY" --rm \
 				-p 127.0.0.1:16443:16443 \
 				--network kind \
 				alpine/socat \
-				tcp-listen:16443,fork,reuseaddr tcp-connect:$(CLUSTER_NAME)-control-plane:6443 > /dev/null; \
-		fi; \
-		KUBECONFIG=$$(mktemp); \
-		trap 'rm -f "$$KUBECONFIG"' EXIT; \
-		kind get kubeconfig --name "$(CLUSTER_NAME)" > "$$KUBECONFIG"; \
-		sed -i 's/127.0.0.1:[0-9]*/127.0.0.1:16443/' "$$KUBECONFIG"; \
-		mkdir -p "$$HOME/.kube"; \
-		cp "$$KUBECONFIG" "$$HOME/.kube/config"; \
-		echo "✓ kubeconfig patched to 127.0.0.1:16443"; \
-	else \
-		echo "→ Standard Docker — kubeconfig OK"; \
+				tcp-listen:16443,fork,reuseaddr tcp-connect:$(CLUSTER_NAME)-control-plane:6443 > /dev/null;
+		fi;
+		KUBECONFIG=$$(mktemp);
+		trap 'rm -f "$$KUBECONFIG"' EXIT;
+		kind get kubeconfig --name "$(CLUSTER_NAME)" > "$$KUBECONFIG";
+		sed -i 's/127.0.0.1:[0-9]*/127.0.0.1:16443/' "$$KUBECONFIG";
+		mkdir -p "$$HOME/.kube";
+		cp "$$KUBECONFIG" "$$HOME/.kube/config";
+		echo "✓ kubeconfig patched to 127.0.0.1:16443";
+	else
+		echo "→ Standard Docker — kubeconfig OK";
 	fi
 
 .PHONY: ingress-install
@@ -626,10 +636,10 @@ storage-provisioner-wait: ## Wait for local-path-provisioner to be ready
 	@echo "→ Waiting for local-path-provisioner..."
 	@if $(KUBECTL) wait --namespace local-path-storage \
 		--for=condition=available deployment/local-path-provisioner \
-		--timeout=120s 2>/dev/null; then \
-		echo "✓ local-path-provisioner ready"; \
-	else \
-		echo "  ⚠ local-path-provisioner not found (may use different namespace)"; \
+		--timeout=120s 2>/dev/null; then
+		echo "✓ local-path-provisioner ready";
+	else
+		echo "  ⚠ local-path-provisioner not found (may use different namespace)";
 	fi
 
 .PHONY: tls-generate
@@ -638,10 +648,10 @@ tls-generate: namespace-ensure ## Generate TLS certificate for $(DOMAIN) (idempo
 		echo "→ TLS secret 'nars-tls' already exists"
 	else
 		echo "→ Generating TLS certificate for $(DOMAIN)..."
-		TLS_TMPDIR=$$(mktemp -d); \
-		trap 'rm -rf "$$TLS_TMPDIR"' EXIT; \
-		CERT_FILE=$$TLS_TMPDIR/tls.crt; \
-		KEY_FILE=$$TLS_TMPDIR/tls.key; \
+		TLS_TMPDIR=$$(mktemp -d);
+		trap 'rm -rf "$$TLS_TMPDIR"' EXIT;
+		CERT_FILE=$$TLS_TMPDIR/tls.crt;
+		KEY_FILE=$$TLS_TMPDIR/tls.key;
 		mkcert -cert-file "$$CERT_FILE" -key-file "$$KEY_FILE" "$(DOMAIN)"
 		CERT_B64=$$(base64 -w0 < "$$CERT_FILE")
 		KEY_B64=$$(base64 -w0 < "$$KEY_FILE")
@@ -695,25 +705,25 @@ ca-secret: ca-generate namespace-ensure ## Create mTLS CA secret from k8s/certs/
 .PHONY: secrets-validate
 secrets-validate: ## Fail if kustomize output contains placeholder values (REPLACE_ME)
 	@echo "→ Validating kustomize output for placeholder values..."
-	@output=$$($(KUBECTL) kustomize "$(K8S_DIR)" 2>&1); \
-	exit_code=$$?; \
-	if [ "$$exit_code" -ne 0 ]; then \
-		echo "✖ ERROR: kustomize failed (exit $$exit_code):"; \
-		echo "$$output" | head -5; \
-		exit 1; \
-	fi; \
-	if [ -z "$$output" ]; then \
-		echo "✖ ERROR: kustomize produced empty output"; \
-		exit 1; \
-	fi; \
-	if echo "$$output" | grep -q "REPLACE_ME"; then \
-		echo "✖ ERROR: kustomize output contains REPLACE_ME placeholder values!"; \
-		echo "  Run 'make secrets-apply' to generate real secrets from .env."; \
-		echo "  Or edit the file directly to replace placeholders."; \
-		echo ""; \
-		echo "$$output" | grep -n "REPLACE_ME"; \
-		exit 1; \
-	fi; \
+	@output=$$($(KUBECTL) kustomize "$(K8S_DIR)" 2>&1);
+	exit_code=$$?;
+	if [ "$$exit_code" -ne 0 ]; then
+		echo "✖ ERROR: kustomize failed (exit $$exit_code):";
+		echo "$$output" | head -5;
+		exit 1;
+	fi;
+	if [ -z "$$output" ]; then
+		echo "✖ ERROR: kustomize produced empty output";
+		exit 1;
+	fi;
+	if echo "$$output" | grep -q "REPLACE_ME"; then
+		echo "✖ ERROR: kustomize output contains REPLACE_ME placeholder values!";
+		echo "  Run 'make secrets-apply' to generate real secrets from .env.";
+		echo "  Or edit the file directly to replace placeholders.";
+		echo "";
+		echo "$$output" | grep -n "REPLACE_ME";
+		exit 1;
+	fi;
 	echo "✓ No placeholder values found"
 
 .PHONY: secrets-apply
@@ -721,13 +731,13 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 # SECURITY: Uses temp files instead of --from-literal to avoid secret
 # exposure in `ps aux` / CI logs. Files are cleaned up on exit.
 	@echo "→ Creating 'nars-secrets'..."
-	@tmpdir=$$(mktemp -d); \
-	trap 'rm -rf "$$tmpdir"' EXIT; \
-	printf '%s' "$$POSTGRES_PASSWORD" > "$$tmpdir/postgres_password"; \
-	printf '%s' "Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=$$POSTGRES_PASSWORD" > "$$tmpdir/ConnectionStrings__DefaultConnection"; \
-	printf '%s' "$$JWT_SECRET" > "$$tmpdir/Jwt__SecretKey"; \
-	printf '%s' "$$GPG_PASSPHRASE" > "$$tmpdir/gpg-passphrase"; \
-	printf '%s' "$$NARS_ADMIN_SIGNUP_TOKEN" > "$$tmpdir/AdminSignup__SignupToken"; \
+	@tmpdir=$$(mktemp -d);
+	trap 'rm -rf "$$tmpdir"' EXIT;
+	printf '%s' "$$POSTGRES_PASSWORD" > "$$tmpdir/postgres_password";
+	printf '%s' "Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=$$POSTGRES_PASSWORD" > "$$tmpdir/ConnectionStrings__DefaultConnection";
+	printf '%s' "$$JWT_SECRET" > "$$tmpdir/Jwt__SecretKey";
+	printf '%s' "$$GPG_PASSPHRASE" > "$$tmpdir/gpg-passphrase";
+	printf '%s' "$$NARS_ADMIN_SIGNUP_TOKEN" > "$$tmpdir/AdminSignup__SignupToken";
 	$(KUBECTL) create secret generic nars-secrets -n "$(NAMESPACE)" \
 		--from-file=postgres_password="$$tmpdir/postgres_password" \
 		--from-file=ConnectionStrings__DefaultConnection="$$tmpdir/ConnectionStrings__DefaultConnection" \
@@ -738,54 +748,54 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 	| $(KUBECTL) apply -f -
 	@echo "✓ nars-secrets created"
 
-	@if [ -n "$(DOCKER_TOKEN)" ]; then \
-		echo "→ Creating 'regcred'..."; \
-		TMPDIR_REGCRED=$$(mktemp -d); \
-		trap 'rm -rf "$$tmpdir" "$$TMPDIR_REGCRED"' EXIT; \
-		printf '%s' "$$DOCKER_TOKEN" > "$$TMPDIR_REGCRED/docker_password"; \
-		printf '%s' "$$DOCKER_USERNAME" > "$$TMPDIR_REGCRED/docker_username"; \
+	@if [ -n "$(DOCKER_TOKEN)" ]; then
+		echo "→ Creating 'regcred'...";
+		TMPDIR_REGCRED=$$(mktemp -d);
+		trap 'rm -rf "$$tmpdir" "$$TMPDIR_REGCRED"' EXIT;
+		printf '%s' "$$DOCKER_TOKEN" > "$$TMPDIR_REGCRED/docker_password";
+		printf '%s' "$$DOCKER_USERNAME" > "$$TMPDIR_REGCRED/docker_username";
 		$(KUBECTL) create secret docker-registry regcred -n "$(NAMESPACE)" \
 			--docker-server=https://index.docker.io/v1/ \
 			--docker-username-file="$$TMPDIR_REGCRED/docker_username" \
 			--docker-password-file="$$TMPDIR_REGCRED/docker_password" \
 			--dry-run=client -o yaml \
-		| $(KUBECTL) apply -f -; \
-		echo "✓ regcred created"; \
-	else \
-		echo "→ Skipping regcred (DOCKER_TOKEN not set — using locally loaded images)"; \
+		| $(KUBECTL) apply -f -;
+		echo "✓ regcred created";
+	else
+		echo "→ Skipping regcred (DOCKER_TOKEN not set — using locally loaded images)";
 	fi
 
 .PHONY: kustomize-set-image-tag
 kustomize-set-image-tag: ## Persistently pin image tags in kustomization.yaml (manual; kustomize-apply rewrites tags per-run)
-	@if [ -z "$(IMAGE_TAG)" ]; then \
-		echo "✖ IMAGE_TAG is empty — specify a tag (e.g. IMAGE_TAG=abc1234)"; \
-		exit 1; \
+	@if [ -z "$(IMAGE_TAG)" ]; then
+		echo "✖ IMAGE_TAG is empty — specify a tag (e.g. IMAGE_TAG=abc1234)";
+		exit 1;
 	fi
-	@if echo "$(IMAGE_TAG)" | grep -qE '[^a-zA-Z0-9._-]'; then \
-		echo "✖ IMAGE_TAG='$(IMAGE_TAG)' contains invalid characters (only alphanumeric, dots, hyphens, underscores allowed)"; \
-		exit 1; \
+	@if echo "$(IMAGE_TAG)" | grep -qE '[^a-zA-Z0-9._-]'; then
+		echo "✖ IMAGE_TAG='$(IMAGE_TAG)' contains invalid characters (only alphanumeric, dots, hyphens, underscores allowed)";
+		exit 1;
 	fi
-	@if echo "$(IMAGE_TAG)" | grep -qi "^latest$$"; then \
-		echo "  ⚠ IMAGE_TAG=$(IMAGE_TAG) is 'latest' — not pinning. Set IMAGE_TAG=<commit-sha> for reproducible deployments."; \
-	else \
-		if ! command -v kustomize >/dev/null 2>&1; then \
-			echo "✖ standalone 'kustomize' binary is not installed (needed for 'edit set image')."; \
-			echo "  Use 'make kustomize-apply IMAGE_TAG=$(IMAGE_TAG)' instead — it applies the pin without modifying files."; \
-			exit 1; \
-		fi; \
-		echo "→ Pinning kustomize image tags to $(IMAGE_TAG)..."; \
+	@if echo "$(IMAGE_TAG)" | grep -qi "^latest$$"; then
+		echo "  ⚠ IMAGE_TAG=$(IMAGE_TAG) is 'latest' — not pinning. Set IMAGE_TAG=<commit-sha> for reproducible deployments.";
+	else
+		if ! command -v kustomize >/dev/null 2>&1; then
+			echo "✖ standalone 'kustomize' binary is not installed (needed for 'edit set image').";
+			echo "  Use 'make kustomize-apply IMAGE_TAG=$(IMAGE_TAG)' instead — it applies the pin without modifying files.";
+			exit 1;
+		fi;
+		echo "→ Pinning kustomize image tags to $(IMAGE_TAG)...";
 		(cd "$(K8S_DIR)" && \
 		kustomize edit set image \
 			$(DOCKER_ORG)/nars-api=$(DOCKER_ORG)/nars-api:$(IMAGE_TAG) \
 			$(DOCKER_ORG)/nars-postgis=$(DOCKER_ORG)/nars-postgis:$(IMAGE_TAG) \
 			$(DOCKER_ORG)/nars-vite=$(DOCKER_ORG)/nars-vite:$(IMAGE_TAG) \
-			$(DOCKER_ORG)/nars-backup=$(DOCKER_ORG)/nars-backup:$(IMAGE_TAG)); \
-		echo "✓ Image tags pinned to $(IMAGE_TAG)"; \
+			$(DOCKER_ORG)/nars-backup=$(DOCKER_ORG)/nars-backup:$(IMAGE_TAG));
+		echo "✓ Image tags pinned to $(IMAGE_TAG)";
 	fi
 
 .PHONY: kustomize-apply
-kustomize-apply: secrets-validate ## Apply k8s manifests via kustomize (pin tags with IMAGE_TAG=<sha>)
-	$(MAKE) postgis-pv-fix
+kustomize-apply: secrets-validate _check-pinned-tag ## Apply k8s manifests via kustomize (pin tags with IMAGE_TAG=<sha>)
+	$(SUBMAKE) postgis-pv-fix
 	@echo "→ Applying kustomization (images: $(DOCKER_ORG)/*:$(IMAGE_TAG))..."
 	@$(KUBECTL) kustomize "$(K8S_DIR)" \
 		| awk -v org="$(DOCKER_ORG)" -v tag="$(IMAGE_TAG)" \
@@ -797,8 +807,8 @@ kustomize-apply: secrets-validate ## Apply k8s manifests via kustomize (pin tags
 	@if $(KUBECTL) get deployment postgis -n "$(NAMESPACE)" 2>/dev/null >/dev/null; then
 		$(KUBECTL) wait --namespace "$(NAMESPACE)" \
 			--for=condition=Available deployment/postgis --timeout=240s
-		$(MAKE) postgis-password-sync
-		$(MAKE) postgis-migration-baseline
+		$(SUBMAKE) postgis-password-sync
+		$(SUBMAKE) postgis-migration-baseline
 	fi
 
 	@echo "→ Waiting for app deployments..."
@@ -889,30 +899,30 @@ postgis-migration-baseline: ## Backfill EF migration history for pre-existing sc
 postgis-pv-fix: ## Fix postgis PV permissions inside kind container (rootless Docker workaround)
 	@echo "→ Fixing postgis PV permissions..."
 	@if docker exec $(CLUSTER_NAME)-control-plane sh -c ' \
-		if [ -d /mnt/nars/postgis/data ]; then \
-			chown -R 999:999 /mnt/nars/postgis/data; \
-			chmod 700 /mnt/nars/postgis/data; \
-			echo "✓ postgis data dir ownership set to 999:999"; \
-		else \
-			echo "⚠  /mnt/nars/postgis/data not found inside kind (PV not mounted yet?)"; \
-			exit 1; \
-		fi \
-	' 2>/dev/null; then \
-		echo "✓ Postgis PV permission fix applied"; \
-	else \
-		echo "⚠  Could not chown postgis data dir (non-fatal)"; \
+		if [ -d /mnt/nars/postgis/data ]; then
+			chown -R 999:999 /mnt/nars/postgis/data;
+			chmod 700 /mnt/nars/postgis/data;
+			echo "✓ postgis data dir ownership set to 999:999";
+		else
+			echo "⚠  /mnt/nars/postgis/data not found inside kind (PV not mounted yet?)";
+			exit 1;
+		fi
+	' 2>/dev/null; then
+		echo "✓ Postgis PV permission fix applied";
+	else
+		echo "⚠  Could not chown postgis data dir (non-fatal)";
 	fi
 
 # ─── Observability (Grafana LGTM + OTel) ─────────────────────
 
 .PHONY: observability-install
 observability-install: helm-check helm-repos ## Install LGTM stack + OpenTelemetry Collector
-	$(MAKE) observability-namespace
-	$(MAKE) observability-prometheus-stack
-	$(MAKE) observability-loki
-	$(MAKE) observability-tempo
-	$(MAKE) observability-otel-collector
-	$(MAKE) observability-servicemonitor
+	$(SUBMAKE) observability-namespace
+	$(SUBMAKE) observability-prometheus-stack
+	$(SUBMAKE) observability-loki
+	$(SUBMAKE) observability-tempo
+	$(SUBMAKE) observability-otel-collector
+	$(SUBMAKE) observability-servicemonitor
 	@echo ""
 	@echo "✓ Observability stack installed!"
 	@echo ""
@@ -941,9 +951,9 @@ observability-namespace: ## Ensure observability namespace exists (idempotent)
 .PHONY: observability-prometheus-stack
 observability-prometheus-stack: ## Install Prometheus + Grafana + AlertManager
 	@echo "→ Installing kube-prometheus-stack..."
-	@tmpdir=$$(mktemp -d); \
-	trap 'rm -rf "$$tmpdir"' EXIT; \
-	printf '%s' "$$GRAFANA_PASSWORD" > "$$tmpdir/grafana_password"; \
+	@tmpdir=$$(mktemp -d);
+	trap 'rm -rf "$$tmpdir"' EXIT;
+	printf '%s' "$$GRAFANA_PASSWORD" > "$$tmpdir/grafana_password";
 	helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
 		--namespace $(OBSERVABILITY_NAMESPACE) \
 		--values $(K8S_DIR)/helm-values/kube-prometheus-stack.yaml \
@@ -1018,12 +1028,12 @@ observability-servicemonitor: ## Apply OTel metrics Service + ServiceMonitor (re
 
 .PHONY: observability-port-forward
 observability-port-forward: ## Port-forward Grafana, Loki, Tempo (background)
-	@mkdir -p "$(LOG_DIR)"; \
-	echo "→ Starting observability port-forwards (background)..."; \
-	pkill -f "port-forward.*observability.*grafana" 2>/dev/null || true; \
-	pkill -f "port-forward.*observability.*loki-gateway" 2>/dev/null || true; \
-	pkill -f "port-forward.*observability.*tempo" 2>/dev/null || true; \
-	sleep 0.5; \
+	@mkdir -p "$(LOG_DIR)";
+	echo "→ Starting observability port-forwards (background)...";
+	pkill -f "port-forward.*observability.*grafana" 2>/dev/null || true;
+	pkill -f "port-forward.*observability.*loki-gateway" 2>/dev/null || true;
+	pkill -f "port-forward.*observability.*tempo" 2>/dev/null || true;
+	sleep 0.5;
 	nohup $(KUBECTL) port-forward -n $(OBSERVABILITY_NAMESPACE) \
 		service/prometheus-stack-grafana 3000:3000 \
 		> "$(LOG_DIR)/port-forward-grafana.log" 2>&1 & \
@@ -1033,10 +1043,10 @@ observability-port-forward: ## Port-forward Grafana, Loki, Tempo (background)
 	nohup $(KUBECTL) port-forward -n $(OBSERVABILITY_NAMESPACE) \
 		service/tempo 3200:3200 \
 		> "$(LOG_DIR)/port-forward-tempo.log" 2>&1 & \
-	echo "✓ Port-forwards running"; \
-	echo "  Grafana: http://localhost:3000 (run \`make grafana-password\` to retrieve credentials)"; \
-	echo "  Loki:    http://localhost:3100"; \
-	echo "  Tempo:   http://localhost:3200"; \
+	echo "✓ Port-forwards running";
+	echo "  Grafana: http://localhost:3000 (run \`make grafana-password\` to retrieve credentials)";
+	echo "  Loki:    http://localhost:3100";
+	echo "  Tempo:   http://localhost:3200";
 	echo "  Logs:    tail -f $(LOG_DIR)/port-forward-{grafana,loki,tempo}.log"
 
 .PHONY: observability-stop
@@ -1046,11 +1056,11 @@ observability-stop: ## Stop observability port-forwards
 
 .PHONY: grafana-password
 grafana-password: ## Show the generated Grafana admin password (stderr only, non-CI safe)
-	@if [ -t 2 ]; then \
-		echo "$(GRAFANA_PASSWORD)" >&2; \
-	else \
-		echo "⚠ Refusing to print password to non-tty stderr (use 'make grafana-password' interactively)" >&2; \
-		exit 1; \
+	@if [ -t 2 ]; then
+		echo "$(GRAFANA_PASSWORD)" >&2;
+	else
+		echo "⚠ Refusing to print password to non-tty stderr (use 'make grafana-password' interactively)" >&2;
+		exit 1;
 	fi
 
 # ─── Code Quality (nars-infra) ──────────────────────────────
@@ -1058,14 +1068,14 @@ grafana-password: ## Show the generated Grafana admin password (stderr only, non
 .PHONY: lint
 lint: ## Run cross-project linting (.NET format + infra linters)
 	dotnet format Workspace.sln --verify-no-changes --no-restore
-	$(MAKE) infra-lint
+	$(SUBMAKE) infra-lint
 
 .PHONY: infra-lint
 infra-lint: ## Run all nars-infra linters (shell, docker, yaml)
-	$(MAKE) infra-lint-shell
-	$(MAKE) infra-lint-docker
-	$(MAKE) infra-lint-yaml
-	$(MAKE) infra-lint-makefile
+	$(SUBMAKE) infra-lint-shell
+	$(SUBMAKE) infra-lint-docker
+	$(SUBMAKE) infra-lint-yaml
+	$(SUBMAKE) infra-lint-makefile
 
 .PHONY: infra-lint-shell
 infra-lint-shell: ## Shell-check nars-infra/scripts/*.sh
@@ -1113,16 +1123,30 @@ infra-lint-makefile: ## Validate Makefile syntax with dry-run
 # Defaults to 'latest' for local dev. CI/CD should set this to the commit SHA.
 IMAGE_TAG ?= latest
 
+# DEPLOY_ENV gates use of the mutable 'latest' tag:
+#   dev (default)       — local kind loop; 'latest' allowed
+#   production/staging  — 'latest' refused; deployments must pin IMAGE_TAG=<sha>
+# Set ALLOW_LATEST=1 for a deliberate emergency manual rollout.
+DEPLOY_ENV ?= dev
+
+.PHONY: _check-pinned-tag
+_check-pinned-tag: ## Fail if deploying with the mutable 'latest' tag outside local dev
+	@if [ "$(ALLOW_LATEST)" != "1" ] && [ "$(DEPLOY_ENV)" != "dev" ] && echo "$(IMAGE_TAG)" | grep -qi "^latest$$"; then
+		echo "✖ Refusing to deploy IMAGE_TAG=latest in $(DEPLOY_ENV) — mutable tags break reproducible deployments.";
+		echo "  Set IMAGE_TAG=<commit-sha>, or DEPLOY_ENV=dev, or ALLOW_LATEST=1 to override.";
+		exit 1;
+	fi
+
 .PHONY: images-build
 images-build: ## Build all Docker images
-	@if echo "$(IMAGE_TAG)" | grep -qi "^latest$$"; then \
-		echo "  ⚠ IMAGE_TAG=latest — set IMAGE_TAG=<commit-sha> for CI/CD builds"; \
+	@if echo "$(IMAGE_TAG)" | grep -qi "^latest$$"; then
+		echo "  ⚠ IMAGE_TAG=latest — set IMAGE_TAG=<commit-sha> for CI/CD builds";
 	fi
 	@echo "→ Building images..."
-	$(MAKE) _build-nars-api
-	$(MAKE) _build-nars-postgis
-	$(MAKE) _build-nars-vite
-	$(MAKE) _build-nars-backup
+	$(SUBMAKE) _build-nars-api
+	$(SUBMAKE) _build-nars-postgis
+	$(SUBMAKE) _build-nars-vite
+	$(SUBMAKE) _build-nars-backup
 	@echo "✓ All images built"
 
 .PHONY: _build-nars-api
@@ -1150,9 +1174,9 @@ _build-nars-backup:
 		-t "$(DOCKER_ORG)/nars-backup:$(IMAGE_TAG)" .
 
 .PHONY: images-push
-images-push: ## Push all Docker images to registry
-	@if echo "$(IMAGE_TAG)" | grep -qi "^latest$$"; then \
-		echo "  ⚠ Pushing 'latest' tag — set IMAGE_TAG=<commit-sha> for CI/CD builds"; \
+images-push: _check-pinned-tag ## Push all Docker images to registry
+	@if echo "$(IMAGE_TAG)" | grep -qi "^latest$$"; then
+		echo "  ⚠ Pushing 'latest' tag — set IMAGE_TAG=<commit-sha> for CI/CD builds";
 	fi
 	@	for img in $(REGISTRY_IMAGES); do
 		echo "→ Pushing $(DOCKER_ORG)/$$img:$(IMAGE_TAG)..."
@@ -1162,8 +1186,8 @@ images-push: ## Push all Docker images to registry
 
 .PHONY: images-load
 images-load: ## Load locally built Docker images into the kind cluster
-	@if echo "$(IMAGE_TAG)" | grep -qi "^latest$$"; then \
-		echo "  ⚠ Loading 'latest' tag — set IMAGE_TAG=<commit-sha> for CI/CD builds"; \
+	@if echo "$(IMAGE_TAG)" | grep -qi "^latest$$"; then
+		echo "  ⚠ Loading 'latest' tag — set IMAGE_TAG=<commit-sha> for CI/CD builds";
 	fi
 	@for img in $(REGISTRY_IMAGES); do
 		full="$(DOCKER_ORG)/$$img:$(IMAGE_TAG)"
@@ -1178,7 +1202,7 @@ images-load: ## Load locally built Docker images into the kind cluster
 
 .PHONY: frontend-update
 frontend-update: ## Rebuild nars-vite, load into kind, and rollout restart
-	$(MAKE) _build-nars-vite
+	$(SUBMAKE) _build-nars-vite
 	@kind load docker-image "$(DOCKER_ORG)/nars-vite:$(IMAGE_TAG)" --name "$(CLUSTER_NAME)"
 	@$(KUBECTL) rollout restart deployment nars-frontend -n "$(NAMESPACE)"
 	@$(KUBECTL) rollout status deployment nars-frontend -n "$(NAMESPACE)" --timeout=120s
@@ -1199,4 +1223,14 @@ test-coverage: ## Run backend tests with coverage and enforce thresholds (coverl
 		/p:CoverletOutput=TestResults/coverage.cobertura.xml
 
 .PHONY: clean
-clean: cluster-down ## Tear down the cluster (data preserved — use 'cluster-clean' to also wipe data)
+clean: ## NOT a build-clean — refuses accidental cluster teardown (use cluster-down / cluster-clean)
+	@echo "⚠ 'make clean' tears down the cluster — this is NOT a build-clean."
+	@echo "  Use 'make cluster-down' (data preserved) or 'make cluster-clean' (data wiped)."
+	@if [ -t 0 ]; then
+		read -p "  Type '$(CLUSTER_NAME)' to proceed with teardown: " confirm
+		if [ "$$confirm" != "$(CLUSTER_NAME)" ]; then echo "  Cancelled."; exit 1; fi
+	else
+		echo "  Non-interactive shell — refusing teardown."
+		exit 1
+	fi
+	@$(SUBMAKE) cluster-down
