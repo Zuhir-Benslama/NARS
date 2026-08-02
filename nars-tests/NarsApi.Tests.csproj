@@ -8,13 +8,14 @@
     <!--
       Coverage thresholds for coverlet.msbuild, applied only when coverage is
       collected (`dotnet test /p:CollectCoverage=true` — see `make test-coverage`).
-      These are a REGRESSION FLOOR, not a target: measured 2026-08-01 was
-      ~32.7% line / 46.1% branch (full suite) and ~23.1% line / 33.6% branch
-      (unit tests only, as CI runs them). Raise as coverage improves — do not lower.
+      These are a REGRESSION FLOOR, not a target: measured 2026-08-02 was
+      ~43.7% line / 38.8% branch (unit tests only, as CI runs them; excludes
+      generated code — see the Exclude property below). Raise as coverage
+      improves — do not lower.
       Defined here (not on the CLI) because the vstest command-line parser
       splits comma-separated /p: values (e.g. ThresholdType=line,branch).
     -->
-    <Threshold Condition="'$(CollectCoverage)' == 'true'">20</Threshold>
+    <Threshold Condition="'$(CollectCoverage)' == 'true'">35</Threshold>
     <ThresholdType Condition="'$(CollectCoverage)' == 'true'">line,branch</ThresholdType>
     <ThresholdStat Condition="'$(CollectCoverage)' == 'true'">total</ThresholdStat>
   </PropertyGroup>
@@ -44,5 +45,16 @@
   <ItemGroup>
     <ProjectReference Include="..\nars-api\NarsApi.csproj" />
   </ItemGroup>
+
+  <!--
+    Coverage exclusions: EF Core migrations (including *.Designer.cs and the
+    model snapshot) and the OpenAPI source-generator output are generated code
+    that cannot be meaningfully unit-tested. Counting them against the coverage
+    floor inflates the denominator by ~50% and hides real regressions.
+    Applied only when coverage is collected (dotnet test /p:CollectCoverage=true).
+  -->
+  <PropertyGroup Condition="'$(CollectCoverage)' == 'true'">
+    <Exclude>[NarsApi]NarsApi.Migrations.*,[NarsApi]Microsoft.AspNetCore.OpenApi.Generated.*,[NarsApi]System.Runtime.CompilerServices.*</Exclude>
+  </PropertyGroup>
 
 </Project>

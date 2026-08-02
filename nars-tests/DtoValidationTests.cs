@@ -16,10 +16,11 @@ public class DtoValidationTests
     /// validates record DTOs.  Validator.TryValidateObject only inspects
     /// properties, which misses parameter-level attributes on records.
     ///
-    /// WARNING: This uses reflection on constructor parameters. If a DTO
-    /// record adds a required parameter without a matching property, or
-    /// changes parameter order, this validator may give wrong results.
-    /// Keep in sync with the actual DTO constructors.
+    /// If a DTO record adds a [Required] constructor parameter that has no
+    /// matching public property (e.g. after a parameter rename), the lookup
+    /// below THROWS instead of silently producing wrong results — keeping the
+    /// helper in sync with the actual DTO constructors is an explicit
+    /// requirement enforced at test time.
     /// </summary>
     private static List<ValidationResult> ValidateRecord<T>(T record)
     {
@@ -33,10 +34,12 @@ public class DtoValidationTests
                 continue;
             }
 
-            var value = record!
-                .GetType()
-                .GetProperty(param.Name!, BindingFlags.Public | BindingFlags.Instance)!
-                .GetValue(record);
+            var prop = typeof(T).GetProperty(param.Name!, BindingFlags.Public | BindingFlags.Instance)
+                ?? throw new InvalidOperationException(
+                    $"DTO {typeof(T).Name} has a [Required] constructor parameter '{param.Name}' " +
+                    "with no matching public property — keep constructor parameters and properties in sync.");
+
+            var value = prop.GetValue(record);
 
             if (value is null && param.ParameterType.IsValueType)
             {

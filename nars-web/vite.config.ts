@@ -46,8 +46,11 @@ export default defineConfig(({ command, mode }) => {
       // Source maps only for non-production builds — shipping maps publicly
       // exposes the full original TS/Vue source. Keep them for dev/staging.
       sourcemap: mode !== "production",
-      // Maplibre GL JS is ~1MB - separated into its own chunk
-      chunkSizeWarningLimit: 1500,
+      // Maplibre GL JS is ~1MB and @geoman-io/maplibre-geoman-free (~0.7MB)
+      // bundles it via a default import, so the vendor-geoman chunk can reach
+      // ~1.7MB after minification — this is stable vendor code that changes
+      // rarely and is cached across deploys.
+      chunkSizeWarningLimit: 1700,
       rollupOptions: {
         output: {
           entryFileNames: "assets/[name]-[hash].js",
@@ -56,8 +59,17 @@ export default defineConfig(({ command, mode }) => {
           manualChunks(id: string) {
             if (!id.includes("node_modules")) return
 
-            // Maplibre GL JS - core library
+            // Maplibre GL JS - core library. Note: rolldown bundles maplibre-gl
+            // INTO the geoman chunk because @geoman-io/maplibre-geoman-free
+            // default-imports the whole library; the split is still honoured at
+            // the CSS level (vendor-maplibre.css stays separate).
             if (id.includes("maplibre-gl")) return "vendor-maplibre"
+
+            // Maplibre Geoman - drawing/editing toolkit (large, changes rarely)
+            if (id.includes("@geoman-io/maplibre-geoman-free")) return "vendor-geoman"
+
+            // Graphology - road network graph (changes rarely)
+            if (id.includes("graphology")) return "vendor-graphology"
 
             // Turf.js - GIS operations (submodules only)
             if (id.includes("@turf")) return "vendor-turf"
