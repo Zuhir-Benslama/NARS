@@ -40,10 +40,15 @@ public static class TestData
     public const int OversizedDataLength = 600_000;
 
     // ── User IDs ───────────────────────────────────────────────────────
+    // Single shared ID so callers don't generate a fresh Guid per call
+    // (each test uses its own in-memory DB, so sharing cannot collide).
     public static readonly Guid UserId = Guid.NewGuid();
 
     // ── Location IDs ───────────────────────────────────────────────────
     public const int CommuneId1 = 1;
+
+    // ── "Not found" sentinels ───────────────────────────────────────────
+    public const int NonExistentId = 999;
 
     // ── Date / time ────────────────────────────────────────────────────
     public static readonly DateTime FixedUtcNow = new(2025, 6, 1, 12, 0, 0, DateTimeKind.Utc);

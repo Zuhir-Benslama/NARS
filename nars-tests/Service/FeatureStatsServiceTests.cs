@@ -6,9 +6,10 @@ using NarsApi.Services;
 using static NarsApi.Tests.TestData;
 using Xunit;
 
-namespace NarsApi.Tests.Integration;
+namespace NarsApi.Tests.Service;
 
 [Collection(PostgreSqlCollection.CollectionName)]
+[Trait("Category", "Service")]
 public class FeatureStatsServiceTests(NarsDatabaseFixture fixture) : IAsyncLifetime
 {
     private readonly NarsDatabaseFixture _fixture = fixture;

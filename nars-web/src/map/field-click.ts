@@ -10,26 +10,33 @@ export function registerFieldWorkerClick(): void {
 
   if (appStore.user?.role !== "field_worker") return
 
-  map.on("click", (e: MapMouseEvent) => {
-    const features = map.queryRenderedFeatures(e.point, {
-      layers: ["nars-point", "nars-line", "nars-polygon-fill", "nars-polygon-stroke"],
-    })
+  map.on("click", onFieldWorkerClick)
+}
 
-    if (features.length === 0) return
+export function unregisterFieldWorkerClick(): void {
+  getCtx().map.off("click", onFieldWorkerClick)
+}
 
-    const feature = features[0]
-    const props = feature.properties
-    if (!props) return
+function onFieldWorkerClick(e: MapMouseEvent): void {
+  const map = getCtx().map
+  const features = map.queryRenderedFeatures(e.point, {
+    layers: ["nars-point", "nars-line", "nars-polygon-fill", "nars-polygon-stroke"],
+  })
 
-    const fieldStore = useFieldStore()
-    const type = mapPhaseKeyToInspectionType(props.phaseKey as string)
-    if (!type) return
+  if (features.length === 0) return
 
-    fieldStore.selectFeature({
-      id: props.dbId as string,
-      label: (props.label as string) || `Unnamed ${type}`,
-      type,
-    })
+  const feature = features[0]
+  const props = feature.properties
+  if (!props) return
+
+  const fieldStore = useFieldStore()
+  const type = mapPhaseKeyToInspectionType(props.phaseKey as string)
+  if (!type) return
+
+  fieldStore.selectFeature({
+    id: props.dbId as string,
+    label: (props.label as string) || `Unnamed ${type}`,
+    type,
   })
 }
 

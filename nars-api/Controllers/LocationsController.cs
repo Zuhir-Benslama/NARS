@@ -23,21 +23,29 @@ public class LocationsController(
     IOptions<LocationsOptions> locationsOptions,
     IBoundaryService boundaryService,
     ILocationQueryService locationQuery,
-    ILocationSearchService locationSearch) : ControllerBase
+    ILocationSearchService locationSearch,
+    IWebHostEnvironment environment) : ControllerBase
 {
 
     private static string EscapeLikeWildcards(string input)
         => input.Replace("%", "\\%").Replace("_", "\\_", StringComparison.Ordinal);
 
-    private string ValidateSearch(string? search)
+    /// <summary>
+    /// Validates the search length and escapes LIKE wildcards. Returns an error
+    /// <see cref="IActionResult"/> when the search is too long, or null on success
+    /// with <paramref name="sanitized"/> holding the escaped search term.
+    /// </summary>
+    private IActionResult? ValidateSearch(string? search, out string sanitized)
     {
         search ??= "";
+        sanitized = EscapeLikeWildcards(search);
         var maxSearchLength = locationsOptions.Value.MaxSearchLength;
         if (search.Length > maxSearchLength)
         {
-            throw new InvalidOperationException($"Search query is too long (max {maxSearchLength} characters).");
+            return Problem(detail: $"Search query is too long (max {maxSearchLength} characters).", statusCode: 400);
         }
-        return EscapeLikeWildcards(search);
+
+        return null;
     }
 
     // ── GET /api/wilayas ──────────────────────────────────────
@@ -52,17 +60,15 @@ public class LocationsController(
         [FromQuery] int take = 100,
         CancellationToken cancellationToken = default)
     {
+        skip = Math.Max(skip, 0);
         take = Math.Clamp(take, 1, 500);
-        try
+        if (ValidateSearch(search, out var sanitized) is { } error)
         {
-            var sanitized = ValidateSearch(search);
-            var result = await locationSearch.SearchWilayasAsync(sanitized, skip, take, cancellationToken);
-            return Ok(result);
+            return error;
         }
-        catch (InvalidOperationException ex)
-        {
-            return Problem(detail: ex.Message, statusCode: 400);
-        }
+
+        var result = await locationSearch.SearchWilayasAsync(sanitized, skip, take, cancellationToken);
+        return Ok(result);
     }
 
     // ── GET /api/dairas ───────────────────────────────────────
@@ -83,17 +89,15 @@ public class LocationsController(
             return Problem(detail: "wilaya_id is required.", statusCode: 400);
         }
 
+        skip = Math.Max(skip, 0);
         take = Math.Clamp(take, 1, 500);
-        try
+        if (ValidateSearch(search, out var sanitized) is { } error)
         {
-            var sanitized = ValidateSearch(search);
-            var result = await locationSearch.SearchDairasAsync(wilaya_id, sanitized, skip, take, cancellationToken);
-            return Ok(result);
+            return error;
         }
-        catch (InvalidOperationException ex)
-        {
-            return Problem(detail: ex.Message, statusCode: 400);
-        }
+
+        var result = await locationSearch.SearchDairasAsync(wilaya_id, sanitized, skip, take, cancellationToken);
+        return Ok(result);
     }
 
     // ── GET /api/communes ─────────────────────────────────────
@@ -114,17 +118,15 @@ public class LocationsController(
             return Problem(detail: "daira_id is required.", statusCode: 400);
         }
 
+        skip = Math.Max(skip, 0);
         take = Math.Clamp(take, 1, 500);
-        try
+        if (ValidateSearch(search, out var sanitized) is { } error)
         {
-            var sanitized = ValidateSearch(search);
-            var result = await locationSearch.SearchCommunesAsync(daira_id.Value, sanitized, skip, take, cancellationToken);
-            return Ok(result);
+            return error;
         }
-        catch (InvalidOperationException ex)
-        {
-            return Problem(detail: ex.Message, statusCode: 400);
-        }
+
+        var result = await locationSearch.SearchCommunesAsync(daira_id.Value, sanitized, skip, take, cancellationToken);
+        return Ok(result);
     }
 
     // ── GET /api/commune/{id}/boundary ────────────────────────
@@ -176,9 +178,9 @@ public class LocationsController(
     [HttpGet("commune/{communeId:int}/boundary-debug")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DebugCommuneBoundary(int communeId, IHostEnvironment env, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> DebugCommuneBoundary(int communeId, CancellationToken cancellationToken = default)
     {
-        if (!env.IsDevelopment())
+        if (!environment.IsDevelopment())
         {
             return NotFound();
         }

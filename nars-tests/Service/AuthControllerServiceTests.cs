@@ -15,10 +15,11 @@ using NarsApi.Services;
 using static NarsApi.Tests.TestData;
 using Xunit;
 
-namespace NarsApi.Tests.Integration;
+namespace NarsApi.Tests.Service;
 
 [Collection(PostgreSqlCollection.CollectionName)]
-public class AuthControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsyncLifetime
+[Trait("Category", "Service")]
+public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLifetime
 {
     private readonly NarsDatabaseFixture _fixture = fixture;
     private AppDbContext _db = null!;
@@ -140,6 +141,11 @@ public class AuthControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsyn
 
         // Fire both concurrently — both pass the SELECT uniqueness check,
         // then one INSERT succeeds while the other hits the unique constraint.
+        // INVARIANT: this test only stays deterministic because the DB unique
+        // index on (username) guarantees exactly one 201 + one 409 regardless
+        // of whether the requests actually overlap. If the uniqueness check is
+        // ever cached or wrapped so the constraint error is swallowed, this
+        // becomes flaky — the 409 must come from the unique index.
         var results = await Task.WhenAll(
             ctrl1.AuthorizedAdminSignup(request, signupToken: TestData.AdminSignupToken, CancellationToken.None),
             ctrl2.AuthorizedAdminSignup(request, signupToken: TestData.AdminSignupToken, CancellationToken.None)
@@ -224,7 +230,7 @@ public class AuthControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsyn
 
         await using var db = _fixture.CreateDbContext();
         var tokenCount = await db.RefreshTokens.AsNoTracking().CountAsync(rt => rt.UserId == user.Id && !rt.Revoked);
-        Assert.True(tokenCount > 0);
+        Assert.NotEqual(0, tokenCount);
 
         var claims = new List<Claim> { new(ClaimNames.UserId, user.Id.ToString()) };
         var httpContext = CreateHttpContext(claims);
@@ -236,7 +242,7 @@ public class AuthControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsyn
         Assert.Equal(200, okResult.StatusCode);
 
         var revokedCount = await db.RefreshTokens.AsNoTracking().CountAsync(rt => rt.UserId == user.Id && rt.Revoked);
-        Assert.True(revokedCount > 0);
+        Assert.NotEqual(0, revokedCount);
     }
 
     [Fact]
@@ -257,7 +263,11 @@ public class AuthControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsyn
 
         var result = await currentController.CurrentUser();
         var okResult = Assert.IsType<OkObjectResult>(result);
-        Assert.NotNull(okResult.Value);
+        var payload = Assert.IsType<UserInfoWithLocation>(okResult.Value);
+        Assert.Equal(user.Id.ToString(), payload.Id);
+        Assert.Equal("current_user", payload.Username);
+        Assert.Equal(UserRoles.CommuneUser, payload.Role);
+        Assert.Equal("current_user@test.com", payload.Email);
     }
 
     private AuthController CreateController() => CreateController(_db);

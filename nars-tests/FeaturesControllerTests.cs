@@ -37,12 +37,10 @@ public class FeaturesControllerTests
         {
             ControllerContext = new ControllerContext
             {
-                HttpContext = new DefaultHttpContext
-                {
-                    User = AuthTestHelper.CreateClaimsPrincipal(UserId, UserRoles.FieldWorker, communeId: 1)
-                }
+                HttpContext = new DefaultHttpContext()
             }
         };
+        AuthTestHelper.SetUser(ctrl, UserId, UserRoles.FieldWorker, communeId: 1);
 
         return ctrl;
     }
@@ -111,7 +109,7 @@ public class FeaturesControllerTests
     {
         using var db = CreateInMemoryDb("FeaturesTest");
         var ctrl = CreateController(db);
-        var data = Json("""{"coordinates":[{"lat":36.0,"lng":3.0}],"roadDbId":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}""");
+        var data = Json($$"""{"coordinates":[{"lat":36.0,"lng":3.0}],"roadDbId":"{{Guid.NewGuid()}}"}""");
         var body = new FeatureSaveRequest(FeatureTypes.HouseEntrance, FeatureTypes.HouseEntranceLayers.Main, "label", data);
         var result = await ctrl.SaveFeature(body);
         var objResult = Assert.IsType<ObjectResult>(result);
@@ -226,7 +224,7 @@ public class FeaturesControllerTests
     {
         var featureServiceMock = new Mock<IFeatureService>();
         featureServiceMock.Setup(s => s.ClearAllFeaturesAsync(UserId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((2, []));
+            .ReturnsAsync(2);
         using var db = CreateInMemoryDb("FeaturesTest");
         var ctrl = CreateController(db, featureService: featureServiceMock.Object);
 

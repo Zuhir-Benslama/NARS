@@ -229,10 +229,9 @@ describe("SettingsUsers", () => {
 
     it("shows error on API failure", async () => {
       mockAppStore.mockReturnValue({ user: { role: "commune_user" } })
-      mockApiFetch.mockResolvedValueOnce(createMockSuccessResponse([])).mockResolvedValueOnce({
-        ok: false,
-        json: vi.fn().mockResolvedValue({ detail: "Email already exists" }),
-      })
+      mockApiFetch
+        .mockResolvedValueOnce(createMockSuccessResponse([]))
+        .mockRejectedValueOnce(new Error("Email already exists"))
       const wrapper = mount(SettingsUsers)
       await new Promise((resolve) => setTimeout(resolve, 0))
 
@@ -246,7 +245,7 @@ describe("SettingsUsers", () => {
       await wrapper.find(".modal-btn-save").trigger("click")
       await new Promise((resolve) => setTimeout(resolve, 0))
 
-      expect(wrapper.find(".su-error").text()).toBe("Email already exists")
+      expect(wrapper.find(".su-error").text()).toBe("err_unknown")
     })
 
     it("resets form after successful creation", async () => {

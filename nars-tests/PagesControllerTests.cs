@@ -15,6 +15,7 @@ using NarsApi.Controllers;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Services;
+using static NarsApi.Tests.TestData;
 using Xunit;
 
 namespace NarsApi.Tests;
@@ -24,11 +25,29 @@ public class PagesControllerTests
     private const string LoginTemplate = "<html><head><meta name=\"csrf-token\" content=\"\"></head><body><script>app();</script></body></html>";
     private const string IndexTemplate = "<html><head><meta name=\"csrf-token\" content=\"\"></head><body><script src=\"/app.js\"></script></body></html>";
 
+    // PagesController reads templates from Directory.GetCurrentDirectory()/wwwroot
+    // (the bin output dir under `dotnet test`), which has no templates by default.
+    // Write them create-if-missing (never clobber a pre-existing file) and guard with
+    // a lock so parallel test hosts sharing the same output dir cannot race.
+    private static readonly object TemplateWriteLock = new();
+
     static PagesControllerTests()
     {
-        Directory.CreateDirectory(Path.Combine(AppContext.BaseDirectory, "wwwroot"));
-        File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "wwwroot", "login.html"), LoginTemplate);
-        File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "wwwroot", "index.html"), IndexTemplate);
+        lock (TemplateWriteLock)
+        {
+            var wwwroot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
+            Directory.CreateDirectory(wwwroot);
+            EnsureTemplate(Path.Combine(wwwroot, "login.html"), LoginTemplate);
+            EnsureTemplate(Path.Combine(wwwroot, "index.html"), IndexTemplate);
+        }
+    }
+
+    private static void EnsureTemplate(string path, string template)
+    {
+        if (!File.Exists(path))
+        {
+            File.WriteAllText(path, template);
+        }
     }
 
     private sealed class ControllerHarness
@@ -194,7 +213,7 @@ public class PagesControllerTests
         h.Jwt.Setup(j => j.ValidateToken("new-access-token")).Returns(principal);
         h.Refresh
             .Setup(r => r.RotateRefreshTokenAsync("refresh-token", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new RefreshTokenResult(true, null, "alice", "new-refresh", "new-access-token", DateTime.UtcNow.AddDays(30)));
+            .ReturnsAsync(new RefreshTokenResult(true, null, "alice", "new-refresh", "new-access-token", FixedUtcNow.AddDays(30)));
 
         var result = await h.Controller.MapPage();
 
@@ -250,7 +269,7 @@ public class PagesControllerTests
         var h = new ControllerHarness(accessCookie: "expired-token", refreshCookie: "refresh-token");
         h.Refresh
             .Setup(r => r.RotateRefreshTokenAsync("refresh-token", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new RefreshTokenResult(true, null, "alice", "new-refresh", "new-access-token", DateTime.UtcNow.AddDays(30)));
+            .ReturnsAsync(new RefreshTokenResult(true, null, "alice", "new-refresh", "new-access-token", FixedUtcNow.AddDays(30)));
 
         var result = await h.Controller.MapPage();
 

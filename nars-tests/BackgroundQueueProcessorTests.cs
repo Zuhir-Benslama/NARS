@@ -7,101 +7,13 @@ using Xunit;
 
 namespace NarsApi.Tests;
 
-public class BackgroundTaskQueueTests
-{
-    private static BackgroundTaskQueue CreateQueue(int capacity = 10) => new(
-            Options.Create(new BackgroundTaskOptions { Capacity = capacity, GracePeriodSeconds = 5 }),
-            Mock.Of<ILogger<BackgroundTaskQueue>>());
-
-    [Fact]
-    public async Task DequeueAsync_ReturnsQueuedItem()
-    {
-        var queue = CreateQueue();
-        Func<IServiceProvider, CancellationToken, Task> workItem = (_, _) => Task.CompletedTask;
-
-        await queue.QueueBackgroundWorkItemAsync(workItem);
-        var dequeued = await queue.DequeueAsync(CancellationToken.None);
-
-        Assert.Same(workItem, dequeued);
-    }
-
-    private static readonly int[] expected = [0, 1, 2];
-
-    [Fact]
-    public async Task DequeueAsync_FIFO_Order()
-    {
-        var queue = CreateQueue();
-        var order = new List<int>();
-
-        for (var i = 0; i < 3; i++)
-        {
-            var captured = i;
-            await queue.QueueBackgroundWorkItemAsync((_, _) =>
-            {
-                order.Add(captured);
-                return Task.CompletedTask;
-            });
-        }
-
-        for (var i = 0; i < 3; i++)
-        {
-            var item = await queue.DequeueAsync(CancellationToken.None);
-            await item(Mock.Of<IServiceProvider>(), CancellationToken.None);
-        }
-
-        Assert.Equal(expected, order);
-    }
-
-    [Fact]
-    public async Task QueueBackgroundWorkItemAsync_Null_Throws()
-    {
-        var queue = CreateQueue();
-        await Assert.ThrowsAnyAsync<ArgumentNullException>(
-            async () => await queue.QueueBackgroundWorkItemAsync(null!));
-    }
-
-    [Fact]
-    public async Task QueueBackgroundWorkItemAsync_Full_DropsOldest()
-    {
-        var queue = CreateQueue(capacity: 2);
-        var executed = new List<int>();
-
-        Func<IServiceProvider, CancellationToken, Task>[] workItems = [
-            (_, _) => { executed.Add(1); return Task.CompletedTask; },
-            (_, _) => { executed.Add(2); return Task.CompletedTask; },
-            (_, _) => { executed.Add(3); return Task.CompletedTask; },
-        ];
-
-        // Fill the queue to capacity.
-        await queue.QueueBackgroundWorkItemAsync(workItems[0]);
-        await queue.QueueBackgroundWorkItemAsync(workItems[1]);
-
-        // Third write must not throw — DropOldest makes room by evicting
-        // the FIRST item, so items 2 and 3 survive.
-        await queue.QueueBackgroundWorkItemAsync(workItems[2]);
-
-        var first = await queue.DequeueAsync(CancellationToken.None);
-        var second = await queue.DequeueAsync(CancellationToken.None);
-        await first(Mock.Of<IServiceProvider>(), CancellationToken.None);
-        await second(Mock.Of<IServiceProvider>(), CancellationToken.None);
-
-        Assert.Equal([2, 3], executed);
-    }
-
-    [Fact]
-    public async Task DequeueAsync_Cancellation_Throws()
-    {
-        var queue = CreateQueue();
-        using var cts = new CancellationTokenSource();
-        cts.Cancel();
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            async () => await queue.DequeueAsync(cts.Token));
-    }
-}
-
 public class BackgroundQueueProcessorTests
 {
+    // Generous real-time ceiling so a hung worker fails the test without
+    // spuriously timing out on a loaded CI runner. The TCS below is the real
+    // completion signal; this only guards against a deadlock.
+    private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(30);
+
     private static (BackgroundQueueProcessor processor, BackgroundTaskQueue queue) CreateProcessor(
         int capacity = 10,
         int gracePeriodSeconds = 2)
@@ -121,7 +33,7 @@ public class BackgroundQueueProcessorTests
     }
 
     [Fact]
-    public async Task ProcessesQueuedWorkItem()
+    public async Task ProcessBackgroundWorkItem_ExecutesQueuedItem()
     {
         var (processor, queue) = CreateProcessor();
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -134,13 +46,12 @@ public class BackgroundQueueProcessorTests
             return Task.CompletedTask;
         });
 
-        await tcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.True(tcs.Task.IsCompletedSuccessfully);
+        await tcs.Task.WaitAsync(TestTimeout);
         await processor.StopAsync(CancellationToken.None);
     }
 
     [Fact]
-    public async Task ContinuesAfterWorkItemThrows()
+    public async Task ProcessBackgroundWorkItem_ContinuesAfterWorkItemThrows()
     {
         var (processor, queue) = CreateProcessor();
         var secondItemExecuted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -157,8 +68,7 @@ public class BackgroundQueueProcessorTests
             return Task.CompletedTask;
         });
 
-        await secondItemExecuted.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.True(secondItemExecuted.Task.IsCompletedSuccessfully);
+        await secondItemExecuted.Task.WaitAsync(TestTimeout);
         await processor.StopAsync(CancellationToken.None);
     }
 
@@ -175,8 +85,7 @@ public class BackgroundQueueProcessorTests
             started.SetResult();
             return Task.CompletedTask;
         });
-        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.True(started.Task.IsCompletedSuccessfully);
+        await started.Task.WaitAsync(TestTimeout);
 
         // Stop — should not hang.
         await processor.StopAsync(CancellationToken.None);

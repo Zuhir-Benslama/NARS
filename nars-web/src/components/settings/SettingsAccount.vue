@@ -97,10 +97,6 @@ async function save() {
     }
     showToast(t("alert_account_updated"), "success")
     form.password = ""
-  } else {
-    const data = await res.json().catch(() => ({}))
-    const msg = data.detail || data.error || t("alert_account_updated_failed") || "Update failed"
-    showToast(msg, "error")
   }
 }
 </script>

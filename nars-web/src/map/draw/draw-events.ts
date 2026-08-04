@@ -24,10 +24,10 @@ import { setRepatchMarkerPointer } from "./draw-state"
 import { repatchMarkerPointer } from "./draw-marker-patch"
 import { registerDrawHandlers, destroyDrawHandlers } from "./draw-handlers"
 import { patchGeomanMarkerPointerSnap } from "./draw-marker-patch"
-import { installSnapInterceptors } from "../snapping/snapping"
+import { installSnapInterceptors, uninstallSnapInterceptors } from "../snapping/snapping"
 import { setDrawingPhase } from "./draw-state"
 import { buildDrawControl } from "./draw-control"
-import { enableCrosshair, resetSnapping } from "../snapping/snapping"
+import { enableCrosshair, resetSnapping, disableSnapping } from "../snapping/snapping"
 import { isEditMode } from "../edit/edit-mode"
 
 export function registerDrawEvents(): void {
@@ -43,6 +43,8 @@ export function destroyDrawEvents(): void {
   store.cleanupDrawWatcher?.()
   store.cleanupDrawWatcher = null
   destroyDrawHandlers()
+  disableSnapping()
+  uninstallSnapInterceptors()
 }
 
 function watchDrawType() {

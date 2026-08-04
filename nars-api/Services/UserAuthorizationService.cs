@@ -17,20 +17,39 @@ public class UserAuthorizationService(AppDbContext db) : IUserAuthorizationServi
         _ => false,
     };
 
-    public async Task<ScopeValidationResult> ValidateCreateUserScopeAsync(
+    public Task<ScopeValidationResult> ValidateCreateUserScopeAsync(
         string callerRole, int? callerDairaId, int? callerWilayaId,
         string targetRole, int? communeId, int? dairaId, int? wilayaId,
         CancellationToken ct = default)
+        => ValidateScopeAsync(callerRole, callerCommuneId: null, callerDairaId, callerWilayaId,
+            targetRole, communeId, dairaId, wilayaId, requireExactFieldWorkerCommune: false, ct);
+
+    private Task<ScopeValidationResult> ValidateUpdateUserScopeAsync(
+        string callerRole, int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
+        string targetRole, int? communeId, int? dairaId, int? wilayaId,
+        CancellationToken ct = default)
+        => ValidateScopeAsync(callerRole, callerCommuneId, callerDairaId, callerWilayaId,
+            targetRole, communeId, dairaId, wilayaId, requireExactFieldWorkerCommune: true, ct);
+
+    private async Task<ScopeValidationResult> ValidateScopeAsync(
+        string callerRole, int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
+        string targetRole, int? communeId, int? dairaId, int? wilayaId,
+        bool requireExactFieldWorkerCommune, CancellationToken ct)
     {
         switch (callerRole, targetRole)
         {
             case (UserRoles.CommuneUser, UserRoles.FieldWorker):
+                if (requireExactFieldWorkerCommune && communeId != callerCommuneId)
+                {
+                    return Forbid("Field workers must remain in your commune.");
+                }
+
                 return Valid();
 
             case (UserRoles.DairaAdmin, UserRoles.CommuneUser):
                 if (!communeId.HasValue)
                 {
-                    return Error("commune_id is required when creating a commune_user.");
+                    return Error("commune_id is required for commune_user.");
                 }
 
                 var commune = await db.Communes.FindAsync([communeId.Value], ct);
@@ -49,7 +68,7 @@ public class UserAuthorizationService(AppDbContext db) : IUserAuthorizationServi
             case (UserRoles.WilayaAdmin, UserRoles.DairaAdmin):
                 if (!dairaId.HasValue)
                 {
-                    return Error("daira_id is required when creating a daira_admin.");
+                    return Error("daira_id is required for daira_admin.");
                 }
 
                 var daira = await db.Dairas.FindAsync([dairaId.Value], ct);
@@ -68,7 +87,7 @@ public class UserAuthorizationService(AppDbContext db) : IUserAuthorizationServi
             case (UserRoles.NationalAdmin, UserRoles.WilayaAdmin):
                 if (!wilayaId.HasValue)
                 {
-                    return Error("wilaya_id is required when creating a wilaya_admin.");
+                    return Error("wilaya_id is required for wilaya_admin.");
                 }
 
                 return Valid();
@@ -121,8 +140,123 @@ public class UserAuthorizationService(AppDbContext db) : IUserAuthorizationServi
     public async Task<User?> FindUserByIdAsync(Guid userId, CancellationToken ct = default)
         => await db.Users.FindAsync([userId], ct);
 
-    public async Task<bool> IsEmailTakenAsync(string email, Guid excludeUserId, CancellationToken ct = default)
-        => await db.Users.AnyAsync(u => u.Email == email && u.Id != excludeUserId, ct);
+    public async Task<User?> FindUserByUsernameAsync(string normalizedUsername, CancellationToken ct = default)
+        => await db.Users.FirstOrDefaultAsync(u => u.Username == normalizedUsername, ct);
+
+    public async Task<UserUpdateResult> UpdateManagedUserAsync(
+        Guid callerUserId, string callerRole,
+        int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
+        Guid targetUserId, UpdateAdminRequest body,
+        CancellationToken ct = default)
+    {
+        var target = await db.Users.FindAsync([targetUserId], ct);
+        if (target is null)
+        {
+            return UserUpdateResult.Failure(UserUpdateErrorCode.NotFound, "User not found.");
+        }
+
+        // Role hierarchy: the caller must be able to manage both the target's
+        // current role and any requested role transition.
+        if (!CanCreateRole(callerRole, target.Role))
+        {
+            return UserUpdateResult.Failure(UserUpdateErrorCode.Forbidden);
+        }
+
+        if (body.Role is not null && !CanCreateRole(callerRole, body.Role))
+        {
+            return UserUpdateResult.Failure(UserUpdateErrorCode.Forbidden);
+        }
+
+        var sensitiveChange = body.Role is not null
+            || body.WilayaId is not null
+            || body.DairaId is not null
+            || body.CommuneId is not null;
+        if (sensitiveChange)
+        {
+            if (string.IsNullOrEmpty(body.Password))
+            {
+                return UserUpdateResult.Failure(UserUpdateErrorCode.PasswordRequired,
+                    "Password is required to change role or geographic scope.");
+            }
+
+            var caller = await db.Users.FindAsync([callerUserId], ct);
+            if (caller is null || !BCrypt.Net.BCrypt.Verify(body.Password, caller.PasswordHash))
+            {
+                return UserUpdateResult.Failure(UserUpdateErrorCode.InvalidPassword, "Password is incorrect.");
+            }
+
+            // Geographic scope: the target's effective role + geography (existing
+            // values merged with the requested changes) must stay within the
+            // caller's scope.
+            var effectiveRole = body.Role ?? target.Role;
+            var effectiveCommuneId = body.CommuneId ?? target.CommuneId;
+            var effectiveDairaId = body.DairaId ?? target.DairaId;
+            var effectiveWilayaId = body.WilayaId ?? target.WilayaId;
+
+            var scopeResult = await ValidateUpdateUserScopeAsync(
+                callerRole, callerCommuneId, callerDairaId, callerWilayaId,
+                effectiveRole, effectiveCommuneId, effectiveDairaId, effectiveWilayaId, ct);
+            if (scopeResult.Error is not null)
+            {
+                return scopeResult.IsAuthorizationFailure
+                    ? UserUpdateResult.Failure(UserUpdateErrorCode.Forbidden, scopeResult.Error)
+                    : UserUpdateResult.Failure(UserUpdateErrorCode.Invalid, scopeResult.Error);
+            }
+        }
+
+        // Apply profile fields.
+        if (body.Name is not null)
+        {
+            target.Name = body.Name;
+        }
+
+        if (body.Email is not null)
+        {
+            var normalizedEmail = body.Email.ToLowerInvariant();
+            var emailConflict = await db.Users.AnyAsync(u => u.Email == normalizedEmail && u.Id != target.Id, ct);
+            if (emailConflict)
+            {
+                return UserUpdateResult.Failure(UserUpdateErrorCode.EmailConflict, "Email already exists.");
+            }
+
+            target.Email = normalizedEmail;
+        }
+
+        if (body.Phone is not null)
+        {
+            target.Phone = body.Phone;
+        }
+
+        // Apply role + geography.
+        if (body.Role is not null)
+        {
+            var geoCheck = GeographicValidator.Validate(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
+            if (geoCheck is not null)
+            {
+                return UserUpdateResult.Failure(UserUpdateErrorCode.Invalid, geoCheck);
+            }
+
+            target.Role = body.Role;
+        }
+
+        if (body.WilayaId is not null)
+        {
+            target.WilayaId = body.WilayaId;
+        }
+
+        if (body.DairaId is not null)
+        {
+            target.DairaId = body.DairaId;
+        }
+
+        if (body.CommuneId is not null)
+        {
+            target.CommuneId = body.CommuneId;
+        }
+
+        await db.SaveChangesAsync(ct);
+        return UserUpdateResult.Success();
+    }
 
     public async Task<bool> DeleteUserAsync(Guid userId, CancellationToken ct = default)
     {
@@ -171,9 +305,6 @@ public class UserAuthorizationService(AppDbContext db) : IUserAuthorizationServi
         await db.SaveChangesAsync(ct);
         return true;
     }
-
-    public async Task SaveChangesAsync(CancellationToken ct = default)
-        => await db.SaveChangesAsync(ct);
 
     private static ScopeValidationResult Valid() => new(null, false);
     private static ScopeValidationResult Error(string msg) => new(msg, false);

@@ -9,10 +9,11 @@ namespace NarsApi.Services;
 public interface IUserCreationService
 {
     /// <summary>
-    /// Validates and creates a new user. Returns null on success, or an error string.
-    /// The caller is responsible for authorization checks.
+    /// Validates and creates a new user. Returns a structured result with an error
+    /// code the caller can map to an HTTP status. The caller is responsible for
+    /// authorization checks.
     /// </summary>
-    Task<(User? User, string? Error)> ValidateAndCreateUserAsync(
+    Task<UserCreationResult> ValidateAndCreateUserAsync(
         string name,
         string email,
         string phone,

@@ -6,6 +6,9 @@ import { getCtx } from "../core/state"
 import { apiFetch } from "../../api"
 import { GEOMETRY_CONFIG } from "../../config"
 import { debugError } from "../../utils/debug"
+import { useAppStore } from "../../stores/appStore"
+import { showToast } from "../../lib/toast"
+import { t } from "../../i18n"
 import maplibregl from "maplibre-gl"
 import type { ScatteredRefreshResponse } from "../../types"
 
@@ -138,6 +141,9 @@ export async function displayCommuneBoundary(communeId: number): Promise<void> {
     }
   } catch (e) {
     debugError("Boundary error:", e)
+    // Missing boundary means hit-testing and the fly-to fallback break —
+    // surface it via the load-error banner instead of failing silently.
+    useAppStore().setLoadError(true)
   }
 }
 
@@ -178,6 +184,7 @@ export async function refreshScatteredAreas(): Promise<void> {
     if (data.geojson) renderScatteredAreas(data.geojson)
   } catch (e) {
     debugError("Scatter refresh error:", e)
+    showToast(t("map_scatter_refresh_failed"), "error")
   }
 }
 

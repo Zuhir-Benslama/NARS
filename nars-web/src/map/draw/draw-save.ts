@@ -3,7 +3,6 @@
 // and resetting the draw mode for the next feature.
 
 import { PHASES } from "../../phases"
-import { useAppStore } from "../../stores/appStore"
 import { useLayerStore } from "../../stores/layerStore"
 import type { FeatureDataByType, ModalResult } from "../../types"
 import { getCtx } from "../core/state"
@@ -11,11 +10,11 @@ import { useFeaturesStore } from "../../stores/featuresStore"
 
 const CITY_CENTER_MIN_RADIUS_M = 5
 const CITY_CENTER_MAX_RADIUS_M = 50_000
-import { buildDrawControl } from "./draw-control"
+import { buildDrawControl, clearEdgeVisibilityPoll } from "./draw-control"
 import { refreshLayerVisibility } from "../rendering/labels"
 import { computeCircleRing, computeCircleRadius, closeRing } from "../rendering/geometry"
 import { getFeatureType } from "../house-numbering"
-import { getErrorMessage } from "../../lib/errors"
+import { getUserMessageKey } from "../../lib/errors"
 import { showToast } from "../../lib/toast"
 import { debugError } from "../../utils/debug"
 import { t } from "../../i18n"
@@ -216,7 +215,6 @@ async function updateStoresAfterSave(
     type: getFeatureType(narsDrawType),
   })
 
-  useAppStore().syncCounts()
   refreshLayerVisibility()
   if (drawingPhase.key === "roads") updateEndpointMarkers()
   showToast(t("map_feature_saved"), "success")
@@ -259,7 +257,7 @@ async function saveAndUpdateStore(
     deleteGeomanFeature(geomanFeatureData)
   } catch (err) {
     debugError("[COMPLETE] Save error:", err)
-    showToast(t("map_save_failed", { error: getErrorMessage(err) }), "error")
+    showToast(t("map_save_failed", { error: t(getUserMessageKey(err)) }), "error")
   } finally {
     setSavingFeature(false)
     if (saveOk) {
@@ -285,6 +283,7 @@ export async function completeDrawingWithGeometry(
   const featureId = crypto.randomUUID()
   const gm = getCtx().geoman
   if (gm) {
+    clearEdgeVisibilityPoll()
     try {
       await gm.disableDraw()
     } catch (err) {
@@ -371,6 +370,7 @@ async function resetDrawMode(): Promise<void> {
   const phase = getDrawingPhase()
   if (!gm || !phase) return
 
+  clearEdgeVisibilityPoll()
   try {
     await gm.disableDraw()
   } catch (err) {

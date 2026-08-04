@@ -119,7 +119,7 @@ public class FeaturesController(
             return Problem(detail: "Set \"confirm\": true to delete all features.", statusCode: 400);
         }
 
-        var (total, _) = await featureService.ClearAllFeaturesAsync(RequiredCurrentUserId, cancellationToken);
+        var total = await featureService.ClearAllFeaturesAsync(RequiredCurrentUserId, cancellationToken);
 
         return Ok(ApiResponse.Ok($"Deleted {total} features"));
     }

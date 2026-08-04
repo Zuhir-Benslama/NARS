@@ -43,6 +43,7 @@ vi.mock("../../lib/toast", () => ({
 
 vi.mock("./draw-control", () => ({
   buildDrawControl: mockBuildDrawControl,
+  clearEdgeVisibilityPoll: vi.fn(),
 }))
 
 // ─── MODULE REFERENCES (loaded dynamically) ───────────────────────────────────

@@ -11,11 +11,12 @@ const CTX_MENU_WIDTH = 180
 const CTX_MENU_HEIGHT = 100
 
 let _currentBoundaryCleanup: (() => void) | null = null
+let _boundaryMap: maplibregl.Map | null = null
 
 // ─── STATE RESET (for testing & HMR) ──────────────────────────────────────────
 
 export function resetBoundaryEvents(): void {
-  useAppStore().boundaryEventsRegistered = false
+  removeBoundaryClickEvents()
   _currentBoundaryCleanup?.()
   _currentBoundaryCleanup = null
 }
@@ -24,32 +25,49 @@ export function addBoundaryClickEvents(map: maplibregl.Map): void {
   const store = useAppStore()
   if (store.boundaryEventsRegistered) return
   store.boundaryEventsRegistered = true
+  _boundaryMap = map
 
-  map.on("click", "nars-boundaries", (e: maplibregl.MapLayerMouseEvent) => {
-    const name = escapeHtml(e.features?.[0]?.properties?.communeName || t("map_commune_label"))
-    new maplibregl.Popup({ closeButton: true, closeOnClick: true })
-      .setLngLat(e.lngLat)
-      .setHTML(`<strong>${name}</strong><br><small>${t("map_commune_boundary")}</small>`)
-      .addTo(map)
-  })
+  map.on("click", "nars-boundaries", onBoundaryClick)
+  map.on("mouseenter", "nars-boundaries", onBoundaryEnter)
+  map.on("mouseleave", "nars-boundaries", onBoundaryLeave)
+  map.on("contextmenu", "nars-boundaries", onBoundaryContextMenu)
+}
 
-  map.on("mouseenter", "nars-boundaries", () => {
-    map.getCanvas().style.setProperty("cursor", "pointer", "important")
-  })
+export function removeBoundaryClickEvents(): void {
+  useAppStore().boundaryEventsRegistered = false
+  const map = _boundaryMap
+  _boundaryMap = null
+  if (!map) return
+  map.off("click", "nars-boundaries", onBoundaryClick)
+  map.off("mouseenter", "nars-boundaries", onBoundaryEnter)
+  map.off("mouseleave", "nars-boundaries", onBoundaryLeave)
+  map.off("contextmenu", "nars-boundaries", onBoundaryContextMenu)
+}
 
-  map.on("mouseleave", "nars-boundaries", () => {
-    map.getCanvas().style.removeProperty("cursor")
-  })
+function onBoundaryClick(e: maplibregl.MapLayerMouseEvent): void {
+  const name = escapeHtml(e.features?.[0]?.properties?.communeName || t("map_commune_label"))
+  new maplibregl.Popup({ closeButton: true, closeOnClick: true })
+    .setLngLat(e.lngLat)
+    .setHTML(`<strong>${name}</strong><br><small>${t("map_commune_boundary")}</small>`)
+    .addTo(_boundaryMap!)
+}
 
-  map.on("contextmenu", "nars-boundaries", (e: maplibregl.MapLayerMouseEvent) => {
-    e.preventDefault()
-    e.originalEvent?.preventDefault()
-    showBoundaryContextMenu(
-      e.point.x,
-      e.point.y,
-      e.features?.[0]?.properties?.communeName || t("map_commune_label"),
-    )
-  })
+function onBoundaryEnter(): void {
+  _boundaryMap?.getCanvas().style.setProperty("cursor", "pointer", "important")
+}
+
+function onBoundaryLeave(): void {
+  _boundaryMap?.getCanvas().style.removeProperty("cursor")
+}
+
+function onBoundaryContextMenu(e: maplibregl.MapLayerMouseEvent): void {
+  e.preventDefault()
+  e.originalEvent?.preventDefault()
+  showBoundaryContextMenu(
+    e.point.x,
+    e.point.y,
+    e.features?.[0]?.properties?.communeName || t("map_commune_label"),
+  )
 }
 
 function showBoundaryContextMenu(x: number, y: number, communeName: string): void {

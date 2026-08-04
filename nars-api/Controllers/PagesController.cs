@@ -48,12 +48,12 @@ public class PagesController(
     // GET /login — inject CSRF token and CSP nonce into the HTML
     [HttpGet("/login")]
     [AllowAnonymous]
-    public async Task<IActionResult> LoginPage()
+    public async Task<IActionResult> LoginPage(CancellationToken cancellationToken = default)
     {
         var tokens = antiforgery.GetAndStoreTokens(HttpContext);
         var nonce = HttpContext.Items["csp-nonce"] as string ?? string.Empty;
 
-        var template = (await LoadPageTemplateAsync("login_html", "login.html")) ?? string.Empty;
+        var template = (await LoadPageTemplateAsync("login_html", "login.html", cancellationToken)) ?? string.Empty;
 
         var html = template
             // Inject the CSRF token into the <meta name="csrf-token"> placeholder
@@ -81,7 +81,7 @@ public class PagesController(
         var tokens = antiforgery.GetAndStoreTokens(HttpContext);
         var nonce = HttpContext.Items["csp-nonce"] as string ?? string.Empty;
 
-        var template = (await LoadPageTemplateAsync("index_html", "index.html")) ?? string.Empty;
+        var template = (await LoadPageTemplateAsync("index_html", "index.html", cancellationToken)) ?? string.Empty;
 
         var html = template
             // Inject CSRF token into the meta placeholder
@@ -95,18 +95,18 @@ public class PagesController(
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private async Task<string> LoadPageTemplateAsync(string cacheKey, string fileName)
+    private async Task<string> LoadPageTemplateAsync(string cacheKey, string fileName, CancellationToken cancellationToken)
     {
         var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", fileName);
         if (env.IsDevelopment())
         {
-            return await System.IO.File.ReadAllTextAsync(path);
+            return await System.IO.File.ReadAllTextAsync(path, cancellationToken);
         }
 
         return (await cache.GetOrCreateAsync(cacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(cacheOptions.Value.PageTemplateDurationHours);
-            return await System.IO.File.ReadAllTextAsync(path);
+            return await System.IO.File.ReadAllTextAsync(path, cancellationToken);
         })) ?? string.Empty;
     }
 
@@ -207,8 +207,7 @@ public class PagesController(
 
             var maxAge = result.RefreshExpiry.Value - timeProvider.UtcNow;
             logger.LogDebug("[Pages] Silent refresh SUCCESS. Issuing new cookies for {Username}", result.Username);
-            Response.Cookies.Append("access_token", result.NewAccessToken, MakeCookieOptions(jwt.AccessTokenExpiresIn));
-            Response.Cookies.Append("refresh_token", result.NewRawToken, MakeCookieOptions(maxAge));
+            AppendAuthCookies(result.NewAccessToken, result.NewRawToken, jwt.AccessTokenExpiresIn, maxAge);
 
             var principal = result.NewAccessToken is not null ? jwt.ValidateToken(result.NewAccessToken) : null;
             if (principal is not null)

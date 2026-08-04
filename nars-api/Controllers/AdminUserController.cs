@@ -1,11 +1,9 @@
-using BCrypt.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
-using NarsApi.Models;
 using NarsApi.Services;
 
 namespace NarsApi.Controllers;
@@ -19,14 +17,14 @@ public class AdminUserController(
     IUserCreationService userCreationService,
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
-    /// <summary>Creates a lower-tier admin account (e.g. commune_user, daira_admin).</summary>
+    /// <summary>Creates a lower-tier managed account (e.g. commune_user, daira_admin, field_worker).</summary>
     [HttpPost("admin/users")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> CreateAdmin([FromBody] CreateAdminRequest body, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> CreateManagedUser([FromBody] CreateAdminRequest body, CancellationToken cancellationToken = default)
     {
         if (body is null)
         {
@@ -57,15 +55,17 @@ public class AdminUserController(
             : body.CommuneId;
 
         // Validate and create user (geographic, uniqueness, password strength).
-        var (newUser, error) = await userCreationService.ValidateAndCreateUserAsync(
+        var creationResult = await userCreationService.ValidateAndCreateUserAsync(
             body.Name, body.Email, body.Phone, body.Username, body.Password,
             body.Role, communeId, body.DairaId, body.WilayaId,
             cancellationToken);
-        if (error is not null || newUser is null)
+        if (!creationResult.IsSuccess)
         {
-            var statusCode = error?.Contains("already exists") == true ? 409 : 400;
-            return Problem(detail: error ?? "User creation failed.", statusCode: statusCode);
+            var statusCode = creationResult.Code == UserCreationErrorCode.Duplicate ? 409 : 400;
+            return Problem(detail: creationResult.Error, statusCode: statusCode);
         }
+
+        var newUser = creationResult.User!;
 
         try
         {
@@ -113,7 +113,7 @@ public class AdminUserController(
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> UpdateAdmin(
+    public async Task<IActionResult> UpdateManagedUser(
         Guid userId, [FromBody] UpdateAdminRequest body,
         CancellationToken cancellationToken = default)
     {
@@ -122,31 +122,23 @@ public class AdminUserController(
             return Problem(detail: "Request body is required.", statusCode: 400);
         }
 
-        var target = await authorizationService.FindUserByIdAsync(userId, cancellationToken);
-        if (target is null)
-        {
-            return Problem(detail: "User not found.", statusCode: 404);
-        }
+        var result = await authorizationService.UpdateManagedUserAsync(
+            RequiredCurrentUserId, CurrentUserRole,
+            CurrentCommuneId, CurrentDairaId, CurrentWilayaId,
+            userId, body, cancellationToken);
 
-        var authError = await ValidateAdminUpdatePermissionAsync(target, body, cancellationToken);
-        if (authError is not null)
+        if (!result.IsSuccess)
         {
-            return authError;
+            return result.Code switch
+            {
+                UserUpdateErrorCode.NotFound => Problem(detail: result.Detail, statusCode: 404),
+                UserUpdateErrorCode.Forbidden => Forbid(),
+                UserUpdateErrorCode.PasswordRequired => Problem(detail: result.Detail, statusCode: 400),
+                UserUpdateErrorCode.InvalidPassword => Problem(detail: result.Detail, statusCode: 403),
+                UserUpdateErrorCode.EmailConflict => Problem(detail: result.Detail, statusCode: 409),
+                _ => Problem(detail: result.Detail, statusCode: 400),
+            };
         }
-
-        var fieldError = await ApplyUpdateFieldsAsync(target, body, cancellationToken);
-        if (fieldError is not null)
-        {
-            return fieldError;
-        }
-
-        var geoError = ApplyRoleAndGeography(target, body);
-        if (geoError is not null)
-        {
-            return geoError;
-        }
-
-        await authorizationService.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation("[Admin] {CallerRole} {CallerId} updated user {UserId}",
             CurrentUserRole, CurrentUserId, userId);
@@ -160,7 +152,7 @@ public class AdminUserController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteAdmin(
+    public async Task<IActionResult> DeleteManagedUser(
         Guid userId, CancellationToken cancellationToken = default)
     {
         if (userId == RequiredCurrentUserId)
@@ -185,96 +177,5 @@ public class AdminUserController(
             CurrentUserRole, CurrentUserId, userId, target.Username);
 
         return NoContent();
-    }
-
-    private async Task<IActionResult?> ValidateAdminUpdatePermissionAsync(
-        User target, UpdateAdminRequest body, CancellationToken ct)
-    {
-        if (!authorizationService.CanCreateRole(CurrentUserRole, target.Role))
-        {
-            return Forbid();
-        }
-
-        if (body.Role is not null && !authorizationService.CanCreateRole(CurrentUserRole, body.Role))
-        {
-            return Forbid();
-        }
-
-        var sensitiveChange = body.Role is not null
-            || body.WilayaId is not null
-            || body.DairaId is not null
-            || body.CommuneId is not null;
-        if (sensitiveChange)
-        {
-            if (string.IsNullOrEmpty(body.Password))
-            {
-                return Problem(detail: "Password is required to change role or geographic scope.", statusCode: 400);
-            }
-
-            var caller = await authorizationService.FindUserByIdAsync(RequiredCurrentUserId, ct);
-            if (caller is null || !BCrypt.Net.BCrypt.Verify(body.Password, caller.PasswordHash))
-            {
-                return Problem(detail: "Password is incorrect.", statusCode: 403);
-            }
-        }
-
-        return null;
-    }
-
-    private async Task<IActionResult?> ApplyUpdateFieldsAsync(User target, UpdateAdminRequest body, CancellationToken ct)
-    {
-        if (body.Name is not null)
-        {
-            target.Name = body.Name;
-        }
-
-        if (body.Email is not null)
-        {
-            var emailConflict = await authorizationService.IsEmailTakenAsync(body.Email, target.Id, ct);
-            if (emailConflict)
-            {
-                return Problem(detail: "Email already exists.", statusCode: 409);
-            }
-
-            target.Email = body.Email;
-        }
-
-        if (body.Phone is not null)
-        {
-            target.Phone = body.Phone;
-        }
-
-        return null;
-    }
-
-    private ObjectResult? ApplyRoleAndGeography(User target, UpdateAdminRequest body)
-    {
-        if (body.Role is not null)
-        {
-            var geoCheck = GeographicValidator.Validate(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
-            if (geoCheck is not null)
-            {
-                return Problem(detail: geoCheck, statusCode: 400);
-            }
-
-            target.Role = body.Role;
-        }
-
-        if (body.WilayaId is not null)
-        {
-            target.WilayaId = body.WilayaId;
-        }
-
-        if (body.DairaId is not null)
-        {
-            target.DairaId = body.DairaId;
-        }
-
-        if (body.CommuneId is not null)
-        {
-            target.CommuneId = body.CommuneId;
-        }
-
-        return null;
     }
 }

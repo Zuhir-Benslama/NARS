@@ -87,12 +87,6 @@ public class RefreshTokenService(
         return (rawToken, hash, expiresAt);
     }
 
-    public async Task<User?> FindUserByIdAsync(Guid userId, CancellationToken cancellationToken = default)
-        => await db.Users.FindAsync([userId], cancellationToken);
-
-    public async Task<User?> FindUserByUsernameAsync(string normalizedUsername, CancellationToken cancellationToken = default)
-        => await db.Users.FirstOrDefaultAsync(u => u.Username == normalizedUsername, cancellationToken);
-
     public async Task RecordFailedLoginAsync(User user, int maxFailedAttempts, int lockoutMinutes, DateTimeOffset utcNow, CancellationToken cancellationToken = default)
     {
         user.FailedLoginAttempts = (user.FailedLoginAttempts ?? 0) + 1;

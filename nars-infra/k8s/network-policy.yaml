@@ -228,14 +228,18 @@ spec:
       ports:
         - port: 5432
 ---
-# Allow Prometheus (monitoring namespace) to scrape metrics from nars pods
+# Allow Prometheus (monitoring namespace) to scrape metrics from nars-api (the
+# only nars pod exposing an HTTP metrics/health endpoint on 8080)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-scrape-from-monitoring
   namespace: nars
 spec:
-  podSelector: {}
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: nars-api
+      app.kubernetes.io/component: api
   policyTypes:
     - Ingress
   ingress:

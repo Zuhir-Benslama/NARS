@@ -37,13 +37,13 @@ jobs:
         run: >
           dotnet test nars-tests/NarsApi.Tests.csproj --no-build --configuration Release
           --verbosity normal
-          --filter "FullyQualifiedName!~Integration"
+          --filter "Category!=Service"
           /p:CollectCoverage=true
           /p:CoverletOutputFormat=cobertura
           /p:CoverletOutput=TestResults/ci-coverage.cobertura.xml
 
   infra-lint:
-    name: Infra — Shell, Docker & YAML Lint
+    name: Infra — Shell, Docker, YAML, Python, Node & Makefile Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -66,8 +66,17 @@ jobs:
       - name: Lint K8s YAML
         run: make infra-lint-yaml
 
+      - name: Lint Python scripts
+        run: make infra-lint-python
+
+      - name: Lint Node scripts
+        run: make infra-lint-node
+
       - name: Lint Makefile
         run: make infra-lint-makefile
+
+      - name: Verify image tag guard rejects 'latest' outside dev
+        run: make infra-lint-tag-guard
 
   security-scan:
     name: Security — Gitleaks + Audit
@@ -87,7 +96,7 @@ jobs:
         run: dotnet list package --vulnerable 2>&1 | tail -20 || true
 
   integration-tests:
-    name: Backend — Integration Tests
+    name: Backend — Service Tests (Postgres)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -103,18 +112,18 @@ jobs:
       - name: Build
         run: dotnet build Workspace.sln --no-restore --configuration Release
 
-      - name: Run integration tests
+      - name: Run service tests
         run: >
           dotnet test Workspace.sln --no-build --configuration Release
           --verbosity normal
-          --filter "FullyQualifiedName~Integration"
+          --filter "Category=Service"
           --logger "trx"
 
       - name: Publish test results
         uses: dorny/test-reporter@v1
         if: always()
         with:
-          name: Integration Test Results
+          name: Service Test Results
           path: "**/TestResults/*.trx"
           reporter: dotnet-trx
 

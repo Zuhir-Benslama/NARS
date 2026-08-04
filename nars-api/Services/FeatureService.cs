@@ -95,9 +95,9 @@ public class FeatureService(AppDbContext db) : IFeatureService
         return true;
     }
 
-    public async Task<(int total, List<Guid> ids)> ClearAllFeaturesAsync(Guid userId, CancellationToken ct)
+    public async Task<int> ClearAllFeaturesAsync(Guid userId, CancellationToken ct)
     {
-        var deletedIds = new List<Guid>();
+        var total = 0;
 
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
 
@@ -105,27 +105,17 @@ public class FeatureService(AppDbContext db) : IFeatureService
         {
             var dbSet = descriptor.GetDbSet(db);
 
-            var ids = await dbSet
-                .Where(f => f.UserId == userId)
-                .Select(f => f.Id)
-                .ToListAsync(ct);
+            // Remove the feature-registry entries for this user's features via a
+            // subquery so no IDs are materialized into memory, then delete the
+            // feature rows themselves.
+            await db.FeatureRegistry
+                .Where(r => dbSet.Where(f => f.UserId == userId).Select(f => f.Id).Contains(r.Id))
+                .ExecuteDeleteAsync(ct);
 
-            if (ids.Count == 0)
-            {
-                continue;
-            }
-
-            deletedIds.AddRange(ids);
-
-            await dbSet.Where(f => f.UserId == userId).ExecuteDeleteAsync(ct);
-        }
-
-        if (deletedIds.Count > 0)
-        {
-            await db.FeatureRegistry.Where(r => deletedIds.Contains(r.Id)).ExecuteDeleteAsync(ct);
+            total += await dbSet.Where(f => f.UserId == userId).ExecuteDeleteAsync(ct);
         }
 
         await tx.CommitAsync(ct);
-        return (deletedIds.Count, deletedIds);
+        return total;
     }
 }

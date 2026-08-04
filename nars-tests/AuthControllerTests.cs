@@ -88,7 +88,7 @@ public class AuthControllerTests
             Username: "testuser",
             Password: TestData.AltPassword,
             Role: UserRoles.CommuneUser,
-            CommuneId: TestData.CommuneId1,
+            CommuneId: CommuneId1,
             DairaId: null,
             WilayaId: null
         ), signupToken: AdminSignupToken);
@@ -115,7 +115,7 @@ public class AuthControllerTests
             Username: "testuser",
             Password: "weak",
             Role: UserRoles.CommuneUser,
-            CommuneId: 1,
+            CommuneId: CommuneId1,
             DairaId: null,
             WilayaId: null
         ), signupToken: AdminSignupToken);
@@ -139,7 +139,7 @@ public class AuthControllerTests
             Username = "existinguser",
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
             Role = UserRoles.CommuneUser,
-            CommuneId = 1,
+            CommuneId = CommuneId1,
         });
         await db.SaveChangesAsync();
 
@@ -154,7 +154,7 @@ public class AuthControllerTests
             Username: "existinguser",
             Password: AltPassword,
             Role: UserRoles.CommuneUser,
-            CommuneId: 1,
+            CommuneId: CommuneId1,
             DairaId: null,
             WilayaId: null
         ), signupToken: AdminSignupToken);
@@ -178,7 +178,7 @@ public class AuthControllerTests
             Username = "existinguser",
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
             Role = UserRoles.CommuneUser,
-            CommuneId = 1,
+            CommuneId = CommuneId1,
         });
         await db.SaveChangesAsync();
 
@@ -193,7 +193,7 @@ public class AuthControllerTests
             Username: "newuser",
             Password: AltPassword,
             Role: UserRoles.CommuneUser,
-            CommuneId: 1,
+            CommuneId: CommuneId1,
             DairaId: null,
             WilayaId: null
         ), signupToken: AdminSignupToken);
@@ -243,7 +243,7 @@ public class AuthControllerTests
             Phone = TestData.DefaultPhone,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
             Role = UserRoles.CommuneUser,
-            CommuneId = 1,
+            CommuneId = CommuneId1,
         });
         await db.SaveChangesAsync();
 
@@ -273,7 +273,7 @@ public class AuthControllerTests
         Assert.Equal(401, unauthorized.StatusCode);
     }
 
-    // Logout is tested in AuthControllerIntegrationTests.Logout_RevokesRefreshTokens
+    // Logout is tested in AuthControllerServiceTests.Logout_RevokesRefreshTokens
     // (real PostgreSQL supports ExecuteUpdateAsync; InMemory does not).
 
     private static async Task SeedLocationDataAsync(AppDbContext db) =>

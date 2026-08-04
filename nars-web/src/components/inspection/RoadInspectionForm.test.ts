@@ -11,7 +11,7 @@ vi.mock("vue-i18n", () => ({
 
 const mockApiFetch = vi.hoisted(() => vi.fn())
 const mockShowToast = vi.hoisted(() => vi.fn())
-const mockGetErrorMessage = vi.hoisted(() => vi.fn((e) => String(e)))
+const mockGetUserMessageKey = vi.hoisted(() => vi.fn(() => "err_unknown"))
 
 vi.mock("../../api", () => ({
   apiFetch: mockApiFetch,
@@ -22,7 +22,7 @@ vi.mock("../../lib/toast", () => ({
 }))
 
 vi.mock("../../lib/errors", () => ({
-  getErrorMessage: mockGetErrorMessage,
+  getUserMessageKey: mockGetUserMessageKey,
 }))
 
 import RoadInspectionForm from "./RoadInspectionForm.vue"
@@ -104,26 +104,20 @@ describe("RoadInspectionForm", () => {
   })
 
   it("shows error toast when API fails", async () => {
-    mockApiFetch.mockResolvedValueOnce({
-      ok: false,
-      json: vi.fn().mockResolvedValue({ detail: "Server error" }),
-    })
+    mockApiFetch.mockRejectedValueOnce(new Error("Server error"))
     const wrapper = mount(RoadInspectionForm, { props: { feature: { id: "1", label: "R" } } })
     await wrapper.find(".rif-submit").trigger("click")
     await nextTick()
-    expect(mockShowToast).toHaveBeenCalledWith("Server error", "error")
+    expect(mockShowToast).toHaveBeenCalledWith("err_unknown", "error")
   })
 
   it("shows network error toast on exception", async () => {
     mockApiFetch.mockRejectedValueOnce(new Error("Network failed"))
-    mockGetErrorMessage.mockReturnValue("Network failed")
+    mockGetUserMessageKey.mockReturnValue("err_network")
     const wrapper = mount(RoadInspectionForm, { props: { feature: { id: "1", label: "R" } } })
     await wrapper.find(".rif-submit").trigger("click")
     await nextTick()
-    expect(mockShowToast).toHaveBeenCalledWith(
-      'error_network_with_msg:{"message":"Network failed"}',
-      "error",
-    )
+    expect(mockShowToast).toHaveBeenCalledWith("err_network", "error")
   })
 
   it("disables submit button while submitting", async () => {

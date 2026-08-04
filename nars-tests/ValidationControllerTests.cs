@@ -46,19 +46,18 @@ public class ValidationControllerTests
     [Fact]
     public async Task MainUrbanExists_WhenNoArea_ReturnsFalse()
     {
-        using var db = CreateInMemoryDb("ValidationTest");
+        using var db = CreateDb();
         var ctrl = CreateController(db);
         var result = await ctrl.MainUrbanExists();
         var ok = Assert.IsType<OkObjectResult>(result);
-        var json = System.Text.Json.JsonSerializer.Serialize(ok.Value);
-        var doc = System.Text.Json.JsonDocument.Parse(json);
-        Assert.False(doc.RootElement.GetProperty("exists").GetBoolean());
+        dynamic payload = ok.Value!;
+        Assert.False((bool)payload.exists);
     }
 
     [Fact]
     public async Task MainUrbanExists_WhenAreaExists_ReturnsTrue()
     {
-        using var db = CreateInMemoryDb("ValidationTest");
+        using var db = CreateDb();
 
         db.Areas.Add(new Area
         {
@@ -74,9 +73,8 @@ public class ValidationControllerTests
         var ctrl = CreateController(db);
         var result = await ctrl.MainUrbanExists();
         var ok = Assert.IsType<OkObjectResult>(result);
-        var json = System.Text.Json.JsonSerializer.Serialize(ok.Value);
-        var doc = System.Text.Json.JsonDocument.Parse(json);
-        Assert.True(doc.RootElement.GetProperty("exists").GetBoolean());
+        dynamic payload = ok.Value!;
+        Assert.True((bool)payload.exists);
     }
 
     // ── POST /api/validate/road ───────────────────────────────────────────
@@ -84,7 +82,7 @@ public class ValidationControllerTests
     [Fact]
     public async Task ValidateRoad_NullBody_Returns400()
     {
-        using var db = CreateInMemoryDb("ValidationTest");
+        using var db = CreateDb();
         var ctrl = CreateController(db);
         var result = await ctrl.ValidateRoad(null!);
         var bad = Assert.IsType<ObjectResult>(result);
@@ -94,7 +92,7 @@ public class ValidationControllerTests
     [Fact]
     public async Task ValidateRoad_LessThan2Points_Returns400()
     {
-        using var db = CreateInMemoryDb("ValidationTest");
+        using var db = CreateDb();
         var ctrl = CreateController(db);
         var body = new ValidateRoadRequest([new CoordDto(36.0, 3.0)]);
         var result = await ctrl.ValidateRoad(body);
@@ -105,7 +103,7 @@ public class ValidationControllerTests
     [Fact]
     public async Task ValidateRoad_NaNCoordinate_Returns400()
     {
-        using var db = CreateInMemoryDb("ValidationTest");
+        using var db = CreateDb();
         var ctrl = CreateController(db);
         var body = new ValidateRoadRequest([
             new CoordDto(36.0, 3.0),
@@ -119,7 +117,7 @@ public class ValidationControllerTests
     [Fact]
     public async Task ValidateRoad_InfinityCoordinate_Returns400()
     {
-        using var db = CreateInMemoryDb("ValidationTest");
+        using var db = CreateDb();
         var ctrl = CreateController(db);
         var body = new ValidateRoadRequest([
             new CoordDto(36.0, 3.0),
@@ -133,7 +131,7 @@ public class ValidationControllerTests
     [Fact]
     public async Task ValidateRoad_NoExistingRoads_ReturnsValid()
     {
-        using var db = CreateInMemoryDb("ValidationTest");
+        using var db = CreateDb();
         var ctrl = CreateController(db);
         var body = new ValidateRoadRequest([
             new CoordDto(36.0, 3.0),
@@ -208,7 +206,7 @@ public class ValidationControllerTests
     [Fact]
     public async Task ValidateDistrict_NullBody_Returns400()
     {
-        using var db = CreateInMemoryDb("ValidationTest");
+        using var db = CreateDb();
         var ctrl = CreateController(db);
         var result = await ctrl.ValidateDistrict(null!);
         var bad = Assert.IsType<ObjectResult>(result);
@@ -218,7 +216,7 @@ public class ValidationControllerTests
     [Fact]
     public async Task ValidateDistrict_LessThan3Points_Returns400()
     {
-        using var db = CreateInMemoryDb("ValidationTest");
+        using var db = CreateDb();
         var ctrl = CreateController(db);
         var body = new ValidateDistrictRequest([new CoordDto(36.0, 3.0), new CoordDto(36.1, 3.1)], "residential");
         var result = await ctrl.ValidateDistrict(body);
@@ -229,7 +227,7 @@ public class ValidationControllerTests
     [Fact]
     public async Task ValidateDistrict_NoExistingDistricts_ReturnsValid()
     {
-        using var db = CreateInMemoryDb("ValidationTest");
+        using var db = CreateDb();
         var ctrl = CreateController(db);
         var body = new ValidateDistrictRequest([
             new CoordDto(36.0, 3.0),
@@ -285,7 +283,7 @@ public class ValidationControllerTests
     [Fact]
     public async Task DistrictsCoverage_NoUrbanAreas_ReturnsCovered()
     {
-        using var db = CreateInMemoryDb("ValidationTest");
+        using var db = CreateDb();
         var ctrl = CreateController(db);
         var result = await ctrl.DistrictsCoverage();
         var ok = Assert.IsType<OkObjectResult>(result);
@@ -296,7 +294,7 @@ public class ValidationControllerTests
     [Fact]
     public async Task DistrictsCoverage_NoDistricts_ReturnsNotCovered()
     {
-        using var db = CreateInMemoryDb("ValidationTest");
+        using var db = CreateDb();
 
         db.Areas.Add(new Area
         {

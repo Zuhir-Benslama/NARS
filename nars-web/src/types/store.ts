@@ -1,4 +1,3 @@
-import type { LatLng } from "./coordinates"
 import type { UserInfo } from "./user"
 
 // FeatureCounts deliberately splits houseEntrances into mainEntrances +
@@ -18,9 +17,6 @@ export interface FeatureCounts {
 
 export interface AppStoreState {
   currentPhase: number
-  counts: FeatureCounts
-  cityCenterMode: "city_center" | "auto" | null
-  cityCenterLatLng: LatLng | null
   user: UserInfo | null
   municipalityName: string
   loadError: boolean

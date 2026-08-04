@@ -5,6 +5,7 @@
 import { getCtx } from "../core/state"
 import { asGeomanInternal } from "../core/geoman-types"
 import type { GeomanActionInstance } from "../core/geoman-types"
+import { clearEdgeVisibilityPoll } from "./draw-control"
 
 // ─── RE-EXPORTS ───────────────────────────────────────────────────────────────
 
@@ -39,6 +40,7 @@ export async function removeLastVertex(): Promise<void> {
   const coords: [number, number][] = lineDrawer.shapeLngLats ?? []
   if (coords.length <= 1) {
     const gm = asGeomanInternal(getCtx().geoman)
+    clearEdgeVisibilityPoll()
     try {
       await gm?.disableDraw?.()
     } catch {

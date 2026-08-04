@@ -69,6 +69,7 @@ public class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactory) : IF
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var users = await db.Users
             .Where(u => userIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.Username, u.Name, u.Email, u.Role })
             .ToListAsync(ct);
 
         var conn = (NpgsqlConnection)db.Database.GetDbConnection();

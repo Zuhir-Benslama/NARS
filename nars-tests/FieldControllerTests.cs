@@ -35,8 +35,8 @@ public class FieldControllerTests
         };
 
     private static void SetUser(FieldController ctrl, string role,
-        int? communeId = null, string? username = null) => ctrl.ControllerContext.HttpContext.User =
-            AuthTestHelper.CreateClaimsPrincipal(UserId, role, communeId, username: username ?? "fieldworker");
+        int? communeId = null, string? username = null) =>
+        AuthTestHelper.SetUser(ctrl, UserId, role, communeId: communeId, username: username ?? "fieldworker");
 
     private static JsonNode Json(string raw) => JsonNode.Parse(raw)!;
 
@@ -243,6 +243,9 @@ public class FieldControllerTests
         var ok = Assert.IsType<OkObjectResult>(result);
         var response = Assert.IsType<FieldInspectionsResponse>(ok.Value);
         Assert.Equal(2, response.Inspections.Count);
+        Assert.Equal("good", response.Inspections[0].Status);
+        Assert.Equal("issue", response.Inspections[1].Status);
+        Assert.Equal(FeatureTypes.Road, response.Inspections[0].Type);
     }
 
     [Fact]

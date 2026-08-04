@@ -58,7 +58,7 @@ public partial class AuthController
         // Short-circuiting on "admin is null" leaks whether a username exists
         // via response-time difference (~0 µs vs ~300 ms for a real BCrypt check).
         var adminNormalized = body.AdminUsername.ToLowerInvariant();
-        var admin = await refreshService.FindUserByUsernameAsync(adminNormalized, cancellationToken);
+        var admin = await authorizationService.FindUserByUsernameAsync(adminNormalized, cancellationToken);
 
         var hashToCheck = admin?.PasswordHash ?? DummyHash;
         var passwordValid = BCrypt.Net.BCrypt.Verify(body.AdminPassword, hashToCheck);
@@ -101,19 +101,23 @@ public partial class AuthController
             cancellationToken);
         if (scopeResult.Error is not null)
         {
-            return Problem(detail: scopeResult.Error, statusCode: 403);
+            return scopeResult.IsAuthorizationFailure
+                ? Problem(detail: scopeResult.Error, statusCode: 403)
+                : Problem(detail: scopeResult.Error, statusCode: 400);
         }
 
         // 5. Validate and create user (uniqueness, password strength, entity creation).
-        var (newUser, error) = await userCreationService.ValidateAndCreateUserAsync(
+        var creationResult = await userCreationService.ValidateAndCreateUserAsync(
             body.Name, body.Email, body.Phone, body.Username, body.Password,
             body.Role, body.CommuneId, body.DairaId, body.WilayaId,
             cancellationToken);
-        if (error is not null || newUser is null)
+        if (!creationResult.IsSuccess)
         {
-            var statusCode = error?.Contains("already exists") == true ? 409 : 400;
-            return Problem(detail: error ?? "User creation failed.", statusCode: statusCode);
+            var statusCode = creationResult.Code == UserCreationErrorCode.Duplicate ? 409 : 400;
+            return Problem(detail: creationResult.Error ?? "User creation failed.", statusCode: statusCode);
         }
+
+        var newUser = creationResult.User!;
 
         // 6. Persist (catch DB-level unique constraint races).
         try

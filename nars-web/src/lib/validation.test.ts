@@ -71,7 +71,7 @@ describe("validateRoad", () => {
     const result = await validateRoad(road)
 
     expect(result.valid).toBe(false)
-    expect(result.error).toContain("Cannot reach")
+    expect(result.error).toBe("err_network")
   })
 })
 
@@ -136,7 +136,7 @@ describe("validateDistrict", () => {
     const result = await validateDistrict(district)
 
     expect(result.valid).toBe(false)
-    expect(result.error).toContain("Cannot reach")
+    expect(result.error).toBe("err_network")
   })
 })
 

@@ -254,6 +254,18 @@ describe("installSnapInterceptors", () => {
   })
 })
 
+describe("uninstallSnapInterceptors", () => {
+  it("unregisters click and mousedown handlers", () => {
+    const offSpy = vi.fn()
+    mockCtx.map.off = offSpy
+
+    mod.uninstallSnapInterceptors()
+
+    expect(offSpy).toHaveBeenCalledWith("click", expect.any(Function))
+    expect(offSpy).toHaveBeenCalledWith("mousedown", expect.any(Function))
+  })
+})
+
 describe("getActiveSnapPhases (draw mode)", () => {
   it("returns completed snap targets for the current phase", () => {
     useAppStore().currentPhase = 3

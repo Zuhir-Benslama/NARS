@@ -73,7 +73,8 @@ public class FieldController(
             return Problem(detail: "Invalid feature_id.", statusCode: 400);
         }
 
-        var featureError = await ValidateInspectionTargetAsync(featureId, body.Type, cancellationToken);
+        var normalizedType = body.Type.ToLowerInvariant();
+        var featureError = await ValidateInspectionTargetAsync(featureId, normalizedType, cancellationToken);
         if (featureError is not null)
         {
             return featureError;
@@ -92,7 +93,7 @@ public class FieldController(
         }
 
         var inspectionId = await fieldService.SubmitInspectionAsync(
-            featureId, RequiredCurrentUserId, body.Type, body.Status, rawData, cancellationToken);
+            featureId, RequiredCurrentUserId, normalizedType, body.Status, rawData, cancellationToken);
 
         logger.LogInformation("[Field] Worker {WorkerId} inspected {Type} {FeatureId} — status: {Status}",
             CurrentUserId, body.Type, featureId, body.Status);

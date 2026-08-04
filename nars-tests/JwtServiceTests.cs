@@ -120,8 +120,8 @@ public class JwtServiceTests
         Assert.NotEmpty(hash);
         // Hash should be different from raw
         Assert.NotEqual(raw, hash);
-        // Hash should be a valid Base64 string
-        Assert.NotNull(Convert.FromBase64String(hash));
+        // Hash should be a valid Base64 string (decodes without throwing)
+        _ = Convert.FromBase64String(hash);
     }
 
     [Fact]

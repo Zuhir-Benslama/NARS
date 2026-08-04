@@ -114,6 +114,6 @@ public class ScatteredAreaServiceTests
         Assert.All(readValues, v =>
             Assert.True(v is null || v == "Simulated database failure",
                 $"Observed inconsistent LastError value: '{v}'"));
-        Assert.NotNull(service.LastError);
+        Assert.Equal("Simulated database failure", service.LastError!.Value.Message);
     }
 }

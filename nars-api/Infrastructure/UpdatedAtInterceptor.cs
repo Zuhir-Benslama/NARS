@@ -1,13 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using NarsApi.Models;
+using NarsApi.Services;
 
 namespace NarsApi.Infrastructure;
 
-public sealed class UpdatedAtInterceptor : SaveChangesInterceptor
+public sealed class UpdatedAtInterceptor(IDateTimeProvider timeProvider) : SaveChangesInterceptor
 {
-    private static readonly TimeProvider _timeProvider = TimeProvider.System;
-
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
         DbContextEventData eventData,
         InterceptionResult<int> result,
@@ -15,7 +14,7 @@ public sealed class UpdatedAtInterceptor : SaveChangesInterceptor
     {
         if (eventData.Context is not null)
         {
-            var now = _timeProvider.GetUtcNow().UtcDateTime;
+            var now = timeProvider.UtcNow;
             foreach (var entry in eventData.Context.ChangeTracker.Entries<FeatureBase>()
                 .Where(e => e.State is EntityState.Modified or EntityState.Added))
             {

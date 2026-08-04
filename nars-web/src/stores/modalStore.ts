@@ -108,6 +108,10 @@ export const useModalStore = defineStore("modal", {
       this.mainEntranceOptions = options
       this.selectedMainIdx = ""
     },
+
+    patchFields(fields: Partial<ModalState>) {
+      this.$patch(fields)
+    },
   },
 })
 

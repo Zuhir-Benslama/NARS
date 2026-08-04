@@ -50,10 +50,9 @@ async function handleResponse(
 ): Promise<Response> {
   if (response.ok) return response
 
-  // 401 = session expired → redirect to login with return URL
+  // 401 = session expired → redirect to login
   if (response.status === 401) {
-    const returnTo = encodeURIComponent(window.location.pathname + window.location.search)
-    window.location.href = `${getLoginPath()}?returnTo=${returnTo}`
+    window.location.href = getLoginPath()
     // Throw to prevent further execution
     const error = createAuthError("Session expired. Redirecting to login.", {
       ...context,

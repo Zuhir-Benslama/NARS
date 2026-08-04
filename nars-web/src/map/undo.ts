@@ -3,9 +3,8 @@
 // During drawing, right-click removes the last vertex (handled by Geoman).
 
 import { apiFetch } from "../api"
-import { getErrorMessage } from "../lib/errors"
+import { getUserMessageKey } from "../lib/errors"
 import { showToast } from "../lib/toast"
-import { useAppStore } from "../stores/appStore"
 import { useLayerStore } from "../stores/layerStore"
 import { useUndoStore } from "../stores/undoStore"
 import { useFeaturesStore } from "../stores/featuresStore"
@@ -40,103 +39,132 @@ export function recordDelete(entry: LayerEntry, phaseKey: FeatureTypeKey): void 
 
 // ─── UNDO (Ctrl+Z) ───────────────────────────────────────────────────────────
 
+let _undoInProgress = false
+
 export async function undo(): Promise<void> {
-  const action = useUndoStore().popUndo()
-  if (!action) {
-    showToast(t("map_nothing_to_restore"), "info")
+  if (_undoInProgress) {
+    debugWarn("[UNDO] Undo already in progress — skipping")
     return
   }
-
+  _undoInProgress = true
   try {
-    const { entry, phaseKey } = action
-
-    // Re-create the feature via the API — it gets a new dbId
-    const shape = toApiSaveShape(entry.data)
-
-    const json = await apiFetch("/api/features", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: shape.type,
-        layer: shape.layer,
-        label: entry.data.label,
-        data: entry.data,
-      }),
-    }).then((r) => r.json())
-    const newDbId = json.id as string | undefined
-    if (!newDbId) {
-      showToast(t("map_restore_no_id"), "error")
+    const action = useUndoStore().popUndo()
+    if (!action) {
+      showToast(t("map_nothing_to_restore"), "info")
       return
     }
 
-    const newId = crypto.randomUUID()
+    try {
+      const { entry, phaseKey } = action
 
-    const restoredEntry: LayerEntry = {
-      ...entry,
-      id: newId,
-      dbId: newDbId,
-    }
+      // Re-create the feature via the API — it gets a new dbId
+      const shape = toApiSaveShape(entry.data)
 
-    // ⚠️ Dev warning: restored feature gets a NEW database ID.
-    // Any cross-references (e.g. secondary entrances → main entrance)
-    // pointing to the old ID will be broken.
-    debugWarn(
-      `[UNDO] Restored "${entry.data.label}" with new DB ID ${newDbId} (old: ${entry.dbId})`,
-    )
-
-    const layerStore = useLayerStore()
-    const state = layerStore.$state
-
-    if (state[phaseKey]) {
-      ;(state[phaseKey] as unknown as LayerEntry[]).push(restoredEntry)
-    }
-
-    // Repair cross-references: update any features that pointed to the old
-    // database ID to now point to the new one.
-    const oldDbId = entry.dbId
-    if (phaseKey === "houseEntrances") {
-      for (const entrance of state.houseEntrances || []) {
-        if (entrance.data.mainEntranceDbId === oldDbId) {
-          entrance.data.mainEntranceDbId = newDbId
-          entrance.data.mainEntranceLabel = restoredEntry.data.label
-          debugLog(
-            `[UNDO] Updated secondary entrance "${entrance.data.label}" → mainEntranceDbId ${newDbId}`,
-          )
-        }
+      const json = await apiFetch("/api/features", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: shape.type,
+          layer: shape.layer,
+          label: entry.data.label,
+          data: entry.data,
+        }),
+      }).then((r) => r.json())
+      const newDbId = json.id as string | undefined
+      if (!newDbId) {
+        showToast(t("map_restore_no_id"), "error")
+        return
       }
-    }
 
-    if (phaseKey === "roads") {
-      for (const entrance of state.houseEntrances || []) {
-        if (entrance.data.roadDbId === oldDbId) {
-          entrance.data.roadDbId = newDbId
-          debugLog(`[UNDO] Updated entrance "${entrance.data.label}" → roadDbId ${newDbId}`)
-        }
-      }
-    }
+      const newId = crypto.randomUUID()
 
-    const phase = PHASES.find((p) => p.key === phaseKey)
-    const style = getDefaultStyle(phase?.color ?? "#8e44ad")
-
-    const geometry = entryDataToGeometry(entry.data, entry.type)
-    const featuresStore = useFeaturesStore()
-    featuresStore.add({
-      id: newId,
-      geometry,
-      properties: {
+      const restoredEntry: LayerEntry = {
+        ...entry,
+        id: newId,
         dbId: newDbId,
-        phaseKey,
-        label: entry.data.label,
-        geomType: geometry.type,
-        ...style,
-      },
-    })
+      }
 
-    useAppStore().syncCounts()
-    showToast(t("map_restored", { label: entry.data.label }), "success")
-  } catch (err) {
-    debugError("[UNDO] Restore failed:", err)
-    showToast(t("map_restore_failed", { error: getErrorMessage(err) }), "error")
+      // ⚠️ Dev warning: restored feature gets a NEW database ID.
+      // Any cross-references (e.g. secondary entrances → main entrance)
+      // pointing to the old ID will be broken.
+      debugWarn(
+        `[UNDO] Restored "${entry.data.label}" with new DB ID ${newDbId} (old: ${entry.dbId})`,
+      )
+
+      const layerStore = useLayerStore()
+      layerStore.addFeature(phaseKey, restoredEntry)
+      const state = layerStore.$state
+
+      // Repair cross-references: update any features that pointed to the old
+      // database ID to now point to the new one.
+      const oldDbId = entry.dbId
+      const repairedEntrances: LayerEntry[] = []
+      if (phaseKey === "houseEntrances") {
+        for (const entrance of state.houseEntrances || []) {
+          if (entrance.data.mainEntranceDbId === oldDbId) {
+            entrance.data.mainEntranceDbId = newDbId
+            entrance.data.mainEntranceLabel = restoredEntry.data.label
+            repairedEntrances.push(entrance)
+            debugLog(
+              `[UNDO] Updated secondary entrance "${entrance.data.label}" → mainEntranceDbId ${newDbId}`,
+            )
+          }
+        }
+      }
+
+      if (phaseKey === "roads") {
+        for (const entrance of state.houseEntrances || []) {
+          if (entrance.data.roadDbId === oldDbId) {
+            entrance.data.roadDbId = newDbId
+            repairedEntrances.push(entrance)
+            debugLog(`[UNDO] Updated entrance "${entrance.data.label}" → roadDbId ${newDbId}`)
+          }
+        }
+      }
+
+      // Persist the reference repair — the server still stores the old (deleted)
+      // ID, so the in-memory fix alone would be lost on reload.
+      if (repairedEntrances.length > 0) {
+        const results = await Promise.allSettled(
+          repairedEntrances.map((entrance) =>
+            apiFetch(`/api/features/${entrance.dbId}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ data: entrance.data }),
+            }),
+          ),
+        )
+        const failures = results.filter((r) => r.status === "rejected").length
+        if (failures > 0) {
+          debugError(`[UNDO] Failed to persist ${failures} cross-reference repair(s).`)
+          showToast(t("map_restore_refs_warning"), "warning")
+        }
+      }
+
+      const phase = PHASES.find((p) => p.key === phaseKey)
+      const style = getDefaultStyle(phase?.color ?? "#8e44ad")
+
+      const geometry = entryDataToGeometry(entry.data, entry.type)
+      const featuresStore = useFeaturesStore()
+      featuresStore.add({
+        id: newId,
+        geometry,
+        properties: {
+          dbId: newDbId,
+          phaseKey,
+          label: entry.data.label,
+          geomType: geometry.type,
+          ...style,
+        },
+      })
+
+      showToast(t("map_restored", { label: entry.data.label }), "success")
+    } catch (err) {
+      debugError("[UNDO] Restore failed:", err)
+      showToast(t("map_restore_failed", { error: t(getUserMessageKey(err)) }), "error")
+    }
+  } finally {
+    _undoInProgress = false
   }
 }
 

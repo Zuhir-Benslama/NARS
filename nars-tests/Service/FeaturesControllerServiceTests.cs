@@ -14,14 +14,15 @@ using Moq;
 using static NarsApi.Tests.TestData;
 using Xunit;
 
-namespace NarsApi.Tests.Integration;
+namespace NarsApi.Tests.Service;
 
 /// <summary>
 /// Integration tests for FeaturesController against real PostgreSQL + PostGIS.
 /// Tests the full CRUD pipeline with spatial data.
 /// </summary>
 [Collection(PostgreSqlCollection.CollectionName)]
-public class FeaturesControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsyncLifetime
+[Trait("Category", "Service")]
+public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLifetime
 {
     private readonly NarsDatabaseFixture _fixture = fixture;
     private AppDbContext _db = null!;
@@ -152,6 +153,9 @@ public class FeaturesControllerIntegrationTests(NarsDatabaseFixture fixture) : I
         var okResult = Assert.IsType<OkObjectResult>(result);
         var loadResponse = Assert.IsType<LoadFeaturesResponse<FeatureResult>>(okResult.Value);
         Assert.Equal(2, loadResponse.Count);
+        Assert.Equal(2, loadResponse.Features.Count);
+        Assert.Contains(loadResponse.Features, f => f.Type == "area" && f.Label == "Area 1");
+        Assert.Contains(loadResponse.Features, f => f.Type == "road" && f.Label == "Road 1");
     }
 
     [Fact]
@@ -244,7 +248,10 @@ public class FeaturesControllerIntegrationTests(NarsDatabaseFixture fixture) : I
         var area = await _db.Areas.AsNoTracking().FirstOrDefaultAsync(a => a.Id == featureId);
         Assert.NotNull(area);
         Assert.Equal("Updated Label", area.Label);
-        Assert.Contains("36.8", area.Data);
+        var persistedData = System.Text.Json.JsonDocument.Parse(area.Data);
+        var coords = persistedData.RootElement.GetProperty("coordinates")[0];
+        Assert.Equal(36.80, coords.GetProperty("lat").GetDouble());
+        Assert.Equal(3.00, coords.GetProperty("lng").GetDouble());
     }
 
     [Fact]

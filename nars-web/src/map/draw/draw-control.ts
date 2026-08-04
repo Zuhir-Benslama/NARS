@@ -25,6 +25,21 @@ export function resetDrawControl(): void {
   store.modeSwitchToken = 0
 }
 
+// Stops the bounded edge-visibility poll started by buildDrawControl. Must be
+// called whenever draw mode is torn down so the poll never keeps ticking
+// against a disabled/destroyed Geoman context.
+export function clearEdgeVisibilityPoll(): void {
+  const store = useDrawStore()
+  if (store.edgePollId !== null) {
+    clearInterval(store.edgePollId)
+    store.edgePollId = null
+  }
+  if (store.edgeTimeoutId !== null) {
+    clearTimeout(store.edgeTimeoutId)
+    store.edgeTimeoutId = null
+  }
+}
+
 export function buildDrawControl(phase: PhaseConfig): void {
   const gm = getCtx().geoman
   if (!gm) return
@@ -34,14 +49,7 @@ export function buildDrawControl(phase: PhaseConfig): void {
   if (!shapeName) return
 
   // Clear any lingering edge-visibility poll from a previous phase
-  if (store.edgePollId !== null) {
-    clearInterval(store.edgePollId)
-    store.edgePollId = null
-  }
-  if (store.edgeTimeoutId !== null) {
-    clearTimeout(store.edgeTimeoutId)
-    store.edgeTimeoutId = null
-  }
+  clearEdgeVisibilityPoll()
 
   debugLog("[DRAW CONTROL] Phase:", phase.key, "| drawType:", phase.drawType, "| shape:", shapeName)
 

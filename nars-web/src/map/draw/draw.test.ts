@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest"
+import { setActivePinia, createPinia } from "pinia"
 import { PHASES } from "../../phases"
 import { pointToSegmentDist } from "./draw-handlers"
 import { normalizeGeometry, getFeatureStyle } from "./draw-save"
@@ -11,7 +12,8 @@ import {
   isSnappingEnabled,
   setSnappingEnabled,
 } from "./draw-state"
-import { resetDrawControl } from "./draw-control"
+import { resetDrawControl, clearEdgeVisibilityPoll } from "./draw-control"
+import { useDrawStore } from "../../stores/drawStore"
 import type { Phase } from "../../types"
 import type { ModalResult } from "../../types/modal"
 
@@ -257,6 +259,25 @@ describe("draw-control.ts", () => {
       resetDrawControl()
       resetDrawControl()
       expect(() => resetDrawControl()).not.toThrow()
+    })
+  })
+
+  describe("clearEdgeVisibilityPoll", () => {
+    it("clears a running poll and its timeout", () => {
+      setActivePinia(createPinia())
+      const store = useDrawStore()
+      store.edgePollId = setInterval(() => {}, 1000) as unknown as ReturnType<typeof setInterval>
+      store.edgeTimeoutId = setTimeout(() => {}, 1000) as unknown as ReturnType<typeof setTimeout>
+
+      clearEdgeVisibilityPoll()
+
+      expect(store.edgePollId).toBeNull()
+      expect(store.edgeTimeoutId).toBeNull()
+    })
+
+    it("is safe when no poll is active", () => {
+      setActivePinia(createPinia())
+      expect(() => clearEdgeVisibilityPoll()).not.toThrow()
     })
   })
 })

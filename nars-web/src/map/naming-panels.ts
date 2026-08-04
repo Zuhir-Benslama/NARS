@@ -11,8 +11,10 @@
 import distance from "@turf/distance"
 import { useLayerStore } from "../stores/layerStore"
 import { useFeaturesStore } from "../stores/featuresStore"
-import { debugError } from "../utils/debug"
+import { debugError, debugWarn } from "../utils/debug"
+import { saveToDatabase } from "./features/feature-persistence"
 import type { NamingPanelFeatureData, LayerEntry, LatLng } from "../types"
+import type { MaplibreFeature } from "./core/state"
 import { PHASES } from "../phases"
 
 const DEDUPE_METERS = 3
@@ -25,7 +27,9 @@ for (const p of PHASES) {
   }
 }
 
-function nearExisting(from: LatLng): boolean {
+// A candidate is a duplicate if it falls within DEDUPE_METERS of a panel that
+// already exists in the store OR of one placed earlier in this same run.
+function nearExisting(from: LatLng, placed: LatLng[]): boolean {
   const layerStore = useLayerStore()
   const state = layerStore.$state
   const existing = state.namingPanels || []
@@ -36,6 +40,12 @@ function nearExisting(from: LatLng): boolean {
       })
       if (dist < DEDUPE_METERS) return true
     }
+  }
+  for (const p of placed) {
+    const dist = distance([from.lng, from.lat], [p.lng, p.lat], {
+      units: "meters",
+    })
+    if (dist < DEDUPE_METERS) return true
   }
   return false
 }
@@ -89,66 +99,59 @@ function roadStations(coords: LatLng[]): LatLng[] {
   return out
 }
 
-async function addPanelIfMissing(
-  label: string,
-  lat: number,
-  lng: number,
-  color: string,
-): Promise<void> {
-  if (nearExisting({ lat, lng })) return
-
-  const layerStore = useLayerStore()
-  const data: NamingPanelFeatureData = {
-    type: "namingPanels",
-    label,
-    lat,
-    lng,
-  }
-
-  const layerEntry: LayerEntry = {
-    id: `panel_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`,
-    dbId: "0",
-    data,
-    type: "marker",
-  }
-
-  layerStore.addFeature("namingPanels", layerEntry)
-
-  const featuresStore = useFeaturesStore()
-  featuresStore.add({
-    id: layerEntry.id,
-    geometry: { type: "Point", coordinates: [lng, lat] },
-    properties: {
-      dbId: layerEntry.dbId,
-      phaseKey: "namingPanels",
-      label,
-      geomType: "Point",
-      circleColor: color,
-      circleRadius: 6,
-      textColor: "#333333",
-    },
-  })
-}
-
 export async function generateNamingPanels(): Promise<void> {
   const layerStore = useLayerStore()
   const state = layerStore.$state
-  const tasks: Promise<void>[] = []
+  const placed: LatLng[] = []
+  const pendingPanels: LayerEntry[] = []
+  const maplibreFeatures: MaplibreFeature[] = []
+
+  const place = (label: string, lat: number, lng: number, color: string): void => {
+    if (nearExisting({ lat, lng }, placed)) return
+    placed.push({ lat, lng })
+
+    const data: NamingPanelFeatureData = {
+      type: "namingPanels",
+      label,
+      lat,
+      lng,
+    }
+
+    const layerEntry: LayerEntry = {
+      id: `panel_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`,
+      dbId: `local_${crypto.randomUUID().slice(0, 8)}`,
+      data,
+      type: "marker",
+    }
+
+    pendingPanels.push(layerEntry)
+    maplibreFeatures.push({
+      id: layerEntry.id,
+      geometry: { type: "Point", coordinates: [lng, lat] },
+      properties: {
+        dbId: layerEntry.dbId,
+        phaseKey: "namingPanels",
+        label,
+        geomType: "Point",
+        circleColor: color,
+        circleRadius: 6,
+        textColor: "#333333",
+      },
+    })
+  }
 
   for (const e of state.districts || []) {
     if (e.data.coordinates) {
-      const verts = polygonVertices(e.data.coordinates)
-      for (const v of verts) {
-        tasks.push(addPanelIfMissing(e.data.label, v.lat, v.lng, PANEL_COLORS.districts))
+      for (const v of polygonVertices(e.data.coordinates)) {
+        place(e.data.label, v.lat, v.lng, PANEL_COLORS.districts)
       }
     }
   }
 
   for (const e of state.roads || []) {
     if (e.data.coordinates && e.data.coordinates.length >= 2) {
-      const stations = roadStations(e.data.coordinates)
-      for (const v of stations) {
-        tasks.push(addPanelIfMissing(e.data.label, v.lat, v.lng, PANEL_COLORS.roads))
+      for (const v of roadStations(e.data.coordinates)) {
+        place(e.data.label, v.lat, v.lng, PANEL_COLORS.roads)
       }
     }
   }
@@ -156,22 +159,42 @@ export async function generateNamingPanels(): Promise<void> {
   for (const e of state.publicBuildings || []) {
     if (e.data.coordinates && e.data.coordinates.length > 0) {
       const v = firstVertex(e.data.coordinates)
-      if (v) {
-        tasks.push(addPanelIfMissing(e.data.label, v.lat, v.lng, PANEL_COLORS.publicBuildings))
-      }
+      if (v) place(e.data.label, v.lat, v.lng, PANEL_COLORS.publicBuildings)
     }
   }
 
   for (const e of state.publicSpaces || []) {
     if (e.data.coordinates && e.data.coordinates.length > 0) {
       const v = firstVertex(e.data.coordinates)
-      if (v) {
-        tasks.push(addPanelIfMissing(e.data.label, v.lat, v.lng, PANEL_COLORS.publicSpaces))
-      }
+      if (v) place(e.data.label, v.lat, v.lng, PANEL_COLORS.publicSpaces)
     }
   }
 
-  await Promise.allSettled(tasks)
+  // Persist the panels so they survive reload and get real server dbIds.
+  // Persistence failures degrade gracefully: the panel stays local-only.
+  if (pendingPanels.length > 0) {
+    const results = await Promise.all(pendingPanels.map((panel) => saveToDatabase(panel.data)))
+    results.forEach((result, i) => {
+      const panel = pendingPanels[i]
+      if (result.ok && result.data?.id) {
+        panel.dbId = result.data.id
+        maplibreFeatures[i].properties.dbId = result.data.id
+      } else {
+        debugWarn(
+          `[PANELS] Panel "${panel.data.label}" not persisted (${result.error}) — kept local-only.`,
+        )
+      }
+    })
+
+    for (const panel of pendingPanels) {
+      layerStore.addFeature("namingPanels", panel)
+    }
+  }
+
+  // Batch-add so the GeoJSON source is rewritten once instead of once per panel.
+  if (maplibreFeatures.length > 0) {
+    useFeaturesStore().batchAdd(maplibreFeatures)
+  }
 }
 
 if (import.meta.env.DEV) {

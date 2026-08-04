@@ -93,33 +93,52 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
   }
 
   // ── Phase 4: apply reversals, persist, refresh arrows ────────────────────
+  let reversedCount = 0
+  let failureCount = 0
+  const saveTasks: Promise<void>[] = []
+
   for (const [dbId, { fwd, rev, entry, needsReverse }] of votes) {
     const shouldReverse = needsReverse !== undefined ? needsReverse : rev > fwd
-    if (shouldReverse) {
-      const coords = entry.data.coordinates
-      if (!coords?.length) continue
-      const reversed = [...coords].reverse()
-      try {
-        await apiFetch(`/api/features/${entry.dbId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ data: { ...entry.data, coordinates: reversed } }),
+    if (!shouldReverse) continue
+
+    const coords = entry.data.coordinates
+    if (!coords?.length) continue
+    const reversed = [...coords].reverse()
+
+    saveTasks.push(
+      apiFetch(`/api/features/${entry.dbId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: { ...entry.data, coordinates: reversed } }),
+      })
+        .then(() => {
+          entry.data.coordinates = reversed
+          featuresStore.update(entry.id, {
+            geometry: {
+              type: "LineString" as const,
+              coordinates: reversed.map((c) => [c.lng, c.lat]),
+            },
+          })
+          reversedCount++
         })
-        entry.data.coordinates = reversed
-        featuresStore.update(entry.id, {
-          geometry: {
-            type: "LineString" as const,
-            coordinates: reversed.map((c) => [c.lng, c.lat]),
-          },
-        })
-      } catch (err) {
-        debugError(`Road direction save error (id=${dbId}):`, err)
-      }
-    }
+        .catch((err) => {
+          debugError(`Road direction save error (id=${dbId}):`, err)
+          failureCount++
+        }),
+    )
   }
 
+  await Promise.all(saveTasks)
+
   updateEndpointMarkers()
-  showToast(t("map_road_directions_applied", { count: votes.size }), "success")
+  if (failureCount > 0) {
+    showToast(
+      t("map_road_directions_partial", { count: reversedCount, failed: failureCount }),
+      "error",
+    )
+  } else {
+    showToast(t("map_road_directions_applied", { count: reversedCount }), "success")
+  }
 }
 
 export { updateEndpointMarkers } from "./road-markers"

@@ -117,6 +117,7 @@ import { ref, computed, onMounted, onUnmounted } from "vue"
 import { useI18n } from "vue-i18n"
 import { apiFetch } from "../api"
 import { useAppStore } from "../stores/appStore"
+import { getUserMessageKey } from "../lib/errors"
 import { slugify } from "../utils/string"
 import type { NationalOverview, WilayaReport, DairaReport, CommuneReport, UserRole } from "../types"
 import CommuneList from "./admin/CommuneList.vue"
@@ -187,7 +188,7 @@ async function loadOverview() {
     else if (isDaira.value) dairaData.value = data as DairaReport
   } catch (err) {
     if (signal.aborted) return
-    error.value = err instanceof Error ? err.message : t("admin.load_error")
+    error.value = t(getUserMessageKey(err))
   } finally {
     if (!signal.aborted) loading.value = false
   }

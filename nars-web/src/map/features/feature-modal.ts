@@ -10,28 +10,31 @@ export async function prepareModalExtras(phase: (typeof PHASES)[number]): Promis
   const state = layerStore.$state
 
   if (phase.key === "areas") {
-    modalStore.mainUrbanExists = await checkMainUrbanExists()
-    if (!modalStore.mainUrbanExists) {
-      modalStore.label = appStore.communeName
-    } else {
-      modalStore.label = ""
-    }
-    modalStore.areaTypeKey = modalStore.mainUrbanExists ? "secondary_urban" : "central_urban"
+    const mainUrbanExists = await checkMainUrbanExists()
+    modalStore.patchFields({
+      mainUrbanExists,
+      areaTypeKey: mainUrbanExists ? "secondary_urban" : "central_urban",
+      label: mainUrbanExists ? "" : appStore.communeName,
+    })
   }
 
   if (phase.key === "houseEntrances") {
-    modalStore.roadOptions = (state.roads || []).map((r, i) => ({
-      idx: i,
-      label: r.data.label || `Road ${i + 1}`,
-      dbId: String(r.dbId),
-    }))
-    modalStore.mainEntranceOptions = (state.houseEntrances || [])
-      .filter((e) => e.data.entranceTypeKey === "main_entrance")
-      .map((e, i) => ({
+    modalStore.setRoadOptions(
+      (state.roads || []).map((r, i) => ({
         idx: i,
-        label: e.data.label || `Entrance ${i + 1}`,
-        dbId: String(e.dbId),
-      }))
+        label: r.data.label || `Road ${i + 1}`,
+        dbId: String(r.dbId),
+      })),
+    )
+    modalStore.setMainEntranceOptions(
+      (state.houseEntrances || [])
+        .filter((e) => e.data.entranceTypeKey === "main_entrance")
+        .map((e, i) => ({
+          idx: i,
+          label: e.data.label || `Entrance ${i + 1}`,
+          dbId: String(e.dbId),
+        })),
+    )
   }
 }
 

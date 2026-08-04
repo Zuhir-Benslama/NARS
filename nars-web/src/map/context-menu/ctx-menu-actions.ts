@@ -2,7 +2,6 @@
 // enableEditGeometry, editFeatureInfo, removeFeature, and helpers.
 
 import { apiFetch } from "../../api"
-import { useAppStore } from "../../stores/appStore"
 import { useSelectionStore } from "../../stores/selectionStore"
 import { openEditModal } from "../../stores/modalStore"
 import { PHASES } from "../../phases"
@@ -10,7 +9,7 @@ import { getCtx } from "../core/state"
 import { useFeaturesStore } from "../../stores/featuresStore"
 import { showToast, showConfirm } from "../../lib/toast"
 import type { FeatureTypeKey } from "../../types"
-import { getErrorMessage } from "../../lib/errors"
+import { getUserMessageKey } from "../../lib/errors"
 import { t } from "../../i18n"
 import { recordDelete } from "../undo"
 import { enableEditMode } from "../draw/draw-events"
@@ -121,7 +120,7 @@ export async function editFeatureInfo(dbId: string): Promise<void> {
 
     showToast(t("map_feature_updated"), "success")
   } catch (err) {
-    showToast(t("map_save_failed", { error: getErrorMessage(err) }), "error")
+    showToast(t("map_save_failed", { error: t(getUserMessageKey(err)) }), "error")
   }
 }
 
@@ -149,20 +148,15 @@ export async function removeFeature(dbId: string): Promise<void> {
   }
 
   if (!phaseKey) return
-  recordDelete(entry, phaseKey)
 
   try {
     await apiFetch(`/api/features/${dbId}`, { method: "DELETE" })
 
+    recordDelete(entry, phaseKey)
+
     const featuresStore = useFeaturesStore()
     featuresStore.remove(entry.id)
     layerStore.removeFeature(phaseKey, dbId)
-
-    if (phaseKey === "cityCenter") {
-      const appStore = useAppStore()
-      appStore.cityCenterMode = null
-      appStore.cityCenterLatLng = null
-    }
 
     if (phaseKey === "roads") {
       updateEndpointMarkers()
@@ -170,6 +164,6 @@ export async function removeFeature(dbId: string): Promise<void> {
 
     showToast(t("map_feature_deleted"), "success")
   } catch (err) {
-    showToast(t("map_delete_failed", { error: getErrorMessage(err) }), "error")
+    showToast(t("map_delete_failed", { error: t(getUserMessageKey(err)) }), "error")
   }
 }

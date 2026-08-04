@@ -70,7 +70,7 @@ export async function enableEditMode(featureId?: string): Promise<void> {
 
   await geoman.enableGlobalEditMode()
   setEditModeActive(true)
-  useEditStore().isEditMode = true
+  useEditStore().setIsEditMode(true)
   setSnapExclude(featureId ?? null)
 
   patchMarkerPointerSnap(featureId ?? null)

@@ -6,21 +6,14 @@ import { getNarsLastSnap } from "./draw-marker-patch"
 
 export function registerGeomanMarker(
   mp: GeomanMarkerPointer,
-  _marker: unknown,
+  marker: unknown,
   orig: SetLngLatFn,
 ): void {
-  const store = useDrawStore()
-  store.geomanMarkerPointer = mp
-  store.originalGeomanMarkerSetLngLat = orig
+  useDrawStore().registerGeomanMarker(mp, marker, orig)
 }
 
 export function unpatchGeomanMarker(): void {
-  const store = useDrawStore()
-  store.snappingEnabled = false
-  const marker = store.geomanMarkerPointer?.marker as Record<string, unknown> | null | undefined
-  if (marker && store.originalGeomanMarkerSetLngLat) {
-    marker.setLngLat = store.originalGeomanMarkerSetLngLat
-  }
+  useDrawStore().unpatchGeomanMarker()
 }
 
 /**

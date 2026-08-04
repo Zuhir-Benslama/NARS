@@ -59,7 +59,7 @@ public partial class AuthController(
     public async Task<IActionResult> SignIn([FromBody] SignInRequest body, CancellationToken cancellationToken = default)
     {
         var normalizedUsername = body.Username.ToLowerInvariant();
-        var user = await refreshService.FindUserByUsernameAsync(normalizedUsername, cancellationToken);
+        var user = await authorizationService.FindUserByUsernameAsync(normalizedUsername, cancellationToken);
 
         var hashToCheck = user?.PasswordHash ?? DummyHash;
         var passwordValid = BCrypt.Net.BCrypt.Verify(body.Password, hashToCheck);
@@ -70,11 +70,11 @@ public partial class AuthController(
         {
             if (!passwordValid && user is not null)
             {
+                // Only record failed logins for actual password mismatches.
+                // A locked user who supplies the correct password is rejected
+                // without extending their lockout, so a lockout never renews
+                // itself for legitimate users.
                 await refreshService.RecordFailedLoginAsync(user, MaxFailedAttempts, LockoutMinutes, timeProvider.UtcNow, cancellationToken);
-            }
-            else if (isLocked && passwordValid)
-            {
-                await refreshService.RecordFailedLoginAsync(user!, MaxFailedAttempts, LockoutMinutes, timeProvider.UtcNow, cancellationToken);
             }
 
             return Problem(detail: "Invalid username or password", statusCode: 401);
@@ -127,8 +127,7 @@ public partial class AuthController(
         }
 
         var cookieMaxAge = result.RefreshExpiry.Value - timeProvider.UtcNow;
-        Response.Cookies.Append("access_token", result.NewAccessToken, MakeCookieOptions(jwt.AccessTokenExpiresIn));
-        Response.Cookies.Append("refresh_token", result.NewRawToken, MakeCookieOptions(cookieMaxAge));
+        AppendAuthCookies(result.NewAccessToken, result.NewRawToken, jwt.AccessTokenExpiresIn, cookieMaxAge);
 
         return Ok(new RefreshResponse(Success: true, TokenType: "bearer"));
     }
@@ -150,7 +149,7 @@ public partial class AuthController(
 
         // Query the database for fresh user data instead of relying on
         // potentially stale JWT claims (user profile may have changed).
-        var user = await refreshService.FindUserByIdAsync(userId, cancellationToken);
+        var user = await authorizationService.FindUserByIdAsync(userId, cancellationToken);
         if (user is null)
         {
             return Problem(detail: "User no longer exists.", statusCode: 401);
@@ -197,8 +196,8 @@ public partial class AuthController(
             Daira: daira is not null
                 ? new CommuneInfo(daira.DairaId, daira.DairaFr, daira.DairaAr, daira.DairaLatitude, daira.DairaLongitude)
                 : null,
-            Commune: communeId > 0
-                ? new CommuneInfo(communeId, commune?.CommuneFr, commune?.CommuneAr, commune?.CommuneLatitude, commune?.CommuneLongitude)
+            Commune: commune is not null
+                ? new CommuneInfo(commune.CommuneId, commune.CommuneFr, commune.CommuneAr, commune.CommuneLatitude, commune.CommuneLongitude)
                 : null
         ));
     }
@@ -221,8 +220,7 @@ public partial class AuthController(
         }
 
         var refreshMaxAge = refreshExpiry - timeProvider.UtcNow;
-        Response.Cookies.Append("access_token", token, MakeCookieOptions(jwt.AccessTokenExpiresIn));
-        Response.Cookies.Append("refresh_token", refreshRaw, MakeCookieOptions(refreshMaxAge));
+        AppendAuthCookies(token, refreshRaw, jwt.AccessTokenExpiresIn, refreshMaxAge);
 
         var loc = await locationQuery.GetCommuneWithDairaAsync(user.CommuneId ?? 0, ct);
 
@@ -235,13 +233,15 @@ public partial class AuthController(
                 Name: user.Name,
                 Email: user.Email,
                 Role: user.Role,
-                Commune: new CommuneInfo(
-                    Id: user.CommuneId,
-                    NameFr: loc.Commune?.CommuneFr,
-                    NameAr: loc.Commune?.CommuneAr,
-                    Latitude: loc.Commune?.CommuneLatitude,
-                    Longitude: loc.Commune?.CommuneLongitude
-                )
+                Commune: loc.Commune is not null
+                    ? new CommuneInfo(
+                        Id: loc.Commune.CommuneId,
+                        NameFr: loc.Commune.CommuneFr,
+                        NameAr: loc.Commune.CommuneAr,
+                        Latitude: loc.Commune.CommuneLatitude,
+                        Longitude: loc.Commune.CommuneLongitude
+                    )
+                    : null
             )
         ));
     }

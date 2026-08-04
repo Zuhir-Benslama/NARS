@@ -23,12 +23,9 @@ export interface LayerState {
   namingPanels: LayerEntry<NamingPanelFeatureData>[]
 }
 
-let _cachedFeatureMap: Map<string, { layer: keyof LayerState; entry: LayerEntry }> | null = null
-let _featureMapDirty = true
-
 export function resetLayerCache(): void {
-  _cachedFeatureMap = null
-  _featureMapDirty = true
+  // Kept as a no-op for backward compatibility — the feature map is now a
+  // plain derived getter and cannot go stale.
 }
 
 function createInitialState(): LayerState {
@@ -76,19 +73,14 @@ export const useLayerStore = defineStore("layer", {
     publicSpaceCount: (state) => state.publicSpaces.length,
     namingPanelCount: (state) => state.namingPanels.length,
 
-    /** Map of dbId → { layer, entry } for O(1) lookups via getFeature(). Cached. */
+    /** Map of dbId → { layer, entry } for O(1) lookups via getFeature(). */
     _featureMap(state): Map<string, { layer: keyof LayerState; entry: LayerEntry }> {
-      if (!_featureMapDirty && _cachedFeatureMap) {
-        return _cachedFeatureMap
-      }
       const map = new Map<string, { layer: keyof LayerState; entry: LayerEntry }>()
       for (const key of LAYER_KEYS) {
         for (const entry of state[key]) {
           map.set(entry.dbId, { layer: key, entry })
         }
       }
-      _cachedFeatureMap = map
-      _featureMapDirty = false
       return map
     },
   },
@@ -96,14 +88,12 @@ export const useLayerStore = defineStore("layer", {
   actions: {
     addFeature(layer: keyof LayerState, entry: LayerEntry) {
       ;(this[layer] as unknown as LayerEntry[]).push(entry)
-      _featureMapDirty = true
     },
 
     removeFeature(layer: keyof LayerState, dbId: string) {
       const idx = (this[layer] as unknown as LayerEntry[]).findIndex((e) => e.dbId === dbId)
       if (idx !== -1) {
         ;(this[layer] as unknown as LayerEntry[]).splice(idx, 1)
-        _featureMapDirty = true
       }
     },
 
@@ -111,13 +101,11 @@ export const useLayerStore = defineStore("layer", {
       const entry = (this[layer] as unknown as LayerEntry[]).find((e) => e.dbId === dbId)
       if (entry) {
         Object.assign(entry.data, data)
-        _featureMapDirty = true
       }
     },
 
     clearLayer(layer: keyof LayerState) {
       this[layer] = []
-      _featureMapDirty = true
     },
 
     getFeature(dbId: string): LayerEntry | null {
@@ -126,7 +114,6 @@ export const useLayerStore = defineStore("layer", {
 
     reset() {
       this.$reset()
-      _featureMapDirty = true
     },
   },
 })

@@ -46,6 +46,10 @@
     <ProjectReference Include="..\nars-api\NarsApi.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <!--
     Coverage exclusions: EF Core migrations (including *.Designer.cs and the
     model snapshot) and the OpenAPI source-generator output are generated code

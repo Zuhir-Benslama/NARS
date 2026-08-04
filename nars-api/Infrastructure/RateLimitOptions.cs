@@ -18,6 +18,12 @@ public class RateLimitOptions
     public int ClearPermitLimit { get; set; } = 3;
     public int ClearWindowMinutes { get; set; } = 10;
 
+    // Scattered-area recompute endpoint limits (deliberately strict — the
+    // recompute is a heavy PostGIS operation that runs synchronously on the
+    // request thread so the frontend receives the computed GeoJSON).
+    public int ScatteredRefreshPermitLimit { get; set; } = 5;
+    public int ScatteredRefreshWindowMinutes { get; set; } = 5;
+
     // General API limits
     public int ApiPermitLimit { get; set; } = 60;
     public int ApiWindowMinutes { get; set; } = 1;
@@ -71,6 +77,15 @@ public static class RateLimitExtensions
             {
                 limiter.PermitLimit = options.ClearPermitLimit;
                 limiter.Window = TimeSpan.FromMinutes(options.ClearWindowMinutes);
+            });
+
+            // "scattered" uses a fixed window for the synchronous scattered-area
+            // recompute: it is an explicit, infrequent trigger that can block the
+            // request thread for seconds, so abuse must be throttled.
+            rateOptions.AddFixedWindowLimiter("scattered", limiter =>
+            {
+                limiter.PermitLimit = options.ScatteredRefreshPermitLimit;
+                limiter.Window = TimeSpan.FromMinutes(options.ScatteredRefreshWindowMinutes);
             });
 
             rateOptions.AddSlidingWindowLimiter("api", limiter =>

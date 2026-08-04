@@ -11,6 +11,9 @@ public static class RateLimitPolicies
     /// <summary>Fixed-window limiter for the delete-all endpoint.</summary>
     public const string Clear = "clear";
 
+    /// <summary>Fixed-window limiter for the synchronous scattered-area recompute.</summary>
+    public const string ScatteredRefresh = "scattered";
+
     /// <summary>Sliding-window limiter for general API endpoints.</summary>
     public const string Api = "api";
 

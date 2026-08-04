@@ -6,6 +6,8 @@ interface DeletedFeature {
   phaseKey: FeatureTypeKey
 }
 
+const MAX_UNDO_ENTRIES = 100
+
 export const useUndoStore = defineStore("undo", {
   state: () => ({
     undoStack: [] as DeletedFeature[],
@@ -22,6 +24,9 @@ export const useUndoStore = defineStore("undo", {
   actions: {
     recordDelete(entry: LayerEntry, phaseKey: FeatureTypeKey): void {
       this.undoStack.push({ entry, phaseKey })
+      if (this.undoStack.length > MAX_UNDO_ENTRIES) {
+        this.undoStack.shift()
+      }
     },
     popUndo(): DeletedFeature | undefined {
       return this.undoStack.pop()

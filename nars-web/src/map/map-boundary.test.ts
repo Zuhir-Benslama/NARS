@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { addBoundaryClickEvents, resetBoundaryEvents } from "./map-boundary"
+import {
+  addBoundaryClickEvents,
+  resetBoundaryEvents,
+  removeBoundaryClickEvents,
+} from "./map-boundary"
 import type maplibregl from "maplibre-gl"
 
 const mockMapOn = vi.fn()
@@ -51,6 +55,31 @@ describe("map-boundary", () => {
   it("re-registers after resetBoundaryEvents", () => {
     addBoundaryClickEvents(makeMap())
     resetBoundaryEvents()
+    addBoundaryClickEvents(makeMap())
+    expect(mockMapOn).toHaveBeenCalledTimes(8)
+  })
+})
+
+describe("removeBoundaryClickEvents", () => {
+  it("unbinds all four handlers", () => {
+    const mapOff = vi.fn()
+    addBoundaryClickEvents({ ...makeMap(), off: mapOff } as unknown as maplibregl.Map)
+
+    removeBoundaryClickEvents()
+
+    expect(mapOff).toHaveBeenCalledWith("click", "nars-boundaries", expect.any(Function))
+    expect(mapOff).toHaveBeenCalledWith("mouseenter", "nars-boundaries", expect.any(Function))
+    expect(mapOff).toHaveBeenCalledWith("mouseleave", "nars-boundaries", expect.any(Function))
+    expect(mapOff).toHaveBeenCalledWith("contextmenu", "nars-boundaries", expect.any(Function))
+  })
+
+  it("is a no-op when no map was registered", () => {
+    expect(() => removeBoundaryClickEvents()).not.toThrow()
+  })
+
+  it("allows re-registration after removal", () => {
+    addBoundaryClickEvents(makeMap())
+    removeBoundaryClickEvents()
     addBoundaryClickEvents(makeMap())
     expect(mockMapOn).toHaveBeenCalledTimes(8)
   })

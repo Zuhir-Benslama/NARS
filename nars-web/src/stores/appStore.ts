@@ -2,25 +2,12 @@
 // Pinia store for application-level state: phase, user, counts, loading.
 
 import { defineStore } from "pinia"
-import type { AppStoreState, FeatureCounts, UserInfo } from "../types"
+import type { AppStoreState, FeatureCounts, UserInfo, LatLng } from "../types"
 import { useLayerStore } from "./layerStore"
 
 export const useAppStore = defineStore("app", {
   state: (): AppStoreState => ({
     currentPhase: 0,
-    counts: {
-      areas: 0,
-      cityCenter: 0,
-      districts: 0,
-      roads: 0,
-      mainEntrances: 0,
-      secondaryEntrances: 0,
-      publicBuildings: 0,
-      publicSpaces: 0,
-      namingPanels: 0,
-    },
-    cityCenterMode: null,
-    cityCenterLatLng: null,
     user: null,
     municipalityName: "",
     loadError: false,
@@ -37,6 +24,31 @@ export const useAppStore = defineStore("app", {
       ["national_admin", "wilaya_admin", "daira_admin"].includes(state.user.role),
     communeName: (state) =>
       state.municipalityName || state.user?.commune?.name_fr || state.user?.commune?.name_ar || "",
+    // Derived from the layer store (single source of truth for features).
+    // Previously duplicated state that had to be manually re-synced at every
+    // mutation site (and was missed in several).
+    cityCenterMode: (): "city_center" | null =>
+      useLayerStore().cityCenter.length > 0 ? "city_center" : null,
+    cityCenterLatLng: (): LatLng | null => {
+      const cc = useLayerStore().cityCenter[0]
+      if (!cc) return null
+      const d = cc.data as { lat?: number; lng?: number }
+      return d.lat != null && d.lng != null ? { lat: d.lat, lng: d.lng } : null
+    },
+    counts: (): FeatureCounts => {
+      const layerStore = useLayerStore()
+      return {
+        areas: layerStore.areaCount,
+        cityCenter: layerStore.cityCenterCount,
+        districts: layerStore.districtCount,
+        roads: layerStore.roadCount,
+        mainEntrances: layerStore.mainEntranceCount,
+        secondaryEntrances: layerStore.secondaryEntranceCount,
+        publicBuildings: layerStore.publicBuildingCount,
+        publicSpaces: layerStore.publicSpaceCount,
+        namingPanels: layerStore.namingPanelCount,
+      }
+    },
   },
 
   actions: {
@@ -50,22 +62,14 @@ export const useAppStore = defineStore("app", {
     setLoadError(hasError: boolean) {
       this.loadError = hasError
     },
-    updateCounts(counts: FeatureCounts) {
-      this.counts = counts
+    setCurrentPhase(index: number) {
+      this.currentPhase = index
     },
-    syncCounts() {
-      const layerStore = useLayerStore()
-      this.counts = {
-        areas: layerStore.areaCount,
-        cityCenter: layerStore.cityCenterCount,
-        districts: layerStore.districtCount,
-        roads: layerStore.roadCount,
-        mainEntrances: layerStore.mainEntranceCount,
-        secondaryEntrances: layerStore.secondaryEntranceCount,
-        publicBuildings: layerStore.publicBuildingCount,
-        publicSpaces: layerStore.publicSpaceCount,
-        namingPanels: layerStore.namingPanelCount,
-      }
+    setReferenceRoad(dbId: string | null) {
+      this.referenceRoadDbId = dbId
+    },
+    setReferenceEntrance(dbId: string | null) {
+      this.referenceEntranceDbId = dbId
     },
   },
 })

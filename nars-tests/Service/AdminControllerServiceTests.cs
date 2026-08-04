@@ -13,10 +13,11 @@ using NarsApi.Services;
 using static NarsApi.Tests.TestData;
 using Xunit;
 
-namespace NarsApi.Tests.Integration;
+namespace NarsApi.Tests.Service;
 
 [Collection(PostgreSqlCollection.CollectionName)]
-public class AdminControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsyncLifetime
+[Trait("Category", "Service")]
+public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLifetime
 {
     private readonly NarsDatabaseFixture _fixture = fixture;
     private AppDbContext _db = null!;
@@ -56,7 +57,7 @@ public class AdminControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsy
         SetAuthenticatedUser(controller, creator);
         var request = BuildRequest(UserRoles.CommuneUser, communeId: 100);
 
-        var result = await controller.CreateAdmin(request);
+        var result = await controller.CreateManagedUser(request);
 
         var created = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, created.StatusCode);
@@ -75,7 +76,7 @@ public class AdminControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsy
         SetAuthenticatedUser(controller, creator);
         var request = BuildRequest(UserRoles.DairaAdmin, dairaId: 10);
 
-        var result = await controller.CreateAdmin(request);
+        var result = await controller.CreateManagedUser(request);
 
         var created = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, created.StatusCode);
@@ -94,7 +95,7 @@ public class AdminControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsy
         SetAuthenticatedUser(controller, creator);
         var request = BuildRequest(UserRoles.WilayaAdmin, wilayaId: 2);
 
-        var result = await controller.CreateAdmin(request);
+        var result = await controller.CreateManagedUser(request);
 
         var created = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, created.StatusCode);
@@ -113,7 +114,7 @@ public class AdminControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsy
         SetAuthenticatedUser(controller, creator);
         var request = BuildRequest(UserRoles.CommuneUser, communeId: 101);
 
-        var result = await controller.CreateAdmin(request);
+        var result = await controller.CreateManagedUser(request);
 
         Assert.IsType<ForbidResult>(result);
     }
@@ -126,7 +127,7 @@ public class AdminControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsy
         SetAuthenticatedUser(controller, creator);
         var request = BuildRequest(UserRoles.DairaAdmin, dairaId: 11);
 
-        var result = await controller.CreateAdmin(request);
+        var result = await controller.CreateManagedUser(request);
 
         Assert.IsType<ForbidResult>(result);
     }
@@ -144,7 +145,7 @@ public class AdminControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsy
         SetAuthenticatedUser(controller, creator);
         var request = BuildRequest(targetRole, communeId: 100, dairaId: 10, wilayaId: 1);
 
-        var result = await controller.CreateAdmin(request);
+        var result = await controller.CreateManagedUser(request);
 
         Assert.IsType<ForbidResult>(result);
     }
@@ -176,7 +177,7 @@ public class AdminControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsy
         SetAuthenticatedUser(controller, creator);
         var request = BuildRequest(UserRoles.FieldWorker, communeId: null);
 
-        var result = await controller.CreateAdmin(request);
+        var result = await controller.CreateManagedUser(request);
 
         var created = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, created.StatusCode);
@@ -199,9 +200,8 @@ public class AdminControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsy
         var result = await controller.Overview();
 
         var okResult = Assert.IsType<OkObjectResult>(result);
-        var json = System.Text.Json.JsonSerializer.Serialize(okResult.Value);
-        var doc = System.Text.Json.JsonDocument.Parse(json);
-        var wilayas = doc.RootElement.GetProperty("wilayas").EnumerateArray().ToList();
+        dynamic payload = okResult.Value!;
+        var wilayas = (IReadOnlyList<WilayaSummary>)payload.wilayas;
         Assert.Equal(2, wilayas.Count);
     }
 
@@ -318,7 +318,8 @@ public class AdminControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsy
 
         var result = await controller.GetDaira(11);
 
-        Assert.IsType<NotFoundResult>(result);
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(404, problem.StatusCode);
     }
 
     [Fact]

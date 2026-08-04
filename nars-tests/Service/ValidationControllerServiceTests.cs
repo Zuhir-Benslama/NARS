@@ -13,14 +13,15 @@ using NarsApi.Services;
 using static NarsApi.Tests.TestData;
 using Xunit;
 
-namespace NarsApi.Tests.Integration;
+namespace NarsApi.Tests.Service;
 
 /// <summary>
 /// Integration tests for ValidationController against real PostgreSQL + PostGIS.
 /// Tests spatial validation logic that cannot be tested with InMemory provider.
 /// </summary>
 [Collection(PostgreSqlCollection.CollectionName)]
-public class ValidationControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsyncLifetime
+[Trait("Category", "Service")]
+public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLifetime
 {
     private readonly NarsDatabaseFixture _fixture = fixture;
     private AppDbContext _db = null!;

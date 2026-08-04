@@ -184,42 +184,55 @@ public static class PipelineExtensions
 
         var cspOptions = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<CspOptions>>().Value;
 
-        app.Use(async (ctx, next) =>
+        app.Use(async (HttpContext ctx, RequestDelegate next) =>
+            await ApplyCspMiddlewareAsync(ctx, next, cspOptions));
+    }
+
+    /// <summary>
+    /// Sets the per-request CSP nonce + security headers on non-API pages
+    /// (<c>/login</c>, <c>/map</c>). The nonce is stashed in
+    /// <c>ctx.Items["csp-nonce"]</c> so <see cref="NarsApi.Controllers.PagesController"/>
+    /// can inject it into inline script tags, and embedded into script-src/style-src
+    /// so <c>'unsafe-inline'</c> is never sent in production.
+    /// </summary>
+    internal static async Task ApplyCspMiddlewareAsync(
+        HttpContext ctx,
+        RequestDelegate next,
+        CspOptions cspOptions)
+    {
+        if (!ctx.Request.Path.StartsWithSegments("/api") && !ctx.Response.HasStarted)
         {
-            if (!ctx.Request.Path.StartsWithSegments("/api") && !ctx.Response.HasStarted)
-            {
-                var nonceBytes = new byte[16];
-                System.Security.Cryptography.RandomNumberGenerator.Fill(nonceBytes);
-                var nonce = Convert.ToBase64String(nonceBytes);
-                ctx.Items["csp-nonce"] = nonce;
+            var nonceBytes = new byte[16];
+            System.Security.Cryptography.RandomNumberGenerator.Fill(nonceBytes);
+            var nonce = Convert.ToBase64String(nonceBytes);
+            ctx.Items["csp-nonce"] = nonce;
 
-                var scriptSrc = cspOptions.ScriptSrc.Contains("'nonce-'")
-                    ? cspOptions.ScriptSrc.Replace("'nonce-'", $"'nonce-{nonce}'")
-                    : $"{cspOptions.ScriptSrc} 'nonce-{nonce}'";
+            var scriptSrc = cspOptions.ScriptSrc.Contains("'nonce-'")
+                ? cspOptions.ScriptSrc.Replace("'nonce-'", $"'nonce-{nonce}'")
+                : $"{cspOptions.ScriptSrc} 'nonce-{nonce}'";
 
-                var styleSrc = cspOptions.StyleSrc.Contains("'nonce-'")
-                    ? cspOptions.StyleSrc.Replace("'nonce-'", $"'nonce-{nonce}'")
-                    : $"{cspOptions.StyleSrc} 'nonce-{nonce}'";
+            var styleSrc = cspOptions.StyleSrc.Contains("'nonce-'")
+                ? cspOptions.StyleSrc.Replace("'nonce-'", $"'nonce-{nonce}'")
+                : $"{cspOptions.StyleSrc} 'nonce-{nonce}'";
 
-                ctx.Response.Headers.ContentSecurityPolicy =
-                    $"default-src {cspOptions.DefaultSrc}; " +
-                    $"script-src {scriptSrc}; " +
-                    $"worker-src {cspOptions.WorkerSrc}; " +
-                    $"style-src {styleSrc}; " +
-                    $"img-src {cspOptions.ImgSrc}; " +
-                    $"font-src {cspOptions.FontSrc}; " +
-                    $"connect-src {cspOptions.ConnectSrc}; " +
-                    $"frame-ancestors {cspOptions.FrameAncestors}; " +
-                    $"base-uri {cspOptions.BaseUri}; " +
-                    $"form-action {cspOptions.FormAction}";
+            ctx.Response.Headers.ContentSecurityPolicy =
+                $"default-src {cspOptions.DefaultSrc}; " +
+                $"script-src {scriptSrc}; " +
+                $"worker-src {cspOptions.WorkerSrc}; " +
+                $"style-src {styleSrc}; " +
+                $"img-src {cspOptions.ImgSrc}; " +
+                $"font-src {cspOptions.FontSrc}; " +
+                $"connect-src {cspOptions.ConnectSrc}; " +
+                $"frame-ancestors {cspOptions.FrameAncestors}; " +
+                $"base-uri {cspOptions.BaseUri}; " +
+                $"form-action {cspOptions.FormAction}";
 
-                ctx.Response.Headers.XContentTypeOptions = "nosniff";
-                ctx.Response.Headers.XFrameOptions = "DENY";
-                ctx.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
-                ctx.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)";
-            }
-            await next();
-        });
+            ctx.Response.Headers.XContentTypeOptions = "nosniff";
+            ctx.Response.Headers.XFrameOptions = "DENY";
+            ctx.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+            ctx.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)";
+        }
+        await next(ctx);
     }
 
     private static void UseCsrfValidation(WebApplication app)
@@ -228,9 +241,12 @@ public static class PipelineExtensions
             var method = ctx.Request.Method.ToUpperInvariant();
             var isAuthenticated = ctx.User.Identity?.IsAuthenticated == true;
             var isApiPath = ctx.Request.Path.StartsWithSegments("/api");
-            if (method is not ("GET" or "HEAD" or "OPTIONS" or "TRACE")
-                && isAuthenticated
-                && !isApiPath)
+            if (ShouldValidateCsrf(
+                    method,
+                    isAuthenticated,
+                    isApiPath,
+                    app.Environment.IsDevelopment(),
+                    ctx.Request.Path))
             {
                 var antiforgery = ctx.RequestServices.GetRequiredService<IAntiforgery>();
                 try { await antiforgery.ValidateRequestAsync(ctx); }
@@ -250,6 +266,38 @@ public static class PipelineExtensions
             }
             await next();
         });
+
+    /// <summary>
+    /// Decides whether the CSRF middleware must validate the request's
+    /// <c>X-CSRF-Token</c> header. Non-GET requests are only validated when they
+    /// are authenticated. API requests are enforced outside Development: in Vite
+    /// dev the SPA page carries no <c>csrf-token</c> meta and the Secure
+    /// antiforgery cookie is never sent over plain HTTP, so validating there
+    /// would break every state-changing request. <c>/api/logs</c> is exempt
+    /// because the SPA flushes logs at unload via <c>sendBeacon()</c>, which
+    /// cannot set headers — its CSRF control is the SameSite=Lax session cookie.
+    /// </summary>
+    internal static bool ShouldValidateCsrf(
+        string method,
+        bool isAuthenticated,
+        bool isApiPath,
+        bool isDevelopment,
+        string path)
+    {
+        if (method is "GET" or "HEAD" or "OPTIONS" or "TRACE")
+        {
+            return false;
+        }
+        if (!isAuthenticated)
+        {
+            return false;
+        }
+        if (path.Equals("/api/logs", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+        return !isApiPath || !isDevelopment;
+    }
 
     private static void UseApiEndpoints(WebApplication app)
     {

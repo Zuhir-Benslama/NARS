@@ -93,15 +93,6 @@ function processFeature(
         properties: geojsonFeature.properties as MaplibreFeature["properties"],
       })
     }
-
-    if (phase.key === "cityCenter") {
-      const cc = data as { lat?: number; lng?: number }
-      if (cc.lat != null && cc.lng != null) {
-        const appStore = useAppStore()
-        appStore.cityCenterMode = "city_center"
-        appStore.cityCenterLatLng = { lat: cc.lat, lng: cc.lng }
-      }
-    }
   } catch (err) {
     debugError("[LOAD] Error loading feature", feature.id, ":", err)
   }
@@ -154,12 +145,11 @@ export async function loadFromDatabase(): Promise<void> {
       persistedPhase >= 0 &&
       persistedPhase < PHASES.length
     ) {
-      appStore.currentPhase = persistedPhase
+      appStore.setCurrentPhase(persistedPhase)
     } else {
-      appStore.currentPhase = 0
+      appStore.setCurrentPhase(0)
     }
 
-    appStore.syncCounts()
     refreshLayerVisibility()
     updateEndpointMarkers()
     debugLog("[LOAD] Loading complete")

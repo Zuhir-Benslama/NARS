@@ -29,6 +29,7 @@ import { useI18n } from "vue-i18n"
 import { useEditStore } from "../stores/editStore"
 import { commitEditMode } from "../map/edit/edit-mode"
 import { showToast } from "../lib/toast"
+import { getUserMessageKey } from "../lib/errors"
 
 const { t } = useI18n()
 const store = useEditStore()
@@ -36,8 +37,7 @@ const visible = computed(() => store.isEditMode)
 
 function save() {
   commitEditMode().catch((err) => {
-    const message = err instanceof Error ? err.message : "Please try again."
-    showToast("Save failed: " + message, "error")
+    showToast(t("map_save_failed", { error: t(getUserMessageKey(err)) }), "error")
   })
 }
 </script>

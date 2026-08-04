@@ -27,6 +27,7 @@ import { useRoute, useRouter } from "vue-router"
 import { useI18n } from "vue-i18n"
 import { apiFetch } from "../api"
 import { useAppStore } from "../stores/appStore"
+import { getUserMessageKey } from "../lib/errors"
 import { slugify } from "../utils/string"
 import type { NationalOverview, WilayaReport, UserRole } from "../types"
 import DairaList from "./admin/DairaList.vue"
@@ -88,7 +89,7 @@ onMounted(async () => {
     wilaya.value = (await detailRes.json()) as WilayaReport
   } catch (err) {
     if (signal.aborted) return
-    error.value = err instanceof Error ? err.message : t("admin.load_error")
+    error.value = t(getUserMessageKey(err))
   } finally {
     if (!signal.aborted) loading.value = false
   }

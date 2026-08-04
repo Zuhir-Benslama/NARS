@@ -208,8 +208,18 @@ export async function cancelEditMode(): Promise<void> {
   }
 
   const snapshot = getActiveEditCoordsSnapshot()
-  if (snapshot) {
-    entry.data.coordinates = snapshot
+  if (snapshot && snapshot.length > 0) {
+    const d = entry.data as { lat?: number; lng?: number; coordinates?: LatLng[] }
+    if (entry.type === "marker") {
+      // Point features are stored as lat/lng; drag-end overwrote them, so
+      // restore the original position (and drop the coordinates array that
+      // the generic cancel path used to leave behind on markers).
+      d.lat = snapshot[0].lat
+      d.lng = snapshot[0].lng
+      delete d.coordinates
+    } else {
+      d.coordinates = snapshot
+    }
     updateFeatureGeometry(entry)
   }
 

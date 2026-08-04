@@ -13,6 +13,9 @@ export const useEditStore = defineStore("edit", {
   }),
 
   actions: {
+    setIsEditMode(v: boolean): void {
+      this.isEditMode = v
+    },
     setActiveGeomanFeatureId(id: string | null): void {
       this.activeGeomanFeatureId = id
     },

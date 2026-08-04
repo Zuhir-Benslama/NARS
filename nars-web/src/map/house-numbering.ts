@@ -14,7 +14,7 @@ import { t } from "../i18n"
 import { apiFetch } from "../api"
 import { debugError } from "../utils/debug"
 
-export async function setHouseNumbers(options?: { syncCounts?: boolean }): Promise<void> {
+export async function setHouseNumbers(): Promise<void> {
   const featuresStore = useFeaturesStore()
   const appStore = useAppStore()
   if (appStore.referenceRoadDbId == null) {
@@ -76,6 +76,8 @@ export async function setHouseNumbers(options?: { syncCounts?: boolean }): Promi
       if (n % 2 === 0 && n >= evenNext) evenNext = n + 2
     })
 
+  let assignedCount = 0
+  let failureCount = 0
   const updates: Promise<void>[] = []
 
   for (const { entry } of withDist) {
@@ -84,31 +86,41 @@ export async function setHouseNumbers(options?: { syncCounts?: boolean }): Promi
     if (isLeft) oddNext += 2
     else evenNext += 2
 
-    entry.data.entranceNumber = number
-    entry.data.label = String(number)
-
-    featuresStore.update(entry.id, {
-      properties: { phaseKey: entry.data.type, label: String(number) },
-    })
+    const newData = { ...entry.data, entranceNumber: number, label: String(number) }
 
     updates.push(
       apiFetch(`/api/features/${entry.dbId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: entry.data }),
-      }).catch((err) =>
-        debugError(`setHouseNumbers save error (id=${entry.dbId}):`, err),
-      ) as Promise<void>,
+        body: JSON.stringify({ data: newData }),
+      })
+        .then(() => {
+          // Apply the local mutation only after the server confirms — the UI
+          // must not show numbers the server never stored.
+          entry.data.entranceNumber = number
+          entry.data.label = String(number)
+          featuresStore.update(entry.id, {
+            properties: { phaseKey: entry.data.type, label: String(number) },
+          })
+          assignedCount++
+        })
+        .catch((err) => {
+          debugError(`setHouseNumbers save error (id=${entry.dbId}):`, err)
+          failureCount++
+        }),
     )
   }
 
   await Promise.all(updates)
 
-  if (options?.syncCounts !== false) {
-    appStore.syncCounts()
+  if (failureCount > 0) {
+    showToast(
+      t("map_assigned_numbers_partial", { assigned: assignedCount, failed: failureCount }),
+      "error",
+    )
+  } else {
+    showToast(t("map_assigned_numbers", { count: assignedCount }), "success")
   }
-
-  showToast(t("map_assigned_numbers", { count: unassigned.length }), "success")
 }
 
 // ─── FEATURE TYPE MAPPING ─────────────────────────────────────────────────────

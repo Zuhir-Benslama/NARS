@@ -32,6 +32,19 @@ export const useSnapStore = defineStore("snap", {
     clearPendingCoords(): void {
       this.snapPendingCoords = null
     },
+    patchSnapState(
+      fields: Partial<{
+        crosshairActive: boolean
+        snapActive: boolean
+        snapLatLng: { lat: number; lng: number } | null
+        snapFrozen: boolean
+        snapRafId: number | null
+        snapPendingCoords: { x: number; y: number } | null
+        editModeActive: boolean
+      }>,
+    ): void {
+      this.$patch(fields)
+    },
     resetSnap(): void {
       if (this.snapRafId !== null) cancelAnimationFrame(this.snapRafId)
       this.$reset()

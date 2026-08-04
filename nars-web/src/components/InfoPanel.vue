@@ -50,7 +50,6 @@ const counts = computed(() => appStore.counts)
 
 const cityCenterStatus = computed(() => {
   if (counts.value.cityCenter > 0) return t("info_status_placed")
-  if (appStore.cityCenterMode === "auto") return t("info_status_skipped")
   return "—"
 })
 </script>

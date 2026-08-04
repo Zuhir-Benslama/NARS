@@ -15,6 +15,7 @@ import { MAP_CONFIG } from "../config"
 import { debugWarn } from "../utils/debug"
 
 let currentActiveStyle: maplibregl.StyleSpecification | undefined
+let _styleSwitchInFlight = false
 
 let _setBaseLayer: (key: string) => void | Promise<void> = () => {
   debugWarn("setBaseLayer called before map initialization")
@@ -49,6 +50,18 @@ export function resetMapInit(): void {
   currentActiveStyle = undefined
   _setBaseLayer = (_key: string) => {
     debugWarn("setBaseLayer called before map initialization")
+  }
+}
+
+export async function disposeGeoman(): Promise<void> {
+  const { geoman } = getCtx()
+  if (!geoman || geoman.destroyed) return
+  try {
+    await geoman.destroy({ removeSources: false })
+  } catch (err) {
+    debugWarn("[MAP] Geoman dispose failed:", err)
+  } finally {
+    getCtx().geoman = undefined
   }
 }
 
@@ -173,31 +186,41 @@ async function switchBaseLayer(
   const next = styles[key]
   if (!next || next === currentActiveStyle) return
   if (!ctx.map) return
+  if (_styleSwitchInFlight) {
+    debugWarn("[MAP] Style switch already in progress — ignoring concurrent request")
+    return
+  }
+  _styleSwitchInFlight = true
   currentActiveStyle = next
 
-  const map = ctx.map
-  const styleLoaded = new Promise<void>((resolve) => {
-    map.once("style.load", () => resolve())
-  })
-  const styleTimeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error("Style load timeout")), MAP_CONFIG.styleLoadTimeout),
-  )
-
-  map.setStyle(next)
   try {
-    await Promise.race([styleLoaded, styleTimeout])
-  } catch (err) {
-    debugWarn("[MAP] Style load failed:", err)
+    const map = ctx.map
+    const styleLoaded = new Promise<void>((resolve) => {
+      map.once("style.load", () => resolve())
+    })
+    const styleTimeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Style load timeout")), MAP_CONFIG.styleLoadTimeout),
+    )
+
+    map.setStyle(next)
+    try {
+      await Promise.race([styleLoaded, styleTimeout])
+    } catch (err) {
+      debugWarn("[MAP] Style load failed:", err)
+    }
+
+    initSources()
+    const featuresStore = useFeaturesStore()
+    featuresStore.updateSource()
+    if (ctx.boundariesGeoJson) ctx.boundariesSource?.setData(ctx.boundariesGeoJson)
+    if (ctx.scatteredGeoJson) ctx.scatteredSource?.setData(ctx.scatteredGeoJson)
+    refreshLayerVisibility()
+
+    updateEndpointMarkers()
+
+    await disposeGeoman()
+    await initGeoman(map, geomanOptions)
+  } finally {
+    _styleSwitchInFlight = false
   }
-
-  initSources()
-  const featuresStore = useFeaturesStore()
-  featuresStore.updateSource()
-  if (ctx.boundariesGeoJson) ctx.boundariesSource?.setData(ctx.boundariesGeoJson)
-  if (ctx.scatteredGeoJson) ctx.scatteredSource?.setData(ctx.scatteredGeoJson)
-  refreshLayerVisibility()
-
-  updateEndpointMarkers()
-
-  await initGeoman(map, geomanOptions)
 }

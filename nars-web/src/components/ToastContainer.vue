@@ -19,10 +19,13 @@
 </template>
 
 <script setup lang="ts">
+import { onUnmounted } from "vue"
 import { useToastStore } from "../stores/toastStore"
 import { UI_CONFIG } from "../config"
 
 const store = useToastStore()
+
+onUnmounted(() => store.clearAll())
 
 function toastBg(type: string): string {
   return UI_CONFIG.toastColors[type as keyof typeof UI_CONFIG.toastColors] ?? "#3b82f6"

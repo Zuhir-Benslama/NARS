@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace NarsApi.Tests.Integration;
+namespace NarsApi.Tests.Service;
 
 /// <summary>
 /// Collection definition for PostgreSQL integration tests.

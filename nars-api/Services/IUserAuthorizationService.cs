@@ -21,10 +21,18 @@ public interface IUserAuthorizationService
         CancellationToken ct = default);
     /// <summary>Finds a user by ID.</summary>
     Task<User?> FindUserByIdAsync(Guid userId, CancellationToken ct = default);
-    /// <summary>Checks whether an email is already taken by another user.</summary>
-    Task<bool> IsEmailTakenAsync(string email, Guid excludeUserId, CancellationToken ct = default);
+    /// <summary>Finds a user by (normalized, lowercased) username.</summary>
+    Task<User?> FindUserByUsernameAsync(string normalizedUsername, CancellationToken ct = default);
+    /// <summary>
+    /// Updates a managed user's profile, role, or geographic scope, enforcing the
+    /// caller's role hierarchy and geographic scope. Returns a structured result
+    /// the caller can map to an HTTP status.
+    /// </summary>
+    Task<UserUpdateResult> UpdateManagedUserAsync(
+        Guid callerUserId, string callerRole,
+        int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
+        Guid targetUserId, UpdateAdminRequest body,
+        CancellationToken ct = default);
     /// <summary>Deletes a user account.</summary>
     Task<bool> DeleteUserAsync(Guid userId, CancellationToken ct = default);
-    /// <summary>Saves all pending changes to the database.</summary>
-    Task SaveChangesAsync(CancellationToken ct = default);
 }

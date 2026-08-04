@@ -31,11 +31,9 @@ public class SpatialControllerTests
         var uid = userId ?? Guid.NewGuid();
         ctrl.ControllerContext = new ControllerContext
         {
-            HttpContext = new DefaultHttpContext
-            {
-                User = AuthTestHelper.CreateClaimsPrincipal(uid, UserRoles.FieldWorker, communeId: 1)
-            }
+            HttpContext = new DefaultHttpContext()
         };
+        AuthTestHelper.SetUser(ctrl, uid, UserRoles.FieldWorker, communeId: 1);
 
         return (ctrl, db);
     }
@@ -89,11 +87,7 @@ public class SpatialControllerTests
     public async Task GetRoadSide_InvalidCoordinates_Returns400(double lat, double lng)
     {
         var uid = Guid.NewGuid();
-        var (ctrl, db) = CreateController(
-            userId: uid,
-            entranceQuery: Mock.Of<IEntranceQueryService>(x =>
-                x.GetUsedEntranceNumbersAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())
-                == Task.FromResult(new HashSet<int>())));
+        var (ctrl, db) = CreateController(userId: uid);
         using (db)
         {
             var roadId = await AddRoadAsync(db, uid, """{"coordinates":[{"lat":36.4,"lng":2.9},{"lat":36.4,"lng":3.1}]}""");

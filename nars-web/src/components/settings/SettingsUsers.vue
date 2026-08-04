@@ -138,7 +138,7 @@ import { useI18n } from "vue-i18n"
 import { useAppStore } from "../../stores/appStore"
 import { apiFetch } from "../../api"
 import { showToast } from "../../lib/toast"
-import { NarsError } from "../../lib/errors"
+import { getUserMessageKey } from "../../lib/errors"
 import { debugWarn } from "../../utils/debug"
 import type { UserRole } from "../../types"
 import LocationSearchSelect from "./LocationSearchSelect.vue"
@@ -217,7 +217,7 @@ async function doDelete() {
       showToast(t("su_err_network"), "error")
     }
   } catch (err) {
-    showToast(err instanceof NarsError ? err.message : t("su_err_network"), "error")
+    showToast(t(getUserMessageKey(err)), "error")
   } finally {
     deleting.value = false
   }
@@ -403,9 +403,6 @@ async function submit() {
         showToast(successMsg.value, "success")
         cancelEdit()
         await fetchUsers()
-      } else {
-        const data = await res.json().catch(() => ({}))
-        errorMsg.value = data.detail || data.error || t("su_err_update_generic")
       }
     } else {
       const body: Record<string, unknown> = {
@@ -432,13 +429,10 @@ async function submit() {
         selectedDairaId.value = null
         selectedCommuneId.value = null
         await fetchUsers()
-      } else {
-        const data = await res.json().catch(() => ({}))
-        errorMsg.value = data.detail || data.error || t("su_err_generic")
       }
     }
   } catch (err) {
-    errorMsg.value = err instanceof NarsError ? err.message : t("su_err_network")
+    errorMsg.value = t(getUserMessageKey(err))
   } finally {
     loading.value = false
   }

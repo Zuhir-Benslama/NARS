@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest"
 import { createPinia, setActivePinia } from "pinia"
 import { useAppStore } from "./appStore"
+import { useLayerStore } from "./layerStore"
 
 describe("useAppStore", () => {
   beforeEach(() => {
@@ -51,21 +52,44 @@ describe("useAppStore", () => {
     expect(appStore.isAdminUser).toBe(true)
   })
 
-  it("updates counts", () => {
+  it("derives counts from the layer store", () => {
     const appStore = useAppStore()
-    appStore.updateCounts({
-      areas: 5,
-      cityCenter: 1,
-      districts: 3,
-      roads: 10,
-      mainEntrances: 8,
-      secondaryEntrances: 4,
-      publicBuildings: 2,
-      publicSpaces: 1,
-      namingPanels: 6,
-    })
-    expect(appStore.counts.areas).toBe(5)
-    expect(appStore.counts.roads).toBe(10)
+    const layerStore = useLayerStore()
+    layerStore.addFeature("areas", {
+      id: "a1",
+      dbId: "a1",
+      type: "polygon",
+      data: {
+        type: "areas",
+        label: "A1",
+        decisionNumber: "",
+        decisionDate: "",
+        areaTypeKey: "central_urban",
+      },
+    } as never)
+    layerStore.addFeature("roads", {
+      id: "r1",
+      dbId: "r1",
+      type: "line",
+      data: {
+        type: "roads",
+        label: "R1",
+        decisionNumber: "",
+        decisionDate: "",
+        roadTypeKey: "street",
+      },
+    } as never)
+    layerStore.addFeature("houseEntrances", {
+      id: "e1",
+      dbId: "e1",
+      type: "marker",
+      data: { type: "houseEntrances", label: "E1", entranceTypeKey: "main_entrance" },
+    } as never)
+
+    expect(appStore.counts.areas).toBe(1)
+    expect(appStore.counts.roads).toBe(1)
+    expect(appStore.counts.mainEntrances).toBe(1)
+    expect(appStore.counts.secondaryEntrances).toBe(0)
   })
 
   it("resets to initial state", () => {

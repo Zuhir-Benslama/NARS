@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -9,10 +10,11 @@ using NarsApi.Infrastructure;
 using NarsApi.Services;
 using Xunit;
 
-namespace NarsApi.Tests.Integration;
+namespace NarsApi.Tests.Service;
 
 [Collection(PostgreSqlCollection.CollectionName)]
-public class LocationsControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsyncLifetime
+[Trait("Category", "Service")]
+public class LocationsControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLifetime
 {
     private readonly NarsDatabaseFixture _fixture = fixture;
     private AppDbContext _db = null!;
@@ -37,7 +39,8 @@ public class LocationsControllerIntegrationTests(NarsDatabaseFixture fixture) : 
             Options.Create(new LocationsOptions()),
             Mock.Of<IBoundaryService>(),
             Mock.Of<ILocationQueryService>(),
-            searchService);
+            searchService,
+            Mock.Of<IWebHostEnvironment>());
     }
 
     [Fact]

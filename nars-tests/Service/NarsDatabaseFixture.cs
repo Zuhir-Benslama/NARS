@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using NarsApi.Data;
 
-namespace NarsApi.Tests.Integration;
+namespace NarsApi.Tests.Service;
 
 /// <summary>
 /// Shared PostgreSQL container for integration tests.

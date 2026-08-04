@@ -17,6 +17,10 @@ import {
 import { mockApiFetch, createMockSuccessResponse } from "../../test/setup"
 import { _setCtx } from "../core/state"
 
+const mockShowToast = vi.hoisted(() => vi.fn())
+
+vi.mock("../../lib/toast", () => ({ showToast: mockShowToast }))
+
 const TOLERANCE_M = 50
 
 describe("geometry", () => {
@@ -350,6 +354,8 @@ describe("geometry", () => {
       mockApiFetch.mockRejectedValue(new Error("boom"))
 
       await expect(displayCommuneBoundary(5)).resolves.toBeUndefined()
+      const { useAppStore } = await import("../../stores/appStore")
+      expect(useAppStore().loadError).toBe(true)
     })
 
     it("works before the boundaries source is created", async () => {
@@ -414,8 +420,10 @@ describe("geometry", () => {
 
     it("handles fetch failures gracefully", async () => {
       mockApiFetch.mockRejectedValue(new Error("boom"))
+      mockShowToast.mockClear()
 
       await expect(refreshScatteredAreas()).resolves.toBeUndefined()
+      expect(mockShowToast).toHaveBeenCalledWith("map_scatter_refresh_failed", "error")
     })
   })
 })

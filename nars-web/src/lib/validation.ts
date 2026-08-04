@@ -1,5 +1,6 @@
 import { apiFetch } from "../api"
-import { NarsError, logError } from "./errors"
+import { NarsError, getUserMessageKey, logError } from "./errors"
+import { t } from "../i18n"
 import { VALIDATION_CONFIG } from "../config"
 import { debugError } from "../utils/debug"
 import type {
@@ -44,14 +45,14 @@ export async function validateRoad(coordinates: LatLng[]): Promise<ValidateRoadR
   } catch (err) {
     if (err instanceof NarsError) {
       logError(err, { action: "validateRoad" })
-      return { valid: false, error: err.message }
+      return { valid: false, error: t(getUserMessageKey(err)) }
     }
     if (err instanceof TypeError) {
       debugError("[VALIDATION] validateRoad network error:", err)
-      return { valid: false, error: "Cannot reach validation service." }
+      return { valid: false, error: t("err_network") }
     }
     debugError("[VALIDATION] validateRoad unexpected error:", err)
-    return { valid: false, error: "Road validation encountered an unexpected error." }
+    return { valid: false, error: t("err_unknown") }
   }
 }
 
@@ -79,10 +80,10 @@ export async function validateDistrict(
   } catch (err) {
     if (err instanceof NarsError) {
       logError(err, { action: "validateDistrict" })
-      return { valid: false, error: err.message }
+      return { valid: false, error: t(getUserMessageKey(err)) }
     }
     debugError("[VALIDATION] validateDistrict network error:", err)
-    return { valid: false, error: "Cannot reach validation service." }
+    return { valid: false, error: t("err_network") }
   }
 }
 
@@ -94,10 +95,10 @@ export async function checkDistrictCoverage(): Promise<DistrictCoverageResponse>
   } catch (err) {
     if (err instanceof NarsError) {
       logError(err, { action: "checkDistrictCoverage" })
-      return { covered: false, message: err.message }
+      return { covered: false, message: t(getUserMessageKey(err)) }
     }
     debugError("[VALIDATION] checkDistrictCoverage network error:", err)
-    return { covered: false, message: "Cannot reach validation service." }
+    return { covered: false, message: t("err_network") }
   }
 }
 

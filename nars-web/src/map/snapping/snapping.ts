@@ -13,7 +13,7 @@ import {
   setSnappingEnabled,
 } from "../draw/draw-complete"
 import { findNearestSnap } from "./snap-search"
-import { debugWarn } from "../../utils/debug"
+import { debugWarn, debugError } from "../../utils/debug"
 export { findNearestSnap, mergeExternalSnapWithDrawFirstVertex } from "./snap-search"
 export type { SnapResult } from "./snap-search"
 
@@ -94,7 +94,7 @@ export function enableCrosshair(): void {
   const { map } = getCtx()
   const store = useSnapStore()
   if (store.crosshairActive) return
-  store.crosshairActive = true
+  store.patchSnapState({ crosshairActive: true })
   map.getCanvas().style.cursor = "crosshair"
 }
 
@@ -102,17 +102,19 @@ export function disableCrosshair(): void {
   const { map } = getCtx()
   const store = useSnapStore()
   if (!store.crosshairActive) return
-  store.crosshairActive = false
+  store.patchSnapState({ crosshairActive: false })
   map.getCanvas().style.cursor = ""
 }
 
 function onMouseDown(): void {
   const store = useSnapStore()
-  if (!store.editModeActive && store.snapActive && store.snapLatLng) store.snapFrozen = true
+  if (!store.editModeActive && store.snapActive && store.snapLatLng) {
+    store.patchSnapState({ snapFrozen: true })
+  }
 }
 
 function onMouseUp(): void {
-  useSnapStore().snapFrozen = false
+  useSnapStore().patchSnapState({ snapFrozen: false })
 }
 
 export function enableSnapping(): void {
@@ -120,7 +122,7 @@ export function enableSnapping(): void {
   const { map } = getCtx()
   const store = useSnapStore()
   setSnappingEnabled(true)
-  store.snapActive = true
+  store.patchSnapState({ snapActive: true })
   setSnapSourceExclude(null)
   map.getContainer().addEventListener("mousemove", onSnapMove, true)
   map.getContainer().addEventListener("mousedown", onMouseDown, true)
@@ -133,15 +135,17 @@ export function disableSnapping(): void {
   const { map } = getCtx()
   const store = useSnapStore()
   setSnappingEnabled(false)
-  store.snapActive = false
+  store.patchSnapState({
+    snapActive: false,
+    snapFrozen: false,
+    editModeActive: false,
+    snapPendingCoords: null,
+  })
   setSnapSourceExclude(null)
-  store.snapFrozen = false
-  store.editModeActive = false
   if (store.snapRafId !== null) {
     cancelAnimationFrame(store.snapRafId)
-    store.snapRafId = null
+    store.patchSnapState({ snapRafId: null })
   }
-  store.snapPendingCoords = null
   map.getContainer().removeEventListener("mousemove", onSnapMove, true)
   map.getContainer().removeEventListener("mousedown", onMouseDown, true)
   map.getContainer().removeEventListener("mouseup", onMouseUp, true)
@@ -181,9 +185,9 @@ export function isSnappingActive(): boolean {
 
 function onSnapMove(e: MouseEvent): void {
   const store = useSnapStore()
-  store.snapPendingCoords = { x: e.clientX, y: e.clientY }
+  store.patchSnapState({ snapPendingCoords: { x: e.clientX, y: e.clientY } })
   if (store.snapRafId !== null) return
-  store.snapRafId = requestAnimationFrame(processSnapMove)
+  store.patchSnapState({ snapRafId: requestAnimationFrame(processSnapMove) })
 }
 
 if (import.meta.hot) {
@@ -191,16 +195,15 @@ if (import.meta.hot) {
     const store = useSnapStore()
     if (store.snapRafId !== null) {
       cancelAnimationFrame(store.snapRafId)
-      store.snapRafId = null
+      store.patchSnapState({ snapRafId: null })
     }
   })
 }
 
 function processSnapMove(): void {
   const store = useSnapStore()
-  store.snapRafId = null
   const coords = store.snapPendingCoords
-  store.snapPendingCoords = null
+  store.patchSnapState({ snapRafId: null, snapPendingCoords: null })
   if (!coords || store.snapFrozen) return
 
   try {
@@ -208,8 +211,7 @@ function processSnapMove(): void {
 
     if (store.editModeActive && !store.editDragActive) {
       if (store.snapActive) {
-        store.snapActive = false
-        store.snapLatLng = null
+        store.patchSnapState({ snapActive: false, snapLatLng: null })
         snapMarker?.remove()
         snapMarker = null
         snapCursor?.remove()
@@ -227,14 +229,12 @@ function processSnapMove(): void {
 
     const snap = findNearestSnap(x, y, activePhases, true)
     if (snap) {
-      store.snapActive = true
-      store.snapLatLng = { lat: snap.lat, lng: snap.lng }
+      store.patchSnapState({ snapActive: true, snapLatLng: { lat: snap.lat, lng: snap.lng } })
       const pos = map.project([snap.lng, snap.lat])
       showSnapIndicator(pos.x, pos.y, snap.type)
       if (import.meta.env.DEV) window.__narsSnapLatLng = store.snapLatLng
     } else {
-      store.snapActive = false
-      store.snapLatLng = null
+      store.patchSnapState({ snapActive: false, snapLatLng: null })
       if (import.meta.env.DEV) window.__narsSnapLatLng = null
       snapMarker?.remove()
       snapMarker = null
@@ -242,8 +242,13 @@ function processSnapMove(): void {
       snapCursor = null
       map.getCanvas().style.cursor = store.crosshairActive ? "crosshair" : ""
     }
-  } catch {
-    // Map context destroyed between scheduling and execution — safe to ignore
+  } catch (err) {
+    // Only the "map context destroyed between scheduling and execution" case
+    // is expected here; anything else is a real bug and must not be swallowed.
+    if (err instanceof Error && err.message.includes("accessed before initMap")) {
+      return
+    }
+    debugError("[SNAP] processSnapMove failed:", err)
   }
 }
 
@@ -301,24 +306,30 @@ export function snapPointForEdit(
   return result ? { lat: result.lat, lng: result.lng } : null
 }
 
+function snapLngLat(e: Record<string, unknown>): void {
+  const store = useSnapStore()
+  if (!store.snapActive || !store.snapLatLng) return
+  const { lng, lat } = store.snapLatLng
+  try {
+    Object.defineProperty(e, "lngLat", {
+      value: { lng, lat, toArray: () => [lng, lat] },
+      writable: true,
+      configurable: true,
+    })
+  } catch (err) {
+    debugWarn("[SNAP] Could not override lngLat on event:", err)
+  }
+}
+
 export function installSnapInterceptors(): void {
   const { map } = getCtx()
 
-  const snapLngLat = (e: Record<string, unknown>): void => {
-    const store = useSnapStore()
-    if (!store.snapActive || !store.snapLatLng) return
-    const { lng, lat } = store.snapLatLng
-    try {
-      Object.defineProperty(e, "lngLat", {
-        value: { lng, lat, toArray: () => [lng, lat] },
-        writable: true,
-        configurable: true,
-      })
-    } catch (err) {
-      debugWarn("[SNAP] Could not override lngLat on event:", err)
-    }
-  }
-
   map.on("click", snapLngLat)
   map.on("mousedown", snapLngLat)
+}
+
+export function uninstallSnapInterceptors(): void {
+  const { map } = getCtx()
+  map.off("click", snapLngLat)
+  map.off("mousedown", snapLngLat)
 }

@@ -34,7 +34,7 @@ public class RefreshTokenServiceTests
     /// ExecuteUpdateAsync) with standard LINQ equivalents usable with the InMemory provider.
     ///
     /// This means unit tests exercise slightly different code paths than production.
-    /// Integration tests (AuthControllerIntegrationTests, FeatureStatsServiceTests, etc.)
+    /// Integration tests (AuthControllerServiceTests, FeatureStatsServiceTests, etc.)
     /// cover the real PostgreSQL code paths via Testcontainers.
     /// </summary>
     private sealed class TestableRefreshTokenService(
@@ -381,81 +381,6 @@ public class RefreshTokenServiceTests
         Assert.NotEqual(raw1, raw2);
         Assert.NotEqual(hash1, hash2);
         Assert.Equal(2, await db.RefreshTokens.CountAsync());
-    }
-
-    // ── FindUserByIdAsync ───────────────────────────────────────────────
-
-    [Fact]
-    public async Task FindUserByIdAsync_ExistingUser_ReturnsUser()
-    {
-        using var db = CreateDb();
-        db.Users.Add(new User
-        {
-            Id = UserId,
-            Username = "testuser",
-            Name = "Test User",
-            Email = AltEmail,
-            Phone = DefaultPhone,
-            PasswordHash = "hash",
-            Role = UserRoles.CommuneUser,
-            CommuneId = 1,
-        });
-        await db.SaveChangesAsync();
-        var svc = CreateService(db);
-
-        var found = await svc.FindUserByIdAsync(UserId);
-
-        Assert.NotNull(found);
-        Assert.Equal(UserId, found.Id);
-        Assert.Equal("testuser", found.Username);
-    }
-
-    [Fact]
-    public async Task FindUserByIdAsync_NonexistentUser_ReturnsNull()
-    {
-        using var db = CreateDb();
-        var svc = CreateService(db);
-
-        var found = await svc.FindUserByIdAsync(Guid.NewGuid());
-
-        Assert.Null(found);
-    }
-
-    // ── FindUserByUsernameAsync ──────────────────────────────────────────
-
-    [Fact]
-    public async Task FindUserByUsernameAsync_ExistingUser_ReturnsUser()
-    {
-        using var db = CreateDb();
-        db.Users.Add(new User
-        {
-            Id = UserId,
-            Username = "testuser",
-            Name = "Test User",
-            Email = AltEmail,
-            Phone = DefaultPhone,
-            PasswordHash = "hash",
-            Role = UserRoles.CommuneUser,
-            CommuneId = 1,
-        });
-        await db.SaveChangesAsync();
-        var svc = CreateService(db);
-
-        var found = await svc.FindUserByUsernameAsync("testuser");
-
-        Assert.NotNull(found);
-        Assert.Equal(UserId, found.Id);
-    }
-
-    [Fact]
-    public async Task FindUserByUsernameAsync_NonexistentUser_ReturnsNull()
-    {
-        using var db = CreateDb();
-        var svc = CreateService(db);
-
-        var found = await svc.FindUserByUsernameAsync("no-such-user");
-
-        Assert.Null(found);
     }
 
     // ── SaveUserAsync (via UserCreationService) ──────────────────────────

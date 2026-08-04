@@ -39,7 +39,7 @@ public class AdminUserControllerTests
         var ctrl = CreateController(db);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
-        var result = await ctrl.CreateAdmin(null!, default);
+        var result = await ctrl.CreateManagedUser(null!, default);
 
         var problem = Assert.IsType<ObjectResult>(result);
         Assert.Equal(400, problem.StatusCode);
@@ -52,7 +52,7 @@ public class AdminUserControllerTests
         var ctrl = CreateController(db);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
-        var result = await ctrl.CreateAdmin(new CreateAdminRequest(
+        var result = await ctrl.CreateManagedUser(new CreateAdminRequest(
             Username: "new_wilaya_admin",
             Password: TestData.DefaultPassword,
             Name: "New Admin",
@@ -86,7 +86,7 @@ public class AdminUserControllerTests
         var ctrl = CreateController(db);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
-        var result = await ctrl.CreateAdmin(new CreateAdminRequest(
+        var result = await ctrl.CreateManagedUser(new CreateAdminRequest(
             Username: "existing",
             Password: TestData.DefaultPassword,
             Name: "New",
@@ -108,7 +108,7 @@ public class AdminUserControllerTests
         var ctrl = CreateController(db);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.CommuneUser, communeId: 1);
 
-        var result = await ctrl.CreateAdmin(new CreateAdminRequest(
+        var result = await ctrl.CreateManagedUser(new CreateAdminRequest(
             Username: "new_user",
             Password: TestData.DefaultPassword,
             Name: "New",
@@ -131,7 +131,7 @@ public class AdminUserControllerTests
         var ctrl = CreateController(db);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.DairaAdmin, dairaId: 1);
 
-        var result = await ctrl.CreateAdmin(new CreateAdminRequest(
+        var result = await ctrl.CreateManagedUser(new CreateAdminRequest(
             Username: "new_user",
             Password: TestData.DefaultPassword,
             Name: "New",
@@ -194,7 +194,7 @@ public class AdminUserControllerTests
         var ctrl = CreateController(db);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
-        var result = await ctrl.UpdateAdmin(
+        var result = await ctrl.UpdateManagedUser(
             Guid.NewGuid(),
             new UpdateAdminRequest(Name: "Updated", Email: null, Phone: null,
                 Role: null, CommuneId: null, DairaId: null, WilayaId: null, Password: null),
@@ -211,7 +211,7 @@ public class AdminUserControllerTests
         var ctrl = CreateController(db);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
-        var result = await ctrl.UpdateAdmin(Guid.NewGuid(), null!, default);
+        var result = await ctrl.UpdateManagedUser(Guid.NewGuid(), null!, default);
 
         var problem = Assert.IsType<ObjectResult>(result);
         Assert.Equal(400, problem.StatusCode);
@@ -237,7 +237,7 @@ public class AdminUserControllerTests
         var ctrl = CreateController(db);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
-        var result = await ctrl.UpdateAdmin(
+        var result = await ctrl.UpdateManagedUser(
             userId,
             new UpdateAdminRequest(Name: "Updated", Email: null, Phone: null,
                 Role: null, CommuneId: null, DairaId: null, WilayaId: null, Password: null),
@@ -249,6 +249,143 @@ public class AdminUserControllerTests
         Assert.Equal("Updated", (await db.Users.FindAsync(userId))!.Name);
     }
 
+    [Fact]
+    public async Task UpdateAdmin_DairaAdminReassignsCommuneUserOutsideDaira_ReturnsForbid()
+    {
+        using var db = CreateDb();
+        db.Communes.AddRange(
+            new Commune { CommuneId = 5, DairaId = 1, CommuneFr = "In daira" },
+            new Commune { CommuneId = 99, DairaId = 99, CommuneFr = "Other daira" });
+        var callerId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            Id = callerId,
+            Username = "caller",
+            Email = "caller@test.com",
+            Name = "Caller",
+            Phone = TestData.DefaultPhone,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(TestData.DefaultPassword),
+            Role = UserRoles.DairaAdmin,
+            DairaId = 1,
+        });
+        var userId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            Id = userId,
+            Username = "commune_user",
+            Email = "cu@test.com",
+            Name = "Commune User",
+            Phone = TestData.DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.CommuneUser,
+            CommuneId = 5,
+        });
+        await db.SaveChangesAsync();
+        var ctrl = CreateController(db);
+        AuthTestHelper.SetUser(ctrl, callerId, UserRoles.DairaAdmin, dairaId: 1);
+
+        var result = await ctrl.UpdateManagedUser(
+            userId,
+            new UpdateAdminRequest(Name: null, Email: null, Phone: null,
+                Role: null, CommuneId: 99, DairaId: null, WilayaId: null,
+                Password: TestData.DefaultPassword),
+            default);
+
+        Assert.IsType<ForbidResult>(result);
+        Assert.Equal(5, (await db.Users.FindAsync(userId))!.CommuneId);
+    }
+
+    [Fact]
+    public async Task UpdateAdmin_DairaAdminReassignsCommuneUserWithinDaira_ReturnsOk()
+    {
+        using var db = CreateDb();
+        db.Communes.AddRange(
+            new Commune { CommuneId = 5, DairaId = 1, CommuneFr = "Commune A" },
+            new Commune { CommuneId = 6, DairaId = 1, CommuneFr = "Commune B" });
+        var callerId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            Id = callerId,
+            Username = "caller",
+            Email = "caller@test.com",
+            Name = "Caller",
+            Phone = TestData.DefaultPhone,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(TestData.DefaultPassword),
+            Role = UserRoles.DairaAdmin,
+            DairaId = 1,
+        });
+        var userId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            Id = userId,
+            Username = "commune_user",
+            Email = "cu@test.com",
+            Name = "Commune User",
+            Phone = TestData.DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.CommuneUser,
+            CommuneId = 5,
+        });
+        await db.SaveChangesAsync();
+        var ctrl = CreateController(db);
+        AuthTestHelper.SetUser(ctrl, callerId, UserRoles.DairaAdmin, dairaId: 1);
+
+        var result = await ctrl.UpdateManagedUser(
+            userId,
+            new UpdateAdminRequest(Name: null, Email: null, Phone: null,
+                Role: null, CommuneId: 6, DairaId: null, WilayaId: null,
+                Password: TestData.DefaultPassword),
+            default);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<ApiResponse>(ok.Value);
+        Assert.True(response.Success);
+        Assert.Equal(6, (await db.Users.FindAsync(userId))!.CommuneId);
+    }
+
+    [Fact]
+    public async Task UpdateAdmin_CommuneUserMovesFieldWorkerOutsideCommune_ReturnsForbid()
+    {
+        using var db = CreateDb();
+        var callerId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            Id = callerId,
+            Username = "caller",
+            Email = "caller@test.com",
+            Name = "Caller",
+            Phone = TestData.DefaultPhone,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(TestData.DefaultPassword),
+            Role = UserRoles.CommuneUser,
+            CommuneId = 1,
+        });
+        var userId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            Id = userId,
+            Username = "field_worker",
+            Email = "fw@test.com",
+            Name = "Field Worker",
+            Phone = TestData.DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.FieldWorker,
+            CommuneId = 1,
+        });
+        await db.SaveChangesAsync();
+        var ctrl = CreateController(db);
+        AuthTestHelper.SetUser(ctrl, callerId, UserRoles.CommuneUser, communeId: 1);
+
+        var result = await ctrl.UpdateManagedUser(
+            userId,
+            new UpdateAdminRequest(Name: null, Email: null, Phone: null,
+                Role: null, CommuneId: 2, DairaId: null, WilayaId: null,
+                Password: TestData.DefaultPassword),
+            default);
+
+        Assert.IsType<ForbidResult>(result);
+        Assert.Equal(1, (await db.Users.FindAsync(userId))!.CommuneId);
+    }
+
     // ─── DeleteAdmin ────────────────────────────────────────────────────
 
     [Fact]
@@ -258,7 +395,7 @@ public class AdminUserControllerTests
         var ctrl = CreateController(db);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
-        var result = await ctrl.DeleteAdmin(Guid.NewGuid(), default);
+        var result = await ctrl.DeleteManagedUser(Guid.NewGuid(), default);
 
         var problem = Assert.IsType<ObjectResult>(result);
         Assert.Equal(404, problem.StatusCode);
@@ -284,7 +421,7 @@ public class AdminUserControllerTests
         var ctrl = CreateController(db);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
-        var result = await ctrl.DeleteAdmin(userId, default);
+        var result = await ctrl.DeleteManagedUser(userId, default);
 
         Assert.IsType<NoContentResult>(result);
         Assert.Null(await db.Users.FindAsync(userId));
@@ -309,7 +446,7 @@ public class AdminUserControllerTests
         var ctrl = CreateController(db);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.WilayaAdmin, wilayaId: 1);
 
-        var result = await ctrl.DeleteAdmin(userId, default);
+        var result = await ctrl.DeleteManagedUser(userId, default);
 
         Assert.IsType<ForbidResult>(result);
     }

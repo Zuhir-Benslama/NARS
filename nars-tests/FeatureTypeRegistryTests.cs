@@ -54,7 +54,7 @@ public class FeatureTypeRegistryTests
         Assert.Equal("street", entity.Layer);
         Assert.Equal("Test Road", entity.Label);
         Assert.Equal("{}", entity.Data);
-        Assert.True(entity.CreatedAt > DateTime.MinValue);
+        Assert.Equal(FixedUtcNow, entity.CreatedAt);
     }
 
     [Fact]

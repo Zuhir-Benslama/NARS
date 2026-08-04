@@ -116,9 +116,11 @@ public class AdminOverviewService(AppDbContext db, IFeatureStatsService featureS
         );
     }
 
-    public async Task<DairaReport?> GetDairaReportAsync(int dairaId, CancellationToken cancellationToken = default)
+    public async Task<DairaReport?> GetDairaReportAsync(int dairaId, int? expectedWilayaId = null, CancellationToken cancellationToken = default)
     {
-        var daira = await db.Dairas.FindAsync([dairaId], cancellationToken);
+        var daira = expectedWilayaId.HasValue
+            ? await db.Dairas.FirstOrDefaultAsync(d => d.DairaId == dairaId && d.WilayaId == expectedWilayaId.Value, cancellationToken)
+            : await db.Dairas.FindAsync([dairaId], cancellationToken);
         if (daira is null)
         {
             return null;
@@ -139,9 +141,6 @@ public class AdminOverviewService(AppDbContext db, IFeatureStatsService featureS
             Communes: communes
         );
     }
-
-    public async Task<Daira?> GetDairaByIdAsync(int dairaId, CancellationToken cancellationToken = default)
-        => await db.Dairas.FindAsync([dairaId], cancellationToken);
 
     private async Task<Dictionary<int, List<CommuneReport>>> BuildCommunesForDairasAsync(int[] dairaIds, CancellationToken cancellationToken = default)
     {

@@ -4,20 +4,21 @@
 // and double-click vertex removal in edit mode.
 
 import { apiFetch } from "../../api"
-import { useAppStore } from "../../stores/appStore"
 import { useLayerStore, LAYER_KEYS } from "../../stores/layerStore"
 import { useEditStore } from "../../stores/editStore"
 import type { LayerState } from "../../stores/layerStore"
-import { getCtx } from "./state"
+import { getCtx, type MaplibreFeature } from "./state"
 import { useFeaturesStore } from "../../stores/featuresStore"
 import { getActiveSnapPhases, snapPointForEdit, setEditDragActive } from "../snapping/snapping"
 import { disableEditMode, getActiveEditEntry, isEditMode } from "../edit/edit-mode"
 import { recordDelete } from "../undo"
 import { refreshLayerVisibility } from "../rendering/labels"
-import { getErrorMessage } from "../../lib/errors"
+import { getUserMessageKey } from "../../lib/errors"
 import { showToast } from "../../lib/toast"
 import { t } from "../../i18n"
 import { debugError } from "../../utils/debug"
+import { PHASES } from "../../phases"
+import { buildGeoJsonFeature } from "../features/loader-build"
 import type { FeatureTypeKey, LayerEntry } from "../../types"
 import type {
   GeomanEditEvent,
@@ -169,7 +170,6 @@ async function onRemove(e: GeomanRemoveEvent): Promise<void> {
       break
     }
   }
-  if (removed && phaseKey) recordDelete(removed, phaseKey)
   if (!removed || !phaseKey) return
 
   try {
@@ -178,18 +178,40 @@ async function onRemove(e: GeomanRemoveEvent): Promise<void> {
     })
     if (!response.ok) {
       showToast(t("map_delete_http_failed", { status: response.status }), "error")
+      restoreRemovedFeature(removed, phaseKey)
       return
     }
 
+    recordDelete(removed, phaseKey)
+
     useFeaturesStore().remove(removed.id)
     layerStore.removeFeature(phaseKey, dbId)
-    useAppStore().syncCounts()
     refreshLayerVisibility()
 
     showToast(t("map_feature_deleted"), "success")
   } catch (err) {
-    showToast(t("map_delete_failed", { error: getErrorMessage(err) }), "error")
+    showToast(t("map_delete_failed", { error: t(getUserMessageKey(err)) }), "error")
+    restoreRemovedFeature(removed, phaseKey)
   }
+}
+
+// Re-render a feature whose DELETE failed, so the map does not stay empty.
+// No-op when the feature is still present in the store (the failed request
+// never removed it).
+function restoreRemovedFeature(removed: LayerEntry, phaseKey: FeatureTypeKey): void {
+  const featuresStore = useFeaturesStore()
+  if (featuresStore.getAll().some((f) => f.id === removed.id)) return
+
+  const phase = PHASES.find((p) => p.key === phaseKey)
+  if (!phase) return
+  const geojson = buildGeoJsonFeature(removed.dbId, removed.data, phase)
+  if (!geojson) return
+
+  featuresStore.add({
+    id: removed.id,
+    geometry: geojson.geometry,
+    properties: geojson.properties as MaplibreFeature["properties"],
+  })
 }
 
 export function registerGeomanEvents(): void {
@@ -204,4 +226,13 @@ export function registerGeomanEvents(): void {
   map.on("dblclick", onDblClick)
   map.on("gm:editend", onEditEnd)
   map.on("gm:remove", onRemove)
+}
+
+export function unregisterGeomanEvents(): void {
+  const { map } = getCtx()
+  map.off("pm:markerdragstart", onVertexDragStart)
+  map.off("pm:markerdragend", onVertexDragEnd)
+  map.off("dblclick", onDblClick)
+  map.off("gm:editend", onEditEnd)
+  map.off("gm:remove", onRemove)
 }

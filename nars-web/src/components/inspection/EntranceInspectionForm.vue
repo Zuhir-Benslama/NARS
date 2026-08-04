@@ -102,7 +102,7 @@
 import { ref } from "vue"
 import { useI18n } from "vue-i18n"
 import { apiFetch } from "../../api"
-import { getErrorMessage } from "../../lib/errors"
+import { getUserMessageKey } from "../../lib/errors"
 import { showToast } from "../../lib/toast"
 import type { EntranceStep, InspectionStatus } from "../../types/inspection"
 
@@ -176,12 +176,9 @@ async function submitInspection(status: InspectionStatus) {
         status === "good" ? "success" : "error",
       )
       emit("done")
-    } else {
-      const body = await res.json()
-      showToast(body.detail ?? t("error_save_failed"), "error")
     }
   } catch (e) {
-    showToast(t("error_network_with_msg", { message: getErrorMessage(e) }), "error")
+    showToast(t(getUserMessageKey(e)), "error")
   } finally {
     submitting.value = false
   }
@@ -203,12 +200,9 @@ async function createEntrance() {
     if (res.ok) {
       showToast(t("alert_entrance_added"), "success")
       await submitInspection("issue")
-    } else {
-      const body = await res.json()
-      showToast(body.detail ?? t("error_create_entrance_failed"), "error")
     }
   } catch (e) {
-    showToast(t("error_network_with_msg", { message: getErrorMessage(e) }), "error")
+    showToast(t(getUserMessageKey(e)), "error")
   } finally {
     creating.value = false
   }

@@ -5,7 +5,7 @@ const {
   mockApiFetch,
   mockShowToast,
   mockShowConfirm,
-  mockGetErrorMessage,
+  mockGetUserMessageKey,
   mockRecordDelete,
   mockEnableEditMode,
   mockComputeCircleRing,
@@ -16,7 +16,7 @@ const {
   mockApiFetch: vi.fn(),
   mockShowToast: vi.fn(),
   mockShowConfirm: vi.fn(),
-  mockGetErrorMessage: vi.fn((e) => `err:${e.message}`),
+  mockGetUserMessageKey: vi.fn(() => "err_unknown"),
   mockRecordDelete: vi.fn(),
   mockEnableEditMode: vi.fn(),
   mockComputeCircleRing: vi.fn(
@@ -33,7 +33,7 @@ const {
 
 vi.mock("../../api", () => ({ apiFetch: mockApiFetch }))
 vi.mock("../../lib/toast", () => ({ showToast: mockShowToast, showConfirm: mockShowConfirm }))
-vi.mock("../../lib/errors", () => ({ getErrorMessage: mockGetErrorMessage }))
+vi.mock("../../lib/errors", () => ({ getUserMessageKey: mockGetUserMessageKey }))
 vi.mock("../undo", () => ({ recordDelete: mockRecordDelete }))
 vi.mock("../draw/draw-events", () => ({ enableEditMode: mockEnableEditMode }))
 vi.mock("../rendering/geometry", () => ({
@@ -211,11 +211,21 @@ describe("removeFeature", () => {
     expect(mockShowToast).toHaveBeenCalledWith("map_feature_deleted", "success")
   })
 
-  it("clears cityCenter on cityCenter feature delete", async () => {
-    useAppStore().cityCenterMode = "city_center"
-    useAppStore().cityCenterLatLng = { lat: 36.0, lng: 127.0 }
+  it("does not record undo when DELETE fails", async () => {
+    addLayerEntry("areas", { dbId: "fail1", data: { type: "areas", label: "Fail" } })
+    mockShowConfirm.mockResolvedValue(true)
+    mockApiFetch.mockRejectedValue(new Error("Network failure"))
 
+    await mod.removeFeature("fail1")
+
+    expect(mockRecordDelete).not.toHaveBeenCalled()
+    expect(mockFeaturesStoreRemove).not.toHaveBeenCalled()
+    expect(mockShowToast).toHaveBeenCalledWith("map_delete_failed", expect.any(String))
+  })
+
+  it("city-center state derives from the layer store after delete", async () => {
     addLayerEntry("cityCenter", { dbId: "cc1", data: { type: "cityCenter", label: "CC" } })
+    expect(useAppStore().cityCenterMode).toBe("city_center")
     mockShowConfirm.mockResolvedValue(true)
     mockApiFetch.mockResolvedValue({ ok: true })
 

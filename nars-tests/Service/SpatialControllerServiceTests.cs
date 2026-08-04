@@ -12,10 +12,11 @@ using NarsApi.Services;
 using static NarsApi.Tests.TestData;
 using Xunit;
 
-namespace NarsApi.Tests.Integration;
+namespace NarsApi.Tests.Service;
 
 [Collection(PostgreSqlCollection.CollectionName)]
-public class SpatialControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsyncLifetime
+[Trait("Category", "Service")]
+public class SpatialControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLifetime
 {
     private readonly NarsDatabaseFixture _fixture = fixture;
     private AppDbContext _db = null!;
@@ -68,7 +69,7 @@ public class SpatialControllerIntegrationTests(NarsDatabaseFixture fixture) : IA
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<RoadSideResponse>(ok.Value);
         Assert.Equal("left", resp.Side);
-        Assert.True(resp.SuggestedNumber > 0);
+        Assert.Equal(1, resp.SuggestedNumber); // no entrances used -> first odd number
     }
 
     [Fact]
@@ -100,7 +101,9 @@ public class SpatialControllerIntegrationTests(NarsDatabaseFixture fixture) : IA
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<ScatteredStatusResponse>(ok.Value);
-        Assert.NotNull(resp);
+        Assert.False(resp.HasError);
+        Assert.Null(resp.LastErrorMessage);
+        Assert.Null(resp.LastErrorTime);
     }
 
     [Fact]

@@ -18,8 +18,8 @@ public interface IFeatureService
     Task<bool> UpdateFeatureAsync(UpdateFeatureCommand command, CancellationToken ct);
     /// <summary>Deletes a single feature by ID, verifying ownership.</summary>
     Task<bool> DeleteFeatureAsync(Guid featureId, Guid userId, string featureType, CancellationToken ct);
-    /// <summary>Deletes all features owned by the user (multi-table CTE).</summary>
-    Task<(int total, List<Guid> ids)> ClearAllFeaturesAsync(Guid userId, CancellationToken ct);
+    /// <summary>Deletes all features owned by the user and returns how many were deleted.</summary>
+    Task<int> ClearAllFeaturesAsync(Guid userId, CancellationToken ct);
 }
 
 public record UpdateFeatureCommand(

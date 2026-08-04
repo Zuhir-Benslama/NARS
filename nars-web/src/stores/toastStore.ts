@@ -1,7 +1,7 @@
 import { defineStore } from "pinia"
 import { UI_CONFIG } from "../config"
 
-export type ToastType = "success" | "error" | "info"
+export type ToastType = "success" | "error" | "info" | "warning"
 
 export interface ToastItem {
   id: number

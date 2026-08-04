@@ -53,7 +53,7 @@ describe("feature-persistence", () => {
       })
 
       expect(result.ok).toBe(false)
-      expect(result.error).toBe("Network failure")
+      expect(result.error).toBe("err_unknown")
     })
 
     it("includes shape type and layer in the body", async () => {

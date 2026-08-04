@@ -4,7 +4,7 @@ import { nextTick } from "vue"
 
 const mockApiFetch = vi.hoisted(() => vi.fn())
 const mockShowToast = vi.hoisted(() => vi.fn())
-const mockGetErrorMessage = vi.hoisted(() => vi.fn((e) => String(e)))
+const mockGetUserMessageKey = vi.hoisted(() => vi.fn(() => "err_unknown"))
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (key: string) => key }),
@@ -19,7 +19,7 @@ vi.mock("../../lib/toast", () => ({
 }))
 
 vi.mock("../../lib/errors", () => ({
-  getErrorMessage: mockGetErrorMessage,
+  getUserMessageKey: mockGetUserMessageKey,
 }))
 
 import NamingPanelInspectionForm from "./NamingPanelInspectionForm.vue"

@@ -39,7 +39,10 @@ public class AdminControllerTests
         var result = await ctrl.Overview(default);
 
         var ok = Assert.IsType<OkObjectResult>(result);
-        Assert.NotNull(ok.Value);
+        dynamic payload = ok.Value!;
+        Assert.Equal("national", (string)payload.level);
+        Assert.Empty(payload.wilayas);
+        Assert.Equal(0, (int)payload.total);
     }
 
     [Fact]
@@ -131,12 +134,12 @@ public class AdminControllerTests
     public async Task GetWilaya_NationalAdmin_UnknownId_ReturnsNotFound()
     {
         var overview = new Mock<IAdminOverviewService>();
-        overview.Setup(s => s.GetWilayaReportAsync(999, default))
+        overview.Setup(s => s.GetWilayaReportAsync(TestData.NonExistentId, default))
             .ReturnsAsync((WilayaReport?)null);
         var ctrl = CreateController(overview.Object);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
-        var result = await ctrl.GetWilaya(999, default);
+        var result = await ctrl.GetWilaya(TestData.NonExistentId, default);
 
         var problem = Assert.IsType<ObjectResult>(result);
         Assert.Equal(404, problem.StatusCode);
@@ -175,12 +178,12 @@ public class AdminControllerTests
     public async Task GetDaira_NationalAdmin_UnknownId_ReturnsNotFound()
     {
         var overview = new Mock<IAdminOverviewService>();
-        overview.Setup(s => s.GetDairaReportAsync(999, default))
+        overview.Setup(s => s.GetDairaReportAsync(TestData.NonExistentId, default))
             .ReturnsAsync((DairaReport?)null);
         var ctrl = CreateController(overview.Object);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
 
-        var result = await ctrl.GetDaira(999, default);
+        var result = await ctrl.GetDaira(TestData.NonExistentId, default);
 
         var problem = Assert.IsType<ObjectResult>(result);
         Assert.Equal(404, problem.StatusCode);
@@ -201,20 +204,18 @@ public class AdminControllerTests
     public async Task GetDaira_WilayaAdmin_WrongWilaya_ReturnsNotFound()
     {
         var overview = new Mock<IAdminOverviewService>();
-        // Return a Daira that belongs to a DIFFERENT wilaya (1) than the user's (2).
-        // This exercises the authorization branch at AdminController.cs:67.
-        overview.Setup(s => s.GetDairaByIdAsync(1, default))
-            .ReturnsAsync(new NarsApi.Models.Daira { DairaId = 1, WilayaId = 1, DairaAr = "test", DairaFr = "test" });
-        // Also mock the report — if the auth check were removed, the controller
-        // would proceed here and return Ok, proving the 404 comes from authorization.
-        overview.Setup(s => s.GetDairaReportAsync(1, default))
-            .ReturnsAsync(new DairaReport(1, "test", "", null, []));
+        // The daira belongs to wilaya 1, but the caller is a wilaya_admin of wilaya 2.
+        // GetDairaReportAsync(1, expectedWilayaId: 2) returns null, which the controller
+        // surfaces as 404 — exercising the scope enforcement inside the report query.
+        overview.Setup(s => s.GetDairaReportAsync(1, 2, default))
+            .ReturnsAsync((DairaReport?)null);
         var ctrl = CreateController(overview.Object);
         AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.WilayaAdmin, wilayaId: 2);
 
         var result = await ctrl.GetDaira(1, default);
 
-        Assert.IsType<NotFoundResult>(result);
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(404, problem.StatusCode);
     }
 
     // ─── CanCreateRole (static helper) ──────────────────────────────────

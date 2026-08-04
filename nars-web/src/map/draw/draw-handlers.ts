@@ -15,7 +15,7 @@ import type { MapMouseEvent as MapLibreMapMouseEvent } from "maplibre-gl"
 import { getCtx, updateSelectionHighlight } from "../core/state"
 import { useFeaturesStore } from "../../stores/featuresStore"
 import { showContextMenu, showMapContextMenu } from "../context-menu/context-menu"
-import { buildDrawControl } from "./draw-control"
+import { buildDrawControl, clearEdgeVisibilityPoll } from "./draw-control"
 import {
   getDrawingPhase,
   completeDrawingWithGeometry,
@@ -185,6 +185,7 @@ function onContextMenu(e: MouseEvent): void {
     const coords: [number, number][] = lineDrawer.shapeLngLats
     if (coords.length <= 1) {
       const phase = PHASES[appStore.currentPhase]
+      clearEdgeVisibilityPoll()
       geoman
         ?.disableDraw()
         .then(() => {
@@ -282,6 +283,7 @@ function onKeyDown(e: KeyboardEvent): void {
       e.preventDefault()
       e.stopImmediatePropagation()
       const phase = PHASES[appStore.currentPhase]
+      clearEdgeVisibilityPoll()
       geoman
         ?.disableDraw()
         .then(() => {

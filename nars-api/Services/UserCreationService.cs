@@ -7,7 +7,7 @@ namespace NarsApi.Services;
 
 public class UserCreationService(AppDbContext db) : IUserCreationService
 {
-    public async Task<(User? User, string? Error)> ValidateAndCreateUserAsync(
+    public async Task<UserCreationResult> ValidateAndCreateUserAsync(
         string name,
         string email,
         string phone,
@@ -23,31 +23,32 @@ public class UserCreationService(AppDbContext db) : IUserCreationService
         var geoError = GeographicValidator.Validate(role, communeId, dairaId, wilayaId);
         if (geoError is not null)
         {
-            return (null, geoError);
+            return UserCreationResult.Failure(UserCreationErrorCode.Invalid, geoError);
         }
 
         // 2. Uniqueness (normalised to lowercase for case-insensitive matching).
         var normalizedUsername = username.ToLowerInvariant();
+        var normalizedEmail = email.ToLowerInvariant();
         var existing = await db.Users
-            .FirstOrDefaultAsync(u => u.Username == normalizedUsername || u.Email == email, cancellationToken);
+            .FirstOrDefaultAsync(u => u.Username == normalizedUsername || u.Email == normalizedEmail, cancellationToken);
         if (existing is not null)
         {
             var field = existing.Username == normalizedUsername ? "Username" : "Email";
-            return (null, $"{field} already exists.");
+            return UserCreationResult.Failure(UserCreationErrorCode.Duplicate, $"{field} already exists.");
         }
 
         // 3. Password strength.
         var pwdErr = PasswordValidator.Validate(password);
         if (pwdErr is not null)
         {
-            return (null, pwdErr);
+            return UserCreationResult.Failure(UserCreationErrorCode.Invalid, pwdErr);
         }
 
         // 4. Create the user entity.
         var newUser = new User
         {
             Name = name,
-            Email = email,
+            Email = normalizedEmail,
             Phone = phone,
             Username = normalizedUsername,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
@@ -58,7 +59,7 @@ public class UserCreationService(AppDbContext db) : IUserCreationService
             FailedLoginAttempts = 0,
         };
 
-        return (newUser, null);
+        return UserCreationResult.Success(newUser);
     }
 
     public async Task SaveUserAsync(User user, CancellationToken cancellationToken = default)

@@ -13,5 +13,8 @@ export async function loadUserAndCommune(): Promise<void> {
     useAppStore().setUser(user)
   } catch (err) {
     debugError("Commune nav error:", err)
+    // Boot without a user means the app runs as an anonymous commune_user with
+    // no boundary and no data — surface it instead of silently degrading.
+    useAppStore().setLoadError(true)
   }
 }

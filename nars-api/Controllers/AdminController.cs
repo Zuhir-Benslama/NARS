@@ -63,25 +63,21 @@ public class AdminController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetDaira(int dairaId, CancellationToken cancellationToken = default)
     {
+        int? expectedWilayaId = null;
         switch (CurrentUserRole)
         {
             case UserRoles.WilayaAdmin:
-                {
-                    var daira = await overviewService.GetDairaByIdAsync(dairaId, cancellationToken);
-                    if (daira is null || daira.WilayaId != CurrentWilayaId)
-                    {
-                        return NotFound();
-                    }
-
-                    break;
-                }
+                // Enforce the caller's wilaya scope inside the report query to
+                // avoid a separate round-trip for the daira entity.
+                expectedWilayaId = CurrentWilayaId;
+                break;
             case UserRoles.NationalAdmin:
                 break;
             default:
                 return Forbid();
         }
 
-        var result = await overviewService.GetDairaReportAsync(dairaId, cancellationToken);
+        var result = await overviewService.GetDairaReportAsync(dairaId, expectedWilayaId, cancellationToken);
         return result is null ? Problem(detail: "Daira not found.", statusCode: 404) : Ok(result);
     }
 
@@ -100,7 +96,7 @@ public class AdminController(
 
     private async Task<IActionResult> DairaOverview(int dairaId, CancellationToken cancellationToken)
     {
-        var report = await overviewService.GetDairaReportAsync(dairaId, cancellationToken);
+        var report = await overviewService.GetDairaReportAsync(dairaId, cancellationToken: cancellationToken);
         return report is null ? Problem(detail: "Daira not found.", statusCode: 404) : Ok(report);
     }
 }

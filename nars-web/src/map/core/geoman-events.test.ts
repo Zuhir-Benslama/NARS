@@ -11,7 +11,7 @@ const {
   mockIsEditMode,
   mockRecordDelete,
   mockRefreshLayerVisibility,
-  mockGetErrorMessage,
+  mockGetUserMessageKey,
   mockShowToast,
   mockDebugError,
 } = vi.hoisted(() => ({
@@ -24,7 +24,7 @@ const {
   mockIsEditMode: vi.fn((): boolean => false),
   mockRecordDelete: vi.fn(),
   mockRefreshLayerVisibility: vi.fn(),
-  mockGetErrorMessage: vi.fn((e: any) => `err:${e.message}`),
+  mockGetUserMessageKey: vi.fn((): string => "err_unknown"),
   mockShowToast: vi.fn(),
   mockDebugError: vi.fn(),
 }))
@@ -42,7 +42,7 @@ vi.mock("../edit/edit-mode", () => ({
 }))
 vi.mock("../undo", () => ({ recordDelete: mockRecordDelete }))
 vi.mock("../rendering/labels", () => ({ refreshLayerVisibility: mockRefreshLayerVisibility }))
-vi.mock("../../lib/errors", () => ({ getErrorMessage: mockGetErrorMessage }))
+vi.mock("../../lib/errors", () => ({ getUserMessageKey: mockGetUserMessageKey }))
 vi.mock("../../lib/toast", () => ({ showToast: mockShowToast }))
 vi.mock("../../utils/debug", () => ({
   debugError: mockDebugError,
@@ -53,7 +53,9 @@ vi.mock("../../utils/debug", () => ({
 import { useLayerStore } from "../../stores/layerStore"
 
 let _setCtx: (ctx: any) => void
+let mockFeaturesStoreGetAll: ReturnType<typeof vi.fn>
 let mockFeaturesStoreRemove: ReturnType<typeof vi.fn>
+let mockFeaturesStoreAdd: ReturnType<typeof vi.fn>
 let mod: typeof import("./geoman-events")
 let mapOn: ReturnType<typeof vi.fn>
 let useEditStore: any
@@ -88,11 +90,13 @@ beforeEach(async () => {
   const stateMod = await import("./state")
   _setCtx = stateMod._setCtx
 
+  mockFeaturesStoreGetAll = vi.fn(() => [])
   mockFeaturesStoreRemove = vi.fn()
+  mockFeaturesStoreAdd = vi.fn()
   vi.doMock("../../stores/featuresStore", () => ({
     useFeaturesStore: () => ({
-      getAll: vi.fn().mockReturnValue([]),
-      add: vi.fn(),
+      getAll: mockFeaturesStoreGetAll,
+      add: mockFeaturesStoreAdd,
       remove: mockFeaturesStoreRemove,
       update: vi.fn(),
     }),
@@ -128,6 +132,21 @@ describe("registerGeomanEvents", () => {
     mod.registerGeomanEvents()
 
     expect(mockDebugError).toHaveBeenCalledWith("Geoman not initialized")
+  })
+})
+
+describe("unregisterGeomanEvents", () => {
+  it("unbinds all five event handlers", () => {
+    const mapOff = vi.fn()
+    _setCtx({ map: { on: mapOn, off: mapOff } as any, geoman: {} as any })
+
+    mod.unregisterGeomanEvents()
+
+    expect(mapOff).toHaveBeenCalledWith("pm:markerdragstart", expect.any(Function))
+    expect(mapOff).toHaveBeenCalledWith("pm:markerdragend", expect.any(Function))
+    expect(mapOff).toHaveBeenCalledWith("dblclick", expect.any(Function))
+    expect(mapOff).toHaveBeenCalledWith("gm:editend", expect.any(Function))
+    expect(mapOff).toHaveBeenCalledWith("gm:remove", expect.any(Function))
   })
 })
 
@@ -273,6 +292,7 @@ describe("onRemove", () => {
     await handler({ feature: { _geoJson: { properties: { dbId: "del1" } } } })
 
     expect(mockApiFetch).toHaveBeenCalledWith("/api/features/del1", { method: "DELETE" })
+    expect(mockRecordDelete).toHaveBeenCalled()
     expect(mockFeaturesStoreRemove).toHaveBeenCalledWith("feat_del1")
     expect(mockShowToast).toHaveBeenCalledWith("map_feature_deleted", "success")
   })
@@ -287,5 +307,33 @@ describe("onRemove", () => {
     await handler({ feature: { _geoJson: { properties: { dbId: "fail1" } } } })
 
     expect(mockShowToast).toHaveBeenCalledWith("map_delete_http_failed", "error")
+  })
+
+  it("does not record undo when DELETE fails; re-renders the feature", async () => {
+    addLayerEntry("areas", { dbId: "fail2" })
+    mockGetActiveEditEntry.mockReturnValue(null)
+    mockApiFetch.mockRejectedValue(new Error("Network failure"))
+    mod.registerGeomanEvents()
+    const handler = getHandler("gm:remove")
+
+    await handler({ feature: { _geoJson: { properties: { dbId: "fail2" } } } })
+
+    expect(mockRecordDelete).not.toHaveBeenCalled()
+    expect(mockFeaturesStoreRemove).not.toHaveBeenCalled()
+    expect(mockFeaturesStoreAdd).toHaveBeenCalled()
+    expect(mockShowToast).toHaveBeenCalledWith("map_delete_failed", expect.any(String))
+  })
+
+  it("does not re-render when the feature is still present in the store", async () => {
+    addLayerEntry("areas", { dbId: "fail3" })
+    mockGetActiveEditEntry.mockReturnValue(null)
+    mockApiFetch.mockResolvedValue({ ok: false, status: 500 })
+    mockFeaturesStoreGetAll.mockReturnValue([{ id: "feat_fail3" }])
+    mod.registerGeomanEvents()
+    const handler = getHandler("gm:remove")
+
+    await handler({ feature: { _geoJson: { properties: { dbId: "fail3" } } } })
+
+    expect(mockFeaturesStoreAdd).not.toHaveBeenCalled()
   })
 })

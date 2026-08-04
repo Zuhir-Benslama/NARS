@@ -15,10 +15,11 @@ using NarsApi.Services;
 using static NarsApi.Tests.TestData;
 using Xunit;
 
-namespace NarsApi.Tests.Integration;
+namespace NarsApi.Tests.Service;
 
 [Collection(PostgreSqlCollection.CollectionName)]
-public class FieldControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsyncLifetime
+[Trait("Category", "Service")]
+public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLifetime
 {
     private readonly NarsDatabaseFixture _fixture = fixture;
     private AppDbContext _db = null!;
@@ -96,7 +97,9 @@ public class FieldControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsy
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<LoadFeaturesResponse<FieldFeatureResult>>(ok.Value);
-        Assert.NotEmpty(resp.Features);
+        Assert.Single(resp.Features);
+        Assert.Equal("Integration Test Road", resp.Features[0].Label);
+        Assert.Equal("street", resp.Features[0].Layer);
     }
 
     [Fact]
@@ -201,7 +204,10 @@ public class FieldControllerIntegrationTests(NarsDatabaseFixture fixture) : IAsy
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<FieldInspectionsResponse>(ok.Value);
-        Assert.NotEmpty(resp.Inspections);
+        var inspection = Assert.Single(resp.Inspections);
+        Assert.Equal("good", inspection.Status);
+        Assert.Equal(FeatureTypes.Road, inspection.Type);
+        Assert.Equal(roadId.ToString(), inspection.FeatureId);
     }
 
     [Fact]

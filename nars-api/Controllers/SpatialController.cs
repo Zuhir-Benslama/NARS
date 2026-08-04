@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Services;
@@ -97,9 +98,17 @@ public class SpatialController(
 
     // ── POST /api/areas/refresh-scattered ────────────────────────────────────
 
-    /// <summary>Triggers a recomputation of scattered areas for the user's commune.</summary>
+    /// <summary>
+    /// Triggers a recomputation of scattered areas for the user's commune.
+    /// Deliberately synchronous: the frontend consumes the computed GeoJSON in the
+    /// response body. It is rate-limited because the PostGIS recompute can block
+    /// the request thread for seconds.
+    /// </summary>
     [HttpPost("areas/refresh-scattered")]
+    [EnableRateLimiting(RateLimitPolicies.ScatteredRefresh)]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> RefreshScattered(CancellationToken cancellationToken = default)
     {
         var communeId = CurrentCommuneId;

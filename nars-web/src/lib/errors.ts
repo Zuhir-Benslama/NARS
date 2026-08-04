@@ -269,6 +269,32 @@ export function logError(error: NarsError, additionalContext?: ErrorContext): vo
 
 // ─── ERROR HELPERS ────────────────────────────────────────────────────────────
 
+/** i18n keys for user-facing messages, keyed by ErrorCode. */
+const USER_MESSAGE_KEYS: Record<ErrorCode, string> = {
+  [ErrorCode.NETWORK]: "err_network",
+  [ErrorCode.VALIDATION]: "err_validation",
+  [ErrorCode.AUTH]: "err_auth",
+  [ErrorCode.NOT_FOUND]: "err_not_found",
+  [ErrorCode.SERVER]: "err_server",
+  [ErrorCode.TIMEOUT]: "err_timeout",
+  [ErrorCode.PERMISSION]: "err_permission",
+  [ErrorCode.CONFLICT]: "err_conflict",
+  [ErrorCode.UNKNOWN]: "err_unknown",
+}
+
+/**
+ * Resolve a user-facing i18n key for any thrown value. Returns a generic key for
+ * non-NarsError values. Callers translate it via `t()`. Raw server bodies must
+ * never be shown to end users — use `getErrorMessage`/`getTechnicalDetails` only
+ * for logging.
+ */
+export function getUserMessageKey(err: unknown): string {
+  if (isNarsError(err)) {
+    return USER_MESSAGE_KEYS[err.code] ?? ErrorCode.UNKNOWN
+  }
+  return USER_MESSAGE_KEYS[ErrorCode.UNKNOWN]
+}
+
 /** Safely extract error message from any thrown value. Prevents `(err as Error).message` casts. */
 export function getErrorMessage(err: unknown, fallback = "Unknown error"): string {
   if (err instanceof Error) return err.message

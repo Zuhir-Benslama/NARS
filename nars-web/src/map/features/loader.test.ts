@@ -35,10 +35,12 @@ describe("loader", () => {
       expect(useAppStore().user).toEqual(userData)
     })
 
-    it("handles fetch errors gracefully", async () => {
+    it("handles fetch errors gracefully and flags the load error", async () => {
       mockApiFetch.mockRejectedValue(new Error("Network failure"))
 
       await expect(loadUserAndCommune()).resolves.toBeUndefined()
+      const { useAppStore } = await import("../../stores/appStore")
+      expect(useAppStore().loadError).toBe(true)
     })
   })
 })

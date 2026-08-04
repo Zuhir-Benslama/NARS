@@ -57,7 +57,7 @@ export function setReferenceRoad(dbId: string): void {
   if (appStore.referenceRoadDbId != null) {
     highlightFeature("roads", appStore.referenceRoadDbId, false)
   }
-  appStore.referenceRoadDbId = dbId
+  appStore.setReferenceRoad(dbId)
   highlightFeature("roads", dbId, true)
 }
 
@@ -65,7 +65,7 @@ export function clearReferenceRoad(): void {
   const appStore = useAppStore()
   if (appStore.referenceRoadDbId != null) {
     highlightFeature("roads", appStore.referenceRoadDbId, false)
-    appStore.referenceRoadDbId = null
+    appStore.setReferenceRoad(null)
   }
 }
 
@@ -74,7 +74,7 @@ export function setReferenceEntrance(dbId: string): void {
   if (appStore.referenceEntranceDbId != null) {
     highlightFeature("houseEntrances", appStore.referenceEntranceDbId, false)
   }
-  appStore.referenceEntranceDbId = dbId
+  appStore.setReferenceEntrance(dbId)
   highlightFeature("houseEntrances", dbId, true)
 }
 

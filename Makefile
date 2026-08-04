@@ -29,9 +29,11 @@ SCALABLE_DEPLOYS   := postgis nars-api nars-frontend
 INGRESS_NGINX_VERSION ?= v1.12.0
 METRICS_SERVER_VERSION ?= v0.7.2
 LOCAL_PATH_PROVISIONER_VERSION ?= v0.0.30
-YAMLLINT_IMAGE     ?= cytopia/yamllint:1.36.0
+YAMLLINT_IMAGE      ?= cytopia/yamllint:1.36.0
+RUFF_IMAGE          ?= ghcr.io/astral-sh/ruff:0.15.15
+NODE_IMAGE          ?= node:22-alpine
 OBSERVABILITY_NAMESPACE ?= observability
-LOG_DIR                ?= /tmp/nars
+LOG_DIR             ?= /tmp/nars
 POSTGIS_GET_POD_CMD = $(KUBECTL) get pod -n "$(NAMESPACE)" -l app.kubernetes.io/name=postgis -o jsonpath='{.items[0].metadata.name}' 2>/dev/null
 
 # ─── Secrets ──────────────────────────────────────────────────
@@ -916,7 +918,7 @@ postgis-pv-fix: ## Fix postgis PV permissions inside kind container (rootless Do
 # ─── Observability (Grafana LGTM + OTel) ─────────────────────
 
 .PHONY: observability-install
-observability-install: helm-check helm-repos ## Install LGTM stack + OpenTelemetry Collector
+observability-install: .env _check-secrets helm-check helm-repos ## Install LGTM stack + OpenTelemetry Collector
 	$(SUBMAKE) observability-namespace
 	$(SUBMAKE) observability-prometheus-stack
 	$(SUBMAKE) observability-loki
@@ -949,7 +951,7 @@ observability-namespace: ## Ensure observability namespace exists (idempotent)
 	@$(KUBECTL) create namespace $(OBSERVABILITY_NAMESPACE) --dry-run=client -o yaml | $(KUBECTL) apply -f -
 
 .PHONY: observability-prometheus-stack
-observability-prometheus-stack: ## Install Prometheus + Grafana + AlertManager
+observability-prometheus-stack: .env _check-secrets ## Install Prometheus + Grafana + AlertManager
 	@echo "→ Installing kube-prometheus-stack..."
 	@tmpdir=$$(mktemp -d);
 	trap 'rm -rf "$$tmpdir"' EXIT;
@@ -1071,11 +1073,14 @@ lint: ## Run cross-project linting (.NET format + infra linters)
 	$(SUBMAKE) infra-lint
 
 .PHONY: infra-lint
-infra-lint: ## Run all nars-infra linters (shell, docker, yaml)
+infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, makefile, tag guard)
 	$(SUBMAKE) infra-lint-shell
 	$(SUBMAKE) infra-lint-docker
 	$(SUBMAKE) infra-lint-yaml
+	$(SUBMAKE) infra-lint-python
+	$(SUBMAKE) infra-lint-node
 	$(SUBMAKE) infra-lint-makefile
+	$(SUBMAKE) infra-lint-tag-guard
 
 .PHONY: infra-lint-shell
 infra-lint-shell: ## Shell-check nars-infra/scripts/*.sh
@@ -1107,6 +1112,25 @@ infra-lint-yaml: ## Lint k8s YAML with yamllint (uses .yamllint.yaml config)
 			-c /mnt/nars-infra/.yamllint.yaml /mnt/nars-infra/k8s/*.yaml /mnt/nars-infra/k8s/helm-values/*.yaml
 	fi
 
+.PHONY: infra-lint-python
+infra-lint-python: ## Lint Python scripts with ruff (check + format)
+	@if command -v ruff >/dev/null 2>&1; then
+		ruff check nars-infra/scripts/
+		ruff format --check nars-infra/scripts/
+	else
+		docker run --rm -v "$$(pwd):/mnt" $(RUFF_IMAGE) check /mnt/nars-infra/scripts/
+		docker run --rm -v "$$(pwd):/mnt" $(RUFF_IMAGE) format --check /mnt/nars-infra/scripts/
+	fi
+
+.PHONY: infra-lint-node
+infra-lint-node: ## Syntax-check Node helper scripts
+	@if command -v node >/dev/null 2>&1; then
+		node --check nars-infra/scripts/render-mermaid-playwright.mjs
+	else
+		docker run --rm -v "$$(pwd):/mnt" $(NODE_IMAGE) \
+			node --check /mnt/nars-infra/scripts/render-mermaid-playwright.mjs
+	fi
+
 .PHONY: infra-lint-makefile
 infra-lint-makefile: ## Validate Makefile syntax with dry-run
 	@echo "→ Checking Makefile syntax..."
@@ -1129,6 +1153,13 @@ IMAGE_TAG ?= latest
 # Set ALLOW_LATEST=1 for a deliberate emergency manual rollout.
 DEPLOY_ENV ?= dev
 
+# Internal: warn when the mutable 'latest' tag is in use (build/push/load).
+.PHONY: _warn-latest-tag
+_warn-latest-tag:
+	@if echo "$(IMAGE_TAG)" | grep -qi "^latest$$"; then \
+		echo "  ⚠ IMAGE_TAG=latest — set IMAGE_TAG=<commit-sha> for CI/CD builds"; \
+	fi
+
 .PHONY: _check-pinned-tag
 _check-pinned-tag: ## Fail if deploying with the mutable 'latest' tag outside local dev
 	@if [ "$(ALLOW_LATEST)" != "1" ] && [ "$(DEPLOY_ENV)" != "dev" ] && echo "$(IMAGE_TAG)" | grep -qi "^latest$$"; then
@@ -1137,11 +1168,23 @@ _check-pinned-tag: ## Fail if deploying with the mutable 'latest' tag outside lo
 		exit 1;
 	fi
 
-.PHONY: images-build
-images-build: ## Build all Docker images
-	@if echo "$(IMAGE_TAG)" | grep -qi "^latest$$"; then
-		echo "  ⚠ IMAGE_TAG=latest — set IMAGE_TAG=<commit-sha> for CI/CD builds";
+.PHONY: infra-lint-tag-guard
+infra-lint-tag-guard: ## Assert _check-pinned-tag rejects 'latest' outside dev (self-test)
+	@echo "→ Verifying _check-pinned-tag rejects IMAGE_TAG=latest in production..."
+	@if DEPLOY_ENV=production IMAGE_TAG=latest ALLOW_LATEST= $(MAKE) _check-pinned-tag >/dev/null 2>&1; then
+		echo "✖ _check-pinned-tag unexpectedly accepted latest in production";
+		exit 1;
 	fi
+	@echo "  ✓ latest rejected in production"
+	@echo "→ Verifying _check-pinned-tag accepts a pinned tag in production..."
+	@DEPLOY_ENV=production IMAGE_TAG=abc123 ALLOW_LATEST= $(MAKE) _check-pinned-tag
+	@echo "  ✓ pinned tag accepted in production"
+	@echo "→ Verifying ALLOW_LATEST=1 overrides the guard..."
+	@DEPLOY_ENV=production IMAGE_TAG=latest ALLOW_LATEST=1 $(MAKE) _check-pinned-tag
+	@echo "  ✓ ALLOW_LATEST=1 override accepted"
+
+.PHONY: images-build
+images-build: _warn-latest-tag ## Build all Docker images
 	@echo "→ Building images..."
 	$(SUBMAKE) _build-nars-api
 	$(SUBMAKE) _build-nars-postgis
@@ -1174,10 +1217,7 @@ _build-nars-backup:
 		-t "$(DOCKER_ORG)/nars-backup:$(IMAGE_TAG)" .
 
 .PHONY: images-push
-images-push: _check-pinned-tag ## Push all Docker images to registry
-	@if echo "$(IMAGE_TAG)" | grep -qi "^latest$$"; then
-		echo "  ⚠ Pushing 'latest' tag — set IMAGE_TAG=<commit-sha> for CI/CD builds";
-	fi
+images-push: _check-pinned-tag _warn-latest-tag ## Push all Docker images to registry
 	@	for img in $(REGISTRY_IMAGES); do
 		echo "→ Pushing $(DOCKER_ORG)/$$img:$(IMAGE_TAG)..."
 		docker push "$(DOCKER_ORG)/$$img:$(IMAGE_TAG)"
@@ -1185,10 +1225,7 @@ images-push: _check-pinned-tag ## Push all Docker images to registry
 	@echo "✓ All images pushed"
 
 .PHONY: images-load
-images-load: ## Load locally built Docker images into the kind cluster
-	@if echo "$(IMAGE_TAG)" | grep -qi "^latest$$"; then
-		echo "  ⚠ Loading 'latest' tag — set IMAGE_TAG=<commit-sha> for CI/CD builds";
-	fi
+images-load: _warn-latest-tag ## Load locally built Docker images into the kind cluster
 	@for img in $(REGISTRY_IMAGES); do
 		full="$(DOCKER_ORG)/$$img:$(IMAGE_TAG)"
 		if docker image inspect "$$full" >/dev/null 2>&1; then
@@ -1214,6 +1251,14 @@ all: cluster-up ## Bring up the full cluster (default: help)
 .PHONY: test
 test: ## Run all tests
 	dotnet test nars-tests/NarsApi.Tests.csproj
+
+.PHONY: test-unit
+test-unit: ## Run only unit tests (no Postgres container)
+	dotnet test nars-tests/NarsApi.Tests.csproj --filter "Category!=Service"
+
+.PHONY: test-service
+test-service: ## Run only Postgres-backed service tests
+	dotnet test nars-tests/NarsApi.Tests.csproj --filter "Category=Service"
 
 .PHONY: test-coverage
 test-coverage: ## Run backend tests with coverage and enforce thresholds (coverlet.msbuild)

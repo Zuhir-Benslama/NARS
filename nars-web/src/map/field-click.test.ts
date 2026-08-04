@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { registerFieldWorkerClick } from "./field-click"
+import { registerFieldWorkerClick, unregisterFieldWorkerClick } from "./field-click"
 import type { MapGeoJSONFeature } from "maplibre-gl"
 
 const { mockSelectFeature, mockMapOn, mockQueryRenderedFeatures } = vi.hoisted(() => ({
@@ -18,10 +18,13 @@ vi.mock("../stores/appStore", () => ({
   useAppStore: vi.fn(),
 }))
 
+const mockMapOff = vi.fn()
+
 vi.mock("./core/state", () => ({
   getCtx: () => ({
     map: {
       on: mockMapOn,
+      off: mockMapOff,
       queryRenderedFeatures: mockQueryRenderedFeatures,
     },
   }),
@@ -142,5 +145,12 @@ describe("registerFieldWorkerClick", () => {
     ])
     capturedHandler({ point: { x: 0, y: 0 } })
     expect(mockSelectFeature).not.toHaveBeenCalled()
+  })
+})
+
+describe("unregisterFieldWorkerClick", () => {
+  it("unbinds the click handler", () => {
+    unregisterFieldWorkerClick()
+    expect(mockMapOff).toHaveBeenCalledWith("click", expect.any(Function))
   })
 })

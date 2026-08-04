@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -17,12 +18,14 @@ public class LocationsControllerTests
     private static LocationsController CreateController(
         ILocationSearchService? searchService = null,
         IBoundaryService? boundaryService = null,
-        ILocationQueryService? locationQuery = null) =>
+        ILocationQueryService? locationQuery = null,
+        IWebHostEnvironment? environment = null) =>
         new(
             Options.Create(new LocationsOptions()),
             boundaryService ?? Mock.Of<IBoundaryService>(),
             locationQuery ?? Mock.Of<ILocationQueryService>(),
-            searchService ?? Mock.Of<ILocationSearchService>());
+            searchService ?? Mock.Of<ILocationSearchService>(),
+            environment ?? Mock.Of<IWebHostEnvironment>(e => e.EnvironmentName == "Development"));
 
     private static ILocationQueryService CreateLocationQueryMock(AppDbContext db)
     {
@@ -244,12 +247,12 @@ public class LocationsControllerTests
     public async Task GetCommuneBoundary_NotFound_Returns404()
     {
         var boundaryMock = new Mock<IBoundaryService>();
-        boundaryMock.Setup(b => b.GetBoundaryGeoJsonAsync(999, It.IsAny<CancellationToken>()))
+        boundaryMock.Setup(b => b.GetBoundaryGeoJsonAsync(TestData.NonExistentId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
 
         var ctrl = CreateController(boundaryService: boundaryMock.Object);
 
-        var result = await ctrl.GetCommuneBoundary(999);
+        var result = await ctrl.GetCommuneBoundary(TestData.NonExistentId);
 
         var objResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(404, objResult.StatusCode);
@@ -260,10 +263,9 @@ public class LocationsControllerTests
     [Fact]
     public async Task DebugCommuneBoundary_NonDevEnv_Returns404()
     {
-        var ctrl = CreateController();
-        var env = Mock.Of<Microsoft.Extensions.Hosting.IHostEnvironment>(e => e.EnvironmentName == "Production");
+        var ctrl = CreateController(environment: Mock.Of<IWebHostEnvironment>(e => e.EnvironmentName == "Production"));
 
-        var result = await ctrl.DebugCommuneBoundary(100, env);
+        var result = await ctrl.DebugCommuneBoundary(100);
 
         Assert.IsType<NotFoundResult>(result);
     }
@@ -271,13 +273,22 @@ public class LocationsControllerTests
     // ── Edge cases ─────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task GetWilayas_NegativeSkip_ReturnsOk()
+    public async Task GetWilayas_NegativeSkip_ClampsToZero()
     {
-        var ctrl = CreateController();
+        var (db, search) = CreateDbWithSearch(nameof(GetWilayas_NegativeSkip_ClampsToZero));
+        using (db)
+        {
+            await SeedWilayas(db);
+            var ctrl = CreateController(searchService: search);
 
-        var result = await ctrl.GetWilayas(skip: -1, take: 10);
+            var result = await ctrl.GetWilayas(skip: -1, take: 10);
 
-        Assert.IsType<OkObjectResult>(result);
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var response = Assert.IsType<PagedResponse<WilayaItem>>(ok.Value);
+            Assert.Equal(3, response.Items.Count);
+            Assert.Equal(3, response.Total);
+            Assert.Equal(0, response.Skip);
+        }
     }
 
     [Fact]
@@ -292,7 +303,10 @@ public class LocationsControllerTests
             var result = await ctrl.GetWilayas(skip: 0, take: 1);
 
             var ok = Assert.IsType<OkObjectResult>(result);
-            Assert.NotNull(ok.Value);
+            var response = Assert.IsType<PagedResponse<WilayaItem>>(ok.Value);
+            var item = Assert.Single(response.Items);
+            Assert.Equal(3, response.Total);
+            Assert.Equal("Alger", item.NameFr);
         }
     }
 
