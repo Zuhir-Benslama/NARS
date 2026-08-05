@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Controllers;
-using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
@@ -19,7 +18,6 @@ namespace NarsApi.Tests;
 public class FieldControllerTests
 {
     private static readonly Guid OtherUserId = Guid.NewGuid();
-    private static AppDbContext CreateDb() => CreateInMemoryDb("FieldTest");
 
     private static FieldController CreateController(
         IFieldService? fieldService = null) => new(
@@ -152,7 +150,6 @@ public class FieldControllerTests
     [Fact]
     public async Task SubmitInspection_WrongCommune_ReturnsForbid()
     {
-        using var db = CreateDb();
         var roadId = Guid.NewGuid();
         var fieldService = new Mock<IFieldService>();
         fieldService.Setup(s => s.GetFeatureRegistryTypeAsync(roadId, default))
@@ -162,9 +159,6 @@ public class FieldControllerTests
         var ctrl = CreateController(fieldService: fieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
-        db.FeatureRegistry.Add(new FeatureRegistry { Id = roadId, FeatureType = FeatureTypes.Road });
-        await db.SaveChangesAsync();
-
         var result = await ctrl.SubmitInspection(new FieldInspectRequest(roadId.ToString(), "road", Json("{}"), "good"));
 
         Assert.IsType<ForbidResult>(result);
@@ -173,7 +167,6 @@ public class FieldControllerTests
     [Fact]
     public async Task SubmitInspection_ValidRequest_Returns201()
     {
-        using var db = CreateDb();
         var roadId = Guid.NewGuid();
         var fieldService = new Mock<IFieldService>();
         fieldService.Setup(s => s.GetFeatureRegistryTypeAsync(roadId, default))
@@ -184,9 +177,6 @@ public class FieldControllerTests
             .ReturnsAsync(Guid.NewGuid());
         var ctrl = CreateController(fieldService: fieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
-
-        db.FeatureRegistry.Add(new FeatureRegistry { Id = roadId, FeatureType = FeatureTypes.Road });
-        await db.SaveChangesAsync();
 
         var result = await ctrl.SubmitInspection(new FieldInspectRequest(roadId.ToString(), "road", Json("""{"key": "val"}"""), "good"));
 
@@ -199,7 +189,6 @@ public class FieldControllerTests
     [Fact]
     public async Task SubmitInspection_InvalidStatus_Returns400()
     {
-        using var db = CreateDb();
         var roadId = Guid.NewGuid();
         var fieldService = new Mock<IFieldService>();
         fieldService.Setup(s => s.GetFeatureRegistryTypeAsync(roadId, default))
@@ -208,9 +197,6 @@ public class FieldControllerTests
             .ReturnsAsync((OtherUserId, (int?)1));
         var ctrl = CreateController(fieldService: fieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
-
-        db.FeatureRegistry.Add(new FeatureRegistry { Id = roadId, FeatureType = FeatureTypes.Road });
-        await db.SaveChangesAsync();
 
         var result = await ctrl.SubmitInspection(new FieldInspectRequest(roadId.ToString(), "road", Json("{}"), "invalid_status"));
 

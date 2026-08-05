@@ -40,12 +40,8 @@ public class AuthenticationExtensionsTests
 
     private static AuthenticationScheme Scheme => new(JwtBearerDefaults.AuthenticationScheme, null, typeof(JwtBearerHandler));
 
-    private static DefaultHttpContext HttpContextWithLogging()
-    {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        return new DefaultHttpContext { RequestServices = services.BuildServiceProvider() };
-    }
+    private static ServiceProvider BuildLoggingProvider() =>
+        new ServiceCollection().AddLogging().BuildServiceProvider();
 
     [Fact]
     public void WithIssuerAndAudience_SetsValidationParameters()
@@ -104,9 +100,11 @@ public class AuthenticationExtensionsTests
     public async Task OnAuthenticationFailed_LogsWithoutThrowing()
     {
         using var sp = BuildProvider();
+        using var logging = BuildLoggingProvider();
         var options = GetJwtOptions(sp);
 
-        var context = new AuthenticationFailedContext(HttpContextWithLogging(), Scheme, options)
+        var context = new AuthenticationFailedContext(
+            new DefaultHttpContext { RequestServices = logging }, Scheme, options)
         {
             Exception = new InvalidOperationException("token expired"),
         };
@@ -118,9 +116,11 @@ public class AuthenticationExtensionsTests
     public async Task OnChallenge_LogsWithoutThrowing()
     {
         using var sp = BuildProvider();
+        using var logging = BuildLoggingProvider();
         var options = GetJwtOptions(sp);
 
-        var context = new JwtBearerChallengeContext(HttpContextWithLogging(), Scheme, options, new AuthenticationProperties());
+        var context = new JwtBearerChallengeContext(
+            new DefaultHttpContext { RequestServices = logging }, Scheme, options, new AuthenticationProperties());
 
         await options.Events.OnChallenge(context);
     }

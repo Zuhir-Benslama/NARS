@@ -22,9 +22,20 @@ namespace NarsApi.Tests;
 /// exercise the registration code paths in ServiceRegistrationExtensions, DatabaseExtensions,
 /// CorsCompressionExtensions, RateLimitExtensions, and the options binding in AppOptions.
 /// </summary>
-public class BootstrappingRegistrationTests
+[Collection(ProgramStartupCollection.Name)]
+public class BootstrappingRegistrationTests : IDisposable
 {
     private const string TestConnStr = "Host=localhost;Port=5432;Database=test;Username=test;Password=test";
+
+    // AddNarsOpenTelemetry reads OTEL_EXPORTER_OTLP_ENDPOINT from the environment at
+    // registration time. An ambient value would either throw UriFormatException on a
+    // malformed URI or spawn background OTLP exporter threads per provider, so these
+    // tests pin a deterministic loopback endpoint and restore the original value.
+    private readonly string? _savedOtelEndpoint =
+        Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
+
+    public void Dispose() =>
+        Environment.SetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT", _savedOtelEndpoint);
 
     private static IConfiguration BuildConfig(Action<IConfigurationBuilder>? overrides = null)
     {
@@ -45,6 +56,7 @@ public class BootstrappingRegistrationTests
 
     private static ServiceProvider BuildProvider(IConfiguration? config = null)
     {
+        Environment.SetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4317");
         var services = new ServiceCollection();
         services.AddNarsServices(
             config ?? BuildConfig(),
@@ -204,6 +216,7 @@ public class BootstrappingRegistrationTests
         var config = BuildConfig(b => b.AddInMemoryCollection(
             new Dictionary<string, string?> { ["Cache:ReferenceDataDurationHours"] = "999" }));
 
+        Environment.SetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4317");
         using var host = Host.CreateDefaultBuilder()
             .ConfigureServices(s => s.AddNarsServices(config, TestConnStr, AuthTestHelper.TestJwtSecret, null, null))
             .Build();

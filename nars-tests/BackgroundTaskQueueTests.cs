@@ -24,12 +24,11 @@ public class BackgroundTaskQueueTests
         Assert.Same(workItem, dequeued);
     }
 
-    private static readonly int[] expected = [0, 1, 2];
-
     [Fact]
     public async Task DequeueAsync_FIFO_Order()
     {
         var queue = CreateQueue();
+        var expected = new[] { 0, 1, 2 };
         var order = new List<int>();
 
         for (var i = 0; i < 3; i++)

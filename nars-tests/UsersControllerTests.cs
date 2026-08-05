@@ -158,6 +158,12 @@ public class UsersControllerTests
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<UpdateCredentialsResponse>(ok.Value);
         Assert.True(resp.Success);
+        Assert.Equal("updateduser", resp.User!.Username);
+        Assert.Equal("new@example.com", resp.User.Email);
+        mock.Verify(s => s.GetUserByIdAsync(userId, It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(s => s.IsUsernameTakenAsync("updateduser", It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(s => s.IsEmailTakenAsync("new@example.com", It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(s => s.UpdateUserAsync(user, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -177,6 +183,7 @@ public class UsersControllerTests
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<UpdateCredentialsResponse>(ok.Value);
         Assert.True(resp.Success);
+        mock.Verify(s => s.UpdateUserAsync(user, It.IsAny<CancellationToken>()), Times.Once);
         mock.Verify(s => s.IsUsernameTakenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -197,6 +204,7 @@ public class UsersControllerTests
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<UpdateCredentialsResponse>(ok.Value);
         Assert.True(resp.Success);
+        mock.Verify(s => s.UpdateUserAsync(user, It.IsAny<CancellationToken>()), Times.Once);
         mock.Verify(s => s.IsEmailTakenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

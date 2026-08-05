@@ -120,9 +120,9 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
             dairaId: 1);
 
         // Two independent contexts + controllers simulating concurrent requests
-        var db1 = _fixture.CreateDbContext();
+        await using var db1 = _fixture.CreateDbContext();
         var ctrl1 = CreateController(db1);
-        var db2 = _fixture.CreateDbContext();
+        await using var db2 = _fixture.CreateDbContext();
         var ctrl2 = CreateController(db2);
 
         var request = new AuthorizedAdminSignupRequest(

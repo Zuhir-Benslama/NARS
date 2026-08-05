@@ -51,7 +51,12 @@ public class FeatureCatalogControllerTests
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var types = Assert.IsType<List<FeatureTypeDefinition>>(ok.Value);
-        Assert.Equal(ExpectedFeatureTypeCount, types.Count);
+        var keys = types.Select(t => t.Key).OrderBy(k => k, StringComparer.Ordinal).ToArray();
+        Assert.Equal(ExpectedFeatureTypeCount, keys.Length);
+        Assert.Equal(keys.Length, keys.Distinct().Count());
+        Assert.Equal(
+            FeatureTypeRegistry.GetAllTypes().OrderBy(k => k, StringComparer.Ordinal),
+            keys);
     }
 
     [Fact]

@@ -43,6 +43,7 @@ public class AdminControllerTests
         Assert.Equal("national", (string)payload.level);
         Assert.Empty(payload.wilayas);
         Assert.Equal(0, (int)payload.total);
+        overview.Verify(s => s.GetNationalOverviewAsync(0, 500, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -94,6 +95,7 @@ public class AdminControllerTests
         var ok = Assert.IsType<OkObjectResult>(result);
         var reportValue = Assert.IsType<WilayaReport>(ok.Value);
         Assert.Equal(1, reportValue.WilayaId);
+        overview.Verify(s => s.GetWilayaReportAsync(1, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

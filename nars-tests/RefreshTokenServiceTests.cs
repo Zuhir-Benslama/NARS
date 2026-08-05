@@ -152,9 +152,16 @@ public class RefreshTokenServiceTests
             var result = await svc.RotateRefreshTokenAsync(raw);
 
             Assert.True(result.Success);
-            Assert.NotNull(result.NewAccessToken);
-            Assert.NotNull(result.NewRawToken);
             Assert.Equal("testuser", result.Username);
+            Assert.Equal("new-access-token", result.NewAccessToken);
+            Assert.Equal("raw-token", result.NewRawToken);
+            Assert.Equal(FixedUtcNow.AddDays(30), result.RefreshExpiry);
+
+            // Round-trip: the freshly issued raw token's hash is persisted for this user.
+            var newToken = await db.RefreshTokens.FirstAsync(rt => rt.TokenHash == "hashed-token");
+            Assert.Equal(UserId, newToken.UserId);
+            Assert.False(newToken.Revoked);
+            Assert.Equal(FixedUtcNow.AddDays(30), newToken.ExpiresAt);
         }
     }
 
@@ -325,22 +332,38 @@ public class RefreshTokenServiceTests
             Role = UserRoles.CommuneUser,
             CommuneId = 1,
         });
-        db.RefreshTokens.Add(new RefreshToken
-        {
-            Id = Guid.NewGuid(),
-            UserId = UserId,
-            TokenHash = "revoked-tok",
-            ExpiresAt = FixedUtcNow.AddDays(30),
-            CreatedAt = FixedUtcNow,
-            Revoked = true,
-        });
+        db.RefreshTokens.AddRange(
+            new RefreshToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = UserId,
+                TokenHash = "revoked-tok",
+                ExpiresAt = FixedUtcNow.AddDays(30),
+                CreatedAt = FixedUtcNow,
+                Revoked = true,
+            },
+            new RefreshToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = UserId,
+                TokenHash = "active-tok",
+                ExpiresAt = FixedUtcNow.AddDays(60),
+                CreatedAt = FixedUtcNow,
+                Revoked = false,
+            });
         await db.SaveChangesAsync();
         var svc = CreateService(db);
 
         await svc.RevokeAllUserTokensAsync(UserId);
 
-        var token = await db.RefreshTokens.FirstAsync(t => t.UserId == UserId);
-        Assert.True(token.Revoked);
+        // The already-revoked token is left completely untouched...
+        var revoked = await db.RefreshTokens.FirstAsync(t => t.TokenHash == "revoked-tok");
+        Assert.True(revoked.Revoked);
+        Assert.Equal(FixedUtcNow.AddDays(30), revoked.ExpiresAt);
+
+        // ...while the active token is revoked by the call.
+        var active = await db.RefreshTokens.FirstAsync(t => t.TokenHash == "active-tok");
+        Assert.True(active.Revoked);
     }
 
     // ── IssueRefreshTokenAsync ──────────────────────────────────────────

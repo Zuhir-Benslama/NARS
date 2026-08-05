@@ -124,6 +124,9 @@ public class ProgramStartupValidationTests : IDisposable
     [Fact]
     public void UnreachableDatabase_FailsStartup()
     {
+        // Real localhost socket, but deliberately unreachable: Port 1 on 127.0.0.1 is
+        // either connection-refused (immediate) or blackholed (ConnectionString Timeout=1
+        // bounds the wait), so startup fails fast either way — no external dependency.
         SetEnv("NARS_DB_PASSWORD", "test");
         ClearEnv("NARS_JWT_SECRET");
         ClearEnv("NARS_ADMIN_SIGNUP_TOKEN");
