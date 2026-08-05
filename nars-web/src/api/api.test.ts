@@ -1,147 +1,262 @@
-// ─── API.TS TESTS ─────────────────────────────────────────────────────────────
-// Tests for error handling classes and retry logic.
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import {
-  NarsError,
-  ErrorCode,
-  createNetworkError,
-  createAuthError,
-  createServerError,
-  createNotFoundError,
-  createTimeoutError,
-  createPermissionError,
-  withRetry,
-  isNarsError,
-  isNetworkError,
-  isAuthError,
-} from "../lib/errors"
+// The global test setup (src/test/setup.ts) mocks ../api with a stub fetch.
+// This file needs the REAL apiFetch, so re-mock ../api to its original
+// implementation for this suite only.
+vi.mock("../api", async (importOriginal) => {
+  return await importOriginal<typeof import("../api")>()
+})
 
-describe("Error handling", () => {
-  describe("NarsError class", () => {
-    it("should create error with code and message", () => {
-      const error = createNetworkError("Connection failed")
-      expect(error).toBeInstanceOf(NarsError)
-      expect(error.code).toBe(ErrorCode.NETWORK)
-      expect(error.message).toBe("Connection failed")
+import { apiFetch, apiUrl } from "../api"
+import { createConflictError } from "../lib/errors"
+import { getApiBaseUrl, getLoginPath } from "../config"
+
+function mockResponse(status: number, body: string | object): Response {
+  const bodyStr = typeof body === "string" ? body : JSON.stringify(body)
+  return new Response(bodyStr, {
+    status,
+    headers: { "Content-Type": "application/json" },
+  })
+}
+
+/** Fetch mock that resolves once the request's abort signal fires. */
+function signalAwareFetch(): ReturnType<typeof vi.fn> {
+  return vi.fn(
+    (_url: string, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () =>
+          reject(new DOMException("The operation was aborted.", "AbortError")),
+        )
+      }),
+  )
+}
+
+function clearCsrfMeta(): void {
+  document.querySelector('meta[name="csrf-token"]')?.remove()
+}
+
+describe("apiUrl", () => {
+  it("prepends the configured API base URL", () => {
+    expect(apiUrl("/health")).toBe(`${getApiBaseUrl()}/health`)
+  })
+})
+
+describe("apiFetch", () => {
+  beforeEach(() => {
+    clearCsrfMeta()
+    // apiFetch logs errors via logError() (console.group/error) in dev — mute
+    // the noise so assertions focus on behavior, not log output.
+    vi.spyOn(console, "group").mockImplementation(() => {})
+    vi.spyOn(console, "error").mockImplementation(() => {})
+    vi.spyOn(console, "log").mockImplementation(() => {})
+    vi.spyOn(console, "warn").mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
+    clearCsrfMeta()
+  })
+
+  it("returns the response for a successful GET", async () => {
+    const mockFetch = vi.fn(() => Promise.resolve(mockResponse(200, { data: "ok" })))
+    vi.stubGlobal("fetch", mockFetch)
+
+    const res = await apiFetch("/health")
+    expect(res.status).toBe(200)
+    await expect(res.json()).resolves.toEqual({ data: "ok" })
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it("sets Content-Type for body-capable methods but not for GET", async () => {
+    const mockFetch = vi.fn((_url: string, _init: RequestInit) =>
+      Promise.resolve(mockResponse(200, {})),
+    )
+    vi.stubGlobal("fetch", mockFetch)
+
+    await apiFetch("/no-body")
+    const noBodyHeaders = mockFetch.mock.calls[0][1].headers as Record<string, string>
+    expect(noBodyHeaders["Content-Type"]).toBeUndefined()
+
+    await apiFetch("/with-body", { method: "POST" })
+    const bodyHeaders = mockFetch.mock.calls[1][1].headers as Record<string, string>
+    expect(bodyHeaders["Content-Type"]).toBe("application/json")
+  })
+
+  it("attaches X-CSRF-Token to state-changing requests and never lets callers override it", async () => {
+    const meta = document.createElement("meta")
+    meta.name = "csrf-token"
+    meta.content = "test-csrf"
+    document.head.appendChild(meta)
+
+    const mockFetch = vi.fn((_url: string, _init: RequestInit) =>
+      Promise.resolve(mockResponse(200, {})),
+    )
+    vi.stubGlobal("fetch", mockFetch)
+
+    await apiFetch("/things", { method: "PUT", headers: { "X-CSRF-Token": "evil" }, body: "{}" })
+    const headers = mockFetch.mock.calls[0][1].headers as Record<string, string>
+    expect(headers["X-CSRF-Token"]).toBe("test-csrf")
+    expect(headers["Content-Type"]).toBe("application/json")
+  })
+
+  it("does not attach a CSRF token to GET requests", async () => {
+    const meta = document.createElement("meta")
+    meta.name = "csrf-token"
+    meta.content = "test-csrf"
+    document.head.appendChild(meta)
+
+    const mockFetch = vi.fn((_url: string, _init: RequestInit) =>
+      Promise.resolve(mockResponse(200, {})),
+    )
+    vi.stubGlobal("fetch", mockFetch)
+
+    await apiFetch("/things")
+    const headers = mockFetch.mock.calls[0][1].headers as Record<string, string>
+    expect(headers["X-CSRF-Token"]).toBeUndefined()
+  })
+
+  it("proceeds without a token in development when the CSRF token is missing", async () => {
+    const mockFetch = vi.fn(() => Promise.resolve(mockResponse(200, {})))
+    vi.stubGlobal("fetch", mockFetch)
+
+    await apiFetch("/things", { method: "POST", body: "{}" })
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it("aborts state-changing requests in production when the CSRF token is missing", async () => {
+    vi.stubEnv("PROD", true)
+    const mockFetch = vi.fn(() => Promise.resolve(mockResponse(200, {})))
+    vi.stubGlobal("fetch", mockFetch)
+
+    await expect(
+      apiFetch("/things", { method: "POST", body: "{}", skipRetry: true }),
+    ).rejects.toMatchObject({
+      code: "NETWORK_ERROR",
     })
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
 
-    it("should capture context", () => {
-      const error = createServerError("Server error", { action: "test" })
-      expect(error.context.action).toBe("test")
-    })
+  it("redirects to login on 401 and throws an auth error", async () => {
+    const mockFetch = vi.fn(() => Promise.resolve(mockResponse(401, {})))
+    vi.stubGlobal("fetch", mockFetch)
 
-    it("should capture cause", () => {
-      const cause = new Error("Original error")
-      const error = createNetworkError("Failed", {}, cause)
-      expect(error.cause).toBe(cause)
-    })
+    const locationMock = { href: "" }
+    const originalLocation = window.location
+    Object.defineProperty(window, "location", { value: locationMock, writable: true })
+    try {
+      await expect(apiFetch("/secret", { skipRetry: true })).rejects.toMatchObject({
+        code: "AUTH_ERROR",
+      })
+      expect(locationMock.href).toBe(getLoginPath())
+    } finally {
+      Object.defineProperty(window, "location", { value: originalLocation, writable: true })
+    }
+  })
 
-    it("should generate user-friendly messages", () => {
-      expect(createNetworkError("").getUserMessage()).toContain("Network error")
-      expect(createAuthError("").getUserMessage()).toContain("Authentication")
-      expect(createNotFoundError("").getUserMessage()).toContain("not found")
-      expect(createTimeoutError("").getUserMessage()).toContain("timed out")
-      expect(createPermissionError("").getUserMessage()).toContain("permission")
-    })
+  it.each([
+    [403, "AUTH_ERROR"],
+    [404, "NOT_FOUND"],
+    [409, "CONFLICT_ERROR"],
+    [422, "SERVER_ERROR"],
+    [500, "SERVER_ERROR"],
+    [503, "SERVER_ERROR"],
+  ])("maps HTTP %i to %s", async (status, code) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(mockResponse(status, { detail: "nope" }))),
+    )
 
-    it("should include technical details", () => {
-      const error = createServerError("Test", { action: "test" })
-      const details = error.getTechnicalDetails()
-      expect(details).toContain("[SERVER_ERROR]")
-      expect(details).toContain("Test")
+    await expect(apiFetch("/x", { skipRetry: true })).rejects.toMatchObject({ code })
+  })
+
+  it("extracts the detail field from a JSON error body", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(mockResponse(404, { detail: "feature not found" }))),
+    )
+
+    await expect(apiFetch("/x", { skipRetry: true })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      message: "feature not found",
     })
   })
 
-  describe("Error type guards", () => {
-    it("should identify NarsError", () => {
-      const error = createNetworkError("")
-      expect(isNarsError(error)).toBe(true)
-      expect(isNarsError(new Error("Regular"))).toBe(false)
-    })
+  it("maps a fetch TypeError to a NETWORK error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("Failed to fetch"))),
+    )
 
-    it("should identify network errors", () => {
-      expect(isNetworkError(createNetworkError(""))).toBe(true)
-      expect(isNetworkError(createAuthError(""))).toBe(false)
-    })
-
-    it("should identify auth errors", () => {
-      expect(isAuthError(createAuthError(""))).toBe(true)
-      expect(isAuthError(createNetworkError(""))).toBe(false)
+    await expect(apiFetch("/x", { skipRetry: true })).rejects.toMatchObject({
+      code: "NETWORK_ERROR",
     })
   })
 
-  describe("withRetry", () => {
-    beforeEach(() => {
-      vi.useFakeTimers()
-    })
+  it("rethrows NarsError instances as-is", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(createConflictError("conflict"))),
+    )
 
-    afterEach(() => {
+    await expect(apiFetch("/x", { skipRetry: true })).rejects.toMatchObject({
+      code: "CONFLICT_ERROR",
+    })
+  })
+
+  it("maps an internal timeout to a TIMEOUT error", async () => {
+    const mockFetch = signalAwareFetch()
+    vi.stubGlobal("fetch", mockFetch)
+
+    await expect(apiFetch("/slow", { timeout: 30, skipRetry: true })).rejects.toMatchObject({
+      code: "TIMEOUT_ERROR",
+    })
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it("surfaces a caller abort before the request starts as an AbortError without retrying", async () => {
+    const controller = new AbortController()
+    const mockFetch = vi.fn(() =>
+      Promise.reject(new DOMException("The operation was aborted.", "AbortError")),
+    )
+    vi.stubGlobal("fetch", mockFetch)
+
+    controller.abort()
+    const promise = apiFetch("/abort", { signal: controller.signal })
+
+    await expect(promise).rejects.toMatchObject({ name: "AbortError" })
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it("surfaces a caller abort mid-flight as an AbortError and does not retry", async () => {
+    const controller = new AbortController()
+    const mockFetch = signalAwareFetch()
+    vi.stubGlobal("fetch", mockFetch)
+
+    const promise = apiFetch("/abort", { signal: controller.signal })
+    controller.abort()
+
+    await expect(promise).rejects.toMatchObject({ name: "AbortError" })
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it("retries transient network errors up to maxRetries", async () => {
+    vi.useFakeTimers()
+    const mockFetch = vi.fn(() => Promise.reject(new TypeError("Failed to fetch")))
+    vi.stubGlobal("fetch", mockFetch)
+    try {
+      const promise = apiFetch("/retry", { timeout: 1000 })
+      // Attach the handler first so the eventual rejection is never flagged
+      // as unhandled while fake timers advance.
+      const assertion = expect(promise).rejects.toMatchObject({ code: "NETWORK_ERROR" })
+      // initial attempt + 3 retries; backoff is 1s/2s/4s with up to 30% jitter
+      await vi.advanceTimersByTimeAsync(15_000)
+
+      await assertion
+      expect(mockFetch).toHaveBeenCalledTimes(4)
+    } finally {
       vi.useRealTimers()
-    })
-
-    it("should succeed on first try", async () => {
-      const fn = vi.fn().mockResolvedValue("success")
-      const result = withRetry(fn, {
-        maxRetries: 2,
-        baseDelay: 10,
-        maxDelay: 100,
-      })
-      await expect(result).resolves.toBe("success")
-      expect(fn).toHaveBeenCalledTimes(1)
-    })
-
-    it("should retry on network errors", async () => {
-      const fn = vi
-        .fn()
-        .mockRejectedValueOnce(createNetworkError("Fail"))
-        .mockRejectedValueOnce(createNetworkError("Fail"))
-        .mockResolvedValueOnce("success")
-
-      const promise = withRetry(fn, {
-        maxRetries: 3,
-        baseDelay: 10,
-        maxDelay: 100,
-      })
-
-      // Advance timers for retries
-      await vi.advanceTimersByTimeAsync(50)
-
-      await expect(promise).resolves.toBe("success")
-      expect(fn).toHaveBeenCalledTimes(3)
-    })
-
-    it("should not retry on non-retryable errors", async () => {
-      const fn = vi.fn().mockRejectedValue(createServerError("Server error"))
-
-      const promise = withRetry(fn, {
-        maxRetries: 3,
-        baseDelay: 10,
-        maxDelay: 100,
-      })
-
-      await expect(promise).rejects.toThrow(NarsError)
-      expect(fn).toHaveBeenCalledTimes(1)
-    })
-
-    it("should exhaust retries and throw final error", async () => {
-      const fn = vi.fn().mockRejectedValue(createNetworkError("Fail"))
-
-      const promise = withRetry(fn, {
-        maxRetries: 2,
-        baseDelay: 10,
-        maxDelay: 100,
-      })
-      // Attach catch early to prevent unhandled rejection warnings
-      const caught = promise.catch((err) => err)
-
-      // Advance timers for all retries
-      await vi.advanceTimersByTimeAsync(300)
-
-      const result = await caught
-      expect(result).toBeInstanceOf(NarsError)
-      expect((result as NarsError).code).toBe(ErrorCode.NETWORK)
-      expect(fn).toHaveBeenCalledTimes(3)
-    })
+    }
   })
 })

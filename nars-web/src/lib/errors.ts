@@ -204,6 +204,12 @@ export async function withRetry<T>(
     try {
       return await fn()
     } catch (error) {
+      // Caller-initiated aborts are never retryable — rethrow as-is so the
+      // caller's AbortError detection (e.g. DOMException name checks) works.
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw error
+      }
+
       const narsError =
         error instanceof NarsError
           ? error

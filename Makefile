@@ -176,7 +176,7 @@ _pre-cluster-down-backup:
 	fi;
 	echo "→ Auto-backing up database before cluster teardown...";
 	PASS=$$($(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
-		-o jsonpath='{.data.postgres_password}' 2>/dev/null | base64 -d 2>/dev/null);
+		-o jsonpath='{.data.postgres_password}' 2>/dev/null | base64 -d 2>/dev/null || true);
 	if [ -z "$$PASS" ]; then
 		echo "  ⚠ Could not read DB password — skipping backup";
 		exit 0;
@@ -337,7 +337,7 @@ smoke-test: ## Post-deploy smoke test: verify /health, frontend, and API auth
 	echo "  1. Health endpoint...";
 	health=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/health" 2>/dev/null || echo "000");
 	if [ "$$health" = "200" ]; then
-		body=$$(curl -s --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/health" 2>/dev/null);
+		body=$$(curl -s --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/health" 2>/dev/null || echo "");
 		if echo "$$body" | grep -q "^Healthy$$"; then
 			pass "/health → 200 Healthy";
 		else
@@ -437,7 +437,7 @@ db-backup: ## Dump the PostGIS database to a local file
 	@POD=$$($(POSTGIS_GET_POD_CMD) || true)
 	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found in namespace '$(NAMESPACE)'"; exit 1; fi
 	@PASS=$$($(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
-		-o jsonpath='{.data.postgres_password}' | base64 -d)
+		-o jsonpath='{.data.postgres_password}' 2>/dev/null | base64 -d 2>/dev/null || true)
 	@if [ -z "$$PASS" ]; then echo "✖ Could not read DB password — is nars-secrets deployed?"; exit 1; fi
 	@echo "→ Backing up database '$(DB_NAME)' from pod $$POD..."
 	@$(_pg_dump_cmd)
@@ -461,7 +461,7 @@ db-restore: ## Restore a backup. Usage: make db-restore FILE=backup/nars_db_2025
 		exit 1;
 	fi
 	@PASS=$$($(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
-		-o jsonpath='{.data.postgres_password}' | base64 -d)
+		-o jsonpath='{.data.postgres_password}' 2>/dev/null | base64 -d 2>/dev/null || true)
 	@if [ -z "$$PASS" ]; then echo "✖ Could not read DB password — is nars-secrets deployed?"; exit 1; fi
 	@echo "→ Restoring '$(FILE)' into $(DB_NAME)..."
 	@echo "  ⚠ This will OVERWRITE the current database."
@@ -707,8 +707,8 @@ ca-secret: ca-generate namespace-ensure ## Create mTLS CA secret from k8s/certs/
 .PHONY: secrets-validate
 secrets-validate: ## Fail if kustomize output contains placeholder values (REPLACE_ME)
 	@echo "→ Validating kustomize output for placeholder values..."
-	@output=$$($(KUBECTL) kustomize "$(K8S_DIR)" 2>&1);
-	exit_code=$$?;
+	@exit_code=0;
+	output=$$($(KUBECTL) kustomize "$(K8S_DIR)" 2>&1) || exit_code=$$?;
 	if [ "$$exit_code" -ne 0 ]; then
 		echo "✖ ERROR: kustomize failed (exit $$exit_code):";
 		echo "$$output" | head -5;
@@ -1152,6 +1152,7 @@ IMAGE_TAG ?= latest
 #   production/staging  — 'latest' refused; deployments must pin IMAGE_TAG=<sha>
 # Set ALLOW_LATEST=1 for a deliberate emergency manual rollout.
 DEPLOY_ENV ?= dev
+ALLOW_LATEST ?=
 
 # Internal: warn when the mutable 'latest' tag is in use (build/push/load).
 .PHONY: _warn-latest-tag
@@ -1171,16 +1172,16 @@ _check-pinned-tag: ## Fail if deploying with the mutable 'latest' tag outside lo
 .PHONY: infra-lint-tag-guard
 infra-lint-tag-guard: ## Assert _check-pinned-tag rejects 'latest' outside dev (self-test)
 	@echo "→ Verifying _check-pinned-tag rejects IMAGE_TAG=latest in production..."
-	@if DEPLOY_ENV=production IMAGE_TAG=latest ALLOW_LATEST= $(MAKE) _check-pinned-tag >/dev/null 2>&1; then
+	@if DEPLOY_ENV=production IMAGE_TAG=latest ALLOW_LATEST= $(SUBMAKE) _check-pinned-tag >/dev/null 2>&1; then
 		echo "✖ _check-pinned-tag unexpectedly accepted latest in production";
 		exit 1;
 	fi
 	@echo "  ✓ latest rejected in production"
 	@echo "→ Verifying _check-pinned-tag accepts a pinned tag in production..."
-	@DEPLOY_ENV=production IMAGE_TAG=abc123 ALLOW_LATEST= $(MAKE) _check-pinned-tag
+	@DEPLOY_ENV=production IMAGE_TAG=abc123 ALLOW_LATEST= $(SUBMAKE) _check-pinned-tag
 	@echo "  ✓ pinned tag accepted in production"
 	@echo "→ Verifying ALLOW_LATEST=1 overrides the guard..."
-	@DEPLOY_ENV=production IMAGE_TAG=latest ALLOW_LATEST=1 $(MAKE) _check-pinned-tag
+	@DEPLOY_ENV=production IMAGE_TAG=latest ALLOW_LATEST=1 $(SUBMAKE) _check-pinned-tag
 	@echo "  ✓ ALLOW_LATEST=1 override accepted"
 
 .PHONY: images-build

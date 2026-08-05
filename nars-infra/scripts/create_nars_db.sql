@@ -204,8 +204,8 @@ CREATE TABLE IF NOT EXISTS public.areas
     layer      character varying(50)    NOT NULL,
     label      character varying(500)   NOT NULL,
     data       jsonb                    NOT NULL,
-    created_at timestamp without time zone NOT NULL DEFAULT now(),
-    updated_at timestamp without time zone,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone,
     CONSTRAINT areas_pkey PRIMARY KEY (id),
     CONSTRAINT areas_user_fk FOREIGN KEY (user_id)
         REFERENCES public.users (id)
@@ -223,8 +223,8 @@ CREATE TABLE IF NOT EXISTS public.districts
     layer      character varying(50)    NOT NULL,
     label      character varying(500)   NOT NULL,
     data       jsonb                    NOT NULL,
-    created_at timestamp without time zone NOT NULL DEFAULT now(),
-    updated_at timestamp without time zone,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone,
     CONSTRAINT districts_pkey PRIMARY KEY (id),
     CONSTRAINT districts_user_fk FOREIGN KEY (user_id)
         REFERENCES public.users (id)
@@ -241,8 +241,8 @@ CREATE TABLE IF NOT EXISTS public.city_centers
     layer      character varying(50)    NOT NULL DEFAULT 'city_center',
     label      character varying(500)   NOT NULL DEFAULT 'City Center',
     data       jsonb                    NOT NULL,
-    created_at timestamp without time zone NOT NULL DEFAULT now(),
-    updated_at timestamp without time zone,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone,
     CONSTRAINT city_centers_pkey PRIMARY KEY (id),
     CONSTRAINT city_centers_user_fk FOREIGN KEY (user_id)
         REFERENCES public.users (id)
@@ -259,8 +259,8 @@ CREATE TABLE IF NOT EXISTS public.roads
     layer      character varying(50)    NOT NULL,
     label      character varying(500)   NOT NULL,
     data       jsonb                    NOT NULL,
-    created_at timestamp without time zone NOT NULL DEFAULT now(),
-    updated_at timestamp without time zone,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone,
     CONSTRAINT roads_pkey PRIMARY KEY (id),
     CONSTRAINT roads_user_fk FOREIGN KEY (user_id)
         REFERENCES public.users (id)
@@ -279,8 +279,8 @@ CREATE TABLE IF NOT EXISTS public.house_entrances
     layer      character varying(50)    NOT NULL,
     label      character varying(500)   NOT NULL,
     data       jsonb                    NOT NULL,
-    created_at timestamp without time zone NOT NULL DEFAULT now(),
-    updated_at timestamp without time zone,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone,
     CONSTRAINT house_entrances_pkey PRIMARY KEY (id),
     CONSTRAINT house_entrances_user_fk FOREIGN KEY (user_id)
         REFERENCES public.users (id)
@@ -302,8 +302,8 @@ CREATE TABLE IF NOT EXISTS public.public_buildings
     layer      character varying(50)    NOT NULL DEFAULT 'public_building',
     label      character varying(500)   NOT NULL,
     data       jsonb                    NOT NULL,
-    created_at timestamp without time zone NOT NULL DEFAULT now(),
-    updated_at timestamp without time zone,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone,
     CONSTRAINT public_buildings_pkey PRIMARY KEY (id),
     CONSTRAINT public_buildings_user_fk FOREIGN KEY (user_id)
         REFERENCES public.users (id)
@@ -320,8 +320,8 @@ CREATE TABLE IF NOT EXISTS public.public_spaces
     layer      character varying(50)    NOT NULL,
     label      character varying(500)   NOT NULL,
     data       jsonb                    NOT NULL,
-    created_at timestamp without time zone NOT NULL DEFAULT now(),
-    updated_at timestamp without time zone,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone,
     CONSTRAINT public_spaces_pkey PRIMARY KEY (id),
     CONSTRAINT public_spaces_user_fk FOREIGN KEY (user_id)
         REFERENCES public.users (id)
@@ -338,8 +338,8 @@ CREATE TABLE IF NOT EXISTS public.naming_panels
     layer      character varying(50)    NOT NULL DEFAULT 'naming_panel',
     label      character varying(500)   NOT NULL,
     data       jsonb                    NOT NULL,
-    created_at timestamp without time zone NOT NULL DEFAULT now(),
-    updated_at timestamp without time zone,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone,
     CONSTRAINT naming_panels_pkey PRIMARY KEY (id),
     CONSTRAINT naming_panels_user_fk FOREIGN KEY (user_id)
         REFERENCES public.users (id)
@@ -348,8 +348,33 @@ CREATE TABLE IF NOT EXISTS public.naming_panels
 
 CREATE INDEX IF NOT EXISTS ix_naming_panels_user_id ON public.naming_panels (user_id);
 
+-- ── Inspections (field-worker inspections) ────────────────────────────────────
+-- Schema mirrors migration 20260511062948_AddInspections (timestamptz per
+-- 20260705061915_MigrateToTimestamptz). feature_id/user_id have no FK
+-- constraints — matching the EF model, which declares them as plain columns.
+CREATE TABLE IF NOT EXISTS public.inspections
+(
+    id         uuid                     NOT NULL,
+    feature_id uuid                     NOT NULL,
+    user_id    uuid                     NOT NULL,
+    type       character varying(30)    NOT NULL,
+    data       jsonb                    NOT NULL,
+    status     character varying(20)    NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone,
+    CONSTRAINT inspections_pkey PRIMARY KEY (id)
+);
+
+CREATE INDEX IF NOT EXISTS ix_inspections_feature_id
+    ON public.inspections (feature_id);
+CREATE INDEX IF NOT EXISTS ix_inspections_user_id
+    ON public.inspections (user_id);
+-- Optimizes "latest inspections per feature" queries (feature_id ASC, created_at DESC)
+CREATE INDEX IF NOT EXISTS ix_inspections_feature_created
+    ON public.inspections (feature_id, created_at DESC);
+
 -- ══════════════════════════════════════════════════════════════════════════════
--- 8.  Error logs (written by NarsApi.LogsController on unhandled exceptions)
+-- 9.  Error logs (written by NarsApi.LogsController on unhandled exceptions)
 -- ══════════════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS public.error_logs
@@ -372,7 +397,7 @@ CREATE TABLE IF NOT EXISTS public.error_logs
 );
 
 -- ══════════════════════════════════════════════════════════════════════════════
--- 9.  Indices for error_logs (admin dashboard queries)
+-- 10.  Indices for error_logs (admin dashboard queries)
 -- ══════════════════════════════════════════════════════════════════════════════
 
 CREATE INDEX IF NOT EXISTS ix_error_logs_created_at ON public.error_logs (created_at);

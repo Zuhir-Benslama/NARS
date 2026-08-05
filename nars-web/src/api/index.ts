@@ -171,9 +171,9 @@ export async function apiFetch(path: string, options: ApiFetchOptions = {}): Pro
         credentials: "include",
         signal: combinedSignal,
         headers: {
+          ...fetchOptions.headers,
           ...(hasBody ? { "Content-Type": "application/json" } : {}),
           ...csrfHeaders,
-          ...fetchOptions.headers,
         },
       })
 
@@ -182,7 +182,17 @@ export async function apiFetch(path: string, options: ApiFetchOptions = {}): Pro
     } catch (error) {
       clearTimeout(timeoutId)
 
-      // AbortError = timeout
+      // Caller-initiated abort (stale request superseded, unmount, etc.) —
+      // surface the original AbortError so callers can detect their own
+      // cancellation, and so withRetry never treats it as a transient timeout.
+      if (externalSignal?.aborted) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          throw error
+        }
+        throw new DOMException("The request was aborted.", "AbortError")
+      }
+
+      // Internal timeout — AbortError fired by our own controller
       if (error instanceof DOMException && error.name === "AbortError") {
         const timeoutError = createTimeoutError(`Request timed out after ${timeout}ms`, context)
         logError(timeoutError)
