@@ -217,14 +217,9 @@ public class PagesController(
 
             return true;
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogError(ex, "[Pages] Error during silent refresh");
-            return false;
-        }
-        catch (IOException ex)
-        {
-            logger.LogError(ex, "[Pages] IO error during silent refresh");
             return false;
         }
     }

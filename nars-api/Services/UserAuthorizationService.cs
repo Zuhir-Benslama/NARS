@@ -6,7 +6,7 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public class UserAuthorizationService(AppDbContext db) : IUserAuthorizationService
+public sealed class UserAuthorizationService(AppDbContext db) : IUserAuthorizationService
 {
     public bool CanCreateRole(string callerRole, string targetRole) => (callerRole, targetRole) switch
     {

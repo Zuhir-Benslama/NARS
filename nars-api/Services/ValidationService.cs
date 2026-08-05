@@ -7,7 +7,7 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public class ValidationService(AppDbContext db) : IValidationService
+public sealed class ValidationService(AppDbContext db) : IValidationService
 {
     private readonly AppDbContext _db = db;
     private readonly string _roadTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.Road)?.TableName

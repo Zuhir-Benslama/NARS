@@ -4,7 +4,7 @@ using NarsApi.Infrastructure;
 
 namespace NarsApi.Services;
 
-public class BoundaryService(AppDbContext db) : IBoundaryService
+public sealed class BoundaryService(AppDbContext db) : IBoundaryService
 {
     public async Task<string?> GetBoundaryGeoJsonAsync(int communeId, CancellationToken ct = default)
     {

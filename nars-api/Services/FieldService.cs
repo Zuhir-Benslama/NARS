@@ -8,7 +8,7 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public class FieldService(
+public sealed class FieldService(
     AppDbContext db,
     ILogger<FieldService> logger) : IFieldService
 {

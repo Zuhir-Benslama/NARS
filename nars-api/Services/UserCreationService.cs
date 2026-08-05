@@ -5,7 +5,7 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public class UserCreationService(AppDbContext db) : IUserCreationService
+public sealed class UserCreationService(AppDbContext db) : IUserCreationService
 {
     public async Task<UserCreationResult> ValidateAndCreateUserAsync(
         string name,

@@ -7,7 +7,7 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public class FeatureService(AppDbContext db) : IFeatureService
+public sealed class FeatureService(AppDbContext db) : IFeatureService
 {
     public async Task<bool> RoadExistsAsync(Guid roadId, Guid userId, CancellationToken ct)
         => await db.Roads.AnyAsync(r => r.Id == roadId && r.UserId == userId, ct);

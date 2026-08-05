@@ -18,9 +18,15 @@ public static class DatabaseExtensions
     {
         services.AddSingleton<UpdatedAtInterceptor>();
 
-        services.AddDbContext<AppDbContext>((sp, options) =>
-            options.UseNpgsql(connectionString, o => o.UseNetTopologySuite())
-                   .AddInterceptors(sp.GetRequiredService<UpdatedAtInterceptor>()));
+        // The DbContext stays scoped for request-scoped services, while the
+        // options are registered as a singleton so the singleton
+        // IDbContextFactory (used by background/singleton services) can consume
+        // them without a captive-scope violation.
+        services.AddDbContext<AppDbContext>(
+            (sp, options) => options.UseNpgsql(connectionString, o => o.UseNetTopologySuite())
+                                    .AddInterceptors(sp.GetRequiredService<UpdatedAtInterceptor>()),
+            contextLifetime: ServiceLifetime.Scoped,
+            optionsLifetime: ServiceLifetime.Singleton);
 
         // DbContextFactory for parallel queries outside request scope
         services.AddDbContextFactory<AppDbContext>((sp, options) =>

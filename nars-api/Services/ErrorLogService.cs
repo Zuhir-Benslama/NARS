@@ -5,7 +5,7 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public class ErrorLogService(AppDbContext db, IOptions<LoggingOptions> loggingOptions) : IErrorLogService
+public sealed class ErrorLogService(AppDbContext db, IOptions<LoggingOptions> loggingOptions) : IErrorLogService
 {
     public async Task LogBatchAsync(List<ErrorLog> entries, CancellationToken ct = default)
     {

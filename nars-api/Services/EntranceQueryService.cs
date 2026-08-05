@@ -5,7 +5,7 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public class EntranceQueryService(AppDbContext db) : IEntranceQueryService
+public sealed class EntranceQueryService(AppDbContext db) : IEntranceQueryService
 {
     public async Task<HashSet<int>> GetUsedEntranceNumbersAsync(Guid userId, Guid roadId, CancellationToken ct = default)
     {

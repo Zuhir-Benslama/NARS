@@ -4,7 +4,7 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public class LocationQueryService(IDbContextFactory<AppDbContext> dbFactory) : ILocationQueryService
+public sealed class LocationQueryService(IDbContextFactory<AppDbContext> dbFactory) : ILocationQueryService
 {
     public async Task<List<Wilaya>> GetAllWilayasAsync(CancellationToken ct = default)
     {

@@ -8,7 +8,7 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactory) : IFeatureStatsService
+public sealed class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactory) : IFeatureStatsService
 {
     private static readonly string[] _featureTypes =
     [

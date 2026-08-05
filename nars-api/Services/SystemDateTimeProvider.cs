@@ -1,6 +1,6 @@
 namespace NarsApi.Services;
 
-public class SystemDateTimeProvider : IDateTimeProvider
+public sealed class SystemDateTimeProvider : IDateTimeProvider
 {
     public DateTime UtcNow => DateTime.UtcNow;
 }

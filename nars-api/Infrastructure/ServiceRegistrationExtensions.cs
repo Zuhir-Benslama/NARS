@@ -12,6 +12,9 @@ public static class ServiceRegistrationExtensions
 {
     public const string DefaultAssemblyVersion = "2.0.0";
 
+    private static readonly string AssemblyVersion =
+        System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? DefaultAssemblyVersion;
+
     /// <summary>
     /// Registers all NARS application services, EF Core DbContext, authentication,
     /// OpenTelemetry, health checks, CORS, compression, rate limiting, and
@@ -32,8 +35,7 @@ public static class ServiceRegistrationExtensions
         services.AddNarsJwtAuthentication(jwtSecret, issuer: jwtIssuer, audience: jwtAudience);
         services.AddNarsDomainServices();
         services.AddNarsHttpClients(config);
-        var assemblyVersion = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? DefaultAssemblyVersion;
-        services.AddNarsControllers(assemblyVersion);
+        services.AddNarsControllers();
         services.AddNarsCors(config);
         services.AddNarsCompression();
         services.AddNarsRateLimiting(config);
@@ -75,10 +77,9 @@ public static class ServiceRegistrationExtensions
         var otelEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")
             ?? otelOpts.OtlpEndpoint;
 
-        var assemblyVersion = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? DefaultAssemblyVersion;
         services.AddOpenTelemetry()
             .ConfigureResource(r => r
-                .AddService("nars-api", serviceVersion: assemblyVersion)
+                .AddService("nars-api", serviceVersion: AssemblyVersion)
                 .AddEnvironmentVariableDetector())
             .WithTracing(t => t
                 .AddAspNetCoreInstrumentation()
@@ -132,7 +133,7 @@ public static class ServiceRegistrationExtensions
         });
     }
 
-    private static void AddNarsControllers(this IServiceCollection services, string assemblyVersion)
+    private static void AddNarsControllers(this IServiceCollection services)
     {
         services.AddMemoryCache();
         services.AddControllers()
@@ -146,7 +147,7 @@ public static class ServiceRegistrationExtensions
             {
                 doc.Info.Title = "NARS - National Addressing Reference System";
                 doc.Info.Description = "Geographic data management API";
-                doc.Info.Version = assemblyVersion;
+                doc.Info.Version = AssemblyVersion;
                 return Task.CompletedTask;
             });
         });

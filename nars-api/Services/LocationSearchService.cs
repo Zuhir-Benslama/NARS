@@ -5,7 +5,7 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public class LocationSearchService(IDbContextFactory<AppDbContext> dbFactory) : ILocationSearchService
+public sealed class LocationSearchService(IDbContextFactory<AppDbContext> dbFactory) : ILocationSearchService
 {
     public async Task<PagedResponse<WilayaItem>> SearchWilayasAsync(string search, int skip, int take, CancellationToken ct = default)
     {

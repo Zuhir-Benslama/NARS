@@ -1,0 +1,141 @@
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Xunit;
+
+namespace NarsApi.Tests;
+
+/// <summary>
+/// Serializes env-var dependent tests. The NARS_* variables are only read by
+/// Program.cs top-level statements (which run exclusively inside these
+/// WebApplicationFactory hosts), so mutating them here cannot race with other
+/// test collections — but keeping them in one collection keeps them serial.
+/// </summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public class ProgramStartupCollection
+{
+    public const string Name = "Program startup env isolation";
+}
+
+/// <summary>
+/// Verifies the fail-fast startup validation in Program.cs: misconfiguration must
+/// throw before the server starts (no database is ever contacted). Also verifies the
+/// database-connectivity guard surfaces as a startup failure.
+/// </summary>
+[Collection(ProgramStartupCollection.Name)]
+public class ProgramStartupValidationTests : IDisposable
+{
+    private const string FastFailConnStr =
+        "Host=127.0.0.1;Port=1;Database=nars;Username=nars;Password=nars;Timeout=1";
+
+    private static readonly string[] EnvKeys =
+        ["NARS_DB_PASSWORD", "NARS_JWT_SECRET", "NARS_ADMIN_SIGNUP_TOKEN"];
+
+    private readonly Dictionary<string, string?> _saved = EnvKeys.ToDictionary(k => k, Environment.GetEnvironmentVariable);
+
+    public void Dispose()
+    {
+        foreach (var (key, value) in _saved)
+        {
+            Environment.SetEnvironmentVariable(key, value);
+        }
+    }
+
+    private static void ClearEnv(string key) => Environment.SetEnvironmentVariable(key, null);
+
+    private static void SetEnv(string key, string value) => Environment.SetEnvironmentVariable(key, value);
+
+    private static InvalidOperationException ExpectStartupFailure(
+        WebApplicationFactory<Program> factory, string messageFragment)
+    {
+        using (factory)
+        {
+            var ex = Record.Exception(() => factory.CreateClient());
+            for (Exception? current = ex; current is not null; current = current.InnerException)
+            {
+                if (current is InvalidOperationException ioe
+                    && ioe.Message.Contains(messageFragment, StringComparison.Ordinal))
+                {
+                    return ioe;
+                }
+            }
+
+            throw new Xunit.Sdk.XunitException(
+                $"Expected InvalidOperationException containing '{messageFragment}', got: {ex}");
+        }
+    }
+
+    [Fact]
+    public void MissingDbPassword_Throws()
+    {
+        ClearEnv("NARS_DB_PASSWORD");
+
+        var factory = new WebApplicationFactory<Program>();
+        var ex = ExpectStartupFailure(factory, "Database password is not configured");
+        Assert.Contains("NARS_DB_PASSWORD", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MissingJwtSecret_Throws()
+    {
+        SetEnv("NARS_DB_PASSWORD", "test");
+        ClearEnv("NARS_JWT_SECRET");
+
+        var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(b => b.UseSetting("Jwt:SecretKey", string.Empty));
+        ExpectStartupFailure(factory, "Jwt:SecretKey is not configured");
+    }
+
+    [Fact]
+    public void ShortJwtSecret_Throws()
+    {
+        SetEnv("NARS_DB_PASSWORD", "test");
+        ClearEnv("NARS_JWT_SECRET");
+
+        var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(b => b.UseSetting("Jwt:SecretKey", "too-short"));
+        var ex = ExpectStartupFailure(factory, "Jwt:SecretKey must be at least 32 characters");
+        Assert.Contains("32 characters", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LowEntropyJwtSecret_Throws()
+    {
+        SetEnv("NARS_DB_PASSWORD", "test");
+        ClearEnv("NARS_JWT_SECRET");
+
+        var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(b => b.UseSetting("Jwt:SecretKey", new string('a', 64)));
+        var ex = ExpectStartupFailure(factory, "Jwt:SecretKey must contain at least 3 of the following");
+        Assert.Contains("3 of the following", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MissingSignupToken_Throws()
+    {
+        SetEnv("NARS_DB_PASSWORD", "test");
+        ClearEnv("NARS_ADMIN_SIGNUP_TOKEN");
+
+        var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(b => b.UseSetting("Jwt:SecretKey", AuthTestHelper.TestJwtSecret));
+        var ex = ExpectStartupFailure(factory, "AdminSignup:SignupToken is not configured");
+        Assert.Contains("NARS_ADMIN_SIGNUP_TOKEN", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void UnreachableDatabase_FailsStartup()
+    {
+        SetEnv("NARS_DB_PASSWORD", "test");
+        ClearEnv("NARS_JWT_SECRET");
+        ClearEnv("NARS_ADMIN_SIGNUP_TOKEN");
+
+        var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(b =>
+            {
+                b.UseSetting("ConnectionStrings:DefaultConnection", FastFailConnStr);
+                b.UseSetting("Jwt:SecretKey", AuthTestHelper.TestJwtSecret);
+                b.UseSetting("AdminSignup:SignupToken", "test-signup-token");
+            });
+
+        ExpectStartupFailure(factory, "Unable to connect to the database");
+    }
+}

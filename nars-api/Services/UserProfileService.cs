@@ -4,7 +4,7 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public class UserProfileService(AppDbContext db) : IUserProfileService
+public sealed class UserProfileService(AppDbContext db) : IUserProfileService
 {
     public async Task<User?> GetUserByIdAsync(Guid userId, CancellationToken ct = default) =>
         await db.Users.FindAsync([userId], ct);
