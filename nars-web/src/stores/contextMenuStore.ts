@@ -34,3 +34,7 @@ export const useContextMenuStore = defineStore("contextMenu", {
     },
   },
 })
+
+export function resetContextMenuStore(): void {
+  useContextMenuStore().reset()
+}

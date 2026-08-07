@@ -3,6 +3,7 @@ import { getCtx } from "../core/state"
 import { useAppStore } from "../../stores/appStore"
 import { useLayerStore } from "../../stores/layerStore"
 import { useSnapStore } from "../../stores/snapStore"
+import { useEditStore } from "../../stores/editStore"
 import type { LayerState } from "../../stores/layerStore"
 import { SNAP_CONFIG } from "../../config"
 import { PHASES } from "../../phases"
@@ -46,16 +47,12 @@ export function resetSnapState(): void {
   snapCursor = null
 }
 
-export function isSnapFrozen(): boolean {
-  return useSnapStore().snapFrozen
-}
-
 export function getFrozenSnapPos(): { lat: number; lng: number } | null {
   return useSnapStore().getFrozenSnapPos
 }
 
 export function setEditModeActive(v: boolean): void {
-  useSnapStore().setEditModeActive(v)
+  useEditStore().setIsEditMode(v)
 }
 
 export function setEditDragActive(v: boolean): void {
@@ -67,8 +64,7 @@ export function setSnapExclude(id: string | null): void {
 }
 
 export function getActiveSnapPhases(): string[] {
-  const store = useSnapStore()
-  if (store.editModeActive) {
+  if (useEditStore().isEditMode) {
     const layerStore = useLayerStore()
     const state = layerStore.$state
     return Object.keys(state).filter((key) => {
@@ -108,7 +104,7 @@ export function disableCrosshair(): void {
 
 function onMouseDown(): void {
   const store = useSnapStore()
-  if (!store.editModeActive && store.snapActive && store.snapLatLng) {
+  if (!useEditStore().isEditMode && store.snapActive && store.snapLatLng) {
     store.patchSnapState({ snapFrozen: true })
   }
 }
@@ -138,7 +134,6 @@ export function disableSnapping(): void {
   store.patchSnapState({
     snapActive: false,
     snapFrozen: false,
-    editModeActive: false,
     snapPendingCoords: null,
   })
   setSnapSourceExclude(null)
@@ -209,7 +204,7 @@ function processSnapMove(): void {
   try {
     const { map } = getCtx()
 
-    if (store.editModeActive && !store.editDragActive) {
+    if (useEditStore().isEditMode && !store.editDragActive) {
       if (store.snapActive) {
         store.patchSnapState({ snapActive: false, snapLatLng: null })
         snapMarker?.remove()

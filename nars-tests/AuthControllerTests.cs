@@ -230,6 +230,33 @@ public class AuthControllerTests
     }
 
     [Fact]
+    public async Task AuthorizedAdminSignup_FieldWorker_ForbiddenForCommuneUserAdmin()
+    {
+        using var db = CreateDb();
+        await SeedLocationDataAsync(db);
+        await SeedAdminAsync(db, username: "commune_admin", role: UserRoles.CommuneUser, communeId: CommuneId1);
+
+        var controller = CreateController(db);
+
+        var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
+            AdminUsername: "commune_admin",
+            AdminPassword: DefaultPassword,
+            Name: "Field Worker",
+            Email: TestData.DefaultEmail,
+            Phone: AltPhone,
+            Username: "fieldworker",
+            Password: AltPassword,
+            Role: UserRoles.FieldWorker,
+            CommuneId: 2,
+            DairaId: null,
+            WilayaId: null
+        ), signupToken: AdminSignupToken);
+
+        Assert.IsType<ForbidResult>(result);
+        Assert.False(await db.Users.AnyAsync(u => u.Username == "fieldworker"));
+    }
+
+    [Fact]
     public async Task SignIn_WrongPassword_Returns401()
     {
         using var db = CreateDb();
@@ -276,12 +303,36 @@ public class AuthControllerTests
     // Logout is tested in AuthControllerServiceTests.Logout_RevokesRefreshTokens
     // (real PostgreSQL supports ExecuteUpdateAsync; InMemory does not).
 
+    [Fact]
+    public async Task Logout_DeletesAuthCookiesWithMatchingOptions()
+    {
+        using var db = CreateDb();
+        var controller = CreateController(db);
+        // No user_id claim → token revocation is skipped (InMemory lacks
+        // ExecuteUpdateAsync), isolating the cookie-deletion behavior under test.
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext(),
+        };
+
+        var result = await controller.Logout();
+
+        Assert.IsType<OkObjectResult>(result);
+        var setCookie = controller.Response.Headers["Set-Cookie"].ToString();
+        Assert.Contains("access_token=", setCookie);
+        Assert.Contains("refresh_token=", setCookie);
+        Assert.Contains("expires=", setCookie);
+        Assert.Contains("path=/", setCookie);
+        Assert.Contains("httponly", setCookie, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("samesite=lax", setCookie, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static async Task SeedLocationDataAsync(AppDbContext db) =>
         await SeedData.SeedExtendedLocationsAsync(db);
 
-    private static async Task SeedAdminAsync(AppDbContext db, string username, string role, int? dairaId = null, int? wilayaId = null)
+    private static async Task SeedAdminAsync(AppDbContext db, string username, string role, int? communeId = null, int? dairaId = null, int? wilayaId = null)
     {
-        var user = await SeedData.CreateUserAsync(db, role, dairaId: dairaId, wilayaId: wilayaId, name: "Admin User");
+        var user = await SeedData.CreateUserAsync(db, role, communeId: communeId, dairaId: dairaId, wilayaId: wilayaId, name: "Admin User");
         user.Username = username;
         await db.SaveChangesAsync();
     }

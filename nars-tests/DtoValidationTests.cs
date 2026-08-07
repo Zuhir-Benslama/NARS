@@ -105,6 +105,7 @@ public class DtoValidationTests
         var request = new UpdateUserRequest(
             Username: null,
             Email: null,
+            CurrentPassword: null,
             Password: null
         );
 

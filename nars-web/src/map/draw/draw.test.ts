@@ -237,14 +237,18 @@ describe("draw-state.ts", () => {
   })
 
   describe("resetDrawState", () => {
-    it("resets all state to defaults", () => {
+    it("resets draw state to defaults", () => {
       setSavingFeature(true)
       setDrawingPhase(PHASES[0])
-      setSnappingEnabled(false)
       resetDrawState()
       expect(isSavingFeature()).toBe(false)
       expect(getDrawingPhase()).toBeNull()
-      expect(isSnappingEnabled()).toBe(true)
+    })
+
+    it("does not touch the snapping toggle (owned by snapStore)", () => {
+      setSnappingEnabled(false)
+      resetDrawState()
+      expect(isSnappingEnabled()).toBe(false)
     })
   })
 })

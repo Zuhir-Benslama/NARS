@@ -7,6 +7,8 @@ import { t } from "../i18n"
 
 const STEP = 5
 
+let rotationControlEl: HTMLElement | null = null
+
 export function resetRotation(): void {
   useRotationStore().resetRotation()
 }
@@ -43,4 +45,17 @@ export function initRotationControls(): void {
   wrap.appendChild(ccw)
   wrap.appendChild(cw)
   container.appendChild(wrap)
+
+  // Keep a reference so destroyMap() can remove the controls on teardown.
+  // map.remove() does NOT remove these — they are appended to the container,
+  // not registered as map controls.
+  if (rotationControlEl) rotationControlEl.remove()
+  rotationControlEl = wrap
+}
+
+export function destroyRotationControls(): void {
+  if (rotationControlEl) {
+    rotationControlEl.remove()
+    rotationControlEl = null
+  }
 }

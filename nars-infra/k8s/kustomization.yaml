@@ -62,6 +62,10 @@ images:
   #   make kustomize-set-image-tag IMAGE_TAG=<commit-sha>
   #   (requires the standalone 'kustomize' binary)
   #
+  # The same apply-time rewrite also pins the app.kubernetes.io/version label
+  # on Deployments, so pod metadata always advertises the image tag actually
+  # running (Services/PVCs carry no version label — they run no image).
+  #
   # For production, use a specific commit SHA. Example:
   #   make kustomize-apply IMAGE_TAG=abc1234 DEPLOY_ENV=production
   #

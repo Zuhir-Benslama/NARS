@@ -113,7 +113,7 @@ describe("findLayerEntryByDbId", () => {
 
 describe("enableEditGeometry", () => {
   it("shows info toast when another feature is already selected", () => {
-    useSelectionStore().selectFeature("other")
+    useSelectionStore().setSelectedFeatureDbId("other")
     addLayerEntry("areas", { dbId: "myfeature" })
 
     mod.enableEditGeometry("myfeature")
@@ -224,14 +224,15 @@ describe("removeFeature", () => {
   })
 
   it("city-center state derives from the layer store after delete", async () => {
+    const { useLayerStore } = await import("../../stores/layerStore")
     addLayerEntry("cityCenter", { dbId: "cc1", data: { type: "cityCenter", label: "CC" } })
-    expect(useAppStore().cityCenterMode).toBe("city_center")
+    expect(useLayerStore().cityCenter).toHaveLength(1)
     mockShowConfirm.mockResolvedValue(true)
     mockApiFetch.mockResolvedValue({ ok: true })
 
     await mod.removeFeature("cc1")
 
-    expect(useAppStore().cityCenterMode).toBeNull()
+    expect(useLayerStore().cityCenter).toHaveLength(0)
     expect(useAppStore().cityCenterLatLng).toBeNull()
   })
 

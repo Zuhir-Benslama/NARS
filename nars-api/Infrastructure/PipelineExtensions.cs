@@ -1,10 +1,12 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using NarsApi.Data;
 using Scalar.AspNetCore;
 
@@ -149,19 +151,47 @@ public static class PipelineExtensions
             ContentTypeProvider = contentTypeProvider,
             OnPrepareResponse = ctx =>
             {
-                var name = ctx.File.Name;
-                if (name is "index.html" or "login.html")
+                var cacheControl = CacheControlForStaticAsset(ctx.File.Name);
+                if (cacheControl.Length > 0)
                 {
-                    ctx.Context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
-                    ctx.Context.Response.Headers.Pragma = "no-cache";
-                    return;
-                }
-                if (name.EndsWith(".js") || name.EndsWith(".mjs") || name.EndsWith(".css") || name.EndsWith(".woff2"))
-                {
-                    ctx.Context.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+                    ctx.Context.Response.Headers.CacheControl = cacheControl;
+                    if (cacheControl.StartsWith("no-store", StringComparison.Ordinal))
+                    {
+                        ctx.Context.Response.Headers.Pragma = "no-cache";
+                    }
                 }
             }
         });
+    }
+
+    // Vite content-fingerprints bundles as <name>-<8+char hash>.<ext>. Only these
+    // files are safe to cache immutable for a year — a given hash never changes.
+    private static readonly Regex ViteContentHashPattern = new(
+        @"-[A-Za-z0-9_-]{8,}\.(?:js|mjs|css|woff2)$",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled,
+        TimeSpan.FromSeconds(1));
+
+    /// <summary>
+    /// Computes the Cache-Control header for a static file. HTML is never cached;
+    /// content-fingerprinted bundles (Vite hash in the filename) are cached
+    /// immutable; any un-hashed asset is revalidated so a deploy is never stale.
+    /// Returns an empty string when no header should be written.
+    /// </summary>
+    internal static string CacheControlForStaticAsset(string fileName)
+    {
+        if (fileName is "index.html" or "login.html")
+        {
+            return "no-store, no-cache, must-revalidate";
+        }
+
+        if (fileName.EndsWith(".js") || fileName.EndsWith(".mjs") || fileName.EndsWith(".css") || fileName.EndsWith(".woff2"))
+        {
+            return ViteContentHashPattern.IsMatch(fileName)
+                ? "public, max-age=31536000, immutable"
+                : "public, no-cache";
+        }
+
+        return string.Empty;
     }
 
     private static void UseSecurityMiddleware(WebApplication app)
@@ -170,10 +200,20 @@ public static class PipelineExtensions
         {
             app.UseHsts();
         }
-        app.UseForwardedHeaders(new ForwardedHeadersOptions
+
+        var forwardingOptions = new ForwardedHeadersOptions
         {
-            ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-        });
+            ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+            ForwardLimit = app.Services.GetRequiredService<IOptions<ProxyOptions>>().Value.ForwardLimit,
+        };
+        foreach (var cidr in app.Services.GetRequiredService<IOptions<ProxyOptions>>().Value.KnownNetworks)
+        {
+            if (System.Net.IPNetwork.Parse(cidr) is { } network)
+            {
+                forwardingOptions.KnownIPNetworks.Add(network);
+            }
+        }
+        app.UseForwardedHeaders(forwardingOptions);
 
         app.UseRouting();
         app.UseCors();
@@ -182,7 +222,7 @@ public static class PipelineExtensions
         app.UseAuthentication();
         app.UseAuthorization();
 
-        var cspOptions = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<CspOptions>>().Value;
+        var cspOptions = app.Services.GetRequiredService<IOptions<CspOptions>>().Value;
 
         app.Use(async (HttpContext ctx, RequestDelegate next) =>
             await ApplyCspMiddlewareAsync(ctx, next, cspOptions));

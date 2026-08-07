@@ -21,8 +21,8 @@ const DRAW_TYPE_MAP: Record<string, DrawModeName> = {
 
 export function resetDrawControl(): void {
   const store = useDrawStore()
-  store.lastPhaseKey = null
-  store.modeSwitchToken = 0
+  store.setLastPhaseKey(null)
+  store.setModeSwitchToken(0)
 }
 
 // Stops the bounded edge-visibility poll started by buildDrawControl. Must be
@@ -32,11 +32,11 @@ export function clearEdgeVisibilityPoll(): void {
   const store = useDrawStore()
   if (store.edgePollId !== null) {
     clearInterval(store.edgePollId)
-    store.edgePollId = null
+    store.setEdgePollId(null)
   }
   if (store.edgeTimeoutId !== null) {
     clearTimeout(store.edgeTimeoutId)
-    store.edgeTimeoutId = null
+    store.setEdgeTimeoutId(null)
   }
 }
 
@@ -59,8 +59,8 @@ export function buildDrawControl(phase: PhaseConfig): void {
     return
   }
 
-  store.lastPhaseKey = phase.key
-  const token = ++store.modeSwitchToken
+  store.setLastPhaseKey(phase.key)
+  const token = store.incrementModeSwitchToken()
 
   void (async () => {
     if (activeModes.length > 0) {
@@ -90,17 +90,19 @@ export function buildDrawControl(phase: PhaseConfig): void {
           const poll = setInterval(() => {
             if (++retries > DRAW_CONFIG.edgeRetryMax) {
               clearInterval(poll)
-              store.edgePollId = null
+              store.setEdgePollId(null)
               return
             }
             ensureGeomanDrawEdgesVisible()
           }, DRAW_CONFIG.edgeRetryIntervalMs)
-          store.edgePollId = poll
-          store.edgeTimeoutId = setTimeout(() => {
-            clearInterval(poll)
-            store.edgePollId = null
-            store.edgeTimeoutId = null
-          }, DRAW_CONFIG.edgeRetryTimeoutMs)
+          store.setEdgePollId(poll)
+          store.setEdgeTimeoutId(
+            setTimeout(() => {
+              clearInterval(poll)
+              store.setEdgePollId(null)
+              store.setEdgeTimeoutId(null)
+            }, DRAW_CONFIG.edgeRetryTimeoutMs),
+          )
         }
       })
       .catch((err) => debugError("[DRAW CONTROL] Failed to enable draw mode:", shapeName, err))

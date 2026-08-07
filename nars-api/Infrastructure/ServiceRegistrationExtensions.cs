@@ -69,6 +69,8 @@ public static class ServiceRegistrationExtensions
             .ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<CspOptions>().Bind(config.GetSection("Csp"))
             .ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<ProxyOptions>().Bind(config.GetSection("ForwardedHeaders"))
+            .ValidateDataAnnotations().ValidateOnStart();
     }
 
     private static void AddNarsOpenTelemetry(this IServiceCollection services, IConfiguration config)
@@ -77,22 +79,28 @@ public static class ServiceRegistrationExtensions
         var otelEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")
             ?? otelOpts.OtlpEndpoint;
 
-        services.AddOpenTelemetry()
+        var builder = services.AddOpenTelemetry()
             .ConfigureResource(r => r
                 .AddService("nars-api", serviceVersion: AssemblyVersion)
-                .AddEnvironmentVariableDetector())
-            .WithTracing(t => t
-                .AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation()
-                .AddEntityFrameworkCoreInstrumentation()
-                .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)))
-            .WithMetrics(m => m
-                .AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation()
-                .AddRuntimeInstrumentation()
-                .AddMeter("Microsoft.AspNetCore.Hosting")
-                .AddMeter("Microsoft.AspNetCore.Server.Kestrel")
-                .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)));
+                .AddEnvironmentVariableDetector());
+
+        // Graceful fallback: without an explicit endpoint (dev), run without an
+        // OTLP exporter instead of hammering an unreachable collector with logs.
+        if (Uri.TryCreate(otelEndpoint, UriKind.Absolute, out var otlpEndpointUri))
+        {
+            builder.WithTracing(t => t
+                    .AddAspNetCoreInstrumentation()
+                    .AddHttpClientInstrumentation()
+                    .AddEntityFrameworkCoreInstrumentation()
+                    .AddOtlpExporter(o => o.Endpoint = otlpEndpointUri))
+                .WithMetrics(m => m
+                    .AddAspNetCoreInstrumentation()
+                    .AddHttpClientInstrumentation()
+                    .AddRuntimeInstrumentation()
+                    .AddMeter("Microsoft.AspNetCore.Hosting")
+                    .AddMeter("Microsoft.AspNetCore.Server.Kestrel")
+                    .AddOtlpExporter(o => o.Endpoint = otlpEndpointUri));
+        }
     }
 
     private static void AddNarsDomainServices(this IServiceCollection services)

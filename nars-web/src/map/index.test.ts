@@ -24,7 +24,10 @@ vi.mock("./core/state", () => ({
 }))
 
 vi.mock("../i18n", () => ({ applyInitialLang: vi.fn() }))
-vi.mock("./rotation", () => ({ initRotationControls: vi.fn() }))
+vi.mock("./rotation", () => ({
+  initRotationControls: vi.fn(),
+  destroyRotationControls: vi.fn(),
+}))
 vi.mock("./draw/draw-events", () => ({
   registerDrawEvents: vi.fn(),
   destroyDrawEvents: mockDestroyDrawEvents,

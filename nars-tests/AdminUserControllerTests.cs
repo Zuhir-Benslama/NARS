@@ -185,6 +185,47 @@ public class AdminUserControllerTests
         Assert.Equal("wa1", users[0].Username);
     }
 
+    [Fact]
+    public async Task GetManageableUsers_NegativeSkip_IsClampedToZero()
+    {
+        using var db = CreateDb();
+        db.Users.AddRange(
+            new User
+            {
+                Id = Guid.NewGuid(),
+                Username = "wa1",
+                Email = "wa1@test.com",
+                Name = "WA1",
+                Phone = TestData.DefaultPhone,
+                PasswordHash = "hash",
+                Role = UserRoles.WilayaAdmin,
+                WilayaId = 1,
+            },
+            new User
+            {
+                Id = Guid.NewGuid(),
+                Username = "wa2",
+                Email = "wa2@test.com",
+                Name = "WA2",
+                Phone = TestData.DefaultPhone,
+                PasswordHash = "hash",
+                Role = UserRoles.WilayaAdmin,
+                WilayaId = 1,
+            });
+        await db.SaveChangesAsync();
+        var ctrl = CreateController(db);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
+
+        // With take=1, an un-clamped skip of -10 would return the empty slice; the
+        // clamped skip of 0 must return the first user in username order.
+        var result = await ctrl.GetManageableUsers(-10, 1, default);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var users = Assert.IsType<List<AdminUserSummary>>(ok.Value);
+        var user = Assert.Single(users);
+        Assert.Equal("wa1", user.Username);
+    }
+
     // ─── UpdateAdmin ────────────────────────────────────────────────────
 
     [Fact]
@@ -386,6 +427,96 @@ public class AdminUserControllerTests
         Assert.Equal(1, (await db.Users.FindAsync(userId))!.CommuneId);
     }
 
+    [Fact]
+    public async Task UpdateAdmin_ProfileOnlyEditOutsideScope_ReturnsForbid()
+    {
+        using var db = CreateDb();
+        db.Communes.AddRange(
+            new Commune { CommuneId = 5, DairaId = 1, CommuneFr = "In daira" },
+            new Commune { CommuneId = 99, DairaId = 99, CommuneFr = "Other daira" });
+        var callerId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            Id = callerId,
+            Username = "caller",
+            Email = "caller@test.com",
+            Name = "Caller",
+            Phone = TestData.DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.DairaAdmin,
+            DairaId = 1,
+        });
+        var userId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            Id = userId,
+            Username = "commune_user",
+            Email = "cu@test.com",
+            Name = "Commune User",
+            Phone = TestData.DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.CommuneUser,
+            CommuneId = 99,
+        });
+        await db.SaveChangesAsync();
+        var ctrl = CreateController(db);
+        AuthTestHelper.SetUser(ctrl, callerId, UserRoles.DairaAdmin, dairaId: 1);
+
+        var result = await ctrl.UpdateManagedUser(
+            userId,
+            new UpdateAdminRequest(Name: "Sneaky", Email: null, Phone: null,
+                Role: null, CommuneId: null, DairaId: null, WilayaId: null, Password: null),
+            default);
+
+        Assert.IsType<ForbidResult>(result);
+        Assert.Equal("Commune User", (await db.Users.FindAsync(userId))!.Name);
+    }
+
+    [Fact]
+    public async Task UpdateAdmin_ProfileOnlyEditWithinScope_ReturnsOk()
+    {
+        using var db = CreateDb();
+        db.Communes.Add(new Commune { CommuneId = 5, DairaId = 1, CommuneFr = "In daira" });
+        var callerId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            Id = callerId,
+            Username = "caller",
+            Email = "caller@test.com",
+            Name = "Caller",
+            Phone = TestData.DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.DairaAdmin,
+            DairaId = 1,
+        });
+        var userId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            Id = userId,
+            Username = "commune_user",
+            Email = "cu@test.com",
+            Name = "Commune User",
+            Phone = TestData.DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.CommuneUser,
+            CommuneId = 5,
+        });
+        await db.SaveChangesAsync();
+        var ctrl = CreateController(db);
+        AuthTestHelper.SetUser(ctrl, callerId, UserRoles.DairaAdmin, dairaId: 1);
+
+        var result = await ctrl.UpdateManagedUser(
+            userId,
+            new UpdateAdminRequest(Name: "Updated", Email: null, Phone: null,
+                Role: null, CommuneId: null, DairaId: null, WilayaId: null, Password: null),
+            default);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<ApiResponse>(ok.Value);
+        Assert.True(response.Success);
+        Assert.Equal("Updated", (await db.Users.FindAsync(userId))!.Name);
+    }
+
     // ─── DeleteAdmin ────────────────────────────────────────────────────
 
     [Fact]
@@ -449,5 +580,85 @@ public class AdminUserControllerTests
         var result = await ctrl.DeleteManagedUser(userId, default);
 
         Assert.IsType<ForbidResult>(result);
+    }
+
+    [Fact]
+    public async Task DeleteAdmin_OutsideScope_ReturnsForbid()
+    {
+        using var db = CreateDb();
+        db.Communes.AddRange(
+            new Commune { CommuneId = 5, DairaId = 1, CommuneFr = "In daira" },
+            new Commune { CommuneId = 99, DairaId = 99, CommuneFr = "Other daira" });
+        var callerId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            Id = callerId,
+            Username = "caller",
+            Email = "caller@test.com",
+            Name = "Caller",
+            Phone = TestData.DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.DairaAdmin,
+            DairaId = 1,
+        });
+        var userId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            Id = userId,
+            Username = "commune_user",
+            Email = "cu@test.com",
+            Name = "Commune User",
+            Phone = TestData.DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.CommuneUser,
+            CommuneId = 99,
+        });
+        await db.SaveChangesAsync();
+        var ctrl = CreateController(db);
+        AuthTestHelper.SetUser(ctrl, callerId, UserRoles.DairaAdmin, dairaId: 1);
+
+        var result = await ctrl.DeleteManagedUser(userId, default);
+
+        Assert.IsType<ForbidResult>(result);
+        Assert.NotNull(await db.Users.FindAsync(userId));
+    }
+
+    [Fact]
+    public async Task DeleteAdmin_WithinScope_ReturnsNoContent()
+    {
+        using var db = CreateDb();
+        db.Communes.Add(new Commune { CommuneId = 5, DairaId = 1, CommuneFr = "In daira" });
+        var callerId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            Id = callerId,
+            Username = "caller",
+            Email = "caller@test.com",
+            Name = "Caller",
+            Phone = TestData.DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.DairaAdmin,
+            DairaId = 1,
+        });
+        var userId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            Id = userId,
+            Username = "commune_user",
+            Email = "cu@test.com",
+            Name = "Commune User",
+            Phone = TestData.DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.CommuneUser,
+            CommuneId = 5,
+        });
+        await db.SaveChangesAsync();
+        var ctrl = CreateController(db);
+        AuthTestHelper.SetUser(ctrl, callerId, UserRoles.DairaAdmin, dairaId: 1);
+
+        var result = await ctrl.DeleteManagedUser(userId, default);
+
+        Assert.IsType<NoContentResult>(result);
+        Assert.Null(await db.Users.FindAsync(userId));
     }
 }

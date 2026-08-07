@@ -65,7 +65,7 @@ function getHandler(eventName: string): (...args: any[]) => void {
   return call ? call[1] : vi.fn()
 }
 
-function addLayerEntry(phaseKey: string, overrides: Record<string, any> = {}): void {
+function addLayerEntry(phaseKey: string, overrides: Record<string, any> = {}): any {
   const dbId = overrides.dbId || "1"
   const entry: any = {
     id: `feat_${dbId}`,
@@ -80,6 +80,7 @@ function addLayerEntry(phaseKey: string, overrides: Record<string, any> = {}): v
     },
   }
   useLayerStore().addFeature(phaseKey as any, entry)
+  return entry
 }
 
 beforeEach(async () => {
@@ -183,7 +184,7 @@ describe("onVertexDragEnd", () => {
 
 describe("onEditEnd", () => {
   it("updates point geometry coordinates", () => {
-    const entry = { id: "feat_1", data: { lat: 0, lng: 0 } }
+    const entry = addLayerEntry("areas", { dbId: "pt1", data: { lat: 0, lng: 0 } })
     mockGetActiveEditEntry.mockReturnValue(entry)
     mod.registerGeomanEvents()
     const handler = getHandler("gm:editend")
@@ -195,7 +196,7 @@ describe("onEditEnd", () => {
   })
 
   it("updates line geometry coordinates", () => {
-    const entry = { id: "feat_1", data: { coordinates: [] } }
+    const entry = addLayerEntry("areas", { dbId: "ln1", data: { coordinates: [] } })
     mockGetActiveEditEntry.mockReturnValue(entry)
     mod.registerGeomanEvents()
     const handler = getHandler("gm:editend")
@@ -230,7 +231,7 @@ describe("onEditEnd", () => {
       featuresSource: { setData: vi.fn() } as any,
     })
 
-    const entry = { id: "feat_1", data: { coordinates: [] } }
+    const entry = addLayerEntry("areas", { dbId: "snap1", data: { coordinates: [] } })
     mockGetActiveEditEntry.mockReturnValue(entry)
     mod.registerGeomanEvents()
     const handler = getHandler("gm:editend")

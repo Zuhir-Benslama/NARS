@@ -230,7 +230,7 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
 
         await using var db = _fixture.CreateDbContext();
         var tokenCount = await db.RefreshTokens.AsNoTracking().CountAsync(rt => rt.UserId == user.Id && !rt.Revoked);
-        Assert.NotEqual(0, tokenCount);
+        Assert.Equal(1, tokenCount);
 
         var claims = new List<Claim> { new(ClaimNames.UserId, user.Id.ToString()) };
         var httpContext = CreateHttpContext(claims);
@@ -242,7 +242,7 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
         Assert.Equal(200, okResult.StatusCode);
 
         var revokedCount = await db.RefreshTokens.AsNoTracking().CountAsync(rt => rt.UserId == user.Id && rt.Revoked);
-        Assert.NotEqual(0, revokedCount);
+        Assert.Equal(1, revokedCount);
     }
 
     [Fact]

@@ -36,7 +36,7 @@ describe("useAppStore", () => {
     })
     expect(appStore.isAuthenticated).toBe(true)
     expect(appStore.isAdminUser).toBe(false)
-    expect(appStore.municipalityName).toBe("Test Commune")
+    expect(appStore.communeName).toBe("Test Commune")
   })
 
   it("detects admin users", () => {

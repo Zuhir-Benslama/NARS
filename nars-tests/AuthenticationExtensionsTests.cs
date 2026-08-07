@@ -157,10 +157,10 @@ public class AuthenticationExtensionsTests
         Assert.Equal(userId.ToString(), principal.FindFirstValue(ClaimNames.UserId));
         Assert.Equal("3", principal.FindFirstValue(ClaimNames.CommuneId));
 
-        // ValidateToken uses the default handler with MapInboundClaims=true, so
-        // standard claims ("role", "name", "email") are remapped to URI types
-        // here — unlike the auth middleware, which opts out via MapInboundClaims=false.
-        Assert.Equal(UserRoles.CommuneUser, principal.FindFirstValue(ClaimTypes.Role));
+        // ValidateToken uses MapInboundClaims=false (matching the JwtBearer pipeline
+        // in AuthenticationExtensions), so claim types are kept verbatim.
+        Assert.Equal(UserRoles.CommuneUser, principal.FindFirstValue(ClaimNames.Role));
+        Assert.Null(principal.FindFirstValue(ClaimTypes.Role));
     }
 
     [Fact]

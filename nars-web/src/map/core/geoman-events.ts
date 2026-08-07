@@ -34,12 +34,12 @@ import type { MapMouseEvent as MapLibreMapMouseEvent } from "maplibre-gl"
 
 function onVertexDragStart(e: GeomanMarkerDragEvent): void {
   setEditDragActive(true)
-  useEditStore().draggedVertexIndex = e?.markerIndex ?? e?.vertexIndex ?? null
+  useEditStore().setDraggedVertexIndex(e?.markerIndex ?? e?.vertexIndex ?? null)
 }
 
 function onVertexDragEnd(): void {
   setEditDragActive(false)
-  useEditStore().draggedVertexIndex = null
+  useEditStore().setDraggedVertexIndex(null)
 }
 
 function onDblClick(e: MapLibreMapMouseEvent): void {
@@ -92,11 +92,11 @@ function onEditEnd(e: GeomanEditEvent): void {
   if (!geometry) return
 
   const featuresStore = useFeaturesStore()
+  const layerStore = useLayerStore()
 
   if (geometry.type === "Point") {
     const c = geometry.coordinates as [number, number]
-    ;(layerEntry.data as { lat: number; lng: number }).lat = c[1]
-    ;(layerEntry.data as { lat: number; lng: number }).lng = c[0]
+    layerStore.updateFeatureData(layerEntry.dbId, { lat: c[1], lng: c[0] })
   } else if (
     geometry.type === "LineString" ||
     geometry.type === "MultiLineString" ||
@@ -132,12 +132,12 @@ function onEditEnd(e: GeomanEditEvent): void {
       }
     }
 
-    layerEntry.data.coordinates = newCoords
+    layerStore.updateFeatureData(layerEntry.dbId, { coordinates: newCoords })
     featuresStore.update(layerEntry.id, { geometry })
   } else if (geometry.type === "MultiPolygon") {
     const coords = geometry.coordinates[0][0] as [number, number][]
     const newCoords = coords.map((c) => ({ lat: c[1], lng: c[0] }))
-    layerEntry.data.coordinates = newCoords
+    layerStore.updateFeatureData(layerEntry.dbId, { coordinates: newCoords })
     featuresStore.update(layerEntry.id, { geometry })
   }
 }

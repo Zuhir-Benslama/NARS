@@ -84,6 +84,7 @@ public class AdminController(
     private async Task<IActionResult> NationalOverview(int skip, int take, CancellationToken cancellationToken)
     {
         take = Math.Clamp(take, 1, 500);
+        skip = Math.Max(skip, 0);
         var (wilayas, total) = await overviewService.GetNationalOverviewAsync(skip, take, cancellationToken);
         return Ok(new { level = "national", wilayas, total, skip, take });
     }

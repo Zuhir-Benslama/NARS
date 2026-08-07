@@ -5,6 +5,7 @@
 import { apiFetch } from "../../api"
 import { getCtx } from "../core/state"
 import { useFeaturesStore } from "../../stores/featuresStore"
+import { useLayerStore } from "../../stores/layerStore"
 import {
   computeCircleRing,
   computeCircleRadius,
@@ -77,26 +78,28 @@ async function readGeomanGeometry(entry: LayerEntry): Promise<boolean> {
       }
     }
 
-    const d = entry.data as { lat?: number; lng?: number; radius?: number; coordinates?: LatLng[] }
+    const patch: { lat?: number; lng?: number; radius?: number; coordinates?: LatLng[] } = {}
 
     if (geometry.type === "Point") {
       const c = geometry.coordinates as [number, number]
-      d.lat = c[1]
-      d.lng = c[0]
+      patch.lat = c[1]
+      patch.lng = c[0]
     } else if (geometry.type === "Polygon") {
       const coords = (geometry.coordinates as [number, number][][])[0]
-      d.coordinates = coords.map((c) => ({ lat: c[1], lng: c[0] }))
+      patch.coordinates = coords.map((c) => ({ lat: c[1], lng: c[0] }))
       if (entry.type === "circle" && coords.length >= 3) {
         const { lat, lng } = computeCircleCenter(coords)
-        d.lat = lat
-        d.lng = lng
-        d.radius = computeCircleRadius(d.lat, d.lng, coords)
+        patch.lat = lat
+        patch.lng = lng
+        patch.radius = computeCircleRadius(lat, lng, coords)
       }
     } else {
       // LineString
       const coords = geometry.coordinates as [number, number][]
-      d.coordinates = coords.map((c) => ({ lat: c[1], lng: c[0] }))
+      patch.coordinates = coords.map((c) => ({ lat: c[1], lng: c[0] }))
     }
+
+    useLayerStore().updateFeature(entry.data.type, entry.dbId, patch)
   } catch (err) {
     debugError("Failed to read Geoman geometry:", err)
   }
@@ -209,16 +212,17 @@ export async function cancelEditMode(): Promise<void> {
 
   const snapshot = getActiveEditCoordsSnapshot()
   if (snapshot && snapshot.length > 0) {
-    const d = entry.data as { lat?: number; lng?: number; coordinates?: LatLng[] }
     if (entry.type === "marker") {
       // Point features are stored as lat/lng; drag-end overwrote them, so
       // restore the original position (and drop the coordinates array that
       // the generic cancel path used to leave behind on markers).
-      d.lat = snapshot[0].lat
-      d.lng = snapshot[0].lng
-      delete d.coordinates
+      useLayerStore().updateFeature(entry.data.type, entry.dbId, {
+        lat: snapshot[0].lat,
+        lng: snapshot[0].lng,
+      })
+      delete entry.data.coordinates
     } else {
-      d.coordinates = snapshot
+      useLayerStore().updateFeature(entry.data.type, entry.dbId, { coordinates: snapshot })
     }
     updateFeatureGeometry(entry)
   }

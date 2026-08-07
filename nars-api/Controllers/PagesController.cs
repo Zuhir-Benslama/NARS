@@ -29,7 +29,6 @@ public class PagesController(
     ILogger<PagesController> logger,
     IRefreshTokenService refreshService,
     IOptions<CacheOptions> cacheOptions,
-    IDateTimeProvider timeProvider,
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     // GET / — redirect to map if authenticated, otherwise to login
@@ -106,7 +105,9 @@ public class PagesController(
         return (await cache.GetOrCreateAsync(cacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(cacheOptions.Value.PageTemplateDurationHours);
-            return await System.IO.File.ReadAllTextAsync(path, cancellationToken);
+            // Do not pass the request's token: a disconnect during the first load
+            // must not abort the read and defeat caching for all later requests.
+            return await System.IO.File.ReadAllTextAsync(path, CancellationToken.None);
         })) ?? string.Empty;
     }
 
@@ -192,24 +193,26 @@ public class PagesController(
 
         try
         {
-            var result = await refreshService.RotateRefreshTokenAsync(refreshToken, cancellationToken);
+            // Read-only page loads mint an access token WITHOUT rotating the
+            // one-time-use refresh token, so concurrent tabs (or double-fetch
+            // from /) never revoke it for each other and bounce to /login.
+            var result = await refreshService.MintAccessTokenAsync(refreshToken, cancellationToken);
             if (!result.Success)
             {
                 logger.LogWarning("[Pages] Refresh failed: {Detail}", result.Detail);
                 return false;
             }
 
-            if (result.RefreshExpiry is null || result.NewAccessToken is null || result.NewRawToken is null)
+            if (result.NewAccessToken is null)
             {
-                logger.LogWarning("[Pages] Refresh succeeded but token data is missing.");
+                logger.LogWarning("[Pages] Refresh succeeded but access token is missing.");
                 return false;
             }
 
-            var maxAge = result.RefreshExpiry.Value - timeProvider.UtcNow;
-            logger.LogDebug("[Pages] Silent refresh SUCCESS. Issuing new cookies for {Username}", result.Username);
-            AppendAuthCookies(result.NewAccessToken, result.NewRawToken, jwt.AccessTokenExpiresIn, maxAge);
+            logger.LogDebug("[Pages] Silent refresh SUCCESS. Issuing new access cookie for {Username}", result.Username);
+            Response.Cookies.Append("access_token", result.NewAccessToken, MakeCookieOptions(jwt.AccessTokenExpiresIn));
 
-            var principal = result.NewAccessToken is not null ? jwt.ValidateToken(result.NewAccessToken) : null;
+            var principal = jwt.ValidateToken(result.NewAccessToken);
             if (principal is not null)
             {
                 await HttpContext.SignInAsync("Pages", principal);

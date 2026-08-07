@@ -43,21 +43,33 @@ public class UsersController(IUserProfileService userProfile, ILogger<UsersContr
             }
         }
 
-        // Validate email uniqueness if changed
-        if (!string.IsNullOrWhiteSpace(body.Email) && body.Email != user.Email)
+        // Validate email uniqueness if changed (store normalized lowercase, matching creation)
+        if (!string.IsNullOrWhiteSpace(body.Email))
         {
-            if (await userProfile.IsEmailTakenAsync(body.Email, cancellationToken))
+            var normalizedEmail = body.Email.Trim().ToLowerInvariant();
+            if (normalizedEmail != user.Email)
             {
-                return Problem(detail: "Email already exists.", statusCode: 409);
-            }
+                if (await userProfile.IsEmailTakenAsync(normalizedEmail, cancellationToken))
+                {
+                    return Problem(detail: "Email already exists.", statusCode: 409);
+                }
 
-            user.Email = body.Email;
+                user.Email = normalizedEmail;
+            }
         }
 
         // Only update password when explicitly provided and valid.
         // Never hash an empty string — that would lock the user out.
         if (!string.IsNullOrEmpty(body.Password))
         {
+            // Require the current password so a stolen session cookie alone
+            // cannot change credentials (defense against account takeover).
+            if (string.IsNullOrEmpty(body.CurrentPassword)
+                || !BCrypt.Net.BCrypt.Verify(body.CurrentPassword, user.PasswordHash))
+            {
+                return Problem(detail: "Current password is incorrect.", statusCode: 403);
+            }
+
             var pwdErr = PasswordValidator.Validate(body.Password);
             if (pwdErr is not null)
             {

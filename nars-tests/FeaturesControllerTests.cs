@@ -141,6 +141,7 @@ public class FeaturesControllerTests
 
         var created = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, created.StatusCode);
+        Assert.Equal(1, await db.HouseEntrances.CountAsync());
     }
 
     [Fact]
@@ -231,6 +232,8 @@ public class FeaturesControllerTests
         var result = await ctrl.ClearFeatures(new ClearFeaturesRequest(Confirm: true));
         var ok = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(200, ok.StatusCode);
+        featureServiceMock.Verify(
+            s => s.ClearAllFeaturesAsync(UserId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     // ── POST /api/update/{id} ─────────────────────────────────────────────
@@ -323,6 +326,10 @@ public class FeaturesControllerTests
 
         var result = await ctrl.DeleteFeature(fid);
         Assert.IsType<NoContentResult>(result);
+        featureServiceMock.Verify(
+            s => s.GetFeatureTypeAsync(fid, It.IsAny<CancellationToken>()), Times.Once);
+        featureServiceMock.Verify(
+            s => s.DeleteFeatureAsync(fid, UserId, FeatureTypes.Area, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

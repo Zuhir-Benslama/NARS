@@ -106,10 +106,15 @@ public partial class AuthController
                 : Problem(detail: scopeResult.Error, statusCode: 400);
         }
 
-        // 5. Validate and create user (uniqueness, password strength, entity creation).
+        // 5. Resolve commune_id: field_workers inherit the creator's commune.
+        var communeId = body.Role == UserRoles.FieldWorker
+            ? admin.CommuneId
+            : body.CommuneId;
+
+        // 6. Validate and create user (uniqueness, password strength, entity creation).
         var creationResult = await userCreationService.ValidateAndCreateUserAsync(
             body.Name, body.Email, body.Phone, body.Username, body.Password,
-            body.Role, body.CommuneId, body.DairaId, body.WilayaId,
+            body.Role, communeId, body.DairaId, body.WilayaId,
             cancellationToken);
         if (!creationResult.IsSuccess)
         {
@@ -119,7 +124,7 @@ public partial class AuthController
 
         var newUser = creationResult.User!;
 
-        // 6. Persist (catch DB-level unique constraint races).
+        // 7. Persist (catch DB-level unique constraint races).
         try
         {
             await userCreationService.SaveUserAsync(newUser, cancellationToken);

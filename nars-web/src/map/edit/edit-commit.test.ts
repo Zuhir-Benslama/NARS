@@ -68,7 +68,9 @@ function markerEntry(overrides: Partial<LayerEntry> = {}): LayerEntry {
 
 describe("cancelEditMode", () => {
   it("restores lat/lng for marker features", async () => {
+    const { useLayerStore } = await import("../../stores/layerStore")
     const entry = markerEntry()
+    useLayerStore().addFeature("houseEntrances", entry)
     mockGetActiveEditEntry.mockReturnValue(entry)
     mockGetActiveEditCoordsSnapshot.mockReturnValue([{ lat: 36.0, lng: 127.0 }])
     const featuresStoreUpdate = vi.spyOn(useFeaturesStore(), "update")
@@ -86,6 +88,7 @@ describe("cancelEditMode", () => {
   })
 
   it("restores coordinates for line/polygon features", async () => {
+    const { useLayerStore } = await import("../../stores/layerStore")
     const entry = {
       id: "feat_2",
       dbId: "db-2",
@@ -102,6 +105,7 @@ describe("cancelEditMode", () => {
         ],
       },
     } as unknown as LayerEntry
+    useLayerStore().addFeature("roads", entry as never)
     mockGetActiveEditEntry.mockReturnValue(entry)
     mockGetActiveEditCoordsSnapshot.mockReturnValue([
       { lat: 36.0, lng: 127.0 },

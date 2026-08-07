@@ -58,7 +58,7 @@ export function disableEditMode(): void {
   store.setActiveEditEntry(null)
   store.setActiveEditCoordsSnapshot(null)
   setSnapExclude(null)
-  useSelectionStore().selectFeature(null)
+  useSelectionStore().setSelectedFeatureDbId(null)
   updateSelectionHighlight(null)
   enableCrosshair()
   reEnableSnapping()

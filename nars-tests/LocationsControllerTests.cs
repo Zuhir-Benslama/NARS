@@ -239,7 +239,11 @@ public class LocationsControllerTests
 
             var result = await ctrl.GetCommuneBoundary(1001);
 
-            Assert.IsType<OkObjectResult>(result);
+            var ok = Assert.IsType<OkObjectResult>(result);
+            dynamic payload = ok.Value!;
+            Assert.Equal(1001, (int)payload.communeId);
+            Assert.Equal("Commune X", (string)payload.communeName);
+            Assert.Equal("{\"type\":\"Polygon\"}", (string)payload.geometry);
         }
     }
 

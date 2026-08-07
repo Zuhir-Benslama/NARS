@@ -117,7 +117,14 @@ public class SpatialController(
             return Problem(detail: "This endpoint requires a commune-level account.", statusCode: 400);
         }
 
-        await scatteredService.RefreshAsync(RequiredCurrentUserId, communeId.Value, cancellationToken);
+        var succeeded = await scatteredService.RefreshAsync(RequiredCurrentUserId, communeId.Value, cancellationToken);
+        if (!succeeded)
+        {
+            return Problem(
+                detail: scatteredService.LastError?.Message ?? "Scattered area recomputation failed.",
+                statusCode: StatusCodes.Status500InternalServerError);
+        }
+
         return Ok(new ScatteredRefreshResponse(true, null, "Scattered area recomputed."));
     }
 }

@@ -94,11 +94,6 @@ export const useModalStore = defineStore("modal", {
       this.visible = false
     },
 
-    /** Reset all modal fields to defaults (without closing). */
-    resetFields() {
-      this.$patch(createDefaultModalState())
-    },
-
     setRoadOptions(options: RoadOption[]) {
       this.roadOptions = options
       this.selectedRoadIdx = ""
@@ -160,6 +155,11 @@ export function resetModalBridge(): void {
     _modalResolver = null
   }
   _modalResult = null
+}
+
+/** Reset the modal store state (without touching the promise bridge). */
+export function resetModalStore(): void {
+  useModalStore().$reset()
 }
 
 // ─── LEGACY HELPER FUNCTIONS ───────────────────────────────────────────────────

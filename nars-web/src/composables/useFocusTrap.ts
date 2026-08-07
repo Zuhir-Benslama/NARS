@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted, type Ref } from "vue"
+import { watch, onBeforeUnmount, type Ref } from "vue"
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -48,27 +48,47 @@ export function useFocusTrap(containerRef: Ref<HTMLElement | null>, isActive: ()
     }
   }
 
-  onMounted(() => {
-    if (!isActive()) return
+  function install() {
+    if (observer) return
     previousActiveElement = document.activeElement as HTMLElement | null
     const container = containerRef.value
     if (container) {
-      const focusable = getFocusable(container)
-      if (focusable.length > 0) {
-        focusable[0].focus()
+      // Only move focus in if nothing inside already has it (e.g. a component
+      // that focuses its own primary button on open).
+      if (!container.contains(document.activeElement)) {
+        const focusable = getFocusable(container)
+        if (focusable.length > 0) {
+          focusable[0].focus()
+        }
       }
       observer = new MutationObserver(refocus)
       observer.observe(container, { childList: true, subtree: true })
     }
     window.addEventListener("keydown", onKeydown)
-  })
+  }
 
-  onUnmounted(() => {
+  function teardown() {
+    if (!observer && previousActiveElement === null) return
     window.removeEventListener("keydown", onKeydown)
     observer?.disconnect()
     observer = null
     if (previousActiveElement && previousActiveElement.isConnected) {
       previousActiveElement.focus()
     }
-  })
+    previousActiveElement = null
+  }
+
+  watch(
+    isActive,
+    (active) => {
+      if (active) {
+        install()
+      } else {
+        teardown()
+      }
+    },
+    { flush: "post", immediate: true },
+  )
+
+  onBeforeUnmount(teardown)
 }

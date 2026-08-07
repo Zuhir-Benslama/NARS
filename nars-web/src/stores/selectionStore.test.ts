@@ -12,23 +12,23 @@ describe("selectionStore", () => {
     expect(store.selectedFeatureDbId).toBeNull()
   })
 
-  it("selectFeature sets the db id", () => {
+  it("setSelectedFeatureDbId sets the db id", () => {
     const store = useSelectionStore()
-    store.selectFeature("abc-123")
+    store.setSelectedFeatureDbId("abc-123")
     expect(store.selectedFeatureDbId).toBe("abc-123")
   })
 
-  it("selectFeature with null clears selection", () => {
+  it("setSelectedFeatureDbId with null clears selection", () => {
     const store = useSelectionStore()
-    store.selectFeature("abc-123")
-    store.selectFeature(null)
+    store.setSelectedFeatureDbId("abc-123")
+    store.setSelectedFeatureDbId(null)
     expect(store.selectedFeatureDbId).toBeNull()
   })
 
-  it("selectFeature overwrites previous selection", () => {
+  it("setSelectedFeatureDbId overwrites previous selection", () => {
     const store = useSelectionStore()
-    store.selectFeature("first-id")
-    store.selectFeature("second-id")
+    store.setSelectedFeatureDbId("first-id")
+    store.setSelectedFeatureDbId("second-id")
     expect(store.selectedFeatureDbId).toBe("second-id")
   })
 })

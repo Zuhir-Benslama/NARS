@@ -4,12 +4,16 @@ import type { LayerEntry } from "../types"
 
 const mockApiFetch = vi.fn()
 const mockFeaturesStoreUpdate = vi.fn()
+const mockFeaturesStoreBatchUpdate = vi.fn()
 const mockShowToast = vi.fn()
 const mockDebugError = vi.fn()
 
 vi.mock("../api", () => ({ apiFetch: mockApiFetch }))
 vi.mock("../stores/featuresStore", () => ({
-  useFeaturesStore: () => ({ update: mockFeaturesStoreUpdate }),
+  useFeaturesStore: () => ({
+    update: mockFeaturesStoreUpdate,
+    batchUpdate: mockFeaturesStoreBatchUpdate,
+  }),
 }))
 vi.mock("../lib/toast", () => ({ showToast: mockShowToast }))
 vi.mock("../i18n", () => ({ t: (key: string) => key }))
@@ -101,7 +105,12 @@ describe("setHouseNumbers", () => {
     expect((left.data as { entranceNumber: number }).entranceNumber).toBe(1)
     expect((left.data as { label: string }).label).toBe("1")
     expect((right.data as { entranceNumber: number }).entranceNumber).toBe(2)
-    expect(mockFeaturesStoreUpdate).toHaveBeenCalledTimes(2)
+    expect(mockFeaturesStoreBatchUpdate).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        { id: "e1", properties: expect.objectContaining({ label: "1" }) },
+        { id: "e2", properties: expect.objectContaining({ label: "2" }) },
+      ]),
+    )
     expect(mockShowToast).toHaveBeenCalledWith("map_assigned_numbers", "success")
   })
 

@@ -24,7 +24,7 @@ public sealed class UserAuthorizationService(AppDbContext db) : IUserAuthorizati
         => ValidateScopeAsync(callerRole, callerCommuneId: null, callerDairaId, callerWilayaId,
             targetRole, communeId, dairaId, wilayaId, requireExactFieldWorkerCommune: false, ct);
 
-    private Task<ScopeValidationResult> ValidateUpdateUserScopeAsync(
+    public Task<ScopeValidationResult> ValidateManagedUserScopeAsync(
         string callerRole, int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
         string targetRole, int? communeId, int? dairaId, int? wilayaId,
         CancellationToken ct = default)
@@ -98,7 +98,7 @@ public sealed class UserAuthorizationService(AppDbContext db) : IUserAuthorizati
     }
 
     public async Task<List<AdminUserSummary>> GetManageableUsersAsync(
-        string callerRole, Guid callerUserId, int? communeId, int? dairaId, int? wilayaId,
+        string callerRole, int? communeId, int? dairaId, int? wilayaId,
         int skip = 0, int take = 100,
         CancellationToken ct = default) => callerRole switch
         {
@@ -171,37 +171,38 @@ public sealed class UserAuthorizationService(AppDbContext db) : IUserAuthorizati
             || body.WilayaId is not null
             || body.DairaId is not null
             || body.CommuneId is not null;
+        if (sensitiveChange && string.IsNullOrEmpty(body.Password))
+        {
+            return UserUpdateResult.Failure(UserUpdateErrorCode.PasswordRequired,
+                "Password is required to change role or geographic scope.");
+        }
+
         if (sensitiveChange)
         {
-            if (string.IsNullOrEmpty(body.Password))
-            {
-                return UserUpdateResult.Failure(UserUpdateErrorCode.PasswordRequired,
-                    "Password is required to change role or geographic scope.");
-            }
-
             var caller = await db.Users.FindAsync([callerUserId], ct);
             if (caller is null || !BCrypt.Net.BCrypt.Verify(body.Password, caller.PasswordHash))
             {
                 return UserUpdateResult.Failure(UserUpdateErrorCode.InvalidPassword, "Password is incorrect.");
             }
+        }
 
-            // Geographic scope: the target's effective role + geography (existing
-            // values merged with the requested changes) must stay within the
-            // caller's scope.
-            var effectiveRole = body.Role ?? target.Role;
-            var effectiveCommuneId = body.CommuneId ?? target.CommuneId;
-            var effectiveDairaId = body.DairaId ?? target.DairaId;
-            var effectiveWilayaId = body.WilayaId ?? target.WilayaId;
+        // Geographic scope: the target's effective role + geography (existing
+        // values merged with the requested changes) must stay within the
+        // caller's scope. Enforced on every update, including profile-only
+        // edits, so a caller cannot tamper with users outside its scope.
+        var effectiveRole = body.Role ?? target.Role;
+        var effectiveCommuneId = body.CommuneId ?? target.CommuneId;
+        var effectiveDairaId = body.DairaId ?? target.DairaId;
+        var effectiveWilayaId = body.WilayaId ?? target.WilayaId;
 
-            var scopeResult = await ValidateUpdateUserScopeAsync(
-                callerRole, callerCommuneId, callerDairaId, callerWilayaId,
-                effectiveRole, effectiveCommuneId, effectiveDairaId, effectiveWilayaId, ct);
-            if (scopeResult.Error is not null)
-            {
-                return scopeResult.IsAuthorizationFailure
-                    ? UserUpdateResult.Failure(UserUpdateErrorCode.Forbidden, scopeResult.Error)
-                    : UserUpdateResult.Failure(UserUpdateErrorCode.Invalid, scopeResult.Error);
-            }
+        var scopeResult = await ValidateManagedUserScopeAsync(
+            callerRole, callerCommuneId, callerDairaId, callerWilayaId,
+            effectiveRole, effectiveCommuneId, effectiveDairaId, effectiveWilayaId, ct);
+        if (scopeResult.Error is not null)
+        {
+            return scopeResult.IsAuthorizationFailure
+                ? UserUpdateResult.Failure(UserUpdateErrorCode.Forbidden, scopeResult.Error)
+                : UserUpdateResult.Failure(UserUpdateErrorCode.Invalid, scopeResult.Error);
         }
 
         // Apply profile fields.

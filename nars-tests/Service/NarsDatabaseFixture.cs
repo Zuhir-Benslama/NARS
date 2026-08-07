@@ -57,6 +57,7 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
     {
         try
         {
+            (_sharedFactory as IDisposable)?.Dispose();
             await _container.StopAsync();
         }
         finally

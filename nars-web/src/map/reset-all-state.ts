@@ -1,7 +1,7 @@
 // ─── RESET ALL MODULE STATE ───────────────────────────────────────────────────
 // Barrel that resets all module-level mutable state. Used in test setup
-// (beforeEach) to ensure clean test isolation, and during HMR to prevent
-// stale state from persisting across hot reloads.
+// (beforeEach) to ensure clean test isolation. Called once for every store
+// covered here so a fresh Pinia instance (or HMR) starts from defaults.
 //
 // Uses dynamic imports internally so these modules are only resolved at
 // call time.  This avoids vitest mocking errors when a test file mocks a
@@ -32,5 +32,13 @@ export async function resetAllState(): Promise<void> {
   await safe("./map-init", "resetMapInit")
   await safe("../../lib/logger", "resetLoggerState")
   await safe("../../stores/modalStore", "resetModalBridge")
+  await safe("../../stores/modalStore", "resetModalStore")
+  await safe("../../stores/confirmStore", "resetConfirmBridge")
+  await safe("../../stores/toastStore", "resetToastStore")
   await safe("../../stores/layerStore", "resetLayerCache")
+  await safe("../../stores/appStore", "resetAppStore")
+  await safe("../../stores/featuresStore", "resetFeaturesStore")
+  await safe("../../stores/selectionStore", "resetSelectionStore")
+  await safe("../../stores/fieldStore", "resetFieldStore")
+  await safe("../../stores/contextMenuStore", "resetContextMenuStore")
 }

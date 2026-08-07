@@ -50,9 +50,12 @@ public class PagesControllerTests
         }
     }
 
-    private sealed class ControllerHarness
+    private sealed class ControllerHarness : IDisposable
     {
-        public DefaultHttpContext HttpContext { get; } = CreateHttpContext();
+        private readonly ServiceProvider _requestServices;
+        private readonly MemoryCache _cache;
+
+        public DefaultHttpContext HttpContext { get; }
         public Mock<IJwtService> Jwt { get; } = new();
         public Mock<IRefreshTokenService> Refresh { get; } = new();
         public Mock<IAntiforgery> Antiforgery { get; } = new();
@@ -60,6 +63,11 @@ public class PagesControllerTests
 
         public ControllerHarness(string? accessCookie = null, string? refreshCookie = null, string? bearer = null)
         {
+            _requestServices = new ServiceCollection()
+                .AddSingleton<IAuthenticationService>(Mock.Of<IAuthenticationService>())
+                .BuildServiceProvider();
+            HttpContext = new DefaultHttpContext { RequestServices = _requestServices };
+
             var cookies = new List<string>();
             if (accessCookie is not null)
             {
@@ -88,15 +96,15 @@ public class PagesControllerTests
 
             var webHost = Mock.Of<IWebHostEnvironment>(e => e.EnvironmentName == Environments.Development);
 
+            _cache = new MemoryCache(new MemoryCacheOptions());
             Controller = new PagesController(
                 Jwt.Object,
                 Antiforgery.Object,
-                new MemoryCache(new MemoryCacheOptions()),
+                _cache,
                 webHost,
                 Mock.Of<ILogger<PagesController>>(),
                 Refresh.Object,
                 Options.Create(new CacheOptions()),
-                Mock.Of<IDateTimeProvider>(),
                 webHost)
             {
                 ControllerContext = new ControllerContext { HttpContext = HttpContext },
@@ -111,21 +119,18 @@ public class PagesControllerTests
             Jwt.Setup(j => j.ValidateToken(token)).Returns(principal);
             return this;
         }
-    }
 
-    private static DefaultHttpContext CreateHttpContext()
-    {
-        var httpContext = new DefaultHttpContext();
-        httpContext.RequestServices = new ServiceCollection()
-            .AddSingleton<IAuthenticationService>(Mock.Of<IAuthenticationService>())
-            .BuildServiceProvider();
-        return httpContext;
+        public void Dispose()
+        {
+            _cache.Dispose();
+            _requestServices.Dispose();
+        }
     }
 
     [Fact]
     public async Task Root_NotAuthenticated_RedirectsToLogin()
     {
-        var h = new ControllerHarness();
+        using var h = new ControllerHarness();
 
         var result = await h.Controller.Root();
 
@@ -136,7 +141,7 @@ public class PagesControllerTests
     [Fact]
     public async Task Root_AuthenticatedViaAccessCookie_RedirectsToMap()
     {
-        var h = new ControllerHarness(accessCookie: "valid-token").WithValidPrincipal("valid-token");
+        using var h = new ControllerHarness(accessCookie: "valid-token").WithValidPrincipal("valid-token");
 
         var result = await h.Controller.Root();
 
@@ -147,7 +152,7 @@ public class PagesControllerTests
     [Fact]
     public async Task LoginPage_ReturnsHtmlWithCsrfTokenInjected()
     {
-        var h = new ControllerHarness();
+        using var h = new ControllerHarness();
         h.HttpContext.Items["csp-nonce"] = "n1";
 
         var result = await h.Controller.LoginPage();
@@ -161,7 +166,7 @@ public class PagesControllerTests
     [Fact]
     public async Task LoginPage_MissingNonce_UsesEmptyNonce()
     {
-        var h = new ControllerHarness();
+        using var h = new ControllerHarness();
 
         var result = await h.Controller.LoginPage();
 
@@ -172,7 +177,7 @@ public class PagesControllerTests
     [Fact]
     public async Task MapPage_NotAuthenticated_RedirectsToLogin()
     {
-        var h = new ControllerHarness();
+        using var h = new ControllerHarness();
 
         var result = await h.Controller.MapPage();
 
@@ -183,7 +188,7 @@ public class PagesControllerTests
     [Fact]
     public async Task MapPage_AuthenticatedViaAccessCookie_ServesPageWithCsrfAndNonce()
     {
-        var h = new ControllerHarness(accessCookie: "valid-token").WithValidPrincipal("valid-token");
+        using var h = new ControllerHarness(accessCookie: "valid-token").WithValidPrincipal("valid-token");
         h.HttpContext.Items["csp-nonce"] = "n2";
 
         var result = await h.Controller.MapPage();
@@ -196,7 +201,7 @@ public class PagesControllerTests
     [Fact]
     public async Task MapPage_ValidBearerHeader_SetsAccessCookieAndServesPage()
     {
-        var h = new ControllerHarness(bearer: "bearer-token").WithValidPrincipal("bearer-token");
+        using var h = new ControllerHarness(bearer: "bearer-token").WithValidPrincipal("bearer-token");
 
         var result = await h.Controller.MapPage();
 
@@ -206,29 +211,29 @@ public class PagesControllerTests
     }
 
     [Fact]
-    public async Task MapPage_ValidRefreshToken_RotatesAndServesPage()
+    public async Task MapPage_ValidRefreshToken_MintsAccessCookieWithoutRotation()
     {
-        var h = new ControllerHarness(refreshCookie: "refresh-token");
+        using var h = new ControllerHarness(refreshCookie: "refresh-token");
         var principal = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "alice")], "jwt"));
         h.Jwt.Setup(j => j.ValidateToken("new-access-token")).Returns(principal);
         h.Refresh
-            .Setup(r => r.RotateRefreshTokenAsync("refresh-token", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new RefreshTokenResult(true, null, "alice", "new-refresh", "new-access-token", FixedUtcNow.AddDays(30)));
+            .Setup(r => r.MintAccessTokenAsync("refresh-token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RefreshTokenResult(true, null, "alice", null, "new-access-token", FixedUtcNow.AddDays(30)));
 
         var result = await h.Controller.MapPage();
 
         Assert.IsType<ContentResult>(result);
         var setCookie = string.Join(";", h.HttpContext.Response.Headers["Set-Cookie"].Where(v => v is not null));
         Assert.Contains("access_token=new-access-token", setCookie);
-        Assert.Contains("refresh_token=new-refresh", setCookie);
+        Assert.DoesNotContain("refresh_token=", setCookie);
     }
 
     [Fact]
     public async Task MapPage_RefreshFails_RedirectsToLogin()
     {
-        var h = new ControllerHarness(refreshCookie: "refresh-token");
+        using var h = new ControllerHarness(refreshCookie: "refresh-token");
         h.Refresh
-            .Setup(r => r.RotateRefreshTokenAsync("refresh-token", It.IsAny<CancellationToken>()))
+            .Setup(r => r.MintAccessTokenAsync("refresh-token", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new RefreshTokenResult(false, "Invalid or expired refresh token.", null, null, null, null));
 
         var result = await h.Controller.MapPage();
@@ -240,22 +245,23 @@ public class PagesControllerTests
     [Fact]
     public async Task MapPage_RefreshReturnsMissingTokens_RedirectsToLogin()
     {
-        var h = new ControllerHarness(refreshCookie: "refresh-token");
+        using var h = new ControllerHarness(refreshCookie: "refresh-token");
         h.Refresh
-            .Setup(r => r.RotateRefreshTokenAsync("refresh-token", It.IsAny<CancellationToken>()))
+            .Setup(r => r.MintAccessTokenAsync("refresh-token", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new RefreshTokenResult(true, null, "alice", null, null, null));
 
         var result = await h.Controller.MapPage();
 
-        Assert.IsType<RedirectResult>(result);
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/login", redirect.Url);
     }
 
     [Fact]
     public async Task MapPage_RefreshThrows_RedirectsToLogin()
     {
-        var h = new ControllerHarness(refreshCookie: "refresh-token");
+        using var h = new ControllerHarness(refreshCookie: "refresh-token");
         h.Refresh
-            .Setup(r => r.RotateRefreshTokenAsync("refresh-token", It.IsAny<CancellationToken>()))
+            .Setup(r => r.MintAccessTokenAsync("refresh-token", It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
         var result = await h.Controller.MapPage();
@@ -266,13 +272,17 @@ public class PagesControllerTests
     [Fact]
     public async Task MapPage_InvalidAccessTokenCookie_FallsBackToRefresh()
     {
-        var h = new ControllerHarness(accessCookie: "expired-token", refreshCookie: "refresh-token");
+        using var h = new ControllerHarness(accessCookie: "expired-token", refreshCookie: "refresh-token");
         h.Refresh
-            .Setup(r => r.RotateRefreshTokenAsync("refresh-token", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new RefreshTokenResult(true, null, "alice", "new-refresh", "new-access-token", FixedUtcNow.AddDays(30)));
+            .Setup(r => r.MintAccessTokenAsync("refresh-token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RefreshTokenResult(true, null, "alice", null, "new-access-token", FixedUtcNow.AddDays(30)));
 
         var result = await h.Controller.MapPage();
 
         Assert.IsType<ContentResult>(result);
+        h.Refresh.Verify(
+            r => r.MintAccessTokenAsync("refresh-token", It.IsAny<CancellationToken>()), Times.Once);
+        var setCookie = string.Join(";", h.HttpContext.Response.Headers["Set-Cookie"].Where(v => v is not null));
+        Assert.Contains("access_token=new-access-token", setCookie);
     }
 }

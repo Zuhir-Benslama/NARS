@@ -13,6 +13,7 @@ import { showToast } from "../lib/toast"
 import { t } from "../i18n"
 import { apiFetch } from "../api"
 import { debugError } from "../utils/debug"
+import type { MaplibreFeature } from "./core/state"
 
 export async function setHouseNumbers(): Promise<void> {
   const featuresStore = useFeaturesStore()
@@ -79,6 +80,10 @@ export async function setHouseNumbers(): Promise<void> {
   let assignedCount = 0
   let failureCount = 0
   const updates: Promise<void>[] = []
+  const mapPatches: Array<{
+    id: string
+    properties: MaplibreFeature["properties"]
+  }> = []
 
   for (const { entry } of withDist) {
     const isLeft = entry.data.side === "left"
@@ -97,9 +102,12 @@ export async function setHouseNumbers(): Promise<void> {
         .then(() => {
           // Apply the local mutation only after the server confirms — the UI
           // must not show numbers the server never stored.
-          entry.data.entranceNumber = number
-          entry.data.label = String(number)
-          featuresStore.update(entry.id, {
+          useLayerStore().updateFeature("houseEntrances", entry.dbId, {
+            entranceNumber: number,
+            label: String(number),
+          })
+          mapPatches.push({
+            id: entry.id,
             properties: { phaseKey: entry.data.type, label: String(number) },
           })
           assignedCount++
@@ -112,6 +120,7 @@ export async function setHouseNumbers(): Promise<void> {
   }
 
   await Promise.all(updates)
+  featuresStore.batchUpdate(mapPatches)
 
   if (failureCount > 0) {
     showToast(

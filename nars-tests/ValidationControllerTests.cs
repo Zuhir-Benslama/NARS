@@ -168,17 +168,6 @@ public class ValidationControllerTests
     {
         using var db = CreateDb();
 
-        db.Roads.Add(new Road
-        {
-            Id = Guid.NewGuid(),
-            UserId = UserId,
-            Layer = FeatureTypes.RoadLayers.Street,
-            Data = "{}",
-            Label = "r",
-            UpdatedAt = FixedUtcNow
-        });
-        await db.SaveChangesAsync();
-
         var validationMock = new Mock<IValidationService>();
         validationMock.Setup(v => v.CountUserRoadsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
@@ -244,16 +233,6 @@ public class ValidationControllerTests
     public async Task ValidateDistrict_Overlap_ReturnsInvalid()
     {
         using var db = CreateDb();
-        db.Districts.Add(new District
-        {
-            Id = Guid.NewGuid(),
-            UserId = UserId,
-            Layer = "residential",
-            Data = "{}",
-            Label = "d",
-            UpdatedAt = FixedUtcNow
-        });
-        await db.SaveChangesAsync();
 
         var validationMock = new Mock<IValidationService>();
         validationMock.Setup(v => v.CountUserDistrictsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))

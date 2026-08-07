@@ -18,7 +18,6 @@ export interface FeatureCounts {
 export interface AppStoreState {
   currentPhase: number
   user: UserInfo | null
-  municipalityName: string
   loadError: boolean
   isLoading: boolean
   referenceRoadDbId: string | null

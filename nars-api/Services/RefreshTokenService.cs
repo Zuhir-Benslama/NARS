@@ -45,6 +45,16 @@ public class RefreshTokenService(
             return new RefreshTokenResult(false, "User no longer exists.", null, null, null, null);
         }
 
+        // A locked-out account must not be able to refresh its session. Reject
+        // rotation and revoke the token so a locked user cannot retry with it.
+        if (user.LockedUntil.HasValue && user.LockedUntil.Value > timeProvider.UtcNow)
+        {
+            stored.Revoked = true;
+            await db.SaveChangesAsync(cancellationToken);
+            await tx.CommitAsync(cancellationToken);
+            return new RefreshTokenResult(false, "Account is temporarily locked.", null, null, null, null);
+        }
+
         stored.Revoked = true;
         var (newRaw, newHash) = jwt.CreateRefreshToken();
         var refreshDays = jwtOptions.Value.RefreshExpiresInDays;
@@ -64,6 +74,44 @@ public class RefreshTokenService(
             communeId: user.CommuneId, role: user.Role, dairaId: user.DairaId, wilayaId: user.WilayaId);
 
         return new RefreshTokenResult(true, null, user.Username, newRaw, newAccessToken, refreshExpiry);
+    }
+
+    public async Task<RefreshTokenResult> MintAccessTokenAsync(string? rawRefreshToken, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(rawRefreshToken))
+        {
+            return new RefreshTokenResult(false, "No refresh token.", null, null, null, null);
+        }
+
+        var hash = Convert.ToBase64String(
+            System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(rawRefreshToken)));
+
+        // Read-only: no rotation, no row lock. Concurrent page loads may all
+        // validate the same token without one revoking it for the others.
+        var stored = await db.RefreshTokens
+            .FirstOrDefaultAsync(rt => rt.TokenHash == hash && !rt.Revoked && rt.ExpiresAt > timeProvider.UtcNow, cancellationToken);
+
+        if (stored is null)
+        {
+            return new RefreshTokenResult(false, "Invalid or expired refresh token.", null, null, null, null);
+        }
+
+        var user = await db.Users.FindAsync([stored.UserId], cancellationToken);
+        if (user is null)
+        {
+            return new RefreshTokenResult(false, "User no longer exists.", null, null, null, null);
+        }
+
+        if (user.LockedUntil.HasValue && user.LockedUntil.Value > timeProvider.UtcNow)
+        {
+            return new RefreshTokenResult(false, "Account is temporarily locked.", null, null, null, null);
+        }
+
+        var newAccessToken = jwt.CreateToken(user.Id, user.Username, user.Name, user.Email,
+            communeId: user.CommuneId, role: user.Role, dairaId: user.DairaId, wilayaId: user.WilayaId);
+
+        return new RefreshTokenResult(true, null, user.Username, null, newAccessToken, stored.ExpiresAt);
     }
 
     public virtual async Task RevokeAllUserTokensAsync(Guid userId, CancellationToken cancellationToken = default) => await db.RefreshTokens

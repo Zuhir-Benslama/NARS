@@ -29,8 +29,9 @@ public class ScatteredAreaServiceTests
 
         var service = CreateService(dbFactory: factory.Object);
 
-        await service.RefreshAsync(Guid.NewGuid(), 1);
+        var success = await service.RefreshAsync(Guid.NewGuid(), 1);
 
+        Assert.False(success);
         Assert.NotNull(service.LastError);
         Assert.Equal(FixedUtcNowOffset, service.LastError!.Value.Timestamp);
         Assert.NotEmpty(service.LastError!.Value.Message);
@@ -47,13 +48,15 @@ public class ScatteredAreaServiceTests
         var service = CreateService(dbFactory: factory.Object);
 
         // First call fails and sets LastError.
-        await service.RefreshAsync(Guid.NewGuid(), 1);
+        var firstSuccess = await service.RefreshAsync(Guid.NewGuid(), 1);
+        Assert.False(firstSuccess);
         Assert.NotNull(service.LastError);
         var firstMessage = service.LastError!.Value.Message;
 
         // Second call fails again — LastError must reflect the LATEST failure,
         // not a stale value captured by the first call.
-        await service.RefreshAsync(Guid.NewGuid(), 2);
+        var secondSuccess = await service.RefreshAsync(Guid.NewGuid(), 2);
+        Assert.False(secondSuccess);
         Assert.NotNull(service.LastError);
         Assert.Equal("Simulated database failure #2", service.LastError!.Value.Message);
         Assert.NotEqual(firstMessage, service.LastError!.Value.Message);
@@ -72,6 +75,8 @@ public class ScatteredAreaServiceTests
             () => service.RefreshAsync(Guid.NewGuid(), 1, new CancellationToken(true)));
 
         Assert.Null(service.LastError);
+        factory.Verify(f => f.CreateDbContextAsync(
+            It.Is<CancellationToken>(t => t.IsCancellationRequested)), Times.Once);
     }
 
     [Fact]
@@ -88,7 +93,6 @@ public class ScatteredAreaServiceTests
         var writers = Enumerable.Range(0, 50)
             .Select(_ => Task.Run(() => service.RefreshAsync(Guid.NewGuid(), 1)))
             .ToArray();
-
         var readErrors = new List<Exception>();
         var readValues = new List<string?>();
         var reads = Enumerable.Range(0, 50).Select(async _ =>
@@ -111,6 +115,7 @@ public class ScatteredAreaServiceTests
         await Task.WhenAll(reads);
 
         Assert.Empty(readErrors);
+        Assert.All(writers, w => Assert.False(w.Result));
         Assert.All(readValues, v =>
             Assert.True(v is null || v == "Simulated database failure",
                 $"Observed inconsistent LastError value: '{v}'"));

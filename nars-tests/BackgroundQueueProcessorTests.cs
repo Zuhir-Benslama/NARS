@@ -80,15 +80,31 @@ public class BackgroundQueueProcessorTests
         // Start and verify processor is running.
         await processor.StartAsync(CancellationToken.None);
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        await queue.QueueBackgroundWorkItemAsync((_, _) =>
+        var allowCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var workItemFinished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await queue.QueueBackgroundWorkItemAsync(async (_, _) =>
         {
             started.SetResult();
-            return Task.CompletedTask;
+            try
+            {
+                await allowCompletion.Task;
+            }
+            finally
+            {
+                workItemFinished.SetResult();
+            }
         });
         await started.Task.WaitAsync(TestTimeout);
 
-        // Stop — should not hang.
-        await processor.StopAsync(CancellationToken.None);
+        // Stop while the in-flight item is still running — StopAsync must wait for
+        // it within the grace period rather than aborting it immediately.
+        var stopTask = processor.StopAsync(CancellationToken.None);
+        await Task.Yield();
+        Assert.False(stopTask.IsCompleted, "StopAsync must wait for the in-flight work item");
+
+        allowCompletion.SetResult();
+        await workItemFinished.Task.WaitAsync(TestTimeout);
+        await stopTask.WaitAsync(TestTimeout);
     }
 
     [Fact]

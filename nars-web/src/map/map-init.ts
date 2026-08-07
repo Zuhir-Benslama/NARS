@@ -126,10 +126,14 @@ export async function initMap(): Promise<void> {
 
   _setBaseLayer = (key: string) => switchBaseLayer(key, geomanOptions)
 
+  let loadTimer: ReturnType<typeof setTimeout> | undefined
   await new Promise<void>((resolve) => {
-    const onLoad = () => resolve()
+    const onLoad = () => {
+      clearTimeout(loadTimer)
+      resolve()
+    }
     ctx.map.once("load", onLoad)
-    setTimeout(() => {
+    loadTimer = setTimeout(() => {
       ctx.map.off("load", onLoad)
       debugWarn("[MAP] Map load event timed out after 15 s")
       resolve()
@@ -195,18 +199,30 @@ async function switchBaseLayer(
 
   try {
     const map = ctx.map
+    let styleResolve!: () => void
+    let styleTimeoutId: ReturnType<typeof setTimeout> | undefined
+    const styleListener = () => {
+      clearTimeout(styleTimeoutId)
+      styleResolve()
+    }
     const styleLoaded = new Promise<void>((resolve) => {
-      map.once("style.load", () => resolve())
+      styleResolve = resolve
     })
-    const styleTimeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Style load timeout")), MAP_CONFIG.styleLoadTimeout),
-    )
+    const styleTimeout = new Promise<never>((_, reject) => {
+      styleTimeoutId = setTimeout(
+        () => reject(new Error("Style load timeout")),
+        MAP_CONFIG.styleLoadTimeout,
+      )
+    })
 
+    map.once("style.load", styleListener)
     map.setStyle(next)
     try {
       await Promise.race([styleLoaded, styleTimeout])
     } catch (err) {
       debugWarn("[MAP] Style load failed:", err)
+    } finally {
+      map.off("style.load", styleListener)
     }
 
     initSources()

@@ -259,4 +259,36 @@ describe("apiFetch", () => {
       vi.useRealTimers()
     }
   })
+
+  it("does not retry POST by default", async () => {
+    vi.useFakeTimers()
+    const mockFetch = vi.fn(() => Promise.reject(new TypeError("Failed to fetch")))
+    vi.stubGlobal("fetch", mockFetch)
+    try {
+      const promise = apiFetch("/things", { method: "POST", body: "{}" })
+      const assertion = expect(promise).rejects.toMatchObject({ code: "NETWORK_ERROR" })
+      await vi.advanceTimersByTimeAsync(15_000)
+
+      await assertion
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("retries a query-style POST when the caller opts in via skipRetry: false", async () => {
+    vi.useFakeTimers()
+    const mockFetch = vi.fn(() => Promise.reject(new TypeError("Failed to fetch")))
+    vi.stubGlobal("fetch", mockFetch)
+    try {
+      const promise = apiFetch("/validate/road", { method: "POST", body: "{}", skipRetry: false })
+      const assertion = expect(promise).rejects.toMatchObject({ code: "NETWORK_ERROR" })
+      await vi.advanceTimersByTimeAsync(15_000)
+
+      await assertion
+      expect(mockFetch).toHaveBeenCalledTimes(4)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

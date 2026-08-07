@@ -20,6 +20,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgis
     app.kubernetes.io/component: database
+    app.kubernetes.io/version: "latest"
 spec:
   replicas: 1
   strategy:

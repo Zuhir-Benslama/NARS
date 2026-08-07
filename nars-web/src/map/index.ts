@@ -2,7 +2,7 @@
 
 import { applyInitialLang } from "../i18n"
 import { getCtx } from "./core/state"
-import { initRotationControls } from "./rotation"
+import { initRotationControls, destroyRotationControls } from "./rotation"
 import { registerDrawEvents, destroyDrawEvents } from "./draw/draw-events"
 import { registerGeomanEvents, unregisterGeomanEvents } from "./core/geoman-events"
 import { disposeGeoman, initMap as initMapInstance } from "./map-init"
@@ -36,6 +36,7 @@ export async function initMap(): Promise<void> {
 
 export async function destroyMap(): Promise<void> {
   const { map } = getCtx()
+  destroyRotationControls()
   destroyDrawEvents()
   unregisterGeomanEvents()
   unregisterFieldWorkerClick()

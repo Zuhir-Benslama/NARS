@@ -3,12 +3,14 @@ import { createPinia, setActivePinia } from "pinia"
 import type { FeatureTypeKey, LayerEntry } from "../types/features"
 
 const mockFeaturesStoreAdd = vi.fn()
+const mockFeaturesStoreBatchUpdate = vi.fn()
 const mockToast = vi.fn()
 const mockToApiSaveShape = vi.fn()
 
 vi.mock("../stores/featuresStore", () => ({
   useFeaturesStore: () => ({
     add: mockFeaturesStoreAdd,
+    batchUpdate: mockFeaturesStoreBatchUpdate,
   }),
 }))
 
@@ -54,6 +56,7 @@ function makeEntry(overrides: Partial<LayerEntry> = {}): LayerEntry {
 beforeEach(async () => {
   setActivePinia(createPinia())
   mockFeaturesStoreAdd.mockReset()
+  mockFeaturesStoreBatchUpdate.mockReset()
   mockToast.mockReset()
   mockToApiSaveShape.mockReset()
   mockToApiSaveShape.mockReturnValue({ type: "areas", layer: "areas" })
@@ -228,6 +231,13 @@ describe("undo", () => {
       expect(putCall).toBeTruthy()
       const putBody = JSON.parse(putCall![1]!.body as string)
       expect(putBody.data).toMatchObject({ mainEntranceDbId: "new-main-id" })
+
+      expect(mockFeaturesStoreBatchUpdate).toHaveBeenCalledWith([
+        {
+          id: "sec-1",
+          properties: { mainEntranceDbId: "new-main-id", mainEntranceLabel: "Main Entrance" },
+        },
+      ])
     })
 
     it("repairs roadDbId cross-references after restoring a road", async () => {
@@ -276,6 +286,10 @@ describe("undo", () => {
       expect(putCall).toBeTruthy()
       const putBody = JSON.parse(putCall![1]!.body as string)
       expect(putBody.data).toMatchObject({ roadDbId: "new-road-id" })
+
+      expect(mockFeaturesStoreBatchUpdate).toHaveBeenCalledWith([
+        { id: "ent-1", properties: { roadDbId: "new-road-id" } },
+      ])
     })
 
     it("shows warning toast when a cross-reference repair fails to persist", async () => {

@@ -1,6 +1,7 @@
 import { defineStore } from "pinia"
 import { PHASES } from "../phases"
 import type { GeomanMarkerPointer } from "../map/core/geoman-types"
+import { useSnapStore } from "./snapStore"
 
 type LngLatInput = [number, number] | { lng: number; lat: number }
 type SetLngLatFn = (lngLat: LngLatInput) => void
@@ -8,8 +9,6 @@ type SetLngLatFn = (lngLat: LngLatInput) => void
 export const useDrawStore = defineStore("draw", {
   state: () => ({
     geomanMarkerPointer: null as GeomanMarkerPointer | null,
-    originalGeomanMarkerSetLngLat: null as SetLngLatFn | null,
-    snappingEnabled: true,
     repatchMarkerPointer: null as (() => void) | null,
     drawingPhase: null as (typeof PHASES)[number] | null,
     savingFeature: false,
@@ -21,20 +20,29 @@ export const useDrawStore = defineStore("draw", {
     edgeTimeoutId: null as ReturnType<typeof setTimeout> | null,
   }),
 
+  getters: {
+    // Single source of truth lives in snapStore (M4). drawStore keeps this
+    // getter so existing callers (draw-state.ts) read one consistent flag.
+    snappingEnabled(): boolean {
+      return useSnapStore().snappingEnabled
+    },
+  },
+
   actions: {
     registerGeomanMarker(mp: GeomanMarkerPointer, _marker: unknown, orig: SetLngLatFn): void {
       this.geomanMarkerPointer = mp
-      this.originalGeomanMarkerSetLngLat = orig
+      useSnapStore().setOrigMarkerSetLngLat(orig)
     },
     unpatchGeomanMarker(): void {
-      this.snappingEnabled = false
       const marker = this.geomanMarkerPointer?.marker as Record<string, unknown> | null | undefined
-      if (marker && this.originalGeomanMarkerSetLngLat) {
-        marker.setLngLat = this.originalGeomanMarkerSetLngLat
+      const orig = useSnapStore().origMarkerSetLngLat
+      if (marker && orig) {
+        marker.setLngLat = orig
       }
+      useSnapStore().setOrigMarkerSetLngLat(null)
     },
     setSnappingEnabled(v: boolean): void {
-      this.snappingEnabled = v
+      useSnapStore().setSnappingEnabled(v)
     },
     setRepatchMarkerPointer(fn: () => void): void {
       this.repatchMarkerPointer = fn
@@ -54,6 +62,15 @@ export const useDrawStore = defineStore("draw", {
     incrementModeSwitchToken(): number {
       return ++this.modeSwitchToken
     },
+    setModeSwitchToken(v: number): void {
+      this.modeSwitchToken = v
+    },
+    setEdgePollId(v: ReturnType<typeof setInterval> | null): void {
+      this.edgePollId = v
+    },
+    setEdgeTimeoutId(v: ReturnType<typeof setTimeout> | null): void {
+      this.edgeTimeoutId = v
+    },
     setCleanupDrawWatcher(fn: (() => void) | null): void {
       this.cleanupDrawWatcher = fn
     },
@@ -61,6 +78,7 @@ export const useDrawStore = defineStore("draw", {
       if (this.edgePollId !== null) clearInterval(this.edgePollId)
       if (this.edgeTimeoutId !== null) clearTimeout(this.edgeTimeoutId)
       this.cleanupDrawWatcher?.()
+      useSnapStore().setOrigMarkerSetLngLat(null)
       this.$reset()
     },
   },

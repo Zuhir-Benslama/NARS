@@ -195,7 +195,7 @@ public class SpatialControllerTests
         var uid = Guid.NewGuid();
         var scatteredMock = new Mock<IScatteredAreaService>();
         scatteredMock.Setup(s => s.RefreshAsync(uid, 1, It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync(true);
         var (ctrl, db) = CreateController(userId: uid, scatteredService: scatteredMock.Object);
         using (db)
         {
@@ -204,6 +204,25 @@ public class SpatialControllerTests
             var ok = Assert.IsType<OkObjectResult>(result);
             var resp = Assert.IsType<ScatteredRefreshResponse>(ok.Value);
             Assert.True(resp.Success);
+        }
+    }
+
+    [Fact]
+    public async Task RefreshScattered_FailedRefresh_Returns500()
+    {
+        var uid = Guid.NewGuid();
+        var scatteredMock = new Mock<IScatteredAreaService>();
+        scatteredMock.Setup(s => s.RefreshAsync(uid, 1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        scatteredMock.SetupGet(s => s.LastError)
+            .Returns((FixedUtcNowOffset, "Simulated refresh failure"));
+        var (ctrl, db) = CreateController(userId: uid, scatteredService: scatteredMock.Object);
+        using (db)
+        {
+            var result = await ctrl.RefreshScattered();
+
+            var objResult = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(500, objResult.StatusCode);
         }
     }
 }

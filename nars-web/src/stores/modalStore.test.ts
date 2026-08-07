@@ -104,15 +104,6 @@ describe("modalStore", () => {
       expect(store.visible).toBe(false)
     })
 
-    it("resetFields restores defaults", () => {
-      const store = useModalStore()
-      store.openCreate(0)
-      store.label = "Custom"
-      store.resetFields()
-      expect(store.label).toBe("")
-      expect(store.visible).toBe(false)
-    })
-
     it("setRoadOptions sets options and resets selection", () => {
       const store = useModalStore()
       store.setRoadOptions([{ idx: 0, dbId: "r1", label: "Road 1" }])

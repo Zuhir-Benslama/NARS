@@ -32,11 +32,12 @@ const createMockModalStore = () => ({
   sectorKey: "banking_postal",
   buildingTypeKey: "bank",
   radius: null as number | null,
+  patchFields: vi.fn(),
   close: vi.fn(),
 })
 
 const createMockAppStore = () => ({
-  municipalityName: "Test Municipality",
+  communeName: "Test Municipality",
   user: { commune: { name_fr: "Test Municipality", name_ar: "", id: 1 } },
 })
 

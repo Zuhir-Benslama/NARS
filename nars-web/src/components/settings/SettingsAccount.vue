@@ -93,7 +93,7 @@ async function save() {
   if (!res) return
   if (res.ok) {
     if (appStore.user) {
-      appStore.user = { ...appStore.user, ...body }
+      appStore.setUser({ ...appStore.user, ...body })
     }
     showToast(t("alert_account_updated"), "success")
     form.password = ""

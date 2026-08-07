@@ -110,7 +110,7 @@
         </label>
         <select v-model="modalStore.districtTypeKey" class="modal-input">
           <option v-for="d in DISTRICT_TYPES" :key="d.key" :value="d.key">
-            {{ d.label }}
+            {{ t("featureTypes." + d.key) }}
           </option>
         </select>
       </div>
@@ -123,7 +123,7 @@
         </label>
         <select v-model="modalStore.roadTypeKey" class="modal-input">
           <option v-for="r in ROAD_TYPES" :key="r.key" :value="r.key">
-            {{ r.label }}
+            {{ t("featureTypes." + r.key) }}
           </option>
         </select>
       </div>
@@ -142,7 +142,7 @@
         </label>
         <select v-model="modalStore.spaceTypeKey" class="modal-input">
           <option v-for="s in PUBLIC_SPACE_TYPES" :key="s.key" :value="s.key">
-            {{ s.label }}
+            {{ t("featureTypes." + s.key) }}
           </option>
         </select>
       </div>
@@ -218,9 +218,11 @@ watch(
     _roadSideController?.abort()
     _roadSideController = null
     if (val === "" || val === null) {
-      modalStore.entranceSide = null
-      modalStore.entranceNumber = null
-      modalStore.entranceSideLoading = false
+      modalStore.patchFields({
+        entranceSide: null,
+        entranceNumber: null,
+        entranceSideLoading: false,
+      })
       return
     }
     if (modalStore.isEdit) return
@@ -251,17 +253,18 @@ watch(
 )
 
 // When area type or district type changes → auto-fill the name.
+// The zone type name is localized via t() (featureTypes.*) rather than the
+// English catalog label, so the persisted feature name is not i18n-hostile.
 watch(
   [() => modalStore.areaTypeKey, () => modalStore.districtTypeKey],
   ([areaType, districtType]) => {
     if (areaType === "central_urban") {
-      modalStore.label = appStore.communeName
-    } else if (!modalStore.isEdit && modalStore.label === appStore.municipalityName) {
-      modalStore.label = ""
+      modalStore.patchFields({ label: appStore.communeName })
+    } else if (!modalStore.isEdit && modalStore.label === appStore.communeName) {
+      modalStore.patchFields({ label: "" })
     }
     if (districtType === "trad_activities_zone" || districtType === "industry_zone") {
-      const dtype = DISTRICT_TYPES.find((d: { key: string }) => d.key === districtType)
-      modalStore.label = dtype?.label ?? ""
+      modalStore.patchFields({ label: t("featureTypes." + districtType) })
     }
   },
 )
@@ -270,7 +273,7 @@ watch(
 
 function onSave() {
   const errors = validate()
-  modalStore.errors = errors
+  modalStore.patchFields({ errors })
   if (Object.keys(errors).length > 0) return
   const result = buildModalResult(appStore.communeName)
   modalStore.close(result)

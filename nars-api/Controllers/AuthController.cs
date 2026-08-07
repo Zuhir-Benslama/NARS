@@ -99,8 +99,11 @@ public partial class AuthController(
             await refreshService.RevokeAllUserTokensAsync(userId, cancellationToken);
         }
 
-        Response.Cookies.Delete("access_token");
-        Response.Cookies.Delete("refresh_token");
+        // Match the HttpOnly/Secure/SameSite/Path attributes used when writing the
+        // cookies so the deletion applies to the same cookies regardless of how
+        // cookie attribute matching is implemented by the client.
+        Response.Cookies.Delete("access_token", MakeCookieOptions(TimeSpan.Zero));
+        Response.Cookies.Delete("refresh_token", MakeCookieOptions(TimeSpan.Zero));
         return Ok(ApiResponse.Ok("Logged out successfully"));
     }
 

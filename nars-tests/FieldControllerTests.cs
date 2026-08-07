@@ -204,6 +204,45 @@ public class FieldControllerTests
         Assert.Equal(400, problem.StatusCode);
     }
 
+    [Fact]
+    public async Task SubmitInspection_TypeMismatch_Returns400()
+    {
+        var roadId = Guid.NewGuid();
+        var fieldService = new Mock<IFieldService>();
+        fieldService.Setup(s => s.GetFeatureRegistryTypeAsync(roadId, default))
+            .ReturnsAsync(FeatureTypes.Road);
+        fieldService.Setup(s => s.GetFeatureOwnerAsync(FeatureTypes.Road, roadId, default))
+            .ReturnsAsync((OtherUserId, (int?)1));
+        var ctrl = CreateController(fieldService: fieldService.Object);
+        SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
+
+        var result = await ctrl.SubmitInspection(new FieldInspectRequest(roadId.ToString(), "house_entrance", Json("{}"), "good"));
+
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, problem.StatusCode);
+        fieldService.Verify(s => s.SubmitInspectionAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SubmitInspection_TypeMatch_Returns201()
+    {
+        var roadId = Guid.NewGuid();
+        var fieldService = new Mock<IFieldService>();
+        fieldService.Setup(s => s.GetFeatureRegistryTypeAsync(roadId, default))
+            .ReturnsAsync(FeatureTypes.Road);
+        fieldService.Setup(s => s.GetFeatureOwnerAsync(FeatureTypes.Road, roadId, default))
+            .ReturnsAsync((OtherUserId, (int?)1));
+        fieldService.Setup(s => s.SubmitInspectionAsync(roadId, It.IsAny<Guid>(), FeatureTypes.Road, "good", It.IsAny<string>(), default))
+            .ReturnsAsync(Guid.NewGuid());
+        var ctrl = CreateController(fieldService: fieldService.Object);
+        SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
+
+        var result = await ctrl.SubmitInspection(new FieldInspectRequest(roadId.ToString(), "ROAD", Json("{}"), "good"));
+
+        var created = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(201, created.StatusCode);
+    }
+
     // ─── GET /api/field/inspections/{featureId} ──────────────────────────
 
     [Fact]

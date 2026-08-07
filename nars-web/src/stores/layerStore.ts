@@ -24,8 +24,7 @@ export interface LayerState {
 }
 
 export function resetLayerCache(): void {
-  // Kept as a no-op for backward compatibility — the feature map is now a
-  // plain derived getter and cannot go stale.
+  useLayerStore().$reset()
 }
 
 function createInitialState(): LayerState {
@@ -52,23 +51,24 @@ export const LAYER_KEYS: (keyof LayerState)[] = [
   "namingPanels",
 ]
 
+const isMainEntrance = (e: LayerEntry<HouseEntranceFeatureData>) =>
+  e.data.entranceTypeKey === "main_entrance"
+const isSecondaryEntrance = (e: LayerEntry<HouseEntranceFeatureData>) =>
+  e.data.entranceTypeKey === "secondary_entrance"
+
 export const useLayerStore = defineStore("layer", {
   state: (): LayerState => createInitialState(),
 
   getters: {
-    mainEntrances: (state) =>
-      state.houseEntrances.filter((e) => e.data.entranceTypeKey === "main_entrance"),
-    secondaryEntrances: (state) =>
-      state.houseEntrances.filter((e) => e.data.entranceTypeKey === "secondary_entrance"),
+    mainEntrances: (state) => state.houseEntrances.filter(isMainEntrance),
+    secondaryEntrances: (state) => state.houseEntrances.filter(isSecondaryEntrance),
 
     areaCount: (state) => state.areas.length,
     cityCenterCount: (state) => state.cityCenter.length,
     districtCount: (state) => state.districts.length,
     roadCount: (state) => state.roads.length,
-    mainEntranceCount: (state) =>
-      state.houseEntrances.filter((e) => e.data.entranceTypeKey === "main_entrance").length,
-    secondaryEntranceCount: (state) =>
-      state.houseEntrances.filter((e) => e.data.entranceTypeKey === "secondary_entrance").length,
+    mainEntranceCount: (state) => state.houseEntrances.filter(isMainEntrance).length,
+    secondaryEntranceCount: (state) => state.houseEntrances.filter(isSecondaryEntrance).length,
     publicBuildingCount: (state) => state.publicBuildings.length,
     publicSpaceCount: (state) => state.publicSpaces.length,
     namingPanelCount: (state) => state.namingPanels.length,
@@ -101,6 +101,15 @@ export const useLayerStore = defineStore("layer", {
       const entry = (this[layer] as unknown as LayerEntry[]).find((e) => e.dbId === dbId)
       if (entry) {
         Object.assign(entry.data, data)
+      }
+    },
+
+    // Lookup by dbId across all layers (via _featureMap) and patch the entry's
+    // data. Used by callers that only hold the feature id (e.g. geoman-events).
+    updateFeatureData(dbId: string, data: Partial<FeatureDataByType>) {
+      const found = this._featureMap.get(dbId)
+      if (found) {
+        Object.assign(found.entry.data, data)
       }
     },
 

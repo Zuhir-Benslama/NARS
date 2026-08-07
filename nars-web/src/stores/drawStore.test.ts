@@ -2,12 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { setActivePinia, createPinia } from "pinia"
 
 let useDrawStore: any
+let useSnapStore: any
 
 beforeEach(async () => {
   vi.clearAllMocks()
   setActivePinia(createPinia())
   const mod = await import("./drawStore")
   useDrawStore = mod.useDrawStore as any
+  const snapMod = await import("./snapStore")
+  useSnapStore = snapMod.useSnapStore as any
 })
 
 describe("drawStore", () => {
@@ -15,7 +18,7 @@ describe("drawStore", () => {
     const store = useDrawStore()
     expect(store.snappingEnabled).toBe(true)
     expect(store.geomanMarkerPointer).toBeNull()
-    expect(store.originalGeomanMarkerSetLngLat).toBeNull()
+    expect(useSnapStore().origMarkerSetLngLat).toBeNull()
     expect(store.drawingPhase).toBeNull()
     expect(store.savingFeature).toBe(false)
     expect(store.modeSwitchToken).toBe(0)
@@ -26,7 +29,7 @@ describe("drawStore", () => {
     const orig = vi.fn()
     const marker = { setLngLat: vi.fn() }
     store.registerGeomanMarker({ marker }, null, orig)
-    expect(store.originalGeomanMarkerSetLngLat).toBeDefined()
+    expect(useSnapStore().origMarkerSetLngLat).toBeDefined()
     expect(store.geomanMarkerPointer?.marker?.setLngLat).toBeDefined()
   })
 
@@ -37,14 +40,12 @@ describe("drawStore", () => {
     store.registerGeomanMarker({ marker }, null, orig)
     store.unpatchGeomanMarker()
     expect(marker.setLngLat).toBe(orig)
-    expect(store.snappingEnabled).toBe(false)
   })
 
   it("unpatchGeomanMarker does not throw when marker is null", () => {
     const store = useDrawStore()
     store.registerGeomanMarker(null as any, null, null)
     expect(() => store.unpatchGeomanMarker()).not.toThrow()
-    expect(store.snappingEnabled).toBe(false)
   })
 
   it("setSnappingEnabled updates flag", () => {

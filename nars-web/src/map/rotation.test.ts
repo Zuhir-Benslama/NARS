@@ -21,12 +21,14 @@ vi.mock("../i18n", () => ({
 let resetRotation: () => void
 let setBearing: (deg: number) => void
 let initRotationControls: () => void
+let destroyRotationControls: () => void
 
 async function loadModule() {
   const mod = await import("./rotation")
   resetRotation = mod.resetRotation
   setBearing = mod.setBearing
   initRotationControls = mod.initRotationControls
+  destroyRotationControls = mod.destroyRotationControls
 }
 
 describe("rotation", () => {
@@ -98,6 +100,34 @@ describe("rotation", () => {
       cw.click()
 
       expect(mockEaseTo).toHaveBeenCalledWith(expect.objectContaining({ bearing: 95 }))
+    })
+  })
+
+  describe("destroyRotationControls", () => {
+    it("removes the controls from the map container", () => {
+      const container = document.createElement("div")
+      mockGetContainer.mockReturnValue(container)
+
+      initRotationControls()
+      expect(container.children.length).toBe(1)
+
+      destroyRotationControls()
+      expect(container.children.length).toBe(0)
+    })
+
+    it("is a no-op when no controls were created", () => {
+      expect(() => destroyRotationControls()).not.toThrow()
+    })
+  })
+
+  describe("re-init after teardown", () => {
+    it("does not stack duplicate controls when re-initialized", () => {
+      const container = document.createElement("div")
+      mockGetContainer.mockReturnValue(container)
+
+      initRotationControls()
+      initRotationControls()
+      expect(container.children.length).toBe(1)
     })
   })
 })

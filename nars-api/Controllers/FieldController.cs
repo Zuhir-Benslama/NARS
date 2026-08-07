@@ -205,6 +205,12 @@ public class FieldController(
             return Problem(detail: "Feature not found.", statusCode: 400);
         }
 
+        // The submitted inspection type must match the feature's registered type.
+        if (!string.Equals(registryType, type, StringComparison.OrdinalIgnoreCase))
+        {
+            return Problem(detail: $"Inspection type '{type}' does not match the feature's type '{registryType}'.", statusCode: 400);
+        }
+
         var feature = await fieldService.GetFeatureOwnerAsync(registryType, featureId, ct);
         if (feature is null)
         {

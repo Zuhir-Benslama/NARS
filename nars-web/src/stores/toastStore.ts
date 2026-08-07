@@ -46,3 +46,7 @@ export const useToastStore = defineStore("toast", {
     },
   },
 })
+
+export function resetToastStore(): void {
+  useToastStore().reset()
+}

@@ -7,13 +7,13 @@ import { openEditModal } from "../../stores/modalStore"
 import { PHASES } from "../../phases"
 import { getCtx } from "../core/state"
 import { useFeaturesStore } from "../../stores/featuresStore"
+import { useLayerStore, LAYER_KEYS } from "../../stores/layerStore"
 import { showToast, showConfirm } from "../../lib/toast"
 import type { FeatureTypeKey } from "../../types"
 import { getUserMessageKey } from "../../lib/errors"
 import { t } from "../../i18n"
 import { recordDelete } from "../undo"
 import { enableEditMode } from "../draw/draw-events"
-import { useLayerStore, LAYER_KEYS } from "../../stores/layerStore"
 import type { LayerEntry } from "../../types"
 import { computeCircleRing, closeRing } from "../rendering/geometry"
 import { debugError } from "../../utils/debug"
@@ -22,14 +22,7 @@ import { updateEndpointMarkers } from "../roads/road-directions"
 // ─── LOOKUP ───────────────────────────────────────────────────────────────────
 
 export function findLayerEntryByDbId(dbId: string): LayerEntry | null {
-  const layerStore = useLayerStore()
-  const state = layerStore.$state
-  for (const key of LAYER_KEYS) {
-    const entries = state[key]
-    const entry = entries?.find((e) => e.dbId === dbId)
-    if (entry) return entry
-  }
-  return null
+  return useLayerStore().getFeature(dbId)
 }
 
 // ─── EDIT GEOMETRY ────────────────────────────────────────────────────────────
@@ -43,7 +36,7 @@ export function enableEditGeometry(dbId: string): void {
   }
 
   if (selectionStore.selectedFeatureDbId === null) {
-    selectionStore.selectFeature(dbId)
+    selectionStore.setSelectedFeatureDbId(dbId)
   }
 
   const entry = findLayerEntryByDbId(dbId)
@@ -93,7 +86,7 @@ export async function editFeatureInfo(dbId: string): Promise<void> {
       body: JSON.stringify({ data: { ...entry.data, ...result } }),
     })
 
-    Object.assign(entry.data, result)
+    useLayerStore().updateFeature(entry.data.type, dbId, result)
 
     const featuresStore = useFeaturesStore()
     const d = entry.data as { radius?: number; lat?: number; lng?: number; label: string }

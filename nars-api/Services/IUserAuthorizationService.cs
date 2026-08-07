@@ -14,9 +14,18 @@ public interface IUserAuthorizationService
         string callerRole, int? callerDairaId, int? callerWilayaId,
         string targetRole, int? communeId, int? dairaId, int? wilayaId,
         CancellationToken ct = default);
+    /// <summary>
+    /// Validates that a target user's role + geography lies within the caller's
+    /// management scope. Used for update and delete paths, where the target's
+    /// current (or effective) role/geography must belong to the caller's scope.
+    /// </summary>
+    Task<ScopeValidationResult> ValidateManagedUserScopeAsync(
+        string callerRole, int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
+        string targetRole, int? communeId, int? dairaId, int? wilayaId,
+        CancellationToken ct = default);
     /// <summary>Returns users that the caller has authority to manage.</summary>
     Task<List<AdminUserSummary>> GetManageableUsersAsync(
-        string callerRole, Guid callerUserId, int? communeId, int? dairaId, int? wilayaId,
+        string callerRole, int? communeId, int? dairaId, int? wilayaId,
         int skip = 0, int take = 100,
         CancellationToken ct = default);
     /// <summary>Finds a user by ID.</summary>

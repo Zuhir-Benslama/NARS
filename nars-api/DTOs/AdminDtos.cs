@@ -14,7 +14,7 @@ public record CreateAdminRequest(
     [Required(AllowEmptyStrings = false), EmailAddress][property: JsonRequired][property: JsonPropertyName("email")] string Email,
     [Required(AllowEmptyStrings = false), Phone][property: JsonRequired][property: JsonPropertyName("phone")] string Phone,
     [Required(AllowEmptyStrings = false)][property: JsonRequired][property: JsonPropertyName("username")] string Username,
-    [Required(AllowEmptyStrings = false)][property: JsonRequired][property: JsonPropertyName("password")] string Password,
+    [Required(AllowEmptyStrings = false), MaxLength(128)][property: JsonRequired][property: JsonPropertyName("password")] string Password,
     [Required(AllowEmptyStrings = false)][property: JsonRequired][property: JsonPropertyName("role")] string Role,
     /// <summary>Required when role = commune_user.</summary>
     [property: JsonPropertyName("commune_id")] int? CommuneId,

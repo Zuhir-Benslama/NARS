@@ -5,7 +5,7 @@
 import { apiFetch } from "../../api"
 import { PHASES, getApiLayerToPhase } from "../../phases"
 import { useAppStore } from "../../stores/appStore"
-import { useLayerStore } from "../../stores/layerStore"
+import { useLayerStore, LAYER_KEYS } from "../../stores/layerStore"
 import type { LayerState } from "../../stores/layerStore"
 import { type MaplibreFeature } from "../core/state"
 import { useFeaturesStore } from "../../stores/featuresStore"
@@ -50,7 +50,7 @@ function resolvePhaseKey(feature: DbFeature): FeatureTypeKey | undefined {
 
 function processFeature(
   feature: DbFeature,
-  state: LayerState,
+  layerStore: ReturnType<typeof useLayerStore>,
   maplibreFeatures: MaplibreFeature[],
 ): "ok" | "scattered" {
   try {
@@ -83,7 +83,7 @@ function processFeature(
       data,
       type: getFeatureType(phase.drawType),
     }
-    ;(state[phaseKey] as unknown as LayerEntry[]).push(layerEntry)
+    layerStore.addFeature(phaseKey as keyof LayerState, layerEntry)
 
     const geojsonFeature = buildGeoJsonFeature(feature.id, data, phase)
     if (geojsonFeature) {
@@ -103,7 +103,7 @@ export async function loadFromDatabase(): Promise<void> {
   const featuresStore = useFeaturesStore()
   const appStore = useAppStore()
   debugLog("[LOAD] Starting...")
-  appStore.isLoading = true
+  appStore.setLoading(true)
   try {
     debugLog("[LOAD] Fetching /api/features...")
     const response = await apiFetch("/api/features")
@@ -119,18 +119,15 @@ export async function loadFromDatabase(): Promise<void> {
     }
 
     const layerStore = useLayerStore()
-    const state = layerStore.$state
-    const phaseKeys = Object.keys(state) as (keyof LayerState)[]
-
-    for (const key of phaseKeys) {
-      state[key] = []
+    for (const key of LAYER_KEYS) {
+      layerStore.clearLayer(key)
     }
     featuresStore.clear()
 
     const maplibreFeatures: MaplibreFeature[] = []
 
     for (const feature of features) {
-      const result = processFeature(feature, state, maplibreFeatures)
+      const result = processFeature(feature, layerStore, maplibreFeatures)
       if (result === "scattered") continue
     }
 
@@ -155,8 +152,8 @@ export async function loadFromDatabase(): Promise<void> {
     debugLog("[LOAD] Loading complete")
   } catch (err) {
     debugError("Load error:", err)
-    appStore.loadError = true
+    appStore.setLoadError(true)
   } finally {
-    appStore.isLoading = false
+    appStore.setLoading(false)
   }
 }

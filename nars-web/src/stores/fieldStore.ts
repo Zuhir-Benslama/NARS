@@ -26,3 +26,7 @@ export const useFieldStore = defineStore("field", {
     },
   },
 })
+
+export function resetFieldStore(): void {
+  useFieldStore().$reset()
+}

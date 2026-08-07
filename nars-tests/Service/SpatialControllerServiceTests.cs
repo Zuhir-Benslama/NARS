@@ -111,7 +111,7 @@ public class SpatialControllerServiceTests(NarsDatabaseFixture fixture) : IAsync
     {
         var scatteredMock = new Mock<IScatteredAreaService>(MockBehavior.Strict);
         scatteredMock.Setup(s => s.RefreshAsync(_userId, 1, It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync(true);
 
         var controller = CreateController(scatteredMock.Object);
 
@@ -120,6 +120,23 @@ public class SpatialControllerServiceTests(NarsDatabaseFixture fixture) : IAsync
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<ScatteredRefreshResponse>(ok.Value);
         Assert.True(resp.Success);
+    }
+
+    [Fact]
+    public async Task RefreshScattered_FailedRefresh_Returns500()
+    {
+        var scatteredMock = new Mock<IScatteredAreaService>(MockBehavior.Strict);
+        scatteredMock.Setup(s => s.RefreshAsync(_userId, 1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        scatteredMock.SetupGet(s => s.LastError)
+            .Returns((FixedUtcNowOffset, "Simulated refresh failure"));
+
+        var controller = CreateController(scatteredMock.Object);
+
+        var result = await controller.RefreshScattered();
+
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(500, objResult.StatusCode);
     }
 
     [Fact]

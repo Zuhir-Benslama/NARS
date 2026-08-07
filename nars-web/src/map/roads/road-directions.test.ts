@@ -4,6 +4,7 @@ import type { LayerEntry } from "../../types"
 
 const mockApiFetch = vi.fn()
 const mockFeaturesStoreUpdate = vi.fn()
+const mockFeaturesStoreBatchUpdate = vi.fn()
 const mockShowToast = vi.fn()
 const mockDebugError = vi.fn()
 const mockBuildConnectionGraph = vi.fn()
@@ -18,6 +19,7 @@ vi.mock("../../api", () => ({
 vi.mock("../../stores/featuresStore", () => ({
   useFeaturesStore: () => ({
     update: mockFeaturesStoreUpdate,
+    batchUpdate: mockFeaturesStoreBatchUpdate,
   }),
 }))
 
@@ -228,9 +230,13 @@ describe("road-directions", () => {
 
       await computeAndApplyRoadDirections()
 
-      expect(mockFeaturesStoreUpdate).toHaveBeenCalledWith(
-        "r1",
-        expect.objectContaining({ geometry: expect.objectContaining({ type: "LineString" }) }),
+      expect(mockFeaturesStoreBatchUpdate).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "r1",
+            geometry: expect.objectContaining({ type: "LineString" }),
+          }),
+        ]),
       )
       expect(mockApiFetch).toHaveBeenCalled()
       expect(mockUpdateEndpointMarkers).toHaveBeenCalledOnce()
@@ -367,7 +373,7 @@ describe("road-directions", () => {
         "/api/features/db-1",
         expect.objectContaining({ method: "PUT" }),
       )
-      expect(mockFeaturesStoreUpdate).toHaveBeenCalled()
+      expect(mockFeaturesStoreBatchUpdate).toHaveBeenCalled()
     })
 
     it("keeps orientation when both endpoints are dead ends and no city center exists", async () => {

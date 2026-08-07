@@ -17,7 +17,13 @@ namespace NarsApi.Services;
 public sealed class JwtService(string secret, string? issuer, string? audience, IOptions<JwtOptions> jwtOptions, ILogger<JwtService> logger, IDateTimeProvider timeProvider) : IJwtService
 {
     // Thread-safe: JwtSecurityTokenHandler is safe for concurrent reads after initialization.
-    private static readonly JwtSecurityTokenHandler TokenHandler = new();
+    // MapInboundClaims=false keeps claim types verbatim ("role", "email", ...) instead of
+    // remapping to the long URI claim types — matching the JwtBearer pipeline
+    // (AuthenticationExtensions) so both validation paths produce identical principals.
+    private static readonly JwtSecurityTokenHandler TokenHandler = new()
+    {
+        MapInboundClaims = false,
+    };
     private readonly int _expiresMinutes = jwtOptions.Value.ExpiresInMinutes;
     private readonly SymmetricSecurityKey _key = new(Encoding.UTF8.GetBytes(secret));
     public TimeSpan AccessTokenExpiresIn => TimeSpan.FromMinutes(_expiresMinutes);

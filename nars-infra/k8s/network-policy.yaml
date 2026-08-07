@@ -137,16 +137,13 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-egress-otel
+  name: allow-egress-otel-api
   namespace: nars
 spec:
   podSelector:
-    matchExpressions:
-      - key: app.kubernetes.io/name
-        operator: In
-        values:
-          - nars-frontend
-          - nars-api
+    matchLabels:
+      app.kubernetes.io/name: nars-api
+      app.kubernetes.io/component: api
   egress:
     - to:
         - namespaceSelector:
@@ -155,6 +152,29 @@ spec:
       ports:
         - port: 4317
           protocol: TCP
+        - port: 4318
+          protocol: TCP
+  policyTypes:
+    - Egress
+---
+# The frontend only ships browser traces over HTTP (nginx /v1/traces proxy),
+# so it gets 4318 only — not the OTLP gRPC port 4317.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-otel-frontend
+  namespace: nars
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: nars-frontend
+      app.kubernetes.io/component: frontend
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+      ports:
         - port: 4318
           protocol: TCP
   policyTypes:

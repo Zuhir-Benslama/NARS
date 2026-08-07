@@ -104,5 +104,8 @@ export interface MaplibreFeature {
     circleColor?: string
     circleRadius?: number
     textColor?: string
+    mainEntranceDbId?: string
+    mainEntranceLabel?: string
+    roadDbId?: string
   }
 }

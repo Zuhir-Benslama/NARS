@@ -46,9 +46,9 @@ public record PagedResponse<T>(
 public record AuthorizedAdminSignupRequest(
     // ── Authorizing admin ────────────────────────────────────────────────────
     [property: JsonPropertyName("admin_username")]
-    [Required(AllowEmptyStrings = false)] string AdminUsername,
+    [Required(AllowEmptyStrings = false), MaxLength(100)] string AdminUsername,
     [property: JsonPropertyName("admin_password")]
-    [Required(AllowEmptyStrings = false)] string AdminPassword,
+    [Required(AllowEmptyStrings = false), MaxLength(128)] string AdminPassword,
     // ── New account details ──────────────────────────────────────────────────
     [property: JsonPropertyName("name")]
     [Required(AllowEmptyStrings = false)] string Name,
@@ -59,7 +59,7 @@ public record AuthorizedAdminSignupRequest(
     [property: JsonPropertyName("username")]
     [Required(AllowEmptyStrings = false)] string Username,
     [property: JsonPropertyName("password")]
-    [Required(AllowEmptyStrings = false)] string Password,
+    [Required(AllowEmptyStrings = false), MaxLength(128)] string Password,
     [property: JsonPropertyName("role")]
     [Required(AllowEmptyStrings = false)] string Role,
     // ── Geographic anchor (one required depending on role) ───────────────────
@@ -69,7 +69,7 @@ public record AuthorizedAdminSignupRequest(
 );
 public record SignInRequest(
     [Required(AllowEmptyStrings = false), MaxLength(100)] string Username,
-    [Required(AllowEmptyStrings = false)] string Password
+    [Required(AllowEmptyStrings = false), MaxLength(128)] string Password
 );
 
 public record UpdateUserRequest(
@@ -77,6 +77,8 @@ public record UpdateUserRequest(
     [MaxLength(100)] string? Username,
     [property: JsonPropertyName("email")]
     [EmailAddress, MaxLength(255)] string? Email,
+    [property: JsonPropertyName("current_password")]
+    [MaxLength(128)] string? CurrentPassword,
     [property: JsonPropertyName("password")]
     [MaxLength(128)] string? Password
 );

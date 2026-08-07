@@ -54,10 +54,12 @@ public class AccountLockoutOptions
 
 public class OpenTelemetryOptions
 {
-    // OTLP default is internal cluster HTTP; overridden via env var in production.
-#pragma warning disable S5332 // Intentional: internal gRPC/HTTP collector endpoint
-    [Required] public string OtlpEndpoint { get; set; } = "http://otel-collector.observability:4317";
-#pragma warning restore S5332
+    /// <summary>
+    /// OTLP collector endpoint. Configured in production via appsettings.json or
+    /// OTEL_EXPORTER_OTLP_ENDPOINT; left empty in dev so no exporter is registered
+    /// (no repeated connection-failure logs). No hard-coded cluster-internal default.
+    /// </summary>
+    public string OtlpEndpoint { get; set; } = string.Empty;
 }
 
 public class BackgroundTaskOptions
@@ -79,8 +81,25 @@ public class CspOptions
     public string StyleSrc { get; set; } = "'self' https://cdn.jsdelivr.net https://unpkg.com 'nonce-' https://fonts.googleapis.com";
     public string ImgSrc { get; set; } = "'self' data: blob: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.arcgisonline.com";
     public string FontSrc { get; set; } = "'self' https://cdn.jsdelivr.net https://fonts.gstatic.com";
-    public string ConnectSrc { get; set; } = "'self' https: data: https://*.arcgisonline.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com";
+    public string ConnectSrc { get; set; } = "'self' https: data: https://*.arcgisonline.com https://*.basemaps.cartocdn.com";
     public string FrameAncestors { get; set; } = "'none'";
     public string BaseUri { get; set; } = "'self'";
     public string FormAction { get; set; } = "'self'";
+}
+
+public class ProxyOptions
+{
+    /// <summary>
+    /// Maximum number of forwarded header entries to trust per request. Set to the
+    /// number of trusted proxy hops in front of the API (1 for ingress-nginx → API).
+    /// </summary>
+    [Range(1, 10)] public int ForwardLimit { get; set; } = 1;
+
+    /// <summary>
+    /// CIDR networks whose forwarded headers (X-Forwarded-For / X-Forwarded-Proto)
+    /// are trusted. Must list the ingress/proxy pod networks in front of the API;
+    /// defaults to the kind cluster pod CIDR (10.244.0.0/16). Override per cluster
+    /// (e.g. EKS 10.0.0.0/16) — see nars-infra/k8s/ingress-api.yaml.
+    /// </summary>
+    public List<string> KnownNetworks { get; set; } = ["10.244.0.0/16"];
 }

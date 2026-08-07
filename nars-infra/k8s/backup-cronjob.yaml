@@ -45,6 +45,10 @@ spec:
   jobTemplate:
     spec:
       backoffLimit: 2
+      # Single hard deadline for the whole Job (an attempt that hangs past
+      # this dies; retries count against the same budget). The pod-level
+      # activeDeadlineSeconds duplicate was removed — the Job deadline
+      # already bounds each attempt.
       activeDeadlineSeconds: 600
       template:
         metadata:
@@ -59,7 +63,6 @@ spec:
             runAsUser: 999
             runAsGroup: 999
             fsGroup: 999
-          activeDeadlineSeconds: 600
           containers:
             - name: pg-dump
               image: zuhirbenslama/nars-backup:latest
@@ -83,13 +86,20 @@ spec:
                   TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
                   FILE="/backup/nars_db_${TIMESTAMP}.sql"
                   echo "→ Backing up database 'nars_db' (encrypted)..."
-                  pg_dump \
+                  # Wrap the pipeline so a hard failure (pg_dump/gzip/gpg error)
+                  # exits here and removes the partial file, instead of being
+                  # cut off by set -e with a half-written .gz.gpg left behind.
+                  if ! pg_dump \
                     -h "${PGHOST}" -U "${PGUSER}" -d "${PGDATABASE}" \
                     --no-owner \
-                  | gzip \
-                  | gpg --batch --yes --passphrase "$GPG_PASSPHRASE" \
-                        --symmetric --cipher-algo AES256 \
-                        -o "${FILE}.gz.gpg"
+                    | gzip \
+                    | gpg --batch --yes --passphrase "$GPG_PASSPHRASE" \
+                          --symmetric --cipher-algo AES256 \
+                          -o "${FILE}.gz.gpg"; then
+                    echo "✖ Backup pipeline failed — removing partial file"
+                    rm -f "${FILE}.gz.gpg"
+                    exit 1
+                  fi
                   FILESIZE=$(stat -c%s "${FILE}.gz.gpg" 2>/dev/null || echo 0)
                   if [ "$FILESIZE" -lt 100 ]; then
                     echo "✖ Backup file is suspiciously small (${FILESIZE} bytes) — possible pg_dump failure"

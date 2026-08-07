@@ -9,7 +9,6 @@ export const useAppStore = defineStore("app", {
   state: (): AppStoreState => ({
     currentPhase: 0,
     user: null,
-    municipalityName: "",
     loadError: false,
     isLoading: false,
     referenceRoadDbId: null,
@@ -22,13 +21,10 @@ export const useAppStore = defineStore("app", {
     isAdminUser: (state) =>
       state.user !== null &&
       ["national_admin", "wilaya_admin", "daira_admin"].includes(state.user.role),
-    communeName: (state) =>
-      state.municipalityName || state.user?.commune?.name_fr || state.user?.commune?.name_ar || "",
+    communeName: (state) => state.user?.commune?.name_fr || state.user?.commune?.name_ar || "",
     // Derived from the layer store (single source of truth for features).
     // Previously duplicated state that had to be manually re-synced at every
     // mutation site (and was missed in several).
-    cityCenterMode: (): "city_center" | null =>
-      useLayerStore().cityCenter.length > 0 ? "city_center" : null,
     cityCenterLatLng: (): LatLng | null => {
       const cc = useLayerStore().cityCenter[0]
       if (!cc) return null
@@ -54,7 +50,6 @@ export const useAppStore = defineStore("app", {
   actions: {
     setUser(user: UserInfo | null) {
       this.user = user
-      this.municipalityName = user?.commune?.name_fr ?? user?.commune?.name_ar ?? ""
     },
     setLoading(isLoading: boolean) {
       this.isLoading = isLoading
@@ -71,5 +66,12 @@ export const useAppStore = defineStore("app", {
     setReferenceEntrance(dbId: string | null) {
       this.referenceEntranceDbId = dbId
     },
+    setBoundaryEventsRegistered(v: boolean) {
+      this.boundaryEventsRegistered = v
+    },
   },
 })
+
+export function resetAppStore(): void {
+  useAppStore().$reset()
+}

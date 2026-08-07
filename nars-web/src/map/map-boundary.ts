@@ -24,7 +24,7 @@ export function resetBoundaryEvents(): void {
 export function addBoundaryClickEvents(map: maplibregl.Map): void {
   const store = useAppStore()
   if (store.boundaryEventsRegistered) return
-  store.boundaryEventsRegistered = true
+  store.setBoundaryEventsRegistered(true)
   _boundaryMap = map
 
   map.on("click", "nars-boundaries", onBoundaryClick)
@@ -34,7 +34,7 @@ export function addBoundaryClickEvents(map: maplibregl.Map): void {
 }
 
 export function removeBoundaryClickEvents(): void {
-  useAppStore().boundaryEventsRegistered = false
+  useAppStore().setBoundaryEventsRegistered(false)
   const map = _boundaryMap
   _boundaryMap = null
   if (!map) return

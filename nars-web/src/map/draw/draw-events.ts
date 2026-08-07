@@ -51,6 +51,12 @@ function watchDrawType() {
   const appStore = useAppStore()
   const store = useDrawStore()
 
+  // Stop the previous watcher before creating a new one — registerDrawEvents()
+  // may be called again (HMR, re-init, tests) without destroyDrawEvents() in
+  // between, which would otherwise accumulate leaking watchers.
+  store.cleanupDrawWatcher?.()
+  store.cleanupDrawWatcher = null
+
   store.cleanupDrawWatcher = watch(
     () => appStore.currentPhase,
     (phaseIdx) => {

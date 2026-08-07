@@ -97,8 +97,9 @@ public class AdminUserController(
         CancellationToken cancellationToken = default)
     {
         take = Math.Clamp(take, 1, 500);
+        skip = Math.Max(skip, 0);
         var users = await authorizationService.GetManageableUsersAsync(
-            CurrentUserRole, RequiredCurrentUserId, CurrentCommuneId, CurrentDairaId, CurrentWilayaId,
+            CurrentUserRole, CurrentCommuneId, CurrentDairaId, CurrentWilayaId,
             skip, take,
             cancellationToken);
 
@@ -169,6 +170,17 @@ public class AdminUserController(
         if (!authorizationService.CanCreateRole(CurrentUserRole, target.Role))
         {
             return Forbid();
+        }
+
+        var scopeResult = await authorizationService.ValidateManagedUserScopeAsync(
+            CurrentUserRole, CurrentCommuneId, CurrentDairaId, CurrentWilayaId,
+            target.Role, target.CommuneId, target.DairaId, target.WilayaId,
+            cancellationToken);
+        if (scopeResult.Error is not null)
+        {
+            return scopeResult.IsAuthorizationFailure
+                ? Forbid()
+                : Problem(detail: scopeResult.Error, statusCode: 400);
         }
 
         await authorizationService.DeleteUserAsync(userId, cancellationToken);

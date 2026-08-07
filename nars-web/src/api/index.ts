@@ -120,16 +120,19 @@ export interface ApiFetchOptions extends RequestInit {
   skipRetry?: boolean
 }
 
+// POST/PATCH are not retried by default: a client-side timeout can race with a
+// successful server write, and retrying would duplicate the created resource.
+// Idempotent methods (GET/HEAD/OPTIONS/PUT/DELETE) keep retrying on transient
+// network/timeout errors. Callers of safe query-style POSTs can opt back in
+// with `skipRetry: false`.
+const NON_RETRYABLE_METHODS = new Set(["POST", "PATCH"])
+
 export async function apiFetch(path: string, options: ApiFetchOptions = {}): Promise<Response> {
-  const {
-    timeout = DEFAULT_TIMEOUT,
-    skipRetry = false,
-    signal: externalSignal,
-    ...fetchOptions
-  } = options
+  const { timeout = DEFAULT_TIMEOUT, signal: externalSignal, ...fetchOptions } = options
 
   const url = apiUrl(path)
   const method = (options.method ?? "GET").toUpperCase()
+  const skipRetry = options.skipRetry ?? NON_RETRYABLE_METHODS.has(method)
 
   const context = { url, method }
 

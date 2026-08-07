@@ -10,8 +10,12 @@ export const useSelectionStore = defineStore("selection", {
   }),
 
   actions: {
-    selectFeature(dbId: string | null) {
+    setSelectedFeatureDbId(dbId: string | null) {
       this.selectedFeatureDbId = dbId
     },
   },
 })
+
+export function resetSelectionStore(): void {
+  useSelectionStore().$reset()
+}

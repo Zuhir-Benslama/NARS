@@ -18,10 +18,14 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
             .ToListAsync(cancellationToken);
         var wilayaIds = pagedWilayas.Select(w => w.WilayaId).ToArray();
 
-        // Run sequentially — DbContext is not thread-safe.
-        var admins = await db.Users
+        // Run sequentially — DbContext is not thread-safe. Grouping tolerates
+        // duplicate admins per wilaya (the filtered index is non-unique); the
+        // earliest-created admin wins instead of crashing on a duplicate key.
+        var adminList = await db.Users
             .Where(u => u.Role == UserRoles.WilayaAdmin && u.WilayaId.HasValue && wilayaIds.Contains(u.WilayaId.Value))
-            .ToDictionaryAsync(u => u.WilayaId!.Value, cancellationToken);
+            .ToListAsync(cancellationToken);
+        var admins = adminList.GroupBy(u => u.WilayaId!.Value)
+            .ToDictionary(g => g.Key, g => g.OrderBy(u => u.CreatedAt).First());
 
         var dairas = await db.Dairas
             .Where(d => wilayaIds.Contains(d.WilayaId))
@@ -33,10 +37,12 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
 
         var allDairaIds = dairas.Select(d => d.DairaId).ToArray();
 
-        var communesByDaira = await db.Communes
+        var communes = await db.Communes
             .Where(c => allDairaIds.Contains(c.DairaId))
+            .ToListAsync(cancellationToken);
+        var communesByDaira = communes
             .GroupBy(c => c.DairaId)
-            .ToDictionaryAsync(g => g.Key, g => g.ToList(), cancellationToken);
+            .ToDictionary(g => g.Key, g => g.ToList());
 
         var allCommuneIds = communesByDaira.Values.SelectMany(c => c).Select(c => c.CommuneId).ToArray();
 
@@ -85,10 +91,12 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
 
         var dairaIds = dairas.Select(d => d.DairaId).ToArray();
 
-        var dairaAdmins = await db.Users
+        // Grouping tolerates duplicate admins per daira (non-unique filtered index).
+        var dairaAdminList = await db.Users
             .Where(u => u.Role == UserRoles.DairaAdmin && u.DairaId.HasValue && dairaIds.Contains(u.DairaId.Value))
-            .Select(u => new { u.DairaId, u })
-            .ToDictionaryAsync(x => x.DairaId!.Value, x => x.u, cancellationToken);
+            .ToListAsync(cancellationToken);
+        var dairaAdmins = dairaAdminList.GroupBy(u => u.DairaId!.Value)
+            .ToDictionary(g => g.Key, g => g.OrderBy(u => u.CreatedAt).First());
 
         var communeReports = await BuildCommunesForDairasAsync(dairaIds, cancellationToken);
 

@@ -117,6 +117,86 @@ public class RefreshTokenServiceTests
         }
     }
 
+    // ── MintAccessTokenAsync ──────────────────────────────────────────────
+
+    [Fact]
+    public async Task MintAccessTokenAsync_ValidToken_DoesNotRevokeAndReturnsAccessToken()
+    {
+        var (svc, db, raw) = await SeedWithValidTokenAsync();
+        using (db)
+        {
+            var result = await svc.MintAccessTokenAsync(raw);
+
+            Assert.True(result.Success);
+            Assert.Equal("new-access-token", result.NewAccessToken);
+            Assert.Null(result.NewRawToken);
+
+            var stored = await db.RefreshTokens.SingleAsync();
+            Assert.False(stored.Revoked);
+        }
+    }
+
+    [Fact]
+    public async Task MintAccessTokenAsync_NullToken_ReturnsFailure()
+    {
+        var (svc, db, _) = await SeedWithValidTokenAsync();
+        using (db)
+        {
+            var result = await svc.MintAccessTokenAsync(null);
+
+            Assert.False(result.Success);
+            Assert.Equal("No refresh token.", result.Detail);
+        }
+    }
+
+    [Fact]
+    public async Task MintAccessTokenAsync_UnknownToken_ReturnsFailure()
+    {
+        var (svc, db, _) = await SeedWithValidTokenAsync();
+        using (db)
+        {
+            var result = await svc.MintAccessTokenAsync("bogus-token");
+
+            Assert.False(result.Success);
+            Assert.Equal("Invalid or expired refresh token.", result.Detail);
+        }
+    }
+
+    [Fact]
+    public async Task MintAccessTokenAsync_RevokedToken_ReturnsFailure()
+    {
+        var (svc, db, raw) = await SeedWithValidTokenAsync();
+        using (db)
+        {
+            await svc.RotateRefreshTokenAsync(raw);
+
+            var result = await svc.MintAccessTokenAsync(raw);
+
+            Assert.False(result.Success);
+            Assert.Equal("Invalid or expired refresh token.", result.Detail);
+        }
+    }
+
+    [Fact]
+    public async Task MintAccessTokenAsync_ConcurrentPageLoads_AllSucceed()
+    {
+        var (svc, db, raw) = await SeedWithValidTokenAsync();
+        using (db)
+        {
+            var results = await Task.WhenAll(
+                Enumerable.Range(0, 5).Select(_ => svc.MintAccessTokenAsync(raw)));
+
+            Assert.All(results, r =>
+            {
+                Assert.True(r.Success);
+                Assert.Equal("new-access-token", r.NewAccessToken);
+            });
+
+            var stored = await db.RefreshTokens.SingleAsync();
+            Assert.False(stored.Revoked);
+        }
+    }
+
     [Fact]
     public async Task RotateRefreshTokenAsync_EmptyToken_ReturnsFailure()
     {
@@ -272,6 +352,48 @@ public class RefreshTokenServiceTests
 
             Assert.False(result.Success);
             Assert.Equal("User no longer exists.", result.Detail);
+        }
+    }
+
+    [Fact]
+    public async Task RotateRefreshTokenAsync_LockedUser_ReturnsFailureAndRevokesToken()
+    {
+        var (db, raw) = await SeedTokenAsync(FixedUtcNow.AddDays(30));
+        var user = await db.Users.FirstAsync();
+        user.LockedUntil = FixedUtcNow.AddMinutes(30);
+        await db.SaveChangesAsync();
+        using (db)
+        {
+            var svc = CreateService(db);
+
+            var result = await svc.RotateRefreshTokenAsync(raw);
+
+            Assert.False(result.Success);
+            Assert.Equal("Account is temporarily locked.", result.Detail);
+
+            var hash = Convert.ToBase64String(
+                System.Security.Cryptography.SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(raw)));
+            var stored = await db.RefreshTokens.FirstAsync(rt => rt.TokenHash == hash);
+            Assert.True(stored.Revoked);
+            Assert.Equal(0, await db.RefreshTokens.CountAsync(rt => !rt.Revoked));
+        }
+    }
+
+    [Fact]
+    public async Task RotateRefreshTokenAsync_ExpiredLockout_StillSucceeds()
+    {
+        var (db, raw) = await SeedTokenAsync(FixedUtcNow.AddDays(30));
+        var user = await db.Users.FirstAsync();
+        user.LockedUntil = FixedUtcNow.AddMinutes(-1);
+        await db.SaveChangesAsync();
+        using (db)
+        {
+            var svc = CreateService(db);
+
+            var result = await svc.RotateRefreshTokenAsync(raw);
+
+            Assert.True(result.Success);
         }
     }
 

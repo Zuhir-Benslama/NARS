@@ -50,34 +50,34 @@ beforeEach(async () => {
 describe("edit-snap", () => {
   describe("patchMarkerPointerSnap", () => {
     it("saves original setLngLat and replaces it", async () => {
-      const { useEditStore } = await import("../../stores/editStore")
-      const store = useEditStore()
-      expect(store.origSetLngLat).toBeNull()
+      const { useSnapStore } = await import("../../stores/snapStore")
+      const store = useSnapStore()
+      expect(store.origMarkerSetLngLat).toBeNull()
 
       patchMarkerPointerSnap("entry-1")
 
-      expect(store.origSetLngLat).not.toBeNull()
-      expect(store.origSetLngLat).not.toBe(mockSetLngLat)
+      expect(store.origMarkerSetLngLat).not.toBeNull()
+      expect(store.origMarkerSetLngLat).not.toBe(mockSetLngLat)
     })
 
     it("does not patch if marker pointer is missing", async () => {
       mockCtx.geoman = undefined
 
-      const { useEditStore } = await import("../../stores/editStore")
-      const store = useEditStore()
+      const { useSnapStore } = await import("../../stores/snapStore")
+      const store = useSnapStore()
       patchMarkerPointerSnap("entry-1")
-      expect(store.origSetLngLat).toBeNull()
+      expect(store.origMarkerSetLngLat).toBeNull()
     })
 
     it("does not patch if already patched", async () => {
-      const { useEditStore } = await import("../../stores/editStore")
-      const store = useEditStore()
+      const { useSnapStore } = await import("../../stores/snapStore")
+      const store = useSnapStore()
       const savedFn = vi.fn()
-      store.origSetLngLat = savedFn as never
+      store.origMarkerSetLngLat = savedFn as never
 
       patchMarkerPointerSnap("entry-1")
 
-      expect(store.origSetLngLat).toBe(savedFn)
+      expect(store.origMarkerSetLngLat).toBe(savedFn)
     })
 
     it("patched function snaps position when snap found", async () => {
@@ -105,8 +105,8 @@ describe("edit-snap", () => {
 
   describe("unpatchMarkerPointerSnap", () => {
     it("restores original setLngLat and clears store", async () => {
-      const { useEditStore } = await import("../../stores/editStore")
-      const store = useEditStore()
+      const { useSnapStore } = await import("../../stores/snapStore")
+      const store = useSnapStore()
 
       patchMarkerPointerSnap("entry-1")
 
@@ -115,19 +115,19 @@ describe("edit-snap", () => {
       const restoredFn = (mockCtx.geoman as any).markerPointer.marker.setLngLat
       restoredFn([99, 88])
       expect(mockSetLngLat).toHaveBeenCalledWith([99, 88])
-      expect(store.origSetLngLat).toBeNull()
+      expect(store.origMarkerSetLngLat).toBeNull()
     })
 
-    it("always clears store.origSetLngLat even when no marker pointer", async () => {
+    it("always clears store.origMarkerSetLngLat even when no marker pointer", async () => {
       mockCtx.geoman = undefined
 
-      const { useEditStore } = await import("../../stores/editStore")
-      const store = useEditStore()
-      store.origSetLngLat = vi.fn() as never
+      const { useSnapStore } = await import("../../stores/snapStore")
+      const store = useSnapStore()
+      store.origMarkerSetLngLat = vi.fn() as never
 
       unpatchMarkerPointerSnap()
 
-      expect(store.origSetLngLat).toBeNull()
+      expect(store.origMarkerSetLngLat).toBeNull()
     })
   })
 })

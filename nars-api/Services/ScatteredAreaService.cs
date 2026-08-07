@@ -19,7 +19,7 @@ public sealed class ScatteredAreaService(
     private (DateTimeOffset Timestamp, string Message)? _lastError;
     public (DateTimeOffset Timestamp, string Message)? LastError { get { lock (_errorLock) { return _lastError; } } }
 
-    public async Task RefreshAsync(Guid userId, int communeId, CancellationToken cancellationToken = default)
+    public async Task<bool> RefreshAsync(Guid userId, int communeId, CancellationToken cancellationToken = default)
     {
         lock (_errorLock)
         {
@@ -74,7 +74,7 @@ public sealed class ScatteredAreaService(
 
             if (scatteredGeoJson is null)
             {
-                return;
+                return true;
             }
 
             await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
@@ -111,6 +111,7 @@ public sealed class ScatteredAreaService(
             });
             await db.SaveChangesAsync(cancellationToken);
             await tx.CommitAsync(cancellationToken);
+            return true;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -123,6 +124,7 @@ public sealed class ScatteredAreaService(
             }
 
             logger.LogError(ex, "ScatteredAreaService refresh failed for user {UserId}, commune {CommuneId}", userId, communeId);
+            return false;
         }
     }
 

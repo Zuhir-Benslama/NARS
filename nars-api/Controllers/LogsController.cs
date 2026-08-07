@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -87,8 +88,8 @@ public class LogsController(IErrorLogService errorLogService, ILogger<LogsContro
                 UserId = userId,
                 Level = level,
                 Code = SanitizeLogField(entry.Code ?? "", 100),
-                Message = entry.Message,
-                Context = string.IsNullOrEmpty(entry.Context) ? null : SanitizeLogField(entry.Context, MaxEntryLength),
+                Message = SanitizeLogMessage(entry.Message, MaxEntryLength),
+                Context = string.IsNullOrEmpty(entry.Context) ? null : SanitizeLogMessage(entry.Context, MaxEntryLength),
                 Url = SanitizeLogField(entry.Url ?? "", MaxUrlLength),
                 Method = SanitizeLogField(entry.Method ?? "", MaxMethodLength),
                 IpAddress = ipAddress,
@@ -119,7 +120,7 @@ public class LogsController(IErrorLogService errorLogService, ILogger<LogsContro
 
     /// <summary>
     /// Strips control characters (except \n, \r, \t) and truncates to maxLen.
-    /// Prevents stored XSS in log viewers and log injection via control chars.
+    /// Prevents log injection via control chars.
     /// </summary>
     private static string SanitizeLogField(string value, int maxLen)
     {
@@ -141,4 +142,11 @@ public class LogsController(IErrorLogService errorLogService, ILogger<LogsContro
         var cleaned = new string(buffer[..written]);
         return cleaned.Length <= maxLen ? cleaned : cleaned[..maxLen];
     }
+
+    /// <summary>
+    /// Sanitizes free-text log fields (Message, Context) and HTML-encodes them so a
+    /// log viewer that renders values as raw HTML cannot execute script (stored XSS).
+    /// </summary>
+    private static string SanitizeLogMessage(string value, int maxLen) =>
+        HtmlEncoder.Default.Encode(SanitizeLogField(value, maxLen));
 }

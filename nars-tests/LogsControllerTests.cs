@@ -196,6 +196,52 @@ public class LogsControllerTests
     }
 
     [Fact]
+    public async Task SubmitLogs_EncodesHtmlInMessageAndContext()
+    {
+        List<ErrorLog>? captured = null;
+        var mock = new Mock<IErrorLogService>();
+        mock.Setup(s => s.LogBatchAsync(It.IsAny<List<ErrorLog>>(), It.IsAny<CancellationToken>()))
+            .Callback<List<ErrorLog>, CancellationToken>((entries, _) => captured = entries)
+            .Returns(Task.CompletedTask);
+
+        var ctrl = CreateController(errorLogService: mock.Object);
+        var body = new LogBatch(
+        [
+            new("error", null, "<script>alert(1)</script>", "<img onerror=alert(1)>", null, null),
+        ]);
+
+        await ctrl.SubmitLogs(body);
+
+        Assert.NotNull(captured);
+        var entry = Assert.Single(captured!);
+        Assert.Equal("&lt;script&gt;alert(1)&lt;/script&gt;", entry.Message);
+        Assert.Equal("&lt;img onerror=alert(1)&gt;", entry.Context);
+    }
+
+    [Fact]
+    public async Task SubmitLogs_EncodesHtmlAfterControlCharStrip()
+    {
+        List<ErrorLog>? captured = null;
+        var mock = new Mock<IErrorLogService>();
+        mock.Setup(s => s.LogBatchAsync(It.IsAny<List<ErrorLog>>(), It.IsAny<CancellationToken>()))
+            .Callback<List<ErrorLog>, CancellationToken>((entries, _) => captured = entries)
+            .Returns(Task.CompletedTask);
+
+        var ctrl = CreateController(errorLogService: mock.Object);
+        var body = new LogBatch(
+        [
+            new("error", null, "msg\u0000<script>", "ctx\u0007<script>", null, null),
+        ]);
+
+        await ctrl.SubmitLogs(body);
+
+        Assert.NotNull(captured);
+        var entry = Assert.Single(captured!);
+        Assert.Equal("msg&lt;script&gt;", entry.Message);
+        Assert.Equal("ctx&lt;script&gt;", entry.Context);
+    }
+
+    [Fact]
     public async Task SubmitLogs_DefaultLevelIsError()
     {
         List<ErrorLog>? captured = null;

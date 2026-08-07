@@ -165,10 +165,11 @@ describe("loader-db", () => {
     })
 
     const { useAppStore } = await import("../../stores/appStore")
+    const { useLayerStore } = await import("../../stores/layerStore")
 
     await loadFromDatabase()
 
-    expect(useAppStore().cityCenterMode).toBe("city_center")
+    expect(useLayerStore().cityCenter).toHaveLength(1)
     expect(useAppStore().cityCenterLatLng).toEqual({ lat: 36.0, lng: 127.5 })
   })
 

@@ -44,7 +44,12 @@ export const useFeaturesStore = defineStore("features", {
       this.updateSource()
     },
 
-    update(id: string, patch: Partial<Pick<MaplibreFeature, "geometry" | "properties">>) {
+    update(
+      id: string,
+      patch: Partial<Pick<MaplibreFeature, "geometry">> & {
+        properties?: Partial<MaplibreFeature["properties"]>
+      },
+    ) {
       const f = this.features.find((f) => f.id === id)
       if (f) {
         if (patch.geometry) f.geometry = patch.geometry
@@ -53,6 +58,28 @@ export const useFeaturesStore = defineStore("features", {
       } else {
         debugWarn("featuresStore.update: feature not found", id)
       }
+    },
+
+    // Apply N patches then call setData once — avoids O(n²) full-source
+    // rebuilds when many features change at once (house numbering, road
+    // direction reversals).
+    batchUpdate(
+      patches: Array<{
+        id: string
+        geometry?: MaplibreFeature["geometry"]
+        properties?: Partial<MaplibreFeature["properties"]>
+      }>,
+    ) {
+      for (const patch of patches) {
+        const f = this.features.find((f) => f.id === patch.id)
+        if (!f) {
+          debugWarn("featuresStore.batchUpdate: feature not found", patch.id)
+          continue
+        }
+        if (patch.geometry) f.geometry = patch.geometry
+        if (patch.properties) f.properties = { ...f.properties, ...patch.properties }
+      }
+      this.updateSource()
     },
 
     getAll(): MaplibreFeature[] {
@@ -92,3 +119,7 @@ export const useFeaturesStore = defineStore("features", {
     },
   },
 })
+
+export function resetFeaturesStore(): void {
+  useFeaturesStore().$reset()
+}

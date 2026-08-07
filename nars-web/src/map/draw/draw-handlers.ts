@@ -257,11 +257,11 @@ function onClick(e: MapLibreMapMouseEvent & { point: { x: number; y: number } })
   if (feature) {
     const dbId = feature.properties?.dbId
     if (dbId) {
-      selectionStore.selectFeature(dbId)
+      selectionStore.setSelectedFeatureDbId(dbId)
       updateSelectionHighlight(dbId)
     }
   } else {
-    selectionStore.selectFeature(null)
+    selectionStore.setSelectedFeatureDbId(null)
     updateSelectionHighlight(null)
     const currentPhase = PHASES[appStore.currentPhase]
     if (currentPhase && currentPhase.key !== "namingPanels") {

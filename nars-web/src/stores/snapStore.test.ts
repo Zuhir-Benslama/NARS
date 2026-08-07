@@ -13,21 +13,23 @@ beforeEach(async () => {
 describe("snapStore", () => {
   it("initializes with default state", () => {
     const store = useSnapStore()
+    expect(store.snappingEnabled).toBe(true)
     expect(store.crosshairActive).toBe(false)
     expect(store.snapActive).toBe(false)
     expect(store.snapLatLng).toBeNull()
     expect(store.snapFrozen).toBe(false)
     expect(store.snapRafId).toBeNull()
     expect(store.snapPendingCoords).toBeNull()
-    expect(store.editModeActive).toBe(false)
     expect(store.editDragActive).toBe(false)
     expect(store.snapExclude).toBeNull()
   })
 
-  it("setEditModeActive updates state", () => {
+  it("setSnappingEnabled updates the master toggle", () => {
     const store = useSnapStore()
-    store.setEditModeActive(true)
-    expect(store.editModeActive).toBe(true)
+    store.setSnappingEnabled(false)
+    expect(store.snappingEnabled).toBe(false)
+    store.setSnappingEnabled(true)
+    expect(store.snappingEnabled).toBe(true)
   })
 
   it("setEditDragActive updates state", () => {

@@ -44,9 +44,7 @@ export async function fetchRoadSide(
   signal?: AbortSignal,
 ): Promise<void> {
   const modalStore = useModalStore()
-  modalStore.entranceSideLoading = true
-  modalStore.entranceSide = null
-  modalStore.entranceNumber = null
+  modalStore.patchFields({ entranceSideLoading: true, entranceSide: null, entranceNumber: null })
 
   const token = ++modalStore.roadSideToken
 
@@ -61,13 +59,12 @@ export async function fetchRoadSide(
     const result = await getRoadSide(roadDbId, lat, lng, signal)
     if (token !== modalStore.roadSideToken) return
     if (result) {
-      modalStore.entranceSide = result.side
-      modalStore.entranceNumber = result.suggestedNumber
+      modalStore.patchFields({ entranceSide: result.side, entranceNumber: result.suggestedNumber })
     }
   }
 
   if (token !== modalStore.roadSideToken) return
-  modalStore.entranceSideLoading = false
+  modalStore.patchFields({ entranceSideLoading: false })
 }
 
 export function computeBisNumber(mainEntranceDbId: string): void {
@@ -79,6 +76,8 @@ export function computeBisNumber(mainEntranceDbId: string): void {
       e.data.mainEntranceDbId === mainEntranceDbId,
   ).length
   const modalStore = useModalStore()
-  modalStore.bisNumber = count + 1
-  modalStore.label = "BIS" + String(count + 1).padStart(2, "0")
+  modalStore.patchFields({
+    bisNumber: count + 1,
+    label: "BIS" + String(count + 1).padStart(2, "0"),
+  })
 }

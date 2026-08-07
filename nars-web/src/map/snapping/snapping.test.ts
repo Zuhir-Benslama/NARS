@@ -60,6 +60,7 @@ let mod: typeof import("./snapping")
 let useSnapStore: any
 let useLayerStore: any
 let useAppStore: any
+let useEditStore: any
 
 beforeEach(async () => {
   vi.clearAllMocks()
@@ -79,6 +80,8 @@ beforeEach(async () => {
   useLayerStore = ls.useLayerStore
   const as = await import("../../stores/appStore")
   useAppStore = as.useAppStore
+  const es = await import("../../stores/editStore")
+  useEditStore = es.useEditStore
 })
 
 describe("resetSnapState", () => {
@@ -89,10 +92,10 @@ describe("resetSnapState", () => {
 })
 
 describe("isSnapFrozen / getFrozenSnapPos", () => {
-  it("returns snapFrozen state", () => {
-    expect(mod.isSnapFrozen()).toBe(false)
+  it("exposes snapFrozen state directly", () => {
+    expect(useSnapStore().snapFrozen).toBe(false)
     useSnapStore().snapFrozen = true
-    expect(mod.isSnapFrozen()).toBe(true)
+    expect(useSnapStore().snapFrozen).toBe(true)
   })
 
   it("returns frozen snap position", () => {
@@ -106,7 +109,7 @@ describe("isSnapFrozen / getFrozenSnapPos", () => {
 describe("setEditModeActive / setEditDragActive", () => {
   it("sets edit mode active", () => {
     mod.setEditModeActive(true)
-    expect(useSnapStore().editModeActive).toBe(true)
+    expect(useEditStore().isEditMode).toBe(true)
   })
 
   it("sets edit drag active", () => {
@@ -132,7 +135,7 @@ describe("isSnappingActive", () => {
 
 describe("getActiveSnapPhases", () => {
   it("returns all non-empty phases in edit mode", () => {
-    useSnapStore().editModeActive = true
+    useEditStore().isEditMode = true
     useLayerStore().addFeature("areas", {
       id: "f1",
       dbId: "1",
@@ -153,7 +156,7 @@ describe("getActiveSnapPhases", () => {
   })
 
   it("returns empty array for empty layers in edit mode", () => {
-    useSnapStore().editModeActive = true
+    useEditStore().isEditMode = true
 
     const result = mod.getActiveSnapPhases()
 
@@ -437,7 +440,7 @@ describe("snap events", () => {
     mockFindNearestSnap.mockReturnValue({ lat: 36.5, lng: 127.5, type: "vertex", distance: 5 })
     enableSnapping()
     const store = useSnapStore()
-    store.editModeActive = true
+    useEditStore().isEditMode = true
     store.snapActive = true
     store.snapLatLng = { lat: 1, lng: 2 }
 

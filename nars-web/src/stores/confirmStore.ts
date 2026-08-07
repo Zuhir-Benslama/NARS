@@ -37,3 +37,14 @@ export const useConfirmStore = defineStore("confirm", {
     },
   },
 })
+
+/**
+ * Reset the confirm promise bridge. Call during HMR disposal or test cleanup
+ * to prevent a stale pending resolver from leaking across reloads.
+ */
+export function resetConfirmBridge(): void {
+  if (_resolver) {
+    _resolver(false)
+    _resolver = null
+  }
+}

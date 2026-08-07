@@ -47,6 +47,21 @@ public class AdminControllerTests
     }
 
     [Fact]
+    public async Task Overview_NationalAdmin_NegativeSkip_IsClampedToZero()
+    {
+        var overview = new Mock<IAdminOverviewService>();
+        overview.Setup(s => s.GetNationalOverviewAsync(0, 100, default))
+            .ReturnsAsync(([], 0));
+        var ctrl = CreateController(overview.Object);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
+
+        var result = await ctrl.Overview(-5, 100, default);
+
+        Assert.IsType<OkObjectResult>(result);
+        overview.Verify(s => s.GetNationalOverviewAsync(0, 100, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task Overview_WilayaAdmin_MissingWilayaId_Returns403()
     {
         var ctrl = CreateController();

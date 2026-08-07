@@ -18,8 +18,11 @@
 # Optional env overrides (interactive if unset):
 #   NARS_DB_HOST  NARS_DB_PORT  NARS_DB_NAME  NARS_DB_USER  NARS_DB_PASSWORD
 #
-# Non-interactive mode (set all of these):
-#   ADMIN_USERNAME  ADMIN_PASSWORD  ADMIN_NAME  ADMIN_EMAIL  ADMIN_PHONE
+# Non-interactive mode (no prompts; requires NON_INTERACTIVE=1):
+#   NON_INTERACTIVE=1  ADMIN_USERNAME  ADMIN_PASSWORD  ADMIN_NAME
+#   ADMIN_EMAIL  ADMIN_PHONE
+#   All ADMIN_* values fall back to generated credentials when omitted.
+#   The generated password is printed to stderr only.
 #
 # Security notes:
 #   - The DB password is never passed as a command-line argument.

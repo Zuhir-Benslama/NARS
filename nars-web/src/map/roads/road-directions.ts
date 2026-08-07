@@ -96,6 +96,10 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
   let reversedCount = 0
   let failureCount = 0
   const saveTasks: Promise<void>[] = []
+  const mapPatches: Array<{
+    id: string
+    geometry: GeoJSON.LineString
+  }> = []
 
   for (const [dbId, { fwd, rev, entry, needsReverse }] of votes) {
     const shouldReverse = needsReverse !== undefined ? needsReverse : rev > fwd
@@ -112,8 +116,9 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
         body: JSON.stringify({ data: { ...entry.data, coordinates: reversed } }),
       })
         .then(() => {
-          entry.data.coordinates = reversed
-          featuresStore.update(entry.id, {
+          useLayerStore().updateFeature("roads", entry.dbId, { coordinates: reversed })
+          mapPatches.push({
+            id: entry.id,
             geometry: {
               type: "LineString" as const,
               coordinates: reversed.map((c) => [c.lng, c.lat]),
@@ -129,6 +134,7 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
   }
 
   await Promise.all(saveTasks)
+  featuresStore.batchUpdate(mapPatches)
 
   updateEndpointMarkers()
   if (failureCount > 0) {

@@ -14,7 +14,8 @@ import { computeCircleRing, closeRing } from "./rendering/geometry"
 import { getDefaultStyle } from "./draw/draw-save"
 import { t } from "../i18n"
 import { debugLog, debugError, debugWarn } from "../utils/debug"
-import type { FeatureTypeKey, LayerEntry } from "../types"
+import type { FeatureTypeKey, LayerEntry, HouseEntranceFeatureData } from "../types"
+import type { MaplibreFeature } from "./core/state"
 
 // ─── STATE RESET (for testing & HMR) ──────────────────────────────────────────
 
@@ -98,12 +99,14 @@ export async function undo(): Promise<void> {
       // Repair cross-references: update any features that pointed to the old
       // database ID to now point to the new one.
       const oldDbId = entry.dbId
-      const repairedEntrances: LayerEntry[] = []
+      const repairedEntrances: LayerEntry<HouseEntranceFeatureData>[] = []
       if (phaseKey === "houseEntrances") {
         for (const entrance of state.houseEntrances || []) {
           if (entrance.data.mainEntranceDbId === oldDbId) {
-            entrance.data.mainEntranceDbId = newDbId
-            entrance.data.mainEntranceLabel = restoredEntry.data.label
+            layerStore.updateFeature("houseEntrances", entrance.dbId, {
+              mainEntranceDbId: newDbId,
+              mainEntranceLabel: restoredEntry.data.label,
+            })
             repairedEntrances.push(entrance)
             debugLog(
               `[UNDO] Updated secondary entrance "${entrance.data.label}" → mainEntranceDbId ${newDbId}`,
@@ -115,7 +118,7 @@ export async function undo(): Promise<void> {
       if (phaseKey === "roads") {
         for (const entrance of state.houseEntrances || []) {
           if (entrance.data.roadDbId === oldDbId) {
-            entrance.data.roadDbId = newDbId
+            layerStore.updateFeature("houseEntrances", entrance.dbId, { roadDbId: newDbId })
             repairedEntrances.push(entrance)
             debugLog(`[UNDO] Updated entrance "${entrance.data.label}" → roadDbId ${newDbId}`)
           }
@@ -139,6 +142,23 @@ export async function undo(): Promise<void> {
           debugError(`[UNDO] Failed to persist ${failures} cross-reference repair(s).`)
           showToast(t("map_restore_refs_warning"), "warning")
         }
+
+        // Re-render the map source so the repaired cross-references are
+        // reflected in the GeoJSON properties without a reload.
+        const featuresStore = useFeaturesStore()
+        featuresStore.batchUpdate(
+          repairedEntrances.map((entrance) => {
+            const properties: Partial<MaplibreFeature["properties"]> = {}
+            if (phaseKey === "houseEntrances") {
+              properties.mainEntranceDbId = entrance.data.mainEntranceDbId
+              properties.mainEntranceLabel = entrance.data.mainEntranceLabel
+            }
+            if (phaseKey === "roads") {
+              properties.roadDbId = entrance.data.roadDbId
+            }
+            return { id: entrance.id, properties }
+          }),
+        )
       }
 
       const phase = PHASES.find((p) => p.key === phaseKey)

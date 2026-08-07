@@ -801,7 +801,7 @@ kustomize-apply: secrets-validate _check-pinned-tag ## Apply k8s manifests via k
 	@echo "→ Applying kustomization (images: $(DOCKER_ORG)/*:$(IMAGE_TAG))..."
 	@$(KUBECTL) kustomize "$(K8S_DIR)" \
 		| awk -v org="$(DOCKER_ORG)" -v tag="$(IMAGE_TAG)" \
-			'BEGIN { esc = org; gsub(/\//, "\\/", esc); pat = "^ *-? *image: " esc "\\/(nars-api|nars-postgis|nars-vite|nars-backup):" } $$0 ~ pat { sub(/:[^ ]*$$/, ":" tag) } { print }' \
+			'BEGIN { esc = org; gsub(/\//, "\\/", esc); pat = "^ *-? *image: " esc "\\/(nars-api|nars-postgis|nars-vite|nars-backup):" } $$0 ~ pat { sub(/:[^ ]*$$/, ":" tag) } /app\.kubernetes\.io\/version:/ { sub(/version:.*$$/, "version: \\"" tag "\\"") } { print }' \
 		| $(KUBECTL) apply -f -
 	@echo "✓ Kustomization applied"
 
