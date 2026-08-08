@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NarsApi.Infrastructure;
 using NarsApi.Services;
@@ -40,42 +41,29 @@ public class AdminController(
 
     /// <summary>Returns a detailed report for a specific wilaya (national admin only).</summary>
     [HttpGet("admin/wilaya/{wilayaId:int}")]
+    [Authorize(Roles = UserRoles.NationalAdmin)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetWilaya(int wilayaId, CancellationToken cancellationToken = default)
     {
-        if (CurrentUserRole != UserRoles.NationalAdmin)
-        {
-            return Forbid();
-        }
-
         var result = await overviewService.GetWilayaReportAsync(wilayaId, cancellationToken);
         return result is null ? Problem(detail: "Wilaya not found.", statusCode: 404) : Ok(result);
     }
 
     /// <summary>Returns a detailed report for a specific daira (wilaya/national admin).</summary>
     [HttpGet("admin/daira/{dairaId:int}")]
+    [Authorize(Roles = UserRoles.WilayaOrNationalAdmin)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetDaira(int dairaId, CancellationToken cancellationToken = default)
     {
-        int? expectedWilayaId = null;
-        switch (CurrentUserRole)
-        {
-            case UserRoles.WilayaAdmin:
-                // Enforce the caller's wilaya scope inside the report query to
-                // avoid a separate round-trip for the daira entity.
-                expectedWilayaId = CurrentWilayaId;
-                break;
-            case UserRoles.NationalAdmin:
-                break;
-            default:
-                return Forbid();
-        }
+        // Enforce the caller's wilaya scope inside the report query for wilaya
+        // admins to avoid a separate round-trip for the daira entity.
+        int? expectedWilayaId = CurrentUserRole == UserRoles.WilayaAdmin ? CurrentWilayaId : null;
 
         var result = await overviewService.GetDairaReportAsync(dairaId, expectedWilayaId, cancellationToken);
         return result is null ? Problem(detail: "Daira not found.", statusCode: 404) : Ok(result);
@@ -83,8 +71,7 @@ public class AdminController(
 
     private async Task<IActionResult> NationalOverview(int skip, int take, CancellationToken cancellationToken)
     {
-        take = Math.Clamp(take, 1, 500);
-        skip = Math.Max(skip, 0);
+        (skip, take) = Pagination.Clamp(skip, take);
         var (wilayas, total) = await overviewService.GetNationalOverviewAsync(skip, take, cancellationToken);
         return Ok(new { level = "national", wilayas, total, skip, take });
     }

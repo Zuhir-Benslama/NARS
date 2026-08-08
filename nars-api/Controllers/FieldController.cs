@@ -51,7 +51,7 @@ public class FieldController(
             return Problem(detail: "Invalid or missing type. Use: road, house_entrance, or naming_panel.", statusCode: 400);
         }
 
-        take = Math.Clamp(take, 1, 1000);
+        (skip, take) = Pagination.Clamp(skip, take);
         var (Items, Total) = await fieldService.QueryFeaturesAsync(descriptor, communeId.Value, skip, take, cancellationToken);
         return Ok(new LoadFeaturesResponse<FieldFeatureResult>(Features: Items, Count: Total, Skip: skip, Take: take));
     }
@@ -115,7 +115,7 @@ public class FieldController(
         [FromQuery] int take = 100,
         CancellationToken cancellationToken = default)
     {
-        take = Math.Clamp(take, 1, 500);
+        (skip, take) = Pagination.Clamp(skip, take);
 
         var communeId = CurrentCommuneId;
         if (communeId is null)
@@ -189,11 +189,9 @@ public class FieldController(
         ));
     }
 
-    private static readonly string[] ValidInspectionTypes = [FeatureTypes.Road, FeatureTypes.HouseEntrance, FeatureTypes.NamingPanel];
-
     private async Task<IActionResult?> ValidateInspectionTargetAsync(Guid featureId, string type, CancellationToken ct)
     {
-        var validTypes = ValidInspectionTypes;
+        var validTypes = FieldService.ValidInspectionTypes;
         if (!validTypes.Contains(type))
         {
             return Problem(detail: $"Invalid inspection type. Must be one of: {string.Join(", ", validTypes)}", statusCode: 400);
@@ -229,11 +227,9 @@ public class FieldController(
             ? str
             : data.ToJsonString();
 
-    private static readonly string[] ValidInspectionStatuses = ["good", "issue"];
-
     private ObjectResult? ValidateInspectionStatus(string status)
     {
-        if (!ValidInspectionStatuses.Contains(status))
+        if (!FieldService.ValidInspectionStatuses.Contains(status))
         {
             return Problem(detail: "Status must be 'good' or 'issue'.", statusCode: 400);
         }

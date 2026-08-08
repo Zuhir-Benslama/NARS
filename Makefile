@@ -155,12 +155,14 @@ cluster-down: proxy-down _pre-cluster-down-backup ## Delete the kind cluster (au
 	@docker rm -f kube-proxy 2>/dev/null || true
 	@echo "✓ Cluster deleted (postgis data preserved at $(POSTGRES_DATA_DIR))"
 
-# Shared pg_dump + gzip logic. Expects $$POD and $$PASS to be set in shell scope.
+# Shared pg_dump + gzip logic. Expects $$POD and $$PASS to be set in shell scope;
+# $$PREFIX (optional) disambiguates the output filename so two backups taken in
+# the same second can never overwrite each other (manual_ vs auto_).
 # SECURITY: Password piped via stdin to avoid exposure in container's process table.
 _pg_dump_cmd = \
 	mkdir -p "$(BACKUP_DIR)"; \
 	TIMESTAMP=$$(date +"%Y%m%d_%H%M%S"); \
-	FILE="$(BACKUP_DIR)/nars_db_$${TIMESTAMP}.sql"; \
+	FILE="$(BACKUP_DIR)/$${PREFIX:+$${PREFIX}_}nars_db_$${TIMESTAMP}.sql"; \
 	printf '%s\n' "$$PASS" | \
 		$(KUBECTL) exec -i "$$POD" -n "$(NAMESPACE)" -- \
 		bash -c 'read -r _pw; PGPASSWORD="$$_pw" pg_dump -U postgres -d "$(DB_NAME)" --no-owner' > "$$FILE"; \
@@ -181,6 +183,7 @@ _pre-cluster-down-backup:
 		echo "  ⚠ Could not read DB password — skipping backup";
 		exit 0;
 	fi;
+	PREFIX=auto;
 	$(_pg_dump_cmd);
 	if [ ! -s "$${FILE}.gz" ]; then
 		echo "✖ Auto-backup FAILED — refusing to tear down cluster";
@@ -440,16 +443,17 @@ db-backup: ## Dump the PostGIS database to a local file
 		-o jsonpath='{.data.postgres_password}' 2>/dev/null | base64 -d 2>/dev/null || true)
 	@if [ -z "$$PASS" ]; then echo "✖ Could not read DB password — is nars-secrets deployed?"; exit 1; fi
 	@echo "→ Backing up database '$(DB_NAME)' from pod $$POD..."
+	@PREFIX=manual
 	@$(_pg_dump_cmd)
 	@echo "✓ Backup saved: $${FILE}.gz"
 	@ls -lh "$${FILE}.gz"
 
 .PHONY: db-restore
-db-restore: ## Restore a backup. Usage: make db-restore FILE=backup/nars_db_20250101_120000.sql.gz
+db-restore: ## Restore a backup. Usage: make db-restore FILE=backup/manual_nars_db_20250101_120000.sql.gz
 	@POD=$$($(POSTGIS_GET_POD_CMD) || true)
 	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found in namespace '$(NAMESPACE)'"; exit 1; fi
 	@if [ -z "$(FILE)" ]; then
-		echo "✖ Usage: make db-restore FILE=backup/nars_db_<timestamp>.sql.gz";
+		echo "✖ Usage: make db-restore FILE=backup/<manual|auto>_nars_db_<timestamp>.sql.gz";
 		echo "";
 		echo "Available backups:";
 		ls -1 "$(BACKUP_DIR)"/*.sql.gz 2>/dev/null | sed 's/^/  /' || echo "  (none)";

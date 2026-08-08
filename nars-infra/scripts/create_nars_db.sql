@@ -171,7 +171,7 @@ CREATE TABLE IF NOT EXISTS public.refresh_tokens
     created_at  timestamp with time zone NOT NULL DEFAULT now(),
     revoked     boolean                  NOT NULL DEFAULT false,
     CONSTRAINT refresh_tokens_pkey PRIMARY KEY (id),
-    CONSTRAINT refresh_tokens_user_fk FOREIGN KEY (user_id)
+    CONSTRAINT FK_refresh_tokens_users_user_id FOREIGN KEY (user_id)
         REFERENCES public.users (id)
         ON UPDATE NO ACTION ON DELETE CASCADE
 );
@@ -350,8 +350,10 @@ CREATE INDEX IF NOT EXISTS ix_naming_panels_user_id ON public.naming_panels (use
 
 -- ── Inspections (field-worker inspections) ────────────────────────────────────
 -- Schema mirrors migration 20260511062948_AddInspections (timestamptz per
--- 20260705061915_MigrateToTimestamptz). feature_id/user_id have no FK
--- constraints — matching the EF model, which declares them as plain columns.
+-- 20260705061915_MigrateToTimestamptz) plus the user FK added by
+-- 20260808070428_AddForeignKeys. FK names match the EF model so a fresh
+-- database initialized from this script converges with a migrated one
+-- (no duplicate constraints).
 CREATE TABLE IF NOT EXISTS public.inspections
 (
     id         uuid                     NOT NULL,
@@ -362,7 +364,10 @@ CREATE TABLE IF NOT EXISTS public.inspections
     status     character varying(20)    NOT NULL,
     created_at timestamp with time zone NOT NULL,
     updated_at timestamp with time zone,
-    CONSTRAINT inspections_pkey PRIMARY KEY (id)
+    CONSTRAINT inspections_pkey PRIMARY KEY (id),
+    CONSTRAINT FK_inspections_users_user_id FOREIGN KEY (user_id)
+        REFERENCES public.users (id)
+        ON UPDATE NO ACTION ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS ix_inspections_feature_id
@@ -391,9 +396,9 @@ CREATE TABLE IF NOT EXISTS public.error_logs
     user_agent  character varying(500),
     created_at  timestamp with time zone NOT NULL,
     CONSTRAINT error_logs_pkey PRIMARY KEY (id),
-    CONSTRAINT error_logs_user_fk FOREIGN KEY (user_id)
+    CONSTRAINT FK_error_logs_users_user_id FOREIGN KEY (user_id)
         REFERENCES public.users (id)
-        ON UPDATE NO ACTION ON DELETE SET NULL
+        ON UPDATE NO ACTION ON DELETE CASCADE
 );
 
 -- ══════════════════════════════════════════════════════════════════════════════

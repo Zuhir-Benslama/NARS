@@ -76,6 +76,22 @@ public class LocationsControllerTests
 
     // ── GET /api/wilayas ──────────────────────────────────────────────────
 
+    [Theory]
+    [InlineData("50%", "50\\%")]
+    [InlineData("a_b", "a\\_b")]
+    [InlineData("50\\%", "50\\\\\\%")]
+    [InlineData("plain", "plain")]
+    public void EscapeLikeWildcards_EscapesWildcardsAndBackslash(string input, string expected)
+        => Assert.Equal(expected, LocationsController.EscapeLikeWildcards(input));
+
+    [Fact]
+    public void EscapeLikeWildcards_BackslashBeforeWildcard_DoesNotNeutralizeEscaping()
+    {
+        // The escaped result must match the literal text "50\%", never act as
+        // "50" followed by the any-character wildcard.
+        Assert.Equal("50\\\\\\%", LocationsController.EscapeLikeWildcards("50\\%"));
+    }
+
     [Fact]
     public async Task GetWilayas_NoSearch_ReturnsAllWilayas()
     {

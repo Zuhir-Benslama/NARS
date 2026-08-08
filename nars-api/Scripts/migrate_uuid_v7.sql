@@ -194,7 +194,7 @@ ALTER TABLE house_entrances  ADD CONSTRAINT house_entrances_road_fk  FOREIGN KEY
 ALTER TABLE public_buildings ADD CONSTRAINT public_buildings_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
 ALTER TABLE public_spaces    ADD CONSTRAINT public_spaces_user_fk    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
 ALTER TABLE naming_panels    ADD CONSTRAINT naming_panels_user_fk    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
-ALTER TABLE refresh_tokens   ADD CONSTRAINT refresh_tokens_user_fk   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE refresh_tokens   ADD CONSTRAINT FK_refresh_tokens_users_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
 
 -- ──────────────────────────────────────────────────────────────────────────────
 -- Step 9: Recreate indexes

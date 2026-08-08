@@ -74,7 +74,7 @@ public abstract class NarsControllerBase(
     /// <summary>Writes the access + refresh auth cookies with consistent secure options.</summary>
     protected void AppendAuthCookies(string accessToken, string refreshToken, TimeSpan accessMaxAge, TimeSpan refreshMaxAge)
     {
-        Response.Cookies.Append("access_token", accessToken, MakeCookieOptions(accessMaxAge));
-        Response.Cookies.Append("refresh_token", refreshToken, MakeCookieOptions(refreshMaxAge));
+        Response.Cookies.Append(CookieNames.AccessToken, accessToken, MakeCookieOptions(accessMaxAge));
+        Response.Cookies.Append(CookieNames.RefreshToken, refreshToken, MakeCookieOptions(refreshMaxAge));
     }
 }

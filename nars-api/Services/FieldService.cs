@@ -10,8 +10,16 @@ namespace NarsApi.Services;
 
 public sealed class FieldService(
     AppDbContext db,
+    IFeatureService featureService,
     ILogger<FieldService> logger) : IFieldService
 {
+    /// <summary>Feature types a field worker may inspect.</summary>
+    public static readonly IReadOnlyList<string> ValidInspectionTypes =
+        [FeatureTypes.Road, FeatureTypes.HouseEntrance, FeatureTypes.NamingPanel];
+
+    /// <summary>Status values a field inspection may carry.</summary>
+    public static readonly IReadOnlyList<string> ValidInspectionStatuses =
+        ["good", "issue"];
     public async Task<(List<FieldFeatureResult> Items, int Total)> QueryFeaturesAsync(
         FeatureTypeDescriptor descriptor, int communeId, int skip, int take, CancellationToken ct = default)
     {
@@ -46,7 +54,7 @@ public sealed class FieldService(
         {
             if (total == 0)
             {
-                total = reader.GetInt32(totalOrdinal);
+                total = Convert.ToInt32(reader.GetInt64(totalOrdinal));
             }
 
             var id = reader.GetGuid(0);
@@ -124,10 +132,10 @@ public sealed class FieldService(
             from r in db.Roads
             join u in db.Users on r.UserId equals u.Id
             where r.Id == roadId
-            select new { Road = r, u.CommuneId }
+            select new { r.UserId, u.CommuneId }
         ).FirstOrDefaultAsync(ct);
 
-        return result is null ? null : (result.Road.UserId, result.CommuneId);
+        return result is null ? null : (result.UserId, result.CommuneId);
     }
 
     public async Task<Guid> CreateEntranceAsync(Guid roadId, Guid ownerUserId, Guid creatorUserId, string label, string data, CancellationToken ct = default)
@@ -157,13 +165,20 @@ public sealed class FieldService(
     }
 
     public async Task<string?> GetFeatureRegistryTypeAsync(Guid featureId, CancellationToken ct = default)
-    {
-        var reg = await db.FeatureRegistry.FindAsync([featureId], ct);
-        return reg?.FeatureType;
-    }
+        => await featureService.GetFeatureTypeAsync(featureId, ct);
 
     public async Task<Guid> SubmitInspectionAsync(Guid featureId, Guid userId, string type, string status, string data, CancellationToken ct = default)
     {
+        if (!ValidInspectionTypes.Contains(type))
+        {
+            throw new ArgumentException($"Invalid inspection type. Must be one of: {string.Join(", ", ValidInspectionTypes)}", nameof(type));
+        }
+
+        if (!ValidInspectionStatuses.Contains(status))
+        {
+            throw new ArgumentException($"Invalid inspection status. Must be one of: {string.Join(", ", ValidInspectionStatuses)}", nameof(status));
+        }
+
         var inspection = new Inspection
         {
             Id = Guid.CreateVersion7(),

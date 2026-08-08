@@ -51,17 +51,17 @@ public record AuthorizedAdminSignupRequest(
     [Required(AllowEmptyStrings = false), MaxLength(128)] string AdminPassword,
     // ── New account details ──────────────────────────────────────────────────
     [property: JsonPropertyName("name")]
-    [Required(AllowEmptyStrings = false)] string Name,
+    [Required(AllowEmptyStrings = false), MaxLength(255)] string Name,
     [property: JsonPropertyName("email")]
-    [Required(AllowEmptyStrings = false), EmailAddress] string Email,
+    [Required(AllowEmptyStrings = false), EmailAddress, MaxLength(255)] string Email,
     [property: JsonPropertyName("phone")]
-    [Required(AllowEmptyStrings = false), Phone] string Phone,
+    [Required(AllowEmptyStrings = false), Phone, MaxLength(50)] string Phone,
     [property: JsonPropertyName("username")]
-    [Required(AllowEmptyStrings = false)] string Username,
+    [Required(AllowEmptyStrings = false), MaxLength(100)] string Username,
     [property: JsonPropertyName("password")]
     [Required(AllowEmptyStrings = false), MaxLength(128)] string Password,
     [property: JsonPropertyName("role")]
-    [Required(AllowEmptyStrings = false)] string Role,
+    [Required(AllowEmptyStrings = false), MaxLength(20)] string Role,
     // ── Geographic anchor (one required depending on role) ───────────────────
     [property: JsonPropertyName("commune_id")] int? CommuneId,
     [property: JsonPropertyName("daira_id")] int? DairaId,

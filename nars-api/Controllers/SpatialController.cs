@@ -88,7 +88,10 @@ public class SpatialController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     public IActionResult GetScatteredStatus()
     {
-        var error = scatteredService.LastError;
+        var communeId = CurrentCommuneId;
+        var error = communeId is null
+            ? null
+            : scatteredService.GetLastError(RequiredCurrentUserId, communeId.Value);
         return Ok(new ScatteredStatusResponse(
             LastErrorTime: error?.Timestamp.ToString(FeatureDtoConverter.IsoDateFormat),
             LastErrorMessage: error.HasValue ? "An error occurred during computation." : null,
@@ -121,7 +124,7 @@ public class SpatialController(
         if (!succeeded)
         {
             return Problem(
-                detail: scatteredService.LastError?.Message ?? "Scattered area recomputation failed.",
+                detail: "Scattered area recomputation failed.",
                 statusCode: StatusCodes.Status500InternalServerError);
         }
 

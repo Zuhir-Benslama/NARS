@@ -113,17 +113,15 @@ public class PagesController(
 
     private async Task<bool> TryAuthenticateAsync(CancellationToken cancellationToken)
     {
-        if (User.Identity?.IsAuthenticated == true)
-        {
-            return true;
-        }
-
+        // Auth for page loads is derived strictly from a freshly validated access
+        // token (cookie or header) or a silent refresh — never from a signed
+        // session cookie, which would carry no token-expiry information and keep
+        // pages authenticated after the access token has expired.
         var principal = ValidateAccessTokenFromCookie();
         principal ??= ValidateAccessTokenFromBearerHeader();
 
         if (principal is not null)
         {
-            await HttpContext.SignInAsync("Pages", principal);
             return true;
         }
 
@@ -132,7 +130,7 @@ public class PagesController(
 
     private ClaimsPrincipal? ValidateAccessTokenFromCookie()
     {
-        var accessToken = Request.Cookies["access_token"];
+        var accessToken = Request.Cookies[CookieNames.AccessToken];
         if (string.IsNullOrEmpty(accessToken))
         {
             return null;
@@ -169,20 +167,22 @@ public class PagesController(
         var principal = jwt.ValidateToken(bearerToken);
         if (principal is not null)
         {
-            logger.LogDebug("[Pages] Valid bearer token header found. Setting access_token cookie.");
-            Response.Cookies.Append("access_token", bearerToken, MakeCookieOptions(jwt.AccessTokenExpiresIn));
+            logger.LogDebug("[Pages] Valid bearer token header found.");
         }
         else
         {
             logger.LogDebug("[Pages] Bearer token header is invalid or expired.");
         }
 
+        // Never persist a header-supplied bearer token into the access_token
+        // cookie: the client chose to send it via header (not as a cookie), and
+        // writing it as a long-lived cookie would broaden the token's exposure.
         return principal;
     }
 
     private async Task<bool> TryRefreshSessionAsync(CancellationToken cancellationToken)
     {
-        var refreshToken = Request.Cookies["refresh_token"];
+        var refreshToken = Request.Cookies[CookieNames.RefreshToken];
         if (string.IsNullOrEmpty(refreshToken))
         {
             logger.LogDebug("[Pages] refresh_token cookie NOT FOUND. Cannot silent refresh.");
@@ -210,15 +210,11 @@ public class PagesController(
             }
 
             logger.LogDebug("[Pages] Silent refresh SUCCESS. Issuing new access cookie for {Username}", result.Username);
-            Response.Cookies.Append("access_token", result.NewAccessToken, MakeCookieOptions(jwt.AccessTokenExpiresIn));
+            Response.Cookies.Append(CookieNames.AccessToken, result.NewAccessToken, MakeCookieOptions(jwt.AccessTokenExpiresIn));
 
             var principal = jwt.ValidateToken(result.NewAccessToken);
-            if (principal is not null)
-            {
-                await HttpContext.SignInAsync("Pages", principal);
-            }
 
-            return true;
+            return principal is not null;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

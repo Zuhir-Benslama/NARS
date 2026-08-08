@@ -91,7 +91,11 @@ public static class PipelineExtensions
                         return;
                     }
 
-                    if (ex is ArgumentException or InvalidOperationException)
+                    // Only ArgumentException reliably indicates malformed client input.
+                    // InvalidOperationException (Sequence contains no elements, collection
+                    // modified, EF tracking errors, ...) usually signals a server bug and
+                    // must fall through to the 500 handler below.
+                    if (ex is ArgumentException)
                     {
                         logger.LogWarning(ex, "Bad request: {Message}", ex.Message);
                         ctx.Response.StatusCode = 400;
@@ -234,13 +238,25 @@ public static class PipelineExtensions
     /// <c>ctx.Items["csp-nonce"]</c> so <see cref="NarsApi.Controllers.PagesController"/>
     /// can inject it into inline script tags, and embedded into script-src/style-src
     /// so <c>'unsafe-inline'</c> is never sent in production.
+    /// API responses still get the nosniff header so a reflected or stored XSS
+    /// payload can never be interpreted as a script by the browser.
     /// </summary>
     internal static async Task ApplyCspMiddlewareAsync(
         HttpContext ctx,
         RequestDelegate next,
         CspOptions cspOptions)
     {
-        if (!ctx.Request.Path.StartsWithSegments("/api") && !ctx.Response.HasStarted)
+        if (ctx.Request.Path.StartsWithSegments("/api"))
+        {
+            if (!ctx.Response.HasStarted)
+            {
+                ctx.Response.Headers.XContentTypeOptions = "nosniff";
+            }
+            await next(ctx);
+            return;
+        }
+
+        if (!ctx.Response.HasStarted)
         {
             var nonceBytes = new byte[16];
             System.Security.Cryptography.RandomNumberGenerator.Fill(nonceBytes);

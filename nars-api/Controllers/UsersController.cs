@@ -12,7 +12,7 @@ namespace NarsApi.Controllers;
 [ApiController]
 [Route("/api")]
 [Tags("Users")]
-public class UsersController(IUserProfileService userProfile, ILogger<UsersController> logger, IWebHostEnvironment webHost) : NarsControllerBase(webHost)
+public class UsersController(IUserProfileService userProfile, IRefreshTokenService refreshTokens, ILogger<UsersController> logger, IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     /// <summary>Updates the authenticated user's username, email, and/or password.</summary>
     [HttpPut("user/profile")]
@@ -60,6 +60,7 @@ public class UsersController(IUserProfileService userProfile, ILogger<UsersContr
 
         // Only update password when explicitly provided and valid.
         // Never hash an empty string — that would lock the user out.
+        var passwordChanged = false;
         if (!string.IsNullOrEmpty(body.Password))
         {
             // Require the current password so a stolen session cookie alone
@@ -77,6 +78,7 @@ public class UsersController(IUserProfileService userProfile, ILogger<UsersContr
             }
 
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(body.Password);
+            passwordChanged = true;
         }
 
         try
@@ -88,6 +90,12 @@ public class UsersController(IUserProfileService userProfile, ILogger<UsersContr
             logger.LogWarning(ex, "Duplicate username/email on profile update (userId={UserId})", CurrentUserId);
             // TOCTOU race: concurrent request claimed the username/email first.
             return Problem(detail: "Username or email already exists.", statusCode: 409);
+        }
+
+        if (passwordChanged)
+        {
+            // Revoke all refresh tokens so sessions using the old password die immediately.
+            await refreshTokens.RevokeAllUserTokensAsync(user.Id, cancellationToken);
         }
 
         return Ok(new UpdateCredentialsResponse(

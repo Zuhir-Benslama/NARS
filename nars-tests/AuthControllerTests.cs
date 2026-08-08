@@ -46,8 +46,8 @@ public class AuthControllerTests
             Options.Create(new AdminSignupOptions { SignupToken = TestData.AdminSignupToken }),
             Mock.Of<ILogger<AuthController>>(),
             timeProvider,
-            new UserAuthorizationService(db),
-            new UserCreationService(db),
+            new UserAuthorizationService(db, refreshService, timeProvider),
+            new UserCreationService(db, new UserAuthorizationService(db, refreshService, timeProvider), Mock.Of<ILogger<UserCreationService>>()),
             Mock.Of<ILocationQueryService>(),
             Mock.Of<IWebHostEnvironment>())
         {

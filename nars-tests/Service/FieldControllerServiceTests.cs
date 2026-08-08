@@ -39,7 +39,8 @@ public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
 
     private FieldController CreateController()
     {
-        var fieldSvc = new FieldService(_db, Mock.Of<ILogger<FieldService>>());
+        var featureSvc = new FeatureService(_db, Mock.Of<IBackgroundTaskQueue>(), Mock.Of<ILogger<FeatureService>>());
+        var fieldSvc = new FieldService(_db, featureSvc, Mock.Of<ILogger<FieldService>>());
         var ctrl = new FieldController(Mock.Of<ILogger<FieldController>>(), Options.Create(new FeatureDefaultsOptions()), fieldSvc, Mock.Of<IWebHostEnvironment>());
         var httpContext = new DefaultHttpContext
         {

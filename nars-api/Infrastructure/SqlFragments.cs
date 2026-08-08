@@ -1,4 +1,5 @@
 using System.Data;
+using NarsApi.Models;
 
 namespace NarsApi.Infrastructure;
 
@@ -10,6 +11,14 @@ namespace NarsApi.Infrastructure;
 /// </summary>
 internal static class SqlFragments
 {
+    /// <summary>
+    /// IN-clause for the urban area layers ('central_urban', 'secondary_urban').
+    /// Sourced from <see cref="AreaLayers.Urban"/> so the SQL and the model
+    /// cannot drift apart.
+    /// </summary>
+    internal static string UrbanAreaLayersSqlIn { get; } =
+        string.Join(", ", FeatureTypes.AreaLayers.Urban.Select(l => $"'{l}'"));
+
     /// <summary>
     /// Template for reconstructing a valid PostGIS POLYGON from a feature's
     /// stored JSONB data. Use {0} as the table alias placeholder.

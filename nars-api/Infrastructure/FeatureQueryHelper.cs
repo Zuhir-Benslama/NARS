@@ -131,14 +131,25 @@ public static class FeatureQueryHelper
             var type = reader.GetString(typeOrdinal);
             totalCount = Convert.ToInt32(reader.GetInt64(totalOrdinal));
 
+            var data = EmptyJsonObject;
+            if (!string.IsNullOrWhiteSpace(dataJson))
+            {
+                try
+                {
+                    data = JsonSerializer.Deserialize<JsonElement>(dataJson);
+                }
+                catch (JsonException)
+                {
+                    // Corrupt stored data must not take the endpoint down; degrade to {}.
+                }
+            }
+
             rows.Add(new FeatureResult(
                 Id: id.ToString(),
                 Type: type,
                 Layer: layerVal,
                 Label: label,
-                Data: string.IsNullOrWhiteSpace(dataJson)
-                    ? EmptyJsonObject
-                    : JsonSerializer.Deserialize<JsonElement>(dataJson),
+                Data: data,
                 CreatedAt: createdAt.ToString(FeatureDtoConverter.IsoDateFormat)
             ));
         }

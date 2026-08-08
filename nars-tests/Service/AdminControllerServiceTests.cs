@@ -43,8 +43,9 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
 
     private AdminUserController CreateUserManagementController() => new(
             Mock.Of<Microsoft.Extensions.Logging.ILogger<AdminUserController>>(),
-            new UserAuthorizationService(_db),
-            new UserCreationService(_db),
+            new UserAuthorizationService(_db, Mock.Of<IRefreshTokenService>(), Mock.Of<IDateTimeProvider>()),
+            new UserCreationService(_db, new UserAuthorizationService(_db, Mock.Of<IRefreshTokenService>(), Mock.Of<IDateTimeProvider>()),
+                Mock.Of<Microsoft.Extensions.Logging.ILogger<UserCreationService>>()),
             Mock.Of<IWebHostEnvironment>());
 
     // ── CreateAdmin ─────────────────────────────────────────────────────
@@ -186,6 +187,39 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         Assert.NotNull(createdUser);
         Assert.Equal(UserRoles.FieldWorker, createdUser.Role);
         Assert.Equal(100, createdUser.CommuneId);
+    }
+
+    // ── DeleteManagedUser ──────────────────────────────────────────────────────
+    // These tests are PostgreSQL-backed (unlike the InMemory variants) because
+    // UserAuthorizationService.DeleteUserAsync uses ExecuteDeleteAsync /
+    // ExecuteUpdateAsync, which the InMemory provider does not support.
+
+    [Fact]
+    public async Task DeleteAdmin_Valid_ReturnsNoContent()
+    {
+        var target = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 1);
+        var creator = await CreateUserAsync(UserRoles.NationalAdmin);
+        var controller = CreateUserManagementController();
+        SetAuthenticatedUser(controller, creator);
+
+        var result = await controller.DeleteManagedUser(target.Id, default);
+
+        Assert.IsType<NoContentResult>(result);
+        Assert.Null(await _db.Users.FindAsync(target.Id));
+    }
+
+    [Fact]
+    public async Task DeleteAdmin_WithinScope_ReturnsNoContent()
+    {
+        var creator = await CreateUserAsync(UserRoles.DairaAdmin, dairaId: 10);
+        var target = await CreateUserAsync(UserRoles.CommuneUser, communeId: 100);
+        var controller = CreateUserManagementController();
+        SetAuthenticatedUser(controller, creator);
+
+        var result = await controller.DeleteManagedUser(target.Id, default);
+
+        Assert.IsType<NoContentResult>(result);
+        Assert.Null(await _db.Users.FindAsync(target.Id));
     }
 
     // ── Overview ───────────────────────────────────────────────────────────────

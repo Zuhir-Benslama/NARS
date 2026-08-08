@@ -48,8 +48,10 @@ export default defineConfig(({ command, mode }) => {
       sourcemap: mode !== "production",
       // Maplibre GL JS is ~1MB and @geoman-io/maplibre-geoman-free (~0.7MB)
       // bundles it via a default import, so the vendor-geoman chunk can reach
-      // ~1.7MB after minification — this is stable vendor code that changes
-      // rarely and is cached across deploys.
+      // ~1.7MB after minification. It is now loaded on demand (dynamic import
+      // in map-init.ts), fetched via modulepreload and only executed when the
+      // map initializes — so it does not block first paint. It is stable
+      // vendor code that changes rarely and is cached across deploys.
       chunkSizeWarningLimit: 1700,
       rollupOptions: {
         output: {

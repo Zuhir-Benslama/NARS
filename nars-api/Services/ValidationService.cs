@@ -1,6 +1,7 @@
 using System.Data;
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using NarsApi.Data;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
@@ -17,6 +18,10 @@ public sealed class ValidationService(AppDbContext db) : IValidationService
     private readonly string _districtTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.District)?.TableName
             ?? throw new InvalidOperationException("FeatureTypeRegistry missing District descriptor");
 
+    // ST_Union/ST_Covers over large polygons can exceed the default 30s command
+    // timeout; cap it so a pathological query returns a client error promptly.
+    private const int CommandTimeoutSeconds = 10;
+
     /// <summary>
     /// Executes a raw SQL scalar query with strongly-named parameters.
     /// Parameters must be passed as (name, value) tuples where value is the
@@ -30,11 +35,23 @@ public sealed class ValidationService(AppDbContext db) : IValidationService
         await using var handle = await conn.EnsureOpenAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = sql;
+        cmd.CommandTimeout = CommandTimeoutSeconds;
         foreach (var (name, value) in parameters)
         {
             SqlFragments.AddParam(cmd, name, value);
         }
-        return await cmd.ExecuteScalarAsync(ct);
+        try
+        {
+            return await cmd.ExecuteScalarAsync(ct);
+        }
+        catch (PostgresException ex)
+        {
+            // Degenerate or oversized geometry in user-drawn data raises a
+            // Postgres error; surface it as a client error (400) instead of a
+            // misleading 500. Connection/server failures (NpgsqlException, not
+            // PostgresException) still bubble up as 500s.
+            throw new ArgumentException("Geometry validation failed. Check the submitted coordinates.", ex);
+        }
     }
 
     public async Task<bool> CheckRoadConnectivityAsync(Guid userId, string wkt, double maxDistanceMeters, CancellationToken ct = default)
@@ -62,7 +79,7 @@ public sealed class ValidationService(AppDbContext db) : IValidationService
                 SELECT ST_Union({SqlFragments.PolygonFromData}) AS geom
                 FROM {_areaTable} f
                 WHERE f.user_id = @uid
-                  AND f.layer  IN ('central_urban', 'secondary_urban')
+                  AND f.layer  IN ({SqlFragments.UrbanAreaLayersSqlIn})
             ),
             districts AS (
                 SELECT ST_Union({SqlFragments.PolygonFromData}) AS geom
@@ -101,7 +118,7 @@ public sealed class ValidationService(AppDbContext db) : IValidationService
                 SELECT {SqlFragments.PolygonFromDataWithAlias("a")} AS geom
                 FROM {_areaTable} a
                 WHERE a.user_id = @uid
-                  AND a.layer IN ('central_urban', 'secondary_urban')
+                  AND a.layer IN ({SqlFragments.UrbanAreaLayersSqlIn})
             )
             SELECT COUNT(*) FROM {_districtTable} d
             WHERE d.user_id = @uid
@@ -126,7 +143,7 @@ public sealed class ValidationService(AppDbContext db) : IValidationService
                 SELECT {SqlFragments.PolygonFromDataWithAlias("a")} AS geom
                 FROM {_areaTable} a
                 WHERE a.user_id = @uid
-                  AND a.layer IN ('central_urban', 'secondary_urban')
+                  AND a.layer IN ({SqlFragments.UrbanAreaLayersSqlIn})
             )
             SELECT EXISTS (
                 SELECT 1 FROM district_geom dg

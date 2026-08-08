@@ -5,8 +5,76 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public sealed class UserCreationService(AppDbContext db) : IUserCreationService
+public sealed class UserCreationService(
+    AppDbContext db,
+    IUserAuthorizationService authorizationService,
+    ILogger<UserCreationService> logger)
+    : IUserCreationService
 {
+    public async Task<ManagedUserCreationResult> CreateUserAsync(
+        string callerRole,
+        int? callerCommuneId,
+        int? callerDairaId,
+        int? callerWilayaId,
+        string name,
+        string email,
+        string phone,
+        string username,
+        string password,
+        string targetRole,
+        int? communeId,
+        int? dairaId,
+        int? wilayaId,
+        CancellationToken ct = default)
+    {
+        // 1. Role hierarchy.
+        if (!authorizationService.CanCreateRole(callerRole, targetRole))
+        {
+            return ManagedUserCreationResult.Failure(
+                403, $"A {callerRole} cannot create a {targetRole} account.", isAuthorizationFailure: true);
+        }
+
+        // 2. Geographic scope per role.
+        var scopeResult = await authorizationService.ValidateCreateUserScopeAsync(
+            callerRole, callerDairaId, callerWilayaId,
+            targetRole, communeId, dairaId, wilayaId, ct);
+        if (scopeResult.Error is not null)
+        {
+            return scopeResult.IsAuthorizationFailure
+                ? ManagedUserCreationResult.Failure(403, scopeResult.Error, isAuthorizationFailure: true)
+                : ManagedUserCreationResult.Failure(400, scopeResult.Error);
+        }
+
+        // 3. Resolve commune_id: field_workers inherit the creator's commune.
+        var effectiveCommuneId = targetRole == UserRoles.FieldWorker ? callerCommuneId : communeId;
+
+        // 4. Validate and create user (uniqueness, password strength, entity creation).
+        var creationResult = await ValidateAndCreateUserAsync(
+            name, email, phone, username, password,
+            targetRole, effectiveCommuneId, dairaId, wilayaId, ct);
+        if (!creationResult.IsSuccess)
+        {
+            var statusCode = creationResult.Code == UserCreationErrorCode.Duplicate ? 409 : 400;
+            return ManagedUserCreationResult.Failure(statusCode, creationResult.Error ?? "User creation failed.");
+        }
+
+        var newUser = creationResult.User!;
+
+        // 5. Persist (catch DB-level unique constraint races).
+        try
+        {
+            await SaveUserAsync(newUser, ct);
+        }
+        catch (DbUpdateException ex)
+        {
+            logger.LogWarning(ex, "Duplicate user during account creation (username={Username}, email={Email})",
+                username, email);
+            return ManagedUserCreationResult.Failure(409, "A user with that username or email already exists.");
+        }
+
+        return ManagedUserCreationResult.Success(newUser);
+    }
+
     public async Task<UserCreationResult> ValidateAndCreateUserAsync(
         string name,
         string email,

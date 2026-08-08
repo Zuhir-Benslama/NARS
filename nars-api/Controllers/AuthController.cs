@@ -25,10 +25,6 @@ public partial class AuthController(
     ILocationQueryService locationQuery,
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
-    // Stable dummy hash so BCrypt always does the full work, even for unknown users.
-    // Prevents username enumeration via response-time side-channel.
-    // NOTE: Only applies to signin and authorized-signup — refresh uses token hash, not BCrypt.
-    private const string DummyHash = "$2a$11$BCfJgwy.hTY703/9RBjPo.8UjBrTHh/95zFznkYLiapLvWdf5ISbO";
     // ── POST /api/signup — DISABLED ────────────────────────────────────────
     // Self-registration is not allowed. All accounts must be created by an
     // admin of the appropriate level:
@@ -59,26 +55,15 @@ public partial class AuthController(
     public async Task<IActionResult> SignIn([FromBody] SignInRequest body, CancellationToken cancellationToken = default)
     {
         var normalizedUsername = body.Username.ToLowerInvariant();
-        var user = await authorizationService.FindUserByUsernameAsync(normalizedUsername, cancellationToken);
+        var credentialResult = await authorizationService.VerifyCredentialsAsync(
+            normalizedUsername, body.Password, MaxFailedAttempts, LockoutMinutes, cancellationToken);
 
-        var hashToCheck = user?.PasswordHash ?? DummyHash;
-        var passwordValid = BCrypt.Net.BCrypt.Verify(body.Password, hashToCheck);
-
-        var isLocked = user?.LockedUntil.HasValue == true && user.LockedUntil.Value > timeProvider.UtcNow;
-
-        if (isLocked || !passwordValid || user is null)
+        if (!credentialResult.IsSuccess)
         {
-            if (!passwordValid && user is not null)
-            {
-                // Only record failed logins for actual password mismatches.
-                // A locked user who supplies the correct password is rejected
-                // without extending their lockout, so a lockout never renews
-                // itself for legitimate users.
-                await refreshService.RecordFailedLoginAsync(user, MaxFailedAttempts, LockoutMinutes, timeProvider.UtcNow, cancellationToken);
-            }
-
             return Problem(detail: "Invalid username or password", statusCode: 401);
         }
+
+        var user = credentialResult.User!;
 
         await refreshService.ResetFailedAttemptsIfNeededAsync(user, cancellationToken);
 
@@ -102,8 +87,8 @@ public partial class AuthController(
         // Match the HttpOnly/Secure/SameSite/Path attributes used when writing the
         // cookies so the deletion applies to the same cookies regardless of how
         // cookie attribute matching is implemented by the client.
-        Response.Cookies.Delete("access_token", MakeCookieOptions(TimeSpan.Zero));
-        Response.Cookies.Delete("refresh_token", MakeCookieOptions(TimeSpan.Zero));
+        Response.Cookies.Delete(CookieNames.AccessToken, MakeCookieOptions(TimeSpan.Zero));
+        Response.Cookies.Delete(CookieNames.RefreshToken, MakeCookieOptions(TimeSpan.Zero));
         return Ok(ApiResponse.Ok("Logged out successfully"));
     }
 
@@ -118,7 +103,7 @@ public partial class AuthController(
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Refresh(CancellationToken cancellationToken = default)
     {
-        var result = await refreshService.RotateRefreshTokenAsync(Request.Cookies["refresh_token"], cancellationToken);
+        var result = await refreshService.RotateRefreshTokenAsync(Request.Cookies[CookieNames.RefreshToken], cancellationToken);
         if (!result.Success)
         {
             return Problem(detail: result.Detail, statusCode: 401);
@@ -225,7 +210,21 @@ public partial class AuthController(
         var refreshMaxAge = refreshExpiry - timeProvider.UtcNow;
         AppendAuthCookies(token, refreshRaw, jwt.AccessTokenExpiresIn, refreshMaxAge);
 
-        var loc = await locationQuery.GetCommuneWithDairaAsync(user.CommuneId ?? 0, ct);
+        CommuneInfo? commune = null;
+        if (user.CommuneId is { } communeId)
+        {
+            var loc = await locationQuery.GetCommuneWithDairaAsync(communeId, ct);
+            if (loc.Commune is not null)
+            {
+                commune = new CommuneInfo(
+                    loc.Commune.CommuneId,
+                    loc.Commune.CommuneFr,
+                    loc.Commune.CommuneAr,
+                    loc.Commune.CommuneLatitude,
+                    loc.Commune.CommuneLongitude
+                );
+            }
+        }
 
         return Ok(new SignInResponse(
             Success: true,
@@ -236,15 +235,7 @@ public partial class AuthController(
                 Name: user.Name,
                 Email: user.Email,
                 Role: user.Role,
-                Commune: loc.Commune is not null
-                    ? new CommuneInfo(
-                        Id: loc.Commune.CommuneId,
-                        NameFr: loc.Commune.CommuneFr,
-                        NameAr: loc.Commune.CommuneAr,
-                        Latitude: loc.Commune.CommuneLatitude,
-                        Longitude: loc.Commune.CommuneLongitude
-                    )
-                    : null
+                Commune: commune
             )
         ));
     }

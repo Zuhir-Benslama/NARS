@@ -118,5 +118,26 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasIndex(i => new { i.FeatureId, i.CreatedAt })
             .IsDescending(false, true)
             .HasDatabaseName("ix_inspections_feature_created");
+
+        // ── Relationships / foreign keys ─────────────────────────────────────
+        // The schema previously declared no FKs, so referential integrity was
+        // enforced only by hand-written delete code. These three relationships
+        // are unambiguous (single parent table each) and cascade to match the
+        // existing DeleteUserAsync flow (children removed before the user row).
+        modelBuilder.Entity<RefreshToken>()
+            .HasOne<User>()
+            .WithMany()
+            .HasForeignKey(rt => rt.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<Inspection>()
+            .HasOne<User>()
+            .WithMany()
+            .HasForeignKey(i => i.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ErrorLog>()
+            .HasOne<User>()
+            .WithMany()
+            .HasForeignKey(el => el.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

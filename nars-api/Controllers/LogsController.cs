@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,7 +16,12 @@ namespace NarsApi.Controllers;
 [Route("/api")]
 [Tags("Logs")]
 [EnableRateLimiting(RateLimitPolicies.Logs)]
-public class LogsController(IErrorLogService errorLogService, ILogger<LogsController> logger, IOptions<LoggingOptions> logOptions, IDateTimeProvider timeProvider) : ControllerBase
+public class LogsController(
+    IErrorLogService errorLogService,
+    ILogger<LogsController> logger,
+    IOptions<LoggingOptions> logOptions,
+    IDateTimeProvider timeProvider,
+    IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     private int MaxBatchSize => logOptions.Value.MaxBatchSize;
     private int MaxEntryLength => logOptions.Value.MaxEntryLength;
@@ -50,9 +56,7 @@ public class LogsController(IErrorLogService errorLogService, ILogger<LogsContro
             return Problem(detail: $"Batch size exceeds maximum of {MaxBatchSize}.", statusCode: 400);
         }
 
-        var userId = User.Identity?.IsAuthenticated == true
-            ? GetUserIdOrNull()
-            : null;
+        var userId = CurrentUserId;
 
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
         var userAgent = Request.Headers.UserAgent.FirstOrDefault();
@@ -112,16 +116,12 @@ public class LogsController(IErrorLogService errorLogService, ILogger<LogsContro
         return NoContent();
     }
 
-    private Guid? GetUserIdOrNull()
-    {
-        var claim = User.FindFirst(ClaimNames.UserId);
-        return claim is not null && Guid.TryParse(claim.Value, out var id) ? id : null;
-    }
-
     /// <summary>
     /// Strips control characters (except \n, \r, \t) and truncates to maxLen.
     /// Prevents log injection via control chars.
     /// </summary>
+    private const int StackBufferCharLimit = 4096;
+
     private static string SanitizeLogField(string value, int maxLen)
     {
         if (string.IsNullOrEmpty(value))
@@ -129,18 +129,45 @@ public class LogsController(IErrorLogService errorLogService, ILogger<LogsContro
             return value;
         }
 
-        Span<char> buffer = stackalloc char[value.Length];
+        // Output can never exceed maxLen, so cap the buffer at maxLen. Large
+        // payloads fall back to the heap to avoid overflowing the thread stack.
+        var capacity = Math.Min(value.Length, maxLen);
+        if (capacity <= StackBufferCharLimit)
+        {
+            Span<char> buffer = stackalloc char[capacity];
+            var written = SanitizeInto(value, buffer);
+            return new string(buffer[..written]);
+        }
+
+        var rented = ArrayPool<char>.Shared.Rent(capacity);
+        try
+        {
+            var written = SanitizeInto(value, rented);
+            return new string(rented.AsSpan(0, written));
+        }
+        finally
+        {
+            ArrayPool<char>.Shared.Return(rented);
+        }
+    }
+
+    private static int SanitizeInto(string value, Span<char> buffer)
+    {
         var written = 0;
         foreach (var c in value)
         {
+            if (written == buffer.Length)
+            {
+                break;
+            }
+
             if (c is '\n' or '\r' or '\t' || !char.IsControl(c))
             {
                 buffer[written++] = c;
             }
         }
 
-        var cleaned = new string(buffer[..written]);
-        return cleaned.Length <= maxLen ? cleaned : cleaned[..maxLen];
+        return written;
     }
 
     /// <summary>

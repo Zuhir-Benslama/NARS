@@ -23,7 +23,7 @@ public sealed class EntranceQueryService(AppDbContext db) : IEntranceQueryServic
             WHERE user_id = @uid
               AND layer   = @layer
               AND road_id = @rid
-              AND data::jsonb->>'entranceNumber' IS NOT NULL";
+              AND (data::jsonb->>'entranceNumber') ~ '^[0-9]+$'";
 #pragma warning restore S2077
         SqlFragments.AddParam(cmd, "@uid", userId);
         SqlFragments.AddParam(cmd, "@rid", roadId);

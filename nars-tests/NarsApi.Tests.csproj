@@ -8,14 +8,19 @@
     <!--
       Coverage thresholds for coverlet.msbuild, applied only when coverage is
       collected (`dotnet test /p:CollectCoverage=true` — see `make test-coverage`).
-      These are a REGRESSION FLOOR, not a target: measured 2026-08-02 was
-      ~43.7% line / 38.8% branch (unit tests only, as CI runs them; excludes
-      generated code — see the Exclude property below). Raise as coverage
-      improves — do not lower.
+      These are a REGRESSION FLOOR, not a target. CI enforces coverage on the
+      UNIT-ONLY run (filter Category!=Service), so the floor must fit the
+      lower of the two measured runs (excludes generated code — see the Exclude
+      property below):
+        - unit-only (what CI gates on): ~63.0% line / 56.0% branch
+        - full suite incl. service tests: ~77.7% line / 68.2% branch
+      Raise as coverage improves — do not lower. The single Threshold value
+      applies to both line and branch, so it is capped by the lower (branch)
+      metric of the unit-only run.
       Defined here (not on the CLI) because the vstest command-line parser
       splits comma-separated /p: values (e.g. ThresholdType=line,branch).
     -->
-    <Threshold Condition="'$(CollectCoverage)' == 'true'">35</Threshold>
+    <Threshold Condition="'$(CollectCoverage)' == 'true'">50</Threshold>
     <ThresholdType Condition="'$(CollectCoverage)' == 'true'">line,branch</ThresholdType>
     <ThresholdStat Condition="'$(CollectCoverage)' == 'true'">total</ThresholdStat>
   </PropertyGroup>

@@ -22,27 +22,11 @@ public sealed class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactor
         var conn = (NpgsqlConnection)db.Database.GetDbConnection();
         await using var connHandle = await conn.EnsureOpenAsync(ct);
 
-        var sb = new StringBuilder();
+        var sql = BuildUnionAll((i, table) =>
+            $"SELECT @t{i} AS Type, COUNT(*)::bigint AS Count FROM {table} WHERE user_id = @u{i}");
+
+        await using var cmd = new NpgsqlCommand(sql, conn);
         var paramIndex = 0;
-        foreach (var type in _featureTypes)
-        {
-            var descriptor = FeatureTypeRegistry.GetDescriptor(type);
-            if (descriptor is null)
-            {
-                continue;
-            }
-
-            if (sb.Length > 0)
-            {
-                sb.AppendLine(" UNION ALL");
-            }
-
-            sb.Append($"SELECT @t{paramIndex} AS Type, COUNT(*)::bigint AS Count FROM {descriptor.TableName} WHERE user_id = @u{paramIndex}");
-            paramIndex++;
-        }
-
-        await using var cmd = new NpgsqlCommand(sb.ToString(), conn);
-        paramIndex = 0;
         foreach (var type in _featureTypes)
         {
             cmd.Parameters.AddWithValue($"t{paramIndex}", type);
@@ -76,27 +60,11 @@ public sealed class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactor
         await using var connHandle = await conn.EnsureOpenAsync(ct);
 
         // Build a single UNION ALL query across all tables, grouped by user_id.
-        var sb = new StringBuilder();
+        var sql = BuildUnionAll((i, table) =>
+            $"SELECT user_id, @tp{i} AS Type, COUNT(*)::bigint AS Count FROM {table} WHERE user_id = ANY(@u{i}) GROUP BY user_id");
+
+        await using var cmd = new NpgsqlCommand(sql, conn);
         var paramIndex = 0;
-        foreach (var type in _featureTypes)
-        {
-            var descriptor = FeatureTypeRegistry.GetDescriptor(type);
-            if (descriptor is null)
-            {
-                continue;
-            }
-
-            if (sb.Length > 0)
-            {
-                sb.AppendLine(" UNION ALL");
-            }
-
-            sb.Append($"SELECT user_id, @tp{paramIndex} AS Type, COUNT(*)::bigint AS Count FROM {descriptor.TableName} WHERE user_id = ANY(@u{paramIndex}) GROUP BY user_id");
-            paramIndex++;
-        }
-
-        await using var cmd = new NpgsqlCommand(sb.ToString(), conn);
-        paramIndex = 0;
         foreach (var type in _featureTypes)
         {
             cmd.Parameters.AddWithValue($"tp{paramIndex}", type);
@@ -158,5 +126,29 @@ public sealed class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactor
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var conn = db.Database.GetDbConnection();
         return await FeatureQueryHelper.LoadByLayerAsync(conn, userId, layer, skip, take, ct);
+    }
+
+    private static string BuildUnionAll(Func<int, string, string> branchBuilder)
+    {
+        // Table names come from the allowlist-validated registry, so they are safe to inline.
+        var sb = new StringBuilder();
+        var i = 0;
+        foreach (var type in _featureTypes)
+        {
+            var descriptor = FeatureTypeRegistry.GetDescriptor(type);
+            if (descriptor is null)
+            {
+                continue;
+            }
+
+            if (sb.Length > 0)
+            {
+                sb.AppendLine(" UNION ALL");
+            }
+
+            sb.Append(branchBuilder(i, descriptor.TableName));
+            i++;
+        }
+        return sb.ToString();
     }
 }

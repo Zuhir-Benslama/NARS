@@ -80,11 +80,13 @@ public static class GeometryHelper
 
     /// <summary>
     /// Suggests the next available entrance number (odd for left, even for right).
+    /// Parity is preserved even past 10,000 so an exhausted series never collides
+    /// with the opposite parity (e.g. 10000 must not be reused by the odd series).
     /// </summary>
     public static int SuggestEntranceNumber(string side, HashSet<int> usedNumbers)
     {
         var suggested = side == "left" ? 1 : 2;
-        while (usedNumbers.Contains(suggested) && suggested < 10_000)
+        while (usedNumbers.Contains(suggested) && suggested < 100_000)
         {
             suggested += 2;
         }
@@ -118,6 +120,11 @@ public static class GeometryHelper
 
     public static string BuildPolygonWkt(List<CoordDto> coords)
     {
+        if (coords.Count < 3)
+        {
+            throw new ArgumentException("Polygon requires at least 3 coordinates.");
+        }
+
         var sb = new StringBuilder("POLYGON((");
         AppendWktCoords(sb, coords);
         var first = $"{FormatDoubleInvariant(coords[0].Lng)} {FormatDoubleInvariant(coords[0].Lat)}";

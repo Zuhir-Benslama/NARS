@@ -1,3 +1,4 @@
+using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using Xunit;
 
@@ -145,5 +146,42 @@ public class GeometryHelperTests
         var num = GeometryHelper.SuggestEntranceNumber("right", used);
 
         Assert.Equal(6, num);
+    }
+
+    [Fact]
+    public void BuildPolygonWkt_EmptyList_Throws()
+    {
+        Assert.Throws<ArgumentException>(() => GeometryHelper.BuildPolygonWkt([]));
+    }
+
+    [Fact]
+    public void BuildPolygonWkt_FewerThanThreePoints_Throws()
+    {
+        Assert.Throws<ArgumentException>(() => GeometryHelper.BuildPolygonWkt(
+            [new CoordDto(1.0, 2.0), new CoordDto(3.0, 4.0)]));
+    }
+
+    [Fact]
+    public void SuggestEntranceNumber_ExhaustedOddSeries_DoesNotCollideWithEvens()
+    {
+        var used = new HashSet<int>(Enumerable.Range(0, 5000).Select(i => i * 2 + 1));
+        used.Add(10000);
+
+        var num = GeometryHelper.SuggestEntranceNumber("left", used);
+
+        Assert.Equal(10001, num);
+        Assert.DoesNotContain(num, used);
+    }
+
+    [Fact]
+    public void SuggestEntranceNumber_ExhaustedEvenSeries_DoesNotReturnTakenBoundary()
+    {
+        var used = new HashSet<int>(Enumerable.Range(1, 5000).Select(i => i * 2));
+        used.Add(10001);
+
+        var num = GeometryHelper.SuggestEntranceNumber("right", used);
+
+        Assert.Equal(10002, num);
+        Assert.DoesNotContain(num, used);
     }
 }

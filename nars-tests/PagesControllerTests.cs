@@ -199,7 +199,7 @@ public class PagesControllerTests
     }
 
     [Fact]
-    public async Task MapPage_ValidBearerHeader_SetsAccessCookieAndServesPage()
+    public async Task MapPage_ValidBearerHeader_ServesPageWithoutPersistingCookie()
     {
         using var h = new ControllerHarness(bearer: "bearer-token").WithValidPrincipal("bearer-token");
 
@@ -207,7 +207,7 @@ public class PagesControllerTests
 
         Assert.IsType<ContentResult>(result);
         var setCookie = string.Join(";", h.HttpContext.Response.Headers["Set-Cookie"].Where(v => v is not null));
-        Assert.Contains("access_token=bearer-token", setCookie);
+        Assert.DoesNotContain("access_token=bearer-token", setCookie);
     }
 
     [Fact]
@@ -273,6 +273,8 @@ public class PagesControllerTests
     public async Task MapPage_InvalidAccessTokenCookie_FallsBackToRefresh()
     {
         using var h = new ControllerHarness(accessCookie: "expired-token", refreshCookie: "refresh-token");
+        var principal = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "alice")], "jwt"));
+        h.Jwt.Setup(j => j.ValidateToken("new-access-token")).Returns(principal);
         h.Refresh
             .Setup(r => r.MintAccessTokenAsync("refresh-token", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new RefreshTokenResult(true, null, "alice", null, "new-access-token", FixedUtcNow.AddDays(30)));

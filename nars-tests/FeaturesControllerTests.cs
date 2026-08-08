@@ -21,15 +21,12 @@ public class FeaturesControllerTests
 {
     private static FeaturesController CreateController(
         AppDbContext db,
-        IBackgroundTaskQueue? bgQueue = null,
         IDateTimeProvider? timeProvider = null,
         IFeatureStatsService? featureStatsService = null,
         IFeatureService? featureService = null)
     {
         var ctrl = new FeaturesController(
-            featureService ?? new FeatureService(db),
-            bgQueue ?? Mock.Of<IBackgroundTaskQueue>(),
-            Mock.Of<ILogger<FeaturesController>>(),
+            featureService ?? new FeatureService(db, Mock.Of<IBackgroundTaskQueue>(), Mock.Of<ILogger<FeatureService>>()),
             Options.Create(new FeatureDefaultsOptions()),
             timeProvider ?? Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow),
             featureStatsService ?? Mock.Of<IFeatureStatsService>(),
@@ -163,38 +160,32 @@ public class FeaturesControllerTests
     [Fact]
     public async Task SaveFeature_Area_QueuesScatteredRefresh()
     {
-        var bgQueueMock = new Mock<IBackgroundTaskQueue>();
-        bgQueueMock.Setup(x => x.QueueBackgroundWorkItemAsync(It.IsAny<Func<IServiceProvider, CancellationToken, Task>>()))
-            .Returns(ValueTask.CompletedTask);
-
+        var featureServiceMock = new Mock<IFeatureService>();
         using var db = CreateInMemoryDb("FeaturesTest");
-        var ctrl = CreateController(db, bgQueue: bgQueueMock.Object);
+        var ctrl = CreateController(db, featureService: featureServiceMock.Object);
         var data = Json("""{"coordinates":[[{"lat":36.0,"lng":3.0}]]}""");
         var body = new FeatureSaveRequest(FeatureTypes.Area, FeatureTypes.AreaLayers.CentralUrban, "area", data);
 
         await ctrl.SaveFeature(body);
 
-        bgQueueMock.Verify(
-            x => x.QueueBackgroundWorkItemAsync(It.IsAny<Func<IServiceProvider, CancellationToken, Task>>()),
+        featureServiceMock.Verify(
+            s => s.QueueScatteredRefreshAsync(UserId, 1),
             Times.Once);
     }
 
     [Fact]
     public async Task SaveFeature_NonArea_DoesNotQueueScatteredRefresh()
     {
-        var bgQueueMock = new Mock<IBackgroundTaskQueue>();
-        bgQueueMock.Setup(x => x.QueueBackgroundWorkItemAsync(It.IsAny<Func<IServiceProvider, CancellationToken, Task>>()))
-            .Returns(ValueTask.CompletedTask);
-
+        var featureServiceMock = new Mock<IFeatureService>();
         using var db = CreateInMemoryDb("FeaturesTest");
-        var ctrl = CreateController(db, bgQueue: bgQueueMock.Object);
+        var ctrl = CreateController(db, featureService: featureServiceMock.Object);
         var data = Json("""{"coordinates":[{"lat":36.0,"lng":3.0}]}""");
         var body = new FeatureSaveRequest(FeatureTypes.Road, FeatureTypes.RoadLayers.Street, "road", data);
 
         await ctrl.SaveFeature(body);
 
-        bgQueueMock.Verify(
-            x => x.QueueBackgroundWorkItemAsync(It.IsAny<Func<IServiceProvider, CancellationToken, Task>>()),
+        featureServiceMock.Verify(
+            s => s.QueueScatteredRefreshAsync(It.IsAny<Guid>(), It.IsAny<int?>()),
             Times.Never);
     }
 

@@ -27,8 +27,15 @@ public class LocationsController(
     IWebHostEnvironment environment) : ControllerBase
 {
 
-    private static string EscapeLikeWildcards(string input)
-        => input.Replace("%", "\\%").Replace("_", "\\_", StringComparison.Ordinal);
+    internal static string EscapeLikeWildcards(string input)
+    {
+        // Escape the escape character FIRST so a user-supplied backslash cannot
+        // neutralize the escaping of a following % or _ (e.g. "50\%" must match
+        // the literal text, not "50" + any single character).
+        return input.Replace("\\", "\\\\", StringComparison.Ordinal)
+                    .Replace("%", "\\%", StringComparison.Ordinal)
+                    .Replace("_", "\\_", StringComparison.Ordinal);
+    }
 
     /// <summary>
     /// Validates the search length and escapes LIKE wildcards. Returns an error
@@ -60,8 +67,7 @@ public class LocationsController(
         [FromQuery] int take = 100,
         CancellationToken cancellationToken = default)
     {
-        skip = Math.Max(skip, 0);
-        take = Math.Clamp(take, 1, 500);
+        (skip, take) = Pagination.Clamp(skip, take);
         if (ValidateSearch(search, out var sanitized) is { } error)
         {
             return error;
@@ -89,8 +95,7 @@ public class LocationsController(
             return Problem(detail: "wilaya_id is required.", statusCode: 400);
         }
 
-        skip = Math.Max(skip, 0);
-        take = Math.Clamp(take, 1, 500);
+        (skip, take) = Pagination.Clamp(skip, take);
         if (ValidateSearch(search, out var sanitized) is { } error)
         {
             return error;
@@ -118,8 +123,7 @@ public class LocationsController(
             return Problem(detail: "daira_id is required.", statusCode: 400);
         }
 
-        skip = Math.Max(skip, 0);
-        take = Math.Clamp(take, 1, 500);
+        (skip, take) = Pagination.Clamp(skip, take);
         if (ValidateSearch(search, out var sanitized) is { } error)
         {
             return error;

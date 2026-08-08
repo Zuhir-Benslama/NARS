@@ -214,8 +214,6 @@ public class SpatialControllerTests
         var scatteredMock = new Mock<IScatteredAreaService>();
         scatteredMock.Setup(s => s.RefreshAsync(uid, 1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
-        scatteredMock.SetupGet(s => s.LastError)
-            .Returns((FixedUtcNowOffset, "Simulated refresh failure"));
         var (ctrl, db) = CreateController(userId: uid, scatteredService: scatteredMock.Object);
         using (db)
         {

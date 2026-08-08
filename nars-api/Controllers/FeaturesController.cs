@@ -14,8 +14,6 @@ namespace NarsApi.Controllers;
 [Tags("Features")]
 public class FeaturesController(
     IFeatureService featureService,
-    IBackgroundTaskQueue bgQueue,
-    ILogger<FeaturesController> logger,
     IOptions<FeatureDefaultsOptions> featureDefaults,
     IDateTimeProvider timeProvider,
     IFeatureStatsService featureStatsService,
@@ -76,7 +74,7 @@ public class FeaturesController(
 
         if (body.Type == FeatureTypes.Area)
         {
-            await QueueScatteredRefresh();
+            await featureService.QueueScatteredRefreshAsync(RequiredCurrentUserId, CurrentCommuneId);
         }
 
         return StatusCode(201, new SaveFeatureResponse(Success: true, Id: newId.ToString(), Message: "Feature saved successfully"));
@@ -87,8 +85,7 @@ public class FeaturesController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> LoadFeatures([FromQuery] int skip = 0, [FromQuery] int take = 1000, CancellationToken cancellationToken = default)
     {
-        skip = Math.Max(skip, 0);
-        take = Math.Clamp(take, 1, 2000);
+        (skip, take) = Pagination.Clamp(skip, take);
 
         var (features, totalCount) = await featureStatsService.LoadAllFeaturesAsync(
             RequiredCurrentUserId, skip, take, cancellationToken);
@@ -194,7 +191,7 @@ public class FeaturesController(
 
         if (featureType == FeatureTypes.Area)
         {
-            await QueueScatteredRefresh();
+            await featureService.QueueScatteredRefreshAsync(RequiredCurrentUserId, CurrentCommuneId);
         }
 
         return Ok(new UpdateFeatureResponse(Success: true, Id: featureId.ToString(), UpdatedAt: updatedAt));
@@ -220,7 +217,7 @@ public class FeaturesController(
 
         if (featureType == FeatureTypes.Area)
         {
-            await QueueScatteredRefresh();
+            await featureService.QueueScatteredRefreshAsync(RequiredCurrentUserId, CurrentCommuneId);
         }
 
         return NoContent();
@@ -233,34 +230,6 @@ public class FeaturesController(
             return null;
         }
 
-        if (!body.Data.TryGetProperty("roadDbId", out var ridEl) || ridEl.ValueKind != JsonValueKind.String)
-        {
-            return null;
-        }
-
-        return Guid.TryParse(ridEl.GetString(), out var rid) ? rid : null;
-    }
-
-    private async ValueTask QueueScatteredRefresh()
-    {
-        var currentUserId = RequiredCurrentUserId;
-        var currentCommuneId = CurrentCommuneId;
-        if (currentCommuneId is null)
-        {
-            return;
-        }
-
-        await bgQueue.QueueBackgroundWorkItemAsync(async (sp, ct) =>
-        {
-            try
-            {
-                var svc = sp.GetRequiredService<IScatteredAreaService>();
-                await svc.RefreshAsync(currentUserId, currentCommuneId.Value, ct);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Background refresh of scattered area failed");
-            }
-        });
+        return FeatureTypeRegistry.TryGetRoadDbId(body.Data, out var rid) ? rid : null;
     }
 }

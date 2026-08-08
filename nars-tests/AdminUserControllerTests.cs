@@ -20,8 +20,8 @@ public class AdminUserControllerTests
 
     private static AdminUserController CreateController(AppDbContext db) =>
         new(Mock.Of<ILogger<AdminUserController>>(),
-            new UserAuthorizationService(db),
-            new UserCreationService(db),
+            new UserAuthorizationService(db, Mock.Of<IRefreshTokenService>(), Mock.Of<IDateTimeProvider>()),
+            new UserCreationService(db, new UserAuthorizationService(db, Mock.Of<IRefreshTokenService>(), Mock.Of<IDateTimeProvider>()), Mock.Of<ILogger<UserCreationService>>()),
             Mock.Of<IWebHostEnvironment>())
         {
             ControllerContext = new ControllerContext
@@ -180,9 +180,10 @@ public class AdminUserControllerTests
         var result = await ctrl.GetManageableUsers(default);
 
         var ok = Assert.IsType<OkObjectResult>(result);
-        var users = Assert.IsType<List<AdminUserSummary>>(ok.Value);
-        Assert.Single(users);
-        Assert.Equal("wa1", users[0].Username);
+        var page = Assert.IsType<PagedResponse<AdminUserSummary>>(ok.Value);
+        Assert.Single(page.Items);
+        Assert.Equal("wa1", page.Items[0].Username);
+        Assert.Equal(1, page.Total);
     }
 
     [Fact]
@@ -221,8 +222,8 @@ public class AdminUserControllerTests
         var result = await ctrl.GetManageableUsers(-10, 1, default);
 
         var ok = Assert.IsType<OkObjectResult>(result);
-        var users = Assert.IsType<List<AdminUserSummary>>(ok.Value);
-        var user = Assert.Single(users);
+        var page = Assert.IsType<PagedResponse<AdminUserSummary>>(ok.Value);
+        var user = Assert.Single(page.Items);
         Assert.Equal("wa1", user.Username);
     }
 
@@ -532,31 +533,10 @@ public class AdminUserControllerTests
         Assert.Equal(404, problem.StatusCode);
     }
 
-    [Fact]
-    public async Task DeleteAdmin_Valid_ReturnsNoContent()
-    {
-        using var db = CreateDb();
-        var userId = Guid.NewGuid();
-        db.Users.Add(new User
-        {
-            Id = userId,
-            Username = "delete_me",
-            Email = "delete@test.com",
-            Name = "Delete Me",
-            Phone = TestData.DefaultPhone,
-            PasswordHash = "hash",
-            Role = UserRoles.WilayaAdmin,
-            WilayaId = 1,
-        });
-        await db.SaveChangesAsync();
-        var ctrl = CreateController(db);
-        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
-
-        var result = await ctrl.DeleteManagedUser(userId, default);
-
-        Assert.IsType<NoContentResult>(result);
-        Assert.Null(await db.Users.FindAsync(userId));
-    }
+    // DeleteAdmin_Valid_ReturnsNoContent and DeleteAdmin_WithinScope_ReturnsNoContent
+    // live in AdminControllerServiceTests (PostgreSQL-backed) because the InMemory
+    // provider does not support ExecuteDeleteAsync/ExecuteUpdateAsync used by
+    // UserAuthorizationService.DeleteUserAsync.
 
     [Fact]
     public async Task DeleteAdmin_ForbiddenRoleHierarchy_ReturnsForbid()
@@ -621,44 +601,5 @@ public class AdminUserControllerTests
 
         Assert.IsType<ForbidResult>(result);
         Assert.NotNull(await db.Users.FindAsync(userId));
-    }
-
-    [Fact]
-    public async Task DeleteAdmin_WithinScope_ReturnsNoContent()
-    {
-        using var db = CreateDb();
-        db.Communes.Add(new Commune { CommuneId = 5, DairaId = 1, CommuneFr = "In daira" });
-        var callerId = Guid.NewGuid();
-        db.Users.Add(new User
-        {
-            Id = callerId,
-            Username = "caller",
-            Email = "caller@test.com",
-            Name = "Caller",
-            Phone = TestData.DefaultPhone,
-            PasswordHash = "hash",
-            Role = UserRoles.DairaAdmin,
-            DairaId = 1,
-        });
-        var userId = Guid.NewGuid();
-        db.Users.Add(new User
-        {
-            Id = userId,
-            Username = "commune_user",
-            Email = "cu@test.com",
-            Name = "Commune User",
-            Phone = TestData.DefaultPhone,
-            PasswordHash = "hash",
-            Role = UserRoles.CommuneUser,
-            CommuneId = 5,
-        });
-        await db.SaveChangesAsync();
-        var ctrl = CreateController(db);
-        AuthTestHelper.SetUser(ctrl, callerId, UserRoles.DairaAdmin, dairaId: 1);
-
-        var result = await ctrl.DeleteManagedUser(userId, default);
-
-        Assert.IsType<NoContentResult>(result);
-        Assert.Null(await db.Users.FindAsync(userId));
     }
 }

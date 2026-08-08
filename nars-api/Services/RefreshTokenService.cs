@@ -164,11 +164,12 @@ public class RefreshTokenService(
             throw new InvalidOperationException($"Unexpected table name '{tableName}' for RefreshToken entity.");
         }
 
-#pragma warning disable S2077 // Table name is allowlist-validated; parameter used for token_hash
+#pragma warning disable S2077 // Table name is allowlist-validated; parameters used for token_hash and cutoff
+        var cutoff = timeProvider.UtcNow;
         return db.RefreshTokens
             .FromSqlRaw(
-                $"SELECT * FROM {expectedTable} WHERE token_hash = {{0}} AND revoked = false AND expires_at > NOW() FOR UPDATE SKIP LOCKED",
-                hash)
+                $"SELECT * FROM {expectedTable} WHERE token_hash = {{0}} AND revoked = false AND expires_at > {{1}} FOR UPDATE SKIP LOCKED",
+                hash, cutoff)
             .FirstOrDefaultAsync(ct);
 #pragma warning restore S2077
     }

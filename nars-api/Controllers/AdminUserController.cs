@@ -1,7 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Services;
@@ -31,55 +28,23 @@ public class AdminUserController(
             return Problem(detail: "Request body is required.", statusCode: 400);
         }
 
-        var callerRole = CurrentUserRole;
-
-        if (!authorizationService.CanCreateRole(callerRole, body.Role))
-        {
-            return Forbid();
-        }
-
-        var scopeResult = await authorizationService.ValidateCreateUserScopeAsync(
-            callerRole, CurrentDairaId, CurrentWilayaId,
+        var result = await userCreationService.CreateUserAsync(
+            CurrentUserRole, CurrentCommuneId, CurrentDairaId, CurrentWilayaId,
+            body.Name, body.Email, body.Phone, body.Username, body.Password,
             body.Role, body.CommuneId, body.DairaId, body.WilayaId,
             cancellationToken);
-        if (scopeResult.Error is not null)
+
+        if (!result.IsSuccess)
         {
-            return scopeResult.IsAuthorizationFailure
+            return result.IsAuthorizationFailure
                 ? Forbid()
-                : Problem(detail: scopeResult.Error, statusCode: 400);
+                : Problem(detail: result.Error, statusCode: result.StatusCode);
         }
 
-        // Resolve commune_id: field_workers inherit the caller's commune.
-        var communeId = body.Role == UserRoles.FieldWorker
-            ? CurrentCommuneId
-            : body.CommuneId;
-
-        // Validate and create user (geographic, uniqueness, password strength).
-        var creationResult = await userCreationService.ValidateAndCreateUserAsync(
-            body.Name, body.Email, body.Phone, body.Username, body.Password,
-            body.Role, communeId, body.DairaId, body.WilayaId,
-            cancellationToken);
-        if (!creationResult.IsSuccess)
-        {
-            var statusCode = creationResult.Code == UserCreationErrorCode.Duplicate ? 409 : 400;
-            return Problem(detail: creationResult.Error, statusCode: statusCode);
-        }
-
-        var newUser = creationResult.User!;
-
-        try
-        {
-            await userCreationService.SaveUserAsync(newUser, cancellationToken);
-        }
-        catch (DbUpdateException ex)
-        {
-            logger.LogWarning(ex, "Duplicate user during admin signup (username={Username}, email={Email})",
-                body.Username, body.Email);
-            return Problem(detail: "Username or email already exists.", statusCode: 409);
-        }
+        var newUser = result.User!;
 
         logger.LogInformation("[Admin] {CallerRole} {CallerId} created {Role} {UserId}",
-            callerRole, CurrentUserId, body.Role, newUser.Id);
+            CurrentUserRole, CurrentUserId, body.Role, newUser.Id);
 
         return StatusCode(201, new CreateAdminResponse(
             Success: true,
@@ -96,14 +61,13 @@ public class AdminUserController(
         [FromQuery] int skip = 0, [FromQuery] int take = 100,
         CancellationToken cancellationToken = default)
     {
-        take = Math.Clamp(take, 1, 500);
-        skip = Math.Max(skip, 0);
-        var users = await authorizationService.GetManageableUsersAsync(
+        (skip, take) = Pagination.Clamp(skip, take);
+        var response = await authorizationService.GetManageableUsersAsync(
             CurrentUserRole, CurrentCommuneId, CurrentDairaId, CurrentWilayaId,
             skip, take,
             cancellationToken);
 
-        return Ok(users);
+        return Ok(response);
     }
 
     /// <summary>Updates a managed user's profile, role, or geographic scope.</summary>

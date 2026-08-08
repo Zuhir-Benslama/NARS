@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
 using NarsApi.DTOs;
@@ -6,8 +7,15 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public sealed class UserAuthorizationService(AppDbContext db) : IUserAuthorizationService
+public sealed class UserAuthorizationService(
+    AppDbContext db,
+    IRefreshTokenService refreshService,
+    IDateTimeProvider timeProvider) : IUserAuthorizationService
 {
+    // Stable dummy hash so BCrypt always does the full work, even for unknown users.
+    // Prevents username enumeration via response-time side-channel.
+    private const string DummyHash = "$2a$11$BCfJgwy.hTY703/9RBjPo.8UjBrTHh/95zFznkYLiapLvWdf5ISbO";
+
     public bool CanCreateRole(string callerRole, string targetRole) => (callerRole, targetRole) switch
     {
         (UserRoles.NationalAdmin, UserRoles.WilayaAdmin) => true,
@@ -97,51 +105,81 @@ public sealed class UserAuthorizationService(AppDbContext db) : IUserAuthorizati
         }
     }
 
-    public async Task<List<AdminUserSummary>> GetManageableUsersAsync(
+    public async Task<PagedResponse<AdminUserSummary>> GetManageableUsersAsync(
         string callerRole, int? communeId, int? dairaId, int? wilayaId,
         int skip = 0, int take = 100,
-        CancellationToken ct = default) => callerRole switch
+        CancellationToken ct = default)
+    {
+        IQueryable<User>? baseQuery = callerRole switch
         {
-            UserRoles.NationalAdmin => await db.Users
-                .Where(u => u.Role == UserRoles.WilayaAdmin)
-                .OrderBy(u => u.Username)
-                .Skip(skip).Take(take)
-                .Select(u => new AdminUserSummary(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role, u.Phone ?? "", u.CommuneId, u.DairaId, u.WilayaId))
-                .ToListAsync(ct),
-
-            UserRoles.WilayaAdmin when wilayaId.HasValue => await db.Users
+            UserRoles.NationalAdmin => db.Users.Where(u => u.Role == UserRoles.WilayaAdmin),
+            UserRoles.WilayaAdmin when wilayaId.HasValue => db.Users
                 .Where(u => u.Role == UserRoles.DairaAdmin && u.DairaId.HasValue)
                 .Join(db.Dairas.Where(d => d.WilayaId == wilayaId.Value),
-                    u => u.DairaId!.Value, d => d.DairaId, (u, _) => u)
-                .OrderBy(u => u.Username)
-                .Skip(skip).Take(take)
-                .Select(u => new AdminUserSummary(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role, u.Phone ?? "", u.CommuneId, u.DairaId, u.WilayaId))
-                .ToListAsync(ct),
-
-            UserRoles.DairaAdmin when dairaId.HasValue => await db.Users
+                    u => u.DairaId!.Value, d => d.DairaId, (u, _) => u),
+            UserRoles.DairaAdmin when dairaId.HasValue => db.Users
                 .Where(u => u.Role == UserRoles.CommuneUser && u.CommuneId.HasValue)
                 .Join(db.Communes.Where(c => c.DairaId == dairaId.Value),
-                    u => u.CommuneId!.Value, c => c.CommuneId, (u, _) => u)
-                .OrderBy(u => u.Username)
-                .Skip(skip).Take(take)
-                .Select(u => new AdminUserSummary(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role, u.Phone ?? "", u.CommuneId, u.DairaId, u.WilayaId))
-                .ToListAsync(ct),
-
-            UserRoles.CommuneUser when communeId.HasValue => await db.Users
-                .Where(u => u.Role == UserRoles.FieldWorker && u.CommuneId == communeId)
-                .OrderBy(u => u.Username)
-                .Skip(skip).Take(take)
-                .Select(u => new AdminUserSummary(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role, u.Phone ?? "", u.CommuneId, u.DairaId, u.WilayaId))
-                .ToListAsync(ct),
-
-            _ => [],
+                    u => u.CommuneId!.Value, c => c.CommuneId, (u, _) => u),
+            UserRoles.CommuneUser when communeId.HasValue => db.Users
+                .Where(u => u.Role == UserRoles.FieldWorker && u.CommuneId == communeId),
+            _ => null,
         };
+
+        if (baseQuery is null)
+        {
+            return new PagedResponse<AdminUserSummary>([], 0, skip, take);
+        }
+
+        var ordered = baseQuery.OrderBy(u => u.Username);
+        var total = await ordered.CountAsync(ct);
+        var items = await ordered
+            .Skip(skip).Take(take)
+            .Select(u => new AdminUserSummary(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role, u.Phone ?? "", u.CommuneId, u.DairaId, u.WilayaId))
+            .ToListAsync(ct);
+
+        return new PagedResponse<AdminUserSummary>(items, total, skip, take);
+    }
 
     public async Task<User?> FindUserByIdAsync(Guid userId, CancellationToken ct = default)
         => await db.Users.FindAsync([userId], ct);
 
     public async Task<User?> FindUserByUsernameAsync(string normalizedUsername, CancellationToken ct = default)
         => await db.Users.FirstOrDefaultAsync(u => u.Username == normalizedUsername, ct);
+
+    public async Task<CredentialCheckResult> VerifyCredentialsAsync(
+        string normalizedUsername, string password, int maxFailedAttempts, int lockoutMinutes,
+        CancellationToken ct = default)
+    {
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Username == normalizedUsername, ct);
+
+        // Always run BCrypt.Verify even when the user is not found.
+        // Short-circuiting on "user is null" leaks whether a username exists
+        // via response-time difference (~0 µs vs ~300 ms for a real BCrypt check).
+        var hashToCheck = user?.PasswordHash ?? DummyHash;
+        var passwordValid = BCrypt.Net.BCrypt.Verify(password, hashToCheck);
+
+        // Only record failed logins for actual password mismatches.
+        if (user is not null && !passwordValid)
+        {
+            await refreshService.RecordFailedLoginAsync(user, maxFailedAttempts, lockoutMinutes, timeProvider.UtcNow, ct);
+        }
+
+        if (user is null || !passwordValid)
+        {
+            return CredentialCheckResult.Invalid();
+        }
+
+        // Lockout check — run after BCrypt to preserve timing-attack resistance.
+        // A locked user who supplies the correct password is reported as locked
+        // without extending their lockout, so a lockout never renews itself.
+        if (user.LockedUntil.HasValue && user.LockedUntil > timeProvider.UtcNow)
+        {
+            return CredentialCheckResult.Locked();
+        }
+
+        return CredentialCheckResult.Success(user);
+    }
 
     public async Task<UserUpdateResult> UpdateManagedUserAsync(
         Guid callerUserId, string callerRole,
@@ -267,43 +305,33 @@ public sealed class UserAuthorizationService(AppDbContext db) : IUserAuthorizati
             return false;
         }
 
-        // Revoke all active refresh tokens.
-        var tokens = await db.RefreshTokens
-            .Where(rt => rt.UserId == userId && !rt.Revoked)
-            .ToListAsync(ct);
-        foreach (var token in tokens)
-        {
-            token.Revoked = true;
-        }
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
 
-        // Delete all features across all feature tables and collect their IDs.
-        var deletedFeatureIds = new List<Guid>();
+        // Revoke all active refresh tokens without materializing them.
+        await db.RefreshTokens
+            .Where(rt => rt.UserId == userId && !rt.Revoked)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(rt => rt.Revoked, true), ct);
+
+        // Delete all features across all feature tables. Registry rows are removed
+        // via a subquery so no IDs are materialized into memory.
         foreach (var descriptor in FeatureTypeRegistry.GetAllDescriptors())
         {
             var dbSet = descriptor.GetDbSet(db);
-            var entities = await dbSet.Where(f => f.UserId == userId).ToListAsync(ct);
-            if (entities.Count > 0)
-            {
-                deletedFeatureIds.AddRange(entities.Select(e => e.Id));
-                db.RemoveRange(entities);
-            }
-        }
 
-        if (deletedFeatureIds.Count > 0)
-        {
-            var registryEntries = await db.FeatureRegistry.Where(r => deletedFeatureIds.Contains(r.Id)).ToListAsync(ct);
-            db.FeatureRegistry.RemoveRange(registryEntries);
+            await db.FeatureRegistry
+                .Where(r => dbSet.Where(f => f.UserId == userId).Select(f => f.Id).Contains(r.Id))
+                .ExecuteDeleteAsync(ct);
+
+            await dbSet.Where(f => f.UserId == userId).ExecuteDeleteAsync(ct);
         }
 
         // Delete inspections and error logs.
-        var inspections = await db.Inspections.Where(i => i.UserId == userId).ToListAsync(ct);
-        db.Inspections.RemoveRange(inspections);
-
-        var errorLogs = await db.ErrorLogs.Where(el => el.UserId == userId).ToListAsync(ct);
-        db.ErrorLogs.RemoveRange(errorLogs);
+        await db.Inspections.Where(i => i.UserId == userId).ExecuteDeleteAsync(ct);
+        await db.ErrorLogs.Where(el => el.UserId == userId).ExecuteDeleteAsync(ct);
 
         db.Users.Remove(user);
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         return true;
     }
 

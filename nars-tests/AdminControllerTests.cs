@@ -1,3 +1,5 @@
+using System.Reflection;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -163,14 +165,13 @@ public class AdminControllerTests
     }
 
     [Fact]
-    public async Task GetWilaya_NonNationalAdmin_ReturnsForbid()
+    public void GetWilaya_OnlyNationalAdmin_IsAuthorizedByRole()
     {
-        var ctrl = CreateController();
-        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.WilayaAdmin, wilayaId: 1);
-
-        var result = await ctrl.GetWilaya(1, default);
-
-        Assert.IsType<ForbidResult>(result);
+        var attr = typeof(AdminController)
+            .GetMethod(nameof(AdminController.GetWilaya))
+            ?.GetCustomAttribute<AuthorizeAttribute>();
+        Assert.NotNull(attr);
+        Assert.Equal(UserRoles.NationalAdmin, attr.Roles);
     }
 
     // ─── GetDaira ───────────────────────────────────────────────────────
@@ -207,14 +208,13 @@ public class AdminControllerTests
     }
 
     [Fact]
-    public async Task GetDaira_CommuneUser_ReturnsForbid()
+    public void GetDaira_WilayaOrNationalAdmin_IsAuthorizedByRole()
     {
-        var ctrl = CreateController();
-        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.CommuneUser, communeId: 1);
-
-        var result = await ctrl.GetDaira(1, default);
-
-        Assert.IsType<ForbidResult>(result);
+        var attr = typeof(AdminController)
+            .GetMethod(nameof(AdminController.GetDaira))
+            ?.GetCustomAttribute<AuthorizeAttribute>();
+        Assert.NotNull(attr);
+        Assert.Equal(UserRoles.WilayaOrNationalAdmin, attr.Roles);
     }
 
     [Fact]
@@ -251,7 +251,7 @@ public class AdminControllerTests
         // CanCreateRole is a pure role-hierarchy check (no DB query).
         // InMemory DB is only needed to satisfy the UserAuthorizationService constructor.
         using var db = CreateInMemoryDb("AdminControllerRoleTest");
-        var svc = new UserAuthorizationService(db);
+        var svc = new UserAuthorizationService(db, Mock.Of<IRefreshTokenService>(), Mock.Of<IDateTimeProvider>());
         Assert.Equal(expected, svc.CanCreateRole(caller, target));
     }
 }

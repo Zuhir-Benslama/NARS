@@ -7,7 +7,10 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public sealed class FeatureService(AppDbContext db) : IFeatureService
+public sealed class FeatureService(
+    AppDbContext db,
+    IBackgroundTaskQueue bgQueue,
+    ILogger<FeatureService> logger) : IFeatureService
 {
     public async Task<bool> RoadExistsAsync(Guid roadId, Guid userId, CancellationToken ct)
         => await db.Roads.AnyAsync(r => r.Id == roadId && r.UserId == userId, ct);
@@ -117,5 +120,26 @@ public sealed class FeatureService(AppDbContext db) : IFeatureService
 
         await tx.CommitAsync(ct);
         return total;
+    }
+
+    public ValueTask QueueScatteredRefreshAsync(Guid userId, int? communeId)
+    {
+        if (communeId is null)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        return bgQueue.QueueBackgroundWorkItemAsync(async (sp, ct) =>
+        {
+            try
+            {
+                var svc = sp.GetRequiredService<IScatteredAreaService>();
+                await svc.RefreshAsync(userId, communeId.Value, ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Background refresh of scattered area failed");
+            }
+        });
     }
 }

@@ -46,9 +46,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var bgQueueMock = Mock.Of<IBackgroundTaskQueue>();
         var ctrl = new FeaturesController(
-            new FeatureService(_db),
-            bgQueueMock,
-            Mock.Of<ILogger<FeaturesController>>(),
+            new FeatureService(_db, bgQueueMock, Mock.Of<ILogger<FeatureService>>()),
             Options.Create(new FeatureDefaultsOptions()),
             timeProvider,
             new FeatureStatsService(_fixture.CreateDbContextFactory()),

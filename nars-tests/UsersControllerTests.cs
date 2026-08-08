@@ -17,11 +17,13 @@ public class UsersControllerTests
 {
     private static UsersController CreateController(
         IUserProfileService? userProfile = null,
+        IRefreshTokenService? refreshTokens = null,
         bool authenticated = true,
         Guid? userId = null)
     {
         var ctrl = new UsersController(
             userProfile ?? Mock.Of<IUserProfileService>(),
+            refreshTokens ?? Mock.Of<IRefreshTokenService>(),
             Mock.Of<ILogger<UsersController>>(),
             Mock.Of<IWebHostEnvironment>());
 
@@ -192,7 +194,8 @@ public class UsersControllerTests
         mock.Setup(s => s.GetUserByIdAsync(userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
 
-        var ctrl = CreateController(userProfile: mock.Object, userId: userId);
+        var refreshTokens = new Mock<IRefreshTokenService>();
+        var ctrl = CreateController(userProfile: mock.Object, refreshTokens: refreshTokens.Object, userId: userId);
 
         var result = await ctrl.UpdateCredentials(
             new UpdateUserRequest(null, null, "CurrentP@ss1", "NewP@ss123"), default);
@@ -202,6 +205,7 @@ public class UsersControllerTests
         Assert.True(resp.Success);
         Assert.True(BCrypt.Net.BCrypt.Verify("NewP@ss123", user.PasswordHash));
         mock.Verify(s => s.UpdateUserAsync(user, It.IsAny<CancellationToken>()), Times.Once);
+        refreshTokens.Verify(s => s.RevokeAllUserTokensAsync(userId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -227,6 +231,25 @@ public class UsersControllerTests
         mock.Verify(s => s.IsUsernameTakenAsync("updateduser", It.IsAny<CancellationToken>()), Times.Once);
         mock.Verify(s => s.IsEmailTakenAsync("new@example.com", It.IsAny<CancellationToken>()), Times.Once);
         mock.Verify(s => s.UpdateUserAsync(user, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateCredentials_NoPasswordChange_DoesNotRevokeSessions()
+    {
+        var userId = Guid.NewGuid();
+        var user = CreateUser(userId);
+        var mock = new Mock<IUserProfileService>();
+        mock.Setup(s => s.GetUserByIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        var refreshTokens = new Mock<IRefreshTokenService>();
+        var ctrl = CreateController(userProfile: mock.Object, refreshTokens: refreshTokens.Object, userId: userId);
+
+        var result = await ctrl.UpdateCredentials(
+            new UpdateUserRequest("updateduser", null, null, null), default);
+
+        Assert.IsType<OkObjectResult>(result);
+        refreshTokens.Verify(s => s.RevokeAllUserTokensAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

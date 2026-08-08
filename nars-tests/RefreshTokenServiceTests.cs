@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Data;
@@ -546,7 +547,7 @@ public class RefreshTokenServiceTests
             CommuneId = 2,
         };
 
-        var svc = new UserCreationService(db);
+        var svc = new UserCreationService(db, Mock.Of<IUserAuthorizationService>(), Mock.Of<ILogger<UserCreationService>>());
         await svc.SaveUserAsync(user);
 
         var stored = await db.Users.FindAsync(UserId);

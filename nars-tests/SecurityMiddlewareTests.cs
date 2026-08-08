@@ -78,7 +78,7 @@ public class SecurityMiddlewareTests
     [InlineData("/api/auth/signin")]
     [InlineData("/api/features")]
     [InlineData("/api/logs")]
-    public async Task ApiRoutes_DoNotGetCspHeader(string path)
+    public async Task ApiRoutes_DoNotGetCspHeader_ButGetNosniff(string path)
     {
         var ctx = CreateContext(path);
 
@@ -86,5 +86,6 @@ public class SecurityMiddlewareTests
 
         Assert.True(string.IsNullOrEmpty(CspHeader(ctx)));
         Assert.Null(ctx.Items["csp-nonce"]);
+        Assert.Equal("nosniff", ctx.Response.Headers.XContentTypeOptions.ToString());
     }
 }

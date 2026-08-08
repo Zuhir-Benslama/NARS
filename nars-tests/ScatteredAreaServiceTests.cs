@@ -28,13 +28,15 @@ public class ScatteredAreaServiceTests
             .ThrowsAsync(new InvalidOperationException("Simulated database failure"));
 
         var service = CreateService(dbFactory: factory.Object);
+        var userId = Guid.NewGuid();
 
-        var success = await service.RefreshAsync(Guid.NewGuid(), 1);
+        var success = await service.RefreshAsync(userId, 1);
 
         Assert.False(success);
-        Assert.NotNull(service.LastError);
-        Assert.Equal(FixedUtcNowOffset, service.LastError!.Value.Timestamp);
-        Assert.NotEmpty(service.LastError!.Value.Message);
+        var error = service.GetLastError(userId, 1);
+        Assert.NotNull(error);
+        Assert.Equal(FixedUtcNowOffset, error!.Value.Timestamp);
+        Assert.NotEmpty(error.Value.Message);
     }
 
     [Fact]
@@ -46,20 +48,17 @@ public class ScatteredAreaServiceTests
             .ThrowsAsync(new InvalidOperationException("Simulated database failure #2"));
 
         var service = CreateService(dbFactory: factory.Object);
+        var userId = Guid.NewGuid();
 
-        // First call fails and sets LastError.
-        var firstSuccess = await service.RefreshAsync(Guid.NewGuid(), 1);
+        // First call fails for (user, commune 1).
+        var firstSuccess = await service.RefreshAsync(userId, 1);
         Assert.False(firstSuccess);
-        Assert.NotNull(service.LastError);
-        var firstMessage = service.LastError!.Value.Message;
+        Assert.NotNull(service.GetLastError(userId, 1));
 
-        // Second call fails again — LastError must reflect the LATEST failure,
-        // not a stale value captured by the first call.
-        var secondSuccess = await service.RefreshAsync(Guid.NewGuid(), 2);
+        // Second call fails for (user, commune 2) — each key tracks its own error.
+        var secondSuccess = await service.RefreshAsync(userId, 2);
         Assert.False(secondSuccess);
-        Assert.NotNull(service.LastError);
-        Assert.Equal("Simulated database failure #2", service.LastError!.Value.Message);
-        Assert.NotEqual(firstMessage, service.LastError!.Value.Message);
+        Assert.NotNull(service.GetLastError(userId, 2));
     }
 
     [Fact]
@@ -70,17 +69,18 @@ public class ScatteredAreaServiceTests
             .ThrowsAsync(new OperationCanceledException());
 
         var service = CreateService(dbFactory: factory.Object);
+        var userId = Guid.NewGuid();
 
         await Assert.ThrowsAsync<OperationCanceledException>(
-            () => service.RefreshAsync(Guid.NewGuid(), 1, new CancellationToken(true)));
+            () => service.RefreshAsync(userId, 1, new CancellationToken(true)));
 
-        Assert.Null(service.LastError);
+        Assert.Null(service.GetLastError(userId, 1));
         factory.Verify(f => f.CreateDbContextAsync(
             It.Is<CancellationToken>(t => t.IsCancellationRequested)), Times.Once);
     }
 
     [Fact]
-    public async Task LastError_IsThreadSafe()
+    public async Task LastError_IsThreadSafe_AndKeyedPerUser()
     {
         var factory = new Mock<IDbContextFactory<AppDbContext>>();
         factory.Setup(f => f.CreateDbContextAsync(It.IsAny<CancellationToken>()))
@@ -89,21 +89,18 @@ public class ScatteredAreaServiceTests
         var service = CreateService(dbFactory: factory.Object);
 
         // Concurrent writers (failing RefreshAsync calls) interleaved with
-        // concurrent readers must not throw or observe a torn LastError.
-        var writers = Enumerable.Range(0, 50)
-            .Select(_ => Task.Run(() => service.RefreshAsync(Guid.NewGuid(), 1)))
+        // concurrent readers must not throw or observe a torn error state, and
+        // each user's error must be isolated to that user's key.
+        var userIds = Enumerable.Range(0, 50).Select(_ => Guid.NewGuid()).ToArray();
+        var writers = userIds
+            .Select(uid => Task.Run(() => service.RefreshAsync(uid, 1)))
             .ToArray();
         var readErrors = new List<Exception>();
-        var readValues = new List<string?>();
-        var reads = Enumerable.Range(0, 50).Select(async _ =>
+        var reads = userIds.Select(async uid =>
         {
             try
             {
-                var error = service.LastError;
-                lock (readValues)
-                {
-                    readValues.Add(error?.Message);
-                }
+                service.GetLastError(uid, 1);
             }
             catch (Exception ex)
             {
@@ -116,9 +113,8 @@ public class ScatteredAreaServiceTests
 
         Assert.Empty(readErrors);
         Assert.All(writers, w => Assert.False(w.Result));
-        Assert.All(readValues, v =>
-            Assert.True(v is null || v == "Simulated database failure",
-                $"Observed inconsistent LastError value: '{v}'"));
-        Assert.Equal("Simulated database failure", service.LastError!.Value.Message);
+        Assert.All(userIds, uid => Assert.NotNull(service.GetLastError(uid, 1)));
+        // Another user's error must not appear under a different user's key.
+        Assert.Null(service.GetLastError(Guid.NewGuid(), 1));
     }
 }

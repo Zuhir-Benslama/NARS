@@ -133,6 +133,78 @@ describe("getSnapRings", () => {
     expect(result).toHaveLength(1)
     expect(result[0][0]).toEqual({ lat: 36.0, lng: 127.0 })
   })
+
+  it("includes rings from MultiPolygon boundaries", async () => {
+    _setCtx({
+      boundariesGeoJson: {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: {
+              type: "MultiPolygon",
+              coordinates: [
+                [
+                  [
+                    [127.0, 36.0],
+                    [127.1, 36.0],
+                    [127.05, 36.1],
+                    [127.0, 36.0],
+                  ],
+                ],
+                [
+                  [
+                    [128.0, 36.0],
+                    [128.1, 36.0],
+                    [128.05, 36.1],
+                    [128.0, 36.0],
+                  ],
+                ],
+              ],
+            },
+            properties: {},
+          },
+        ],
+      },
+    } as any)
+
+    const result = mod.getSnapRings([])
+
+    expect(result).toHaveLength(2)
+    expect(result[0][0]).toEqual({ lat: 36.0, lng: 127.0 })
+    expect(result[1][0]).toEqual({ lat: 36.0, lng: 128.0 })
+  })
+
+  it("recurses through non-linear-ring coordinate arrays", async () => {
+    _setCtx({
+      boundariesGeoJson: {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: {
+              type: "Polygon",
+              coordinates: [
+                [
+                  [127.0, 36.0],
+                  [127.1, 36.0],
+                  [127.05, 36.1],
+                  [127.0, 36.0],
+                ],
+                [["not-a-ring"], [0, 0]],
+              ],
+            },
+            properties: {},
+          },
+        ],
+      },
+    } as any)
+
+    const result = mod.getSnapRings([])
+
+    expect(result).toHaveLength(1)
+    expect(result[0][0]).toEqual({ lat: 36.0, lng: 127.0 })
+  })
 })
 
 describe("getRoadChains", () => {

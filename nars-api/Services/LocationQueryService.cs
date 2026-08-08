@@ -9,40 +9,40 @@ public sealed class LocationQueryService(IDbContextFactory<AppDbContext> dbFacto
     public async Task<List<Wilaya>> GetAllWilayasAsync(CancellationToken ct = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db.Wilayas.ToListAsync(ct);
+        return await db.Wilayas.AsNoTracking().ToListAsync(ct);
     }
 
     public async Task<List<Daira>> GetDairasByWilayaAsync(int wilayaId, CancellationToken ct = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db.Dairas.Where(d => d.WilayaId == wilayaId).ToListAsync(ct);
+        return await db.Dairas.AsNoTracking().Where(d => d.WilayaId == wilayaId).ToListAsync(ct);
     }
 
     public async Task<List<Commune>> GetCommunesByDairaAsync(int dairaId, CancellationToken ct = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db.Communes.Where(c => c.DairaId == dairaId).ToListAsync(ct);
+        return await db.Communes.AsNoTracking().Where(c => c.DairaId == dairaId).ToListAsync(ct);
     }
 
     public async Task<Commune?> GetCommuneByIdAsync(int communeId, CancellationToken ct = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db.Communes.FirstOrDefaultAsync(c => c.CommuneId == communeId, ct);
+        return await db.Communes.AsNoTracking().FirstOrDefaultAsync(c => c.CommuneId == communeId, ct);
     }
 
     public async Task<CommuneBoundary?> GetCommuneBoundaryAsync(int communeId, CancellationToken ct = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db.CommuneBoundaries.FirstOrDefaultAsync(b => b.CommuneId == communeId, ct);
+        return await db.CommuneBoundaries.AsNoTracking().FirstOrDefaultAsync(b => b.CommuneId == communeId, ct);
     }
 
     public async Task<(Commune? Commune, Daira? Daira)> GetCommuneWithDairaAsync(int communeId, CancellationToken ct = default)
     {
         await using var context = await dbFactory.CreateDbContextAsync(ct);
         var result = await (
-            from c in context.Communes
+            from c in context.Communes.AsNoTracking()
             where c.CommuneId == communeId
-            join d in context.Dairas on c.DairaId equals d.DairaId into dj
+            join d in context.Dairas.AsNoTracking() on c.DairaId equals d.DairaId into dj
             from d in dj.DefaultIfEmpty()
             select new { Commune = c, Daira = (Daira?)d }
         ).FirstOrDefaultAsync(ct);
@@ -53,11 +53,11 @@ public sealed class LocationQueryService(IDbContextFactory<AppDbContext> dbFacto
     {
         await using var context = await dbFactory.CreateDbContextAsync(ct);
         var result = await (
-            from c in context.Communes
+            from c in context.Communes.AsNoTracking()
             where c.CommuneId == communeId
-            join d in context.Dairas on c.DairaId equals d.DairaId into dj
+            join d in context.Dairas.AsNoTracking() on c.DairaId equals d.DairaId into dj
             from d in dj.DefaultIfEmpty()
-            join w in context.Wilayas on d.WilayaId equals w.WilayaId into wj
+            join w in context.Wilayas.AsNoTracking() on d.WilayaId equals w.WilayaId into wj
             from w in wj.DefaultIfEmpty()
             select new { Commune = c, Daira = (Daira?)d, Wilaya = (Wilaya?)w }
         ).FirstOrDefaultAsync(ct);
@@ -68,9 +68,9 @@ public sealed class LocationQueryService(IDbContextFactory<AppDbContext> dbFacto
     {
         await using var context = await dbFactory.CreateDbContextAsync(ct);
         var result = await (
-            from d in context.Dairas
+            from d in context.Dairas.AsNoTracking()
             where d.DairaId == dairaId
-            join w in context.Wilayas on d.WilayaId equals w.WilayaId into wj
+            join w in context.Wilayas.AsNoTracking() on d.WilayaId equals w.WilayaId into wj
             from w in wj.DefaultIfEmpty()
             select new { Daira = d, Wilaya = (Wilaya?)w }
         ).FirstOrDefaultAsync(ct);
@@ -85,6 +85,6 @@ public sealed class LocationQueryService(IDbContextFactory<AppDbContext> dbFacto
         }
 
         await using var context = await dbFactory.CreateDbContextAsync(ct);
-        return await context.Wilayas.FindAsync([wilayaId.Value], ct);
+        return await context.Wilayas.AsNoTracking().FirstOrDefaultAsync(w => w.WilayaId == wilayaId.Value, ct);
     }
 }

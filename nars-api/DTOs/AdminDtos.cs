@@ -10,12 +10,12 @@ namespace NarsApi.DTOs;
 /// Only admin users of higher or equal level may call this endpoint.
 /// </summary>
 public record CreateAdminRequest(
-    [Required(AllowEmptyStrings = false)][property: JsonRequired][property: JsonPropertyName("name")] string Name,
-    [Required(AllowEmptyStrings = false), EmailAddress][property: JsonRequired][property: JsonPropertyName("email")] string Email,
-    [Required(AllowEmptyStrings = false), Phone][property: JsonRequired][property: JsonPropertyName("phone")] string Phone,
-    [Required(AllowEmptyStrings = false)][property: JsonRequired][property: JsonPropertyName("username")] string Username,
+    [Required(AllowEmptyStrings = false), MaxLength(255)][property: JsonRequired][property: JsonPropertyName("name")] string Name,
+    [Required(AllowEmptyStrings = false), EmailAddress, MaxLength(255)][property: JsonRequired][property: JsonPropertyName("email")] string Email,
+    [Required(AllowEmptyStrings = false), Phone, MaxLength(50)][property: JsonRequired][property: JsonPropertyName("phone")] string Phone,
+    [Required(AllowEmptyStrings = false), MaxLength(100)][property: JsonRequired][property: JsonPropertyName("username")] string Username,
     [Required(AllowEmptyStrings = false), MaxLength(128)][property: JsonRequired][property: JsonPropertyName("password")] string Password,
-    [Required(AllowEmptyStrings = false)][property: JsonRequired][property: JsonPropertyName("role")] string Role,
+    [Required(AllowEmptyStrings = false), MaxLength(20)][property: JsonRequired][property: JsonPropertyName("role")] string Role,
     /// <summary>Required when role = commune_user.</summary>
     [property: JsonPropertyName("commune_id")] int? CommuneId,
     /// <summary>Required when role = daira_admin.</summary>

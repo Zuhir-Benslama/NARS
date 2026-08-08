@@ -56,7 +56,7 @@ public static class AuthenticationExtensions
                 {
                     OnMessageReceived = ctx =>
                     {
-                        var token = ctx.Request.Cookies["access_token"];
+                        var token = ctx.Request.Cookies[CookieNames.AccessToken];
                         if (!string.IsNullOrEmpty(token))
                         {
                             ctx.Token = token;

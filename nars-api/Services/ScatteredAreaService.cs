@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Data;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -14,17 +15,19 @@ public sealed class ScatteredAreaService(
     : IScatteredAreaService
 {
     private const string DefaultLabel = "Scattered Area";
+    private const string GenericErrorMessage = "An error occurred during scattered area recomputation.";
 
-    private readonly Lock _errorLock = new();
-    private (DateTimeOffset Timestamp, string Message)? _lastError;
-    public (DateTimeOffset Timestamp, string Message)? LastError { get { lock (_errorLock) { return _lastError; } } }
+    // Error state keyed per (user, commune) so one account's failure is never
+    // surfaced to another. Only a generic message is stored; the real exception
+    // goes to the logger.
+    private readonly ConcurrentDictionary<(Guid UserId, int CommuneId), (DateTimeOffset Timestamp, string Message)> _lastErrors = new();
+
+    public (DateTimeOffset Timestamp, string Message)? GetLastError(Guid userId, int communeId)
+        => _lastErrors.TryGetValue((userId, communeId), out var error) ? error : null;
 
     public async Task<bool> RefreshAsync(Guid userId, int communeId, CancellationToken cancellationToken = default)
     {
-        lock (_errorLock)
-        {
-            _lastError = null;
-        }
+        _lastErrors.TryRemove((userId, communeId), out _);
 
         try
         {
@@ -49,7 +52,7 @@ public sealed class ScatteredAreaService(
                     SELECT ST_Union({SqlFragments.PolygonFromData}) AS geom
                     FROM {areaTable} f
                     WHERE f.user_id = @uid
-                      AND f.layer  IN ('central_urban', 'secondary_urban')
+                      AND f.layer  IN ({SqlFragments.UrbanAreaLayersSqlIn})
                 )
                 SELECT ST_AsGeoJSON(
                     ST_Difference(
@@ -115,13 +118,7 @@ public sealed class ScatteredAreaService(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            var errorMessage = ex.InnerException is not null
-                ? $"{ex.Message} → {ex.InnerException.Message}"
-                : ex.Message;
-            lock (_errorLock)
-            {
-                _lastError = (timeProvider.UtcNow, errorMessage);
-            }
+            _lastErrors[(userId, communeId)] = (timeProvider.UtcNow, GenericErrorMessage);
 
             logger.LogError(ex, "ScatteredAreaService refresh failed for user {UserId}, commune {CommuneId}", userId, communeId);
             return false;

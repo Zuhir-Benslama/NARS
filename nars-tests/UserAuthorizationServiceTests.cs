@@ -1,3 +1,4 @@
+using Moq;
 using NarsApi.Data;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
@@ -9,7 +10,8 @@ namespace NarsApi.Tests;
 
 public class UserAuthorizationServiceTests
 {
-    private static UserAuthorizationService CreateService(AppDbContext db) => new(db);
+    private static UserAuthorizationService CreateService(AppDbContext db) =>
+        new(db, Mock.Of<IRefreshTokenService>(), Mock.Of<IDateTimeProvider>());
 
     [Fact]
     public async Task FindUserByIdAsync_ExistingUser_ReturnsUser()

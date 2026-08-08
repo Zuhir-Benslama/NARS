@@ -112,5 +112,15 @@ public sealed class JwtService(string secret, string? issuer, string? audience, 
             }
             return null;
         }
+        // Malformed tokens (bad base64, wrong segment count) surface as ArgumentException,
+        // not SecurityTokenException. Treat them as invalid rather than crashing the request.
+        catch (ArgumentException ex)
+        {
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug(ex, "Malformed JWT rejected: {Message}", ex.Message);
+            }
+            return null;
+        }
     }
 }

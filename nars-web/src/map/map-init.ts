@@ -3,7 +3,6 @@
 // and exposes the setBaseLayer public API.
 
 import maplibregl from "maplibre-gl"
-import { createGeomanInstance } from "@geoman-io/maplibre-geoman-free"
 import { getCtx, _setCtx } from "./core/state"
 import { useFeaturesStore } from "../stores/featuresStore"
 import type { MapContext } from "./core/state"
@@ -170,6 +169,7 @@ async function initGeoman(
   map: maplibregl.Map,
   options: ReturnType<typeof buildGeomanOptions>,
 ): Promise<void> {
+  const { createGeomanInstance } = await import("@geoman-io/maplibre-geoman-free")
   getCtx().geoman = await createGeomanInstance(map, options)
   suppressGeomanFill()
   ensureGeomanDrawEdgesVisible()

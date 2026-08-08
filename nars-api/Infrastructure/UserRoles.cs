@@ -12,6 +12,9 @@ public static class UserRoles
     public const string NationalAdmin = "national_admin";
     public const string FieldWorker = "field_worker";
 
+    /// <summary>Roles allowed to view any daira's report.</summary>
+    public const string WilayaOrNationalAdmin = WilayaAdmin + "," + NationalAdmin;
+
     /// <summary>All admin roles — useful for policy declarations.</summary>
     public static readonly string[] AllAdminRoles =
         [DairaAdmin, WilayaAdmin, NationalAdmin];

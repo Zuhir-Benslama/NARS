@@ -128,8 +128,6 @@ public class SpatialControllerServiceTests(NarsDatabaseFixture fixture) : IAsync
         var scatteredMock = new Mock<IScatteredAreaService>(MockBehavior.Strict);
         scatteredMock.Setup(s => s.RefreshAsync(_userId, 1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
-        scatteredMock.SetupGet(s => s.LastError)
-            .Returns((FixedUtcNowOffset, "Simulated refresh failure"));
 
         var controller = CreateController(scatteredMock.Object);
 

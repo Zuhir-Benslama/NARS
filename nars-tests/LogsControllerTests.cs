@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -31,7 +32,8 @@ public class LogsControllerTests
             errorLogService ?? Mock.Of<IErrorLogService>(),
             Mock.Of<ILogger<LogsController>>(),
             Options.Create(logOptions ?? DefaultLogOptions),
-            CreateFixedTime());
+            CreateFixedTime(),
+            Mock.Of<IWebHostEnvironment>());
 
         var claims = new List<Claim>();
         if (authenticated && userId.HasValue)

@@ -1,8 +1,6 @@
-using BCrypt.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.EntityFrameworkCore;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Services;
@@ -53,86 +51,41 @@ public partial class AuthController
             return Problem(detail: "Invalid request.", statusCode: 403);
         }
 
-        // 1. Verify the authorizing admin's credentials.
-        // IMPORTANT: always run BCrypt.Verify even when the user is not found.
-        // Short-circuiting on "admin is null" leaks whether a username exists
-        // via response-time difference (~0 µs vs ~300 ms for a real BCrypt check).
+        // 1. Verify the authorizing admin's credentials (timing-safe: the shared
+        //    service always runs BCrypt, even for unknown usernames).
         var adminNormalized = body.AdminUsername.ToLowerInvariant();
-        var admin = await authorizationService.FindUserByUsernameAsync(adminNormalized, cancellationToken);
+        var credentialResult = await authorizationService.VerifyCredentialsAsync(
+            adminNormalized, body.AdminPassword, MaxFailedAttempts, LockoutMinutes, cancellationToken);
 
-        var hashToCheck = admin?.PasswordHash ?? DummyHash;
-        var passwordValid = BCrypt.Net.BCrypt.Verify(body.AdminPassword, hashToCheck);
-
-        if (admin is null || !passwordValid)
+        if (!credentialResult.IsSuccess)
         {
-            if (admin is not null && !passwordValid)
-            {
-                await refreshService.RecordFailedLoginAsync(admin, MaxFailedAttempts, LockoutMinutes, timeProvider.UtcNow, cancellationToken);
-            }
-
-            return Problem(detail: "Admin credentials are invalid.", statusCode: 401);
+            return credentialResult.Status == CredentialCheckStatus.Locked
+                ? Problem(detail: "Admin account is temporarily locked.", statusCode: 423)
+                : Problem(detail: "Admin credentials are invalid.", statusCode: 401);
         }
 
-        // 2. Lockout check — run after BCrypt to preserve timing-attack resistance.
-        //    If the password was correct but the account is locked, return 423
-        //    instead of 401 so the caller knows the credentials were valid.
-        if (admin.LockedUntil.HasValue && admin.LockedUntil > timeProvider.UtcNow)
-        {
-            return Problem(detail: "Admin account is temporarily locked.", statusCode: 423);
-        }
+        var admin = credentialResult.User!;
 
         if (!UserRoles.IsAdmin(admin.Role))
         {
             return Forbid();
         }
 
-        // 3. Role hierarchy.
-        if (!authorizationService.CanCreateRole(admin.Role, body.Role))
-        {
-            return Problem(
-                detail: $"A {admin.Role} cannot create a {body.Role} account.",
-                statusCode: 403);
-        }
-
-        // 4. Geographic scope per role.
-        var scopeResult = await authorizationService.ValidateCreateUserScopeAsync(
-            admin.Role, admin.DairaId, admin.WilayaId,
-            body.Role, body.CommuneId, body.DairaId, body.WilayaId,
-            cancellationToken);
-        if (scopeResult.Error is not null)
-        {
-            return scopeResult.IsAuthorizationFailure
-                ? Problem(detail: scopeResult.Error, statusCode: 403)
-                : Problem(detail: scopeResult.Error, statusCode: 400);
-        }
-
-        // 5. Resolve commune_id: field_workers inherit the creator's commune.
-        var communeId = body.Role == UserRoles.FieldWorker
-            ? admin.CommuneId
-            : body.CommuneId;
-
-        // 6. Validate and create user (uniqueness, password strength, entity creation).
-        var creationResult = await userCreationService.ValidateAndCreateUserAsync(
+        // 3. Validate and create user (role hierarchy, geographic scope, creation,
+        //    and persistence are consolidated in the user creation service).
+        var creationResult = await userCreationService.CreateUserAsync(
+            admin.Role, admin.CommuneId, admin.DairaId, admin.WilayaId,
             body.Name, body.Email, body.Phone, body.Username, body.Password,
-            body.Role, communeId, body.DairaId, body.WilayaId,
+            body.Role, body.CommuneId, body.DairaId, body.WilayaId,
             cancellationToken);
         if (!creationResult.IsSuccess)
         {
-            var statusCode = creationResult.Code == UserCreationErrorCode.Duplicate ? 409 : 400;
-            return Problem(detail: creationResult.Error ?? "User creation failed.", statusCode: statusCode);
+            return creationResult.IsAuthorizationFailure
+                ? Problem(detail: creationResult.Error, statusCode: 403)
+                : Problem(detail: creationResult.Error, statusCode: creationResult.StatusCode);
         }
 
         var newUser = creationResult.User!;
-
-        // 7. Persist (catch DB-level unique constraint races).
-        try
-        {
-            await userCreationService.SaveUserAsync(newUser, cancellationToken);
-        }
-        catch (DbUpdateException)
-        {
-            return Problem(detail: "A user with that username or email already exists.", statusCode: 409);
-        }
 
         await refreshService.ResetFailedAttemptsIfNeededAsync(admin, cancellationToken);
 
