@@ -21,3 +21,5 @@ data:
   PGPORT: "5432"
   PGUSER: "postgres"
   PGDATABASE: "nars_db"
+  # nars-roads segmentation microservice (internal ClusterIP DNS name).
+  Segmentation__BaseUrl: "http://nars-roads:8000"

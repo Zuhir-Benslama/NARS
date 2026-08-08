@@ -26,6 +26,8 @@ resources:
   - hpa.yaml
   - pdb.yaml
   - backup-cronjob.yaml
+  # nars-roads segmentation microservice (deployment.yaml + service.yaml)
+  - ../roads
   # otel-metrics-service.yaml and servicemonitor.yaml are applied separately
   # after the observability stack is installed (their CRDs are only available then):
   #   make observability-servicemonitor
@@ -79,4 +81,6 @@ images:
   - name: zuhirbenslama/nars-vite
     newTag: latest
   - name: zuhirbenslama/nars-backup
+    newTag: latest
+  - name: zuhirbenslama/nars-roads
     newTag: latest

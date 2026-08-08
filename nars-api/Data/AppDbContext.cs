@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NarsApi.Data.Configurations;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
 
@@ -30,6 +31,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Daira> Dairas { get; set; }
     public DbSet<Commune> Communes { get; set; }
     public DbSet<CommuneBoundary> CommuneBoundaries { get; set; }
+
+    // ── AI draft features (review queue) ────────────────────────────────────
+    public DbSet<AiDraftFeature> AiDraftFeatures { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -139,5 +143,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithMany()
             .HasForeignKey(el => el.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // ── ai_draft_features (created by SQL migration, EF just queries/updates) ─
+        modelBuilder.ApplyConfiguration(new AiDraftFeatureConfiguration());
     }
 }

@@ -24,6 +24,14 @@ public static class UserRoles
         role is DairaAdmin or WilayaAdmin or NationalAdmin;
 
     /// <summary>
+    /// Roles allowed to review (accept/reject) AI-suggested draft features.
+    /// Field workers and commune users operate in a commune scope; all admins
+    /// can review from any scope.
+    /// </summary>
+    public static bool IsDraftReviewer(string? role) =>
+        role is FieldWorker or CommuneUser or DairaAdmin or WilayaAdmin or NationalAdmin;
+
+    /// <summary>
     /// Roles that operate within a commune scope.
     /// commune_user draws features; field_worker inspects them.
     /// </summary>

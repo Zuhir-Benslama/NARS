@@ -24,8 +24,8 @@ DOCKER_TOKEN       ?=
 BACKUP_DIR         ?= backup
 DB_NAME            ?= nars_db
 POSTGRES_DATA_DIR  ?= data/nars/postgis
-REGISTRY_IMAGES    := nars-api nars-postgis nars-vite nars-backup
-SCALABLE_DEPLOYS   := postgis nars-api nars-frontend
+REGISTRY_IMAGES    := nars-api nars-postgis nars-vite nars-backup nars-roads
+SCALABLE_DEPLOYS   := postgis nars-api nars-frontend nars-roads
 INGRESS_NGINX_VERSION ?= v1.12.0
 METRICS_SERVER_VERSION ?= v0.7.2
 LOCAL_PATH_PROVISIONER_VERSION ?= v0.0.30
@@ -57,6 +57,7 @@ fi
 	echo "GPG_PASSPHRASE=$$(_RND 32)" >> $@;
 	echo "GRAFANA_PASSWORD=$$(_RND 12)" >> $@;
 	echo "NARS_ADMIN_SIGNUP_TOKEN=$$(_RND 32)" >> $@;
+	echo "NARS_ROADS_INTERNAL_TOKEN=$$(_RND 32)" >> $@;
 	chmod 600 $@;
 	echo "→ Created $@ with fresh secrets (permissions: 600)"
 
@@ -71,7 +72,8 @@ JWT_SECRET         ?=
 GPG_PASSPHRASE     ?=
 GRAFANA_PASSWORD   ?=
 NARS_ADMIN_SIGNUP_TOKEN ?=
-export POSTGRES_PASSWORD JWT_SECRET GPG_PASSPHRASE GRAFANA_PASSWORD NARS_ADMIN_SIGNUP_TOKEN
+NARS_ROADS_INTERNAL_TOKEN ?=
+export POSTGRES_PASSWORD JWT_SECRET GPG_PASSPHRASE GRAFANA_PASSWORD NARS_ADMIN_SIGNUP_TOKEN NARS_ROADS_INTERNAL_TOKEN
 
 .PHONY: help
 help: ## Show available targets
@@ -102,6 +104,10 @@ _check-secrets: ## Fail fast if critical secrets are empty (prevents deploying w
 	fi
 	@if [ -z "$(NARS_ADMIN_SIGNUP_TOKEN)" ]; then
 		echo "✖ NARS_ADMIN_SIGNUP_TOKEN not set — run 'make .env' to generate it";
+		exit 1;
+	fi
+	@if [ -z "$(NARS_ROADS_INTERNAL_TOKEN)" ]; then
+		echo "✖ NARS_ROADS_INTERNAL_TOKEN not set — run 'make .env' to generate it";
 		exit 1;
 	fi
 
@@ -744,15 +750,25 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 	printf '%s' "$$JWT_SECRET" > "$$tmpdir/Jwt__SecretKey";
 	printf '%s' "$$GPG_PASSPHRASE" > "$$tmpdir/gpg-passphrase";
 	printf '%s' "$$NARS_ADMIN_SIGNUP_TOKEN" > "$$tmpdir/AdminSignup__SignupToken";
+	printf '%s' "$$NARS_ROADS_INTERNAL_TOKEN" > "$$tmpdir/Segmentation__InternalToken";
 	$(KUBECTL) create secret generic nars-secrets -n "$(NAMESPACE)" \
 		--from-file=postgres_password="$$tmpdir/postgres_password" \
 		--from-file=ConnectionStrings__DefaultConnection="$$tmpdir/ConnectionStrings__DefaultConnection" \
 		--from-file=Jwt__SecretKey="$$tmpdir/Jwt__SecretKey" \
 		--from-file=gpg-passphrase="$$tmpdir/gpg-passphrase" \
 		--from-file=AdminSignup__SignupToken="$$tmpdir/AdminSignup__SignupToken" \
+		--from-file=Segmentation__InternalToken="$$tmpdir/Segmentation__InternalToken" \
 		--dry-run=client -o yaml \
 	| $(KUBECTL) apply -f -
 	@echo "✓ nars-secrets created"
+
+	@echo "→ Creating 'nars-roads-secrets' (shared internal token)..."
+	printf '%s' "$$NARS_ROADS_INTERNAL_TOKEN" > "$$tmpdir/internal-token";
+	$(KUBECTL) create secret generic nars-roads-secrets -n "$(NAMESPACE)" \
+		--from-file=internal-token="$$tmpdir/internal-token" \
+		--dry-run=client -o yaml \
+	| $(KUBECTL) apply -f -
+	@echo "✓ nars-roads-secrets created"
 
 	@if [ -n "$(DOCKER_TOKEN)" ]; then
 		echo "→ Creating 'regcred'...";
@@ -795,7 +811,8 @@ kustomize-set-image-tag: ## Persistently pin image tags in kustomization.yaml (m
 			$(DOCKER_ORG)/nars-api=$(DOCKER_ORG)/nars-api:$(IMAGE_TAG) \
 			$(DOCKER_ORG)/nars-postgis=$(DOCKER_ORG)/nars-postgis:$(IMAGE_TAG) \
 			$(DOCKER_ORG)/nars-vite=$(DOCKER_ORG)/nars-vite:$(IMAGE_TAG) \
-			$(DOCKER_ORG)/nars-backup=$(DOCKER_ORG)/nars-backup:$(IMAGE_TAG));
+			$(DOCKER_ORG)/nars-backup=$(DOCKER_ORG)/nars-backup:$(IMAGE_TAG) \
+			$(DOCKER_ORG)/nars-roads=$(DOCKER_ORG)/nars-roads:$(IMAGE_TAG));
 		echo "✓ Image tags pinned to $(IMAGE_TAG)";
 	fi
 
@@ -805,7 +822,7 @@ kustomize-apply: secrets-validate _check-pinned-tag ## Apply k8s manifests via k
 	@echo "→ Applying kustomization (images: $(DOCKER_ORG)/*:$(IMAGE_TAG))..."
 	@$(KUBECTL) kustomize "$(K8S_DIR)" \
 		| awk -v org="$(DOCKER_ORG)" -v tag="$(IMAGE_TAG)" \
-			'BEGIN { esc = org; gsub(/\//, "\\/", esc); pat = "^ *-? *image: " esc "\\/(nars-api|nars-postgis|nars-vite|nars-backup):" } $$0 ~ pat { sub(/:[^ ]*$$/, ":" tag) } /app\.kubernetes\.io\/version:/ { sub(/version:.*$$/, "version: \\"" tag "\\"") } { print }' \
+			'BEGIN { esc = org; gsub(/\//, "\\/", esc); pat = "^ *-? *image: " esc "\\/(nars-api|nars-postgis|nars-vite|nars-backup|nars-roads):" } $$0 ~ pat { sub(/:[^ ]*$$/, ":" tag) } /app\.kubernetes\.io\/version:/ { sub(/version:.*$$/, "version: \\"" tag "\\"") } { print }' \
 		| $(KUBECTL) apply -f -
 	@echo "✓ Kustomization applied"
 
@@ -1110,20 +1127,20 @@ infra-lint-docker: ## Lint Dockerfiles with hadolint
 .PHONY: infra-lint-yaml
 infra-lint-yaml: ## Lint k8s YAML with yamllint (uses .yamllint.yaml config)
 	@if command -v yamllint >/dev/null 2>&1; then
-		yamllint -c nars-infra/.yamllint.yaml nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml
+		yamllint -c nars-infra/.yamllint.yaml nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml nars-infra/roads/*.yaml
 	else
 		docker run --rm -v "$$(pwd):/mnt" $(YAMLLINT_IMAGE) \
-			-c /mnt/nars-infra/.yamllint.yaml /mnt/nars-infra/k8s/*.yaml /mnt/nars-infra/k8s/helm-values/*.yaml
+			-c /mnt/nars-infra/.yamllint.yaml /mnt/nars-infra/k8s/*.yaml /mnt/nars-infra/k8s/helm-values/*.yaml /mnt/nars-infra/roads/*.yaml
 	fi
 
 .PHONY: infra-lint-python
 infra-lint-python: ## Lint Python scripts with ruff (check + format)
 	@if command -v ruff >/dev/null 2>&1; then
-		ruff check nars-infra/scripts/
-		ruff format --check nars-infra/scripts/
+		ruff check nars-infra/scripts/ nars-roads/app/
+		ruff format --check nars-infra/scripts/ nars-roads/app/
 	else
-		docker run --rm -v "$$(pwd):/mnt" $(RUFF_IMAGE) check /mnt/nars-infra/scripts/
-		docker run --rm -v "$$(pwd):/mnt" $(RUFF_IMAGE) format --check /mnt/nars-infra/scripts/
+		docker run --rm -v "$$(pwd):/mnt" $(RUFF_IMAGE) check /mnt/nars-infra/scripts/ /mnt/nars-roads/app/
+		docker run --rm -v "$$(pwd):/mnt" $(RUFF_IMAGE) format --check /mnt/nars-infra/scripts/ /mnt/nars-roads/app/
 	fi
 
 .PHONY: infra-lint-node
@@ -1195,6 +1212,7 @@ images-build: _warn-latest-tag ## Build all Docker images
 	$(SUBMAKE) _build-nars-postgis
 	$(SUBMAKE) _build-nars-vite
 	$(SUBMAKE) _build-nars-backup
+	$(SUBMAKE) _build-nars-roads
 	@echo "✓ All images built"
 
 .PHONY: _build-nars-api
@@ -1220,6 +1238,12 @@ _build-nars-backup:
 	@echo "  → $(DOCKER_ORG)/nars-backup:$(IMAGE_TAG)"
 	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-backup" \
 		-t "$(DOCKER_ORG)/nars-backup:$(IMAGE_TAG)" .
+
+.PHONY: _build-nars-roads
+_build-nars-roads:
+	@echo "  → $(DOCKER_ORG)/nars-roads:$(IMAGE_TAG)"
+	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-roads" \
+		-t "$(DOCKER_ORG)/nars-roads:$(IMAGE_TAG)" nars-roads/
 
 .PHONY: images-push
 images-push: _check-pinned-tag _warn-latest-tag ## Push all Docker images to registry

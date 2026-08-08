@@ -1,0 +1,32 @@
+# ─── Segmentation Service (nars-roads, FastAPI + PyTorch) ─────────────────────
+# Build from repo root:
+#   docker build -f nars-infra/docker/Dockerfile.nars-roads -t nars-roads:latest nars-roads/
+FROM python:3.11-slim
+
+# rasterio needs GDAL at the OS level
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        gdal-bin \
+        libgdal-dev \
+        libgl1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /srv
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app ./app
+# Place real weights (e.g. unet_r34_multiclass.pth) in nars-roads/weights/.
+# If absent, the service still starts but logs a warning and serves random
+# predictions until weights are added or mounted at NARS_ROADS_WEIGHTS_PATH.
+COPY weights ./weights
+
+ENV NARS_ROADS_WEIGHTS_PATH=/srv/weights/unet_r34_multiclass.pth
+ENV NARS_ROADS_TILE_SIZE=1024
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+
+CMD ["opentelemetry-instrument", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

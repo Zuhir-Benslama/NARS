@@ -139,6 +139,7 @@ public static class ServiceRegistrationExtensions
             client.Timeout = TimeSpan.FromSeconds(httpOpts.SatelliteTimeoutSeconds);
             client.DefaultRequestHeaders.Add("User-Agent", "NARS-Satellite/1.0");
         });
+        services.AddSegmentationClient(config);
     }
 
     private static void AddNarsControllers(this IServiceCollection services)
