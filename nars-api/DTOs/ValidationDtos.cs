@@ -34,3 +34,7 @@ public record DistrictCoverageResponse(
     [property: JsonPropertyName("covered")] bool Covered,
     [property: JsonPropertyName("message")] string Message
 );
+
+public record MainUrbanExistsResponse(
+    [property: JsonPropertyName("exists")] bool Exists
+);

@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
@@ -24,8 +26,8 @@ public class ProgramStartupCollection
 [Collection(ProgramStartupCollection.Name)]
 public class ProgramStartupValidationTests : IDisposable
 {
-    private const string FastFailConnStr =
-        "Host=127.0.0.1;Port=1;Database=nars;Username=nars;Password=nars;Timeout=1";
+    private static string FastFailConnStr(int port) =>
+        $"Host=127.0.0.1;Port={port};Database=nars;Username=nars;Password=nars;Timeout=1";
 
     private static readonly string[] EnvKeys =
         ["NARS_DB_PASSWORD", "NARS_JWT_SECRET", "NARS_ADMIN_SIGNUP_TOKEN"];
@@ -124,9 +126,15 @@ public class ProgramStartupValidationTests : IDisposable
     [Fact]
     public void UnreachableDatabase_FailsStartup()
     {
-        // Real localhost socket, but deliberately unreachable: Port 1 on 127.0.0.1 is
-        // either connection-refused (immediate) or blackholed (ConnectionString Timeout=1
-        // bounds the wait), so startup fails fast either way — no external dependency.
+        // Hermetic: bind a listener on an OS-assigned free port and never accept.
+        // The TCP handshake completes, but no Postgres greeting is ever sent, so
+        // the probe times out (ConnectionString Timeout=1) and the connectivity
+        // guard surfaces a startup failure. No external dependency, and no reliance
+        // on a particular port being closed or blackholed.
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+
         SetEnv("NARS_DB_PASSWORD", "test");
         ClearEnv("NARS_JWT_SECRET");
         ClearEnv("NARS_ADMIN_SIGNUP_TOKEN");
@@ -134,7 +142,7 @@ public class ProgramStartupValidationTests : IDisposable
         var factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(b =>
             {
-                b.UseSetting("ConnectionStrings:DefaultConnection", FastFailConnStr);
+                b.UseSetting("ConnectionStrings:DefaultConnection", FastFailConnStr(port));
                 b.UseSetting("Jwt:SecretKey", AuthTestHelper.TestJwtSecret);
                 b.UseSetting("AdminSignup:SignupToken", "test-signup-token");
             });

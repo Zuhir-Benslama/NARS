@@ -21,6 +21,10 @@ public class FeaturesController(
 {
     private readonly int _maxFeatureDataSize = featureDefaults.Value.MaxFeatureDataSize;
 
+    // Mirrors FeatureSaveRequest's [MaxLength(500)] on Label, which is dropped
+    // on the nullable FeatureUpdateRequest record param by the C# compiler.
+    private const int MaxLabelLength = 500;
+
     /// <summary>Creates a new geographic feature (road, area, district, building, etc.).</summary>
     [HttpPost("")]
     [ProducesResponseType(StatusCodes.Status201Created)]
@@ -174,6 +178,12 @@ public class FeaturesController(
             {
                 return Problem(detail: $"Feature data is too large (max {_maxFeatureDataSize / 1024} KB).", statusCode: 400);
             }
+        }
+
+        var labelError = UserFieldValidator.ValidateMaxLength(body.Label, MaxLabelLength, "Label");
+        if (labelError is not null)
+        {
+            return Problem(detail: labelError, statusCode: 400);
         }
 
         var descriptor = FeatureTypeRegistry.GetDescriptor(featureType);

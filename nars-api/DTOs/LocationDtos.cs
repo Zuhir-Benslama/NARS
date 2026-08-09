@@ -28,3 +28,9 @@ public record CommuneItem(
     [property: JsonPropertyName("longitude")] double? Longitude,
     [property: JsonPropertyName("full_name")] string FullName
 );
+
+public record CommuneBoundaryResponse(
+    [property: JsonPropertyName("communeId")] int CommuneId,
+    [property: JsonPropertyName("communeName")] string? CommuneName,
+    [property: JsonPropertyName("geometry")] string Geometry
+);

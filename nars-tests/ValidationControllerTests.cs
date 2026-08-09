@@ -50,8 +50,8 @@ public class ValidationControllerTests
         var ctrl = CreateController(db);
         var result = await ctrl.MainUrbanExists();
         var ok = Assert.IsType<OkObjectResult>(result);
-        dynamic payload = ok.Value!;
-        Assert.False((bool)payload.exists);
+        var payload = Assert.IsType<MainUrbanExistsResponse>(ok.Value);
+        Assert.False(payload.Exists);
     }
 
     [Fact]
@@ -73,8 +73,8 @@ public class ValidationControllerTests
         var ctrl = CreateController(db);
         var result = await ctrl.MainUrbanExists();
         var ok = Assert.IsType<OkObjectResult>(result);
-        dynamic payload = ok.Value!;
-        Assert.True((bool)payload.exists);
+        var payload = Assert.IsType<MainUrbanExistsResponse>(ok.Value);
+        Assert.True(payload.Exists);
     }
 
     // ── POST /api/validate/road ───────────────────────────────────────────

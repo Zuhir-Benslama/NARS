@@ -204,6 +204,8 @@ public class SpatialControllerTests
             var ok = Assert.IsType<OkObjectResult>(result);
             var resp = Assert.IsType<ScatteredRefreshResponse>(ok.Value);
             Assert.True(resp.Success);
+            Assert.Equal("Scattered area recomputed.", resp.Message);
+            Assert.Null(resp.GeoJson);
         }
     }
 

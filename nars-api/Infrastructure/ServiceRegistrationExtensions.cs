@@ -124,6 +124,8 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IRoadQueryService, RoadQueryService>();
         services.AddScoped<IUserProfileService, UserProfileService>();
         services.AddScoped<IUserCreationService, UserCreationService>();
+        services.AddScoped<ICommuneScopeService, CommuneScopeService>();
+        services.AddScoped<IDraftFeaturesService, DraftFeaturesService>();
     }
 
     private static void AddNarsHttpClients(this IServiceCollection services, IConfiguration config)

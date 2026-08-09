@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Services;
 
@@ -73,7 +74,7 @@ public class AdminController(
     {
         (skip, take) = Pagination.Clamp(skip, take);
         var (wilayas, total) = await overviewService.GetNationalOverviewAsync(skip, take, cancellationToken);
-        return Ok(new { level = "national", wilayas, total, skip, take });
+        return Ok(new NationalOverviewResponse("national", wilayas, total, skip, take));
     }
 
     private async Task<IActionResult> WilayaOverview(int wilayaId, CancellationToken cancellationToken)

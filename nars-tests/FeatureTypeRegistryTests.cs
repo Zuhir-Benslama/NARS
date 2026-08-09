@@ -45,13 +45,13 @@ public class FeatureTypeRegistryTests
         var id = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var entity = FeatureTypeRegistry.CreateEntity(
-            FeatureTypes.Road, id, userId, "street", "Test Road", "{}", FixedUtcNow);
+            FeatureTypes.Road, id, userId, FeatureTypes.RoadLayers.Street, "Test Road", "{}", FixedUtcNow);
 
         Assert.NotNull(entity);
         Assert.IsType<Road>(entity);
         Assert.Equal(id, entity.Id);
         Assert.Equal(userId, entity.UserId);
-        Assert.Equal("street", entity.Layer);
+        Assert.Equal(FeatureTypes.RoadLayers.Street, entity.Layer);
         Assert.Equal("Test Road", entity.Label);
         Assert.Equal("{}", entity.Data);
         Assert.Equal(FixedUtcNow, entity.CreatedAt);

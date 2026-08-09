@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Moq;
@@ -25,7 +24,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     public async Task InitializeAsync()
     {
         _db = _fixture.CreateDbContext();
-        await SeedReferenceDataAsync();
+        await SeedData.SeedAdminLocationsAsync(_db);
     }
 
     public async Task DisposeAsync()
@@ -36,7 +35,6 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
 
     private AdminController CreateOverviewController()
     {
-        _db.ChangeTracker.Clear();
         var featureStats = new FeatureStatsService(_fixture.CreateDbContextFactory());
         return new AdminController(new AdminOverviewService(_db, featureStats), Mock.Of<IWebHostEnvironment>());
     }
@@ -55,8 +53,8 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     {
         var creator = await CreateUserAsync(UserRoles.DairaAdmin, dairaId: 10);
         var controller = CreateUserManagementController();
-        SetAuthenticatedUser(controller, creator);
-        var request = BuildRequest(UserRoles.CommuneUser, communeId: 100);
+        AuthTestHelper.SetUser(controller, creator);
+        var request = BuildRequest(UserRoles.CommuneUser, communeId: CommuneId100);
 
         var result = await controller.CreateManagedUser(request);
 
@@ -66,7 +64,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         var createdUser = await _db.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
         Assert.NotNull(createdUser);
         Assert.Equal(UserRoles.CommuneUser, createdUser.Role);
-        Assert.Equal(100, createdUser.CommuneId);
+        Assert.Equal(CommuneId100, createdUser.CommuneId);
     }
 
     [Fact]
@@ -74,8 +72,8 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     {
         var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 1);
         var controller = CreateUserManagementController();
-        SetAuthenticatedUser(controller, creator);
-        var request = BuildRequest(UserRoles.DairaAdmin, dairaId: 10);
+        AuthTestHelper.SetUser(controller, creator);
+        var request = BuildRequest(UserRoles.DairaAdmin, dairaId: DairaId10);
 
         var result = await controller.CreateManagedUser(request);
 
@@ -93,8 +91,8 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     {
         var creator = await CreateUserAsync(UserRoles.NationalAdmin);
         var controller = CreateUserManagementController();
-        SetAuthenticatedUser(controller, creator);
-        var request = BuildRequest(UserRoles.WilayaAdmin, wilayaId: 2);
+        AuthTestHelper.SetUser(controller, creator);
+        var request = BuildRequest(UserRoles.WilayaAdmin, wilayaId: WilayaId2);
 
         var result = await controller.CreateManagedUser(request);
 
@@ -112,8 +110,8 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     {
         var creator = await CreateUserAsync(UserRoles.DairaAdmin, dairaId: 10);
         var controller = CreateUserManagementController();
-        SetAuthenticatedUser(controller, creator);
-        var request = BuildRequest(UserRoles.CommuneUser, communeId: 101);
+        AuthTestHelper.SetUser(controller, creator);
+        var request = BuildRequest(UserRoles.CommuneUser, communeId: CommuneId101);
 
         var result = await controller.CreateManagedUser(request);
 
@@ -125,8 +123,8 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     {
         var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 1);
         var controller = CreateUserManagementController();
-        SetAuthenticatedUser(controller, creator);
-        var request = BuildRequest(UserRoles.DairaAdmin, dairaId: 11);
+        AuthTestHelper.SetUser(controller, creator);
+        var request = BuildRequest(UserRoles.DairaAdmin, dairaId: DairaId11);
 
         var result = await controller.CreateManagedUser(request);
 
@@ -141,10 +139,10 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
             creatorRole,
             dairaId: creatorRole == UserRoles.DairaAdmin ? 10 : null,
             wilayaId: creatorRole == UserRoles.WilayaAdmin ? 1 : null,
-            communeId: creatorRole == UserRoles.CommuneUser ? 100 : null);
+            communeId: creatorRole == UserRoles.CommuneUser ? CommuneId100 : null);
         var controller = CreateUserManagementController();
-        SetAuthenticatedUser(controller, creator);
-        var request = BuildRequest(targetRole, communeId: 100, dairaId: 10, wilayaId: 1);
+        AuthTestHelper.SetUser(controller, creator);
+        var request = BuildRequest(targetRole, communeId: CommuneId100, dairaId: DairaId10, wilayaId: WilayaId1);
 
         var result = await controller.CreateManagedUser(request);
 
@@ -173,9 +171,9 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     [Fact]
     public async Task CreateAdmin_CommuneUserToFieldWorker_Returns201()
     {
-        var creator = await CreateUserAsync(UserRoles.CommuneUser, communeId: 100);
+        var creator = await CreateUserAsync(UserRoles.CommuneUser, communeId: CommuneId100);
         var controller = CreateUserManagementController();
-        SetAuthenticatedUser(controller, creator);
+        AuthTestHelper.SetUser(controller, creator);
         var request = BuildRequest(UserRoles.FieldWorker, communeId: null);
 
         var result = await controller.CreateManagedUser(request);
@@ -186,7 +184,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         var createdUser = await _db.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
         Assert.NotNull(createdUser);
         Assert.Equal(UserRoles.FieldWorker, createdUser.Role);
-        Assert.Equal(100, createdUser.CommuneId);
+        Assert.Equal(CommuneId100, createdUser.CommuneId);
     }
 
     // ── DeleteManagedUser ──────────────────────────────────────────────────────
@@ -200,7 +198,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         var target = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 1);
         var creator = await CreateUserAsync(UserRoles.NationalAdmin);
         var controller = CreateUserManagementController();
-        SetAuthenticatedUser(controller, creator);
+        AuthTestHelper.SetUser(controller, creator);
 
         var result = await controller.DeleteManagedUser(target.Id, default);
 
@@ -212,9 +210,9 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     public async Task DeleteAdmin_WithinScope_ReturnsNoContent()
     {
         var creator = await CreateUserAsync(UserRoles.DairaAdmin, dairaId: 10);
-        var target = await CreateUserAsync(UserRoles.CommuneUser, communeId: 100);
+        var target = await CreateUserAsync(UserRoles.CommuneUser, communeId: CommuneId100);
         var controller = CreateUserManagementController();
-        SetAuthenticatedUser(controller, creator);
+        AuthTestHelper.SetUser(controller, creator);
 
         var result = await controller.DeleteManagedUser(target.Id, default);
 
@@ -229,14 +227,13 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     {
         var creator = await CreateUserAsync(UserRoles.NationalAdmin);
         var controller = CreateOverviewController();
-        SetAuthenticatedUser(controller, creator);
+        AuthTestHelper.SetUser(controller, creator);
 
         var result = await controller.Overview();
 
         var okResult = Assert.IsType<OkObjectResult>(result);
-        dynamic payload = okResult.Value!;
-        var wilayas = (IReadOnlyList<WilayaSummary>)payload.wilayas;
-        Assert.Equal(2, wilayas.Count);
+        var payload = Assert.IsType<NationalOverviewResponse>(okResult.Value);
+        Assert.Equal(2, payload.Wilayas.Count);
     }
 
     [Fact]
@@ -244,7 +241,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     {
         var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 2);
         var controller = CreateOverviewController();
-        SetAuthenticatedUser(controller, creator);
+        AuthTestHelper.SetUser(controller, creator);
 
         var result = await controller.Overview();
 
@@ -260,7 +257,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     {
         var creator = await CreateUserAsync(UserRoles.DairaAdmin, dairaId: 10);
         var controller = CreateOverviewController();
-        SetAuthenticatedUser(controller, creator);
+        AuthTestHelper.SetUser(controller, creator);
 
         var result = await controller.Overview();
 
@@ -268,15 +265,15 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         var report = Assert.IsType<DairaReport>(okResult.Value);
         Assert.Equal(10, report.DairaId);
         Assert.Single(report.Communes);
-        Assert.Equal(100, report.Communes[0].CommuneId);
+        Assert.Equal(CommuneId100, report.Communes[0].CommuneId);
     }
 
     [Fact]
     public async Task Overview_CommuneUser_ReturnsForbid()
     {
-        var creator = await CreateUserAsync(UserRoles.CommuneUser, communeId: 100);
+        var creator = await CreateUserAsync(UserRoles.CommuneUser, communeId: CommuneId100);
         var controller = CreateOverviewController();
-        SetAuthenticatedUser(controller, creator);
+        AuthTestHelper.SetUser(controller, creator);
 
         var result = await controller.Overview();
 
@@ -286,9 +283,9 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     [Fact]
     public async Task Overview_FieldWorker_ReturnsForbid()
     {
-        var creator = await CreateUserAsync(UserRoles.FieldWorker, communeId: 100);
+        var creator = await CreateUserAsync(UserRoles.FieldWorker, communeId: CommuneId100);
         var controller = CreateOverviewController();
-        SetAuthenticatedUser(controller, creator);
+        AuthTestHelper.SetUser(controller, creator);
 
         var result = await controller.Overview();
 
@@ -302,7 +299,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     {
         var creator = await CreateUserAsync(UserRoles.NationalAdmin);
         var controller = CreateOverviewController();
-        SetAuthenticatedUser(controller, creator);
+        AuthTestHelper.SetUser(controller, creator);
 
         var result = await controller.GetWilaya(2);
 
@@ -318,9 +315,9 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     {
         var creator = await CreateUserAsync(UserRoles.NationalAdmin);
         var controller = CreateOverviewController();
-        SetAuthenticatedUser(controller, creator);
+        AuthTestHelper.SetUser(controller, creator);
 
-        var result = await controller.GetWilaya(999);
+        var result = await controller.GetWilaya(NonExistentId);
 
         var notFound = Assert.IsType<ObjectResult>(result);
         Assert.Equal(404, notFound.StatusCode);
@@ -333,7 +330,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     {
         var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 1);
         var controller = CreateOverviewController();
-        SetAuthenticatedUser(controller, creator);
+        AuthTestHelper.SetUser(controller, creator);
 
         var result = await controller.GetDaira(10);
 
@@ -348,7 +345,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     {
         var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 1);
         var controller = CreateOverviewController();
-        SetAuthenticatedUser(controller, creator);
+        AuthTestHelper.SetUser(controller, creator);
 
         var result = await controller.GetDaira(11);
 
@@ -361,7 +358,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     {
         var creator = await CreateUserAsync(UserRoles.NationalAdmin);
         var controller = CreateOverviewController();
-        SetAuthenticatedUser(controller, creator);
+        AuthTestHelper.SetUser(controller, creator);
 
         var result = await controller.GetDaira(11);
 
@@ -376,9 +373,9 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     {
         var creator = await CreateUserAsync(UserRoles.NationalAdmin);
         var controller = CreateOverviewController();
-        SetAuthenticatedUser(controller, creator);
+        AuthTestHelper.SetUser(controller, creator);
 
-        var result = await controller.GetDaira(999);
+        var result = await controller.GetDaira(NonExistentId);
 
         var notFound = Assert.IsType<ObjectResult>(result);
         Assert.Equal(404, notFound.StatusCode);
@@ -408,26 +405,4 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         int? communeId = null,
         int? dairaId = null,
         int? wilayaId = null) => await SeedData.CreateUserAsync(_db, role, communeId, dairaId, wilayaId, name: $"Creator {Guid.NewGuid().ToString("N")[..8]}");
-
-    private static void SetAuthenticatedUser(AdminController controller, User user)
-    {
-        var httpContext = new DefaultHttpContext
-        {
-            User = AuthTestHelper.CreateClaimsPrincipal(
-                user.Id, user.Role, user.CommuneId, user.DairaId, user.WilayaId, user.Username)
-        };
-        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
-    }
-
-    private static void SetAuthenticatedUser(AdminUserController controller, User user)
-    {
-        var httpContext = new DefaultHttpContext
-        {
-            User = AuthTestHelper.CreateClaimsPrincipal(
-                user.Id, user.Role, user.CommuneId, user.DairaId, user.WilayaId, user.Username)
-        };
-        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
-    }
-
-    private async Task SeedReferenceDataAsync() => await SeedData.SeedAdminLocationsAsync(_db);
 }

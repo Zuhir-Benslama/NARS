@@ -256,10 +256,10 @@ public class LocationsControllerTests
             var result = await ctrl.GetCommuneBoundary(1001);
 
             var ok = Assert.IsType<OkObjectResult>(result);
-            dynamic payload = ok.Value!;
-            Assert.Equal(1001, (int)payload.communeId);
-            Assert.Equal("Commune X", (string)payload.communeName);
-            Assert.Equal("{\"type\":\"Polygon\"}", (string)payload.geometry);
+            var payload = Assert.IsType<CommuneBoundaryResponse>(ok.Value);
+            Assert.Equal(1001, payload.CommuneId);
+            Assert.Equal("Commune X", payload.CommuneName);
+            Assert.Equal("{\"type\":\"Polygon\"}", payload.Geometry);
         }
     }
 

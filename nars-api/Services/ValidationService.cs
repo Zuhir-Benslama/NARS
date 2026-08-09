@@ -44,15 +44,24 @@ public sealed class ValidationService(AppDbContext db) : IValidationService
         {
             return await cmd.ExecuteScalarAsync(ct);
         }
-        catch (PostgresException ex)
+        catch (PostgresException ex) when (IsGeometryDataError(ex))
         {
             // Degenerate or oversized geometry in user-drawn data raises a
-            // Postgres error; surface it as a client error (400) instead of a
-            // misleading 500. Connection/server failures (NpgsqlException, not
-            // PostgresException) still bubble up as 500s.
+            // Postgres data exception; surface it as a client error (400)
+            // instead of a misleading 500. Genuine server failures (permission
+            // denied, disk full, deadlock, connection loss) fall through as 500s.
             throw new ArgumentException("Geometry validation failed. Check the submitted coordinates.", ex);
         }
     }
+
+    /// <summary>
+    /// Matches SQLSTATE class 22 (data exception — invalid_parameter_value,
+    /// invalid_text_representation, ...), which PostGIS raises for malformed
+    /// geometry input. Broader codes (connection, permission, disk) are not
+    /// client faults and must not be remapped to 400.
+    /// </summary>
+    private static bool IsGeometryDataError(PostgresException ex) =>
+        ex.SqlState?.StartsWith("22", StringComparison.Ordinal) == true;
 
     public async Task<bool> CheckRoadConnectivityAsync(Guid userId, string wkt, double maxDistanceMeters, CancellationToken ct = default)
     {

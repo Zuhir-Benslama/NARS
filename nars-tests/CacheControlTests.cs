@@ -5,13 +5,17 @@ namespace NarsApi.Tests;
 
 public class CacheControlTests
 {
+    // Synthetic Vite-style hashed names — the test exercises the fingerprint
+    // regex, so stable fake hashes are used instead of real build outputs
+    // (which change on every frontend rebuild and would need constant churn).
+
     [Theory]
     [InlineData("index.html", "no-store, no-cache, must-revalidate")]
     [InlineData("login.html", "no-store, no-cache, must-revalidate")]
-    [InlineData("assets/index-Dp0zqR50.js", "public, max-age=31536000, immutable")]
-    [InlineData("assets/AdminDashboard-B0M4F_US.css", "public, max-age=31536000, immutable")]
-    [InlineData("assets/rolldown-runtime-QTnfLwEv.js", "public, max-age=31536000, immutable")]
-    [InlineData("assets/vendor-geoman-3EH5LiXU.css", "public, max-age=31536000, immutable")]
+    [InlineData("assets/index-abcd1234.js", "public, max-age=31536000, immutable")]
+    [InlineData("assets/AdminDashboard-efgh5678.css", "public, max-age=31536000, immutable")]
+    [InlineData("assets/rolldown-runtime-ijkl9012.js", "public, max-age=31536000, immutable")]
+    [InlineData("assets/vendor-geoman-mnop3456.css", "public, max-age=31536000, immutable")]
     public void ContentFingerprintedBundles_AreImmutable(string fileName, string expected)
     {
         Assert.Equal(expected, PipelineExtensions.CacheControlForStaticAsset(fileName));
@@ -32,7 +36,7 @@ public class CacheControlTests
     [InlineData("favicon.ico")]
     [InlineData("NARS.jpg")]
     [InlineData("tiles.svg")]
-    [InlineData("assets/index-Dp0zqR50.js.map")]
+    [InlineData("assets/index-abcd1234.js.map")]
     public void OtherAssets_WriteNoCacheControlHeader(string fileName)
     {
         Assert.Equal(string.Empty, PipelineExtensions.CacheControlForStaticAsset(fileName));

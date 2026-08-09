@@ -319,8 +319,8 @@ public class AuthControllerTests
 
         Assert.IsType<OkObjectResult>(result);
         var setCookie = controller.Response.Headers["Set-Cookie"].ToString();
-        Assert.Contains("access_token=", setCookie);
-        Assert.Contains("refresh_token=", setCookie);
+        Assert.Contains(CookieNames.AccessToken + "=", setCookie);
+        Assert.Contains(CookieNames.RefreshToken + "=", setCookie);
         Assert.Contains("expires=", setCookie);
         Assert.Contains("path=/", setCookie);
         Assert.Contains("httponly", setCookie, StringComparison.OrdinalIgnoreCase);

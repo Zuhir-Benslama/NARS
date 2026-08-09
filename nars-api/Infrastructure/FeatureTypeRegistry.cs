@@ -327,6 +327,32 @@ public static class FeatureTypeRegistry
         return descriptor?.AddToContext(db, entity);
     }
 
+    /// <summary>
+    /// Deletes all features owned by a user across every registered feature
+    /// table plus their <c>feature_registry</c> rows. Shared by user deletion
+    /// and "clear all features" so the per-table loop cannot drift. Callers
+    /// are responsible for wrapping this in a transaction.
+    /// </summary>
+    public static async Task<int> DeleteAllFeaturesForUserAsync(AppDbContext db, Guid userId, CancellationToken ct)
+    {
+        var total = 0;
+
+        foreach (var descriptor in GetAllDescriptors())
+        {
+            var dbSet = descriptor.GetDbSet(db);
+
+            // Remove the feature-registry entries via a subquery so no IDs are
+            // materialized into memory, then delete the feature rows.
+            await db.FeatureRegistry
+                .Where(r => dbSet.Where(f => f.UserId == userId).Select(f => f.Id).Contains(r.Id))
+                .ExecuteDeleteAsync(ct);
+
+            total += await dbSet.Where(f => f.UserId == userId).ExecuteDeleteAsync(ct);
+        }
+
+        return total;
+    }
+
     private static FeatureTypeDescriptor? GetDescriptor(FeatureBase entity) =>
         _entityTypeMap.GetValueOrDefault(entity.GetType());
 

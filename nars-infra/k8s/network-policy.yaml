@@ -157,6 +157,75 @@ spec:
   policyTypes:
     - Egress
 ---
+# Allow nars-api to reach the nars-roads segmentation service (8000)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-api-to-roads
+  namespace: nars
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: nars-api
+      app.kubernetes.io/component: api
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: nars-roads
+              app.kubernetes.io/component: segmentation
+      ports:
+        - port: 8000
+          protocol: TCP
+  policyTypes:
+    - Egress
+---
+# Allow nars-roads to reach the OTel collector (4317/4318)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-otel-roads
+  namespace: nars
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: nars-roads
+      app.kubernetes.io/component: segmentation
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+      ports:
+        - port: 4317
+          protocol: TCP
+        - port: 4318
+          protocol: TCP
+  policyTypes:
+    - Egress
+---
+# Allow nars-api to reach nars-roads (8000) — ingress side
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-roads-from-api
+  namespace: nars
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: nars-roads
+      app.kubernetes.io/component: segmentation
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: nars-api
+              app.kubernetes.io/component: api
+      ports:
+        - port: 8000
+---
 # The frontend only ships browser traces over HTTP (nginx /v1/traces proxy),
 # so it gets 4318 only — not the OTLP gRPC port 4317.
 apiVersion: networking.k8s.io/v1

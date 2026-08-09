@@ -1,19 +1,41 @@
 # ─── Segmentation Service (nars-roads, FastAPI + PyTorch) ─────────────────────
 # Build from repo root:
 #   docker build -f nars-infra/docker/Dockerfile.nars-roads -t nars-roads:latest nars-roads/
-FROM python:3.11-slim
+# Run the test suite:
+#   docker build -f nars-infra/docker/Dockerfile.nars-roads --target test -t nars-roads:test nars-roads/
+#   docker run --rm nars-roads:test
+FROM python:3.11-slim AS base
 
 # rasterio needs GDAL at the OS level
+# Versions pinned with wildcard suffixes (see .hadolint.yaml dl3008 convention)
+# to allow security patches within the same Debian series.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        gdal-bin \
-        libgdal-dev \
-        libgl1 \
+        gdal-bin=3.10.3+dfsg-1* \
+        libgdal-dev=3.10.3+dfsg-1* \
+        libgl1=1.7.0-1+b* \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /srv
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+FROM base AS test
+
+COPY requirements-dev.txt .
+RUN pip install --no-cache-dir -r requirements-dev.txt
+
+COPY pytest.ini .
+COPY app ./app
+COPY tests ./tests
+
+CMD ["pytest", "-q", "tests/"]
+
+FROM base
+
+# Run as a non-root user. The deployment enforces runAsNonRoot/runAsUser 10001
+# (see nars-infra/roads/deployment.yaml) — the image USER must match.
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin nars-roads
 
 COPY app ./app
 # Place real weights (e.g. unet_r34_multiclass.pth) in nars-roads/weights/.
@@ -23,6 +45,13 @@ COPY weights ./weights
 
 ENV NARS_ROADS_WEIGHTS_PATH=/srv/weights/unet_r34_multiclass.pth
 ENV NARS_ROADS_TILE_SIZE=1024
+ENV HOME=/home/nars-roads
+
+# Writable scratch space for GDAL/rasterio temp artifacts (the pod mounts an
+# emptyDir at /tmp and the deployment points TMPDIR there).
+RUN mkdir -p /tmp && chown -R nars-roads:nars-roads /srv /tmp
+
+USER nars-roads
 
 EXPOSE 8000
 

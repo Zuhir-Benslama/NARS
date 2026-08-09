@@ -395,6 +395,8 @@ public class RefreshTokenServiceTests
             var result = await svc.RotateRefreshTokenAsync(raw);
 
             Assert.True(result.Success);
+            Assert.Equal("testuser", result.Username);
+            Assert.Equal("new-access-token", result.NewAccessToken);
         }
     }
 
@@ -658,7 +660,6 @@ public class RefreshTokenServiceTests
         };
         db.Users.Add(user);
         await db.SaveChangesAsync();
-        db.ChangeTracker.Clear();
         var svc = CreateService(db);
 
         await svc.ResetFailedAttemptsIfNeededAsync(user);

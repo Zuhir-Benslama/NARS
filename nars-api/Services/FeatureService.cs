@@ -94,29 +94,32 @@ public sealed class FeatureService(
         }
 
         await db.FeatureRegistry.Where(r => r.Id == featureId).ExecuteDeleteAsync(ct);
+
+        // Roads own their entrances: the schema has no FK/cascade, so the
+        // delete contract is enforced here. A deleted road must not leave
+        // orphaned house_entrances rows pointing at a non-existent road.
+        if (featureType == FeatureTypes.Road)
+        {
+            var orphanedEntranceIds = db.HouseEntrances
+                .Where(e => e.RoadId == featureId)
+                .Select(e => e.Id);
+            await db.FeatureRegistry
+                .Where(r => orphanedEntranceIds.Contains(r.Id))
+                .ExecuteDeleteAsync(ct);
+            await db.HouseEntrances
+                .Where(e => e.RoadId == featureId)
+                .ExecuteDeleteAsync(ct);
+        }
+
         await tx.CommitAsync(ct);
         return true;
     }
 
     public async Task<int> ClearAllFeaturesAsync(Guid userId, CancellationToken ct)
     {
-        var total = 0;
-
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
 
-        foreach (var descriptor in FeatureTypeRegistry.GetAllDescriptors())
-        {
-            var dbSet = descriptor.GetDbSet(db);
-
-            // Remove the feature-registry entries for this user's features via a
-            // subquery so no IDs are materialized into memory, then delete the
-            // feature rows themselves.
-            await db.FeatureRegistry
-                .Where(r => dbSet.Where(f => f.UserId == userId).Select(f => f.Id).Contains(r.Id))
-                .ExecuteDeleteAsync(ct);
-
-            total += await dbSet.Where(f => f.UserId == userId).ExecuteDeleteAsync(ct);
-        }
+        var total = await FeatureTypeRegistry.DeleteAllFeaturesForUserAsync(db, userId, ct);
 
         await tx.CommitAsync(ct);
         return total;

@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -44,11 +43,7 @@ public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : IAs
             Options.Create(new ValidationOptions()),
             new ValidationService(_db),
             Mock.Of<IWebHostEnvironment>());
-        var httpContext = new DefaultHttpContext
-        {
-            User = AuthTestHelper.CreateClaimsPrincipal(userId, UserRoles.CommuneUser, communeId: 1)
-        };
-        ctrl.ControllerContext = new ControllerContext { HttpContext = httpContext };
+        AuthTestHelper.SetUser(ctrl, userId, UserRoles.CommuneUser, communeId: 1);
         return ctrl;
     }
 
@@ -75,7 +70,7 @@ public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : IAs
                 new CoordDto(3.0, 36.0),
                 new CoordDto(3.1, 36.0),
             ],
-            DistrictTypeKey: "district"
+            DistrictTypeKey: FeatureTypes.District
         ));
 
         var badResult = Assert.IsType<ObjectResult>(result);
@@ -103,7 +98,7 @@ public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : IAs
         {
             Id = Guid.NewGuid(),
             UserId = userId,
-            Layer = "district",
+            Layer = FeatureTypes.DistrictLayers.DistrictLayer,
             Label = "Existing District",
             Data = existingData,
         });
@@ -117,7 +112,7 @@ public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : IAs
                 new CoordDto(36.725, 2.965),
                 new CoordDto(36.715, 2.965),
             ],
-            DistrictTypeKey: "district"
+            DistrictTypeKey: FeatureTypes.District
         ));
 
         var okResult = Assert.IsType<OkObjectResult>(result);

@@ -117,7 +117,9 @@ public class LogsControllerTests
 
         Assert.IsType<NoContentResult>(result);
         mock.Verify(s => s.LogBatchAsync(
-            It.Is<List<ErrorLog>>(l => l.Count == 2),
+            It.Is<List<ErrorLog>>(l => l.Count == 2
+                && l[0].Message == "Something broke"
+                && l[1].Message == "Deprecated usage"),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -137,7 +139,9 @@ public class LogsControllerTests
 
         Assert.IsType<NoContentResult>(result);
         mock.Verify(s => s.LogBatchAsync(
-            It.Is<List<ErrorLog>>(l => l.Count == 1),
+            It.Is<List<ErrorLog>>(l => l.Count == 1
+                && l[0].Message == "valid entry"
+                && l[0].Level == "info"),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 

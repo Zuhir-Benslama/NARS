@@ -8,12 +8,22 @@ namespace NarsApi.Models;
 /// </summary>
 public sealed class AiDraftFeature
 {
+    // Draft feature-type keys (the segmentation client can emit roads or buildings).
+    public const string TypeRoad = "road";
+    public const string TypeBuilding = "building";
+
+    // Status values.
+    public const string StatusPending = "pending";
+    public const string StatusAccepted = "accepted";
+    public const string StatusRejected = "rejected";
+    public const string StatusEdited = "edited";
+
     public Guid Id { get; private set; }
     public string FeatureType { get; private set; } = null!; // "road" | "building"
     public string GeometryGeoJson { get; private set; } = null!;
     public string Source { get; private set; } = "ai_segmentation";
     public double Confidence { get; private set; }
-    public string Status { get; private set; } = "pending"; // pending | accepted | rejected | edited
+    public string Status { get; private set; } = StatusPending; // pending | accepted | rejected | edited
     public int CommuneId { get; private set; }
     public Guid? ReviewedBy { get; private set; }
     public DateTimeOffset? ReviewedAt { get; private set; }
@@ -30,7 +40,7 @@ public sealed class AiDraftFeature
         string? sourceTileRef,
         DateTimeOffset createdAt)
     {
-        if (featureType is not ("road" or "building"))
+        if (featureType is not (TypeRoad or TypeBuilding))
         {
             throw new ArgumentException($"Unknown feature type: {featureType}", nameof(featureType));
         }
@@ -44,20 +54,20 @@ public sealed class AiDraftFeature
             CommuneId = communeId,
             SourceTileRef = sourceTileRef,
             CreatedAt = createdAt,
-            Status = "pending",
+            Status = StatusPending,
         };
     }
 
     public void MarkAccepted(Guid reviewedBy, DateTimeOffset reviewedAt)
     {
-        Status = "accepted";
+        Status = StatusAccepted;
         ReviewedBy = reviewedBy;
         ReviewedAt = reviewedAt;
     }
 
     public void MarkRejected(Guid reviewedBy, DateTimeOffset reviewedAt)
     {
-        Status = "rejected";
+        Status = StatusRejected;
         ReviewedBy = reviewedBy;
         ReviewedAt = reviewedAt;
     }

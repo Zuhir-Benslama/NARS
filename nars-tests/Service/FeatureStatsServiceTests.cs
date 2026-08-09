@@ -23,12 +23,12 @@ public class FeatureStatsServiceTests(NarsDatabaseFixture fixture) : IAsyncLifet
         _userId1 = Guid.NewGuid();
         _userId2 = Guid.NewGuid();
 
-        _db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = _userId1, Layer = "central_urban", Label = "A1", Data = "{}", CreatedAt = FixedUtcNow });
-        _db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = _userId1, Layer = "secondary_urban", Label = "A2", Data = "{}", CreatedAt = FixedUtcNow });
-        _db.Roads.Add(new Road { Id = Guid.CreateVersion7(), UserId = _userId1, Layer = "street", Label = "R1", Data = "{}", CreatedAt = FixedUtcNow });
-        _db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = _userId2, Layer = "central_urban", Label = "A3", Data = "{}", CreatedAt = FixedUtcNow });
-        _db.Districts.Add(new District { Id = Guid.CreateVersion7(), UserId = _userId2, Layer = "housing_estate", Label = "D1", Data = "{}", CreatedAt = FixedUtcNow });
-        _db.Districts.Add(new District { Id = Guid.CreateVersion7(), UserId = _userId2, Layer = "district", Label = "D2", Data = "{}", CreatedAt = FixedUtcNow });
+        _db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = _userId1, Layer = FeatureTypes.AreaLayers.CentralUrban, Label = "A1", Data = "{}", CreatedAt = FixedUtcNow });
+        _db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = _userId1, Layer = FeatureTypes.AreaLayers.SecondaryUrban, Label = "A2", Data = "{}", CreatedAt = FixedUtcNow });
+        _db.Roads.Add(new Road { Id = Guid.CreateVersion7(), UserId = _userId1, Layer = FeatureTypes.RoadLayers.Street, Label = "R1", Data = "{}", CreatedAt = FixedUtcNow });
+        _db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = _userId2, Layer = FeatureTypes.AreaLayers.CentralUrban, Label = "A3", Data = "{}", CreatedAt = FixedUtcNow });
+        _db.Districts.Add(new District { Id = Guid.CreateVersion7(), UserId = _userId2, Layer = FeatureTypes.DistrictLayers.HousingEstate, Label = "D1", Data = "{}", CreatedAt = FixedUtcNow });
+        _db.Districts.Add(new District { Id = Guid.CreateVersion7(), UserId = _userId2, Layer = FeatureTypes.DistrictLayers.DistrictLayer, Label = "D2", Data = "{}", CreatedAt = FixedUtcNow });
         _db.Users.Add(new User { Id = _userId1, Username = "user1", Name = "User 1", Email = "u1@test.com", Phone = DefaultPhone, PasswordHash = "hash", Role = UserRoles.CommuneUser, CommuneId = 1 });
         _db.Users.Add(new User { Id = _userId2, Username = "user2", Name = "User 2", Email = "u2@test.com", Phone = AltPhone, PasswordHash = "hash", Role = UserRoles.CommuneUser, CommuneId = 1 });
         await _db.SaveChangesAsync();

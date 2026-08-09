@@ -35,7 +35,7 @@ public sealed class FieldService(
             FROM {tableName} f
             JOIN users u ON u.id = f.user_id
             WHERE u.commune_id = @commune_id
-            ORDER BY f.created_at DESC
+            ORDER BY f.created_at DESC, f.id
             OFFSET @skip
             LIMIT @take
             """;
@@ -114,6 +114,7 @@ public sealed class FieldService(
     public async Task<List<FieldInspectionResponse>> GetInspectionsAsync(Guid featureId, int skip, int take, CancellationToken ct = default) => await db.Inspections
             .Where(i => i.FeatureId == featureId)
             .OrderByDescending(i => i.CreatedAt)
+            .ThenByDescending(i => i.Id)
             .Skip(skip)
             .Take(take)
             .Select(i => new FieldInspectionResponse(

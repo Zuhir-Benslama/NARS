@@ -18,8 +18,10 @@ public class BackgroundTaskQueue : IBackgroundTaskQueue
         var capacity = options.Value.Capacity;
         var channelOptions = new BoundedChannelOptions(capacity)
         {
-            // Drop oldest when queue is full to avoid blocking the HTTP request path.
-            FullMode = BoundedChannelFullMode.DropOldest,
+            // Reject new writes when the queue is full (rather than silently
+            // evicting the oldest) so the caller learns the item was dropped
+            // and the pending work already queued still runs.
+            FullMode = BoundedChannelFullMode.DropWrite,
             SingleWriter = false,
             SingleReader = true,
         };
@@ -30,9 +32,9 @@ public class BackgroundTaskQueue : IBackgroundTaskQueue
     {
         ArgumentNullException.ThrowIfNull(workItem);
 
-        // TryWrite returns false when the bounded channel is full and DropOldest
-        // cannot make room (e.g. the channel is actively being drained). Log the
-        // dropped item so operational visibility is maintained.
+        // With DropWrite, TryWrite returns false when the bounded channel is
+        // full, meaning this newly submitted item was rejected. Log it so the
+        // drop is never silent.
         if (!_queue.Writer.TryWrite(workItem))
         {
             _logger.LogWarning("Background task queue is full — work item was dropped.");

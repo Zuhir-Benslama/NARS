@@ -13,6 +13,7 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
         var total = await db.Wilayas.CountAsync(cancellationToken);
 
         var pagedWilayas = await db.Wilayas
+            .AsNoTracking()
             .OrderBy(w => w.WilayaId)
             .Skip(skip).Take(take)
             .ToListAsync(cancellationToken);
@@ -22,12 +23,14 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
         // duplicate admins per wilaya (the filtered index is non-unique); the
         // earliest-created admin wins instead of crashing on a duplicate key.
         var adminList = await db.Users
+            .AsNoTracking()
             .Where(u => u.Role == UserRoles.WilayaAdmin && u.WilayaId.HasValue && wilayaIds.Contains(u.WilayaId.Value))
             .ToListAsync(cancellationToken);
         var admins = adminList.GroupBy(u => u.WilayaId!.Value)
             .ToDictionary(g => g.Key, g => g.OrderBy(u => u.CreatedAt).First());
 
         var dairas = await db.Dairas
+            .AsNoTracking()
             .Where(d => wilayaIds.Contains(d.WilayaId))
             .ToListAsync(cancellationToken);
 
@@ -38,6 +41,7 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
         var allDairaIds = dairas.Select(d => d.DairaId).ToArray();
 
         var communes = await db.Communes
+            .AsNoTracking()
             .Where(c => allDairaIds.Contains(c.DairaId))
             .ToListAsync(cancellationToken);
         var communesByDaira = communes
@@ -77,22 +81,23 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
 
     public async Task<WilayaReport?> GetWilayaReportAsync(int wilayaId, CancellationToken cancellationToken = default)
     {
-        var wilaya = await db.Wilayas.FindAsync([wilayaId], cancellationToken);
+        var wilaya = await db.Wilayas.AsNoTracking().FirstOrDefaultAsync(w => w.WilayaId == wilayaId, cancellationToken);
         if (wilaya is null)
         {
             return null;
         }
 
-        var admin = await db.Users.FirstOrDefaultAsync(u =>
+        var admin = await db.Users.AsNoTracking().FirstOrDefaultAsync(u =>
             u.Role == UserRoles.WilayaAdmin && u.WilayaId == wilayaId, cancellationToken);
 
-        var dairas = await db.Dairas.Where(d => d.WilayaId == wilayaId)
+        var dairas = await db.Dairas.AsNoTracking().Where(d => d.WilayaId == wilayaId)
             .OrderBy(d => d.DairaFr).ToListAsync(cancellationToken);
 
         var dairaIds = dairas.Select(d => d.DairaId).ToArray();
 
         // Grouping tolerates duplicate admins per daira (non-unique filtered index).
         var dairaAdminList = await db.Users
+            .AsNoTracking()
             .Where(u => u.Role == UserRoles.DairaAdmin && u.DairaId.HasValue && dairaIds.Contains(u.DairaId.Value))
             .ToListAsync(cancellationToken);
         var dairaAdmins = dairaAdminList.GroupBy(u => u.DairaId!.Value)
@@ -127,14 +132,14 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
     public async Task<DairaReport?> GetDairaReportAsync(int dairaId, int? expectedWilayaId = null, CancellationToken cancellationToken = default)
     {
         var daira = expectedWilayaId.HasValue
-            ? await db.Dairas.FirstOrDefaultAsync(d => d.DairaId == dairaId && d.WilayaId == expectedWilayaId.Value, cancellationToken)
-            : await db.Dairas.FindAsync([dairaId], cancellationToken);
+            ? await db.Dairas.AsNoTracking().FirstOrDefaultAsync(d => d.DairaId == dairaId && d.WilayaId == expectedWilayaId.Value, cancellationToken)
+            : await db.Dairas.AsNoTracking().FirstOrDefaultAsync(d => d.DairaId == dairaId, cancellationToken);
         if (daira is null)
         {
             return null;
         }
 
-        var admin = await db.Users.FirstOrDefaultAsync(u =>
+        var admin = await db.Users.AsNoTracking().FirstOrDefaultAsync(u =>
             u.Role == UserRoles.DairaAdmin && u.DairaId == dairaId, cancellationToken);
 
         var communesByDaira = await BuildCommunesForDairasAsync([dairaId], cancellationToken);
@@ -152,7 +157,7 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
 
     private async Task<Dictionary<int, List<CommuneReport>>> BuildCommunesForDairasAsync(int[] dairaIds, CancellationToken cancellationToken = default)
     {
-        var communes = await db.Communes.Where(c => dairaIds.Contains(c.DairaId))
+        var communes = await db.Communes.AsNoTracking().Where(c => dairaIds.Contains(c.DairaId))
             .OrderBy(c => c.CommuneFr).ToListAsync(cancellationToken);
 
         var communeIds = communes.Select(c => c.CommuneId).ToArray();

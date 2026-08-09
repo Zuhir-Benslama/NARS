@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using NarsApi.Infrastructure;
 using NarsApi.Services;
+using static NarsApi.Tests.TestData;
 using Xunit;
 
 namespace NarsApi.Tests;
@@ -136,7 +137,7 @@ public class AuthenticationExtensionsTests
         Assert.Equal(SameSiteMode.Lax, options.Cookie.SameSite);
         Assert.Equal(TimeSpan.FromMinutes(15), options.ExpireTimeSpan);
         Assert.True(options.SlidingExpiration);
-        Assert.Equal("/login", options.LoginPath);
+        Assert.Equal(LoginPath, options.LoginPath);
     }
 
     [Fact]

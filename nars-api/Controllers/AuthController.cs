@@ -78,8 +78,7 @@ public partial class AuthController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> Logout(CancellationToken cancellationToken = default)
     {
-        var userIdStr = User.FindFirstValue(ClaimNames.UserId);
-        if (!string.IsNullOrEmpty(userIdStr) && Guid.TryParse(userIdStr, out Guid userId))
+        if (CurrentUserId is { } userId)
         {
             await refreshService.RevokeAllUserTokensAsync(userId, cancellationToken);
         }
@@ -129,15 +128,15 @@ public partial class AuthController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> CurrentUser(CancellationToken cancellationToken = default)
     {
-        var userIdStr = User.FindFirstValue(ClaimNames.UserId);
-        if (!Guid.TryParse(userIdStr, out Guid userId))
+        var userId = CurrentUserId;
+        if (userId is null)
         {
             return Problem(detail: "Malformed token claims.", statusCode: 401);
         }
 
         // Query the database for fresh user data instead of relying on
         // potentially stale JWT claims (user profile may have changed).
-        var user = await authorizationService.FindUserByIdAsync(userId, cancellationToken);
+        var user = await authorizationService.FindUserByIdAsync(userId.Value, cancellationToken);
         if (user is null)
         {
             return Problem(detail: "User no longer exists.", statusCode: 401);

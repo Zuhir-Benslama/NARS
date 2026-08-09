@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using NarsApi.DTOs;
-using NarsApi.Infrastructure;
 using NarsApi.Services;
 
 namespace NarsApi.Controllers;
@@ -12,96 +10,42 @@ namespace NarsApi.Controllers;
 [ApiController]
 [Route("/api")]
 [Tags("Users")]
-public class UsersController(IUserProfileService userProfile, IRefreshTokenService refreshTokens, ILogger<UsersController> logger, IWebHostEnvironment webHost) : NarsControllerBase(webHost)
+public class UsersController(IUserProfileService userProfile, IRefreshTokenService refreshTokens, IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     /// <summary>Updates the authenticated user's username, email, and/or password.</summary>
     [HttpPut("user/profile")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateCredentials([FromBody] UpdateUserRequest body, CancellationToken cancellationToken = default)
     {
-        var user = await userProfile.GetUserByIdAsync(RequiredCurrentUserId, cancellationToken);
-        if (user is null)
+        var result = await userProfile.UpdateCredentialsAsync(RequiredCurrentUserId, body, cancellationToken);
+        if (!result.Succeeded)
         {
-            return Problem(detail: "User not found.", statusCode: 404);
-        }
-
-        // Validate username uniqueness if changed (store normalized lowercase)
-        if (!string.IsNullOrWhiteSpace(body.Username))
-        {
-            var normalized = body.Username.Trim().ToLowerInvariant();
-            if (normalized != user.Username)
+            return result.Error switch
             {
-                if (await userProfile.IsUsernameTakenAsync(normalized, cancellationToken))
-                {
-                    return Problem(detail: "Username already exists.", statusCode: 409);
-                }
-
-                user.Username = normalized;
-            }
+                CredentialUpdateError.UserNotFound => Problem(detail: "User not found.", statusCode: 404),
+                CredentialUpdateError.InvalidUsername or CredentialUpdateError.InvalidEmail or CredentialUpdateError.WeakPassword =>
+                    Problem(detail: result.Detail, statusCode: 400),
+                CredentialUpdateError.DuplicateUsername or CredentialUpdateError.DuplicateEmail =>
+                    Problem(detail: "Username or email already exists.", statusCode: 409),
+                CredentialUpdateError.WrongCurrentPassword => Problem(detail: "Current password is incorrect.", statusCode: 403),
+                _ => Problem(detail: result.Detail, statusCode: 400),
+            };
         }
 
-        // Validate email uniqueness if changed (store normalized lowercase, matching creation)
-        if (!string.IsNullOrWhiteSpace(body.Email))
-        {
-            var normalizedEmail = body.Email.Trim().ToLowerInvariant();
-            if (normalizedEmail != user.Email)
-            {
-                if (await userProfile.IsEmailTakenAsync(normalizedEmail, cancellationToken))
-                {
-                    return Problem(detail: "Email already exists.", statusCode: 409);
-                }
-
-                user.Email = normalizedEmail;
-            }
-        }
-
-        // Only update password when explicitly provided and valid.
-        // Never hash an empty string — that would lock the user out.
-        var passwordChanged = false;
-        if (!string.IsNullOrEmpty(body.Password))
-        {
-            // Require the current password so a stolen session cookie alone
-            // cannot change credentials (defense against account takeover).
-            if (string.IsNullOrEmpty(body.CurrentPassword)
-                || !BCrypt.Net.BCrypt.Verify(body.CurrentPassword, user.PasswordHash))
-            {
-                return Problem(detail: "Current password is incorrect.", statusCode: 403);
-            }
-
-            var pwdErr = PasswordValidator.Validate(body.Password);
-            if (pwdErr is not null)
-            {
-                return Problem(detail: pwdErr, statusCode: 400);
-            }
-
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(body.Password);
-            passwordChanged = true;
-        }
-
-        try
-        {
-            await userProfile.UpdateUserAsync(user, cancellationToken);
-        }
-        catch (DbUpdateException ex)
-        {
-            logger.LogWarning(ex, "Duplicate username/email on profile update (userId={UserId})", CurrentUserId);
-            // TOCTOU race: concurrent request claimed the username/email first.
-            return Problem(detail: "Username or email already exists.", statusCode: 409);
-        }
-
-        if (passwordChanged)
+        if (result.PasswordChanged)
         {
             // Revoke all refresh tokens so sessions using the old password die immediately.
-            await refreshTokens.RevokeAllUserTokensAsync(user.Id, cancellationToken);
+            await refreshTokens.RevokeAllUserTokensAsync(result.User!.Id, cancellationToken);
         }
 
         return Ok(new UpdateCredentialsResponse(
             Success: true,
             Message: "Profile updated successfully.",
-            User: new UserCredentialsInfo(Username: user.Username, Email: user.Email)
+            User: new UserCredentialsInfo(Username: result.User!.Username, Email: result.User.Email)
         ));
     }
 }

@@ -41,10 +41,10 @@ public class AdminControllerTests
         var result = await ctrl.Overview(default);
 
         var ok = Assert.IsType<OkObjectResult>(result);
-        dynamic payload = ok.Value!;
-        Assert.Equal("national", (string)payload.level);
-        Assert.Empty(payload.wilayas);
-        Assert.Equal(0, (int)payload.total);
+        var payload = Assert.IsType<NationalOverviewResponse>(ok.Value);
+        Assert.Equal("national", payload.Level);
+        Assert.Empty(payload.Wilayas);
+        Assert.Equal(0, payload.Total);
         overview.Verify(s => s.GetNationalOverviewAsync(0, 500, It.IsAny<CancellationToken>()), Times.Once);
     }
 

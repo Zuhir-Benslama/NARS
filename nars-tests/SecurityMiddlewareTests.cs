@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http;
 using NarsApi.Infrastructure;
+using static NarsApi.Tests.TestData;
 using Xunit;
 
 namespace NarsApi.Tests;
@@ -30,7 +31,7 @@ public class SecurityMiddlewareTests
     }
 
     [Theory]
-    [InlineData("/login")]
+    [InlineData(LoginPath)]
     [InlineData("/map")]
     public async Task PageRoutes_GetCspHeaderWithNonce_AndNoUnsafeInline(string path)
     {
@@ -46,7 +47,7 @@ public class SecurityMiddlewareTests
     }
 
     [Theory]
-    [InlineData("/login")]
+    [InlineData(LoginPath)]
     [InlineData("/map")]
     public async Task PageRoutes_HeaderNonceMatchesContextNonce(string path)
     {
@@ -61,7 +62,7 @@ public class SecurityMiddlewareTests
     }
 
     [Theory]
-    [InlineData("/login")]
+    [InlineData(LoginPath)]
     [InlineData("/map")]
     public async Task PageRoutes_GetDefenseInDepthHeaders(string path)
     {
@@ -75,9 +76,9 @@ public class SecurityMiddlewareTests
     }
 
     [Theory]
-    [InlineData("/api/auth/signin")]
-    [InlineData("/api/features")]
-    [InlineData("/api/logs")]
+    [InlineData(ApiAuthSignInPath)]
+    [InlineData(ApiFeaturesPath)]
+    [InlineData(ApiLogsPath)]
     public async Task ApiRoutes_DoNotGetCspHeader_ButGetNosniff(string path)
     {
         var ctx = CreateContext(path);

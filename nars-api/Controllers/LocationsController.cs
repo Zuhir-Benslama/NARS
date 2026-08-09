@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Services;
 
@@ -167,12 +168,7 @@ public class LocationsController(
             }
         }
 
-        return Ok(new
-        {
-            communeId,
-            communeName = commune.CommuneFr,
-            geometry = geoJson,
-        });
+        return Ok(new CommuneBoundaryResponse(communeId, commune.CommuneFr, geoJson));
     }
 
     // ── GET /api/commune/{id}/boundary-debug ──────────────────

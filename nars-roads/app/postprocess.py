@@ -5,16 +5,13 @@ Roads:     threshold -> clean -> skeletonize -> graph -> simplified LineStrings
 Buildings: threshold -> clean -> connected components -> simplified Polygons
 """
 
+import logging
+
 import numpy as np
 import rasterio
-import sknw
 from shapely.geometry import LineString, Polygon, mapping
-from skimage.measure import find_contours, label
-from skimage.morphology import (
-    binary_closing,
-    remove_small_objects,
-    skeletonize,
-)
+
+logger = logging.getLogger("nars-roads.postprocess")
 
 # Simplification tolerance in degrees. ~0.00002 deg is roughly 2m at the
 # equator - tune per your imagery resolution.
@@ -26,6 +23,9 @@ MIN_BUILDING_COMPONENT_PX = 20
 def mask_to_linestrings(
     prob_mask: np.ndarray, transform: rasterio.Affine, threshold: float = 0.5
 ) -> list[dict]:
+    import sknw
+    from skimage.morphology import remove_small_objects, skeletonize
+
     binary = prob_mask > threshold
     binary = remove_small_objects(binary, min_size=MIN_ROAD_COMPONENT_PX)
     if not binary.any():
@@ -40,17 +40,26 @@ def mask_to_linestrings(
         if pts is None or len(pts) < 2:
             continue
 
-        coords = [rasterio.transform.xy(transform, float(r), float(c)) for r, c in pts]
-        line = LineString(coords)
-        if line.length == 0:
+        try:
+            coords = [
+                rasterio.transform.xy(transform, float(r), float(c)) for r, c in pts
+            ]
+            line = LineString(coords)
+            if line.length == 0:
+                continue
+            line = line.simplify(SIMPLIFY_TOLERANCE, preserve_topology=False)
+            if not line.is_valid or line.geom_type != "LineString":
+                continue
+            geometry = mapping(line)
+        except Exception:
+            logger.debug("Skipping degenerate road edge", exc_info=True)
             continue
-        line = line.simplify(SIMPLIFY_TOLERANCE, preserve_topology=False)
 
         confidence = float(prob_mask[pts[:, 0], pts[:, 1]].mean())
         features.append(
             {
                 "type": "Feature",
-                "geometry": mapping(line),
+                "geometry": geometry,
                 "properties": {
                     "confidence": round(confidence, 4),
                     "feature_type": "road",
@@ -63,6 +72,9 @@ def mask_to_linestrings(
 def mask_to_polygons(
     prob_mask: np.ndarray, transform: rasterio.Affine, threshold: float = 0.5
 ) -> list[dict]:
+    from skimage.measure import find_contours, label
+    from skimage.morphology import binary_closing, remove_small_objects
+
     binary = prob_mask > threshold
     binary = binary_closing(binary)
     binary = remove_small_objects(binary, min_size=MIN_BUILDING_COMPONENT_PX)
@@ -88,6 +100,7 @@ def mask_to_polygons(
         try:
             poly = Polygon(coords).simplify(SIMPLIFY_TOLERANCE, preserve_topology=True)
         except Exception:
+            logger.debug("Skipping malformed building polygon", exc_info=True)
             continue
 
         if not poly.is_valid or poly.area == 0 or poly.geom_type != "Polygon":

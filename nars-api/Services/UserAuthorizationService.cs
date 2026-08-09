@@ -246,11 +246,23 @@ public sealed class UserAuthorizationService(
         // Apply profile fields.
         if (body.Name is not null)
         {
+            var nameError = UserFieldValidator.ValidateMaxLength(body.Name, UserFieldValidator.MaxNameLength, "Name");
+            if (nameError is not null)
+            {
+                return UserUpdateResult.Failure(UserUpdateErrorCode.Invalid, nameError);
+            }
+
             target.Name = body.Name;
         }
 
         if (body.Email is not null)
         {
+            var emailError = UserFieldValidator.ValidateEmail(body.Email);
+            if (emailError is not null)
+            {
+                return UserUpdateResult.Failure(UserUpdateErrorCode.Invalid, emailError);
+            }
+
             var normalizedEmail = body.Email.ToLowerInvariant();
             var emailConflict = await db.Users.AnyAsync(u => u.Email == normalizedEmail && u.Id != target.Id, ct);
             if (emailConflict)
@@ -263,6 +275,12 @@ public sealed class UserAuthorizationService(
 
         if (body.Phone is not null)
         {
+            var phoneError = UserFieldValidator.ValidateMaxLength(body.Phone, UserFieldValidator.MaxPhoneLength, "Phone");
+            if (phoneError is not null)
+            {
+                return UserUpdateResult.Failure(UserUpdateErrorCode.Invalid, phoneError);
+            }
+
             target.Phone = body.Phone;
         }
 
@@ -312,18 +330,9 @@ public sealed class UserAuthorizationService(
             .Where(rt => rt.UserId == userId && !rt.Revoked)
             .ExecuteUpdateAsync(setters => setters.SetProperty(rt => rt.Revoked, true), ct);
 
-        // Delete all features across all feature tables. Registry rows are removed
-        // via a subquery so no IDs are materialized into memory.
-        foreach (var descriptor in FeatureTypeRegistry.GetAllDescriptors())
-        {
-            var dbSet = descriptor.GetDbSet(db);
-
-            await db.FeatureRegistry
-                .Where(r => dbSet.Where(f => f.UserId == userId).Select(f => f.Id).Contains(r.Id))
-                .ExecuteDeleteAsync(ct);
-
-            await dbSet.Where(f => f.UserId == userId).ExecuteDeleteAsync(ct);
-        }
+        // Delete all features across all feature tables (registry rows removed
+        // via subquery so no IDs are materialized into memory).
+        await FeatureTypeRegistry.DeleteAllFeaturesForUserAsync(db, userId, ct);
 
         // Delete inspections and error logs.
         await db.Inspections.Where(i => i.UserId == userId).ExecuteDeleteAsync(ct);

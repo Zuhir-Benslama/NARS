@@ -1,6 +1,5 @@
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -42,11 +41,7 @@ public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         var featureSvc = new FeatureService(_db, Mock.Of<IBackgroundTaskQueue>(), Mock.Of<ILogger<FeatureService>>());
         var fieldSvc = new FieldService(_db, featureSvc, Mock.Of<ILogger<FieldService>>());
         var ctrl = new FieldController(Mock.Of<ILogger<FieldController>>(), Options.Create(new FeatureDefaultsOptions()), fieldSvc, Mock.Of<IWebHostEnvironment>());
-        var httpContext = new DefaultHttpContext
-        {
-            User = AuthTestHelper.CreateClaimsPrincipal(_workerId, UserRoles.FieldWorker, communeId: 1)
-        };
-        ctrl.ControllerContext = new ControllerContext { HttpContext = httpContext };
+        AuthTestHelper.SetUser(ctrl, _workerId, UserRoles.FieldWorker, communeId: 1);
         return ctrl;
     }
 
@@ -59,27 +54,15 @@ public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
 
     private async Task<Guid> CreateRoadWithOwnerAsync()
     {
-        var ownerId = Guid.NewGuid();
-        await _db.Users.AddAsync(new User
-        {
-            Id = ownerId,
-            Name = "Road Owner",
-            Email = $"road-owner-{ownerId:N}@test.com",
-            Phone = DefaultPhone,
-            Username = $"road_owner_{ownerId:N}",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
-            Role = UserRoles.CommuneUser,
-            CommuneId = 1,
-        });
-
+        var owner = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: 1, name: "Road Owner");
         var roadId = Guid.NewGuid();
         _db.Roads.Add(new Road
         {
             Id = roadId,
-            UserId = ownerId,
+            UserId = owner.Id,
             Data = """{"coordinates":[{"lat":36.71,"lng":2.95},{"lat":36.72,"lng":2.96}]}""",
             Label = "Integration Test Road",
-            Layer = "street",
+            Layer = FeatureTypes.RoadLayers.Street,
             UpdatedAt = FixedUtcNow,
         });
         _db.FeatureRegistry.Add(new FeatureRegistry { Id = roadId, FeatureType = FeatureTypes.Road });
@@ -94,13 +77,13 @@ public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         var controller = CreateController();
         await CreateRoadWithOwnerAsync();
 
-        var result = await controller.GetFeatures(type: "road");
+        var result = await controller.GetFeatures(type: FeatureTypes.Road);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<LoadFeaturesResponse<FieldFeatureResult>>(ok.Value);
         Assert.Single(resp.Features);
         Assert.Equal("Integration Test Road", resp.Features[0].Label);
-        Assert.Equal("street", resp.Features[0].Layer);
+        Assert.Equal(FeatureTypes.RoadLayers.Street, resp.Features[0].Layer);
     }
 
     [Fact]
@@ -172,7 +155,7 @@ public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
             UserId = otherOwnerId,
             Data = "{}",
             Label = "Other Commune Road",
-            Layer = "street",
+            Layer = FeatureTypes.RoadLayers.Street,
             UpdatedAt = FixedUtcNow,
         });
         _db.FeatureRegistry.Add(new FeatureRegistry { Id = roadId, FeatureType = FeatureTypes.Road });

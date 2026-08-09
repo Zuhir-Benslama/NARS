@@ -94,6 +94,13 @@ public sealed class UserCreationService(
             return UserCreationResult.Failure(UserCreationErrorCode.Invalid, geoError);
         }
 
+        // 1b. Email format (defense-in-depth; the HTTP layer enforces it too).
+        var emailError = UserFieldValidator.ValidateEmail(email);
+        if (emailError is not null)
+        {
+            return UserCreationResult.Failure(UserCreationErrorCode.Invalid, emailError);
+        }
+
         // 2. Uniqueness (normalised to lowercase for case-insensitive matching).
         var normalizedUsername = username.ToLowerInvariant();
         var normalizedEmail = email.ToLowerInvariant();

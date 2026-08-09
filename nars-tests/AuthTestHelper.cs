@@ -51,4 +51,8 @@ public static class AuthTestHelper
                 User = CreateClaimsPrincipal(userId, role, communeId, dairaId, wilayaId, username ?? "testuser")
             }
         };
+
+    public static void SetUser<T>(T controller, User user)
+        where T : ControllerBase =>
+        SetUser(controller, user.Id, user.Role, user.CommuneId, user.DairaId, user.WilayaId, user.Username);
 }

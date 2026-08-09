@@ -108,13 +108,40 @@ public class ScatteredAreaServiceTests
             }
         });
 
-        await Task.WhenAll(writers);
+        var writeResults = await Task.WhenAll(writers);
         await Task.WhenAll(reads);
 
         Assert.Empty(readErrors);
-        Assert.All(writers, w => Assert.False(w.Result));
+        Assert.All(writeResults, Assert.False);
         Assert.All(userIds, uid => Assert.NotNull(service.GetLastError(uid, 1)));
         // Another user's error must not appear under a different user's key.
         Assert.Null(service.GetLastError(Guid.NewGuid(), 1));
+    }
+
+    [Fact]
+    public async Task LastError_ExceedingCap_EvictsOldestEntries()
+    {
+        var factory = new Mock<IDbContextFactory<AppDbContext>>();
+        factory.Setup(f => f.CreateDbContextAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Simulated database failure"));
+
+        var now = FixedUtcNow;
+        var ticking = new Mock<IDateTimeProvider>();
+        ticking.Setup(t => t.UtcNow).Returns(() => now = now.AddSeconds(1));
+
+        var service = CreateService(dbFactory: factory.Object, timeProvider: ticking.Object);
+
+        // 1005 distinct failing keys exceeds the 1000-entry cap.
+        const int keys = 1005;
+        var ids = Enumerable.Range(0, keys).Select(_ => Guid.NewGuid()).ToArray();
+        for (var i = 0; i < keys; i++)
+        {
+            Assert.False(await service.RefreshAsync(ids[i], 1));
+        }
+
+        // The newest entry survives; the very first (oldest) entries were evicted.
+        Assert.NotNull(service.GetLastError(ids[^1], 1));
+        Assert.Null(service.GetLastError(ids[0], 1));
+        Assert.Null(service.GetLastError(ids[1], 1));
     }
 }

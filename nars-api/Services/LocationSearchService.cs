@@ -19,7 +19,7 @@ public sealed class LocationSearchService(IDbContextFactory<AppDbContext> dbFact
         }
 
         var total = await q.CountAsync(ct);
-        var items = await q.OrderBy(w => w.WilayaFr).Skip(skip).Take(take)
+        var items = await q.OrderBy(w => w.WilayaFr).ThenBy(w => w.WilayaId).Skip(skip).Take(take)
             .Select(w => new WilayaItem(w.WilayaId, w.WilayaFr ?? "", w.WilayaAr ?? "", w.WilayaLatitude, w.WilayaLongitude))
             .ToListAsync(ct);
 
@@ -38,7 +38,7 @@ public sealed class LocationSearchService(IDbContextFactory<AppDbContext> dbFact
         }
 
         var total = await q.CountAsync(ct);
-        var items = await q.OrderBy(d => d.DairaFr).Skip(skip).Take(take)
+        var items = await q.OrderBy(d => d.DairaFr).ThenBy(d => d.DairaId).Skip(skip).Take(take)
             .Select(d => new DairaItem(d.DairaId, d.DairaFr, d.DairaAr, d.DairaLatitude, d.DairaLongitude, d.DairaName ?? ""))
             .ToListAsync(ct);
 
@@ -57,7 +57,7 @@ public sealed class LocationSearchService(IDbContextFactory<AppDbContext> dbFact
         }
 
         var total = await q.CountAsync(ct);
-        var items = await q.OrderBy(c => c.CommuneFr).Skip(skip).Take(take)
+        var items = await q.OrderBy(c => c.CommuneFr).ThenBy(c => c.CommuneId).Skip(skip).Take(take)
             .Select(c => new CommuneItem(c.CommuneId, c.CommuneFr, c.CommuneAr, c.CommuneCode == null ? null : c.CommuneCode.ToString(), c.CommuneLatitude, c.CommuneLongitude, c.CommuneName ?? ""))
             .ToListAsync(ct);
 

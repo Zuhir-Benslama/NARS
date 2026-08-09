@@ -128,3 +128,11 @@ public record WilayaSummary(
     [property: JsonPropertyName("commune_count")] int CommuneCount,
     [property: JsonPropertyName("commune_user_count")] int CommuneUserCount
 );
+
+public record NationalOverviewResponse(
+    [property: JsonPropertyName("level")] string Level,
+    [property: JsonPropertyName("wilayas")] IReadOnlyList<WilayaSummary> Wilayas,
+    [property: JsonPropertyName("total")] int Total,
+    [property: JsonPropertyName("skip")] int Skip,
+    [property: JsonPropertyName("take")] int Take
+);

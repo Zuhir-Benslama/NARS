@@ -135,7 +135,7 @@ public class PagesControllerTests
         var result = await h.Controller.Root();
 
         var redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/login", redirect.Url);
+        Assert.Equal(LoginPath, redirect.Url);
     }
 
     [Fact]
@@ -182,7 +182,7 @@ public class PagesControllerTests
         var result = await h.Controller.MapPage();
 
         var redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/login", redirect.Url);
+        Assert.Equal(LoginPath, redirect.Url);
     }
 
     [Fact]
@@ -239,7 +239,7 @@ public class PagesControllerTests
         var result = await h.Controller.MapPage();
 
         var redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/login", redirect.Url);
+        Assert.Equal(LoginPath, redirect.Url);
     }
 
     [Fact]
@@ -253,7 +253,7 @@ public class PagesControllerTests
         var result = await h.Controller.MapPage();
 
         var redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/login", redirect.Url);
+        Assert.Equal(LoginPath, redirect.Url);
     }
 
     [Fact]

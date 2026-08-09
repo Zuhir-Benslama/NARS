@@ -14,7 +14,10 @@ namespace NarsApi.Infrastructure;
 /// </summary>
 public static class FeatureQueryHelper
 {
-    private static readonly JsonElement EmptyJsonObject = JsonDocument.Parse("{}").RootElement;
+    // JsonSerializer.Deserialize<JsonElement> returns an unowned element backed
+    // by the serializer's own buffer — unlike JsonDocument.Parse(...).RootElement,
+    // it requires no disposal and cannot leak the pooled document.
+    private static readonly JsonElement EmptyJsonObject = JsonSerializer.Deserialize<JsonElement>("{}");
     private static readonly string _loadFeaturesSql = BuildSql(withLayer: false);
     private static readonly string _loadByLayerSql = BuildSql(withLayer: true);
 
@@ -34,7 +37,7 @@ public static class FeatureQueryHelper
             )
             SELECT f.id, f.label, f.data, f.created_at, f.layer, f.feature_type, t.total_count
             FROM filtered f, total t
-            ORDER BY f.created_at
+            ORDER BY f.created_at, f.id
             OFFSET @skip LIMIT @take
             """;
     }

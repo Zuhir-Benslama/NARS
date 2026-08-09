@@ -17,6 +17,12 @@ public static class TestData
     // ── Auth tokens ────────────────────────────────────────────────────
     public const string AdminSignupToken = "nars-admin-signup-v1";
 
+    // ── Route constants ────────────────────────────────────────────────
+    public const string LoginPath = "/login";
+    public const string ApiFeaturesPath = "/api/features";
+    public const string ApiLogsPath = "/api/logs";
+    public const string ApiAuthSignInPath = "/api/auth/signin";
+
     // ── Phone numbers ──────────────────────────────────────────────────
     public const string DefaultPhone = "0555000000";
     public const string AltPhone = "0555123456";
@@ -40,12 +46,21 @@ public static class TestData
     public const int OversizedDataLength = 600_000;
 
     // ── User IDs ───────────────────────────────────────────────────────
-    // Single shared ID so callers don't generate a fresh Guid per call
-    // (each test uses its own in-memory DB, so sharing cannot collide).
-    public static readonly Guid UserId = Guid.NewGuid();
+    // Fixed value so tests are fully deterministic (each test uses its own
+    // in-memory DB, so sharing the ID across tests cannot collide).
+    public static readonly Guid UserId = new("11111111-1111-1111-1111-111111111111");
 
     // ── Location IDs ───────────────────────────────────────────────────
     public const int CommuneId1 = 1;
+
+    // IDs seeded by SeedData.SeedAdminLocationsAsync:
+    //   wilaya 1/2, daira 10/11, commune 100/101.
+    public const int WilayaId1 = 1;
+    public const int WilayaId2 = 2;
+    public const int DairaId10 = 10;
+    public const int DairaId11 = 11;
+    public const int CommuneId100 = 100;
+    public const int CommuneId101 = 101;
 
     // ── "Not found" sentinels ───────────────────────────────────────────
     public const int NonExistentId = 999;

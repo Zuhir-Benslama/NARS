@@ -77,7 +77,7 @@ export POSTGRES_PASSWORD JWT_SECRET GPG_PASSPHRASE GRAFANA_PASSWORD NARS_ADMIN_S
 
 .PHONY: help
 help: ## Show available targets
-	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
+	@grep -hE '^[a-zA-Z][a-zA-Z_-]*:.*?## .*$$' $(MAKEFILE_LIST) \
 		| sort \
 		| awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-28s\033[0m %s\n", $$1, $$2}'
 
@@ -249,8 +249,9 @@ cluster-logs: ## Tail logs from all pods in the namespace
 		|| echo "! Failed to tail logs — no running pods in '$(NAMESPACE)' or kubectl error"
 
 .PHONY: cluster-port-forward
-cluster-port-forward: proxy-up ## Deprecated — use 'proxy-up' directly.
+cluster-port-forward: ## Deprecated — use 'proxy-up' directly.
 	@echo "⚠ DEPRECATED: 'cluster-port-forward' is deprecated — use 'proxy-up' instead." >&2
+	@$(SUBMAKE) proxy-up
 
 PROXY_CONTAINER ?= kind-proxy
 
@@ -1136,20 +1137,20 @@ infra-lint-yaml: ## Lint k8s YAML with yamllint (uses .yamllint.yaml config)
 .PHONY: infra-lint-python
 infra-lint-python: ## Lint Python scripts with ruff (check + format)
 	@if command -v ruff >/dev/null 2>&1; then
-		ruff check nars-infra/scripts/ nars-roads/app/
-		ruff format --check nars-infra/scripts/ nars-roads/app/
+		ruff check nars-infra/scripts/ nars-roads/app/ nars-roads/tests/
+		ruff format --check nars-infra/scripts/ nars-roads/app/ nars-roads/tests/
 	else
-		docker run --rm -v "$$(pwd):/mnt" $(RUFF_IMAGE) check /mnt/nars-infra/scripts/ /mnt/nars-roads/app/
-		docker run --rm -v "$$(pwd):/mnt" $(RUFF_IMAGE) format --check /mnt/nars-infra/scripts/ /mnt/nars-roads/app/
+		docker run --rm -v "$$(pwd):/mnt" $(RUFF_IMAGE) check /mnt/nars-infra/scripts/ /mnt/nars-roads/app/ /mnt/nars-roads/tests/
+		docker run --rm -v "$$(pwd):/mnt" $(RUFF_IMAGE) format --check /mnt/nars-infra/scripts/ /mnt/nars-roads/app/ /mnt/nars-roads/tests/
 	fi
 
 .PHONY: infra-lint-node
 infra-lint-node: ## Syntax-check Node helper scripts
 	@if command -v node >/dev/null 2>&1; then
-		node --check nars-infra/scripts/render-mermaid-playwright.mjs
+		for f in nars-infra/scripts/*.mjs; do node --check "$$f"; done
 	else
 		docker run --rm -v "$$(pwd):/mnt" $(NODE_IMAGE) \
-			node --check /mnt/nars-infra/scripts/render-mermaid-playwright.mjs
+			sh -c 'for f in /mnt/nars-infra/scripts/*.mjs; do node --check "$$f"; done'
 	fi
 
 .PHONY: infra-lint-makefile
@@ -1275,7 +1276,7 @@ frontend-update: ## Rebuild nars-vite, load into kind, and rollout restart
 	@echo "✓ nars-vite rebuilt and deployed"
 
 .PHONY: all
-all: cluster-up ## Bring up the full cluster (default: help)
+all: cluster-up ## Bring up the full cluster (bare 'make' shows help)
 
 .PHONY: test
 test: ## Run all tests
@@ -1295,6 +1296,13 @@ test-coverage: ## Run backend tests with coverage and enforce thresholds (coverl
 		/p:CollectCoverage=true \
 		/p:CoverletOutputFormat=cobertura \
 		/p:CoverletOutput=TestResults/coverage.cobertura.xml
+
+.PHONY: roads-test
+roads-test: ## Run the segmentation service's Python test suite in a container
+	docker build -f "$(DOCKER_DIR)/Dockerfile.nars-roads" \
+		--target test \
+		-t "$(DOCKER_ORG)/nars-roads:test" nars-roads/
+	docker run --rm "$(DOCKER_ORG)/nars-roads:test"
 
 .PHONY: clean
 clean: ## NOT a build-clean — refuses accidental cluster teardown (use cluster-down / cluster-clean)

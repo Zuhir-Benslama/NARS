@@ -8,7 +8,6 @@ using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
-using Microsoft.AspNetCore.Http;
 using NarsApi.Services;
 using Moq;
 using static NarsApi.Tests.TestData;
@@ -42,7 +41,6 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
 
     private FeaturesController CreateController()
     {
-        _db.ChangeTracker.Clear();
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var bgQueueMock = Mock.Of<IBackgroundTaskQueue>();
         var ctrl = new FeaturesController(
@@ -51,11 +49,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
             timeProvider,
             new FeatureStatsService(_fixture.CreateDbContextFactory()),
             Mock.Of<IWebHostEnvironment>());
-        var httpContext = new DefaultHttpContext
-        {
-            User = AuthTestHelper.CreateClaimsPrincipal(_userId, UserRoles.CommuneUser, communeId: 1)
-        };
-        ctrl.ControllerContext = new ControllerContext { HttpContext = httpContext };
+        AuthTestHelper.SetUser(ctrl, _userId, UserRoles.CommuneUser, communeId: 1);
         return ctrl;
     }
 
@@ -74,8 +68,8 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         };
 
         var result = await controller.SaveFeature(new FeatureSaveRequest(
-            Type: "area",
-            Layer: "central_urban",
+            Type: FeatureTypes.Area,
+            Layer: FeatureTypes.AreaLayers.CentralUrban,
             Label: "Test Central Urban",
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(data)).RootElement
         ));
@@ -86,7 +80,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         // Verify in database
         var area = await _db.Areas.FirstOrDefaultAsync(a => a.UserId == _userId && a.Label == "Test Central Urban");
         Assert.NotNull(area);
-        Assert.Equal("central_urban", area.Layer);
+        Assert.Equal(FeatureTypes.AreaLayers.CentralUrban, area.Layer);
     }
 
     [Fact]
@@ -102,8 +96,8 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         };
 
         var result = await controller.SaveFeature(new FeatureSaveRequest(
-            Type: "road",
-            Layer: "street",
+            Type: FeatureTypes.Road,
+            Layer: FeatureTypes.RoadLayers.Street,
             Label: "Test Road",
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(data)).RootElement
         ));
@@ -121,7 +115,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         var controller = CreateController();
         var result = await controller.SaveFeature(new FeatureSaveRequest(
             Type: "nonexistent_type",
-            Layer: "central_urban",
+            Layer: FeatureTypes.AreaLayers.CentralUrban,
             Label: "Bad Type",
             Data: System.Text.Json.JsonDocument.Parse("{}").RootElement
         ));
@@ -139,11 +133,11 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         var dataRoad = new { coordinates = new[] { new { lat = 36.71, lng = 2.95 }, new { lat = 36.72, lng = 2.96 } } };
 
         await controller.SaveFeature(new FeatureSaveRequest(
-            Type: "area", Layer: "central_urban", Label: "Area 1",
+            Type: FeatureTypes.Area, Layer: FeatureTypes.AreaLayers.CentralUrban, Label: "Area 1",
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(dataArea)).RootElement));
 
         await controller.SaveFeature(new FeatureSaveRequest(
-            Type: "road", Layer: "street", Label: "Road 1",
+            Type: FeatureTypes.Road, Layer: FeatureTypes.RoadLayers.Street, Label: "Road 1",
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(dataRoad)).RootElement));
 
         var result = await controller.LoadFeatures();
@@ -152,8 +146,8 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         var loadResponse = Assert.IsType<LoadFeaturesResponse<FeatureResult>>(okResult.Value);
         Assert.Equal(2, loadResponse.Count);
         Assert.Equal(2, loadResponse.Features.Count);
-        Assert.Contains(loadResponse.Features, f => f.Type == "area" && f.Label == "Area 1");
-        Assert.Contains(loadResponse.Features, f => f.Type == "road" && f.Label == "Road 1");
+        Assert.Contains(loadResponse.Features, f => f.Type == FeatureTypes.Area && f.Label == "Area 1");
+        Assert.Contains(loadResponse.Features, f => f.Type == FeatureTypes.Road && f.Label == "Road 1");
     }
 
     [Fact]
@@ -163,7 +157,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         var data = new { coordinates = new[] { new { lat = 36.71, lng = 2.95 }, new { lat = 36.72, lng = 2.96 }, new { lat = 36.71, lng = 2.96 } } };
 
         var saveResult = await controller.SaveFeature(new FeatureSaveRequest(
-            Type: "area", Layer: "central_urban", Label: "To Delete",
+            Type: FeatureTypes.Area, Layer: FeatureTypes.AreaLayers.CentralUrban, Label: "To Delete",
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(data)).RootElement));
 
         // Extract the ID from the response
@@ -195,16 +189,48 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
     }
 
     [Fact]
+    public async Task DeleteRoad_RemovesOrphanedHouseEntrances()
+    {
+        var controller = CreateController();
+
+        // Save a road feature.
+        var data = new { coordinates = new[] { new { lat = 36.71, lng = 2.95 }, new { lat = 36.72, lng = 2.96 } } };
+        var saveResult = await controller.SaveFeature(new FeatureSaveRequest(
+            Type: FeatureTypes.Road, Layer: FeatureTypes.RoadLayers.Street, Label: "Road A",
+            Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(data)).RootElement));
+        var saveOk = Assert.IsType<ObjectResult>(saveResult);
+        Assert.Equal(201, saveOk.StatusCode);
+        var saveResponse = Assert.IsType<SaveFeatureResponse>(saveOk.Value);
+        var roadId = Guid.Parse(saveResponse.Id);
+
+        // Attach a house entrance owned by that road.
+        var fieldService = new FieldService(
+            _db,
+            Mock.Of<IFeatureService>(),
+            Mock.Of<ILogger<FieldService>>());
+        var entranceId = await fieldService.CreateEntranceAsync(roadId, _userId, _userId, "Entrance A", "{}");
+
+        // Delete the road — the orphaned entrance must go with it.
+        var deleteResult = await controller.DeleteFeature(roadId);
+        Assert.IsType<NoContentResult>(deleteResult);
+
+        var entrance = await _db.HouseEntrances.AsNoTracking().FirstOrDefaultAsync(e => e.Id == entranceId);
+        Assert.Null(entrance);
+        var reg = await _db.FeatureRegistry.AsNoTracking().FirstOrDefaultAsync(r => r.Id == entranceId);
+        Assert.Null(reg);
+    }
+
+    [Fact]
     public async Task ClearFeatures_RemovesAll()
     {
         var controller = CreateController();
         var data = new { coordinates = new[] { new { lat = 36.71, lng = 2.95 }, new { lat = 36.72, lng = 2.96 }, new { lat = 36.71, lng = 2.96 } } };
 
         await controller.SaveFeature(new FeatureSaveRequest(
-            Type: "area", Layer: "central_urban", Label: "Area 1",
+            Type: FeatureTypes.Area, Layer: FeatureTypes.AreaLayers.CentralUrban, Label: "Area 1",
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(data)).RootElement));
         await controller.SaveFeature(new FeatureSaveRequest(
-            Type: "area", Layer: "secondary_urban", Label: "Area 2",
+            Type: FeatureTypes.Area, Layer: FeatureTypes.AreaLayers.SecondaryUrban, Label: "Area 2",
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(data)).RootElement));
 
         var result = await controller.ClearFeatures(new ClearFeaturesRequest(Confirm: true));
@@ -225,7 +251,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         var data = new { coordinates = new[] { new { lat = 36.71, lng = 2.95 }, new { lat = 36.72, lng = 2.96 }, new { lat = 36.71, lng = 2.96 } } };
 
         var saveResult = await controller.SaveFeature(new FeatureSaveRequest(
-            Type: "area", Layer: "central_urban", Label: "Original Label",
+            Type: FeatureTypes.Area, Layer: FeatureTypes.AreaLayers.CentralUrban, Label: "Original Label",
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(data)).RootElement));
 
         var saveOk = Assert.IsType<ObjectResult>(saveResult);
@@ -268,7 +294,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         var data = new { coordinates = new[] { new { lat = 36.71, lng = 2.95 }, new { lat = 36.72, lng = 2.96 } } };
 
         var saveResult = await controller.SaveFeature(new FeatureSaveRequest(
-            Type: "road", Layer: "street", Label: "Road Before",
+            Type: FeatureTypes.Road, Layer: FeatureTypes.RoadLayers.Street, Label: "Road Before",
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(data)).RootElement));
 
         var saveOk = Assert.IsType<ObjectResult>(saveResult);

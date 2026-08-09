@@ -67,7 +67,7 @@ public class LogsController(
         var skipped = 0;
         foreach (var entry in body.Logs)
         {
-            if (string.IsNullOrEmpty(entry.Message))
+            if (entry is null || string.IsNullOrEmpty(entry.Message))
             {
                 skipped++;
                 continue;

@@ -75,7 +75,10 @@ public class BackgroundQueueProcessorTests
     [Fact]
     public async Task StopAsync_CompletesGracefully()
     {
-        var (processor, queue) = CreateProcessor(gracePeriodSeconds: 1);
+        // Use a long grace period so the negative assertion below cannot be
+        // tripped by a slow scheduler: stopTask stays incomplete until the
+        // in-flight item is released, no matter how long the runner pauses.
+        var (processor, queue) = CreateProcessor(gracePeriodSeconds: 30);
 
         // Start and verify processor is running.
         await processor.StartAsync(CancellationToken.None);

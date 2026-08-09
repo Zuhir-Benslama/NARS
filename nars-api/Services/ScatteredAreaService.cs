@@ -17,6 +17,11 @@ public sealed class ScatteredAreaService(
     private const string DefaultLabel = "Scattered Area";
     private const string GenericErrorMessage = "An error occurred during scattered area recomputation.";
 
+    // Upper bound on retained error entries. Entries are only removed when the
+    // same (user, commune) refreshes again, so without a cap a long-running
+    // process would accumulate one entry per never-retried failure forever.
+    private const int MaxErrorEntries = 1000;
+
     // Error state keyed per (user, commune) so one account's failure is never
     // surfaced to another. Only a generic message is stored; the real exception
     // goes to the logger.
@@ -118,10 +123,28 @@ public sealed class ScatteredAreaService(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _lastErrors[(userId, communeId)] = (timeProvider.UtcNow, GenericErrorMessage);
+            RecordError(userId, communeId);
 
             logger.LogError(ex, "ScatteredAreaService refresh failed for user {UserId}, commune {CommuneId}", userId, communeId);
             return false;
+        }
+    }
+
+    private void RecordError(Guid userId, int communeId)
+    {
+        _lastErrors[(userId, communeId)] = (timeProvider.UtcNow, GenericErrorMessage);
+
+        if (_lastErrors.Count <= MaxErrorEntries)
+        {
+            return;
+        }
+
+        // Evict the oldest error entries so the dictionary stays bounded.
+        foreach (var kvp in _lastErrors
+                     .OrderBy(kvp => kvp.Value.Timestamp)
+                     .Take(_lastErrors.Count - MaxErrorEntries))
+        {
+            _lastErrors.TryRemove(kvp.Key, out _);
         }
     }
 

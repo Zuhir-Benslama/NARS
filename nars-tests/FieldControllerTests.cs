@@ -46,7 +46,7 @@ public class FieldControllerTests
         var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker);
 
-        var result = await ctrl.GetFeatures(type: "road");
+        var result = await ctrl.GetFeatures(type: FeatureTypes.Road);
 
         var problem = Assert.IsType<ObjectResult>(result);
         Assert.Equal(400, problem.StatusCode);
@@ -84,12 +84,12 @@ public class FieldControllerTests
         mockFieldService.Setup(s => s.QueryFeaturesAsync(descriptor, 1, 0, 500, default))
             .ReturnsAsync((
             [
-                new("r1", UserId.ToString(), "street", "Road 1", System.Text.Json.JsonDocument.Parse("{}").RootElement, FixedUtcNow, null),
+                new("r1", UserId.ToString(), FeatureTypes.RoadLayers.Street, "Road 1", System.Text.Json.JsonDocument.Parse("{}").RootElement, FixedUtcNow, null),
             ], 1));
         var ctrl = CreateController(fieldService: mockFieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
-        var result = await ctrl.GetFeatures(type: "road");
+        var result = await ctrl.GetFeatures(type: FeatureTypes.Road);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var response = Assert.IsType<LoadFeaturesResponse<FieldFeatureResult>>(ok.Value);
@@ -117,7 +117,7 @@ public class FieldControllerTests
         var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
-        var result = await ctrl.SubmitInspection(new FieldInspectRequest("not-a-guid", "road", Json("{}"), "good"));
+        var result = await ctrl.SubmitInspection(new FieldInspectRequest("not-a-guid", FeatureTypes.Road, Json("{}"), "good"));
 
         var problem = Assert.IsType<ObjectResult>(result);
         Assert.Equal(400, problem.StatusCode);
@@ -129,7 +129,7 @@ public class FieldControllerTests
         var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
-        var result = await ctrl.SubmitInspection(new FieldInspectRequest(Guid.NewGuid().ToString(), "area", Json("{}"), "good"));
+        var result = await ctrl.SubmitInspection(new FieldInspectRequest(Guid.NewGuid().ToString(), FeatureTypes.Area, Json("{}"), "good"));
 
         var problem = Assert.IsType<ObjectResult>(result);
         Assert.Equal(400, problem.StatusCode);
@@ -141,7 +141,7 @@ public class FieldControllerTests
         var ctrl = CreateController();
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
-        var result = await ctrl.SubmitInspection(new FieldInspectRequest(Guid.NewGuid().ToString(), "road", Json("{}"), "good"));
+        var result = await ctrl.SubmitInspection(new FieldInspectRequest(Guid.NewGuid().ToString(), FeatureTypes.Road, Json("{}"), "good"));
 
         var problem = Assert.IsType<ObjectResult>(result);
         Assert.Equal(400, problem.StatusCode);
@@ -159,7 +159,7 @@ public class FieldControllerTests
         var ctrl = CreateController(fieldService: fieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
-        var result = await ctrl.SubmitInspection(new FieldInspectRequest(roadId.ToString(), "road", Json("{}"), "good"));
+        var result = await ctrl.SubmitInspection(new FieldInspectRequest(roadId.ToString(), FeatureTypes.Road, Json("{}"), "good"));
 
         Assert.IsType<ForbidResult>(result);
     }
@@ -178,7 +178,7 @@ public class FieldControllerTests
         var ctrl = CreateController(fieldService: fieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
-        var result = await ctrl.SubmitInspection(new FieldInspectRequest(roadId.ToString(), "road", Json("""{"key": "val"}"""), "good"));
+        var result = await ctrl.SubmitInspection(new FieldInspectRequest(roadId.ToString(), FeatureTypes.Road, Json("""{"key": "val"}"""), "good"));
 
         var created = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, created.StatusCode);
@@ -198,7 +198,7 @@ public class FieldControllerTests
         var ctrl = CreateController(fieldService: fieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
-        var result = await ctrl.SubmitInspection(new FieldInspectRequest(roadId.ToString(), "road", Json("{}"), "invalid_status"));
+        var result = await ctrl.SubmitInspection(new FieldInspectRequest(roadId.ToString(), FeatureTypes.Road, Json("{}"), "invalid_status"));
 
         var problem = Assert.IsType<ObjectResult>(result);
         Assert.Equal(400, problem.StatusCode);

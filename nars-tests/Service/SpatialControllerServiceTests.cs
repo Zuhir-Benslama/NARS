@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Moq;
@@ -41,11 +40,7 @@ public class SpatialControllerServiceTests(NarsDatabaseFixture fixture) : IAsync
             scatteredService ?? Mock.Of<IScatteredAreaService>(),
             new EntranceQueryService(_db),
             Mock.Of<IWebHostEnvironment>());
-        var httpContext = new DefaultHttpContext
-        {
-            User = AuthTestHelper.CreateClaimsPrincipal(_userId, UserRoles.FieldWorker, communeId: 1)
-        };
-        ctrl.ControllerContext = new ControllerContext { HttpContext = httpContext };
+        AuthTestHelper.SetUser(ctrl, _userId, UserRoles.FieldWorker, communeId: 1);
         return ctrl;
     }
 
@@ -140,18 +135,12 @@ public class SpatialControllerServiceTests(NarsDatabaseFixture fixture) : IAsync
     [Fact]
     public async Task RefreshScattered_NoCommuneId_Returns400()
     {
-        var httpContext = new DefaultHttpContext
-        {
-            User = AuthTestHelper.CreateClaimsPrincipal(_userId, UserRoles.NationalAdmin, communeId: null)
-        };
         var controller = new SpatialController(
             new RoadQueryService(_db),
             Mock.Of<IScatteredAreaService>(),
             new EntranceQueryService(_db),
-            Mock.Of<IWebHostEnvironment>())
-        {
-            ControllerContext = new ControllerContext { HttpContext = httpContext }
-        };
+            Mock.Of<IWebHostEnvironment>());
+        AuthTestHelper.SetUser(controller, _userId, UserRoles.NationalAdmin);
 
         var result = await controller.RefreshScattered();
 

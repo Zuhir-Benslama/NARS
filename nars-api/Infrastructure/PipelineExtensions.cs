@@ -51,7 +51,11 @@ public static class PipelineExtensions
         logger.LogInformation("NARS - ASP.NET Core + PostgreSQL/PostGIS");
         logger.LogInformation("==================================================");
 
-        var canConnect = await dbCtx.Database.CanConnectAsync();
+        // Bound the startup connectivity probe: if the database host is
+        // unreachable (packets dropped), Npgsql's connect timeout alone can
+        // leave startup hanging for minutes. Fail fast instead.
+        using var connectTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var canConnect = await dbCtx.Database.CanConnectAsync(connectTimeout.Token);
         if (!canConnect)
         {
             throw new InvalidOperationException(

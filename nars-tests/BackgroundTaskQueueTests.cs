@@ -59,7 +59,7 @@ public class BackgroundTaskQueueTests
     }
 
     [Fact]
-    public async Task QueueBackgroundWorkItemAsync_Full_DropsOldest()
+    public async Task QueueBackgroundWorkItemAsync_Full_DropsNewest()
     {
         var queue = CreateQueue(capacity: 2);
         var executed = new List<int>();
@@ -74,8 +74,8 @@ public class BackgroundTaskQueueTests
         await queue.QueueBackgroundWorkItemAsync(workItems[0]);
         await queue.QueueBackgroundWorkItemAsync(workItems[1]);
 
-        // Third write must not throw — DropOldest makes room by evicting
-        // the FIRST item, so items 2 and 3 survive.
+        // Third write must not throw — DropWrite rejects the NEW item, so
+        // items 1 and 2 survive and the caller's write fails (logged).
         await queue.QueueBackgroundWorkItemAsync(workItems[2]);
 
         var first = await queue.DequeueAsync(CancellationToken.None);
@@ -83,7 +83,7 @@ public class BackgroundTaskQueueTests
         await first(Mock.Of<IServiceProvider>(), CancellationToken.None);
         await second(Mock.Of<IServiceProvider>(), CancellationToken.None);
 
-        Assert.Equal([2, 3], executed);
+        Assert.Equal([1, 2], executed);
     }
 
     [Fact]

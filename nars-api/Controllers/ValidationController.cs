@@ -30,7 +30,7 @@ public class ValidationController(
     {
         var exists = CurrentUserId.HasValue &&
             await validationService.UserHasCentralUrbanAreaAsync(CurrentUserId.Value, cancellationToken);
-        return Ok(new { exists });
+        return Ok(new MainUrbanExistsResponse(exists));
     }
 
     /// <summary>Validates road geometry (turn angles, connectivity to existing roads).</summary>

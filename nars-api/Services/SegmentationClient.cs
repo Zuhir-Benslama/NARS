@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json;
 
@@ -46,7 +47,11 @@ public sealed class SegmentationClient : ISegmentationClient
         streamContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
         content.Add(streamContent, "tile", fileName);
 
-        var query = $"?min_lon={bbox.MinLon}&min_lat={bbox.MinLat}&max_lon={bbox.MaxLon}&max_lat={bbox.MaxLat}";
+        // InvariantCulture so the service never sees locale-dependent decimal
+        // separators (e.g. "2,95" from a comma-locale) in the coordinates.
+        var query = string.Create(
+            CultureInfo.InvariantCulture,
+            $"?min_lon={bbox.MinLon}&min_lat={bbox.MinLat}&max_lon={bbox.MaxLon}&max_lat={bbox.MaxLat}");
 
         using var response = await _httpClient.PostAsync($"/segment{query}", content, cancellationToken);
 
