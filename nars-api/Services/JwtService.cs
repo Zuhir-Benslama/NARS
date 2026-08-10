@@ -29,7 +29,7 @@ public sealed class JwtService(string secret, string? issuer, string? audience, 
     public TimeSpan AccessTokenExpiresIn => TimeSpan.FromMinutes(_expiresMinutes);
 
     public string CreateToken(Guid userId, string username, string name, string email, int? communeId,
-        string role = "commune_user", int? dairaId = null, int? wilayaId = null)
+        string securityStamp, string role = "commune_user", int? dairaId = null, int? wilayaId = null)
     {
         var creds = new SigningCredentials(_key, SecurityAlgorithms.HmacSha256);
 
@@ -40,6 +40,7 @@ public sealed class JwtService(string secret, string? issuer, string? audience, 
             new(ClaimNames.Name,    name),
             new(ClaimNames.Email,   email),
             new(ClaimNames.Role,    role),
+            new(ClaimNames.SecurityStamp, securityStamp),
         };
 
         if (communeId.HasValue)
@@ -102,6 +103,10 @@ public sealed class JwtService(string secret, string? issuer, string? audience, 
                             && expires != null && expires.Value > now;
                     },
                     ClockSkew = TimeSpan.Zero,
+                    // Keep both validation paths producing identical principals to the
+                    // JwtBearer pipeline (see AuthenticationExtensions).
+                    RoleClaimType = ClaimNames.Role,
+                    NameClaimType = ClaimNames.Username,
                 }, out _);
         }
         catch (SecurityTokenException ex)

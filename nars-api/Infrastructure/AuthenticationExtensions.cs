@@ -2,8 +2,10 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using NarsApi.Data;
 using NarsApi.Services;
 
 namespace NarsApi.Infrastructure;
@@ -38,6 +40,12 @@ public static class AuthenticationExtensions
                     ValidateIssuer = !string.IsNullOrEmpty(issuer),
                     ValidateAudience = !string.IsNullOrEmpty(audience),
                     ClockSkew = TimeSpan.Zero,
+                    // Claims are kept verbatim (MapInboundClaims=false above), so tell the
+                    // principal which raw claim types map to role and name. Without this,
+                    // RoleClaimType defaults to the ClaimTypes.Role URI and every
+                    // [Authorize(Roles = ...)] check fails with 403.
+                    RoleClaimType = ClaimNames.Role,
+                    NameClaimType = ClaimNames.Username,
                 };
 
                 if (!string.IsNullOrEmpty(issuer))
@@ -63,6 +71,34 @@ public static class AuthenticationExtensions
                             ctx.Token = token;
                         }
                         return Task.CompletedTask;
+                    },
+                    OnTokenValidated = async ctx =>
+                    {
+                        // The security stamp is a random per-user value embedded
+                        // in the JWT and rotated on lockout/password change.
+                        // Re-checking it here means a rotated stamp immediately
+                        // invalidates every previously issued access token
+                        // (stateless JWTs would otherwise stay valid to expiry).
+                        var userId = Guid.TryParse(ctx.Principal?.FindFirstValue(ClaimNames.UserId),
+                            out var id) ? id : (Guid?)null;
+                        var stamp = ctx.Principal?.FindFirstValue(ClaimNames.SecurityStamp);
+
+                        if (userId is null || string.IsNullOrEmpty(stamp))
+                        {
+                            ctx.Fail("Token is missing identity claims.");
+                            return;
+                        }
+
+                        var db = ctx.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                        var current = await db.Users.AsNoTracking()
+                            .Where(u => u.Id == userId.Value)
+                            .Select(u => u.SecurityStamp)
+                            .FirstOrDefaultAsync(ctx.HttpContext.RequestAborted);
+
+                        if (current != stamp)
+                        {
+                            ctx.Fail("Session has been invalidated (security stamp rotated).");
+                        }
                     },
                     OnAuthenticationFailed = ctx =>
                     {

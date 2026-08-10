@@ -34,6 +34,7 @@ RUFF_IMAGE          ?= ghcr.io/astral-sh/ruff:0.15.15
 NODE_IMAGE          ?= node:22-alpine
 OBSERVABILITY_NAMESPACE ?= observability
 LOG_DIR             ?= /tmp/nars
+MIGRATIONS_DIR      ?= nars-infra/migrations
 POSTGIS_GET_POD_CMD = $(KUBECTL) get pod -n "$(NAMESPACE)" -l app.kubernetes.io/name=postgis -o jsonpath='{.items[0].metadata.name}' 2>/dev/null
 
 # ─── Secrets ──────────────────────────────────────────────────
@@ -73,7 +74,8 @@ GPG_PASSPHRASE     ?=
 GRAFANA_PASSWORD   ?=
 NARS_ADMIN_SIGNUP_TOKEN ?=
 NARS_ROADS_INTERNAL_TOKEN ?=
-export POSTGRES_PASSWORD JWT_SECRET GPG_PASSPHRASE GRAFANA_PASSWORD NARS_ADMIN_SIGNUP_TOKEN NARS_ROADS_INTERNAL_TOKEN
+NARS_ROADS_WEIGHTS_URL ?=
+export POSTGRES_PASSWORD JWT_SECRET GPG_PASSPHRASE GRAFANA_PASSWORD NARS_ADMIN_SIGNUP_TOKEN NARS_ROADS_INTERNAL_TOKEN NARS_ROADS_WEIGHTS_URL
 
 .PHONY: help
 help: ## Show available targets
@@ -763,10 +765,12 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 	| $(KUBECTL) apply -f -
 	@echo "✓ nars-secrets created"
 
-	@echo "→ Creating 'nars-roads-secrets' (shared internal token)..."
+	@echo "→ Creating 'nars-roads-secrets' (shared internal token + weights URL)..."
 	printf '%s' "$$NARS_ROADS_INTERNAL_TOKEN" > "$$tmpdir/internal-token";
+	printf '%s' "$$NARS_ROADS_WEIGHTS_URL" > "$$tmpdir/weights-url";
 	$(KUBECTL) create secret generic nars-roads-secrets -n "$(NAMESPACE)" \
 		--from-file=internal-token="$$tmpdir/internal-token" \
+		--from-file=weights-url="$$tmpdir/weights-url" \
 		--dry-run=client -o yaml \
 	| $(KUBECTL) apply -f -
 	@echo "✓ nars-roads-secrets created"
@@ -833,6 +837,7 @@ kustomize-apply: secrets-validate _check-pinned-tag ## Apply k8s manifests via k
 			--for=condition=Available deployment/postgis --timeout=240s
 		$(SUBMAKE) postgis-password-sync
 		$(SUBMAKE) postgis-migration-baseline
+		$(SUBMAKE) db-migrate-nars
 	fi
 
 	@echo "→ Waiting for app deployments..."
@@ -885,6 +890,8 @@ postgis-migration-baseline: ## Backfill EF migration history for pre-existing sc
 	DECLARE
 	    has_areas boolean;
 	    has_inspections boolean;
+	    has_inspections_fk boolean;
+	    has_security_stamp boolean;
 	BEGIN
 	    SELECT EXISTS (
 	        SELECT 1
@@ -897,6 +904,26 @@ postgis-migration-baseline: ## Backfill EF migration history for pre-existing sc
 	        FROM information_schema.tables
 	        WHERE table_schema = 'public' AND table_name = 'inspections'
 	    ) INTO has_inspections;
+
+	    -- AddForeignKeys (20260808070428) is reflected by the inspections→users
+	    -- FK that both the EF migration and create_nars_db.sql create.
+	    SELECT EXISTS (
+	        SELECT 1
+	        FROM information_schema.table_constraints
+	        WHERE table_schema = 'public'
+	          AND constraint_type = 'FOREIGN KEY'
+	          AND table_name = 'inspections'
+	          AND UPPER(constraint_name) = 'FK_INSPECTIONS_USERS_USER_ID'
+	    ) INTO has_inspections_fk;
+
+	    -- AddUserSecurityStamp (20260810062821) is reflected by the column itself.
+	    SELECT EXISTS (
+	        SELECT 1
+	        FROM information_schema.columns
+	        WHERE table_schema = 'public'
+	          AND table_name = 'users'
+	          AND column_name = 'security_stamp'
+	    ) INTO has_security_stamp;
 
 	    IF has_areas THEN
 	        INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
@@ -915,9 +942,32 @@ postgis-migration-baseline: ## Backfill EF migration history for pre-existing sc
 	        VALUES ('20260705061915_MigrateToTimestamptz', '10.0.7')
 	        ON CONFLICT ("MigrationId") DO NOTHING;
 	    END IF;
+
+	    IF has_inspections_fk THEN
+	        INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+	        VALUES ('20260808070428_AddForeignKeys', '10.0.7')
+	        ON CONFLICT ("MigrationId") DO NOTHING;
+	    END IF;
+
+	    IF has_security_stamp THEN
+	        INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+	        VALUES ('20260810062821_AddUserSecurityStamp', '10.0.7')
+	        ON CONFLICT ("MigrationId") DO NOTHING;
+	    END IF;
 	END $$$$;
 	SQL
 	@echo "✓ EF migration history baseline ensured"
+
+.PHONY: db-migrate-nars
+db-migrate-nars: ## Apply NARS SQL migrations (nars-infra/migrations/*.sql) to the deployed DB (idempotent)
+	@echo "→ Applying NARS SQL migrations from $(MIGRATIONS_DIR)..."
+	@for f in "$(MIGRATIONS_DIR)"/*.sql; do \
+		[ -f "$$f" ] || continue; \
+		echo "→ Applying $$(basename "$$f")..."; \
+		cat "$$f" | $(KUBECTL) exec -i -n "$(NAMESPACE)" deployment/postgis -- \
+			psql -U postgres -d "$(DB_NAME)" -v ON_ERROR_STOP=1 >/dev/null || exit 1; \
+	done
+	@echo "✓ NARS SQL migrations applied"
 
 .PHONY: postgis-pv-fix
 postgis-pv-fix: ## Fix postgis PV permissions inside kind container (rootless Docker workaround)
@@ -1161,7 +1211,10 @@ infra-lint-makefile: ## Validate Makefile syntax with dry-run
 	@echo "→ Checking undefined variable references..."
 	# GNUMAKEFLAGS is a GNU Make internal variable spuriously flagged by
 	# --warn-undefined-variables -Rr (make 4.4+); filter it out.
-	@make -Rr --warn-undefined-variables -n help 2>&1 | grep -i 'warning.*undefined' | grep -v GNUMAKEFLAGS || true
+	# Fails when references are found — `|| true` only handles the clean case.
+	@make -Rr --warn-undefined-variables -n help 2>&1 | grep -i 'warning.*undefined' | grep -v GNUMAKEFLAGS \
+		&& { echo "✖ Undefined variable references found (see above)"; exit 1; } \
+		|| echo "✓ No undefined variable references"
 
 # ─── Docker Images ───────────────────────────────────────────
 

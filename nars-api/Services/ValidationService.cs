@@ -156,8 +156,8 @@ public sealed class ValidationService(AppDbContext db) : IValidationService
             )
             SELECT EXISTS (
                 SELECT 1 FROM district_geom dg
-                WHERE ST_Touches(ST_SetSRID(ST_GeomFromText(@wkt), 4326), dg.geom)
-                   OR ST_Intersects(ST_Boundary(ST_SetSRID(ST_GeomFromText(@wkt), 4326)), ST_Boundary(dg.geom))
+                WHERE (ST_Touches(ST_SetSRID(ST_GeomFromText(@wkt), 4326), dg.geom)
+                   OR ST_Intersects(ST_Boundary(ST_SetSRID(ST_GeomFromText(@wkt), 4326)), ST_Boundary(dg.geom)))
                   AND EXISTS (
                       SELECT 1 FROM area_geom ag
                       WHERE ST_Intersects(ag.geom, ST_SetSRID(ST_GeomFromText(@wkt), 4326))

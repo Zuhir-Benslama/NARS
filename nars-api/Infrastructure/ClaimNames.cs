@@ -10,4 +10,5 @@ public static class ClaimNames
     public const string CommuneId = "commune_id";
     public const string DairaId = "daira_id";
     public const string WilayaId = "wilaya_id";
+    public const string SecurityStamp = "security_stamp";
 }

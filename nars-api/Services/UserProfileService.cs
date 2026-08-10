@@ -90,18 +90,45 @@ public sealed class UserProfileService(AppDbContext db) : IUserProfileService
 
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
             passwordChanged = true;
+            // Rotate the security stamp so access tokens issued before the
+            // password change are rejected immediately.
+            user.SecurityStamp = User.GenerateSecurityStamp();
         }
 
         try
         {
             await UpdateUserAsync(user, ct);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex, out var constraintName))
         {
-            // TOCTOU race: a concurrent request claimed the username/email first.
-            return new UpdateCredentialsResult(CredentialUpdateError.DuplicateUsername);
+            // TOCTOU race: a concurrent request claimed the username/email
+            // first. Match the colliding unique constraint so we return the
+            // correct error instead of always reporting a duplicate username.
+            return constraintName?.Contains("email", StringComparison.OrdinalIgnoreCase) == true
+                ? new UpdateCredentialsResult(CredentialUpdateError.DuplicateEmail)
+                : new UpdateCredentialsResult(CredentialUpdateError.DuplicateUsername);
         }
 
         return new UpdateCredentialsResult(PasswordChanged: passwordChanged, User: user);
+    }
+
+    /// <summary>
+    /// Returns true when <paramref name="ex"/> chains to a PostgreSQL unique
+    /// violation (SQLSTATE 23505), exposing the colliding constraint name.
+    /// Genuine server failures (connection loss, deadlock, disk) fall through
+    /// to the caller as unhandled DbUpdateException instead of being masked.
+    /// </summary>
+    internal static bool IsUniqueViolation(DbUpdateException ex, out string? constraintName)
+    {
+        constraintName = null;
+        for (Exception? inner = ex.InnerException; inner is not null; inner = inner.InnerException)
+        {
+            if (inner is Npgsql.PostgresException pg && pg.SqlState == "23505")
+            {
+                constraintName = pg.ConstraintName;
+                return true;
+            }
+        }
+        return false;
     }
 }

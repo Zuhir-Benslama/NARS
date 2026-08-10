@@ -21,7 +21,8 @@ public class RefreshTokenServiceTests
         var mock = new Mock<IJwtService>();
         mock.Setup(j => j.CreateRefreshToken()).Returns(("raw-token", "hashed-token"));
         mock.Setup(j => j.CreateToken(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<int?>()))
+            It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<string>(),
+            It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<int?>()))
             .Returns("new-access-token");
         mock.Setup(j => j.AccessTokenExpiresIn).Returns(TimeSpan.FromMinutes(60));
         return mock;
@@ -48,7 +49,7 @@ public class RefreshTokenServiceTests
 
         protected override Task<RefreshToken?> FindRefreshTokenByHashAsync(string hash, CancellationToken ct)
             => _db.RefreshTokens
-                .FirstOrDefaultAsync(rt => rt.TokenHash == hash && !rt.Revoked && rt.ExpiresAt > TimeProvider.UtcNow, ct);
+                .FirstOrDefaultAsync(rt => rt.TokenHash == hash && rt.ExpiresAt > TimeProvider.UtcNow, ct);
 
         public override async Task RevokeAllUserTokensAsync(Guid userId, CancellationToken cancellationToken = default)
         {
@@ -87,6 +88,7 @@ public class RefreshTokenServiceTests
             PasswordHash = "hash",
             Role = UserRoles.CommuneUser,
             CommuneId = 1,
+            SecurityStamp = User.GenerateSecurityStamp(),
         });
         const string raw = "valid-refresh-token";
         var hash = Convert.ToBase64String(
@@ -290,6 +292,7 @@ public class RefreshTokenServiceTests
                 Email = AltEmail,
                 Phone = DefaultPhone,
                 PasswordHash = "hash",
+                SecurityStamp = User.GenerateSecurityStamp(),
                 Role = UserRoles.CommuneUser,
                 CommuneId = 1,
             });
@@ -338,6 +341,32 @@ public class RefreshTokenServiceTests
 
             Assert.False(result.Success);
             Assert.Equal("Invalid or expired refresh token.", result.Detail);
+        }
+    }
+
+    [Fact]
+    public async Task RotateRefreshTokenAsync_ReplayOfRevokedToken_RevokesAllTokensForUser()
+    {
+        var (db, raw) = await SeedTokenAsync(FixedUtcNow.AddDays(30));
+        using (db)
+        {
+            var svc = CreateService(db);
+
+            // First rotation succeeds and revokes the old token...
+            var first = await svc.RotateRefreshTokenAsync(raw);
+            Assert.True(first.Success);
+
+            // ...the fresh token keeps the session alive.
+            var active = await db.RefreshTokens.CountAsync(rt => !rt.Revoked);
+            Assert.Equal(1, active);
+
+            // Replaying the old (now-revoked) token signals theft: every
+            // outstanding token for the user must be revoked.
+            var replay = await svc.RotateRefreshTokenAsync(raw);
+
+            Assert.False(replay.Success);
+            Assert.Equal("Invalid or expired refresh token.", replay.Detail);
+            Assert.Equal(0, await db.RefreshTokens.CountAsync(rt => !rt.Revoked));
         }
     }
 
@@ -416,6 +445,7 @@ public class RefreshTokenServiceTests
             PasswordHash = "hash",
             Role = UserRoles.CommuneUser,
             CommuneId = 1,
+            SecurityStamp = User.GenerateSecurityStamp(),
         });
         db.RefreshTokens.Add(new RefreshToken
         {
@@ -456,6 +486,7 @@ public class RefreshTokenServiceTests
             PasswordHash = "hash",
             Role = UserRoles.CommuneUser,
             CommuneId = 1,
+            SecurityStamp = User.GenerateSecurityStamp(),
         });
         db.RefreshTokens.AddRange(
             new RefreshToken
@@ -547,6 +578,7 @@ public class RefreshTokenServiceTests
             PasswordHash = "pw-hash",
             Role = UserRoles.CommuneUser,
             CommuneId = 2,
+            SecurityStamp = User.GenerateSecurityStamp(),
         };
 
         var svc = new UserCreationService(db, Mock.Of<IUserAuthorizationService>(), Mock.Of<ILogger<UserCreationService>>());
@@ -574,6 +606,7 @@ public class RefreshTokenServiceTests
             PasswordHash = "hash",
             Role = UserRoles.CommuneUser,
             CommuneId = 1,
+            SecurityStamp = User.GenerateSecurityStamp(),
             FailedLoginAttempts = 0,
         };
         db.Users.Add(user);
@@ -585,6 +618,8 @@ public class RefreshTokenServiceTests
         Assert.Equal(1, user.FailedLoginAttempts);
         Assert.Null(user.LockedUntil);
     }
+
+    private const string originalStamp = "original-stamp";
 
     [Fact]
     public async Task RecordFailedLoginAsync_AtThreshold_LocksUser()
@@ -600,6 +635,7 @@ public class RefreshTokenServiceTests
             PasswordHash = "hash",
             Role = UserRoles.CommuneUser,
             CommuneId = 1,
+            SecurityStamp = originalStamp,
             FailedLoginAttempts = 4,
         };
         db.Users.Add(user);
@@ -610,6 +646,7 @@ public class RefreshTokenServiceTests
 
         Assert.Equal(5, user.FailedLoginAttempts);
         Assert.Equal(FixedUtcNowOffset.DateTime.AddMinutes(15), user.LockedUntil);
+        Assert.NotEqual(originalStamp, user.SecurityStamp);
     }
 
     // ── ResetFailedAttemptsIfNeededAsync ────────────────────────────────
@@ -628,6 +665,7 @@ public class RefreshTokenServiceTests
             PasswordHash = "hash",
             Role = UserRoles.CommuneUser,
             CommuneId = 1,
+            SecurityStamp = User.GenerateSecurityStamp(),
             FailedLoginAttempts = 3,
             LockedUntil = FixedUtcNow.AddMinutes(30),
         };
@@ -655,6 +693,7 @@ public class RefreshTokenServiceTests
             PasswordHash = "hash",
             Role = UserRoles.CommuneUser,
             CommuneId = 1,
+            SecurityStamp = User.GenerateSecurityStamp(),
             FailedLoginAttempts = 0,
             LockedUntil = null,
         };

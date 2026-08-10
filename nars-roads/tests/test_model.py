@@ -59,6 +59,29 @@ def test_normalize_window_float_0_255_rescaled():
     assert out[0, 0, 0] == pytest.approx(200.0 / 255.0)
 
 
+def test_normalize_window_float_noise_above_one_not_rescaled():
+    # A value just over 1.0 is noise on a [0,1] raster and must not be
+    # divided by 255 (which would black it). Regression for the old
+    # `img.max() > 1.0 -> /255` heuristic.
+    arr = np.full((3, 1, 1), 1.02, dtype=np.float32)
+    out = _normalize(arr, "float32")
+    assert out[0, 0, 0] == pytest.approx(1.0)
+
+
+def test_normalize_window_float_nan_and_inf_neutralized():
+    # One pixel column with nan/+inf/-inf across the 3 bands, plus a 0.5 col.
+    arr = np.array(
+        [[[float("nan"), float("inf"), -float("inf"), 0.5]]], dtype=np.float32
+    )
+    arr = np.repeat(arr, 3, axis=0)  # (3, 1, 4) -> transpose makes W the middle dim
+    out = _normalize(arr, "float32")
+    assert np.all(np.isfinite(out))
+    assert np.all(out[0, 0, :] == 0.0)  # nan -> 0
+    assert np.all(out[0, 1, :] == 1.0)  # +inf -> 1
+    assert np.all(out[0, 2, :] == 0.0)  # -inf -> 0
+    assert np.all(out[0, 3, :] == pytest.approx(0.5))
+
+
 def test_normalize_window_single_band_repeated():
     arr = np.array([[[10, 20]]], dtype=np.uint8)  # (1, 1, 2)
     out = _normalize(arr, "uint8")

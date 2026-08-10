@@ -38,9 +38,10 @@ FROM base
 RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin nars-roads
 
 COPY app ./app
-# Place real weights (e.g. unet_r34_multiclass.pth) in nars-roads/weights/.
-# If absent, the service still starts but logs a warning and serves random
-# predictions until weights are added or mounted at NARS_ROADS_WEIGHTS_PATH.
+# Dev fallback only: the deployed pod fetches real weights via the
+# fetch-weights initContainer into an emptyDir mounted at /srv/weights
+# (see nars-infra/roads/deployment.yaml). The emptyDir mount shadows this
+# copy at runtime. Kept empty in git; place a checkpoint here for local runs.
 COPY weights ./weights
 
 ENV NARS_ROADS_WEIGHTS_PATH=/srv/weights/unet_r34_multiclass.pth

@@ -1,11 +1,15 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using NarsApi.Infrastructure;
+using NarsApi.Data;
+using NarsApi.Models;
 using NarsApi.Services;
 using static NarsApi.Tests.TestData;
 using Xunit;
@@ -149,7 +153,8 @@ public class AuthenticationExtensionsTests
         var userId = Guid.NewGuid();
         var token = jwt.CreateToken(
             userId, "alice", "Alice", "alice@test.com",
-            communeId: 3, role: UserRoles.CommuneUser, dairaId: null, wilayaId: null);
+            communeId: 3, securityStamp: "test-security-stamp",
+            role: UserRoles.CommuneUser, dairaId: null, wilayaId: null);
 
         var principal = jwt.ValidateToken(token);
 
@@ -157,11 +162,35 @@ public class AuthenticationExtensionsTests
         Assert.Equal("alice", principal!.FindFirstValue(ClaimNames.Username));
         Assert.Equal(userId.ToString(), principal.FindFirstValue(ClaimNames.UserId));
         Assert.Equal("3", principal.FindFirstValue(ClaimNames.CommuneId));
+        Assert.Equal("test-security-stamp", principal.FindFirstValue(ClaimNames.SecurityStamp));
 
         // ValidateToken uses MapInboundClaims=false (matching the JwtBearer pipeline
         // in AuthenticationExtensions), so claim types are kept verbatim.
         Assert.Equal(UserRoles.CommuneUser, principal.FindFirstValue(ClaimNames.Role));
         Assert.Null(principal.FindFirstValue(ClaimTypes.Role));
+    }
+
+    [Fact]
+    public void JwtBearerPipeline_PrincipalSupportsRoleBasedAuthorization()
+    {
+        // Regression test for [Authorize(Roles = ...)] returning 403 for every
+        // user: the JwtBearer pipeline must map the verbatim "role" claim to the
+        // principal's RoleClaimType (and "username" to NameClaimType).
+        using var sp = BuildProvider(Issuer, Audience);
+        var jwt = sp.GetRequiredService<IJwtService>();
+        var options = GetJwtOptions(sp);
+
+        var token = jwt.CreateToken(
+            Guid.NewGuid(), "alice", "Alice", "alice@test.com",
+            communeId: 3, securityStamp: "test-security-stamp",
+            role: UserRoles.FieldWorker, dairaId: null, wilayaId: null);
+
+        var handler = new JwtSecurityTokenHandler { MapInboundClaims = false };
+        var principal = handler.ValidateToken(token, options.TokenValidationParameters, out _);
+
+        Assert.True(principal.IsInRole(UserRoles.FieldWorker));
+        Assert.False(principal.IsInRole(UserRoles.NationalAdmin));
+        Assert.Equal("alice", principal.Identity?.Name);
     }
 
     [Fact]
@@ -172,7 +201,8 @@ public class AuthenticationExtensionsTests
 
         var token = jwt.CreateToken(
             Guid.NewGuid(), "alice", "Alice", "alice@test.com",
-            communeId: null, role: UserRoles.CommuneUser, dairaId: null, wilayaId: null);
+            communeId: null, securityStamp: "test-security-stamp",
+            role: UserRoles.CommuneUser, dairaId: null, wilayaId: null);
 
         var tampered = token[..^1] + (token[^1] == 'A' ? 'B' : 'A');
 
@@ -192,5 +222,107 @@ public class AuthenticationExtensionsTests
         Assert.False(string.IsNullOrEmpty(raw2));
         Assert.NotEqual(raw1, raw2);
         Assert.NotEqual(hash1, hash2);
+    }
+
+    private static ClaimsPrincipal PrincipalWith(Guid userId, string stamp) =>
+        new(new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimNames.UserId, userId.ToString()),
+            new Claim(ClaimNames.SecurityStamp, stamp),
+            new Claim(ClaimNames.Username, "alice"),
+            new Claim(ClaimNames.Role, UserRoles.CommuneUser),
+        }, "Bearer"));
+
+    private static async Task<TokenValidatedContext> RunOnTokenValidatedAsync(
+        JwtBearerOptions options, AppDbContext db, ClaimsPrincipal principal)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(db);
+        var httpContext = new DefaultHttpContext { RequestServices = services.BuildServiceProvider() };
+        var context = new TokenValidatedContext(httpContext, Scheme, options) { Principal = principal };
+        await options.Events.OnTokenValidated(context);
+        return context;
+    }
+
+    [Fact]
+    public async Task OnTokenValidated_MatchingStamp_DoesNotFail()
+    {
+        using var db = CreateInMemoryDb("StampMatch");
+        db.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "alice",
+            Name = "Alice",
+            Email = "a@test.com",
+            Phone = "0555000000",
+            PasswordHash = "hash",
+            Role = UserRoles.CommuneUser,
+            SecurityStamp = "stamp-abc",
+        });
+        await db.SaveChangesAsync();
+        using var sp = BuildProvider();
+        var options = GetJwtOptions(sp);
+        var user = await db.Users.SingleAsync();
+
+        var ctx = await RunOnTokenValidatedAsync(options, db, PrincipalWith(user.Id, "stamp-abc"));
+
+        Assert.Null(ctx.Result); // no failure recorded
+    }
+
+    [Fact]
+    public async Task OnTokenValidated_MismatchedStamp_FailsAuthentication()
+    {
+        using var db = CreateInMemoryDb("StampMismatch");
+        db.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "alice",
+            Name = "Alice",
+            Email = "a@test.com",
+            Phone = "0555000000",
+            PasswordHash = "hash",
+            Role = UserRoles.CommuneUser,
+            SecurityStamp = "stamp-rotated",
+        });
+        await db.SaveChangesAsync();
+        using var sp = BuildProvider();
+        var options = GetJwtOptions(sp);
+        var user = await db.Users.SingleAsync();
+
+        var ctx = await RunOnTokenValidatedAsync(options, db, PrincipalWith(user.Id, "stamp-old"));
+
+        Assert.NotNull(ctx.Result);
+        Assert.NotNull(ctx.Result!.Failure);
+        Assert.Equal("Session has been invalidated (security stamp rotated).", ctx.Result.Failure!.Message);
+    }
+
+    [Fact]
+    public async Task OnTokenValidated_MissingIdentityClaims_FailsAuthentication()
+    {
+        using var db = CreateInMemoryDb("StampMissingClaims");
+        using var sp = BuildProvider();
+        var options = GetJwtOptions(sp);
+
+        var noClaims = new ClaimsPrincipal(new ClaimsIdentity("Bearer"));
+        var ctx = await RunOnTokenValidatedAsync(options, db, noClaims);
+
+        Assert.NotNull(ctx.Result);
+        Assert.NotNull(ctx.Result!.Failure);
+        Assert.Equal("Token is missing identity claims.", ctx.Result.Failure!.Message);
+    }
+
+    [Fact]
+    public async Task OnTokenValidated_UserDeleted_FailsAuthentication()
+    {
+        using var db = CreateInMemoryDb("StampDeletedUser");
+        using var sp = BuildProvider();
+        var options = GetJwtOptions(sp);
+
+        var ctx = await RunOnTokenValidatedAsync(
+            options, db, PrincipalWith(Guid.NewGuid(), "stamp-any"));
+
+        Assert.NotNull(ctx.Result);
+        Assert.NotNull(ctx.Result!.Failure);
+        Assert.Equal("Session has been invalidated (security stamp rotated).", ctx.Result.Failure!.Message);
     }
 }

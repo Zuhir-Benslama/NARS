@@ -45,11 +45,13 @@ export function removeBoundaryClickEvents(): void {
 }
 
 function onBoundaryClick(e: maplibregl.MapLayerMouseEvent): void {
+  const map = _boundaryMap
+  if (!map) return
   const name = escapeHtml(e.features?.[0]?.properties?.communeName || t("map_commune_label"))
   new maplibregl.Popup({ closeButton: true, closeOnClick: true })
     .setLngLat(e.lngLat)
     .setHTML(`<strong>${name}</strong><br><small>${t("map_commune_boundary")}</small>`)
-    .addTo(_boundaryMap!)
+    .addTo(map)
 }
 
 function onBoundaryEnter(): void {

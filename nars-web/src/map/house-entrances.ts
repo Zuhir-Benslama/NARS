@@ -29,7 +29,7 @@ function highlightFeature(phaseKey: string, dbId: string, active: boolean): void
   const entry = entries.find((e) => e.dbId === dbId)
   if (!entry) return
 
-  const geometry = parseGeometry(entry.data.geometry as string | undefined)
+  const geometry = parseGeometry(entry.data.geometry)
 
   if (phaseKey === "roads") {
     featuresStore.update(entry.id, {

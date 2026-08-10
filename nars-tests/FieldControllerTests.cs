@@ -17,7 +17,7 @@ namespace NarsApi.Tests;
 
 public class FieldControllerTests
 {
-    private static readonly Guid OtherUserId = Guid.NewGuid();
+    private static readonly Guid OtherUserId = new("22222222-2222-2222-2222-222222222222");
 
     private static FieldController CreateController(
         IFieldService? fieldService = null) => new(

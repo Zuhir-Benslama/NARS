@@ -106,6 +106,12 @@ CREATE TABLE IF NOT EXISTS public.users
     phone                 character varying(50)    NOT NULL,
     username              character varying(100)   NOT NULL,
     password_hash         character varying(255)   NOT NULL,
+    -- Invalidation stamp — bumped on password change / token rotation so existing
+    -- JWTs are rejected on their next use. Mirrors EF migration
+    -- 20260810062821_AddUserSecurityStamp (varchar(64), default '' backfilled
+    -- with a random stamp for legacy rows at migration time; fresh rows are
+    -- stamped by the application at creation).
+    security_stamp        character varying(64)    NOT NULL DEFAULT '',
     -- Role hierarchy: commune_user → daira_admin → wilaya_admin → national_admin
     -- national_admin is inserted directly into the database (no API endpoint).
     role                  character varying(20)    NOT NULL DEFAULT 'commune_user',
@@ -408,6 +414,50 @@ CREATE TABLE IF NOT EXISTS public.error_logs
 CREATE INDEX IF NOT EXISTS ix_error_logs_created_at ON public.error_logs (created_at);
 CREATE INDEX IF NOT EXISTS ix_error_logs_user_id    ON public.error_logs (user_id);
 CREATE INDEX IF NOT EXISTS ix_error_logs_level      ON public.error_logs (level);
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- 11.  AI draft features (segmentation suggestions awaiting human review)
+-- ══════════════════════════════════════════════════════════════════════════════
+-- Mirrors nars-infra/migrations/0001_create_ai_draft_features.sql. Draft rows
+-- written by the nars-roads segmentation service are never promoted to the
+-- production feature tables until a field worker / commune admin accepts them.
+
+CREATE TABLE IF NOT EXISTS public.ai_draft_features
+(
+    id              uuid                     NOT NULL DEFAULT gen_random_uuid(),
+    feature_type    character varying(20)    NOT NULL,
+    geometry        jsonb                    NOT NULL,
+    source          character varying(20)    NOT NULL DEFAULT 'ai_segmentation',
+    confidence      real,
+    status          character varying(20)    NOT NULL DEFAULT 'pending',
+    commune_id      integer                  NOT NULL,
+    reviewed_by     uuid,
+    reviewed_at     timestamp with time zone,
+    created_at      timestamp with time zone NOT NULL DEFAULT now(),
+    source_tile_ref character varying(255),
+    CONSTRAINT ai_draft_features_pkey PRIMARY KEY (id),
+    CONSTRAINT chk_ai_draft_feature_type CHECK (feature_type IN ('road', 'building')),
+    CONSTRAINT chk_ai_draft_confidence CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 1)),
+    CONSTRAINT chk_ai_draft_status CHECK (status IN ('pending', 'accepted', 'rejected', 'edited')),
+    CONSTRAINT chk_ai_draft_geometry_matches_type CHECK (
+        (feature_type = 'road' AND geometry->>'type' = 'LineString')
+        OR (feature_type = 'building' AND geometry->>'type' IN ('Polygon', 'MultiPolygon'))
+    ),
+    CONSTRAINT ai_draft_features_commune_fk FOREIGN KEY (commune_id)
+        REFERENCES public.communes (commune_id)
+        ON UPDATE NO ACTION ON DELETE RESTRICT,
+    CONSTRAINT ai_draft_features_reviewed_by_fk FOREIGN KEY (reviewed_by)
+        REFERENCES public.users (id)
+        ON UPDATE NO ACTION ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_ai_draft_status
+    ON public.ai_draft_features (feature_type, status, commune_id);
+CREATE INDEX IF NOT EXISTS ix_ai_draft_created_at
+    ON public.ai_draft_features (created_at DESC);
+
+COMMENT ON TABLE public.ai_draft_features IS
+    'AI-suggested road/building features awaiting human review before promotion to production feature tables.';
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- Verification

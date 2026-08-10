@@ -39,6 +39,17 @@ public class RefreshTokenService(
             return new RefreshTokenResult(false, "Invalid or expired refresh token.", null, null, null, null);
         }
 
+        // Replay of an already-rotated token signals theft (the legitimate
+        // holder only ever uses the newest token). Revoke every outstanding
+        // token so the attacker's session dies too, then reject the request
+        // with the same generic message to avoid revealing what happened.
+        if (stored.Revoked)
+        {
+            await RevokeAllUserTokensAsync(stored.UserId, cancellationToken);
+            await tx.CommitAsync(cancellationToken);
+            return new RefreshTokenResult(false, "Invalid or expired refresh token.", null, null, null, null);
+        }
+
         var user = await db.Users.FindAsync([stored.UserId], cancellationToken);
         if (user is null)
         {
@@ -71,7 +82,8 @@ public class RefreshTokenService(
         await tx.CommitAsync(cancellationToken);
 
         var newAccessToken = jwt.CreateToken(user.Id, user.Username, user.Name, user.Email,
-            communeId: user.CommuneId, role: user.Role, dairaId: user.DairaId, wilayaId: user.WilayaId);
+            communeId: user.CommuneId, securityStamp: user.SecurityStamp,
+            role: user.Role, dairaId: user.DairaId, wilayaId: user.WilayaId);
 
         return new RefreshTokenResult(true, null, user.Username, newRaw, newAccessToken, refreshExpiry);
     }
@@ -109,7 +121,8 @@ public class RefreshTokenService(
         }
 
         var newAccessToken = jwt.CreateToken(user.Id, user.Username, user.Name, user.Email,
-            communeId: user.CommuneId, role: user.Role, dairaId: user.DairaId, wilayaId: user.WilayaId);
+            communeId: user.CommuneId, securityStamp: user.SecurityStamp,
+            role: user.Role, dairaId: user.DairaId, wilayaId: user.WilayaId);
 
         return new RefreshTokenResult(true, null, user.Username, null, newAccessToken, stored.ExpiresAt);
     }
@@ -141,6 +154,10 @@ public class RefreshTokenService(
         if (user.FailedLoginAttempts >= maxFailedAttempts)
         {
             user.LockedUntil = utcNow.UtcDateTime.AddMinutes(lockoutMinutes);
+            // Rotate the security stamp so any access tokens issued before the
+            // lockout are rejected immediately (see AuthenticationExtensions
+            // OnTokenValidated) instead of remaining valid until expiry.
+            user.SecurityStamp = User.GenerateSecurityStamp();
         }
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -166,9 +183,11 @@ public class RefreshTokenService(
 
 #pragma warning disable S2077 // Table name is allowlist-validated; parameters used for token_hash and cutoff
         var cutoff = timeProvider.UtcNow;
+        // Note: intentionally does NOT filter revoked — the caller distinguishes
+        // a valid token from a replay of a rotated one to revoke the family.
         return db.RefreshTokens
             .FromSqlRaw(
-                $"SELECT * FROM {expectedTable} WHERE token_hash = {{0}} AND revoked = false AND expires_at > {{1}} FOR UPDATE SKIP LOCKED",
+                $"SELECT * FROM {expectedTable} WHERE token_hash = {{0}} AND expires_at > {{1}} FOR UPDATE SKIP LOCKED",
                 hash, cutoff)
             .FirstOrDefaultAsync(ct);
 #pragma warning restore S2077

@@ -26,4 +26,14 @@ public class User
     [Column("created_at")] public DateTime CreatedAt { get; set; }
     [Column("failed_login_attempts")] public int? FailedLoginAttempts { get; set; }
     [Column("locked_until")] public DateTime? LockedUntil { get; set; }
+    /// <summary>
+    /// Random per-user value embedded in issued JWTs and re-checked against the
+    /// database on every authenticated request. Rotating it (on lockout or a
+    /// password change) instantly invalidates all previously issued access
+    /// tokens. Null/empty on legacy rows until they next sign in.
+    /// </summary>
+    [Column("security_stamp"), MaxLength(64)] public string SecurityStamp { get; set; } = string.Empty;
+
+    /// <summary>Generates a fresh, unpredictable security stamp.</summary>
+    public static string GenerateSecurityStamp() => Guid.NewGuid().ToString("N");
 }

@@ -50,6 +50,14 @@ narstreet/
 .DS_Store
 .aider*
 
+# === Python (nars-roads, nars-infra scripts) ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.venv/
+
 # === Android ===
 *.apk
 *.aar

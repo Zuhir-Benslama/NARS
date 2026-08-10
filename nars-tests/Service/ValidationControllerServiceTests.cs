@@ -121,11 +121,109 @@ public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : IAs
         Assert.False(string.IsNullOrEmpty(response.Error));
     }
 
+    [Fact]
+    public async Task CheckDistrictAdjacency_TouchingWithoutSharedUrbanArea_ReturnsFalse()
+    {
+        // Regression test for the SQL operator-precedence bug: a district that
+        // merely touches an existing district must NOT pass the adjacency check
+        // unless a single urban area intersects both. Previously the expression
+        // was `Touches OR (BoundaryIntersects AND EXISTS(urban area))`, so any
+        // touching district short-circuited past the urban-area gate.
+        var userId = await CreateTestUserAsync();
+        var service = new ValidationService(_db);
+
+        var existingSquare = new[]
+        {
+            new CoordDto(36.000, 2.900),
+            new CoordDto(36.020, 2.900),
+            new CoordDto(36.020, 2.920),
+            new CoordDto(36.000, 2.920),
+        };
+
+        await _db.Districts.AddAsync(new District
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Layer = FeatureTypes.DistrictLayers.DistrictLayer,
+            Label = "Existing District",
+            Data = System.Text.Json.JsonSerializer.Serialize(new { coordinates = existingSquare }),
+        });
+        await _db.SaveChangesAsync();
+
+        // Shares an edge with the existing district (lat 36.020) but no urban
+        // area intersects either polygon.
+        var touchingSquare = new[]
+        {
+            new CoordDto(36.020, 2.900),
+            new CoordDto(36.040, 2.900),
+            new CoordDto(36.040, 2.920),
+            new CoordDto(36.020, 2.920),
+        };
+
+        var wkt = GeometryHelper.BuildPolygonWkt([.. touchingSquare]);
+        var adjacent = await service.CheckDistrictAdjacencyAsync(userId, wkt);
+
+        Assert.False(adjacent);
+    }
+
+    [Fact]
+    public async Task CheckDistrictAdjacency_TouchingWithinSharedUrbanArea_ReturnsTrue()
+    {
+        var userId = await CreateTestUserAsync();
+        var service = new ValidationService(_db);
+
+        var urbanSquare = new[]
+        {
+            new CoordDto(35.98, 2.88),
+            new CoordDto(36.06, 2.88),
+            new CoordDto(36.06, 2.96),
+            new CoordDto(35.98, 2.96),
+        };
+
+        var existingSquare = new[]
+        {
+            new CoordDto(36.000, 2.900),
+            new CoordDto(36.020, 2.900),
+            new CoordDto(36.020, 2.920),
+            new CoordDto(36.000, 2.920),
+        };
+
+        await _db.Areas.AddAsync(new Area
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Layer = FeatureTypes.AreaLayers.CentralUrban,
+            Label = "Urban Area",
+            Data = System.Text.Json.JsonSerializer.Serialize(new { coordinates = urbanSquare }),
+        });
+        await _db.Districts.AddAsync(new District
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Layer = FeatureTypes.DistrictLayers.DistrictLayer,
+            Label = "Existing District",
+            Data = System.Text.Json.JsonSerializer.Serialize(new { coordinates = existingSquare }),
+        });
+        await _db.SaveChangesAsync();
+
+        var touchingSquare = new[]
+        {
+            new CoordDto(36.020, 2.900),
+            new CoordDto(36.040, 2.900),
+            new CoordDto(36.040, 2.920),
+            new CoordDto(36.020, 2.920),
+        };
+
+        var wkt = GeometryHelper.BuildPolygonWkt([.. touchingSquare]);
+        var adjacent = await service.CheckDistrictAdjacencyAsync(userId, wkt);
+
+        Assert.True(adjacent);
+    }
+
     private async Task<Guid> CreateTestUserAsync()
     {
         var user = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: 1, name: "Validation Test User");
         return user.Id;
     }
-
     private async Task SeedReferenceDataAsync() => await SeedData.SeedBasicLocationsAsync(_db);
 }

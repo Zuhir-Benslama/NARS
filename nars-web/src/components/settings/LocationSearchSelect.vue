@@ -89,9 +89,13 @@ function extractSearchOptions(payload: unknown): SearchOption[] {
 
 // ── Debounced search ───────────────────────────────────────────────────────
 let timer: ReturnType<typeof setTimeout> | null = null
+// Monotonic generation counter — supersedes out-of-order responses so a slow
+// result for an older query can never overwrite a newer one.
+let searchGen = 0
 
 function runSearch(q: string) {
   if (timer) clearTimeout(timer)
+  const gen = ++searchGen
   timer = setTimeout(async () => {
     try {
       const url =
@@ -99,15 +103,18 @@ function runSearch(q: string) {
           ? props.endpoint(q)
           : `${props.endpoint}?search=${encodeURIComponent(q)}`
       const res = await apiFetch(url)
-      options.value = extractSearchOptions(await res.json())
+      const items = extractSearchOptions(await res.json())
+      if (gen !== searchGen) return
+      options.value = items
     } catch (e) {
-      debugWarn("[LocationSearchSelect] search failed:", e)
+      if (gen === searchGen) debugWarn("[LocationSearchSelect] search failed:", e)
     }
   }, DEBOUNCE_MS)
 }
 
 function cleanup() {
   if (timer) clearTimeout(timer)
+  searchGen++
 }
 
 // ── Dropdown positioning ────────────────────────────────────────────────────

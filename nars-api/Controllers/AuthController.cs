@@ -197,7 +197,8 @@ public partial class AuthController(
     private async Task<IActionResult> BuildSignInResponseAsync(Models.User user, CancellationToken ct)
     {
         var token = jwt.CreateToken(user.Id, user.Username, user.Name, user.Email,
-            communeId: user.CommuneId, role: user.Role, dairaId: user.DairaId, wilayaId: user.WilayaId);
+            communeId: user.CommuneId, securityStamp: user.SecurityStamp,
+            role: user.Role, dairaId: user.DairaId, wilayaId: user.WilayaId);
 
         var (refreshRaw, _, refreshExpiry) = await refreshService.IssueRefreshTokenAsync(user.Id, ct);
 

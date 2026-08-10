@@ -10,6 +10,8 @@ is only reachable from inside the cluster network.
 
 import logging
 import os
+import secrets
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Header, HTTPException, UploadFile
@@ -34,6 +36,11 @@ MAX_TILE_BYTES = int(os.environ.get("NARS_ROADS_MAX_TILE_BYTES", str(50 * 1024 *
 # never forces a multi-hundred-MB weight load.
 _model: SegmentationModel | None = None
 
+# Each inference can peak at ~500MB (25M-px prob maps + windows), so unbounded
+# threadpool concurrency on a 4Gi pod is an OOM risk. A small semaphore caps
+# how many inferences run in parallel; the rest queue in the threadpool.
+INFERENCE_SEMAPHORE = threading.BoundedSemaphore(2)
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -55,7 +62,9 @@ def verify_internal_token(x_internal_token: str = Header(default=None)) -> None:
     network, but we still gate it so a compromised pod elsewhere in the mesh
     can't call it for free. Fails closed: if the token is not configured, all
     requests are rejected rather than silently allowing unauthenticated use."""
-    if not INTERNAL_TOKEN or x_internal_token != INTERNAL_TOKEN:
+    if not INTERNAL_TOKEN or not secrets.compare_digest(
+        x_internal_token or "", INTERNAL_TOKEN
+    ):
         raise HTTPException(status_code=401, detail="Invalid internal token")
 
 
@@ -80,6 +89,24 @@ def _validate_threshold(threshold: float) -> float:
             status_code=422, detail="threshold must be between 0.0 and 1.0"
         )
     return threshold
+
+
+def _validate_bbox(
+    min_lon: float, min_lat: float, max_lon: float, max_lat: float
+) -> None:
+    """Reject inverted and out-of-range boxes before they reach from_bounds.
+
+    An unvalidated box (e.g. min_lon > max_lon, lat > 90) would produce an
+    inverted transform in model.predict and silently garbage GeoJSON."""
+    if not (-180.0 <= min_lon <= 180.0) or not (-180.0 <= max_lon <= 180.0):
+        raise HTTPException(status_code=422, detail="longitude must be in [-180, 180]")
+    if not (-90.0 <= min_lat <= 90.0) or not (-90.0 <= max_lat <= 90.0):
+        raise HTTPException(status_code=422, detail="latitude must be in [-90, 90]")
+    if min_lon >= max_lon or min_lat >= max_lat:
+        raise HTTPException(
+            status_code=422,
+            detail="bbox must have min_lon < max_lon and min_lat < max_lat",
+        )
 
 
 @app.post(
@@ -107,6 +134,7 @@ def segment(
     which would stall /health during long requests.
     """
     _validate_threshold(threshold)
+    _validate_bbox(min_lon, min_lat, max_lon, max_lat)
 
     if tile.content_type not in ("image/tiff", "image/png", "image/jpeg"):
         raise HTTPException(
@@ -128,9 +156,15 @@ def segment(
         raise HTTPException(status_code=503, detail="Model not ready")
 
     try:
-        road_prob, building_prob, transform = _model.predict(
-            raw, bbox=(min_lon, min_lat, max_lon, max_lat)
-        )
+        # Cap concurrent inferences so a burst of large tiles can't OOM the
+        # 4Gi pod; extra requests queue here instead of stacking ~500MB each.
+        INFERENCE_SEMAPHORE.acquire()
+        try:
+            road_prob, building_prob, transform = _model.predict(
+                raw, bbox=(min_lon, min_lat, max_lon, max_lat)
+            )
+        finally:
+            INFERENCE_SEMAPHORE.release()
     except TileTooLargeError:
         raise HTTPException(
             status_code=413,

@@ -29,8 +29,8 @@ public class FeatureStatsServiceTests(NarsDatabaseFixture fixture) : IAsyncLifet
         _db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = _userId2, Layer = FeatureTypes.AreaLayers.CentralUrban, Label = "A3", Data = "{}", CreatedAt = FixedUtcNow });
         _db.Districts.Add(new District { Id = Guid.CreateVersion7(), UserId = _userId2, Layer = FeatureTypes.DistrictLayers.HousingEstate, Label = "D1", Data = "{}", CreatedAt = FixedUtcNow });
         _db.Districts.Add(new District { Id = Guid.CreateVersion7(), UserId = _userId2, Layer = FeatureTypes.DistrictLayers.DistrictLayer, Label = "D2", Data = "{}", CreatedAt = FixedUtcNow });
-        _db.Users.Add(new User { Id = _userId1, Username = "user1", Name = "User 1", Email = "u1@test.com", Phone = DefaultPhone, PasswordHash = "hash", Role = UserRoles.CommuneUser, CommuneId = 1 });
-        _db.Users.Add(new User { Id = _userId2, Username = "user2", Name = "User 2", Email = "u2@test.com", Phone = AltPhone, PasswordHash = "hash", Role = UserRoles.CommuneUser, CommuneId = 1 });
+        _db.Users.Add(new User { Id = _userId1, Username = "user1", Name = "User 1", Email = "u1@test.com", Phone = DefaultPhone, PasswordHash = "hash", Role = UserRoles.CommuneUser, CommuneId = 1, SecurityStamp = User.GenerateSecurityStamp() });
+        _db.Users.Add(new User { Id = _userId2, Username = "user2", Name = "User 2", Email = "u2@test.com", Phone = AltPhone, PasswordHash = "hash", Role = UserRoles.CommuneUser, CommuneId = 1, SecurityStamp = User.GenerateSecurityStamp() });
         await _db.SaveChangesAsync();
     }
 
@@ -103,7 +103,7 @@ public class FeatureStatsServiceTests(NarsDatabaseFixture fixture) : IAsyncLifet
     public async Task GetUserFeatureCountsAsync_UserWithNoFeatures_ReturnsZeros()
     {
         var unknownId = Guid.NewGuid();
-        _db.Users.Add(new User { Id = unknownId, Username = "empty", Name = "Empty", Email = "empty@test.com", Phone = DefaultPhone, PasswordHash = "hash", Role = UserRoles.CommuneUser, CommuneId = 1 });
+        _db.Users.Add(new User { Id = unknownId, Username = "empty", Name = "Empty", Email = "empty@test.com", Phone = DefaultPhone, PasswordHash = "hash", Role = UserRoles.CommuneUser, CommuneId = 1, SecurityStamp = User.GenerateSecurityStamp() });
         await _db.SaveChangesAsync();
         var svc = new FeatureStatsService(_fixture.CreateDbContextFactory());
 

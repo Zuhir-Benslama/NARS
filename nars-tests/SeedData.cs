@@ -110,6 +110,7 @@ public static class SeedData
             CommuneId = communeId,
             DairaId = dairaId,
             WilayaId = wilayaId,
+            SecurityStamp = User.GenerateSecurityStamp(),
         };
         db.Users.Add(user);
         await db.SaveChangesAsync();

@@ -25,6 +25,51 @@ spec:
         # Must match USER in docker/Dockerfile.nars-roads (10001)
         runAsUser: 10001
         fsGroup: 10001
+      initContainers:
+        - name: fetch-weights
+          # Pulls the model checkpoint from NARS_ROADS_WEIGHTS_URL into a
+          # shared emptyDir. Fails the init (CrashLoopBackOff) instead of
+          # letting the pod sit NotReady forever when weights can't be fetched,
+          # so the cause is visible in `kubectl describe pod`.
+          image: curlimages/curl:8.10.1
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              if [ -z "$NARS_ROADS_WEIGHTS_URL" ]; then
+                echo "NARS_ROADS_WEIGHTS_URL is not set; cannot fetch weights" >&2
+                exit 1
+              fi
+              curl --fail --silent --show-error --location \
+                "$NARS_ROADS_WEIGHTS_URL" -o /srv/weights/unet_r34_multiclass.pth
+              ls -lh /srv/weights
+          env:
+            - name: NARS_ROADS_WEIGHTS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: nars-roads-secrets
+                  key: weights-url
+                  optional: true
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: weights
+              mountPath: /srv/weights
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
       containers:
         - name: nars-roads
           # ⚠ Dev default only — override via kustomize in CI/CD (e.g.
@@ -39,11 +84,18 @@ spec:
                 secretKeyRef:
                   name: nars-roads-secrets
                   key: internal-token
+            - name: NARS_ROADS_WEIGHTS_PATH
+              value: /srv/weights/unet_r34_multiclass.pth
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://otel-collector.observability:4317"
             - name: OTEL_SERVICE_NAME
               value: "nars-roads"
             - name: TMPDIR
+              value: /tmp
+            # readOnlyRootFilesystem makes the image's /home/nars-roads (and any
+            # ~/.cache) read-only. Point HOME at the writable emptyDir so tools
+            # that write user caches (e.g. torch, GDAL) don't fail at runtime.
+            - name: HOME
               value: /tmp
           resources:
             requests:
@@ -64,6 +116,8 @@ spec:
           volumeMounts:
             - name: temp
               mountPath: /tmp
+            - name: weights
+              mountPath: /srv/weights
           readinessProbe:
             httpGet:
               path: /ready
@@ -78,4 +132,6 @@ spec:
             periodSeconds: 30
       volumes:
         - name: temp
+          emptyDir: {}
+        - name: weights
           emptyDir: {}

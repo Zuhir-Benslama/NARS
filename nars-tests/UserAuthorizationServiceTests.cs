@@ -25,6 +25,7 @@ public class UserAuthorizationServiceTests
             Email = AltEmail,
             Phone = DefaultPhone,
             PasswordHash = "hash",
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.CommuneUser,
             CommuneId = 1,
         });
@@ -61,6 +62,7 @@ public class UserAuthorizationServiceTests
             Email = AltEmail,
             Phone = DefaultPhone,
             PasswordHash = "hash",
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.CommuneUser,
             CommuneId = 1,
         });

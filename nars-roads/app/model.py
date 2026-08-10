@@ -107,11 +107,19 @@ class SegmentationModel:
 
         img = np.transpose(arr, (1, 2, 0))
         if np.issubdtype(dtype, np.floating):
-            # Assume float input is already normalized to [0, 1]; some
-            # producers ship float data in [0, 255], so rescale that case.
+            # Float input is assumed already normalized to [0, 1]; some
+            # producers ship float data in [0, 255]. Rescale only when it is
+            # clearly byte-scaled (max well above 1): a value like 1.02 is
+            # sensor noise on a [0,1] raster and must not be divided by 255
+            # (which would black it). Non-finite values are neutralized so a
+            # single NaN/Inf can't poison normalization downstream.
             img = img.astype(np.float32)
-            if img.max() > 1.0:
-                img = img / 255.0
+            img = np.nan_to_num(img, nan=0.0, posinf=1.0, neginf=0.0)
+            mx = float(img.max())
+            if mx > 1.0:
+                if mx > 2.0:
+                    img = img / 255.0
+                img = np.clip(img, 0.0, 1.0)
         else:
             # Scale by the integer bit depth: uint8 -> 255, uint16 -> 65535.
             img = img.astype(np.float32) / float(np.iinfo(dtype).max)

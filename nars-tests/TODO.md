@@ -1,7 +1,7 @@
 # NARS Tests TODO
 
 Code quality issues found during review of the test project (build clean,
-0 warnings; 488 tests: 399 unit + 89 PostgreSQL-backed). Grouped by severity.
+0 warnings; 501 tests: 410 unit + 91 PostgreSQL-backed). Grouped by severity.
 
 ## High
 
@@ -47,3 +47,12 @@ Code quality issues found during review of the test project (build clean,
 - [x] `TestData.UserId` is a `static readonly Guid.NewGuid()` — now a fixed deterministic GUID (`11111111-…`).
 - [x] `ProgramStartupValidationTests.cs` `UnreachableDatabase_FailsStartup` performed a real TCP connect to `127.0.0.1:1` — fast-failed but not hermetic. Now binds a `TcpListener` on an OS-assigned free port (never accepting) so the probe deterministically times out on a port we control; no reliance on port 1 being refused/blackholed.
 - [x] Plaintext test credentials are fine — verified confined to test code (`AuthTestHelper.TestJwtSecret`, `InfrastructureServicesTests.cs` `NARS_DB_PASSWORD="s3cret"`); no shared config exposure.
+
+## Round 2 (post-M2)
+
+- [x] **Dead code** — `AuthenticationExtensionsTests.cs` private `BuildStampValidationOptions()` never called (and had a pointless `async`); removed.
+- [x] **Fragile exact-double assertions** — `Service/FeaturesControllerServiceTests.cs` `Assert.Equal(36.80, lat)` / `Assert.Equal(3.00, lng)` now use a 4-decimal precision delta (`36.80` is not binary-exact; any PostGIS/serialization normalization could otherwise break the test).
+- [x] **Missing `SecurityStamp` in test users** — added `SecurityStamp = User.GenerateSecurityStamp()` to every `new User { ... }` block that lacked it (30 blocks across `AdminUserControllerTests`, `AdminOverviewServiceTests`, `AuthControllerTests`, `UserAuthorizationServiceTests`, `RefreshTokenServiceTests`, `Service/FieldControllerServiceTests`). EF InMemory ignores NOT NULL so tests passed either way, but the data now matches `SeedData`/the security-stamp feature under test.
+- [x] **Non-deterministic `OtherUserId`** — `FieldControllerTests.cs` `static readonly Guid OtherUserId = Guid.NewGuid()` pinned to a fixed GUID (`22222222-…`), consistent with deterministic `TestData.UserId`.
+- [x] **Discard-based Base64 sanity check** — `JwtServiceTests.cs` `_ = Convert.FromBase64String(hash);` replaced with `Assert.Equal(32, Convert.FromBase64String(hash).Length)` (also asserts it is a SHA-256 digest).
+- [x] Verified: build 0 warnings/0 errors; 410 unit + 91 service tests pass.

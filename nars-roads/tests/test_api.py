@@ -79,6 +79,42 @@ def test_segment_rejects_threshold_out_of_range():
     assert resp.status_code == 422
 
 
+def test_segment_rejects_inverted_bbox():
+    resp = _post(
+        headers=AUTH,
+        params={"min_lon": 1.0, "min_lat": 1.0, "max_lon": 0.0, "max_lat": 0.0},
+        files={"tile": ("t.tif", b"x", "image/tiff")},
+    )
+    assert resp.status_code == 422
+
+
+def test_segment_rejects_out_of_range_latitude():
+    resp = _post(
+        headers=AUTH,
+        params={"min_lon": 0.0, "min_lat": -95.0, "max_lon": 1.0, "max_lat": 1.0},
+        files={"tile": ("t.tif", b"x", "image/tiff")},
+    )
+    assert resp.status_code == 422
+
+
+def test_segment_rejects_out_of_range_longitude():
+    resp = _post(
+        headers=AUTH,
+        params={"min_lon": -200.0, "min_lat": 0.0, "max_lon": 1.0, "max_lat": 1.0},
+        files={"tile": ("t.tif", b"x", "image/tiff")},
+    )
+    assert resp.status_code == 422
+
+
+def test_segment_rejects_degenerate_bbox():
+    resp = _post(
+        headers=AUTH,
+        params={"min_lon": 0.0, "min_lat": 0.0, "max_lon": 0.0, "max_lat": 1.0},
+        files={"tile": ("t.tif", b"x", "image/tiff")},
+    )
+    assert resp.status_code == 422
+
+
 def test_segment_accepts_threshold_in_range():
     resp = _post(
         headers=AUTH,
@@ -95,6 +131,66 @@ def test_segment_models_not_ready():
         files={"tile": ("t.tif", b"x", "image/tiff")},
     )
     assert resp.status_code == 503
+
+
+def test_segment_schema_rejects_malformed_feature():
+    from pydantic import ValidationError
+
+    from app.schemas import SegmentResponse
+
+    with pytest.raises(ValidationError):
+        SegmentResponse.model_validate(
+            {
+                "roads": {
+                    "type": "FeatureCollection",
+                    "features": [{"geometry": {"coordinates": []}}],  # missing type
+                },
+                "buildings": {"type": "FeatureCollection", "features": []},
+            }
+        )
+
+
+def test_segment_schema_accepts_wellformed_features():
+    from app.schemas import SegmentResponse
+
+    parsed = SegmentResponse.model_validate(
+        {
+            "roads": {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "type": "Feature",
+                        "geometry": {
+                            "type": "LineString",
+                            "coordinates": [[0, 0], [1, 1]],
+                        },
+                        "properties": {"confidence": 0.9, "feature_type": "road"},
+                    }
+                ],
+            },
+            "buildings": {"type": "FeatureCollection", "features": []},
+        }
+    )
+    assert parsed.roads.features[0].geometry.type == "LineString"
+    assert parsed.roads.features[0].properties["confidence"] == 0.9
+
+
+def test_inference_concurrency_is_bounded():
+    import threading
+
+    import app.main as roads
+
+    assert isinstance(roads.INFERENCE_SEMAPHORE, threading.BoundedSemaphore)
+    assert roads.INFERENCE_SEMAPHORE._value <= 4
+
+
+def test_missing_token_fails_closed(monkeypatch):
+    # If the token env is missing entirely, all requests are rejected.
+    import app.main as roads
+
+    monkeypatch.setattr(roads, "INTERNAL_TOKEN", "")
+    assert _post(headers={"X-Internal-Token": "test-token"}).status_code == 401
+    assert _post().status_code == 401
 
 
 def test_segment_rejects_oversized_upload(monkeypatch):
@@ -128,3 +224,9 @@ def test_segment_end_to_end_returns_geojson():
         for fc in data.values():
             assert fc["type"] == "FeatureCollection"
             assert isinstance(fc["features"], list)
+            for feature in fc["features"]:
+                assert feature["type"] == "Feature"
+                assert feature["geometry"]["type"] in {"LineString", "Polygon"}
+                assert "coordinates" in feature["geometry"]
+                assert feature["properties"]["confidence"] >= 0.0
+                assert feature["properties"]["confidence"] <= 1.0

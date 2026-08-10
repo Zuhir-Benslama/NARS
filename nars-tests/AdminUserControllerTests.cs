@@ -79,6 +79,7 @@ public class AdminUserControllerTests
             Name = "Existing",
             Phone = TestData.DefaultPhone,
             PasswordHash = "hash",
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.WilayaAdmin,
             WilayaId = 1,
         });
@@ -159,6 +160,7 @@ public class AdminUserControllerTests
             Name = "WA1",
             Phone = TestData.DefaultPhone,
             PasswordHash = "hash",
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.WilayaAdmin,
             WilayaId = 1,
         });
@@ -170,6 +172,7 @@ public class AdminUserControllerTests
             Name = "CU1",
             Phone = TestData.DefaultPhone,
             PasswordHash = "hash",
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.CommuneUser,
             CommuneId = 1,
         });
@@ -199,6 +202,7 @@ public class AdminUserControllerTests
                 Name = "WA1",
                 Phone = TestData.DefaultPhone,
                 PasswordHash = "hash",
+                SecurityStamp = User.GenerateSecurityStamp(),
                 Role = UserRoles.WilayaAdmin,
                 WilayaId = 1,
             },
@@ -210,6 +214,7 @@ public class AdminUserControllerTests
                 Name = "WA2",
                 Phone = TestData.DefaultPhone,
                 PasswordHash = "hash",
+                SecurityStamp = User.GenerateSecurityStamp(),
                 Role = UserRoles.WilayaAdmin,
                 WilayaId = 1,
             });
@@ -272,6 +277,7 @@ public class AdminUserControllerTests
             Name = "Original",
             Phone = TestData.DefaultPhone,
             PasswordHash = "hash",
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.WilayaAdmin,
             WilayaId = 1,
         });
@@ -307,6 +313,7 @@ public class AdminUserControllerTests
             Name = "Caller",
             Phone = TestData.DefaultPhone,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(TestData.DefaultPassword),
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.DairaAdmin,
             DairaId = 1,
         });
@@ -319,6 +326,7 @@ public class AdminUserControllerTests
             Name = "Commune User",
             Phone = TestData.DefaultPhone,
             PasswordHash = "hash",
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.CommuneUser,
             CommuneId = 5,
         });
@@ -353,6 +361,7 @@ public class AdminUserControllerTests
             Name = "Caller",
             Phone = TestData.DefaultPhone,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(TestData.DefaultPassword),
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.DairaAdmin,
             DairaId = 1,
         });
@@ -365,6 +374,7 @@ public class AdminUserControllerTests
             Name = "Commune User",
             Phone = TestData.DefaultPhone,
             PasswordHash = "hash",
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.CommuneUser,
             CommuneId = 5,
         });
@@ -398,6 +408,7 @@ public class AdminUserControllerTests
             Name = "Caller",
             Phone = TestData.DefaultPhone,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(TestData.DefaultPassword),
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.CommuneUser,
             CommuneId = 1,
         });
@@ -410,6 +421,7 @@ public class AdminUserControllerTests
             Name = "Field Worker",
             Phone = TestData.DefaultPhone,
             PasswordHash = "hash",
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.FieldWorker,
             CommuneId = 1,
         });
@@ -444,6 +456,7 @@ public class AdminUserControllerTests
             Name = "Caller",
             Phone = TestData.DefaultPhone,
             PasswordHash = "hash",
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.DairaAdmin,
             DairaId = 1,
         });
@@ -456,6 +469,7 @@ public class AdminUserControllerTests
             Name = "Commune User",
             Phone = TestData.DefaultPhone,
             PasswordHash = "hash",
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.CommuneUser,
             CommuneId = 99,
         });
@@ -487,6 +501,7 @@ public class AdminUserControllerTests
             Name = "Caller",
             Phone = TestData.DefaultPhone,
             PasswordHash = "hash",
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.DairaAdmin,
             DairaId = 1,
         });
@@ -499,6 +514,7 @@ public class AdminUserControllerTests
             Name = "Commune User",
             Phone = TestData.DefaultPhone,
             PasswordHash = "hash",
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.CommuneUser,
             CommuneId = 5,
         });
@@ -551,6 +567,7 @@ public class AdminUserControllerTests
             Name = "National",
             Phone = TestData.DefaultPhone,
             PasswordHash = "hash",
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.NationalAdmin,
         });
         await db.SaveChangesAsync();
@@ -578,6 +595,7 @@ public class AdminUserControllerTests
             Name = "Caller",
             Phone = TestData.DefaultPhone,
             PasswordHash = "hash",
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.DairaAdmin,
             DairaId = 1,
         });
@@ -590,6 +608,7 @@ public class AdminUserControllerTests
             Name = "Commune User",
             Phone = TestData.DefaultPhone,
             PasswordHash = "hash",
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.CommuneUser,
             CommuneId = 99,
         });

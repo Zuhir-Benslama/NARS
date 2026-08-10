@@ -33,7 +33,7 @@ public class JwtServiceTests
     {
         var service = CreateService();
         var token = service.CreateToken(
-            Guid.NewGuid(), "testuser", "Test User", DefaultEmail, 1);
+            Guid.NewGuid(), "testuser", "Test User", DefaultEmail, 1, "test-security-stamp");
 
         Assert.NotNull(token);
         Assert.NotEmpty(token);
@@ -46,7 +46,7 @@ public class JwtServiceTests
         var service = CreateService();
         var userId = Guid.NewGuid();
         var token = service.CreateToken(
-            userId, "testuser", "Test User", DefaultEmail, 42);
+            userId, "testuser", "Test User", DefaultEmail, 42, "test-security-stamp");
 
         var handler = new JwtSecurityTokenHandler();
         var jwt = handler.ReadJwtToken(token);
@@ -61,6 +61,8 @@ public class JwtServiceTests
             jwt.Claims.First(c => c.Type == ClaimNames.Email).Value);
         Assert.Equal("42",
             jwt.Claims.First(c => c.Type == ClaimNames.CommuneId).Value);
+        Assert.Equal("test-security-stamp",
+            jwt.Claims.First(c => c.Type == ClaimNames.SecurityStamp).Value);
     }
 
     [Fact]
@@ -68,7 +70,7 @@ public class JwtServiceTests
     {
         var service = CreateService();
         var token = service.CreateToken(
-            Guid.NewGuid(), "testuser", "Test User", DefaultEmail, 1);
+            Guid.NewGuid(), "testuser", "Test User", DefaultEmail, 1, "test-security-stamp");
 
         var principal = service.ValidateToken(token);
 
@@ -81,7 +83,7 @@ public class JwtServiceTests
     {
         var service = CreateService();
         var token = service.CreateToken(
-            Guid.NewGuid(), "testuser", "Test User", DefaultEmail, 1);
+            Guid.NewGuid(), "testuser", "Test User", DefaultEmail, 1, "test-security-stamp");
 
         // Tamper with the token
         var tampered = token[..^5] + "XXXXX";
@@ -101,7 +103,7 @@ public class JwtServiceTests
     {
         var issuer = CreateService(secret: "correct-secret-key-that-is-long-enough!!");
         var token = issuer.CreateToken(
-            Guid.NewGuid(), "testuser", "Test User", DefaultEmail, 1);
+            Guid.NewGuid(), "testuser", "Test User", DefaultEmail, 1, "test-security-stamp");
 
         var verifier = CreateService(secret: "wrong-secret-key-that-is-long-enough-32chars!!");
 
@@ -120,8 +122,8 @@ public class JwtServiceTests
         Assert.NotEmpty(hash);
         // Hash should be different from raw
         Assert.NotEqual(raw, hash);
-        // Hash should be a valid Base64 string (decodes without throwing)
-        _ = Convert.FromBase64String(hash);
+        // Hash should be a valid Base64 encoding of a SHA-256 digest (32 bytes)
+        Assert.Equal(32, Convert.FromBase64String(hash).Length);
     }
 
     [Fact]
@@ -140,7 +142,7 @@ public class JwtServiceTests
     {
         var expiredService = CreateService(expiresMinutes: -1);
         var token = expiredService.CreateToken(
-            Guid.NewGuid(), "testuser", "Test User", DefaultEmail, 1);
+            Guid.NewGuid(), "testuser", "Test User", DefaultEmail, 1, "test-security-stamp");
 
         var principal = expiredService.ValidateToken(token);
 

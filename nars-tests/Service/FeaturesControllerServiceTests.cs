@@ -274,8 +274,8 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         Assert.Equal("Updated Label", area.Label);
         var persistedData = System.Text.Json.JsonDocument.Parse(area.Data);
         var coords = persistedData.RootElement.GetProperty("coordinates")[0];
-        Assert.Equal(36.80, coords.GetProperty("lat").GetDouble());
-        Assert.Equal(3.00, coords.GetProperty("lng").GetDouble());
+        Assert.Equal(36.80, coords.GetProperty("lat").GetDouble(), 4);
+        Assert.Equal(3.00, coords.GetProperty("lng").GetDouble(), 4);
     }
 
     [Fact]

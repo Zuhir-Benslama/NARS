@@ -132,6 +132,7 @@ public sealed class UserCreationService(
             DairaId = dairaId,
             WilayaId = wilayaId,
             FailedLoginAttempts = 0,
+            SecurityStamp = User.GenerateSecurityStamp(),
         };
 
         return UserCreationResult.Success(newUser);

@@ -138,6 +138,7 @@ public class AuthControllerTests
             Phone = TestData.DefaultPhone,
             Username = "existinguser",
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.CommuneUser,
             CommuneId = CommuneId1,
         });
@@ -177,6 +178,7 @@ public class AuthControllerTests
             Phone = TestData.DefaultPhone,
             Username = "existinguser",
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.CommuneUser,
             CommuneId = CommuneId1,
         });
@@ -269,6 +271,7 @@ public class AuthControllerTests
             Username = "testuser",
             Phone = TestData.DefaultPhone,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
+            SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.CommuneUser,
             CommuneId = CommuneId1,
         });
