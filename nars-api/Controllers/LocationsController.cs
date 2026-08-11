@@ -10,7 +10,6 @@ namespace NarsApi.Controllers;
 /// <summary>
 /// Administrative hierarchy endpoints (Wilayas, Dairas, Communes) with
 /// pagination support. Maximum page size is 500 to prevent oversized responses.
-/// Reference data (lists without search) is cached using IMemoryCache.
 ///
 /// INTENTIONALLY UNAUTHENTICATED: These endpoints are consumed by the login
 /// page for admin signup (wilaya/daira/commune dropdowns) and by the map page

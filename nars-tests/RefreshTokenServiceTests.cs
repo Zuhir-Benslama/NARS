@@ -75,12 +75,16 @@ public class RefreshTokenServiceTests
             timeProvider ?? CreateTimeProvider());
     }
 
-    private static async Task<(TestableRefreshTokenService Service, AppDbContext Db, string RawToken)> SeedWithValidTokenAsync()
+    private static async Task<User> SeedUserAsync(
+        AppDbContext db,
+        Guid? userId = null,
+        string? securityStamp = null,
+        int failedLoginAttempts = 0,
+        DateTime? lockedUntil = null)
     {
-        var db = CreateDb();
-        db.Users.Add(new User
+        var user = new User
         {
-            Id = UserId,
+            Id = userId ?? UserId,
             Username = "testuser",
             Name = "Test User",
             Email = AltEmail,
@@ -88,8 +92,19 @@ public class RefreshTokenServiceTests
             PasswordHash = "hash",
             Role = UserRoles.CommuneUser,
             CommuneId = 1,
-            SecurityStamp = User.GenerateSecurityStamp(),
-        });
+            SecurityStamp = securityStamp ?? User.GenerateSecurityStamp(),
+            FailedLoginAttempts = failedLoginAttempts,
+            LockedUntil = lockedUntil,
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        return user;
+    }
+
+    private static async Task<(TestableRefreshTokenService Service, AppDbContext Db, string RawToken)> SeedWithValidTokenAsync()
+    {
+        var db = CreateDb();
+        await SeedUserAsync(db);
         const string raw = "valid-refresh-token";
         var hash = Convert.ToBase64String(
             System.Security.Cryptography.SHA256.HashData(
@@ -284,18 +299,7 @@ public class RefreshTokenServiceTests
         var uid = userId ?? UserId;
         if (!skipUser)
         {
-            db.Users.Add(new User
-            {
-                Id = uid,
-                Username = "testuser",
-                Name = "Test User",
-                Email = AltEmail,
-                Phone = DefaultPhone,
-                PasswordHash = "hash",
-                SecurityStamp = User.GenerateSecurityStamp(),
-                Role = UserRoles.CommuneUser,
-                CommuneId = 1,
-            });
+            await SeedUserAsync(db, uid);
         }
         var raw = $"{(revoked ? "revoked" : "expired")}-token-{Guid.NewGuid():N}";
         var hash = Convert.ToBase64String(
@@ -435,18 +439,7 @@ public class RefreshTokenServiceTests
     public async Task RevokeAllUserTokensAsync_RevokesUnrevokedTokens()
     {
         using var db = CreateDb();
-        db.Users.Add(new User
-        {
-            Id = UserId,
-            Username = "testuser",
-            Name = "Test User",
-            Email = AltEmail,
-            Phone = DefaultPhone,
-            PasswordHash = "hash",
-            Role = UserRoles.CommuneUser,
-            CommuneId = 1,
-            SecurityStamp = User.GenerateSecurityStamp(),
-        });
+        await SeedUserAsync(db);
         db.RefreshTokens.Add(new RefreshToken
         {
             Id = Guid.NewGuid(),
@@ -476,18 +469,7 @@ public class RefreshTokenServiceTests
     public async Task RevokeAllUserTokensAsync_AlreadyRevokedTokens_AreNotAffected()
     {
         using var db = CreateDb();
-        db.Users.Add(new User
-        {
-            Id = UserId,
-            Username = "testuser",
-            Name = "Test User",
-            Email = AltEmail,
-            Phone = DefaultPhone,
-            PasswordHash = "hash",
-            Role = UserRoles.CommuneUser,
-            CommuneId = 1,
-            SecurityStamp = User.GenerateSecurityStamp(),
-        });
+        await SeedUserAsync(db);
         db.RefreshTokens.AddRange(
             new RefreshToken
             {
@@ -596,21 +578,7 @@ public class RefreshTokenServiceTests
     public async Task RecordFailedLoginAsync_IncrementsAttempts()
     {
         using var db = CreateDb();
-        var user = new User
-        {
-            Id = UserId,
-            Username = "testuser",
-            Name = "Test User",
-            Email = AltEmail,
-            Phone = DefaultPhone,
-            PasswordHash = "hash",
-            Role = UserRoles.CommuneUser,
-            CommuneId = 1,
-            SecurityStamp = User.GenerateSecurityStamp(),
-            FailedLoginAttempts = 0,
-        };
-        db.Users.Add(user);
-        await db.SaveChangesAsync();
+        var user = await SeedUserAsync(db, failedLoginAttempts: 0);
         var svc = CreateService(db);
 
         await svc.RecordFailedLoginAsync(user, maxFailedAttempts: 5, lockoutMinutes: 15, FixedUtcNowOffset);
@@ -625,21 +593,7 @@ public class RefreshTokenServiceTests
     public async Task RecordFailedLoginAsync_AtThreshold_LocksUser()
     {
         using var db = CreateDb();
-        var user = new User
-        {
-            Id = UserId,
-            Username = "testuser",
-            Name = "Test User",
-            Email = AltEmail,
-            Phone = DefaultPhone,
-            PasswordHash = "hash",
-            Role = UserRoles.CommuneUser,
-            CommuneId = 1,
-            SecurityStamp = originalStamp,
-            FailedLoginAttempts = 4,
-        };
-        db.Users.Add(user);
-        await db.SaveChangesAsync();
+        var user = await SeedUserAsync(db, securityStamp: originalStamp, failedLoginAttempts: 4);
         var svc = CreateService(db);
 
         await svc.RecordFailedLoginAsync(user, maxFailedAttempts: 5, lockoutMinutes: 15, FixedUtcNowOffset);
@@ -655,22 +609,7 @@ public class RefreshTokenServiceTests
     public async Task ResetFailedAttemptsIfNeededAsync_ClearsState()
     {
         using var db = CreateDb();
-        var user = new User
-        {
-            Id = UserId,
-            Username = "testuser",
-            Name = "Test User",
-            Email = AltEmail,
-            Phone = DefaultPhone,
-            PasswordHash = "hash",
-            Role = UserRoles.CommuneUser,
-            CommuneId = 1,
-            SecurityStamp = User.GenerateSecurityStamp(),
-            FailedLoginAttempts = 3,
-            LockedUntil = FixedUtcNow.AddMinutes(30),
-        };
-        db.Users.Add(user);
-        await db.SaveChangesAsync();
+        var user = await SeedUserAsync(db, failedLoginAttempts: 3, lockedUntil: FixedUtcNow.AddMinutes(30));
         var svc = CreateService(db);
 
         await svc.ResetFailedAttemptsIfNeededAsync(user);
@@ -683,22 +622,7 @@ public class RefreshTokenServiceTests
     public async Task ResetFailedAttemptsIfNeededAsync_AlreadyClean_NoSave()
     {
         using var db = CreateDb();
-        var user = new User
-        {
-            Id = UserId,
-            Username = "testuser",
-            Name = "Test User",
-            Email = AltEmail,
-            Phone = DefaultPhone,
-            PasswordHash = "hash",
-            Role = UserRoles.CommuneUser,
-            CommuneId = 1,
-            SecurityStamp = User.GenerateSecurityStamp(),
-            FailedLoginAttempts = 0,
-            LockedUntil = null,
-        };
-        db.Users.Add(user);
-        await db.SaveChangesAsync();
+        var user = await SeedUserAsync(db, failedLoginAttempts: 0);
         var svc = CreateService(db);
 
         await svc.ResetFailedAttemptsIfNeededAsync(user);

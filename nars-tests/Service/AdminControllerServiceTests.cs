@@ -39,10 +39,13 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         return new AdminController(new AdminOverviewService(_db, featureStats), Mock.Of<IWebHostEnvironment>());
     }
 
+    private static IDateTimeProvider FixedTimeProvider() =>
+        Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
+
     private AdminUserController CreateUserManagementController() => new(
             Mock.Of<Microsoft.Extensions.Logging.ILogger<AdminUserController>>(),
-            new UserAuthorizationService(_db, Mock.Of<IRefreshTokenService>(), Mock.Of<IDateTimeProvider>()),
-            new UserCreationService(_db, new UserAuthorizationService(_db, Mock.Of<IRefreshTokenService>(), Mock.Of<IDateTimeProvider>()),
+            new UserAuthorizationService(_db, Mock.Of<IRefreshTokenService>(), FixedTimeProvider()),
+            new UserCreationService(_db, new UserAuthorizationService(_db, Mock.Of<IRefreshTokenService>(), FixedTimeProvider()),
                 Mock.Of<Microsoft.Extensions.Logging.ILogger<UserCreationService>>()),
             Mock.Of<IWebHostEnvironment>());
 
@@ -51,7 +54,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     [Fact]
     public async Task CreateAdmin_DairaAdminToCommuneUser_InOwnDaira_Returns201()
     {
-        var creator = await CreateUserAsync(UserRoles.DairaAdmin, dairaId: 10);
+        var creator = await CreateUserAsync(UserRoles.DairaAdmin, dairaId: DairaId10);
         var controller = CreateUserManagementController();
         AuthTestHelper.SetUser(controller, creator);
         var request = BuildRequest(UserRoles.CommuneUser, communeId: CommuneId100);
@@ -70,7 +73,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     [Fact]
     public async Task CreateAdmin_WilayaAdminToDairaAdmin_InOwnWilaya_Returns201()
     {
-        var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 1);
+        var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: WilayaId1);
         var controller = CreateUserManagementController();
         AuthTestHelper.SetUser(controller, creator);
         var request = BuildRequest(UserRoles.DairaAdmin, dairaId: DairaId10);
@@ -83,7 +86,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         var createdUser = await _db.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
         Assert.NotNull(createdUser);
         Assert.Equal(UserRoles.DairaAdmin, createdUser.Role);
-        Assert.Equal(10, createdUser.DairaId);
+        Assert.Equal(DairaId10, createdUser.DairaId);
     }
 
     [Fact]
@@ -102,13 +105,13 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         var createdUser = await _db.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
         Assert.NotNull(createdUser);
         Assert.Equal(UserRoles.WilayaAdmin, createdUser.Role);
-        Assert.Equal(2, createdUser.WilayaId);
+        Assert.Equal(WilayaId2, createdUser.WilayaId);
     }
 
     [Fact]
     public async Task CreateAdmin_DairaAdminToCommuneUser_OutsideOwnDaira_ReturnsForbid()
     {
-        var creator = await CreateUserAsync(UserRoles.DairaAdmin, dairaId: 10);
+        var creator = await CreateUserAsync(UserRoles.DairaAdmin, dairaId: DairaId10);
         var controller = CreateUserManagementController();
         AuthTestHelper.SetUser(controller, creator);
         var request = BuildRequest(UserRoles.CommuneUser, communeId: CommuneId101);
@@ -121,7 +124,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     [Fact]
     public async Task CreateAdmin_WilayaAdminToDairaAdmin_OutsideOwnWilaya_ReturnsForbid()
     {
-        var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 1);
+        var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: WilayaId1);
         var controller = CreateUserManagementController();
         AuthTestHelper.SetUser(controller, creator);
         var request = BuildRequest(UserRoles.DairaAdmin, dairaId: DairaId11);
@@ -137,8 +140,8 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     {
         var creator = await CreateUserAsync(
             creatorRole,
-            dairaId: creatorRole == UserRoles.DairaAdmin ? 10 : null,
-            wilayaId: creatorRole == UserRoles.WilayaAdmin ? 1 : null,
+            dairaId: creatorRole == UserRoles.DairaAdmin ? DairaId10 : null,
+            wilayaId: creatorRole == UserRoles.WilayaAdmin ? WilayaId1 : null,
             communeId: creatorRole == UserRoles.CommuneUser ? CommuneId100 : null);
         var controller = CreateUserManagementController();
         AuthTestHelper.SetUser(controller, creator);
@@ -195,7 +198,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     [Fact]
     public async Task DeleteAdmin_Valid_ReturnsNoContent()
     {
-        var target = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 1);
+        var target = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: WilayaId1);
         var creator = await CreateUserAsync(UserRoles.NationalAdmin);
         var controller = CreateUserManagementController();
         AuthTestHelper.SetUser(controller, creator);
@@ -209,7 +212,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     [Fact]
     public async Task DeleteAdmin_WithinScope_ReturnsNoContent()
     {
-        var creator = await CreateUserAsync(UserRoles.DairaAdmin, dairaId: 10);
+        var creator = await CreateUserAsync(UserRoles.DairaAdmin, dairaId: DairaId10);
         var target = await CreateUserAsync(UserRoles.CommuneUser, communeId: CommuneId100);
         var controller = CreateUserManagementController();
         AuthTestHelper.SetUser(controller, creator);
@@ -239,7 +242,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     [Fact]
     public async Task Overview_WilayaAdmin_ReturnsWilayaReport()
     {
-        var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 2);
+        var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: WilayaId2);
         var controller = CreateOverviewController();
         AuthTestHelper.SetUser(controller, creator);
 
@@ -247,15 +250,15 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
 
         var okResult = Assert.IsType<OkObjectResult>(result);
         var report = Assert.IsType<WilayaReport>(okResult.Value);
-        Assert.Equal(2, report.WilayaId);
+        Assert.Equal(WilayaId2, report.WilayaId);
         Assert.Single(report.Dairas);
-        Assert.Equal(11, report.Dairas[0].DairaId);
+        Assert.Equal(DairaId11, report.Dairas[0].DairaId);
     }
 
     [Fact]
     public async Task Overview_DairaAdmin_ReturnsDairaReport()
     {
-        var creator = await CreateUserAsync(UserRoles.DairaAdmin, dairaId: 10);
+        var creator = await CreateUserAsync(UserRoles.DairaAdmin, dairaId: DairaId10);
         var controller = CreateOverviewController();
         AuthTestHelper.SetUser(controller, creator);
 
@@ -263,7 +266,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
 
         var okResult = Assert.IsType<OkObjectResult>(result);
         var report = Assert.IsType<DairaReport>(okResult.Value);
-        Assert.Equal(10, report.DairaId);
+        Assert.Equal(DairaId10, report.DairaId);
         Assert.Single(report.Communes);
         Assert.Equal(CommuneId100, report.Communes[0].CommuneId);
     }
@@ -301,13 +304,13 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         var controller = CreateOverviewController();
         AuthTestHelper.SetUser(controller, creator);
 
-        var result = await controller.GetWilaya(2);
+        var result = await controller.GetWilaya(WilayaId2);
 
         var okResult = Assert.IsType<OkObjectResult>(result);
         var report = Assert.IsType<WilayaReport>(okResult.Value);
-        Assert.Equal(2, report.WilayaId);
+        Assert.Equal(WilayaId2, report.WilayaId);
         Assert.Single(report.Dairas);
-        Assert.Equal(11, report.Dairas[0].DairaId);
+        Assert.Equal(DairaId11, report.Dairas[0].DairaId);
     }
 
     [Fact]
@@ -328,26 +331,26 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     [Fact]
     public async Task GetDaira_WilayaAdmin_OwnDaira_ReturnsDairaReport()
     {
-        var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 1);
+        var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: WilayaId1);
         var controller = CreateOverviewController();
         AuthTestHelper.SetUser(controller, creator);
 
-        var result = await controller.GetDaira(10);
+        var result = await controller.GetDaira(DairaId10);
 
         var okResult = Assert.IsType<OkObjectResult>(result);
         var report = Assert.IsType<DairaReport>(okResult.Value);
-        Assert.Equal(10, report.DairaId);
+        Assert.Equal(DairaId10, report.DairaId);
         Assert.Single(report.Communes);
     }
 
     [Fact]
     public async Task GetDaira_WilayaAdmin_WrongWilaya_ReturnsNotFound()
     {
-        var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: 1);
+        var creator = await CreateUserAsync(UserRoles.WilayaAdmin, wilayaId: WilayaId1);
         var controller = CreateOverviewController();
         AuthTestHelper.SetUser(controller, creator);
 
-        var result = await controller.GetDaira(11);
+        var result = await controller.GetDaira(DairaId11);
 
         var problem = Assert.IsType<ObjectResult>(result);
         Assert.Equal(404, problem.StatusCode);
@@ -360,11 +363,11 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         var controller = CreateOverviewController();
         AuthTestHelper.SetUser(controller, creator);
 
-        var result = await controller.GetDaira(11);
+        var result = await controller.GetDaira(DairaId11);
 
         var okResult = Assert.IsType<OkObjectResult>(result);
         var report = Assert.IsType<DairaReport>(okResult.Value);
-        Assert.Equal(11, report.DairaId);
+        Assert.Equal(DairaId11, report.DairaId);
         Assert.Single(report.Communes);
     }
 

@@ -14,7 +14,7 @@ public record FieldInspectRequest(
 public record FieldEntranceCreateRequest(
     [property: JsonPropertyName("road_id")][param: Required] string RoadId,
     [property: JsonPropertyName("data")][property: JsonRequired][param: Required] JsonNode Data,
-    [property: JsonPropertyName("label")] string? Label
+    [property: JsonPropertyName("label")][param: MaxLength(500)] string? Label
 );
 
 public record FieldInspectionResponse(

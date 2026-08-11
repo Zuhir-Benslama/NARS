@@ -6,24 +6,6 @@ namespace NarsApi.Services;
 
 public sealed class LocationQueryService(IDbContextFactory<AppDbContext> dbFactory) : ILocationQueryService
 {
-    public async Task<List<Wilaya>> GetAllWilayasAsync(CancellationToken ct = default)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db.Wilayas.AsNoTracking().ToListAsync(ct);
-    }
-
-    public async Task<List<Daira>> GetDairasByWilayaAsync(int wilayaId, CancellationToken ct = default)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db.Dairas.AsNoTracking().Where(d => d.WilayaId == wilayaId).ToListAsync(ct);
-    }
-
-    public async Task<List<Commune>> GetCommunesByDairaAsync(int dairaId, CancellationToken ct = default)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db.Communes.AsNoTracking().Where(c => c.DairaId == dairaId).ToListAsync(ct);
-    }
-
     public async Task<Commune?> GetCommuneByIdAsync(int communeId, CancellationToken ct = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);

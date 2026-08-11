@@ -15,6 +15,12 @@ public static class UserRoles
     /// <summary>Roles allowed to view any daira's report.</summary>
     public const string WilayaOrNationalAdmin = WilayaAdmin + "," + NationalAdmin;
 
+    /// <summary>Any admin level — for [Authorize(Roles = ...)] gates open to all admins.</summary>
+    public const string AnyAdmin = DairaAdmin + "," + WilayaAdmin + "," + NationalAdmin;
+
+    /// <summary>Roles allowed to create/manage lower-tier accounts (AdminUserController).</summary>
+    public const string UserManagementRoles = NationalAdmin + "," + WilayaAdmin + "," + DairaAdmin + "," + CommuneUser;
+
     /// <summary>All admin roles — useful for policy declarations.</summary>
     public static readonly string[] AllAdminRoles =
         [DairaAdmin, WilayaAdmin, NationalAdmin];

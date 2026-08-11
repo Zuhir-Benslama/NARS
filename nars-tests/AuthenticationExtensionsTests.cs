@@ -1,7 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -19,7 +18,7 @@ namespace NarsApi.Tests;
 /// <summary>
 /// Verifies <see cref="AuthenticationExtensions.AddNarsJwtAuthentication"/> configuration:
 /// token validation parameters, cookie-based token extraction, challenge/failure logging,
-/// the Pages cookie scheme, and the JwtService registration round-trip.
+/// and the JwtService registration round-trip.
 /// </summary>
 public class AuthenticationExtensionsTests
 {
@@ -131,17 +130,18 @@ public class AuthenticationExtensionsTests
     }
 
     [Fact]
-    public void PagesCookieScheme_IsConfiguredSecurely()
+    public async Task NoLegacyPagesCookieScheme_IsRegistered()
     {
         using var sp = BuildProvider();
-        var options = sp.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>().Get("Pages");
+        var schemeProvider = sp.GetRequiredService<IAuthenticationSchemeProvider>();
 
-        Assert.True(options.Cookie.HttpOnly);
-        Assert.Equal(CookieSecurePolicy.Always, options.Cookie.SecurePolicy);
-        Assert.Equal(SameSiteMode.Lax, options.Cookie.SameSite);
-        Assert.Equal(TimeSpan.FromMinutes(15), options.ExpireTimeSpan);
-        Assert.True(options.SlidingExpiration);
-        Assert.Equal(LoginPath, options.LoginPath);
+        var schemes = await schemeProvider.GetAllSchemesAsync();
+
+        // The "Pages" cookie scheme was dead config (PagesController uses
+        // [AllowAnonymous] + manual JwtService validation) and has been removed.
+        // Assert it stays gone while JWT bearer remains the only registered scheme.
+        Assert.Contains(schemes, s => s.Name == JwtBearerDefaults.AuthenticationScheme);
+        Assert.DoesNotContain(schemes, s => s.Name == "Pages");
     }
 
     [Fact]

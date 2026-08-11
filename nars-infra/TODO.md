@@ -56,3 +56,63 @@ migrations, Makefile infra targets) for code quality and hardening.
 - `create_nars_db.sql` — runs cleanly (20 tables / 30 indices); `security_stamp`
   present; `ai_draft_features` inserts pass, mismatched geometry rejected by
   CHECK; `postgis-migration-baseline` backfills all 5 EF migration IDs.
+
+---
+
+# nars-infra — Code Quality Review (round 2)
+
+Date: 2026-08-11
+
+## Scope
+Fresh pass over nars-infra (k8s manifests, Dockerfiles, nginx, roads
+deployment, scripts, SQL, seed data) beyond the lint gates.
+
+## Gates verified
+- `make infra-lint` (shell, docker, yaml, python, node, makefile, tag-guard) — pass
+- `kubectl kustomize` (k8s/ and roads/) — pass
+- Seed data `docs/seed_reference_data.sql`: 1541 commune rows, no duplicate
+  `commune_id` PKs (verified programmatically); all blocks use `COPY FROM stdin`.
+- `.gitignore` still covers `ca.key`, `.env`, `docs/pdf/`, `docs/uml/*.{svg,png}`,
+  `__pycache__/`, `.ruff_cache/`.
+- READMEs (`k8s/README.md`, `docker/README.md`) consistent with manifests.
+
+## Findings & fixes (all applied)
+
+### High
+1. **`k8s/backup-cronjob.yaml` — backup encryption always fails.** The
+   `nars-backup` image is based on `postgres:17-alpine`, whose postgres user is
+   uid **70** (verified: `postgres:x:70:70`); the CronJob ran as `runAsUser:
+   999`/`fsGroup: 999`. With no passwd entry for uid 999, HOME falls back to `/`
+   and gpg fails:
+   `gpg: Fatal: can't create directory '//.gnupg': Permission denied`.
+   Reproduced with `docker run --user 999:999 zuhirbenslama/nars-backup:latest
+   ... gpg ...`; works with `HOME=/tmp`. Fix: added `HOME=/tmp` env to the
+   `pg-dump` container (same pattern as the nars-roads fix, item 5 of round 1).
+   Note: if the CronJob is ever re-run with different uid/PVC ownership, keep
+   `HOME` pointing at a writable dir.
+
+### Medium
+2. **`k8s/network-policy.yaml` — no egress for nars-roads `fetch-weights`
+   initContainer.** Under `default-deny-egress`, the roads pod may only reach
+   DNS (53) and OTel (4317/4318); the checkpoint download from
+   `NARS_ROADS_WEIGHTS_URL` (secret `weights-url`, arbitrary host) is blocked on
+   any NetworkPolicy-enforcing CNI (Calico/Cilium). Latent in the kind dev
+   cluster because kindnet doesn't enforce NetworkPolicy. Fix: added
+   `allow-egress-roads-weights` (nars-roads → any IP on TCP 443/80, commented as
+   required for model download).
+
+## Non-findings (checked, no change needed)
+- nginx `/login` prefix also matching `/login.html` is correct (routes to the API
+  login page).
+- Official nginx image symlinks access/error logs to stdout/stderr, so
+  `readOnlyRootFilesystem: true` in `frontend-deployment.yaml` is safe.
+- `Dockerfile.nars-roads` `COPY weights ./weights` safe — repo contains only
+  `.gitkeep`.
+- `Dockerfile.nars-postgis` build-context assumption (repo root) documented.
+- Secret/ConfigMap key references all consistent across manifests and Makefile.
+
+## Verification
+- `make infra-lint` — pass
+- `kubectl kustomize` (k8s/ and roads/) — pass
+- gpg encryption as uid 999 fails without `HOME=/tmp`, succeeds with it
+  (empirically verified against the built `nars-backup` image).

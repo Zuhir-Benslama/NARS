@@ -48,7 +48,7 @@ public record AuthorizedAdminSignupRequest(
     [property: JsonPropertyName("admin_username")]
     [Required(AllowEmptyStrings = false), MaxLength(100)] string AdminUsername,
     [property: JsonPropertyName("admin_password")]
-    [Required(AllowEmptyStrings = false), MaxLength(128)] string AdminPassword,
+    [Required(AllowEmptyStrings = false), MaxLength(72)] string AdminPassword,
     // ── New account details ──────────────────────────────────────────────────
     [property: JsonPropertyName("name")]
     [Required(AllowEmptyStrings = false), MaxLength(255)] string Name,
@@ -59,7 +59,7 @@ public record AuthorizedAdminSignupRequest(
     [property: JsonPropertyName("username")]
     [Required(AllowEmptyStrings = false), MaxLength(100)] string Username,
     [property: JsonPropertyName("password")]
-    [Required(AllowEmptyStrings = false), MaxLength(128)] string Password,
+    [Required(AllowEmptyStrings = false), MaxLength(72)] string Password,
     [property: JsonPropertyName("role")]
     [Required(AllowEmptyStrings = false), MaxLength(20)] string Role,
     // ── Geographic anchor (one required depending on role) ───────────────────
@@ -69,7 +69,7 @@ public record AuthorizedAdminSignupRequest(
 );
 public record SignInRequest(
     [Required(AllowEmptyStrings = false), MaxLength(100)] string Username,
-    [Required(AllowEmptyStrings = false), MaxLength(128)] string Password
+    [Required(AllowEmptyStrings = false), MaxLength(72)] string Password
 );
 
 public record UpdateUserRequest(
@@ -78,9 +78,9 @@ public record UpdateUserRequest(
     [property: JsonPropertyName("email")]
     [EmailAddress, MaxLength(255)] string? Email,
     [property: JsonPropertyName("current_password")]
-    [MaxLength(128)] string? CurrentPassword,
+    [MaxLength(72)] string? CurrentPassword,
     [property: JsonPropertyName("password")]
-    [MaxLength(128)] string? Password
+    [MaxLength(72)] string? Password
 );
 
 // ─── RESPONSE DTOs ────────────────────────────────────────────────────────────

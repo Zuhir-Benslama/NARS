@@ -61,7 +61,11 @@ def test_segment_rejects_unsupported_content_type():
     assert resp.status_code == 415
 
 
-def test_segment_rejects_empty_file():
+def test_segment_rejects_empty_file(monkeypatch):
+    import app.main as roads
+
+    # Satisfy the readiness gate so the empty-upload check is what fires.
+    monkeypatch.setattr(roads, "_model", object())
     resp = _post(
         headers=AUTH,
         params=BBOX,
@@ -181,7 +185,16 @@ def test_inference_concurrency_is_bounded():
     import app.main as roads
 
     assert isinstance(roads.INFERENCE_SEMAPHORE, threading.BoundedSemaphore)
-    assert roads.INFERENCE_SEMAPHORE._value <= 4
+    # Behavioral check that doesn't reach into private _value: the semaphore
+    # must not grant more than 2 concurrent permits (a third acquire fails).
+    acquired = []
+    try:
+        for _ in range(3):
+            acquired.append(roads.INFERENCE_SEMAPHORE.acquire(blocking=False))
+        assert False in acquired, "semaphore allowed unbounded concurrency"
+    finally:
+        for _ in range(sum(acquired)):
+            roads.INFERENCE_SEMAPHORE.release()
 
 
 def test_missing_token_fails_closed(monkeypatch):
@@ -197,6 +210,7 @@ def test_segment_rejects_oversized_upload(monkeypatch):
     import app.main as roads
 
     monkeypatch.setattr(roads, "MAX_TILE_BYTES", 1024)
+    monkeypatch.setattr(roads, "_model", object())  # pass the readiness gate
     resp = _post(
         headers=AUTH,
         params=BBOX,

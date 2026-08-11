@@ -119,6 +119,13 @@ public static class FeatureQueryHelper
 
         while (await reader.ReadAsync(ct))
         {
+            if (rows.Count == 0)
+            {
+                // total_count is a constant from the CTE (one row joined onto
+                // every output row) — read it once instead of on each row.
+                totalCount = Convert.ToInt32(reader.GetInt64(totalOrdinal));
+            }
+
             var idValue = reader.GetValue(idOrdinal);
             Guid id = idValue switch
             {
@@ -132,7 +139,6 @@ public static class FeatureQueryHelper
             var createdAt = reader.GetDateTime(createdAtOrdinal);
             var layerVal = await reader.IsDBNullAsync(layerOrdinal, ct) ? null : reader.GetString(layerOrdinal);
             var type = reader.GetString(typeOrdinal);
-            totalCount = Convert.ToInt32(reader.GetInt64(totalOrdinal));
 
             var data = EmptyJsonObject;
             if (!string.IsNullOrWhiteSpace(dataJson))
@@ -159,7 +165,4 @@ public static class FeatureQueryHelper
 
         return (rows, totalCount);
     }
-
-    public static void AddParameter(DbCommand cmd, string name, Guid[] values)
-        => SqlFragments.AddParam(cmd, name, values);
 }

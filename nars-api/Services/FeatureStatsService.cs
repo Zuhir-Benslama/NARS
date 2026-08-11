@@ -130,7 +130,6 @@ public sealed class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactor
 
     private static string BuildUnionAll(Func<int, string, string> branchBuilder)
     {
-        // Table names come from the allowlist-validated registry, so they are safe to inline.
         var sb = new StringBuilder();
         var i = 0;
         foreach (var type in _featureTypes)
@@ -146,7 +145,8 @@ public sealed class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactor
                 sb.AppendLine(" UNION ALL");
             }
 
-            sb.Append(branchBuilder(i, descriptor.TableName));
+            var tableName = FeatureTypeRegistry.ValidateTableName(descriptor.TableName);
+            sb.Append(branchBuilder(i, tableName));
             i++;
         }
         return sb.ToString();

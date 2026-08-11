@@ -66,9 +66,11 @@ public sealed class FeatureTypeDescriptor
     public IReadOnlyList<CompositeIndexDefinition> CompositeIndexes { get; init; } = [];
 
     /// <summary>
-    /// Creates a new entity instance with common fields populated.
+    /// Creates a new entity instance with common fields populated. When
+    /// <paramref name="createdAt"/> is omitted, <see cref="UpdatedAtInterceptor"/>
+    /// stamps CreatedAt/UpdatedAt on SaveChanges.
     /// </summary>
-    public FeatureBase CreateEntity(Guid id, Guid userId, string layer, string label, string data, DateTime createdAt)
+    public FeatureBase CreateEntity(Guid id, Guid userId, string layer, string label, string data, DateTime createdAt = default)
     {
         var entity = CreateInstance();
         entity.Id = id;
@@ -302,9 +304,10 @@ public static class FeatureTypeRegistry
 
     /// <summary>
     /// Creates a new entity for the given type with common fields populated.
-    /// Returns null if the type is unknown.
+    /// Returns null if the type is unknown. When <paramref name="createdAt"/> is
+    /// omitted, <see cref="UpdatedAtInterceptor"/> stamps CreatedAt/UpdatedAt.
     /// </summary>
-    public static FeatureBase? CreateEntity(string type, Guid id, Guid userId, string layer, string label, string data, DateTime createdAt)
+    public static FeatureBase? CreateEntity(string type, Guid id, Guid userId, string layer, string label, string data, DateTime createdAt = default)
     {
         var descriptor = GetDescriptor(type);
         return descriptor?.CreateEntity(id, userId, layer, label, data, createdAt);

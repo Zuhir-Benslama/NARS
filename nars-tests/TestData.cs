@@ -21,7 +21,7 @@ public static class TestData
     public const string LoginPath = "/login";
     public const string ApiFeaturesPath = "/api/features";
     public const string ApiLogsPath = "/api/logs";
-    public const string ApiAuthSignInPath = "/api/auth/signin";
+    public const string ApiAuthSignInPath = "/api/signin";
 
     // ── Phone numbers ──────────────────────────────────────────────────
     public const string DefaultPhone = "0555000000";

@@ -469,7 +469,7 @@ db-restore: ## Restore a backup. Usage: make db-restore FILE=backup/manual_nars_
 		exit 1;
 	fi
 	@if [ ! -f "$(FILE)" ]; then echo "✖ File not found: $(FILE)"; exit 1; fi
-	@if echo "$(FILE)" | grep -qE '[^a-zA-Z0-9._/-]'; then
+	@if echo "$(FILE)" | grep -qE '[^a-zA-Z0-9._/-]|\.\.'; then
 		echo "✖ FILE='$(FILE)' contains unexpected characters";
 		exit 1;
 	fi
@@ -749,7 +749,7 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 	@tmpdir=$$(mktemp -d);
 	trap 'rm -rf "$$tmpdir"' EXIT;
 	printf '%s' "$$POSTGRES_PASSWORD" > "$$tmpdir/postgres_password";
-	printf '%s' "Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=$$POSTGRES_PASSWORD" > "$$tmpdir/ConnectionStrings__DefaultConnection";
+	printf '%s' "Host=postgis;Port=5432;Database=$(DB_NAME);Username=postgres;Password=$$POSTGRES_PASSWORD" > "$$tmpdir/ConnectionStrings__DefaultConnection";
 	printf '%s' "$$JWT_SECRET" > "$$tmpdir/Jwt__SecretKey";
 	printf '%s' "$$GPG_PASSPHRASE" > "$$tmpdir/gpg-passphrase";
 	printf '%s' "$$NARS_ADMIN_SIGNUP_TOKEN" > "$$tmpdir/AdminSignup__SignupToken";
@@ -812,12 +812,9 @@ kustomize-set-image-tag: ## Persistently pin image tags in kustomization.yaml (m
 		fi;
 		echo "→ Pinning kustomize image tags to $(IMAGE_TAG)...";
 		(cd "$(K8S_DIR)" && \
-		kustomize edit set image \
-			$(DOCKER_ORG)/nars-api=$(DOCKER_ORG)/nars-api:$(IMAGE_TAG) \
-			$(DOCKER_ORG)/nars-postgis=$(DOCKER_ORG)/nars-postgis:$(IMAGE_TAG) \
-			$(DOCKER_ORG)/nars-vite=$(DOCKER_ORG)/nars-vite:$(IMAGE_TAG) \
-			$(DOCKER_ORG)/nars-backup=$(DOCKER_ORG)/nars-backup:$(IMAGE_TAG) \
-			$(DOCKER_ORG)/nars-roads=$(DOCKER_ORG)/nars-roads:$(IMAGE_TAG));
+		for img in $(REGISTRY_IMAGES); do \
+			kustomize edit set image "$(DOCKER_ORG)/$$img=$(DOCKER_ORG)/$$img:$(IMAGE_TAG)"; \
+		done);
 		echo "✓ Image tags pinned to $(IMAGE_TAG)";
 	fi
 
@@ -826,8 +823,8 @@ kustomize-apply: secrets-validate _check-pinned-tag ## Apply k8s manifests via k
 	$(SUBMAKE) postgis-pv-fix
 	@echo "→ Applying kustomization (images: $(DOCKER_ORG)/*:$(IMAGE_TAG))..."
 	@$(KUBECTL) kustomize "$(K8S_DIR)" \
-		| awk -v org="$(DOCKER_ORG)" -v tag="$(IMAGE_TAG)" \
-			'BEGIN { esc = org; gsub(/\//, "\\/", esc); pat = "^ *-? *image: " esc "\\/(nars-api|nars-postgis|nars-vite|nars-backup|nars-roads):" } $$0 ~ pat { sub(/:[^ ]*$$/, ":" tag) } /app\.kubernetes\.io\/version:/ { sub(/version:.*$$/, "version: \\"" tag "\\"") } { print }' \
+		| awk -v org="$(DOCKER_ORG)" -v tag="$(IMAGE_TAG)" -v images="$(REGISTRY_IMAGES)" \
+			'BEGIN { esc = org; gsub(/\//, "\\/", esc); n = split(images, imgs, " "); alts = imgs[1]; for (i = 2; i <= n; i++) alts = alts "|" imgs[i]; pat = "^ *-? *image: " esc "\\/(" alts "):" } $$0 ~ pat { sub(/:[^ ]*$$/, ":" tag) } /app\.kubernetes\.io\/version:/ { sub(/version:.*$$/, "version: \\"" tag "\\"") } { print }' \
 		| $(KUBECTL) apply -f -
 	@echo "✓ Kustomization applied"
 
@@ -879,7 +876,7 @@ postgis-migration-baseline: ## Backfill EF migration history for pre-existing sc
 # Make expands $$$$ → $$, then the single-quoted heredoc 'SQL' prevents
 # shell expansion, so psql receives $$ as PL/pgSQL dollar-quoting.
 	@cat <<'SQL' | $(KUBECTL) exec -i -n "$(NAMESPACE)" deployment/postgis -- \
-		psql -U postgres -d nars_db -v ON_ERROR_STOP=1 >/dev/null
+		psql -U postgres -d "$(DB_NAME)" -v ON_ERROR_STOP=1 >/dev/null
 	CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
 	    "MigrationId" character varying(150) NOT NULL,
 	    "ProductVersion" character varying(32) NOT NULL,
@@ -1033,6 +1030,7 @@ observability-prometheus-stack: .env _check-secrets ## Install Prometheus + Graf
 		--values $(K8S_DIR)/helm-values/kube-prometheus-stack.yaml \
 		--set-file grafana.adminPassword="$$tmpdir/grafana_password" \
 		--timeout 10m
+	@echo "✓ kube-prometheus-stack installed"
 
 .PHONY: observability-loki
 observability-loki: ## Install Loki (logs)

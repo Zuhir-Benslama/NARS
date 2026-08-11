@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { createPinia, setActivePinia } from "pinia"
 import { _setCtx, resetMapState } from "../core/state"
 import { useAppStore } from "../../stores/appStore"
-import { refreshLayerVisibility, refreshAllEdgeLabels } from "./labels"
+import { refreshLayerVisibility } from "./labels"
 
 function makeMockMap() {
   return {
@@ -17,12 +17,6 @@ describe("labels", () => {
     setActivePinia(createPinia())
     resetMapState()
     _setCtx({ map: makeMockMap() as any })
-  })
-
-  describe("refreshAllEdgeLabels", () => {
-    it("calls refreshLayerVisibility without throwing", () => {
-      expect(() => refreshAllEdgeLabels()).not.toThrow()
-    })
   })
 
   describe("refreshLayerVisibility", () => {

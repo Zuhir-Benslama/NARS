@@ -2,25 +2,6 @@
 // Centralized configuration constants for the NARS application.
 // Environment variables and magic numbers should be defined here.
 
-import { debugWarn } from "../utils/debug"
-
-// ─── ENVIRONMENT VARIABLE VALIDATION ─────────────────────────────────────────
-
-/** Validate required environment variables at startup */
-function validateEnvVars(): void {
-  if (!import.meta.env.VITE_API_BASE && import.meta.env.PROD) {
-    debugWarn("VITE_API_BASE is not set — API requests will fail in production.")
-  }
-  if (!import.meta.env.VITE_TILE_SATELLITE && import.meta.env.PROD) {
-    debugWarn("VITE_TILE_SATELLITE is not set — satellite tiles may not load.")
-  }
-  if (!import.meta.env.VITE_TILE_STREET && import.meta.env.PROD) {
-    debugWarn("VITE_TILE_STREET is not set — street tiles may not load.")
-  }
-}
-
-validateEnvVars()
-
 // ─── API CONFIGURATION ────────────────────────────────────────────────────────
 
 export const API_CONFIG = {
@@ -150,13 +131,6 @@ export const EDIT_CONFIG = {
   edgeLineWidth: 3,
 } as const
 
-// ─── VALIDATION CONFIGURATION ─────────────────────────────────────────────────
-
-export const VALIDATION_CONFIG = {
-  /** Minimum road length in meters */
-  minRoadLengthMeters: 10,
-} as const
-
 // ─── UI CONFIGURATION ─────────────────────────────────────────────────────────
 
 export const UI_CONFIG = {
@@ -210,9 +184,4 @@ export function getLoginPath(): string {
 /** Check if running in development mode */
 export function isDev(): boolean {
   return import.meta.env?.DEV ?? false
-}
-
-/** Check if running in production mode */
-export function isProd(): boolean {
-  return import.meta.env?.PROD ?? false
 }

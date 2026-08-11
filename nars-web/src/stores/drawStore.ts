@@ -77,6 +77,13 @@ export const useDrawStore = defineStore("draw", {
     resetDraw(): void {
       if (this.edgePollId !== null) clearInterval(this.edgePollId)
       if (this.edgeTimeoutId !== null) clearTimeout(this.edgeTimeoutId)
+      // Cancel any pending marker re-patch rAF too — repatchMarkerPointer
+      // keeps polling up to ~5 s and would re-write geomanMarkerPointer into
+      // freshly-reset state if left running.
+      if (this.patchRafRef.current !== null) {
+        cancelAnimationFrame(this.patchRafRef.current)
+        this.patchRafRef.current = null
+      }
       this.cleanupDrawWatcher?.()
       useSnapStore().setOrigMarkerSetLngLat(null)
       this.$reset()

@@ -37,37 +37,41 @@ async function flush(): Promise<void> {
   }
   if (batch.length === 0 || flushing) return
 
-  const entries = batch.slice(0, BATCH_LIMIT)
+  // Take the entries up front: if every attempt fails we drop them rather
+  // than re-sending the same slice forever while the batch grows unbounded.
+  // Logging is best-effort telemetry — a down endpoint shouldn't leak memory
+  // or spam itself with duplicate batches.
+  const entries = batch.splice(0, BATCH_LIMIT)
   flushing = true
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
-      const headers: Record<string, string> = { "Content-Type": "application/json" }
-      const csrfToken = getCsrfToken()
-      if (csrfToken) headers["X-CSRF-Token"] = csrfToken
+        const headers: Record<string, string> = { "Content-Type": "application/json" }
+        const csrfToken = getCsrfToken()
+        if (csrfToken) headers["X-CSRF-Token"] = csrfToken
 
-      const res = await fetch(`${getApiBaseUrl()}/api/logs`, {
-        method: "POST",
-        credentials: "include",
-        headers,
-        body: JSON.stringify({ logs: entries }),
-        signal: controller.signal,
-      })
-      clearTimeout(timeoutId)
-      if (res.ok) {
-        batch.splice(0, entries.length)
-        break
+        const res = await fetch(`${getApiBaseUrl()}/api/logs`, {
+          method: "POST",
+          credentials: "include",
+          headers,
+          body: JSON.stringify({ logs: entries }),
+          signal: controller.signal,
+        })
+        clearTimeout(timeoutId)
+        if (res.ok) break
+      } catch (err) {
+        // Silently ignore in production — don't create a feedback loop by logging the logger
+        if (isDev()) debugWarn("[Logger] Failed to send log batch:", err)
       }
-    } catch (err) {
-      // Silently ignore in production — don't create a feedback loop by logging the logger
-      if (isDev()) debugWarn("[Logger] Failed to send log batch:", err)
     }
+  } finally {
+    flushing = false
   }
 
-  flushing = false
   if (batch.length > 0) setTimeout(flush, FLUSH_INTERVAL_MS)
 }
 

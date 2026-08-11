@@ -60,11 +60,13 @@ public enum DraftReviewStatus
 public sealed class DraftFeaturesService(
     AppDbContext db,
     ISegmentationClient segmentationClient,
-    ICommuneScopeService communeScope) : IDraftFeaturesService
+    ICommuneScopeService communeScope,
+    IDateTimeProvider timeProvider) : IDraftFeaturesService
 {
     private readonly AppDbContext _db = db;
     private readonly ISegmentationClient _segmentationClient = segmentationClient;
     private readonly ICommuneScopeService _communeScope = communeScope;
+    private readonly IDateTimeProvider _timeProvider = timeProvider;
 
     public async Task<SegmentSummaryResponse> SegmentTileAsync(
         string callerRole, int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
@@ -88,7 +90,7 @@ public sealed class DraftFeaturesService(
         result = await _segmentationClient.SegmentTileAsync(
             stream, fileName, contentType, bbox, ct);
 
-        var now = DateTimeOffset.UtcNow;
+        var now = _timeProvider.UtcNow;
         var draftEntities = new List<AiDraftFeature>();
 
         foreach (var road in result.Roads)
@@ -181,11 +183,11 @@ public sealed class DraftFeaturesService(
 
         if (accept)
         {
-            draft.MarkAccepted(reviewedBy: userId, reviewedAt: DateTimeOffset.UtcNow);
+            draft.MarkAccepted(reviewedBy: userId, reviewedAt: _timeProvider.UtcNow);
         }
         else
         {
-            draft.MarkRejected(reviewedBy: userId, reviewedAt: DateTimeOffset.UtcNow);
+            draft.MarkRejected(reviewedBy: userId, reviewedAt: _timeProvider.UtcNow);
         }
 
         await _db.SaveChangesAsync(ct);

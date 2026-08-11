@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
@@ -8,6 +9,7 @@ namespace NarsApi.Controllers;
 [ApiController]
 [Route("/api")]
 [Tags("Admin")]
+[Authorize(Roles = UserRoles.UserManagementRoles)]
 public class AdminUserController(
     ILogger<AdminUserController> logger,
     IUserAuthorizationService authorizationService,

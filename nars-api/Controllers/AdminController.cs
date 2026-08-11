@@ -17,6 +17,7 @@ public class AdminController(
     /// <param name="skip">Number of wilayas to skip (national overview only, default 0).</param>
     /// <param name="take">Maximum wilayas to return (national overview only, clamped 1-500, default 500).</param>
     [HttpGet("admin/overview")]
+    [Authorize(Roles = UserRoles.AnyAdmin)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]

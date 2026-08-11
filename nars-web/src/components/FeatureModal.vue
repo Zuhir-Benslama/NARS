@@ -288,7 +288,9 @@ function onKeydown(e: KeyboardEvent) {
   if (!modalStore.visible) return
   if (e.key === "Enter") {
     const tag = (e.target as HTMLElement)?.tagName
-    if (tag === "SELECT" || tag === "TEXTAREA") return
+    // Let native Enter activate focused buttons (e.g. Cancel/Save) and native
+    // input behavior; only treat Enter as a save shortcut elsewhere.
+    if (tag === "SELECT" || tag === "TEXTAREA" || tag === "BUTTON" || tag === "INPUT") return
     e.preventDefault()
     onSave()
   }

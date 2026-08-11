@@ -47,7 +47,7 @@ public sealed class AiDraftFeature
 
         return new AiDraftFeature
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             FeatureType = featureType,
             GeometryGeoJson = geometryGeoJson,
             Confidence = confidence,

@@ -30,6 +30,7 @@ public class LogsController(
     private const int MaxUrlLength = 2048;
     private const int MaxMethodLength = 10;
     private const int MaxUserAgentLength = 500;
+    private const int MaxCodeLength = 50; // must match ErrorLog.Code [MaxLength(50)]
 
     /// <summary>Accepts client-side error logs for server-side storage and analysis.</summary>
     [HttpPost("logs")]
@@ -91,9 +92,9 @@ public class LogsController(
                 Id = Guid.CreateVersion7(),
                 UserId = userId,
                 Level = level,
-                Code = SanitizeLogField(entry.Code ?? "", 100),
-                Message = SanitizeLogMessage(entry.Message, MaxEntryLength),
-                Context = string.IsNullOrEmpty(entry.Context) ? null : SanitizeLogMessage(entry.Context, MaxEntryLength),
+                Code = SanitizeLogField(entry.Code ?? "", MaxCodeLength),
+                Message = SanitizeLogField(entry.Message, MaxEntryLength),
+                Context = string.IsNullOrEmpty(entry.Context) ? null : SanitizeLogField(entry.Context, MaxEntryLength),
                 Url = SanitizeLogField(entry.Url ?? "", MaxUrlLength),
                 Method = SanitizeLogField(entry.Method ?? "", MaxMethodLength),
                 IpAddress = ipAddress,
@@ -117,8 +118,11 @@ public class LogsController(
     }
 
     /// <summary>
-    /// Strips control characters (except \n, \r, \t) and truncates to maxLen.
-    /// Prevents log injection via control chars.
+    /// Strips control characters (except \n, \r, \t), HTML-encodes, and truncates
+    /// to maxLen. Prevents both log injection via control chars and stored XSS in a
+    /// dashboard that renders values as raw HTML. All log fields share this
+    /// sanitizer so encoding is consistent. The encoded form is re-truncated to
+    /// maxLen so the stored value never exceeds the column limit after expansion.
     /// </summary>
     private const int StackBufferCharLimit = 4096;
 
@@ -129,6 +133,12 @@ public class LogsController(
             return value;
         }
 
+        var encoded = HtmlEncoder.Default.Encode(SanitizeControlCharacters(value, maxLen));
+        return encoded.Length <= maxLen ? encoded : encoded[..maxLen];
+    }
+
+    private static string SanitizeControlCharacters(string value, int maxLen)
+    {
         // Output can never exceed maxLen, so cap the buffer at maxLen. Large
         // payloads fall back to the heap to avoid overflowing the thread stack.
         var capacity = Math.Min(value.Length, maxLen);
@@ -169,11 +179,4 @@ public class LogsController(
 
         return written;
     }
-
-    /// <summary>
-    /// Sanitizes free-text log fields (Message, Context) and HTML-encodes them so a
-    /// log viewer that renders values as raw HTML cannot execute script (stored XSS).
-    /// </summary>
-    private static string SanitizeLogMessage(string value, int maxLen) =>
-        HtmlEncoder.Default.Encode(SanitizeLogField(value, maxLen));
 }

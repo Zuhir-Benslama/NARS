@@ -17,6 +17,15 @@ public class JwtOptions
 {
     [Range(1, 1440)] public int ExpiresInMinutes { get; set; } = 1440;
     [Range(1, 365)] public int RefreshExpiresInDays { get; set; } = 30;
+
+    /// <summary>
+    /// JWT signing algorithm. Allowlisted to the symmetric HS* family that the
+    /// signing key (a raw secret) can support; a misconfiguration fails fast at
+    /// startup via DataAnnotations validation instead of being silently ignored.
+    /// </summary>
+    [RegularExpression("^(HS256|HS384|HS512)$",
+        ErrorMessage = "Jwt:Algorithm must be HS256, HS384 or HS512.")]
+    public string Algorithm { get; set; } = "HS256";
 }
 
 public class FeatureDefaultsOptions
@@ -66,6 +75,11 @@ public class BackgroundTaskOptions
 {
     [Range(1, 10_000)] public int Capacity { get; set; } = 100;
     [Range(1, 60)] public int GracePeriodSeconds { get; set; } = 5;
+}
+
+public class RefreshTokenPruningOptions
+{
+    [Range(1, 720)] public int IntervalHours { get; set; } = 24;
 }
 
 public class AdminSignupOptions

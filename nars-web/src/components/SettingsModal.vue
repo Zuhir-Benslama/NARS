@@ -96,13 +96,15 @@ function onTabKeydown(e: KeyboardEvent) {
     e.preventDefault()
     const next = (idx + 1) % tabs.value.length
     activeTab.value = tabs.value[next].id
+    document.getElementById("settings-tab-" + activeTab.value)?.focus()
   } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
     e.preventDefault()
     const prev = (idx - 1 + tabs.value.length) % tabs.value.length
     activeTab.value = tabs.value[prev].id
+    document.getElementById("settings-tab-" + activeTab.value)?.focus()
   }
-  const el = document.getElementById("settings-tab-" + activeTab.value)
-  el?.focus()
+  // Tab is intentionally left untouched so the browser's default order can
+  // move focus out of the tablist into the panel content / close button.
 }
 </script>
 

@@ -19,10 +19,6 @@ const PHASE_VISIBILITY: Record<string, string[]> = {
 
 const KNOWN_PHASE_KEYS = PHASES.map((p) => p.key)
 
-export function refreshAllEdgeLabels(): void {
-  refreshLayerVisibility()
-}
-
 export function refreshLayerVisibility(): void {
   const appStore = useAppStore()
   const currentPhaseKey = PHASES[appStore.currentPhase]?.key

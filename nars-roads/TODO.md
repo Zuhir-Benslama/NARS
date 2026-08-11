@@ -3,12 +3,80 @@
 Code quality issues found during review of the segmentation microservice
 (FastAPI + PyTorch inference). Grouped by severity.
 
-## Review round 2 (current)
+## Review round 3 (current)
 
-New findings from a fresh review (tests: 17 passed, 6 skipped without
-torch/skimage; `ruff check` clean). All fixed.
+Fresh review on top of round 2 (ruff clean; full suite 38 passed in the
+torch+skimage image). All items resolved.
 
 ## High
+
+- [x] **`python-multipart==0.0.9` — CVE-2024-53981 DoS** (`requirements.txt:3`)
+  - Affected `python-multipart` (`<0.0.18`) floods the event loop with a
+    log-per-byte parse for malformed multipart boundaries (data before the
+    first / after the last boundary), stalling the threadpool processing
+    thread → DoS on a single request. `/segment` is a multipart endpoint.
+    - **Fix:** `python-multipart==0.0.20` (>=0.0.18); FastAPI 0.115.0's
+      `python-multipart>=0.0.7` constraint accepts it.
+    - ⚠ Rebuild the image for this to take effect (`make roads-test` or
+      `_build-nars-roads` re-run the pip layer). The verification runs below
+      mounted current code over the old image.
+
+## Medium
+
+- [x] **Unready pod buffers the whole upload before rejecting** (`app/main.py:146`)
+  - The `_model is None` gate ran *after* `tile.file.read(MAX_TILE_BYTES+1)`,
+    so during model load every request still pulled up to 50 MiB into memory
+    just to be told 503.
+  - **Fix:** readiness gate moved before the read (cheap 503); content-type
+    validation still runs first. Empty-file/oversize tests now stub `_model`
+    so they still exercise their intended checks.
+
+- [x] **Postprocessing runs outside the concurrency semaphore** (`app/main.py:167`)
+  - The ~300 MB prob maps stay alive while `mask_to_linestrings`/
+    `mask_to_polygons` allocate skeletonize/contour arrays on top of them,
+    but the semaphore was released before those calls — peak memory could be
+    2× predicts + 2× postprocesses simultaneously.
+  - **Fix:** `predict` + both converters now share one permit.
+
+## Low
+
+- [x] **`verify_internal_token` annotated `str` with `None` default** (`app/main.py:60`)
+  - Header is optional (rejected via `compare_digest` fail-closed); the
+    annotation now reads `str | None`.
+
+- [x] **`os.path.exists` before `torch.load`** (`app/model.py:66`)
+  - A *directory* at the weights path passed `exists` and would crash the
+    lifespan with a raw OSError. Now `os.path.isfile`.
+
+- [x] **sknw `pts` indexed into the prob mask unguarded** (`app/postprocess.py:38`)
+  - Float point coordinates from `sknw` would raise IndexError (→ 500) at
+    the confidence computation, which sat outside the try/except. `pts` is
+    now coerced to `np.intp` before use.
+
+- [x] **Unused `client` fixture** (`tests/conftest.py:49`)
+  - No test consumed it (test_api uses its module-level client); the fixture
+    and its now-unused `pytest`/`TestClient`/`app` imports are gone.
+
+- [x] **Test reads private `BoundedSemaphore._value`** (`tests/test_api.py:184`)
+  - Replaced with a behavioral check: three non-blocking acquires must not
+    all succeed (capacity ≤ 2), no private attribute access.
+
+## Deferred (documented, not changed)
+
+- **Dependency vintage:** `torch==2.4.1`, `fastapi==0.115.0`, `numpy==1.26.4`
+  are 2024-era pins. `weights_only=True` neutralizes the main torch pickle
+  RCE and the service is cluster-internal, so this is supply-chain hygiene
+  rather than an active hole — recommend a coordinated bump in a dedicated
+  pass (torch bumps can change inference numerics/behavior).
+- **No per-request timeout:** a pathological raster can hold a semaphore
+  permit indefinitely, queueing every other request. Accepted tradeoff —
+  bounded memory under load matters more here; note in code is already
+  present.
+- **Float-raster rescale heuristic** (`max > 2.0` ⇒ byte-scaled): remains a
+  heuristic; genuine float data in `(1, 255]` is still mis-scaled. Rare for
+  this imagery and documented.
+
+## Review round 2
 
 - [x] **nars-roads can never become Ready in the cluster — the service is unusable as deployed** (`nars-infra/roads/deployment.yaml`, `nars-infra/docker/Dockerfile.nars-roads:44`)
   - The `/ready` fail-closed gate is correct, but nothing ever provisions weights: `weights/` contains only `.gitkeep` (empty dir baked into the image), and the deployment mounts no weights volume / initContainer / ConfigMap / PVC.

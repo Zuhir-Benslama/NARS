@@ -34,32 +34,32 @@ High/Medium items below have all been fixed; Low items remain open.
 
 ## Low
 
-- [ ] **Refresh tokens never pruned** (`Services/RefreshTokenService.cs:63-68`)
-  - Every rotation inserts a new row; revoked/expired rows accumulate forever. Add a periodic cleanup (`DELETE FROM refresh_tokens WHERE revoked OR expires_at < now()`).
+- [x] **Refresh tokens never pruned** (`Services/RefreshTokenService.cs:63-68`)
+  - Every rotation inserts a new row; revoked/expired rows accumulated forever. **Fix:** added `Services/RefreshTokenPruner.cs` — a `BackgroundService` that deletes `revoked OR expires_at <= now` on a configurable interval (`RefreshTokenPruning:IntervalHours`, default 24h; `RefreshTokenPruningOptions`), registered in `AddNarsDomainServices`. Failed runs are logged and retried next tick.
 
-- [ ] **"Pages" cookie scheme is dead config** (`Infrastructure/AuthenticationExtensions.cs:82-90`)
-  - `AddCookie("Pages", ...)` is registered but nothing references the scheme (`PagesController` uses `[AllowAnonymous]` + manual `jwt.ValidateToken`). Remove it or actually use it.
+- [x] **"Pages" cookie scheme is dead config** (`Infrastructure/AuthenticationExtensions.cs`)
+  - `AddCookie("Pages", ...)` was registered but nothing referenced the scheme (`PagesController` uses `[AllowAnonymous]` + manual `jwt.ValidateToken`). **Fix:** removed the registration (and its unused `Microsoft.AspNetCore.Authentication.Cookies` using). `AuthenticationExtensionsTests.PagesCookieScheme_IsConfiguredSecurely` replaced with `NoLegacyPagesCookieScheme_IsRegistered`, which asserts the scheme stays absent while JWT bearer remains registered.
 
-- [ ] **`Jwt:Algorithm` config is silently ignored** (`appsettings.json`, `Infrastructure/AppOptions.cs:16-20`, `Services/JwtService.cs:34`)
-  - The config key has no corresponding `JwtOptions` property and `JwtService` hardcodes `SecurityAlgorithms.HmacSha256`. Remove the config key or wire it up with an allowlist.
+- [x] **`Jwt:Algorithm` config is silently ignored** (`appsettings.json`, `Infrastructure/AppOptions.cs`, `Services/JwtService.cs`)
+  - The config key had no corresponding `JwtOptions` property and `JwtService` hardcoded `HmacSha256`. **Fix:** added `JwtOptions.Algorithm` with an HS256/HS384/HS512 allowlist enforced by `[RegularExpression]` at startup (options are `ValidateOnStart`). `JwtService` now signs with the configured algorithm and sets `ValidAlgorithms` on validation; the JwtBearer pipeline sets an HS* `ValidAlgorithms` allowlist to close algorithm-confusion swaps. The existing `"Algorithm": "HS256"` in `appsettings.json` is now honored.
 
-- [ ] **`total_count` re-read per row** (`Infrastructure/FeatureQueryHelper.cs:135`)
-  - The same `total_count` (constant from the CTE) is assigned on every iteration of the read loop. Read it once before the loop.
+- [x] **`total_count` re-read per row** (`Infrastructure/FeatureQueryHelper.cs:135`)
+  - The same `total_count` (constant from the CTE) was assigned on every iteration of the read loop. **Fix:** read once on the first row.
 
-- [ ] **Mixed Guid schemes** (`Models/AiDraftFeature.cs:50`)
-  - Uses `Guid.NewGuid()` (v4) while everything else uses `Guid.CreateVersion7()` (`FeaturesController.cs:68`, `FieldService.cs:144,185`, `LogsController.cs:91`). v4 destroys index locality for the draft queue.
+- [x] **Mixed Guid schemes** (`Models/AiDraftFeature.cs:50`)
+  - Uses `Guid.NewGuid()` (v4) while everything else uses `Guid.CreateVersion7()`. **Fix applied (round 1):** now `Guid.CreateVersion7()`.
 
-- [ ] **`DraftFeaturesService` bypasses `IDateTimeProvider`** (`Services/DraftFeaturesService.cs:91,184,188`)
-  - Uses `DateTimeOffset.UtcNow` directly, unlike the rest of the codebase; also widens the DateTime/DateTimeOffset split (see next). Inject the provider for testability and consistency.
+- [x] **`DraftFeaturesService` bypasses `IDateTimeProvider`** (`Services/DraftFeaturesService.cs:91,184,188`)
+  - **Fix applied (round 1):** injected `IDateTimeProvider` (wired via DI).
 
 - [ ] **Mixed `DateTime` vs `DateTimeOffset` + timezone-less columns**
-  - User/RefreshToken/Feature timestamps are `DateTime` mapped to `timestamp without time zone`, while `AiDraftFeature` uses `DateTimeOffset` (timestamptz); `RefreshTokenService.cs:143` mixes `utcNow.UtcDateTime` with direct `DateTime` comparisons. Works on UTC hosts, but a non-UTC host skews lockout/expiry. Standardize on `DateTimeOffset`.
+  - User/RefreshToken/Feature timestamps are `DateTime` mapped to `timestamp without time zone`, while `AiDraftFeature` uses `DateTimeOffset` (timestamptz); `RefreshTokenService.cs:143` mixes `utcNow.UtcDateTime` with direct `DateTime` comparisons. Works on UTC hosts. **Status:** deliberately deferred — standardizing on `DateTimeOffset` is a schema-wide change (column type migration across several tables) with no functional defect on the UTC-deployed hosts. Documented here rather than half-applied.
 
-- [ ] **Entrance label has no length validation** (`DTOs/FieldDtos.cs:14-18`)
-  - `FieldEntranceCreateRequest.Label` lacks `[MaxLength]`, unlike `FeatureSaveRequest.Label` (`[MaxLength(500)]`). A huge label hits the DB unwarned.
+- [x] **Entrance label has no length validation** (`DTOs/FieldDtos.cs:14-18`)
+  - **Fix applied (round 1):** added `[param: MaxLength(500)]` matching `HouseEntrance.Label`.
 
-- [ ] **Locked sign-in is reported as 401, admin sign-up as 423** (`Controllers/AuthController.cs:61-64`, `Controllers/AuthController.AdminSignup.cs:62-64`)
-  - Sign-in discards `CredentialCheckStatus.Locked` and returns "Invalid username or password", while admin sign-up returns 423. Align (or deliberately document the 401 for enumeration resistance).
+- [x] **Locked sign-in is reported as 401, admin sign-up as 423** (`Controllers/AuthController.cs:61-64`, `Controllers/AuthController.AdminSignup.cs:62-64`)
+  - **Status:** kept as-is and deliberately documented in `AuthController.SignIn`. The public sign-in endpoint returns one generic 401 for every failure (enumeration resistance for the main login surface); admin sign-up reports 423 because that endpoint already proves ownership of an admin account, so revealing lock state leaks nothing. The asymmetry is intentional.
 
 ## Not an issue (checked and confirmed sound)
 

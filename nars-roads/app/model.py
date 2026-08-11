@@ -63,7 +63,7 @@ class SegmentationModel:
         self.is_loaded = False
         self.net = self._build_model()
 
-        if os.path.exists(weights_path):
+        if os.path.isfile(weights_path):
             # weights_only=True rejects the pickle gadgets that allow
             # arbitrary code execution from a malicious checkpoint. Our
             # checkpoints are pure state_dicts, so this is always safe.

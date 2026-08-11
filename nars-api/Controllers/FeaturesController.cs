@@ -67,7 +67,7 @@ public class FeaturesController(
 
         var newId = Guid.CreateVersion7();
 
-        var entity = FeatureTypeRegistry.CreateEntity(body.Type, newId, RequiredCurrentUserId, body.Layer, body.Label, dataJson, timeProvider.UtcNow)!;
+        var entity = FeatureTypeRegistry.CreateEntity(body.Type, newId, RequiredCurrentUserId, body.Layer, body.Label, dataJson)!;
 
         if (entity is HouseEntrance entrance)
         {

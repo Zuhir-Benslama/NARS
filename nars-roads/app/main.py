@@ -57,7 +57,9 @@ app = FastAPI(
 )
 
 
-def verify_internal_token(x_internal_token: str = Header(default=None)) -> None:
+def verify_internal_token(
+    x_internal_token: str | None = Header(default=None),
+) -> None:
     """Shared-secret check. This service is only exposed inside the cluster
     network, but we still gate it so a compromised pod elsewhere in the mesh
     can't call it for free. Fails closed: if the token is not configured, all
@@ -141,6 +143,11 @@ def segment(
             status_code=415, detail=f"Unsupported content type: {tile.content_type}"
         )
 
+    # Cheap readiness gate before buffering the upload: an unready pod should
+    # reject with 503 without reading (and discarding) up to MAX_TILE_BYTES.
+    if _model is None:
+        raise HTTPException(status_code=503, detail="Model not ready")
+
     # Authoritative size cap: read one byte past the limit and reject if the
     # upload is bigger, so we never buffer an unbounded tile into memory.
     raw = tile.file.read(MAX_TILE_BYTES + 1)
@@ -152,17 +159,19 @@ def segment(
     if not raw:
         raise HTTPException(status_code=400, detail="Empty file upload")
 
-    if _model is None:
-        raise HTTPException(status_code=503, detail="Model not ready")
-
     try:
         # Cap concurrent inferences so a burst of large tiles can't OOM the
         # 4Gi pod; extra requests queue here instead of stacking ~500MB each.
+        # Postprocessing runs under the same permit: the prob maps (~300MB)
+        # stay alive while skeletonize/find_contours allocate on top of them,
+        # so bounding the whole pipeline keeps peak memory tight.
         INFERENCE_SEMAPHORE.acquire()
         try:
             road_prob, building_prob, transform = _model.predict(
                 raw, bbox=(min_lon, min_lat, max_lon, max_lat)
             )
+            roads = mask_to_linestrings(road_prob, transform, threshold=threshold)
+            buildings = mask_to_polygons(building_prob, transform, threshold=threshold)
         finally:
             INFERENCE_SEMAPHORE.release()
     except TileTooLargeError:
@@ -173,9 +182,6 @@ def segment(
     except Exception:
         logger.exception("Inference failed")
         raise HTTPException(status_code=500, detail="Inference failed")
-
-    roads = mask_to_linestrings(road_prob, transform, threshold=threshold)
-    buildings = mask_to_polygons(building_prob, transform, threshold=threshold)
 
     return SegmentResponse(
         roads=FeatureCollection(features=roads),

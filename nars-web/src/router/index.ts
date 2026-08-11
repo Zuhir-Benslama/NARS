@@ -34,9 +34,10 @@ router.beforeEach((to) => {
   const appStore = useAppStore()
   if (!appStore.isAuthenticated) {
     // The login page is not a SPA route (served statically / by the backend),
-    // so do not re-trigger this guard for it — that would cause a redirect loop.
-    if (to.fullPath !== getLoginPath()) return getLoginPath()
-    return
+    // so redirect with a full page load. Returning the path here would do a
+    // client-side navigation to an unregistered route and render a blank page.
+    window.location.assign(getLoginPath())
+    return false
   }
   if ((to.name === "admin" || to.name === "wilaya-detail") && !appStore.isAdminUser) {
     return false

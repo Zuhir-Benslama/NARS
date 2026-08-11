@@ -7,6 +7,11 @@ namespace NarsApi.Services;
 /// </summary>
 public interface IEntranceQueryService
 {
-    /// <summary>Returns the set of entrance numbers already used on a given road.</summary>
-    Task<HashSet<int>> GetUsedEntranceNumbersAsync(Guid userId, Guid roadId, CancellationToken ct = default);
+    /// <summary>
+    /// Returns the entrance numbers already used on a given road, restricted to
+    /// the requested side's parity (odd for left, even for right). Filtering by
+    /// parity in SQL avoids materializing the other half of the road's numbers,
+    /// which <see cref="GeometryHelper.SuggestEntranceNumber"/> never consults.
+    /// </summary>
+    Task<HashSet<int>> GetUsedEntranceNumbersAsync(Guid userId, Guid roadId, string side, CancellationToken ct = default);
 }

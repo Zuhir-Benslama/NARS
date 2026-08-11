@@ -124,7 +124,7 @@ public class SpatialControllerTests
         var (ctrl, db) = CreateController(
             userId: uid,
             entranceQuery: Mock.Of<IEntranceQueryService>(x =>
-                x.GetUsedEntranceNumbersAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())
+                x.GetUsedEntranceNumbersAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())
                 == Task.FromResult(new HashSet<int>())));
         using (db)
         {
@@ -148,7 +148,7 @@ public class SpatialControllerTests
         var (ctrl, db) = CreateController(
             userId: uid,
             entranceQuery: Mock.Of<IEntranceQueryService>(x =>
-                x.GetUsedEntranceNumbersAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())
+                x.GetUsedEntranceNumbersAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())
                 == Task.FromResult(usedNumbers)));
         using (db)
         {

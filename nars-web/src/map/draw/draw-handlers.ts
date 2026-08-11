@@ -273,6 +273,17 @@ function onClick(e: MapLibreMapMouseEvent & { point: { x: number; y: number } })
 // ─── KEYBOARD HANDLERS ────────────────────────────────────────────────────────
 
 function onKeyDown(e: KeyboardEvent): void {
+  // Do not hijack Ctrl+Z / Escape while the user is typing in an input,
+  // textarea or contenteditable (label editing, modal fields). Native undo
+  // and field behavior must win there.
+  const target = e.target as HTMLElement | null
+  if (
+    target &&
+    (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
+  ) {
+    return
+  }
+
   const appStore = useAppStore()
   if (e.key === "Escape") {
     if (useModalStore().visible) return

@@ -112,19 +112,26 @@ export async function displayCommuneBoundary(communeId: number): Promise<void> {
       }
     }
 
-    // Update the boundaries GeoJSON source
+    // Update the boundaries GeoJSON source. Cache the FeatureCollection in
+    // ctx.boundariesGeoJson too: switchBaseLayer() wipes every source via
+    // map.setStyle() and restores them from this cache (map-init.ts), and
+    // snap-sources.ts reads it to snap to municipal boundary rings. Without
+    // the cache the boundary line vanishes after a style switch and boundary
+    // snapping never activates.
     const { boundariesSource, map } = getCtx()
+    const featureCollection: GeoJSON.FeatureCollection = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: geojson,
+          properties: {},
+        },
+      ],
+    }
+    getCtx().boundariesGeoJson = featureCollection
     if (boundariesSource) {
-      boundariesSource.setData({
-        type: "FeatureCollection",
-        features: [
-          {
-            type: "Feature",
-            geometry: geojson,
-            properties: {},
-          },
-        ],
-      })
+      boundariesSource.setData(featureCollection)
     }
 
     // Fly camera to frame the commune boundary
@@ -316,15 +323,4 @@ export function computeCircleRadius(
     0,
   )
   return ring.length > 0 ? total / ring.length : 0
-}
-
-/**
- * Build a GeoJSON Feature object from feature data.
- * Used across loader, undo, and draw-complete.
- */
-export function makeGeoJsonFeature(
-  geometry: GeoJSON.Geometry,
-  properties: Record<string, unknown>,
-): GeoJSON.Feature {
-  return { type: "Feature", geometry, properties }
 }

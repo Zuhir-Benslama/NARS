@@ -72,19 +72,6 @@ internal static class SqlFragments
     }
 
     /// <summary>
-    /// Adds a GUID array parameter for use with PostgreSQL ANY(@ids).
-    /// Avoids boxing each GUID individually.
-    /// </summary>
-    internal static IDbDataParameter AddParam(IDbCommand cmd, string name, Guid[] values)
-    {
-        var p = cmd.CreateParameter();
-        p.ParameterName = name;
-        p.Value = values;
-        cmd.Parameters.Add(p);
-        return p;
-    }
-
-    /// <summary>
     /// Returns the polygon SQL fragment with the given table alias substituted.
     /// Uses format-string templating instead of string.Replace to guarantee
     /// no accidental matches inside JSON string values or column names.

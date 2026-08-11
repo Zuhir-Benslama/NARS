@@ -74,7 +74,7 @@ public class SpatialController(
         // Query used entrance numbers via dedicated service (raw ADO.NET
         // is required for JSONB field extraction that EF Core doesn't handle).
         var usedNumbers = await entranceQuery.GetUsedEntranceNumbersAsync(
-            RequiredCurrentUserId, body.RoadId, cancellationToken);
+            RequiredCurrentUserId, body.RoadId, side, cancellationToken);
 
         var suggested = GeometryHelper.SuggestEntranceNumber(side, usedNumbers);
 

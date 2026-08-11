@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using System.Text;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -40,6 +39,9 @@ public static class AuthenticationExtensions
                     ValidateIssuer = !string.IsNullOrEmpty(issuer),
                     ValidateAudience = !string.IsNullOrEmpty(audience),
                     ClockSkew = TimeSpan.Zero,
+                    // Restrict validation to the symmetric HS algorithms the
+                    // signing key supports, closing off algorithm swaps.
+                    ValidAlgorithms = [SecurityAlgorithms.HmacSha256, SecurityAlgorithms.HmacSha384, SecurityAlgorithms.HmacSha512],
                     // Claims are kept verbatim (MapInboundClaims=false above), so tell the
                     // principal which raw claim types map to role and name. Without this,
                     // RoleClaimType defaults to the ClaimTypes.Role URI and every
@@ -114,15 +116,6 @@ public static class AuthenticationExtensions
                         return Task.CompletedTask;
                     }
                 };
-            })
-            .AddCookie("Pages", options =>
-            {
-                options.Cookie.HttpOnly = true;
-                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-                options.Cookie.SameSite = SameSiteMode.Lax;
-                options.ExpireTimeSpan = TimeSpan.FromMinutes(15);
-                options.SlidingExpiration = true;
-                options.LoginPath = "/login";
             });
 
         services.AddAuthorization(options =>

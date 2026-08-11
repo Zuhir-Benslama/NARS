@@ -49,22 +49,61 @@ export interface Seg {
  * Grid-based spatial index. Cell size is 2× CONNECT_M so any road
  * within CONNECT_M of a cell border is also present in the neighbor cell.
  * This guarantees we never miss a junction that straddles cells.
+ *
+ * Buckets are keyed in METERS, not degrees: a degree-sized cell (60°) would
+ * collapse a whole country into a handful of cells and silently defeat the
+ * spatial index, degrading junction detection back to O(n²) turf geometry
+ * comparisons for every pair of roads.
  */
-const CELL_SIZE = CONNECT_M * 2
+const CELL_SIZE = CONNECT_M * 2 // meters
+// ~WGS84 mean meters per degree of latitude.
+const METERS_PER_DEG_LAT = 111_320
+
+function latCell(lat: number): number {
+  return Math.floor((lat * METERS_PER_DEG_LAT) / CELL_SIZE)
+}
+
+/**
+ * Longitude meters-per-degree shrink with latitude (× cos(lat)). `lngScale`
+ * is the dataset's minimum cos (most equator-ward latitude), so lng cells
+ * are never smaller than CELL_SIZE in real meters and the 3×3-neighbor
+ * lookup below still covers every junction within CONNECT_M.
+ */
+function lngCell(lng: number, lngScale: number): number {
+  return Math.floor((lng * METERS_PER_DEG_LAT * lngScale) / CELL_SIZE)
+}
 
 /** Expand a bounding box into the set of grid cells it overlaps. */
-function cellsForBbox(minLat: number, maxLat: number, minLng: number, maxLng: number): Set<string> {
+function cellsForBbox(
+  minLat: number,
+  maxLat: number,
+  minLng: number,
+  maxLng: number,
+  lngScale: number,
+): Set<string> {
   const cells = new Set<string>()
-  const r0 = Math.floor(minLat / CELL_SIZE)
-  const r1 = Math.floor(maxLat / CELL_SIZE)
-  const c0 = Math.floor(minLng / CELL_SIZE)
-  const c1 = Math.floor(maxLng / CELL_SIZE)
+  const r0 = latCell(minLat)
+  const r1 = latCell(maxLat)
+  const c0 = lngCell(minLng, lngScale)
+  const c1 = lngCell(maxLng, lngScale)
   for (let r = r0; r <= r1; r++) {
     for (let c = c0; c <= c1; c++) {
       cells.add(`${r},${c}`)
     }
   }
   return cells
+}
+
+/** Global lng scale (min cos over the dataset) so cells are never under-sized. */
+function computeLngScale(roads: LayerEntry[]): number {
+  let scale = 1
+  for (const road of roads) {
+    for (const c of road.data.coordinates ?? []) {
+      const cos = Math.cos(Math.abs(c.lat) * (Math.PI / 180))
+      if (cos < scale) scale = cos
+    }
+  }
+  return scale
 }
 
 // ─── PHASE 1: CONNECTION SCAN → GRAPH ────────────────────────────────────────
@@ -75,13 +114,14 @@ export function buildConnectionGraph(roads: LayerEntry[]): {
 } {
   const graph = new Graph({ multi: true, type: "undirected" })
   const segs = new Map<string, Seg>()
+  const lngScale = computeLngScale(roads)
 
   // Spatial index for graph nodes — avoids O(n) scan per resolveNode call
   const nodeGrid = new Map<string, Set<string>>()
 
   const resolveNode = (c: Coord): string => {
-    const cr = Math.floor(c.lat / CELL_SIZE)
-    const cc = Math.floor(c.lng / CELL_SIZE)
+    const cr = latCell(c.lat)
+    const cc = lngCell(c.lng, lngScale)
     // Check self cell + 8 neighbors (cell size = 2×CONNECT_M, so this covers all matches within CONNECT_M)
     for (let r = cr - 1; r <= cr + 1; r++) {
       for (let c2 = cc - 1; c2 <= cc + 1; c2++) {
@@ -144,7 +184,7 @@ export function buildConnectionGraph(roads: LayerEntry[]): {
     }
     roadEntries.push(entry)
 
-    for (const ck of cellsForBbox(minLat, maxLat, minLng, maxLng)) {
+    for (const ck of cellsForBbox(minLat, maxLat, minLng, maxLng, lngScale)) {
       let bucket = grid.get(ck)
       if (!bucket) {
         bucket = []
@@ -162,7 +202,7 @@ export function buildConnectionGraph(roads: LayerEntry[]): {
 
     // Collect candidate neighbors from all cells this road touches
     const neighborSet = new Set<RoadEntry>()
-    for (const ck of cellsForBbox(re.minLat, re.maxLat, re.minLng, re.maxLng)) {
+    for (const ck of cellsForBbox(re.minLat, re.maxLat, re.minLng, re.maxLng, lngScale)) {
       for (const n of grid.get(ck) ?? []) {
         if (n !== re) neighborSet.add(n)
       }

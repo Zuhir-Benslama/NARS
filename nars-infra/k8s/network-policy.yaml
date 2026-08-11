@@ -317,6 +317,32 @@ spec:
       ports:
         - port: 5432
 ---
+# The fetch-weights initContainer downloads the segmentation checkpoint from
+# NARS_ROADS_WEIGHTS_URL (arbitrary host, secret-supplied). default-deny-egress
+# would block it on NetworkPolicy-enforcing CNIs (Calico/Cilium) — allow plain
+# HTTP(S) egress only. kindnet does not enforce this; it matters for production.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-roads-weights
+  namespace: nars
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: nars-roads
+      app.kubernetes.io/component: segmentation
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 443
+          protocol: TCP
+        - port: 80
+          protocol: TCP
+  policyTypes:
+    - Egress
+---
 # Allow Prometheus (monitoring namespace) to scrape metrics from nars-api (the
 # only nars pod exposing an HTTP metrics/health endpoint on 8080)
 apiVersion: networking.k8s.io/v1

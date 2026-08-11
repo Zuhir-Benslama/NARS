@@ -118,6 +118,11 @@ spec:
                   cpu: 500m
                   memory: 512Mi
               env:
+                # Alpine's postgres uid is 70, not 999 — with HOME unset gpg
+                # tries to create '//.gnupg' and fails. Point it at the
+                # world-writable tmpdir (same pattern as nars-roads).
+                - name: HOME
+                  value: /tmp
                 - name: PGHOST
                   valueFrom:
                     configMapKeyRef:

@@ -36,6 +36,13 @@ public static class PasswordValidator
             return "Password must be at least 8 characters.";
         }
 
+        // BCrypt truncates input to its first 72 bytes (UTF-8); silently
+        // accepting longer passwords would make the tail bytes meaningless.
+        if (System.Text.Encoding.UTF8.GetByteCount(password) > 72)
+        {
+            return "Password must not exceed 72 bytes (UTF-8).";
+        }
+
         if (!password.Any(c => char.IsUpper(c)))
         {
             return "Password must contain at least one uppercase letter.";

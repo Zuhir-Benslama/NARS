@@ -103,14 +103,6 @@ export function createNetworkError(
   return new NarsError(ErrorCode.NETWORK, message, context, cause)
 }
 
-export function createValidationError(
-  message: string,
-  context: ErrorContext = {},
-  cause?: unknown,
-): NarsError {
-  return new NarsError(ErrorCode.VALIDATION, message, context, cause)
-}
-
 export function createAuthError(
   message: string,
   context: ErrorContext = {},
@@ -141,14 +133,6 @@ export function createTimeoutError(
   cause?: unknown,
 ): NarsError {
   return new NarsError(ErrorCode.TIMEOUT, message, context, cause)
-}
-
-export function createPermissionError(
-  message: string,
-  context: ErrorContext = {},
-  cause?: unknown,
-): NarsError {
-  return new NarsError(ErrorCode.PERMISSION, message, context, cause)
 }
 
 export function createConflictError(
@@ -316,16 +300,4 @@ export function getErrorMessage(err: unknown, fallback = "Unknown error"): strin
 
 export function isNarsError(error: unknown): error is NarsError {
   return error instanceof NarsError
-}
-
-export function isNetworkError(error: unknown): error is NarsError {
-  return isNarsError(error) && error.code === ErrorCode.NETWORK
-}
-
-export function isValidationError(error: unknown): error is NarsError {
-  return isNarsError(error) && error.code === ErrorCode.VALIDATION
-}
-
-export function isAuthError(error: unknown): error is NarsError {
-  return isNarsError(error) && error.code === ErrorCode.AUTH
 }

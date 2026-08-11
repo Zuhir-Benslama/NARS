@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { getApiBaseUrl, getLoginPath, isDev, isProd } from "./index"
+import { getApiBaseUrl, getLoginPath, isDev } from "./index"
 
 describe("config helpers", () => {
   describe("getApiBaseUrl", () => {
@@ -19,12 +19,6 @@ describe("config helpers", () => {
   describe("isDev", () => {
     it("returns true in vitest mode", () => {
       expect(isDev()).toBe(true)
-    })
-  })
-
-  describe("isProd", () => {
-    it("returns boolean in test mode", () => {
-      expect(typeof isProd()).toBe("boolean")
     })
   })
 })

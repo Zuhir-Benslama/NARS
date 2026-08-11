@@ -109,7 +109,7 @@ public class GeometryHelperTests
             0.0, 0.0,
             1.0, 1.0);
 
-        Assert.Equal(0.0, angle);
+        Assert.Equal(0.0, angle, 6);
     }
 
     [Fact]

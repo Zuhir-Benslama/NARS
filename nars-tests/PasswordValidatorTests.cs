@@ -66,9 +66,13 @@ public class PasswordValidatorTests
         Assert.NotNull(PasswordValidator.Validate("   "));
 
     [Fact]
-    public void VeryLongPassword_Valid()
+    public void VeryLongPassword_RejectedBeyondBcryptLimit()
     {
-        var longPwd = "Aa1!" + new string('x', 200);
-        Assert.Null(PasswordValidator.Validate(longPwd));
+        var atLimit = "Aa1!" + new string('x', 68);
+        Assert.Null(PasswordValidator.Validate(atLimit));
+
+        var overLimit = "Aa1!" + new string('x', 69);
+        Assert.Equal("Password must not exceed 72 bytes (UTF-8).",
+            PasswordValidator.Validate(overLimit));
     }
 }

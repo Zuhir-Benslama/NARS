@@ -40,6 +40,10 @@ def mask_to_linestrings(
         if pts is None or len(pts) < 2:
             continue
 
+        # sknw may hand back float point coordinates; mask indexing below
+        # requires ints, so coerce before using pts anywhere.
+        pts = np.asarray(pts, dtype=np.intp)
+
         try:
             coords = [
                 rasterio.transform.xy(transform, float(r), float(c)) for r, c in pts

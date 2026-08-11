@@ -7,15 +7,10 @@ fail-closed auth can be exercised deterministically.
 import os
 
 import numpy as np
-import pytest
 from rasterio.io import MemoryFile
 from rasterio.transform import Affine
 
 os.environ["NARS_ROADS_INTERNAL_TOKEN"] = "test-token"
-
-from fastapi.testclient import TestClient  # noqa: E402
-
-from app.main import app  # noqa: E402
 
 
 def make_tiff_bytes(
@@ -44,10 +39,3 @@ def make_tiff_bytes(
         ) as dst:
             dst.write(data)
         return memfile.read()
-
-
-@pytest.fixture
-def client():
-    """TestClient used OUTSIDE the lifespan context manager, so the model is
-    never loaded and endpoint behavior can be exercised without torch."""
-    return TestClient(app)

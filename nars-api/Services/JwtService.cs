@@ -25,13 +25,14 @@ public sealed class JwtService(string secret, string? issuer, string? audience, 
         MapInboundClaims = false,
     };
     private readonly int _expiresMinutes = jwtOptions.Value.ExpiresInMinutes;
+    private readonly string _algorithm = jwtOptions.Value.Algorithm;
     private readonly SymmetricSecurityKey _key = new(Encoding.UTF8.GetBytes(secret));
     public TimeSpan AccessTokenExpiresIn => TimeSpan.FromMinutes(_expiresMinutes);
 
     public string CreateToken(Guid userId, string username, string name, string email, int? communeId,
         string securityStamp, string role = "commune_user", int? dairaId = null, int? wilayaId = null)
     {
-        var creds = new SigningCredentials(_key, SecurityAlgorithms.HmacSha256);
+        var creds = new SigningCredentials(_key, _algorithm);
 
         var claims = new List<Claim>
         {
@@ -103,6 +104,9 @@ public sealed class JwtService(string secret, string? issuer, string? audience, 
                             && expires != null && expires.Value > now;
                     },
                     ClockSkew = TimeSpan.Zero,
+                    // Restrict validation to the configured signing algorithm so
+                    // tokens signed with a different algorithm are rejected.
+                    ValidAlgorithms = [_algorithm],
                     // Keep both validation paths producing identical principals to the
                     // JwtBearer pipeline (see AuthenticationExtensions).
                     RoleClaimType = ClaimNames.Role,

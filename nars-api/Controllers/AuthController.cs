@@ -60,6 +60,10 @@ public partial class AuthController(
 
         if (!credentialResult.IsSuccess)
         {
+            // Deliberate single generic 401 for every failure (bad password AND
+            // lockout) to keep the public sign-in endpoint enumeration-resistant.
+            // Admin sign-up (AuthController.AdminSignup) reports 423 for a locked
+            // admin because that path already proves ownership of an admin account.
             return Problem(detail: "Invalid username or password", statusCode: 401);
         }
 

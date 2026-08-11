@@ -65,6 +65,8 @@ public static class ServiceRegistrationExtensions
             .ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<BackgroundTaskOptions>().Bind(config.GetSection("BackgroundTask"))
             .ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<RefreshTokenPruningOptions>().Bind(config.GetSection("RefreshTokenPruning"))
+            .ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<AdminSignupOptions>().Bind(config.GetSection("AdminSignup"))
             .ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<CspOptions>().Bind(config.GetSection("Csp"))
@@ -108,6 +110,7 @@ public static class ServiceRegistrationExtensions
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
         services.AddSingleton<IBackgroundTaskQueue, BackgroundTaskQueue>();
         services.AddHostedService<BackgroundQueueProcessor>();
+        services.AddHostedService<RefreshTokenPruner>();
         services.AddSingleton<IScatteredAreaService, ScatteredAreaService>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
         services.AddScoped<IValidationService, ValidationService>();

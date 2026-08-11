@@ -13,7 +13,11 @@ namespace NarsApi.Tests;
 public class DraftFeaturesServiceTests
 {
     private static DraftFeaturesService CreateService(AppDbContext db, ISegmentationClient? segmentationClient = null) =>
-        new(db, segmentationClient ?? Mock.Of<ISegmentationClient>(), new CommuneScopeService(db));
+        new(
+            db,
+            segmentationClient ?? Mock.Of<ISegmentationClient>(),
+            new CommuneScopeService(db),
+            Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow));
 
     private static async Task SeedAsync(AppDbContext db)
     {

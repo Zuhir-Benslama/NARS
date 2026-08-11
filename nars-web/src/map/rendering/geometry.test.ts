@@ -9,7 +9,6 @@ import {
   haversineDistance,
   computeCircleRadius,
   computeCircleCenter,
-  makeGeoJsonFeature,
   resetGeometryState,
   displayCommuneBoundary,
   refreshScatteredAreas,
@@ -238,17 +237,6 @@ describe("geometry", () => {
 
     it("returns 0 for empty ring", () => {
       expect(computeCircleRadius(0, 0, [])).toBe(0)
-    })
-  })
-
-  describe("makeGeoJsonFeature", () => {
-    it("creates a Feature with given geometry and properties", () => {
-      const geometry: GeoJSON.Point = { type: "Point", coordinates: [3.2, 36.7] }
-      const properties = { label: "test", id: 1 }
-      const feature = makeGeoJsonFeature(geometry, properties)
-      expect(feature.type).toBe("Feature")
-      expect(feature.geometry).toEqual(geometry)
-      expect(feature.properties).toEqual(properties)
     })
   })
 

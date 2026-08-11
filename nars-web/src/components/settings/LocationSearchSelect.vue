@@ -92,6 +92,10 @@ let timer: ReturnType<typeof setTimeout> | null = null
 // Monotonic generation counter — supersedes out-of-order responses so a slow
 // result for an older query can never overwrite a newer one.
 let searchGen = 0
+// Suppresses the debounced re-search triggered by the programmatic query
+// write in selectOption(), which would otherwise repopulate the dropdown over
+// the just-selected value ~200 ms later.
+let suppressNextSearch = false
 
 function runSearch(q: string) {
   if (timer) clearTimeout(timer)
@@ -146,13 +150,23 @@ onUnmounted(() => {
 
 // ── Watchers ────────────────────────────────────────────────────────────────
 watch(query, (q) => {
+  if (suppressNextSearch) {
+    suppressNextSearch = false
+    return
+  }
   runSearch(q ?? "")
 })
 
 function selectOption(opt: SearchOption) {
   emit("update:modelValue", opt.id)
+  suppressNextSearch = true
   query.value = opt.name_fr
   options.value = []
+  // If the query didn't actually change the watcher never fires; clear the
+  // flag so it can't swallow the next genuine search.
+  setTimeout(() => {
+    suppressNextSearch = false
+  }, 0)
 }
 
 function reset() {
