@@ -10,18 +10,7 @@ import pytest
 from rasterio.transform import Affine, from_bounds
 
 from app.model import SegmentationModel, TileTooLargeError
-from conftest import make_tiff_bytes
-
-try:
-    import torch  # noqa: F401
-
-    TORCH_AVAILABLE = True
-except ImportError:
-    TORCH_AVAILABLE = False
-
-skip_without_torch = pytest.mark.skipif(
-    not TORCH_AVAILABLE, reason="torch not installed"
-)
+from helpers import make_tiff_bytes, requires_torch
 
 
 def _normalize(arr, dtype):
@@ -101,7 +90,7 @@ def model():
     return SegmentationModel(weights_path="/nonexistent/weights.pth", tile_size=32)
 
 
-@skip_without_torch
+@requires_torch
 def test_predict_shapes_and_georeferenced_transform(model):
     raw = make_tiff_bytes(width=64, height=48)
     road, building, transform = model.predict(raw, bbox=(0.0, 0.0, 1.0, 1.0))
@@ -113,7 +102,7 @@ def test_predict_shapes_and_georeferenced_transform(model):
     assert transform == Affine(1.0, 0.0, 100.0, 0.0, -1.0, 50.0)
 
 
-@skip_without_torch
+@requires_torch
 def test_predict_bbox_fallback_when_not_georeferenced(model):
     raw = make_tiff_bytes(width=64, height=48, transform=Affine.identity())
     _, _, transform = model.predict(raw, bbox=(10.0, 20.0, 12.0, 21.0))
@@ -121,7 +110,7 @@ def test_predict_bbox_fallback_when_not_georeferenced(model):
     assert transform == expected
 
 
-@skip_without_torch
+@requires_torch
 def test_predict_decodes_windows_not_whole_image(model, monkeypatch):
     raw = make_tiff_bytes(width=100, height=80)
     seen = []
@@ -142,7 +131,7 @@ def test_predict_decodes_windows_not_whole_image(model, monkeypatch):
     assert np.allclose(building, 0.1)
 
 
-@skip_without_torch
+@requires_torch
 def test_predict_rejects_decode_over_budget(model, monkeypatch):
     import app.model as roads_model
 

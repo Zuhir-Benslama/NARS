@@ -43,7 +43,12 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
                 .Options;
 
             await using var db = new AppDbContext(options);
-            await db.Database.EnsureCreatedAsync();
+
+            // Apply the real EF migrations from scratch. This doubles as a
+            // migration smoke test: a broken/regressed migration fails here
+            // instead of passing CI (EnsureCreatedAsync would have built the
+            // schema straight from the model and skipped the migration SQL).
+            await db.Database.MigrateAsync();
             _initialized = true;
         }
         catch

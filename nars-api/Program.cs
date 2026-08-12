@@ -34,14 +34,16 @@ if (jwtSecret.Length < minJwtSecretLength)
     throw new InvalidOperationException($"Jwt:SecretKey must be at least {minJwtSecretLength} characters for HMAC-SHA256 security.");
 }
 
-var hasLower = jwtSecret.Any(char.IsLower);
-var hasUpper = jwtSecret.Any(char.IsUpper);
-var hasDigit = jwtSecret.Any(char.IsDigit);
-var hasSpecial = jwtSecret.Any(c => !char.IsLetterOrDigit(c));
-if (new[] { hasLower, hasUpper, hasDigit, hasSpecial }.Count(v => v) < 3)
+// Reject low-entropy secrets: a 64-char string of one repeated character passes
+// the length check but is trivially guessable. Estimate Shannon entropy over the
+// secret's characters and require roughly the entropy NIST SP 800-131A
+// recommends for HMAC keys (≥ 112 bits).
+const int minJwtSecretEntropyBits = 100;
+if (EstimateShannonEntropy(jwtSecret) * jwtSecret.Length < minJwtSecretEntropyBits)
 {
     throw new InvalidOperationException(
-        "Jwt:SecretKey must contain at least 3 of the following: lowercase, uppercase, digits, special characters.");
+        $"Jwt:SecretKey does not have enough entropy (minimum {minJwtSecretEntropyBits} bits). " +
+        "Generate a random key, e.g. `openssl rand -base64 32`.");
 }
 
 var signupToken = builder.Configuration["AdminSignup:SignupToken"];
@@ -94,6 +96,29 @@ static string GetRequiredConfig(IConfiguration config, string primaryKey, string
     throw new InvalidOperationException(
         $"{primaryKey} is not configured. Set one of: {string.Join(", ", fallbackKeys)} " +
         $"in appsettings.Production.json or via environment variables.");
+}
+
+/// <summary>
+/// Estimates the Shannon entropy (bits per character) of a string from its
+/// character frequency distribution. A uniformly distributed set of characters
+/// scores high; a repeated single character scores zero.
+/// </summary>
+static double EstimateShannonEntropy(string value)
+{
+    var counts = new Dictionary<char, int>(value.Length);
+    foreach (var c in value)
+    {
+        counts.TryGetValue(c, out var count);
+        counts[c] = count + 1;
+    }
+
+    var entropy = 0.0;
+    foreach (var count in counts.Values)
+    {
+        var p = (double)count / value.Length;
+        entropy -= p * Math.Log2(p);
+    }
+    return entropy;
 }
 
 // Exposed for integration/contract tests via WebApplicationFactory.

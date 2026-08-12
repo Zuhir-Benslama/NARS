@@ -72,7 +72,8 @@ public sealed class DraftFeaturesController(
         }
         catch (KeyNotFoundException ex)
         {
-            return NotFound(ex.Message);
+            _logger.LogWarning(ex, "Segmentation target commune not found: {Reason}", ex.Message);
+            return NotFound("The requested commune was not found.");
         }
         catch (SegmentationServiceException ex)
         {

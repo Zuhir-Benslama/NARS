@@ -27,43 +27,43 @@ def _building_mask(height=60, width=60):
 
 
 def test_linestrings_empty_mask():
-    assert mask_to_linestrings(np.zeros((20, 20), dtype=np.float32), TRANSFORM) == []
+    assert not mask_to_linestrings(np.zeros((20, 20), dtype=np.float32), TRANSFORM)
 
 
 def test_linestrings_below_threshold():
-    assert mask_to_linestrings(_road_mask(), TRANSFORM, threshold=0.95) == []
+    assert not mask_to_linestrings(_road_mask(), TRANSFORM, threshold=0.95)
 
 
 def test_linestrings_horizontal_line():
     features = mask_to_linestrings(_road_mask(), TRANSFORM)
     assert len(features) >= 1
     for feature in features:
-        assert feature["type"] == "Feature"
-        assert feature["geometry"]["type"] == "LineString"
-        assert feature["properties"]["feature_type"] == "road"
-        assert 0.0 <= feature["properties"]["confidence"] <= 1.0
+        assert feature.type == "Feature"
+        assert feature.geometry.type == "LineString"
+        assert feature.properties["feature_type"] == "road"
+        assert 0.0 <= feature.properties["confidence"] <= 1.0
         # the line sits on row 10; sknw centers coordinates on pixel centers
-        ys = [coord[1] for coord in feature["geometry"]["coordinates"]]
+        ys = [coord[1] for coord in feature.geometry.coordinates]
         assert all(abs(y - 10.5) < 0.5 for y in ys)
 
 
 def test_polygons_empty_mask():
-    assert mask_to_polygons(np.zeros((20, 20), dtype=np.float32), TRANSFORM) == []
+    assert not mask_to_polygons(np.zeros((20, 20), dtype=np.float32), TRANSFORM)
 
 
 def test_polygons_below_threshold():
-    assert mask_to_polygons(_building_mask(), TRANSFORM, threshold=0.95) == []
+    assert not mask_to_polygons(_building_mask(), TRANSFORM, threshold=0.95)
 
 
 def test_polygons_square_blob():
     features = mask_to_polygons(_building_mask(), TRANSFORM)
     assert len(features) >= 1
     for feature in features:
-        assert feature["type"] == "Feature"
-        assert feature["geometry"]["type"] == "Polygon"
-        assert feature["properties"]["feature_type"] == "building"
-        assert 0.0 <= feature["properties"]["confidence"] <= 1.0
-        xs = [coord[0] for coord in feature["geometry"]["coordinates"][0]]
-        ys = [coord[1] for coord in feature["geometry"]["coordinates"][0]]
+        assert feature.type == "Feature"
+        assert feature.geometry.type == "Polygon"
+        assert feature.properties["feature_type"] == "building"
+        assert 0.0 <= feature.properties["confidence"] <= 1.0
+        xs = [coord[0] for coord in feature.geometry.coordinates[0]]
+        ys = [coord[1] for coord in feature.geometry.coordinates[0]]
         assert min(xs) >= 18 and max(xs) <= 42
         assert min(ys) >= 18 and max(ys) <= 42

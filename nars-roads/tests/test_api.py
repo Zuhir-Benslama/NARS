@@ -8,14 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from conftest import make_tiff_bytes
-
-try:
-    import torch  # noqa: F401
-
-    TORCH_AVAILABLE = True
-except ImportError:
-    TORCH_AVAILABLE = False
+from helpers import make_tiff_bytes, requires_torch
 
 client = TestClient(app)
 
@@ -219,7 +212,7 @@ def test_segment_rejects_oversized_upload(monkeypatch):
     assert resp.status_code == 413
 
 
-@pytest.mark.skipif(not TORCH_AVAILABLE, reason="torch not installed")
+@requires_torch
 def test_segment_end_to_end_returns_geojson():
     """Full request path with the model actually loaded (random weights in the
     test image, since no checkpoint is mounted)."""

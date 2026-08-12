@@ -11,6 +11,8 @@ import numpy as np
 import rasterio
 from shapely.geometry import LineString, Polygon, mapping
 
+from app.schemas import Feature
+
 logger = logging.getLogger("nars-roads.postprocess")
 
 # Simplification tolerance in degrees. ~0.00002 deg is roughly 2m at the
@@ -22,7 +24,7 @@ MIN_BUILDING_COMPONENT_PX = 20
 
 def mask_to_linestrings(
     prob_mask: np.ndarray, transform: rasterio.Affine, threshold: float = 0.5
-) -> list[dict]:
+) -> list[Feature]:
     import sknw
     from skimage.morphology import remove_small_objects, skeletonize
 
@@ -35,7 +37,7 @@ def mask_to_linestrings(
     graph = sknw.build_sknw(skeleton, multi=True)
 
     features = []
-    for s, e, edge_data in graph.edges(data=True):
+    for _, _, edge_data in graph.edges(data=True):
         pts = edge_data.get("pts")
         if pts is None or len(pts) < 2:
             continue
@@ -61,21 +63,20 @@ def mask_to_linestrings(
 
         confidence = float(prob_mask[pts[:, 0], pts[:, 1]].mean())
         features.append(
-            {
-                "type": "Feature",
-                "geometry": geometry,
-                "properties": {
+            Feature(
+                geometry=geometry,
+                properties={
                     "confidence": round(confidence, 4),
                     "feature_type": "road",
                 },
-            }
+            )
         )
     return features
 
 
 def mask_to_polygons(
     prob_mask: np.ndarray, transform: rasterio.Affine, threshold: float = 0.5
-) -> list[dict]:
+) -> list[Feature]:
     from skimage.measure import find_contours, label
     from skimage.morphology import binary_closing, remove_small_objects
 
@@ -112,13 +113,12 @@ def mask_to_polygons(
 
         confidence = float(prob_mask[region_mask].mean())
         features.append(
-            {
-                "type": "Feature",
-                "geometry": mapping(poly),
-                "properties": {
+            Feature(
+                geometry=mapping(poly),
+                properties={
                     "confidence": round(confidence, 4),
                     "feature_type": "building",
                 },
-            }
+            )
         )
     return features

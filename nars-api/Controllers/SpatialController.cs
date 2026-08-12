@@ -19,8 +19,10 @@ public class SpatialController(
     IRoadQueryService roadQuery,
     IScatteredAreaService scatteredService,
     IEntranceQueryService entranceQuery,
-    IWebHostEnvironment webHost) : NarsControllerBase(webHost)
+    IWebHostEnvironment webHost,
+    ILogger<SpatialController> logger) : NarsControllerBase(webHost)
 {
+    private readonly ILogger<SpatialController> _logger = logger;
     // ── POST /api/road-side ───────────────────────────────────────────────────
 
     /// <summary>Determines which side of a road a marker is on and suggests the next entrance number.</summary>
@@ -57,7 +59,8 @@ public class SpatialController(
         }
         catch (ArgumentException ex)
         {
-            return Problem(detail: ex.Message, statusCode: 400);
+            _logger.LogDebug(ex, "Rejected invalid road coordinates: {Reason}", ex.Message);
+            return Problem(detail: "Road coordinates are invalid.", statusCode: 400);
         }
 
         if (double.IsNaN(body.Lat) || double.IsInfinity(body.Lat) ||

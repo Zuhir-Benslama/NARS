@@ -107,8 +107,8 @@ public class ProgramStartupValidationTests : IDisposable
 
         var factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(b => b.UseSetting("Jwt:SecretKey", new string('a', 64)));
-        var ex = ExpectStartupFailure(factory, "Jwt:SecretKey must contain at least 3 of the following");
-        Assert.Contains("3 of the following", ex.Message, StringComparison.Ordinal);
+        var ex = ExpectStartupFailure(factory, "Jwt:SecretKey does not have enough entropy");
+        Assert.Contains("100 bits", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]

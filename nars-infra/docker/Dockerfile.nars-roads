@@ -29,7 +29,11 @@ COPY pytest.ini .
 COPY app ./app
 COPY tests ./tests
 
-CMD ["pytest", "-q", "tests/"]
+# Coverage gate on the CI path: the test image enforces a floor so a
+# regression in test coverage fails `make roads-test` (CI) instead of silently
+# eroding. Local runs without pytest-cov stay unaffected (args live here, not
+# in pytest.ini addopts).
+CMD ["pytest", "-q", "tests/", "--cov=app", "--cov-report=term-missing", "--cov-fail-under=85"]
 
 FROM base
 

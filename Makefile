@@ -29,6 +29,12 @@ SCALABLE_DEPLOYS   := postgis nars-api nars-frontend nars-roads
 INGRESS_NGINX_VERSION ?= v1.12.0
 METRICS_SERVER_VERSION ?= v0.7.2
 LOCAL_PATH_PROVISIONER_VERSION ?= v0.0.30
+# Helm chart versions are pinned for reproducible observability installs,
+# consistent with the upstream-manifest and base-image pins above.
+KUBE_PROMETHEUS_STACK_VERSION ?= 88.3.0
+LOKI_VERSION ?= 7.3.0
+TEMPO_VERSION ?= 1.24.4
+OTEL_COLLECTOR_VERSION ?= 0.169.0
 YAMLLINT_IMAGE      ?= cytopia/yamllint:1.36.0
 RUFF_IMAGE          ?= ghcr.io/astral-sh/ruff:0.15.15
 NODE_IMAGE          ?= node:22-alpine
@@ -165,11 +171,14 @@ cluster-down: proxy-down _pre-cluster-down-backup ## Delete the kind cluster (au
 
 # Shared pg_dump + gzip logic. Expects $$POD and $$PASS to be set in shell scope;
 # $$PREFIX (optional) disambiguates the output filename so two backups taken in
-# the same second can never overwrite each other (manual_ vs auto_).
+# the same second can never overwrite each other (manual_ vs auto_). The
+# nanosecond timestamp (%N) additionally makes same-second runs of the same
+# target unique, so `make db-backup` twice in a row can never clobber an
+# earlier dump.
 # SECURITY: Password piped via stdin to avoid exposure in container's process table.
 _pg_dump_cmd = \
 	mkdir -p "$(BACKUP_DIR)"; \
-	TIMESTAMP=$$(date +"%Y%m%d_%H%M%S"); \
+	TIMESTAMP=$$(date +"%Y%m%d_%H%M%S_%N"); \
 	FILE="$(BACKUP_DIR)/$${PREFIX:+$${PREFIX}_}nars_db_$${TIMESTAMP}.sql"; \
 	printf '%s\n' "$$PASS" | \
 		$(KUBECTL) exec -i "$$POD" -n "$(NAMESPACE)" -- \
@@ -594,6 +603,10 @@ kubeconfig-fix: ## Patch kubeconfig for rootless Docker (port 16443 via kube-pro
 		kind get kubeconfig --name "$(CLUSTER_NAME)" > "$$KUBECONFIG";
 		sed -i 's/127.0.0.1:[0-9]*/127.0.0.1:16443/' "$$KUBECONFIG";
 		mkdir -p "$$HOME/.kube";
+		if [ -f "$$HOME/.kube/config" ] && ! cmp -s "$$HOME/.kube/config" "$$KUBECONFIG"; then
+			cp "$$HOME/.kube/config" "$$HOME/.kube/config.bak.$$(date +%Y%m%d_%H%M%S)";
+			echo "  → Existing kubeconfig backed up before overwrite";
+		fi;
 		cp "$$KUBECONFIG" "$$HOME/.kube/config";
 		echo "✓ kubeconfig patched to 127.0.0.1:16443";
 	else
@@ -924,31 +937,31 @@ postgis-migration-baseline: ## Backfill EF migration history for pre-existing sc
 
 	    IF has_areas THEN
 	        INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
-	        VALUES ('20260510191030_AddErrorLogs', '10.0.7')
+	        VALUES ('20260510191030_AddErrorLogs', '10.0.10')
 	        ON CONFLICT ("MigrationId") DO NOTHING;
 	    END IF;
 
 	    IF has_inspections THEN
 	        INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
-	        VALUES ('20260511062948_AddInspections', '10.0.7')
+	        VALUES ('20260511062948_AddInspections', '10.0.10')
 	        ON CONFLICT ("MigrationId") DO NOTHING;
 	    END IF;
 
 	    IF has_areas AND has_inspections THEN
 	        INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
-	        VALUES ('20260705061915_MigrateToTimestamptz', '10.0.7')
+	        VALUES ('20260705061915_MigrateToTimestamptz', '10.0.10')
 	        ON CONFLICT ("MigrationId") DO NOTHING;
 	    END IF;
 
 	    IF has_inspections_fk THEN
 	        INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
-	        VALUES ('20260808070428_AddForeignKeys', '10.0.7')
+	        VALUES ('20260808070428_AddForeignKeys', '10.0.10')
 	        ON CONFLICT ("MigrationId") DO NOTHING;
 	    END IF;
 
 	    IF has_security_stamp THEN
 	        INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
-	        VALUES ('20260810062821_AddUserSecurityStamp', '10.0.7')
+	        VALUES ('20260810062821_AddUserSecurityStamp', '10.0.10')
 	        ON CONFLICT ("MigrationId") DO NOTHING;
 	    END IF;
 	END $$$$;
@@ -1027,6 +1040,7 @@ observability-prometheus-stack: .env _check-secrets ## Install Prometheus + Graf
 	printf '%s' "$$GRAFANA_PASSWORD" > "$$tmpdir/grafana_password";
 	helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
 		--namespace $(OBSERVABILITY_NAMESPACE) \
+		--version "$(KUBE_PROMETHEUS_STACK_VERSION)" \
 		--values $(K8S_DIR)/helm-values/kube-prometheus-stack.yaml \
 		--set-file grafana.adminPassword="$$tmpdir/grafana_password" \
 		--timeout 10m
@@ -1037,6 +1051,7 @@ observability-loki: ## Install Loki (logs)
 	@echo "→ Installing Loki..."
 	@helm upgrade --install loki grafana/loki \
 		--namespace $(OBSERVABILITY_NAMESPACE) \
+		--version "$(LOKI_VERSION)" \
 		--set deploymentMode=SingleBinary \
 		--set loki.commonConfig.replication_factor=1 \
 		--set loki.auth_enabled=false \
@@ -1066,6 +1081,7 @@ observability-tempo: ## Install Tempo (traces)
 	@echo "→ Installing Tempo..."
 	@helm upgrade --install tempo grafana/tempo \
 		--namespace $(OBSERVABILITY_NAMESPACE) \
+		--version "$(TEMPO_VERSION)" \
 		--set tempo.replicas=1 \
 		--set tempo.resources.requests.cpu=50m \
 		--set tempo.resources.requests.memory=128Mi \
@@ -1088,6 +1104,7 @@ observability-otel-collector: ## Install OpenTelemetry Collector
 	@echo "→ Installing OpenTelemetry Collector..."
 	@helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
 		--namespace $(OBSERVABILITY_NAMESPACE) \
+		--version "$(OTEL_COLLECTOR_VERSION)" \
 		--values $(K8S_DIR)/helm-values/opentelemetry-collector.yaml \
 		--timeout 10m
 
@@ -1129,7 +1146,10 @@ observability-stop: ## Stop observability port-forwards
 .PHONY: grafana-password
 grafana-password: ## Show the generated Grafana admin password (stderr only, non-CI safe)
 	@if [ -t 2 ]; then
-		echo "$(GRAFANA_PASSWORD)" >&2;
+		# Shell env var ($${...}) not Make expansion ($(...)) so a password
+		# containing shell metacharacters cannot break the quoting — same rule
+		# documented at postgis-password-sync.
+		echo "$${GRAFANA_PASSWORD}" >&2;
 	else
 		echo "⚠ Refusing to print password to non-tty stderr (use 'make grafana-password' interactively)" >&2;
 		exit 1;

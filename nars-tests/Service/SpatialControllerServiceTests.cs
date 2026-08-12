@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Moq;
 using NarsApi.Controllers;
 using NarsApi.Data;
@@ -39,7 +40,8 @@ public class SpatialControllerServiceTests(NarsDatabaseFixture fixture) : IAsync
             new RoadQueryService(_db),
             scatteredService ?? Mock.Of<IScatteredAreaService>(),
             new EntranceQueryService(_db),
-            Mock.Of<IWebHostEnvironment>());
+            Mock.Of<IWebHostEnvironment>(),
+            Mock.Of<ILogger<SpatialController>>());
         AuthTestHelper.SetUser(ctrl, _userId, UserRoles.FieldWorker, communeId: 1);
         return ctrl;
     }
@@ -139,7 +141,8 @@ public class SpatialControllerServiceTests(NarsDatabaseFixture fixture) : IAsync
             new RoadQueryService(_db),
             Mock.Of<IScatteredAreaService>(),
             new EntranceQueryService(_db),
-            Mock.Of<IWebHostEnvironment>());
+            Mock.Of<IWebHostEnvironment>(),
+            Mock.Of<ILogger<SpatialController>>());
         AuthTestHelper.SetUser(controller, _userId, UserRoles.NationalAdmin);
 
         var result = await controller.RefreshScattered();

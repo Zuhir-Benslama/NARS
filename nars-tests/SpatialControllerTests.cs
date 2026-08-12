@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Moq;
 using NarsApi.Controllers;
 using NarsApi.DTOs;
@@ -26,7 +27,8 @@ public class SpatialControllerTests
             new RoadQueryService(db),
             scatteredService ?? Mock.Of<IScatteredAreaService>(),
             entranceQuery ?? Mock.Of<IEntranceQueryService>(),
-            Mock.Of<IWebHostEnvironment>());
+            Mock.Of<IWebHostEnvironment>(),
+            Mock.Of<ILogger<SpatialController>>());
 
         var uid = userId ?? Guid.NewGuid();
         ctrl.ControllerContext = new ControllerContext
