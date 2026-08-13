@@ -61,3 +61,88 @@ findings. All findings below fixed.
   `npm audit` — all clean.
 - E2E suite (`npm run test:e2e`) not run locally — requires the full stack on
   `:5000`/`:5173` (Playwright specs exist under `e2e/`).
+
+## Review round 2
+
+Baseline verified before fixing: `npm run lint`, `npm run typecheck`,
+`npm run lint:css` clean; 958 tests passing (92 files). Findings below, grouped
+by severity.
+
+## High
+
+- [x] **Seed-ring tolerance in `orientFromCityCenter` compared km against meters**
+  (`src/map/roads/road-orient.ts:80`)
+  - `@turf/distance` defaults to kilometers but the filter compared the result
+    against `CONNECT_M` (30 **meters**) as if it were 30 km — every node within
+    ±30 km of the city-center ring became a seed, effectively seeding the whole
+    dataset. The caller (`road-directions.ts:42`) passes the stored city-center
+    radius, which is in meters (computed via `computeCircleRadius`).
+  - ✅ **Done:** distance now requested with `{ units: "meters" }`, so both
+    `radius` and `CONNECT_M` are meters. Tests updated to meter radii
+    (1100 m / 1000 m / 100 km), comments corrected.
+
+- [x] **`prepareModalExtras()` never actually ran — `mainUrbanExists` guard was dead**
+  (`src/map/features/feature-modal.ts:6`, call site was `FeatureModal.vue` `onMounted`)
+  - `FeatureModal` mounts once at app start (when `phaseIndex` is null), so the
+    `onMounted` guard never fired. The areas modal therefore always offered the
+    `central_urban` option (a duplicate main-urban area could be created) and
+    road/main-entrance options were never populated. `draw-modal.ts`'s comment
+    even promised the call.
+  - ✅ **Done:** `openModalForFeature` now awaits `prepareModalExtras(phase)`
+    after `openModal()` (create path only — `openEditModal` still untouched, so
+    existing data is not clobbered). Dead `onMounted` block removed.
+
+## Medium
+
+- [x] **`switchBaseLayer` committed `currentActiveStyle` before the style loaded**
+  (`src/map/map-init.ts`)
+  - On style-load timeout/error the map kept the old style while
+    `currentActiveStyle` already pointed at the new one, silently skipping later
+    switches for that key.
+  - ✅ **Done:** `currentActiveStyle` is only updated after `style.load`
+    resolves; on failure it is reverted to the previous value.
+
+- [x] **`WilayaDetailPage` loaded data only in `onMounted` — stale on slug change**
+  (`src/components/WilayaDetailPage.vue`)
+  - Navigating `/nars/<w1>` → `/nars/<w2>` reuses the instance and kept showing
+    the previous wilaya's data.
+  - ✅ **Done:** load extracted into a `load()` that resets state, aborts the
+    prior request, and is driven by `watch(() => route.params.wilayaName, load,
+    { immediate: true })`.
+
+## Low
+
+- [x] **Direct store-state mutation outside an action**
+  (`src/map/snapping/snap-sources.ts:13`) — added `setSnapExclude` action to
+  `snapStore` and used it.
+- [x] **Untracked re-scheduled flush timer in logger** (`src/lib/logger.ts:75`) —
+  `setTimeout` now assigned to `timer` so `push()`/`resetLoggerState`/`beforeunload`
+  can't leave overlapping flush timers.
+- [x] **Boundary popup never removed** (`src/map/map-boundary.ts:51`) — repeated
+  clicks stacked unclosed popups; a single reusable popup is removed before
+  re-adding.
+- [x] **Double cast `as unknown as ModalResult`** (`src/map/features/loader-build.ts:22`)
+  — reduced to `data as ModalResult` (typechecks fine; literal `type` unions match).
+
+## Known / deferred
+
+- **House-entrance modal path is unreachable** — `draw-modal.ts` returns a direct
+  `ModalResult` for `houseEntrances` and `ctx-menu-actions.ts:71` blocks editing,
+  so `FeatureModal`'s road-side/BIS watchers and `RoadAssignmentSelector` are dead
+  code. Wiring the modal back up (and passing real geometry to `fetchRoadSide`)
+  is a product decision — deferred.
+- **`LocationSearchSelect` doesn't reflect `modelValue` on edit** — `query` is only
+  written by typing/selecting, so editing a user shows blank wilaya/daira/commune
+  fields. Needs an id→name resolution (backend or a label prop) — deferred.
+- **`geoman-events.ts` `onEditEnd` casts `MultiLineString`/`MultiPolygon` coords as
+  `[number, number][]`** (`MultiLineString` is nested arrays) — latent, roads are
+  always `LineString`. Left for a future geometry refactor.
+- **Hardcoded English strings in `RoadAssignmentSelector.vue`** — reachable only
+  via the dead modal path (see above); move to the i18n catalog if that path is
+  wired back up.
+
+## Verification (round 2)
+
+- `npm run test:run` — 958 passed (92 files), unchanged count.
+- `npm run lint`, `npm run typecheck`, `npm run lint:css` — all clean.
+- E2E suite not run locally (requires the full stack).

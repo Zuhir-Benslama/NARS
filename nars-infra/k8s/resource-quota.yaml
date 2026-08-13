@@ -33,5 +33,8 @@ spec:
         memory: 128Mi
       max:
         cpu: 2
-        memory: 2Gi
+        # nars-roads (PyTorch inference) requests 1Gi and is capped at 4Gi —
+        # the LimitRange max must not reject its limit or the roads pods
+        # fail admission control. Keep this ≥ the largest container limit.
+        memory: 4Gi
       type: Container

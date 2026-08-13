@@ -116,3 +116,118 @@ deployment, scripts, SQL, seed data) beyond the lint gates.
 - `kubectl kustomize` (k8s/ and roads/) — pass
 - gpg encryption as uid 999 fails without `HOME=/tmp`, succeeds with it
   (empirically verified against the built `nars-backup` image).
+
+---
+
+# nars-infra — Code Quality Review (round 3)
+
+Date: 2026-08-13
+
+## Scope
+Fresh pass over nars-infra (k8s manifests, Dockerfiles, nginx, roads
+deployment, scripts, SQL, Makefile guards, helm values) beyond the lint gates.
+
+## Gates verified
+- `make infra-lint` (shell, docker, yaml, python, node, makefile, tag-guard,
+  local-ingress-guard) — pass
+- `kubectl kustomize` (k8s/ and roads/) — pass
+- All container limits sum within namespace ResourceQuota (requests.cpu 4 /
+  requests.memory 8Gi / limits.cpu 8 / limits.memory 16Gi).
+- The initial directory listing from round-2's notes was inaccurate; the real
+  k8s/ contents were re-inventoried against `ls` (postgis-pv.yaml exists;
+  cert-manager-issuer.yaml and postgis-reference-data-job.yaml do NOT).
+
+## Findings & fixes (all applied)
+
+### High
+1. **`k8s/resource-quota.yaml` LimitRange max (2Gi) rejected nars-roads pods.**
+   The roads deployment caps memory at 4Gi (PyTorch inference), but the
+   namespace LimitRange `max.memory: 2Gi` would fail admission control:
+   `exceeds the max limit`. Fix: raised `max.memory` to 4Gi (≥ the largest
+   container limit), with a comment explaining the coupling so it can't regress.
+
+### Medium
+2. **`app-deployment.yaml` pulled the whole `nars-secrets` via `envFrom`.** The
+   API only reads `ConnectionStrings__DefaultConnection`, `Jwt__SecretKey`,
+   `AdminSignup__SignupToken`, `Segmentation__InternalToken` (verified against
+   Program.cs / SegmentationServiceExtensions.cs). It has no need for
+   `postgres_password` or `gpg-passphrase`. Fix: replaced `envFrom secretRef`
+   with explicit `secretKeyRef` env entries (least privilege; configmap
+   `envFrom` kept).
+3. **`Dockerfile.nars-roads` base image not digest-pinned.** It was the only
+   Dockerfile using a mutable tag (`python:3.11-slim`); every other base image
+   is pinned by `@sha256`. Fix: pinned to the amd64 digest
+   `78b39ef14d8e...` (verified via `docker manifest inspect`).
+4. **Dev-only local ingresses shipped in the base kustomization.** The base
+   (applied by `make kustomize-apply`) contains `nars-api-local` (no mTLS, no
+   host restriction) and `nars-frontend-local` (hostless catch-all). A
+   production apply would silently expose `/api` and `/login` without client
+   certs. Fix: new `_check-local-ingresses` Makefile guard — fails
+   `kustomize-apply` when `DEPLOY_ENV != dev` and the local ingresses are in
+   the kustomize output; self-tested via `infra-lint-local-ingress-guard`.
+
+### Low
+5. `k8s/otel-metrics-service.yaml` — comment said "verified against chart
+   0.159.0" but the Makefile pins `OTEL_COLLECTOR_VERSION ?= 0.169.0`. Fix:
+   comment now points at the Makefile var and instructs re-verification of the
+   selector on chart bumps.
+
+## Non-findings (checked, no change needed)
+- `create_national_admin.sh` trap `rm -rf "${DB_HELPER_DIR}" "${VENV_DIR}"`
+  with unset VENV_DIR → `rm -rf ""` returns 0 (verified empirically), no bug.
+- Backup gpg passphrase passed via `--passphrase` on the command line — visible
+  only inside the pod's own process list; acceptable, container is
+  single-purpose.
+- `allow-egress-roads-weights` grants 443/80 egress to the whole roads pod
+  (initContainer needs it; NetworkPolicy is pod-scoped, cannot restrict to the
+  init container alone) — documented tradeoff, required for weights download.
+- postgis `init-chown` runs as root — required to chown the data dir before the
+  main container drops to uid 999; documented in the manifest.
+- nginx local-dev ingresses in the same files as prod ingresses is intentional
+  (multi-doc YAML); the new guard protects production applies.
+- HPA memory metric on nars-api kept (comment already flags its caveat).
+
+## Verification
+- `make infra-lint` — pass (including the new local-ingress-guard self-test)
+- `kubectl kustomize` (k8s/ and roads/) — pass
+- `_check-local-ingresses` rejects in production, passes in dev (verified)
+- LimitRange max (4Gi) ≥ every container limit in the namespace (verified by
+  grepping all deployment/cronjob limits)
+
+---
+
+# nars-infra — Code Quality Review (round 4)
+
+Date: 2026-08-13
+
+## Scope
+Fresh pass over the Makefile (all 1411 lines) and the smoke-test
+assumptions against the API implementation.
+
+## Gates verified
+- `make infra-lint-makefile` — pass (syntax + undefined-variable dry-run)
+- `make infra-lint-tag-guard` — pass (self-tests)
+- `make infra-lint-local-ingress-guard` — pass (self-tests)
+
+## Findings & fixes (all applied)
+
+### Medium
+1. **`Makefile smoke-test` health body assertion never matched.** The target
+   grepped the `/health` response body for a bare `^Healthy$`, but the API
+   registers `app.MapHealthChecks("/health")` with the default response writer
+   (no custom `HealthCheckResponseWriter` anywhere in nars-api) — it emits JSON
+   (`{"status":"Healthy","totalDuration":...,"entries":{...}}`). So a healthy
+   cluster always failed the "body unexpected" branch. Fix: match the JSON
+   status field instead — `grep -qE '"status"[[:space:]]*:[[:space:]]*"Healthy"'`.
+   Verified the pattern accepts the real JSON output and rejects a
+   non-Healthy status.
+
+## Non-findings (checked, no change needed)
+- `POSTGIS_GET_POD_CMD` label `app.kubernetes.io/name=postgis` matches
+  `postgis.yaml` deployment/pod labels.
+- `_check-secrets` and the `.env` auto-generation remain consistent (all six
+  secrets generated, exported, and validated).
+- The remaining `/health` checks are status-code only (no body assertions)
+  and are correct.
+- `db-restore` FILE validation, `cluster-clean` interactive confirmation, and
+  `clean` teardown refusal are all intact (data-safety rules).

@@ -5,7 +5,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Moq;
 using NarsApi.Infrastructure;
 using NarsApi.Data;
 using NarsApi.Models;
@@ -44,8 +46,16 @@ public class AuthenticationExtensionsTests
 
     private static AuthenticationScheme Scheme => new(JwtBearerDefaults.AuthenticationScheme, null, typeof(JwtBearerHandler));
 
-    private static ServiceProvider BuildLoggingProvider() =>
-        new ServiceCollection().AddLogging().BuildServiceProvider();
+    private static (ServiceProvider Provider, Mock<ILogger> Logger) BuildLoggingProvider()
+    {
+        var logger = new Mock<ILogger>();
+        var factory = new Mock<ILoggerFactory>();
+        factory.Setup(f => f.CreateLogger(It.IsAny<string>())).Returns(logger.Object);
+        var provider = new ServiceCollection()
+            .AddSingleton(factory.Object)
+            .BuildServiceProvider();
+        return (provider, logger);
+    }
 
     [Fact]
     public void WithIssuerAndAudience_SetsValidationParameters()
@@ -79,7 +89,7 @@ public class AuthenticationExtensionsTests
         var options = GetJwtOptions(sp);
 
         var httpContext = new DefaultHttpContext();
-        httpContext.Request.Headers.Cookie = "access_token=my-access-token";
+        httpContext.Request.Headers.Cookie = $"{CookieNames.AccessToken}=my-access-token";
         var context = new MessageReceivedContext(httpContext, Scheme, options);
 
         await options.Events.OnMessageReceived(context);
@@ -104,33 +114,53 @@ public class AuthenticationExtensionsTests
     public async Task OnAuthenticationFailed_LogsWithoutThrowing()
     {
         using var sp = BuildProvider();
-        using var logging = BuildLoggingProvider();
-        var options = GetJwtOptions(sp);
-
-        var context = new AuthenticationFailedContext(
-            new DefaultHttpContext { RequestServices = logging }, Scheme, options)
+        var (logging, logger) = BuildLoggingProvider();
+        using (logging)
         {
-            Exception = new InvalidOperationException("token expired"),
-        };
+            var options = GetJwtOptions(sp);
 
-        await options.Events.OnAuthenticationFailed(context);
+            var context = new AuthenticationFailedContext(
+                new DefaultHttpContext { RequestServices = logging }, Scheme, options)
+            {
+                Exception = new InvalidOperationException("token expired"),
+            };
+
+            await options.Events.OnAuthenticationFailed(context);
+
+            logger.Verify(l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((state, _) => state.ToString()!.Contains("[Auth] Authentication failed", StringComparison.Ordinal)),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()), Times.Once);
+        }
     }
 
     [Fact]
     public async Task OnChallenge_LogsWithoutThrowing()
     {
         using var sp = BuildProvider();
-        using var logging = BuildLoggingProvider();
-        var options = GetJwtOptions(sp);
+        var (logging, logger) = BuildLoggingProvider();
+        using (logging)
+        {
+            var options = GetJwtOptions(sp);
 
-        var context = new JwtBearerChallengeContext(
-            new DefaultHttpContext { RequestServices = logging }, Scheme, options, new AuthenticationProperties());
+            var context = new JwtBearerChallengeContext(
+                new DefaultHttpContext { RequestServices = logging }, Scheme, options, new AuthenticationProperties());
 
-        await options.Events.OnChallenge(context);
+            await options.Events.OnChallenge(context);
+
+            logger.Verify(l => l.Log(
+                LogLevel.Information,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((state, _) => state.ToString()!.Contains("Challenging", StringComparison.Ordinal)),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()), Times.Once);
+        }
     }
 
     [Fact]
-    public async Task NoLegacyPagesCookieScheme_IsRegistered()
+    public async Task JwtBearer_IsTheOnlyRegisteredAuthenticationScheme()
     {
         using var sp = BuildProvider();
         var schemeProvider = sp.GetRequiredService<IAuthenticationSchemeProvider>();

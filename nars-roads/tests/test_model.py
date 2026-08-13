@@ -9,19 +9,19 @@ import numpy as np
 import pytest
 from rasterio.transform import Affine, from_bounds
 
-from app.model import SegmentationModel, TileTooLargeError
-from helpers import make_tiff_bytes, requires_torch
+from app.model import InvalidTileError, SegmentationModel, TileTooLargeError
+from helpers import DEFAULT_TRANSFORM, make_tiff_bytes, requires_torch
 
 
-def _normalize(arr, dtype):
-    return SegmentationModel._normalize_window(arr, np.dtype(dtype))
+def _normalize(arr):
+    return SegmentationModel._normalize_window(arr)
 
 
 def test_normalize_window_uint8_scales_to_unit():
     arr = np.zeros((3, 2, 4), dtype=np.uint8)
     arr[1, 0, 1] = 255
     arr[2, 1, 3] = 128
-    out = _normalize(arr, "uint8")
+    out = _normalize(arr)
     assert out.shape == (2, 4, 3)
     assert out.dtype == np.float32
     assert out[0, 1, 1] == pytest.approx(1.0)
@@ -32,19 +32,19 @@ def test_normalize_window_uint8_scales_to_unit():
 def test_normalize_window_uint16_scales_by_bit_depth():
     arr = np.zeros((3, 1, 1), dtype=np.uint16)
     arr[:, 0, 0] = 65535
-    out = _normalize(arr, "uint16")
+    out = _normalize(arr)
     assert out[0, 0, 0] == pytest.approx(1.0)
 
 
 def test_normalize_window_float_normalized_unchanged():
     arr = np.full((3, 1, 1), 0.7, dtype=np.float32)
-    out = _normalize(arr, "float32")
+    out = _normalize(arr)
     assert out[0, 0, 0] == pytest.approx(0.7)
 
 
 def test_normalize_window_float_0_255_rescaled():
     arr = np.full((3, 1, 1), 200.0, dtype=np.float32)
-    out = _normalize(arr, "float32")
+    out = _normalize(arr)
     assert out[0, 0, 0] == pytest.approx(200.0 / 255.0)
 
 
@@ -53,7 +53,7 @@ def test_normalize_window_float_noise_above_one_not_rescaled():
     # divided by 255 (which would black it). Regression for the old
     # `img.max() > 1.0 -> /255` heuristic.
     arr = np.full((3, 1, 1), 1.02, dtype=np.float32)
-    out = _normalize(arr, "float32")
+    out = _normalize(arr)
     assert out[0, 0, 0] == pytest.approx(1.0)
 
 
@@ -63,7 +63,7 @@ def test_normalize_window_float_nan_and_inf_neutralized():
         [[[float("nan"), float("inf"), -float("inf"), 0.5]]], dtype=np.float32
     )
     arr = np.repeat(arr, 3, axis=0)  # (3, 1, 4) -> transpose makes W the middle dim
-    out = _normalize(arr, "float32")
+    out = _normalize(arr)
     assert np.all(np.isfinite(out))
     assert np.all(out[0, 0, :] == 0.0)  # nan -> 0
     assert np.all(out[0, 1, :] == 1.0)  # +inf -> 1
@@ -73,7 +73,7 @@ def test_normalize_window_float_nan_and_inf_neutralized():
 
 def test_normalize_window_single_band_repeated():
     arr = np.array([[[10, 20]]], dtype=np.uint8)  # (1, 1, 2)
-    out = _normalize(arr, "uint8")
+    out = _normalize(arr)
     assert out.shape == (1, 2, 3)
     assert np.allclose(out[0, 0, :], 10 / 255)
     assert np.allclose(out[0, 1, :], 20 / 255)
@@ -81,7 +81,7 @@ def test_normalize_window_single_band_repeated():
 
 def test_normalize_window_trims_extra_bands():
     arr = np.zeros((4, 1, 1), dtype=np.uint8)
-    out = _normalize(arr, "uint8")
+    out = _normalize(arr)
     assert out.shape == (1, 1, 3)
 
 
@@ -99,7 +99,7 @@ def test_predict_shapes_and_georeferenced_transform(model):
     assert road.dtype == np.float32
     assert road.min() >= 0.0 and road.max() <= 1.0
     assert building.min() >= 0.0 and building.max() <= 1.0
-    assert transform == Affine(1.0, 0.0, 100.0, 0.0, -1.0, 50.0)
+    assert transform == DEFAULT_TRANSFORM
 
 
 @requires_torch
@@ -139,3 +139,11 @@ def test_predict_rejects_decode_over_budget(model, monkeypatch):
     raw = make_tiff_bytes(width=64, height=48)  # 3072 pixels > 100
     with pytest.raises(TileTooLargeError):
         model.predict(raw, bbox=(0.0, 0.0, 1.0, 1.0))
+
+
+@requires_torch
+def test_predict_rejects_non_image_bytes(model):
+    # Bytes that are not a readable image must raise InvalidTileError so the
+    # endpoint can map it to a 4xx instead of crashing with a 500.
+    with pytest.raises(InvalidTileError):
+        model.predict(b"definitely not a tiff", bbox=(0.0, 0.0, 1.0, 1.0))

@@ -16,7 +16,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Header, HTTPException, UploadFile
 
-from app.model import SegmentationModel, TileTooLargeError
+from app.model import (
+    InvalidTileError,
+    SegmentationModel,
+    TileTooLargeError,
+)
 from app.postprocess import mask_to_linestrings, mask_to_polygons
 from app.schemas import FeatureCollection, SegmentResponse
 
@@ -31,6 +35,11 @@ TILE_SIZE = int(os.environ.get("NARS_ROADS_TILE_SIZE", "1024"))
 # Upper bound on a single tile upload. Inference reads the whole tile into
 # memory, so an oversized upload is a pod-level memory-exhaustion risk.
 MAX_TILE_BYTES = int(os.environ.get("NARS_ROADS_MAX_TILE_BYTES", str(50 * 1024 * 1024)))
+# How many inferences may run concurrently before requests queue in the
+# threadpool. Sized for the pod memory limit; raise/lower per deployment.
+MAX_CONCURRENT_INFERENCES = max(
+    1, int(os.environ.get("NARS_ROADS_MAX_CONCURRENT_INFERENCES", "2"))
+)
 
 # Built lazily in lifespan so importing this module (tests, tooling, --reload)
 # never forces a multi-hundred-MB weight load.
@@ -39,7 +48,7 @@ _model: SegmentationModel | None = None
 # Each inference can peak at ~500MB (25M-px prob maps + windows), so unbounded
 # threadpool concurrency on a 4Gi pod is an OOM risk. A small semaphore caps
 # how many inferences run in parallel; the rest queue in the threadpool.
-INFERENCE_SEMAPHORE = threading.BoundedSemaphore(2)
+INFERENCE_SEMAPHORE = threading.BoundedSemaphore(MAX_CONCURRENT_INFERENCES)
 
 
 @asynccontextmanager
@@ -145,7 +154,9 @@ def segment(
 
     # Cheap readiness gate before buffering the upload: an unready pod should
     # reject with 503 without reading (and discarding) up to MAX_TILE_BYTES.
-    if _model is None:
+    # Mirrors /ready — a constructed-but-unloaded model (missing weights) must
+    # fail closed too, never serve random predictions.
+    if _model is None or not _model.is_loaded:
         raise HTTPException(status_code=503, detail="Model not ready")
 
     # Authoritative size cap: read one byte past the limit and reject if the
@@ -179,6 +190,8 @@ def segment(
             status_code=413,
             detail="Tile decodes to more pixels than the service accepts",
         )
+    except InvalidTileError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except Exception:
         logger.exception("Inference failed")
         raise HTTPException(status_code=500, detail="Inference failed")

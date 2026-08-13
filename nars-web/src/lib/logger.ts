@@ -72,7 +72,9 @@ async function flush(): Promise<void> {
     flushing = false
   }
 
-  if (batch.length > 0) setTimeout(flush, FLUSH_INTERVAL_MS)
+  // Track the re-scheduled timer so push()/resetLoggerState()/beforeunload
+  // don't end up with two overlapping flush timers.
+  if (batch.length > 0) timer = setTimeout(flush, FLUSH_INTERVAL_MS)
 }
 
 if (typeof window !== "undefined") {

@@ -71,12 +71,12 @@ public class PagesControllerTests
             var cookies = new List<string>();
             if (accessCookie is not null)
             {
-                cookies.Add($"access_token={accessCookie}");
+                cookies.Add($"{CookieNames.AccessToken}={accessCookie}");
             }
 
             if (refreshCookie is not null)
             {
-                cookies.Add($"refresh_token={refreshCookie}");
+                cookies.Add($"{CookieNames.RefreshToken}={refreshCookie}");
             }
 
             if (cookies.Count > 0)
@@ -207,7 +207,7 @@ public class PagesControllerTests
 
         Assert.IsType<ContentResult>(result);
         var setCookie = string.Join(";", h.HttpContext.Response.Headers["Set-Cookie"].Where(v => v is not null));
-        Assert.DoesNotContain("access_token=bearer-token", setCookie);
+        Assert.DoesNotContain($"{CookieNames.AccessToken}=bearer-token", setCookie);
     }
 
     [Fact]
@@ -224,8 +224,8 @@ public class PagesControllerTests
 
         Assert.IsType<ContentResult>(result);
         var setCookie = string.Join(";", h.HttpContext.Response.Headers["Set-Cookie"].Where(v => v is not null));
-        Assert.Contains("access_token=new-access-token", setCookie);
-        Assert.DoesNotContain("refresh_token=", setCookie);
+        Assert.Contains($"{CookieNames.AccessToken}=new-access-token", setCookie);
+        Assert.DoesNotContain($"{CookieNames.RefreshToken}=", setCookie);
     }
 
     [Fact]
@@ -285,6 +285,6 @@ public class PagesControllerTests
         h.Refresh.Verify(
             r => r.MintAccessTokenAsync("refresh-token", It.IsAny<CancellationToken>()), Times.Once);
         var setCookie = string.Join(";", h.HttpContext.Response.Headers["Set-Cookie"].Where(v => v is not null));
-        Assert.Contains("access_token=new-access-token", setCookie);
+        Assert.Contains($"{CookieNames.AccessToken}=new-access-token", setCookie);
     }
 }

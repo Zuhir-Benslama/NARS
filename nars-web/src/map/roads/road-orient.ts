@@ -76,7 +76,10 @@ export function orientFromCityCenter(
   visited: Set<string>,
 ): void {
   const seeds = graph.nodes().filter((k: string) => {
-    const d = turfDistance.distance(toPt(center), toPt(fromNk(k)))
+    // `radius` (city-center ring) and CONNECT_M are in meters; turf distance
+    // defaults to km, so request meters explicitly or the 30 m ring tolerance
+    // silently becomes 30 km and every node becomes a seed.
+    const d = turfDistance.distance(toPt(center), toPt(fromNk(k)), { units: "meters" })
     return Math.abs(d - radius) <= CONNECT_M
   })
   if (!seeds.length) return

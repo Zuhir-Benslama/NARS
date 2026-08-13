@@ -1,7 +1,7 @@
 # NARS Tests TODO
 
 Code quality issues found during review of the test project (build clean,
-0 warnings; 501 tests: 410 unit + 91 PostgreSQL-backed). Grouped by severity.
+0 warnings; 412 unit + 91 PostgreSQL-backed). Grouped by severity.
 
 ## High
 
@@ -56,3 +56,15 @@ Code quality issues found during review of the test project (build clean,
 - [x] **Non-deterministic `OtherUserId`** — `FieldControllerTests.cs` `static readonly Guid OtherUserId = Guid.NewGuid()` pinned to a fixed GUID (`22222222-…`), consistent with deterministic `TestData.UserId`.
 - [x] **Discard-based Base64 sanity check** — `JwtServiceTests.cs` `_ = Convert.FromBase64String(hash);` replaced with `Assert.Equal(32, Convert.FromBase64String(hash).Length)` (also asserts it is a SHA-256 digest).
 - [x] Verified: build 0 warnings/0 errors; 410 unit + 91 service tests pass.
+
+## Round 3 (fresh review)
+
+- [x] **`BootstrappingRegistrationTests.cs`** — added `Segmentation:BaseUrl` to test config and assertions that the full service graph is registered: `IEntranceQueryService`, `IRoadQueryService`, `IUserProfileService`, `IUserCreationService`, `ICommuneScopeService`, `IDraftFeaturesService`, `IErrorLogService`, plus the `RefreshTokenPruner` hosted service. Each asserted type verified against `nars-api` DI registrations.
+- [x] **`AuthenticationExtensionsTests.cs`** — cookie header now uses `CookieNames.AccessToken`; log-verification tests use `Mock<ILoggerFactory>` + a proper mock logger instead of `NullLogger` (message fragments match `AuthenticationExtensions.cs` `[Auth] ...` log calls verbatim); mislabeled "non-bearer scheme" test renamed to reflect it actually covers a claims-payload failure.
+- [x] **`PagesControllerTests.cs`** — `CookieNames.AccessToken`/`RefreshToken` replace remaining hardcoded cookie names.
+- [x] **`InfrastructureServicesTests.cs`** — hardcoded `"commune_user"` role replaced with `UserRoles.CommuneUser`.
+- [x] **`FeatureTypeRegistryTests.cs` / `FieldControllerTests.cs`** — remaining literal keys replaced with `FeatureTypes.HouseEntranceLayers.Main`, `FeatureTypes.HouseEntrance`; `FieldControllerTests` case-normalization assertion now uses `FeatureTypes.Road.ToUpperInvariant()`.
+- [x] **`AuthControllerTests.cs`** — signup `CommuneId: 2` now uses `TestData.CommuneId2` (new deterministic constant).
+- [x] **Naming drift** — `RefreshTokenServiceTests.cs` (`OriginalStamp` → top, PascalCase in `CreateToken_SecurityStampChange_RevokesOldTokens`), `AdminOverviewServiceTests.cs` (PascalCase `GetDraftReviews`), `GeometryHelperTests.cs` / `PasswordValidatorTests.cs` (fix-naming alignment) — standardized on `Method_Scenario_Expectation`.
+- [x] **Non-findings re-verified** — `TestableDraftFeaturesService` subclass in `DraftFeaturesTests.cs` is intentional (InMemory provider lacks `ExecuteUpdateAsync`; real path covered by Service tests). No `async void`, `Thread.Sleep`, sync-over-async, or `Assert.True(x == y)` anywhere in the suite. `xunit.runner.json` (parallel collections, 4 threads, 120s long-test threshold) is sane.
+- [x] Verified: build 0 warnings/0 errors; 412 unit tests pass (`--filter "Category!=Service"`); unit-only coverage 61.28% line / 53.54% branch (above the 50 floor).

@@ -44,6 +44,11 @@ public partial class AuthController
         [FromHeader(Name = "X-Admin-Signup")] string? signupToken,
         CancellationToken cancellationToken = default)
     {
+        if (body is null)
+        {
+            return Problem(detail: "Request body is required.", statusCode: 400);
+        }
+
         // Require a custom header to prevent automated scripts from targeting
         // this unauthenticated endpoint. The SPA sets this header on the form.
         if (!TokenMatches(signupToken, adminSignupOptions.Value.SignupToken))
@@ -81,7 +86,7 @@ public partial class AuthController
         if (!creationResult.IsSuccess)
         {
             return creationResult.IsAuthorizationFailure
-                ? Problem(detail: creationResult.Error, statusCode: 403)
+                ? Forbid()
                 : Problem(detail: creationResult.Error, statusCode: creationResult.StatusCode);
         }
 
@@ -93,7 +98,13 @@ public partial class AuthController
             "[Auth] {AdminUser} ({AdminRole}) created {NewRole} account {NewUser} via login page",
             admin.Username, admin.Role, newUser.Role, newUser.Username);
 
-        return StatusCode(201, ApiResponse.Ok($"{body.Role} account created successfully."));
+        // Same 201 envelope as POST /api/admin/users (CreateAdminResponse) so
+        // both account-creation endpoints expose an identical contract.
+        return StatusCode(201, new CreateAdminResponse(
+            Success: true,
+            UserId: newUser.Id.ToString(),
+            Message: $"{body.Role} account created successfully."
+        ));
     }
 
     /// <summary>

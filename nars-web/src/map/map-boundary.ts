@@ -12,6 +12,7 @@ const CTX_MENU_HEIGHT = 100
 
 let _currentBoundaryCleanup: (() => void) | null = null
 let _boundaryMap: maplibregl.Map | null = null
+let _boundaryPopup: maplibregl.Popup | null = null
 
 // ─── STATE RESET (for testing & HMR) ──────────────────────────────────────────
 
@@ -19,6 +20,8 @@ export function resetBoundaryEvents(): void {
   removeBoundaryClickEvents()
   _currentBoundaryCleanup?.()
   _currentBoundaryCleanup = null
+  _boundaryPopup?.remove()
+  _boundaryPopup = null
 }
 
 export function addBoundaryClickEvents(map: maplibregl.Map): void {
@@ -48,7 +51,10 @@ function onBoundaryClick(e: maplibregl.MapLayerMouseEvent): void {
   const map = _boundaryMap
   if (!map) return
   const name = escapeHtml(e.features?.[0]?.properties?.communeName || t("map_commune_label"))
-  new maplibregl.Popup({ closeButton: true, closeOnClick: true })
+  // Reuse a single popup: removing the previous one keeps rapid clicks from
+  // stacking multiple unclosed popups on the map.
+  _boundaryPopup?.remove()
+  _boundaryPopup = new maplibregl.Popup({ closeButton: true, closeOnClick: true })
     .setLngLat(e.lngLat)
     .setHTML(`<strong>${name}</strong><br><small>${t("map_commune_boundary")}</small>`)
     .addTo(map)

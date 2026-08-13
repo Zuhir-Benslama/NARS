@@ -159,12 +159,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch, onMounted, onUnmounted, ref } from "vue"
+import { computed, watch, onUnmounted, ref } from "vue"
 import { useI18n } from "vue-i18n"
 import { PHASES, DISTRICT_TYPES, ROAD_TYPES, PUBLIC_SPACE_TYPES } from "../phases"
 import { useAppStore } from "../stores/appStore"
 import { useModalStore } from "../stores/modalStore"
-import { fetchRoadSide, computeBisNumber, prepareModalExtras } from "../map"
+import { fetchRoadSide, computeBisNumber } from "../map"
 import { useFeatureValidation } from "../composables/useFeatureValidation"
 import { useFocusTrap } from "../composables/useFocusTrap"
 import { useWindowKeydown } from "../composables/useWindowKeydown"
@@ -306,17 +306,5 @@ useWindowKeydown({
   Escape: (e) => {
     if (modalStore.visible) onKeydown(e)
   },
-})
-
-onMounted(async () => {
-  // Populate phase-specific extras (e.g. mainUrbanExists, roadOptions) after
-  // the modal store is initialized by openCreate/openEdit.
-  if (modalStore.phaseIndex !== null) {
-    try {
-      await prepareModalExtras(PHASES[modalStore.phaseIndex])
-    } catch (e) {
-      debugWarn("[FeatureModal] prepareModalExtras failed:", e)
-    }
-  }
 })
 </script>

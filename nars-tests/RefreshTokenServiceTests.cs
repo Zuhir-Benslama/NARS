@@ -14,6 +14,8 @@ namespace NarsApi.Tests;
 
 public class RefreshTokenServiceTests
 {
+    private const string OriginalStamp = "original-stamp";
+
     private static AppDbContext CreateDb() => CreateInMemoryDb("RefreshTokenTest");
 
     private static Mock<IJwtService> CreateJwtMock()
@@ -587,20 +589,18 @@ public class RefreshTokenServiceTests
         Assert.Null(user.LockedUntil);
     }
 
-    private const string originalStamp = "original-stamp";
-
     [Fact]
     public async Task RecordFailedLoginAsync_AtThreshold_LocksUser()
     {
         using var db = CreateDb();
-        var user = await SeedUserAsync(db, securityStamp: originalStamp, failedLoginAttempts: 4);
+        var user = await SeedUserAsync(db, securityStamp: OriginalStamp, failedLoginAttempts: 4);
         var svc = CreateService(db);
 
         await svc.RecordFailedLoginAsync(user, maxFailedAttempts: 5, lockoutMinutes: 15, FixedUtcNowOffset);
 
         Assert.Equal(5, user.FailedLoginAttempts);
         Assert.Equal(FixedUtcNowOffset.DateTime.AddMinutes(15), user.LockedUntil);
-        Assert.NotEqual(originalStamp, user.SecurityStamp);
+        Assert.NotEqual(OriginalStamp, user.SecurityStamp);
     }
 
     // ── ResetFailedAttemptsIfNeededAsync ────────────────────────────────

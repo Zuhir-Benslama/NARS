@@ -359,7 +359,7 @@ smoke-test: ## Post-deploy smoke test: verify /health, frontend, and API auth
 	health=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/health" 2>/dev/null || echo "000");
 	if [ "$$health" = "200" ]; then
 		body=$$(curl -s --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/health" 2>/dev/null || echo "");
-		if echo "$$body" | grep -q "^Healthy$$"; then
+		if echo "$$body" | grep -qE '"status"[[:space:]]*:[[:space:]]*"Healthy"'; then
 			pass "/health → 200 Healthy";
 		else
 			fail "/health → 200 but body unexpected: $$body";
@@ -832,7 +832,7 @@ kustomize-set-image-tag: ## Persistently pin image tags in kustomization.yaml (m
 	fi
 
 .PHONY: kustomize-apply
-kustomize-apply: secrets-validate _check-pinned-tag ## Apply k8s manifests via kustomize (pin tags with IMAGE_TAG=<sha>)
+kustomize-apply: secrets-validate _check-pinned-tag _check-local-ingresses ## Apply k8s manifests via kustomize (pin tags with IMAGE_TAG=<sha>)
 	$(SUBMAKE) postgis-pv-fix
 	@echo "→ Applying kustomization (images: $(DOCKER_ORG)/*:$(IMAGE_TAG))..."
 	@$(KUBECTL) kustomize "$(K8S_DIR)" \
@@ -1171,6 +1171,7 @@ infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, ma
 	$(SUBMAKE) infra-lint-node
 	$(SUBMAKE) infra-lint-makefile
 	$(SUBMAKE) infra-lint-tag-guard
+	$(SUBMAKE) infra-lint-local-ingress-guard
 
 .PHONY: infra-lint-shell
 infra-lint-shell: ## Shell-check nars-infra/scripts/*.sh
@@ -1262,6 +1263,15 @@ _check-pinned-tag: ## Fail if deploying with the mutable 'latest' tag outside lo
 		exit 1;
 	fi
 
+.PHONY: _check-local-ingresses
+_check-local-ingresses: ## Fail if dev-only local ingresses would be deployed outside local dev
+	@if [ "$(DEPLOY_ENV)" != "dev" ] && $(KUBECTL) kustomize "$(K8S_DIR)" 2>/dev/null | grep -qE "name: nars-(api|frontend)-local"; then
+		echo "✖ Refusing to deploy dev-only local ingresses (nars-api-local / nars-frontend-local) in $(DEPLOY_ENV).";
+		echo "  They expose /api and /login WITHOUT mTLS and match any Host.";
+		echo "  Exclude them via a production overlay, or set DEPLOY_ENV=dev.";
+		exit 1;
+	fi
+
 .PHONY: infra-lint-tag-guard
 infra-lint-tag-guard: ## Assert _check-pinned-tag rejects 'latest' outside dev (self-test)
 	@echo "→ Verifying _check-pinned-tag rejects IMAGE_TAG=latest in production..."
@@ -1276,6 +1286,18 @@ infra-lint-tag-guard: ## Assert _check-pinned-tag rejects 'latest' outside dev (
 	@echo "→ Verifying ALLOW_LATEST=1 overrides the guard..."
 	@DEPLOY_ENV=production IMAGE_TAG=latest ALLOW_LATEST=1 $(SUBMAKE) _check-pinned-tag
 	@echo "  ✓ ALLOW_LATEST=1 override accepted"
+
+.PHONY: infra-lint-local-ingress-guard
+infra-lint-local-ingress-guard: ## Assert _check-local-ingresses rejects local ingresses outside dev (self-test)
+	@echo "→ Verifying _check-local-ingresses rejects the base kustomization in production (it ships nars-api-local)..."
+	@if DEPLOY_ENV=production $(SUBMAKE) _check-local-ingresses >/dev/null 2>&1; then
+		echo "✖ _check-local-ingresses unexpectedly accepted dev local ingresses in production";
+		exit 1;
+	fi
+	@echo "  ✓ local ingresses rejected in production"
+	@echo "→ Verifying _check-local-ingresses passes in dev..."
+	@DEPLOY_ENV=dev $(SUBMAKE) _check-local-ingresses
+	@echo "  ✓ local ingresses allowed in dev"
 
 .PHONY: images-build
 images-build: _warn-latest-tag ## Build all Docker images

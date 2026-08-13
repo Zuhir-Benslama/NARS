@@ -57,11 +57,10 @@ def mask_to_linestrings(
             if not line.is_valid or line.geom_type != "LineString":
                 continue
             geometry = mapping(line)
+            confidence = float(prob_mask[pts[:, 0], pts[:, 1]].mean())
         except Exception:
             logger.debug("Skipping degenerate road edge", exc_info=True)
             continue
-
-        confidence = float(prob_mask[pts[:, 0], pts[:, 1]].mean())
         features.append(
             Feature(
                 geometry=geometry,

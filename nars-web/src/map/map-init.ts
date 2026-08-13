@@ -195,7 +195,7 @@ async function switchBaseLayer(
     return
   }
   _styleSwitchInFlight = true
-  currentActiveStyle = next
+  const previous = currentActiveStyle
 
   try {
     const map = ctx.map
@@ -217,13 +217,20 @@ async function switchBaseLayer(
 
     map.once("style.load", styleListener)
     map.setStyle(next)
+    let styleOk = false
     try {
       await Promise.race([styleLoaded, styleTimeout])
+      styleOk = true
     } catch (err) {
       debugWarn("[MAP] Style load failed:", err)
     } finally {
       map.off("style.load", styleListener)
     }
+    // Commit the new style as active only once it actually loaded. If the load
+    // failed the map still shows the old style — leaving currentActiveStyle
+    // pointing at the new one would make later switches for this key a no-op
+    // (see the early return above) and desync the UI's active-style state.
+    currentActiveStyle = styleOk ? next : previous
 
     initSources()
     const featuresStore = useFeaturesStore()

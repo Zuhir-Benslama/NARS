@@ -36,7 +36,7 @@ public class GeometryHelperTests
     }
 
     [Fact]
-    public void FindNearestSegmentIndex_PointAtStart()
+    public void FindNearestSegmentIndex_PointAtStart_ReturnsZero()
     {
         var coords = new List<(double Lat, double Lng)>
         {
@@ -51,7 +51,7 @@ public class GeometryHelperTests
     }
 
     [Fact]
-    public void DetermineSide_Left()
+    public void DetermineSide_NorthOfSegment_ReturnsLeft()
     {
         // Moving east (0,0)->(0,1), point is north (above) -> left
         var side = GeometryHelper.DetermineSide(1.0, 0.5, 0.0, 0.0, 0.0, 1.0);
@@ -60,7 +60,7 @@ public class GeometryHelperTests
     }
 
     [Fact]
-    public void DetermineSide_Right()
+    public void DetermineSide_SouthOfSegment_ReturnsRight()
     {
         // Moving east (0,0)->(0,1), point is south (below) -> right
         var side = GeometryHelper.DetermineSide(-1.0, 0.5, 0.0, 0.0, 0.0, 1.0);

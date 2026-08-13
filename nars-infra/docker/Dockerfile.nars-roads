@@ -4,7 +4,7 @@
 # Run the test suite:
 #   docker build -f nars-infra/docker/Dockerfile.nars-roads --target test -t nars-roads:test nars-roads/
 #   docker run --rm nars-roads:test
-FROM python:3.11-slim AS base
+FROM python:3.11-slim@sha256:78b39ef14d8e2b4d71f8dc304f1328c37df95fe0ef99477c2ae6bd3d03784553 AS base
 
 # rasterio needs GDAL at the OS level
 # Versions pinned with wildcard suffixes (see .hadolint.yaml dl3008 convention)

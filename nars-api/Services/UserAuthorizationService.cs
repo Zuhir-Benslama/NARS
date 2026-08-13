@@ -311,7 +311,20 @@ public sealed class UserAuthorizationService(
             target.CommuneId = body.CommuneId;
         }
 
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (UserProfileService.IsUniqueViolation(ex, out var constraintName))
+        {
+            // TOCTOU race: a concurrent request claimed the email between the
+            // AnyAsync check above and this save. Surface it as the same 409
+            // the eager check returns instead of an unhandled 500.
+            return constraintName?.Contains("email", StringComparison.OrdinalIgnoreCase) == true
+                ? UserUpdateResult.Failure(UserUpdateErrorCode.EmailConflict, "Email already exists.")
+                : UserUpdateResult.Failure(UserUpdateErrorCode.EmailConflict, "User already exists.");
+        }
+
         return UserUpdateResult.Success();
     }
 
@@ -325,18 +338,11 @@ public sealed class UserAuthorizationService(
 
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
 
-        // Revoke all active refresh tokens without materializing them.
-        await db.RefreshTokens
-            .Where(rt => rt.UserId == userId && !rt.Revoked)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(rt => rt.Revoked, true), ct);
-
-        // Delete all features across all feature tables (registry rows removed
-        // via subquery so no IDs are materialized into memory).
+        // Feature tables have no FK/cascade to users (by design), so their rows
+        // and feature_registry entries are removed explicitly. Refresh tokens,
+        // inspections, and error logs are cleaned up by the ON DELETE CASCADE
+        // relationships declared in AppDbContext.
         await FeatureTypeRegistry.DeleteAllFeaturesForUserAsync(db, userId, ct);
-
-        // Delete inspections and error logs.
-        await db.Inspections.Where(i => i.UserId == userId).ExecuteDeleteAsync(ct);
-        await db.ErrorLogs.Where(el => el.UserId == userId).ExecuteDeleteAsync(ct);
 
         db.Users.Remove(user);
         await db.SaveChangesAsync(ct);

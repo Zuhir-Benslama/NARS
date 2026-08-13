@@ -22,7 +22,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue"
+import { ref, computed, watch, onUnmounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useI18n } from "vue-i18n"
 import { apiFetch } from "../api"
@@ -48,10 +48,12 @@ function goBack() {
   router.push("/admin")
 }
 
-onMounted(async () => {
+async function load() {
   const wilayaNameSlug = route.params.wilayaName as string
   loading.value = true
   error.value = null
+  wilaya.value = null
+  abortController?.abort()
   abortController = new AbortController()
   const { signal } = abortController
 
@@ -93,7 +95,11 @@ onMounted(async () => {
   } finally {
     if (!signal.aborted) loading.value = false
   }
-})
+}
+
+// Re-run when navigating between /nars/<wilaya1> and /nars/<wilaya2>: the
+// component instance is reused, so a mount-only load would show stale data.
+watch(() => route.params.wilayaName, load, { immediate: true })
 
 onUnmounted(() => abortController?.abort())
 </script>

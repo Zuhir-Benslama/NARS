@@ -19,12 +19,14 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
             .ToListAsync(cancellationToken);
         var wilayaIds = pagedWilayas.Select(w => w.WilayaId).ToArray();
 
-        // Run sequentially — DbContext is not thread-safe. Grouping tolerates
-        // duplicate admins per wilaya (the filtered index is non-unique); the
-        // earliest-created admin wins instead of crashing on a duplicate key.
+        // Run sequentially — DbContext is not thread-safe. Project to a slim
+        // row (no PasswordHash) and group by wilaya: the filtered index is
+        // non-unique, so the earliest-created admin wins instead of crashing
+        // on a duplicate key.
         var adminList = await db.Users
             .AsNoTracking()
             .Where(u => u.Role == UserRoles.WilayaAdmin && u.WilayaId.HasValue && wilayaIds.Contains(u.WilayaId.Value))
+            .Select(u => new AdminPick(u.WilayaId, null, u.Id, u.Username, u.Name, u.Email, u.Role, u.CreatedAt))
             .ToListAsync(cancellationToken);
         var admins = adminList.GroupBy(u => u.WilayaId!.Value)
             .ToDictionary(g => g.Key, g => g.OrderBy(u => u.CreatedAt).First());
@@ -68,8 +70,7 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
                 WilayaId: wilaya.WilayaId,
                 WilayaNameFr: wilaya.WilayaFr ?? "",
                 WilayaNameAr: wilaya.WilayaAr ?? "",
-                WilayaAdmin: admin is null ? null : new AdminInfo(
-                    admin.Id.ToString(), admin.Username, admin.Name, admin.Email, admin.Role),
+                WilayaAdmin: admin is null ? null : admin.ToAdminInfo(),
                 DairaCount: dairaCounts.GetValueOrDefault(wilaya.WilayaId),
                 CommuneCount: communeIds.Length,
                 CommuneUserCount: communeIds.Sum(cid => userCountByCommune.GetValueOrDefault(cid))
@@ -87,8 +88,13 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
             return null;
         }
 
-        var admin = await db.Users.AsNoTracking().FirstOrDefaultAsync(u =>
-            u.Role == UserRoles.WilayaAdmin && u.WilayaId == wilayaId, cancellationToken);
+        // Project to a slim AdminInfo and order by CreatedAt so the chosen
+        // admin is deterministic when duplicates exist (mirrors the national view).
+        var admin = await db.Users.AsNoTracking()
+            .Where(u => u.Role == UserRoles.WilayaAdmin && u.WilayaId == wilayaId)
+            .OrderBy(u => u.CreatedAt)
+            .Select(u => new AdminInfo(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role))
+            .FirstOrDefaultAsync(cancellationToken);
 
         var dairas = await db.Dairas.AsNoTracking().Where(d => d.WilayaId == wilayaId)
             .OrderBy(d => d.DairaFr).ToListAsync(cancellationToken);
@@ -99,6 +105,7 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
         var dairaAdminList = await db.Users
             .AsNoTracking()
             .Where(u => u.Role == UserRoles.DairaAdmin && u.DairaId.HasValue && dairaIds.Contains(u.DairaId.Value))
+            .Select(u => new AdminPick(null, u.DairaId, u.Id, u.Username, u.Name, u.Email, u.Role, u.CreatedAt))
             .ToListAsync(cancellationToken);
         var dairaAdmins = dairaAdminList.GroupBy(u => u.DairaId!.Value)
             .ToDictionary(g => g.Key, g => g.OrderBy(u => u.CreatedAt).First());
@@ -113,8 +120,7 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
                 DairaId: daira.DairaId,
                 DairaNameFr: daira.DairaFr ?? "",
                 DairaNameAr: daira.DairaAr ?? "",
-                DairaAdmin: da is null ? null : new AdminInfo(
-                    da.Id.ToString(), da.Username, da.Name, da.Email, da.Role),
+                DairaAdmin: da is null ? null : da.ToAdminInfo(),
                 Communes: communeReports.GetValueOrDefault(daira.DairaId) ?? []
             );
         }).ToList();
@@ -123,8 +129,7 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
             WilayaId: wilayaId,
             WilayaNameFr: wilaya.WilayaFr ?? "",
             WilayaNameAr: wilaya.WilayaAr ?? "",
-            WilayaAdmin: admin is null ? null : new AdminInfo(
-                admin.Id.ToString(), admin.Username, admin.Name, admin.Email, admin.Role),
+            WilayaAdmin: admin,
             Dairas: dairaReports
         );
     }
@@ -139,8 +144,11 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
             return null;
         }
 
-        var admin = await db.Users.AsNoTracking().FirstOrDefaultAsync(u =>
-            u.Role == UserRoles.DairaAdmin && u.DairaId == dairaId, cancellationToken);
+        var admin = await db.Users.AsNoTracking()
+            .Where(u => u.Role == UserRoles.DairaAdmin && u.DairaId == dairaId)
+            .OrderBy(u => u.CreatedAt)
+            .Select(u => new AdminInfo(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role))
+            .FirstOrDefaultAsync(cancellationToken);
 
         var communesByDaira = await BuildCommunesForDairasAsync([dairaId], cancellationToken);
         var communes = communesByDaira.GetValueOrDefault(dairaId) ?? [];
@@ -149,8 +157,7 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
             DairaId: dairaId,
             DairaNameFr: daira.DairaFr,
             DairaNameAr: daira.DairaAr,
-            DairaAdmin: admin is null ? null : new AdminInfo(
-                admin.Id.ToString(), admin.Username, admin.Name, admin.Email, admin.Role),
+            DairaAdmin: admin,
             Communes: communes
         );
     }
@@ -203,5 +210,23 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Slim admin projection used to build the overview reports. Loads only the
+    /// display fields (no PasswordHash) and keeps CreatedAt for deterministic
+    /// earliest-admin selection when duplicates exist.
+    /// </summary>
+    private sealed record AdminPick(
+        int? WilayaId,
+        int? DairaId,
+        Guid Id,
+        string Username,
+        string Name,
+        string Email,
+        string Role,
+        DateTime CreatedAt)
+    {
+        public AdminInfo ToAdminInfo() => new(Id.ToString(), Username, Name, Email, Role);
     }
 }

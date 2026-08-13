@@ -62,8 +62,7 @@ public class FeatureTypeRegistryTests
     {
         var entity = FeatureTypeRegistry.CreateEntity(
             FeatureTypes.HouseEntrance, Guid.NewGuid(), Guid.NewGuid(),
-            "main_entrance", "Test Entrance", "{}", FixedUtcNow);
-
+            FeatureTypes.HouseEntranceLayers.Main, "Test Entrance", "{}", FixedUtcNow);
         Assert.NotNull(entity);
         Assert.IsType<HouseEntrance>(entity);
     }

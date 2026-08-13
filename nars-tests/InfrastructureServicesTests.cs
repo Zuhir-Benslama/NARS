@@ -137,7 +137,7 @@ public class InfrastructureServicesTests
             var addedRoad = NewRoad(userId, "added");
             db.Roads.Add(addedRoad);
             db.Inspections.Add(new Inspection { Id = Guid.NewGuid(), FeatureId = Guid.NewGuid(), UserId = userId, Type = "pothole", Data = "{}", Status = "open" });
-            db.Users.Add(new User { Id = userId, Name = "A", Email = "a@example.com", Phone = "0555000000", Username = "a", PasswordHash = "x", Role = "commune_user", SecurityStamp = User.GenerateSecurityStamp() });
+            db.Users.Add(new User { Id = userId, Name = "A", Email = "a@example.com", Phone = "0555000000", Username = "a", PasswordHash = "x", Role = UserRoles.CommuneUser, SecurityStamp = User.GenerateSecurityStamp() });
             db.RefreshTokens.Add(new RefreshToken { Id = Guid.NewGuid(), UserId = userId, TokenHash = "h", ExpiresAt = TestData.FixedUtcNow.AddDays(1) });
 
             await db.SaveChangesAsync();

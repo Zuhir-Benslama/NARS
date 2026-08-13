@@ -26,8 +26,11 @@ public static class PipelineExtensions
         LogJwtWarning(startupLogger, logJwtWarning);
         await VerifyDatabaseConnectionAsync(app, startupLogger);
         UseExceptionHandling(app);
-        UseStaticFilesWithCaching(app);
+        // Security headers must run before static files so /index.html, /login.html
+        // and the fingerprinted bundles get the same CSP/X-Frame-Options/nosniff
+        // protection as the controller-served pages.
         UseSecurityMiddleware(app);
+        UseStaticFilesWithCaching(app);
         UseCsrfValidation(app);
         UseApiEndpoints(app);
         LogStartupComplete(app, config, startupLogger);

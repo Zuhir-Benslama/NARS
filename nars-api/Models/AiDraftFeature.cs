@@ -25,8 +25,8 @@ public sealed class AiDraftFeature
     public double Confidence { get; private set; }
     public string Status { get; private set; } = StatusPending; // pending | accepted | rejected | edited
     public int CommuneId { get; private set; }
-    public Guid? ReviewedBy { get; private set; }
-    public DateTimeOffset? ReviewedAt { get; private set; }
+    public Guid? ReviewedBy { get; }
+    public DateTimeOffset? ReviewedAt { get; }
     public DateTimeOffset CreatedAt { get; private set; }
     public string? SourceTileRef { get; private set; }
 
@@ -56,19 +56,5 @@ public sealed class AiDraftFeature
             CreatedAt = createdAt,
             Status = StatusPending,
         };
-    }
-
-    public void MarkAccepted(Guid reviewedBy, DateTimeOffset reviewedAt)
-    {
-        Status = StatusAccepted;
-        ReviewedBy = reviewedBy;
-        ReviewedAt = reviewedAt;
-    }
-
-    public void MarkRejected(Guid reviewedBy, DateTimeOffset reviewedAt)
-    {
-        Status = StatusRejected;
-        ReviewedBy = reviewedBy;
-        ReviewedAt = reviewedAt;
     }
 }

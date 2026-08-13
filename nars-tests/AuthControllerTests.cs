@@ -71,6 +71,30 @@ public class AuthControllerTests
     }
 
     [Fact]
+    public async Task SignIn_NullBody_Returns400()
+    {
+        using var db = CreateDb();
+        var controller = CreateController(db);
+
+        var result = await controller.SignIn(null!);
+
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task AuthorizedAdminSignup_NullBody_Returns400()
+    {
+        using var db = CreateDb();
+        var controller = CreateController(db);
+
+        var result = await controller.AuthorizedAdminSignup(null!, signupToken: AdminSignupToken);
+
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, objResult.StatusCode);
+    }
+
+    [Fact]
     public async Task AuthorizedAdminSignup_ValidRequest_Returns201()
     {
         using var db = CreateDb();
@@ -222,13 +246,12 @@ public class AuthControllerTests
             Username: "testuser",
             Password: AltPassword,
             Role: UserRoles.CommuneUser,
-            CommuneId: 2,
+            CommuneId: CommuneId2,
             DairaId: null,
             WilayaId: null
         ), signupToken: AdminSignupToken);
 
-        var statusCodeResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(403, statusCodeResult.StatusCode);
+        Assert.IsType<ForbidResult>(result);
     }
 
     [Fact]
@@ -249,7 +272,7 @@ public class AuthControllerTests
             Username: "fieldworker",
             Password: AltPassword,
             Role: UserRoles.FieldWorker,
-            CommuneId: 2,
+            CommuneId: CommuneId2,
             DairaId: null,
             WilayaId: null
         ), signupToken: AdminSignupToken);

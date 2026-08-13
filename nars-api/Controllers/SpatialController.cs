@@ -22,7 +22,6 @@ public class SpatialController(
     IWebHostEnvironment webHost,
     ILogger<SpatialController> logger) : NarsControllerBase(webHost)
 {
-    private readonly ILogger<SpatialController> _logger = logger;
     // ── POST /api/road-side ───────────────────────────────────────────────────
 
     /// <summary>Determines which side of a road a marker is on and suggests the next entrance number.</summary>
@@ -59,7 +58,7 @@ public class SpatialController(
         }
         catch (ArgumentException ex)
         {
-            _logger.LogDebug(ex, "Rejected invalid road coordinates: {Reason}", ex.Message);
+            logger.LogDebug(ex, "Rejected invalid road coordinates: {Reason}", ex.Message);
             return Problem(detail: "Road coordinates are invalid.", statusCode: 400);
         }
 

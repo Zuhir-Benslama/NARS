@@ -11,6 +11,7 @@ import { showToast } from "../../lib/toast"
 import { getRoadSide } from "../../lib/validation"
 import { t } from "../../i18n"
 import type { ModalResult } from "../../types"
+import { prepareModalExtras } from "../features/feature-modal"
 export async function openModalForFeature(
   phase: (typeof PHASES)[number],
   featureId: string,
@@ -27,7 +28,9 @@ export async function openModalForFeature(
 
   // Open modal first (initializes state via openCreate), then populate extras
   // so prepareModalExtras' values are not wiped by createDefaultModalState.
-  return openModal(phase.index, featureId, radius ? { radius } : undefined)
+  const result = openModal(phase.index, featureId, radius ? { radius } : undefined)
+  await prepareModalExtras(phase)
+  return result
 }
 
 async function openHouseEntranceModal(geometry: GeoJSON.Geometry): Promise<ModalResult | null> {

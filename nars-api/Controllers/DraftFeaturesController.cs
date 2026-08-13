@@ -14,9 +14,6 @@ public sealed class DraftFeaturesController(
     ILogger<DraftFeaturesController> logger,
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
-    private readonly IDraftFeaturesService _draftFeaturesService = draftFeaturesService;
-    private readonly ILogger<DraftFeaturesController> _logger = logger;
-
     /// <summary>
     /// Submits an imagery tile for the given commune, runs road+building
     /// segmentation, and stores the results as pending draft features.
@@ -53,7 +50,7 @@ public sealed class DraftFeaturesController(
         try
         {
             await using var stream = request.Tile.OpenReadStream();
-            var summary = await _draftFeaturesService.SegmentTileAsync(
+            var summary = await draftFeaturesService.SegmentTileAsync(
                 CurrentUserRole,
                 CurrentCommuneId,
                 CurrentDairaId,
@@ -72,30 +69,34 @@ public sealed class DraftFeaturesController(
         }
         catch (KeyNotFoundException ex)
         {
-            _logger.LogWarning(ex, "Segmentation target commune not found: {Reason}", ex.Message);
+            logger.LogWarning(ex, "Segmentation target commune not found: {Reason}", ex.Message);
             return NotFound("The requested commune was not found.");
         }
         catch (SegmentationServiceException ex)
         {
-            _logger.LogError(ex, "Segmentation service call failed for commune {CommuneId}", request.CommuneId);
+            logger.LogError(ex, "Segmentation service call failed for commune {CommuneId}", request.CommuneId);
             return StatusCode(StatusCodes.Status502BadGateway, "Segmentation service is unavailable");
         }
     }
 
     /// <summary>
-    /// Lists pending draft features for a commune, for the review queue UI.
+    /// Lists draft features for a commune, for the review queue UI.
     /// The caller must have access to the commune.
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<List<AiDraftFeatureDto>>> ListDrafts(
+    public async Task<ActionResult<PagedResponse<AiDraftFeatureDto>>> ListDrafts(
         [FromQuery] int communeId,
         [FromQuery] string? featureType,
         [FromQuery] string status = "pending",
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 100,
         CancellationToken cancellationToken = default)
     {
+        (skip, take) = Pagination.Clamp(skip, take);
+
         try
         {
-            var drafts = await _draftFeaturesService.ListDraftsAsync(
+            var drafts = await draftFeaturesService.ListDraftsAsync(
                 CurrentUserRole,
                 CurrentCommuneId,
                 CurrentDairaId,
@@ -103,6 +104,8 @@ public sealed class DraftFeaturesController(
                 communeId,
                 featureType,
                 status,
+                skip,
+                take,
                 cancellationToken);
             return Ok(drafts);
         }
@@ -131,10 +134,10 @@ public sealed class DraftFeaturesController(
     private async Task<IActionResult> ReviewDraftAsync(Guid id, bool accept, CancellationToken ct)
     {
         var result = accept
-            ? await _draftFeaturesService.AcceptDraftAsync(
+            ? await draftFeaturesService.AcceptDraftAsync(
                 CurrentUserRole, CurrentCommuneId, CurrentDairaId, CurrentWilayaId,
                 RequiredCurrentUserId, id, ct)
-            : await _draftFeaturesService.RejectDraftAsync(
+            : await draftFeaturesService.RejectDraftAsync(
                 CurrentUserRole, CurrentCommuneId, CurrentDairaId, CurrentWilayaId,
                 RequiredCurrentUserId, id, ct);
 

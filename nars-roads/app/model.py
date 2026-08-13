@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import rasterio
+from rasterio.errors import RasterioIOError
 from rasterio.io import MemoryFile
 from rasterio.transform import from_bounds
 from rasterio.windows import Window
@@ -35,11 +36,15 @@ IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 # gigabytes, so we also bound the decoded footprint before allocating the
 # output arrays. 25M pixels keeps the working set well under the pod's 4Gi
 # limit while still accommodating far larger tiles than the service sees.
-MAX_DECODED_PIXELS = 25_000_000
+MAX_DECODED_PIXELS = int(os.environ.get("NARS_ROADS_MAX_DECODED_PIXELS", "25000000"))
 
 
 class TileTooLargeError(ValueError):
     """Raised when a tile decodes to more than MAX_DECODED_PIXELS pixels."""
+
+
+class InvalidTileError(ValueError):
+    """Raised when the uploaded bytes cannot be decoded as a readable image."""
 
 
 def _import_torch():
@@ -95,18 +100,21 @@ class SegmentationModel:
         )
 
     @staticmethod
-    def _normalize_window(arr: np.ndarray, dtype: np.dtype) -> np.ndarray:
+    def _normalize_window(arr: np.ndarray) -> np.ndarray:
         """Normalize one decoded window: (bands, H, W) -> (H, W, 3) float32
         in [0, 1]. Selects the first 3 bands (repeating band 0 for
         single-band rasters) and scales by the source bit depth so a 16-bit
-        GeoTIFF lands in the same range as a uint8 one."""
+        GeoTIFF lands in the same range as a uint8 one. The scale is derived
+        from the array's own dtype — rasterio decodes every band into the
+        dataset's band-0 dtype, so that is the only scale the values actually
+        carry."""
         if arr.shape[0] >= 3:
             arr = arr[:3]
         else:
             arr = np.repeat(arr[:1], 3, axis=0)
 
         img = np.transpose(arr, (1, 2, 0))
-        if np.issubdtype(dtype, np.floating):
+        if np.issubdtype(arr.dtype, np.floating):
             # Float input is assumed already normalized to [0, 1]; some
             # producers ship float data in [0, 255]. Rescale only when it is
             # clearly byte-scaled (max well above 1): a value like 1.02 is
@@ -122,7 +130,7 @@ class SegmentationModel:
                 img = np.clip(img, 0.0, 1.0)
         else:
             # Scale by the integer bit depth: uint8 -> 255, uint16 -> 65535.
-            img = img.astype(np.float32) / float(np.iinfo(dtype).max)
+            img = img.astype(np.float32) / float(np.iinfo(arr.dtype).max)
         return img
 
     def _preprocess(self, img: np.ndarray) -> torch.Tensor:
@@ -175,32 +183,38 @@ class SegmentationModel:
         non-overlapping grid is used. Swap in overlap-and-blend if seam
         artifacts show up in practice on real imagery."""
         with MemoryFile(raw_bytes) as memfile:
-            with memfile.open() as src:
-                if src.transform and src.transform != rasterio.Affine.identity():
-                    transform = src.transform
-                else:
-                    transform = from_bounds(*bbox, width=src.width, height=src.height)
+            try:
+                with memfile.open() as src:
+                    if src.transform and src.transform != rasterio.Affine.identity():
+                        transform = src.transform
+                    else:
+                        transform = from_bounds(
+                            *bbox, width=src.width, height=src.height
+                        )
 
-                h, w = src.height, src.width
-                if h * w > MAX_DECODED_PIXELS:
-                    raise TileTooLargeError(
-                        f"Tile decodes to {h}x{w} pixels; limit is {MAX_DECODED_PIXELS}"
-                    )
+                    h, w = src.height, src.width
+                    if h * w > MAX_DECODED_PIXELS:
+                        raise TileTooLargeError(
+                            f"Tile decodes to {h}x{w} pixels; limit is {MAX_DECODED_PIXELS}"
+                        )
 
-                dtype = src.dtypes[0]
-                probs = np.zeros((h, w, NUM_CLASSES), dtype=np.float32)
-                counts = np.zeros((h, w, 1), dtype=np.float32)
+                    probs = np.zeros((h, w, NUM_CLASSES), dtype=np.float32)
+                    counts = np.zeros((h, w, 1), dtype=np.float32)
 
-                step = self.tile_size
-                for y in range(0, h, step):
-                    for x0 in range(0, w, step):
-                        y_end = min(y + step, h)
-                        x_end = min(x0 + step, w)
-                        window = Window.from_slices((y, y_end), (x0, x_end))
-                        chip = self._normalize_window(src.read(window=window), dtype)
-                        chip_probs = self._predict_tile(chip)
-                        probs[y:y_end, x0:x_end] += chip_probs
-                        counts[y:y_end, x0:x_end] += 1.0
+                    step = self.tile_size
+                    for y in range(0, h, step):
+                        for x0 in range(0, w, step):
+                            y_end = min(y + step, h)
+                            x_end = min(x0 + step, w)
+                            window = Window.from_slices((y, y_end), (x0, x_end))
+                            chip = self._normalize_window(src.read(window=window))
+                            chip_probs = self._predict_tile(chip)
+                            probs[y:y_end, x0:x_end] += chip_probs
+                            counts[y:y_end, x0:x_end] += 1.0
+            except RasterioIOError as exc:
+                # Decoding a garbage/truncated upload raises here; surface it
+                # as a 4xx client error instead of a 500.
+                raise InvalidTileError(f"Tile could not be decoded: {exc}") from exc
 
         probs = probs / np.clip(counts, 1.0, None)
         road_prob = probs[:, :, 1]

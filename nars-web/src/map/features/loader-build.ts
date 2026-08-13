@@ -19,7 +19,7 @@ export function buildGeoJsonFeature(
   data: FeatureData,
   phase: (typeof PHASES)[number],
 ): GeoJsonFeatureWithStyle | null {
-  const style = getFeatureStyle(phase, data as unknown as ModalResult)
+  const style = getFeatureStyle(phase, data as ModalResult)
   const sanitizedLabel = sanitizeApiText(data.label)
 
   debugLog(

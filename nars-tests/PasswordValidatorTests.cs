@@ -39,7 +39,7 @@ public class PasswordValidatorTests
         Assert.Null(PasswordValidator.Validate(password));
 
     [Fact]
-    public void Exactly8Chars_Valid() =>
+    public void ValidPassword_Exactly8Chars_ReturnsNull() =>
         Assert.Null(PasswordValidator.Validate("Aa1!xxxx"));
 
     [Fact]

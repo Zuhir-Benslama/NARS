@@ -10,7 +10,7 @@ import type { LayerState } from "../../stores/layerStore"
 
 /** Called by snapping.ts when the exclude target changes. */
 export function setSnapSourceExclude(id: string | null): void {
-  useSnapStore().snapExclude = id
+  useSnapStore().setSnapExclude(id)
 }
 
 function resolveExclude(excludeId?: string | null): string | null {

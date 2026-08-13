@@ -52,6 +52,7 @@ public static class TestData
 
     // ── Location IDs ───────────────────────────────────────────────────
     public const int CommuneId1 = 1;
+    public const int CommuneId2 = 2;
 
     // IDs seeded by SeedData.SeedAdminLocationsAsync:
     //   wilaya 1/2, daira 10/11, commune 100/101.

@@ -3,10 +3,56 @@
 Code quality issues found during review of the segmentation microservice
 (FastAPI + PyTorch inference). Grouped by severity.
 
-## Review round 3 (current)
+## Review round 4 (current)
 
-Fresh review on top of round 2 (ruff clean; full suite 38 passed in the
-torch+skimage image). All items resolved.
+Fresh review on top of round 3 (ruff clean; 31 tests pass locally with the
+torch/skimage-dependent tests skipped — full suite runs in the torch+skimage
+test image). All items resolved.
+
+## Medium
+
+- [x] **`/segment` readiness gate was asymmetric with `/ready`** (`app/main.py`)
+  - `/ready` returns 503 until real weights are loaded (`is_loaded`), but
+    `/segment` only rejected when `_model is None` — a constructed-but-unloaded
+    model (missing weights) served garbage predictions with HTTP 200 to any
+    caller that bypassed the k8s probe, contradicting the documented fail-closed
+    philosophy.
+  - **Fix:** the endpoint gate now mirrors `/ready`:
+    `if _model is None or not _model.is_loaded -> 503`. The end-to-end test
+    flips `is_loaded = True` after lifespan (weights are random in the test
+    image) so the full predict/postprocess pipeline is still exercised; a new
+    `test_segment_rejects_unready_model` covers the 503 path.
+
+## Low
+
+- [x] **Hardcoded operational knobs** (`app/main.py`, `app/model.py`)
+  - `INFERENCE_SEMAPHORE = BoundedSemaphore(2)` and `MAX_DECODED_PIXELS` were
+    hardcoded, unlike every other knob (TILE_SIZE, MAX_TILE_BYTES).
+  - **Fix:** `NARS_ROADS_MAX_CONCURRENT_INFERENCES` (default 2, clamped ≥ 1) and
+    `NARS_ROADS_MAX_DECODED_PIXELS` (default 25,000,000) env vars.
+
+- [x] **Garbage bytes with a TIFF content-type 500'd** (`app/model.py`, `app/main.py`)
+  - `image/tiff` + non-image bytes reached rasterio, whose `RasterioIOError`
+    fell into the broad `except Exception -> 500`. It is a client error.
+  - **Fix:** `predict` wraps the decode in `except RasterioIOError` and raises
+    `InvalidTileError`; the endpoint maps it to 400. New tests cover both the
+    model-level raise and the endpoint's 400 mapping (and a generic
+    inference failure still returns 500).
+
+- [x] **`_normalize_window` took a dtype that could disagree with the data** (`app/model.py`)
+  - It scaled by `src.dtypes[0]`; rasterio decodes every band into band 0's
+    dtype, so the scale is now derived from the array's own dtype (`arr.dtype`),
+    which can never disagree with the values being normalized.
+  - **Fix:** dropped the `dtype` parameter; the docstring documents why
+    `arr.dtype` is authoritative.
+
+- [x] **`mask_to_linestrings` confidence sat outside the geometry guard** (`app/postprocess.py`)
+  - The confidence read was outside the try/except that skips degenerate edges,
+    so an unexpected indexing error there would 500 a request instead of
+    skipping the feature.
+  - **Fix:** moved the confidence computation inside the guarded block.
+
+## Review round 3
 
 ## High
 

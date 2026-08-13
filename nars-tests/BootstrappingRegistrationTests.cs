@@ -49,6 +49,7 @@ public class BootstrappingRegistrationTests : IDisposable
             ["RateLimit:ApiSegmentsPerWindow"] = "4",
             ["Cors:AllowedOrigins:0"] = "http://localhost:3000",
             ["HttpClient:TileProxyTimeoutSeconds"] = "20",
+            ["Segmentation:BaseUrl"] = "http://localhost:8000",
         });
         overrides?.Invoke(builder);
         return builder.Build();
@@ -86,14 +87,22 @@ public class BootstrappingRegistrationTests : IDisposable
         Assert.IsType<LocationQueryService>(sp.GetRequiredService<ILocationQueryService>());
         Assert.IsType<LocationSearchService>(sp.GetRequiredService<ILocationSearchService>());
         Assert.IsType<AdminOverviewService>(sp.GetRequiredService<IAdminOverviewService>());
+        Assert.IsType<EntranceQueryService>(sp.GetRequiredService<IEntranceQueryService>());
+        Assert.IsType<RoadQueryService>(sp.GetRequiredService<IRoadQueryService>());
+        Assert.IsType<UserProfileService>(sp.GetRequiredService<IUserProfileService>());
+        Assert.IsType<UserCreationService>(sp.GetRequiredService<IUserCreationService>());
+        Assert.IsType<CommuneScopeService>(sp.GetRequiredService<ICommuneScopeService>());
+        Assert.IsType<DraftFeaturesService>(sp.GetRequiredService<IDraftFeaturesService>());
+        Assert.IsType<ErrorLogService>(sp.GetRequiredService<IErrorLogService>());
     }
 
     [Fact]
-    public async Task AddNarsServices_RegistersBackgroundProcessorAsHostedService()
+    public async Task AddNarsServices_RegistersBackgroundHostedServices()
     {
         await using var sp = BuildProvider();
 
         Assert.Contains(sp.GetServices<IHostedService>(), s => s.GetType() == typeof(BackgroundQueueProcessor));
+        Assert.Contains(sp.GetServices<IHostedService>(), s => s.GetType() == typeof(RefreshTokenPruner));
     }
 
     [Fact]

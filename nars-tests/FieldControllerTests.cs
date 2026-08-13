@@ -216,7 +216,7 @@ public class FieldControllerTests
         var ctrl = CreateController(fieldService: fieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
-        var result = await ctrl.SubmitInspection(new FieldInspectRequest(roadId.ToString(), "house_entrance", Json("{}"), "good"));
+        var result = await ctrl.SubmitInspection(new FieldInspectRequest(roadId.ToString(), FeatureTypes.HouseEntrance, Json("{}"), "good"));
 
         var problem = Assert.IsType<ObjectResult>(result);
         Assert.Equal(400, problem.StatusCode);
@@ -237,7 +237,7 @@ public class FieldControllerTests
         var ctrl = CreateController(fieldService: fieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
-        var result = await ctrl.SubmitInspection(new FieldInspectRequest(roadId.ToString(), "ROAD", Json("{}"), "good"));
+        var result = await ctrl.SubmitInspection(new FieldInspectRequest(roadId.ToString(), FeatureTypes.Road.ToUpperInvariant(), Json("{}"), "good"));
 
         var created = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, created.StatusCode);

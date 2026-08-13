@@ -17,7 +17,7 @@ public class AdminOverviewServiceTests
         new(db, Mock.Of<IFeatureStatsService>());
 
     [Fact]
-    public async Task GetNationalOverviewAsync_DuplicateWilayaAdmins_DoesNotCrash()
+    public async Task GetNationalOverviewAsync_DuplicateWilayaAdmins_PicksEarliestCreated()
     {
         using var db = CreateDb();
         db.Wilayas.Add(new Wilaya { WilayaId = 1, WilayaFr = "Wilaya", WilayaAr = "ولاية" });
@@ -60,7 +60,7 @@ public class AdminOverviewServiceTests
     }
 
     [Fact]
-    public async Task GetWilayaReportAsync_DuplicateDairaAdmins_DoesNotCrash()
+    public async Task GetWilayaReportAsync_DuplicateDairaAdmins_PicksEarliestCreated()
     {
         using var db = CreateDb();
         db.Wilayas.Add(new Wilaya { WilayaId = 1, WilayaFr = "Wilaya", WilayaAr = "ولاية" });

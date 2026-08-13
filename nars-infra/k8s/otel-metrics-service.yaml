@@ -16,7 +16,9 @@ spec:
       targetPort: 8889
       protocol: TCP
   # Selector must match the pod labels emitted by the opentelemetry-collector
-  # Helm chart (verified against chart 0.159.0). The chart sets
+  # Helm chart (verified against chart 0.159.0; the Makefile pins the chart
+  # version via OTEL_COLLECTOR_VERSION — re-verify this selector whenever that
+  # version changes). The chart sets
   # app.kubernetes.io/component: standalone-collector on its pods when
   # mode: deployment — keep in sync with the Deployment's
   # spec.selector.matchLabels, not just the Service metadata labels above

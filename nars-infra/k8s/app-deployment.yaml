@@ -63,9 +63,32 @@ spec:
           envFrom:
             - configMapRef:
                 name: nars-config
-            - secretRef:
-                name: nars-secrets
           env:
+            # Least-privilege: pull only the keys nars-api actually reads, not the
+            # whole nars-secrets secret (which also carries postgres_password and
+            # gpg-passphrase — the DB password is already embedded in the
+            # connection string, but the backup GPG passphrase is unrelated to
+            # the API and must not be exposed to its environment).
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: nars-secrets
+                  key: ConnectionStrings__DefaultConnection
+            - name: Jwt__SecretKey
+              valueFrom:
+                secretKeyRef:
+                  name: nars-secrets
+                  key: Jwt__SecretKey
+            - name: AdminSignup__SignupToken
+              valueFrom:
+                secretKeyRef:
+                  name: nars-secrets
+                  key: AdminSignup__SignupToken
+            - name: Segmentation__InternalToken
+              valueFrom:
+                secretKeyRef:
+                  name: nars-secrets
+                  key: Segmentation__InternalToken
             # Containers don't need runtime config file watching; disabling it
             # avoids inotify exhaustion on constrained local clusters.
             - name: DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE

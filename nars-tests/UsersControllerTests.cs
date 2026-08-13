@@ -253,7 +253,7 @@ public class UsersControllerTests
     }
 
     [Fact]
-    public async Task UpdateCredentials_SameUsernameNoConflict()
+    public async Task UpdateCredentials_WithSameUsername_ReturnsServiceUser()
     {
         var userId = Guid.NewGuid();
         var user = CreateUser(userId, username: "sameuser");
@@ -273,7 +273,7 @@ public class UsersControllerTests
     }
 
     [Fact]
-    public async Task UpdateCredentials_EmailNormalizedToLowercase()
+    public async Task UpdateCredentials_WithMixedCaseEmail_ReturnsServiceUser()
     {
         var userId = Guid.NewGuid();
         var user = CreateUser(userId, email: "mixed@example.com");
@@ -292,7 +292,7 @@ public class UsersControllerTests
     }
 
     [Fact]
-    public async Task UpdateCredentials_SameEmailNoConflict()
+    public async Task UpdateCredentials_WithSameEmail_ReturnsServiceUser()
     {
         var userId = Guid.NewGuid();
         var user = CreateUser(userId, email: "same@example.com");

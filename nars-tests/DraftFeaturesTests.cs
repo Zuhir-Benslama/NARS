@@ -12,11 +12,42 @@ namespace NarsApi.Tests;
 
 public class DraftFeaturesServiceTests
 {
+    /// <summary>
+    /// A testable subclass that replaces the PostgreSQL-specific conditional
+    /// ExecuteUpdateAsync with an equivalent tracked update usable with the
+    /// InMemory provider (which does not implement ExecuteUpdateAsync). The
+    /// real PostgreSQL code path is covered by integration tests.
+    /// </summary>
+    private sealed class TestableDraftFeaturesService(
+        AppDbContext db,
+        ISegmentationClient segmentationClient,
+        IDateTimeProvider timeProvider) : DraftFeaturesService(db, segmentationClient, new CommuneScopeService(db), timeProvider)
+    {
+        private readonly AppDbContext _db = db;
+
+        protected override async Task<int> TryReviewDraftAsync(
+            Guid draftId, string newStatus, Guid reviewedBy, DateTimeOffset reviewedAt, CancellationToken ct)
+        {
+            var draft = await _db.AiDraftFeatures.FirstOrDefaultAsync(
+                f => f.Id == draftId && f.Status == AiDraftFeature.StatusPending, ct);
+            if (draft is null)
+            {
+                return 0;
+            }
+
+            var entry = _db.Entry(draft);
+            entry.Property(f => f.Status).CurrentValue = newStatus;
+            entry.Property(f => f.ReviewedBy).CurrentValue = reviewedBy;
+            entry.Property(f => f.ReviewedAt).CurrentValue = reviewedAt;
+            await _db.SaveChangesAsync(ct);
+            return 1;
+        }
+    }
+
     private static DraftFeaturesService CreateService(AppDbContext db, ISegmentationClient? segmentationClient = null) =>
-        new(
+        new TestableDraftFeaturesService(
             db,
             segmentationClient ?? Mock.Of<ISegmentationClient>(),
-            new CommuneScopeService(db),
             Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow));
 
     private static async Task SeedAsync(AppDbContext db)
@@ -59,7 +90,7 @@ public class DraftFeaturesServiceTests
 
         var drafts = await svc.ListDraftsAsync(UserRoles.FieldWorker, CommuneId100, null, null, CommuneId100, null, AiDraftFeature.StatusPending, default);
 
-        var draft = Assert.Single(drafts);
+        var draft = Assert.Single(drafts.Items);
         Assert.Equal(draftId, draft.Id);
     }
 

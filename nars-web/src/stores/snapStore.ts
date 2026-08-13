@@ -34,6 +34,9 @@ export const useSnapStore = defineStore("snap", {
     setEditDragActive(v: boolean): void {
       this.editDragActive = v
     },
+    setSnapExclude(id: string | null): void {
+      this.snapExclude = id
+    },
     setOrigMarkerSetLngLat(fn: MarkerSetLngLatFn | null): void {
       this.origMarkerSetLngLat = fn
     },

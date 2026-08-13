@@ -28,13 +28,14 @@ public interface IDraftFeaturesService
         CancellationToken ct);
 
     /// <summary>
-    /// Lists pending draft features for a commune. Throws when the caller has
+    /// Lists draft features for a commune. Throws when the caller has
     /// no access to the commune.
     /// </summary>
-    Task<List<AiDraftFeatureDto>> ListDraftsAsync(
+    Task<PagedResponse<AiDraftFeatureDto>> ListDraftsAsync(
         string callerRole, int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
         int communeId, string? featureType, string status,
-        CancellationToken ct);
+        int skip = 0, int take = 100,
+        CancellationToken ct = default);
 
     /// <summary>Marks a draft accepted if the caller may review it.</summary>
     Task<DraftReviewResult> AcceptDraftAsync(
@@ -57,7 +58,7 @@ public enum DraftReviewStatus
     Forbidden,
 }
 
-public sealed class DraftFeaturesService(
+public class DraftFeaturesService(
     AppDbContext db,
     ISegmentationClient segmentationClient,
     ICommuneScopeService communeScope,
@@ -86,9 +87,8 @@ public sealed class DraftFeaturesService(
         }
 
         SegmentationResult result;
-        await using var stream = tileStream;
         result = await _segmentationClient.SegmentTileAsync(
-            stream, fileName, contentType, bbox, ct);
+            tileStream, fileName, contentType, bbox, ct);
 
         var now = _timeProvider.UtcNow;
         var draftEntities = new List<AiDraftFeature>();
@@ -124,10 +124,11 @@ public sealed class DraftFeaturesService(
             DraftIds: draftEntities.Select(d => d.Id).ToList());
     }
 
-    public async Task<List<AiDraftFeatureDto>> ListDraftsAsync(
+    public async Task<PagedResponse<AiDraftFeatureDto>> ListDraftsAsync(
         string callerRole, int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
         int communeId, string? featureType, string status,
-        CancellationToken ct)
+        int skip = 0, int take = 100,
+        CancellationToken ct = default)
     {
         if (!await CanAccessCommuneAsync(callerRole, callerCommuneId, callerDairaId, callerWilayaId, communeId, ct))
         {
@@ -142,11 +143,16 @@ public sealed class DraftFeaturesService(
             query = query.Where(f => f.FeatureType == featureType);
         }
 
-        return await query
+        var total = await query.CountAsync(ct);
+        var items = await query
             .OrderByDescending(f => f.Confidence)
+            .Skip(skip)
+            .Take(take)
             .Select(f => new AiDraftFeatureDto(
                 f.Id, f.FeatureType, f.GeometryGeoJson, f.Confidence, f.Status, f.CreatedAt))
             .ToListAsync(ct);
+
+        return new PagedResponse<AiDraftFeatureDto>(items, total, skip, take);
     }
 
     public Task<DraftReviewResult> AcceptDraftAsync(
@@ -181,17 +187,41 @@ public sealed class DraftFeaturesService(
             return new DraftReviewResult(DraftReviewStatus.AlreadyReviewed);
         }
 
-        if (accept)
+        // Atomic conditional update closes the TOCTOU window between the status
+        // read above and the write: only one concurrent reviewer can transition
+        // a pending draft, and the losing reviewer sees AlreadyReviewed instead
+        // of silently overwriting the winner's decision.
+        var newStatus = accept ? AiDraftFeature.StatusAccepted : AiDraftFeature.StatusRejected;
+        var reviewedAt = _timeProvider.UtcNow;
+        var affected = await TryReviewDraftAsync(draftId, newStatus, userId, reviewedAt, ct);
+
+        if (affected == 0)
         {
-            draft.MarkAccepted(reviewedBy: userId, reviewedAt: _timeProvider.UtcNow);
-        }
-        else
-        {
-            draft.MarkRejected(reviewedBy: userId, reviewedAt: _timeProvider.UtcNow);
+            var stillExists = await _db.AiDraftFeatures.AsNoTracking()
+                .AnyAsync(f => f.Id == draftId, ct);
+            return stillExists
+                ? new DraftReviewResult(DraftReviewStatus.AlreadyReviewed)
+                : new DraftReviewResult(DraftReviewStatus.NotFound);
         }
 
-        await _db.SaveChangesAsync(ct);
         return new DraftReviewResult(DraftReviewStatus.Success);
+    }
+
+    /// <summary>
+    /// Applies the review status transition as a single conditional UPDATE ... WHERE
+    /// Status = 'pending', returning the number of affected rows. Kept virtual so
+    /// tests can substitute an equivalent tracked update for the InMemory provider,
+    /// which does not implement ExecuteUpdateAsync.
+    /// </summary>
+    protected virtual async Task<int> TryReviewDraftAsync(
+        Guid draftId, string newStatus, Guid reviewedBy, DateTimeOffset reviewedAt, CancellationToken ct)
+    {
+        return await _db.AiDraftFeatures
+            .Where(f => f.Id == draftId && f.Status == AiDraftFeature.StatusPending)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(f => f.Status, newStatus)
+                .SetProperty(f => f.ReviewedBy, reviewedBy)
+                .SetProperty(f => f.ReviewedAt, reviewedAt), ct);
     }
 
     private Task<bool> CanAccessCommuneAsync(

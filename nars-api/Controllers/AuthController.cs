@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -54,6 +53,11 @@ public partial class AuthController(
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> SignIn([FromBody] SignInRequest body, CancellationToken cancellationToken = default)
     {
+        if (body is null)
+        {
+            return Problem(detail: "Request body is required.", statusCode: 400);
+        }
+
         var normalizedUsername = body.Username.ToLowerInvariant();
         var credentialResult = await authorizationService.VerifyCredentialsAsync(
             normalizedUsername, body.Password, MaxFailedAttempts, LockoutMinutes, cancellationToken);
@@ -146,10 +150,10 @@ public partial class AuthController(
             return Problem(detail: "User no longer exists.", statusCode: 401);
         }
 
-        if (!int.TryParse(User.FindFirstValue(ClaimNames.CommuneId), out var communeId))
-        {
-            communeId = user.CommuneId ?? 0;
-        }
+        // Prefer the freshly-loaded DB value over the (potentially stale) JWT
+        // claim: if an admin moved the user to another commune right after
+        // token issuance, the location chain must reflect the new scope.
+        var communeId = user.CommuneId ?? 0;
 
         Models.Daira? daira = null;
         Models.Commune? commune = null;

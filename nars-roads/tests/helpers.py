@@ -19,6 +19,11 @@ except ImportError:
 
 requires_torch = pytest.mark.skipif(not _TORCH_AVAILABLE, reason="torch not installed")
 
+# Default georeferencing for generated test tiles (EPSG:4326). Keep a named
+# constant so tests can assert on the exact transform instead of duplicating
+# the literal.
+DEFAULT_TRANSFORM = Affine(1.0, 0.0, 100.0, 0.0, -1.0, 50.0)
+
 
 def make_tiff_bytes(
     width: int = 64,
@@ -33,7 +38,7 @@ def make_tiff_bytes(
     data[1, height // 4 : height // 2, width // 8 : 7 * width // 8] = (
         np.iinfo(dt).max if dt.kind == "u" else 200.0
     )
-    transform = transform or Affine(1.0, 0.0, 100.0, 0.0, -1.0, 50.0)
+    transform = transform or DEFAULT_TRANSFORM
     with MemoryFile() as memfile:
         with memfile.open(
             driver="GTiff",
