@@ -8,6 +8,7 @@ const mockDebugLog = vi.fn()
 
 vi.mock("../map/core/state", () => ({
   getCtx: () => ({ featuresSource: { setData: mockSetData } }),
+  tryGetCtx: () => ({ featuresSource: { setData: mockSetData } }),
 }))
 
 vi.mock("../utils/debug", () => ({

@@ -7,7 +7,7 @@ import { useFeaturesStore } from "../stores/featuresStore"
 
 vi.mock("../lib/toast", () => ({ showToast: vi.fn() }))
 
-vi.mock("./core/state", () => ({ getCtx: () => ({}) }))
+vi.mock("./core/state", () => ({ getCtx: () => ({}), tryGetCtx: () => ({}) }))
 
 const REFERENCE_COLOR = "#f39c12"
 const DEFAULT_ROAD_COLOR = "#3498db"

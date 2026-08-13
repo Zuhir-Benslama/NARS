@@ -41,6 +41,15 @@ export function getCtx(): MapContext {
 }
 
 /**
+ * Non-throwing variant — returns null before initMap(). Use in contexts that
+ * must tolerate an uninitialized map (e.g. store actions fired during the
+ * mount-to-initMap window).
+ */
+export function tryGetCtx(): MapContext | null {
+  return _ctx
+}
+
+/**
  * Internal setter — called once from initMap() after constructing the ctx object.
  */
 export function _setCtx(ctx: MapContext): void {

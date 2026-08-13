@@ -10,7 +10,7 @@
 //   - We look up features by properties.dbId and our in-memory array instead
 
 import { defineStore } from "pinia"
-import { getCtx, type MaplibreFeature } from "../map/core/state"
+import { tryGetCtx, type MaplibreFeature } from "../map/core/state"
 import { debugWarn, debugLog } from "../utils/debug"
 
 export const useFeaturesStore = defineStore("features", {
@@ -87,7 +87,7 @@ export const useFeaturesStore = defineStore("features", {
     },
 
     updateSource() {
-      const ctx = getCtx()
+      const ctx = tryGetCtx()
       if (!ctx?.featuresSource) {
         debugWarn("updateSource called but ctx.featuresSource is NOT set!")
         return

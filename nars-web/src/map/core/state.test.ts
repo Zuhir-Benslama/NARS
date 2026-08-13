@@ -25,6 +25,10 @@ describe("ctx / getCtx", () => {
     expect(() => mod.getCtx()).toThrow("accessed before initMap")
   })
 
+  it("tryGetCtx returns null before initMap", () => {
+    expect(mod.tryGetCtx()).toBeNull()
+  })
+
   it("_setCtx + getCtx returns context", () => {
     mod._setCtx({ map: mockMap, geoman: undefined })
     const ctx = mod.getCtx()
@@ -150,6 +154,19 @@ describe("featuresStore (Pinia)", () => {
     store.updateSource()
 
     expect(featuresSource.setData).not.toHaveBeenCalled()
+  })
+
+  it("updateSource does not throw before initMap", async () => {
+    const { useFeaturesStore } = await import("../../stores/featuresStore")
+    mod.resetMapState()
+    const store = useFeaturesStore()
+    store.add({
+      id: "1",
+      geometry: { type: "Point", coordinates: [0, 0] } as any,
+      properties: { phaseKey: "areas", label: "A" },
+    })
+
+    expect(store.getAll()).toHaveLength(1)
   })
 
   it("updateSource sets feature collection without id field", async () => {
