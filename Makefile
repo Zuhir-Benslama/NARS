@@ -837,7 +837,7 @@ kustomize-apply: secrets-validate _check-pinned-tag _check-local-ingresses ## Ap
 	@echo "→ Applying kustomization (images: $(DOCKER_ORG)/*:$(IMAGE_TAG))..."
 	@$(KUBECTL) kustomize "$(K8S_DIR)" \
 		| awk -v org="$(DOCKER_ORG)" -v tag="$(IMAGE_TAG)" -v images="$(REGISTRY_IMAGES)" \
-			'BEGIN { esc = org; gsub(/\//, "\\/", esc); n = split(images, imgs, " "); alts = imgs[1]; for (i = 2; i <= n; i++) alts = alts "|" imgs[i]; pat = "^ *-? *image: " esc "\\/(" alts "):" } $$0 ~ pat { sub(/:[^ ]*$$/, ":" tag) } /app\.kubernetes\.io\/version:/ { sub(/version:.*$$/, "version: \\"" tag "\\"") } { print }' \
+			'BEGIN { esc = org; gsub(/\//, "\\/", esc); n = split(images, imgs, " "); alts = imgs[1]; for (i = 2; i <= n; i++) alts = alts "|" imgs[i]; pat = "^ *-? *image: " esc "\\/(" alts "):" } $$0 ~ pat { sub(/:[^ ]*$$/, ":" tag) } /app\.kubernetes\.io\/version:/ { sub(/version:.*$$/, "version: \"" tag "\"") } { print }' \
 		| $(KUBECTL) apply -f -
 	@echo "✓ Kustomization applied"
 
@@ -886,86 +886,8 @@ postgis-password-sync: ## Align postgres user password with POSTGRES_PASSWORD (f
 .PHONY: postgis-migration-baseline
 postgis-migration-baseline: ## Backfill EF migration history for pre-existing schemas
 	@echo "→ Ensuring EF migration history baseline..."
-# Make expands $$$$ → $$, then the single-quoted heredoc 'SQL' prevents
-# shell expansion, so psql receives $$ as PL/pgSQL dollar-quoting.
-	@cat <<'SQL' | $(KUBECTL) exec -i -n "$(NAMESPACE)" deployment/postgis -- \
+	@cat "nars-infra/scripts/postgis-migration-baseline.sql" | $(KUBECTL) exec -i -n "$(NAMESPACE)" deployment/postgis -- \
 		psql -U postgres -d "$(DB_NAME)" -v ON_ERROR_STOP=1 >/dev/null
-	CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
-	    "MigrationId" character varying(150) NOT NULL,
-	    "ProductVersion" character varying(32) NOT NULL,
-	    CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY ("MigrationId")
-	);
-
-	DO $$$$
-	DECLARE
-	    has_areas boolean;
-	    has_inspections boolean;
-	    has_inspections_fk boolean;
-	    has_security_stamp boolean;
-	BEGIN
-	    SELECT EXISTS (
-	        SELECT 1
-	        FROM information_schema.tables
-	        WHERE table_schema = 'public' AND table_name = 'areas'
-	    ) INTO has_areas;
-
-	    SELECT EXISTS (
-	        SELECT 1
-	        FROM information_schema.tables
-	        WHERE table_schema = 'public' AND table_name = 'inspections'
-	    ) INTO has_inspections;
-
-	    -- AddForeignKeys (20260808070428) is reflected by the inspections→users
-	    -- FK that both the EF migration and create_nars_db.sql create.
-	    SELECT EXISTS (
-	        SELECT 1
-	        FROM information_schema.table_constraints
-	        WHERE table_schema = 'public'
-	          AND constraint_type = 'FOREIGN KEY'
-	          AND table_name = 'inspections'
-	          AND UPPER(constraint_name) = 'FK_INSPECTIONS_USERS_USER_ID'
-	    ) INTO has_inspections_fk;
-
-	    -- AddUserSecurityStamp (20260810062821) is reflected by the column itself.
-	    SELECT EXISTS (
-	        SELECT 1
-	        FROM information_schema.columns
-	        WHERE table_schema = 'public'
-	          AND table_name = 'users'
-	          AND column_name = 'security_stamp'
-	    ) INTO has_security_stamp;
-
-	    IF has_areas THEN
-	        INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
-	        VALUES ('20260510191030_AddErrorLogs', '10.0.10')
-	        ON CONFLICT ("MigrationId") DO NOTHING;
-	    END IF;
-
-	    IF has_inspections THEN
-	        INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
-	        VALUES ('20260511062948_AddInspections', '10.0.10')
-	        ON CONFLICT ("MigrationId") DO NOTHING;
-	    END IF;
-
-	    IF has_areas AND has_inspections THEN
-	        INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
-	        VALUES ('20260705061915_MigrateToTimestamptz', '10.0.10')
-	        ON CONFLICT ("MigrationId") DO NOTHING;
-	    END IF;
-
-	    IF has_inspections_fk THEN
-	        INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
-	        VALUES ('20260808070428_AddForeignKeys', '10.0.10')
-	        ON CONFLICT ("MigrationId") DO NOTHING;
-	    END IF;
-
-	    IF has_security_stamp THEN
-	        INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
-	        VALUES ('20260810062821_AddUserSecurityStamp', '10.0.10')
-	        ON CONFLICT ("MigrationId") DO NOTHING;
-	    END IF;
-	END $$$$;
-	SQL
 	@echo "✓ EF migration history baseline ensured"
 
 .PHONY: db-migrate-nars
