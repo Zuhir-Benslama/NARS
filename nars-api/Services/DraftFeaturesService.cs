@@ -16,7 +16,7 @@ namespace NarsApi.Services;
 public interface IDraftFeaturesService
 {
     /// <summary>
-    /// Runs road+building segmentation on the uploaded tile and persists the
+    /// Runs building segmentation on the uploaded tile and persists the
     /// results as pending draft features for the commune. Returns an empty
     /// list of ids when no features were detected. Throws when the caller has
     /// no access to the commune or the commune does not exist.
@@ -93,17 +93,6 @@ public class DraftFeaturesService(
         var now = _timeProvider.UtcNow;
         var draftEntities = new List<AiDraftFeature>();
 
-        foreach (var road in result.Roads)
-        {
-            draftEntities.Add(AiDraftFeature.Create(
-                featureType: "road",
-                geometryGeoJson: road.GeometryGeoJson,
-                confidence: road.Confidence,
-                communeId: communeId,
-                sourceTileRef: fileName,
-                createdAt: now));
-        }
-
         foreach (var building in result.Buildings)
         {
             draftEntities.Add(AiDraftFeature.Create(
@@ -119,7 +108,6 @@ public class DraftFeaturesService(
         await _db.SaveChangesAsync(ct);
 
         return new SegmentSummaryResponse(
-            RoadCount: result.Roads.Count,
             BuildingCount: result.Buildings.Count,
             DraftIds: draftEntities.Select(d => d.Id).ToList());
     }

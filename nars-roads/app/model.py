@@ -1,12 +1,18 @@
 """
-Multi-class segmentation model wrapper.
+Single-class segmentation model wrapper (background / foreground).
 
-Single U-Net (ResNet34 encoder) producing 3 classes per pixel:
-  0 = background, 1 = road, 2 = building
+One U-Net (ResNet34 encoder) produces a 2-class-per-pixel map:
+  0 = background, 1 = the foreground object (building, road, ...)
 
-Training the weights is out of scope for this file - this only covers
-loading a checkpoint and running inference. Swap `_build_model` for
-D-LinkNet or another architecture without touching main.py or postprocess.py.
+Each feature type gets its own `SegmentationModel` instance (see the model
+registry in main.py), so checkpoints can be swapped and released
+independently. The buildings checkpoint (`unet_bldg_base.pth`) is the HOT
+fAIr building baseline from
+https://huggingface.co/nilsho01/unet-resnet34-vhr-buildings, a drop-in
+smp.Unet(resnet34, classes=2) state_dict. Training the weights is out of
+scope for this file - this only covers loading a checkpoint and running
+inference. Swap `_build_model` for D-LinkNet or another architecture
+without touching main.py or postprocess.py.
 """
 
 from __future__ import annotations
@@ -27,7 +33,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("nars-roads.model")
 
-NUM_CLASSES = 3  # background, road, building
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
@@ -58,10 +63,15 @@ def _import_torch():
 
 class SegmentationModel:
     def __init__(
-        self, weights_path: str, tile_size: int = 1024, device: str | None = None
+        self,
+        weights_path: str,
+        tile_size: int = 1024,
+        num_classes: int = 2,
+        device: str | None = None,
     ):
         torch = _import_torch()
         self.tile_size = tile_size
+        self.num_classes = num_classes
         self.device = torch.device(
             device or ("cuda" if torch.cuda.is_available() else "cpu")
         )
@@ -96,7 +106,7 @@ class SegmentationModel:
             encoder_name="resnet34",
             encoder_weights=None,  # real weights loaded from checkpoint above
             in_channels=3,
-            classes=NUM_CLASSES,
+            classes=self.num_classes,
         )
 
     @staticmethod
@@ -141,7 +151,8 @@ class SegmentationModel:
 
     def _predict_tile(self, img: np.ndarray) -> np.ndarray:
         """Run the net on one tile, resizing to the model's expected input
-        size and back, returning per-class probabilities (H, W, NUM_CLASSES)."""
+        size and back, returning per-class probabilities
+        (H, W, self.num_classes)."""
         torch = _import_torch()
         import torch.nn.functional as F
 
@@ -168,9 +179,10 @@ class SegmentationModel:
 
     def predict(
         self, raw_bytes: bytes, bbox: tuple[float, float, float, float]
-    ) -> tuple[np.ndarray, np.ndarray, rasterio.Affine]:
-        """Returns (road_prob, building_prob, transform) where each prob map
-        is a float32 array of shape (H, W) with values in [0, 1].
+    ) -> tuple[np.ndarray, rasterio.Affine]:
+        """Returns (fg_prob, transform) where fg_prob is the foreground-class
+        (channel 1) probability map, a float32 array of shape (H, W) with
+        values in [0, 1].
 
         The raster is decoded one tile-sized window at a time instead of
         materializing the full image, so peak memory stays bounded by the
@@ -198,7 +210,7 @@ class SegmentationModel:
                             f"Tile decodes to {h}x{w} pixels; limit is {MAX_DECODED_PIXELS}"
                         )
 
-                    probs = np.zeros((h, w, NUM_CLASSES), dtype=np.float32)
+                    probs = np.zeros((h, w, self.num_classes), dtype=np.float32)
                     counts = np.zeros((h, w, 1), dtype=np.float32)
 
                     step = self.tile_size
@@ -217,6 +229,5 @@ class SegmentationModel:
                 raise InvalidTileError(f"Tile could not be decoded: {exc}") from exc
 
         probs = probs / np.clip(counts, 1.0, None)
-        road_prob = probs[:, :, 1]
-        building_prob = probs[:, :, 2]
-        return road_prob, building_prob, transform
+        fg_prob = probs[:, :, 1]
+        return fg_prob, transform

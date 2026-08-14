@@ -93,11 +93,9 @@ def model():
 @requires_torch
 def test_predict_shapes_and_georeferenced_transform(model):
     raw = make_tiff_bytes(width=64, height=48)
-    road, building, transform = model.predict(raw, bbox=(0.0, 0.0, 1.0, 1.0))
-    assert road.shape == (48, 64)
+    building, transform = model.predict(raw, bbox=(0.0, 0.0, 1.0, 1.0))
     assert building.shape == (48, 64)
-    assert road.dtype == np.float32
-    assert road.min() >= 0.0 and road.max() <= 1.0
+    assert building.dtype == np.float32
     assert building.min() >= 0.0 and building.max() <= 1.0
     assert transform == DEFAULT_TRANSFORM
 
@@ -105,7 +103,7 @@ def test_predict_shapes_and_georeferenced_transform(model):
 @requires_torch
 def test_predict_bbox_fallback_when_not_georeferenced(model):
     raw = make_tiff_bytes(width=64, height=48, transform=Affine.identity())
-    _, _, transform = model.predict(raw, bbox=(10.0, 20.0, 12.0, 21.0))
+    _, transform = model.predict(raw, bbox=(10.0, 20.0, 12.0, 21.0))
     expected = from_bounds(10.0, 20.0, 12.0, 21.0, width=64, height=48)
     assert transform == expected
 
@@ -118,17 +116,16 @@ def test_predict_decodes_windows_not_whole_image(model, monkeypatch):
     def fake_predict(chip):
         seen.append(chip.shape[:2])
         return np.broadcast_to(
-            np.array([0.0, 0.9, 0.1], dtype=np.float32),
-            chip.shape[:2] + (3,),
+            np.array([0.1, 0.9], dtype=np.float32),
+            chip.shape[:2] + (2,),
         ).copy()
 
     monkeypatch.setattr(model, "_predict_tile", fake_predict)
-    road, building, _ = model.predict(raw, bbox=(0.0, 0.0, 1.0, 1.0))
+    building, _ = model.predict(raw, bbox=(0.0, 0.0, 1.0, 1.0))
     # 80x100 with tile_size=32 -> rows 32/32/16, cols 32/32/32/4
     assert set(seen) == {(32, 32), (32, 4), (16, 32), (16, 4)}
-    assert road.shape == (80, 100)
-    assert np.allclose(road, 0.9)
-    assert np.allclose(building, 0.1)
+    assert building.shape == (80, 100)
+    assert np.allclose(building, 0.9)
 
 
 @requires_torch

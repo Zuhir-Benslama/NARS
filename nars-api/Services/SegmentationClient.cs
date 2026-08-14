@@ -6,7 +6,7 @@ namespace NarsApi.Services;
 
 public record SegmentedFeature(string GeometryGeoJson, double Confidence, string FeatureType);
 
-public record SegmentationResult(IReadOnlyList<SegmentedFeature> Roads, IReadOnlyList<SegmentedFeature> Buildings);
+public record SegmentationResult(IReadOnlyList<SegmentedFeature> Buildings);
 
 public interface ISegmentationClient
 {
@@ -53,7 +53,7 @@ public sealed class SegmentationClient : ISegmentationClient
             CultureInfo.InvariantCulture,
             $"?min_lon={bbox.MinLon}&min_lat={bbox.MinLat}&max_lon={bbox.MaxLon}&max_lat={bbox.MaxLat}");
 
-        using var response = await _httpClient.PostAsync($"/segment{query}", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"/segment/buildings{query}", content, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -68,10 +68,9 @@ public sealed class SegmentationClient : ISegmentationClient
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
 
-        var roads = ExtractFeatures(doc.RootElement.GetProperty("roads").GetProperty("features"), "road");
         var buildings = ExtractFeatures(doc.RootElement.GetProperty("buildings").GetProperty("features"), "building");
 
-        return new SegmentationResult(roads, buildings);
+        return new SegmentationResult(buildings);
     }
 
     private static List<SegmentedFeature> ExtractFeatures(JsonElement featureArray, string featureType)

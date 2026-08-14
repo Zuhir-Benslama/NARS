@@ -32,7 +32,7 @@ class FeatureCollection(BaseModel):
 
 
 class SegmentResponse(BaseModel):
-    """Top-level segmentation result: separate road and building collections."""
+    """Segmentation result keyed by feature type. Buildings only today; roads
+    will be added here when a road checkpoint exists in the model registry."""
 
-    roads: FeatureCollection
     buildings: FeatureCollection

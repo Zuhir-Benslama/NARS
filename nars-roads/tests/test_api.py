@@ -33,7 +33,7 @@ class _StubModel:
 
 
 def _post(**kwargs):
-    return client.post("/segment", **kwargs)
+    return client.post("/segment/buildings", **kwargs)
 
 
 def test_health_reports_model_not_loaded():
@@ -52,7 +52,7 @@ def test_ready_200_and_health_when_model_loaded(monkeypatch):
     # The readiness contract's success side: with real weights loaded the pod
     # reports ready and health reflects the loaded model. Mirrors the 503
     # paths tested elsewhere without needing torch (stub is enough).
-    monkeypatch.setattr(roads, "_model", _StubModel(is_loaded=True))
+    monkeypatch.setattr(roads, "_models", {"buildings": _StubModel(is_loaded=True)})
     ready = client.get("/ready")
     assert ready.status_code == 200
     assert ready.json() == {"status": "ready", "model_loaded": True}
@@ -87,7 +87,7 @@ def test_segment_rejects_empty_file(monkeypatch):
     import app.main as roads
 
     # Satisfy the readiness gate so the empty-upload check is what fires.
-    monkeypatch.setattr(roads, "_model", _StubModel())
+    monkeypatch.setattr(roads, "_models", {"buildings": _StubModel()})
     resp = _post(
         headers=AUTH,
         params=BBOX,
@@ -164,7 +164,7 @@ def test_segment_rejects_unready_model(monkeypatch):
     # /ready) instead of serving random predictions.
     import app.main as roads
 
-    monkeypatch.setattr(roads, "_model", _StubModel(is_loaded=False))
+    monkeypatch.setattr(roads, "_models", {"buildings": _StubModel(is_loaded=False)})
     resp = _post(
         headers=AUTH,
         params=BBOX,
@@ -177,7 +177,9 @@ def test_segment_returns_413_when_decode_too_large(monkeypatch):
     import app.main as roads
 
     monkeypatch.setattr(
-        roads, "_model", _StubModel(predict_error=TileTooLargeError("too big"))
+        roads,
+        "_models",
+        {"buildings": _StubModel(predict_error=TileTooLargeError("too big"))},
     )
     resp = _post(
         headers=AUTH,
@@ -193,7 +195,9 @@ def test_segment_returns_400_for_undecodable_tile(monkeypatch):
     import app.main as roads
 
     monkeypatch.setattr(
-        roads, "_model", _StubModel(predict_error=InvalidTileError("garbage tile"))
+        roads,
+        "_models",
+        {"buildings": _StubModel(predict_error=InvalidTileError("garbage tile"))},
     )
     resp = _post(
         headers=AUTH,
@@ -206,7 +210,11 @@ def test_segment_returns_400_for_undecodable_tile(monkeypatch):
 def test_segment_returns_500_on_inference_failure(monkeypatch):
     import app.main as roads
 
-    monkeypatch.setattr(roads, "_model", _StubModel(predict_error=RuntimeError("boom")))
+    monkeypatch.setattr(
+        roads,
+        "_models",
+        {"buildings": _StubModel(predict_error=RuntimeError("boom"))},
+    )
     resp = _post(
         headers=AUTH,
         params=BBOX,
@@ -223,11 +231,10 @@ def test_segment_schema_rejects_malformed_feature():
     with pytest.raises(ValidationError):
         SegmentResponse.model_validate(
             {
-                "roads": {
+                "buildings": {
                     "type": "FeatureCollection",
                     "features": [{"geometry": {"coordinates": []}}],  # missing type
                 },
-                "buildings": {"type": "FeatureCollection", "features": []},
             }
         )
 
@@ -237,24 +244,23 @@ def test_segment_schema_accepts_wellformed_features():
 
     parsed = SegmentResponse.model_validate(
         {
-            "roads": {
+            "buildings": {
                 "type": "FeatureCollection",
                 "features": [
                     {
                         "type": "Feature",
                         "geometry": {
-                            "type": "LineString",
-                            "coordinates": [[0, 0], [1, 1]],
+                            "type": "Polygon",
+                            "coordinates": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]],
                         },
-                        "properties": {"confidence": 0.9, "feature_type": "road"},
+                        "properties": {"confidence": 0.9, "feature_type": "building"},
                     }
                 ],
             },
-            "buildings": {"type": "FeatureCollection", "features": []},
         }
     )
-    assert parsed.roads.features[0].geometry.type == "LineString"
-    assert parsed.roads.features[0].properties["confidence"] == 0.9
+    assert parsed.buildings.features[0].geometry.type == "Polygon"
+    assert parsed.buildings.features[0].properties["confidence"] == 0.9
 
 
 def test_inference_concurrency_is_bounded():
@@ -291,7 +297,9 @@ def test_segment_rejects_oversized_upload(monkeypatch):
     import app.main as roads
 
     monkeypatch.setattr(roads, "MAX_TILE_BYTES", 1024)
-    monkeypatch.setattr(roads, "_model", _StubModel())  # pass the readiness gate
+    monkeypatch.setattr(
+        roads, "_models", {"buildings": _StubModel()}
+    )  # pass the readiness gate
     resp = _post(
         headers=AUTH,
         params=BBOX,
@@ -310,23 +318,23 @@ def test_segment_end_to_end_returns_geojson():
     import app.main as roads
 
     with TestClient(live_app) as live:
-        assert roads._model is not None
-        roads._model.is_loaded = True
+        assert roads._models["buildings"] is not None
+        roads._models["buildings"].is_loaded = True
         resp = live.post(
-            "/segment",
+            "/segment/buildings",
             params={**BBOX, "threshold": 0.5},
             headers=AUTH,
             files={"tile": ("t.tif", make_tiff_bytes(), "image/tiff")},
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert set(data) == {"roads", "buildings"}
+        assert set(data) == {"buildings"}
         for fc in data.values():
             assert fc["type"] == "FeatureCollection"
             assert isinstance(fc["features"], list)
             for feature in fc["features"]:
                 assert feature["type"] == "Feature"
-                assert feature["geometry"]["type"] in {"LineString", "Polygon"}
+                assert feature["geometry"]["type"] == "Polygon"
                 assert "coordinates" in feature["geometry"]
                 assert feature["properties"]["confidence"] >= 0.0
                 assert feature["properties"]["confidence"] <= 1.0

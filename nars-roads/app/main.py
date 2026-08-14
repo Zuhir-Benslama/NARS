@@ -1,7 +1,11 @@
 """
 NARS Segmentation Service
 Stateless inference microservice: satellite/aerial tile in -> GeoJSON draft
-features (roads as LineStrings, buildings as Polygons) out.
+features out. One model instance per feature type (a model registry) rather
+than a shared multiclass network, so each checkpoint can be swapped and
+released independently. Today only `buildings` has a checkpoint; `roads` is
+documented in the registry so adding a road model is a config entry plus a
+/segment/roads endpoint.
 
 This service owns no data. nars-api (.NET) is responsible for persisting
 results into ai_draft_features and for auth/business rules. This service
@@ -21,16 +25,13 @@ from app.model import (
     SegmentationModel,
     TileTooLargeError,
 )
-from app.postprocess import mask_to_linestrings, mask_to_polygons
+from app.postprocess import mask_to_polygons
 from app.schemas import FeatureCollection, SegmentResponse
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("nars-roads")
 
 INTERNAL_TOKEN = os.environ.get("NARS_ROADS_INTERNAL_TOKEN")
-WEIGHTS_PATH = os.environ.get(
-    "NARS_ROADS_WEIGHTS_PATH", "weights/unet_r34_multiclass.pth"
-)
 TILE_SIZE = int(os.environ.get("NARS_ROADS_TILE_SIZE", "1024"))
 # Upper bound on a single tile upload. Inference reads the whole tile into
 # memory, so an oversized upload is a pod-level memory-exhaustion risk.
@@ -41,9 +42,27 @@ MAX_CONCURRENT_INFERENCES = max(
     1, int(os.environ.get("NARS_ROADS_MAX_CONCURRENT_INFERENCES", "2"))
 )
 
+# Model registry: feature type -> how to build its model. Each entry is an
+# independent binary (foreground/background) checkpoint, so one task can be
+# updated or rolled back without touching the others. Roads stays commented
+# out until a road checkpoint exists; enabling it is this entry plus a
+# /segment/roads endpoint (postprocess: mask_to_linestrings).
+MODEL_SPECS: dict[str, dict] = {
+    "buildings": {
+        "weights_path": os.environ.get(
+            "NARS_ROADS_WEIGHTS_PATH", "weights/unet_bldg_base.pth"
+        ),
+        "num_classes": 2,
+    },
+    # "roads": {
+    #     "weights_path": os.environ.get("NARS_ROADS_ROADS_WEIGHTS_PATH"),
+    #     "num_classes": 2,
+    # },
+}
+
 # Built lazily in lifespan so importing this module (tests, tooling, --reload)
 # never forces a multi-hundred-MB weight load.
-_model: SegmentationModel | None = None
+_models: dict[str, SegmentationModel] = {}
 
 # Each inference can peak at ~500MB (25M-px prob maps + windows), so unbounded
 # threadpool concurrency on a 4Gi pod is an OOM risk. A small semaphore caps
@@ -53,17 +72,29 @@ INFERENCE_SEMAPHORE = threading.BoundedSemaphore(MAX_CONCURRENT_INFERENCES)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    global _model
-    _model = SegmentationModel(weights_path=WEIGHTS_PATH, tile_size=TILE_SIZE)
+    global _models
+    for task, spec in MODEL_SPECS.items():
+        _models[task] = SegmentationModel(
+            weights_path=spec["weights_path"],
+            num_classes=spec["num_classes"],
+            tile_size=TILE_SIZE,
+        )
     yield
-    _model = None
+    _models = {}
 
 
 app = FastAPI(
     title="NARS Segmentation Service",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
+
+
+def _buildings_loaded() -> bool:
+    """Readiness signal for the only task with real weights today. A missing
+    or unloaded model fails closed (never serves random predictions)."""
+    model = _models.get("buildings")
+    return model is not None and model.is_loaded
 
 
 def verify_internal_token(
@@ -82,14 +113,14 @@ def verify_internal_token(
 @app.get("/health")
 def health() -> dict:
     """Liveness: the process is up. Does not require the model to be loaded."""
-    return {"status": "ok", "model_loaded": _model.is_loaded if _model else False}
+    return {"status": "ok", "model_loaded": _buildings_loaded()}
 
 
 @app.get("/ready")
 def ready() -> dict:
     """Readiness: only report ready when real weights are loaded, so the pod
     never receives traffic while serving random predictions."""
-    if _model is None or not _model.is_loaded:
+    if not _buildings_loaded():
         raise HTTPException(status_code=503, detail="Model weights not loaded")
     return {"status": "ready", "model_loaded": True}
 
@@ -120,30 +151,17 @@ def _validate_bbox(
         )
 
 
-@app.post(
-    "/segment",
-    response_model=SegmentResponse,
-    dependencies=[Depends(verify_internal_token)],
-)
-def segment(
+def _segment_task(
+    task: str,
     tile: UploadFile,
     min_lon: float,
     min_lat: float,
     max_lon: float,
     max_lat: float,
-    threshold: float = 0.5,
-) -> SegmentResponse:
-    """
-    Run inference on a single georeferenced tile.
-
-    bbox is passed as four separate query params (min_lon, min_lat, max_lon,
-    max_lat) rather than one packed string, so nars-api doesn't have to do
-    any custom parsing on either side.
-
-    Declared as a plain `def` (not `async def`) so FastAPI runs it in the
-    threadpool: inference is CPU-bound and must not block the event loop,
-    which would stall /health during long requests.
-    """
+    threshold: float,
+) -> FeatureCollection:
+    """Run inference for one registered task and convert the foreground mask
+    to vector features. Shared by every /segment/<task> endpoint."""
     _validate_threshold(threshold)
     _validate_bbox(min_lon, min_lat, max_lon, max_lat)
 
@@ -152,12 +170,11 @@ def segment(
             status_code=415, detail=f"Unsupported content type: {tile.content_type}"
         )
 
-    # Cheap readiness gate before buffering the upload: an unready pod should
+    # Cheap readiness gate before buffering the upload: an unready task should
     # reject with 503 without reading (and discarding) up to MAX_TILE_BYTES.
-    # Mirrors /ready — a constructed-but-unloaded model (missing weights) must
-    # fail closed too, never serve random predictions.
-    if _model is None or not _model.is_loaded:
-        raise HTTPException(status_code=503, detail="Model not ready")
+    model = _models.get(task)
+    if model is None or not model.is_loaded:
+        raise HTTPException(status_code=503, detail=f"{task} model not ready")
 
     # Authoritative size cap: read one byte past the limit and reject if the
     # upload is bigger, so we never buffer an unbounded tile into memory.
@@ -174,15 +191,20 @@ def segment(
         # Cap concurrent inferences so a burst of large tiles can't OOM the
         # 4Gi pod; extra requests queue here instead of stacking ~500MB each.
         # Postprocessing runs under the same permit: the prob maps (~300MB)
-        # stay alive while skeletonize/find_contours allocate on top of them,
-        # so bounding the whole pipeline keeps peak memory tight.
+        # stay alive while find_contours allocates on top of them, so bounding
+        # the whole pipeline keeps peak memory tight.
         INFERENCE_SEMAPHORE.acquire()
         try:
-            road_prob, building_prob, transform = _model.predict(
+            fg_prob, transform = model.predict(
                 raw, bbox=(min_lon, min_lat, max_lon, max_lat)
             )
-            roads = mask_to_linestrings(road_prob, transform, threshold=threshold)
-            buildings = mask_to_polygons(building_prob, transform, threshold=threshold)
+            if task == "buildings":
+                features = mask_to_polygons(fg_prob, transform, threshold=threshold)
+            else:
+                # Future task (e.g. roads): mask_to_linestrings(fg_prob, ...).
+                raise HTTPException(
+                    status_code=500, detail=f"No postprocessor for task '{task}'"
+                )
         finally:
             INFERENCE_SEMAPHORE.release()
     except TileTooLargeError:
@@ -196,7 +218,41 @@ def segment(
         logger.exception("Inference failed")
         raise HTTPException(status_code=500, detail="Inference failed")
 
+    return FeatureCollection(features=features)
+
+
+@app.post(
+    "/segment/buildings",
+    response_model=SegmentResponse,
+    dependencies=[Depends(verify_internal_token)],
+)
+def segment_buildings(
+    tile: UploadFile,
+    min_lon: float,
+    min_lat: float,
+    max_lon: float,
+    max_lat: float,
+    threshold: float = 0.5,
+) -> SegmentResponse:
+    """
+    Run building inference on a single georeferenced tile.
+
+    bbox is passed as four separate query params (min_lon, min_lat, max_lon,
+    max_lat) rather than one packed string, so nars-api doesn't have to do
+    any custom parsing on either side.
+
+    Declared as a plain `def` (not `async def`) so FastAPI runs it in the
+    threadpool: inference is CPU-bound and must not block the event loop,
+    which would stall /health during long requests.
+    """
     return SegmentResponse(
-        roads=FeatureCollection(features=roads),
-        buildings=FeatureCollection(features=buildings),
+        buildings=_segment_task(
+            "buildings",
+            tile,
+            min_lon,
+            min_lat,
+            max_lon,
+            max_lat,
+            threshold,
+        )
     )

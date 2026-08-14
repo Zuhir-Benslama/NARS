@@ -15,7 +15,7 @@ public sealed class DraftFeaturesController(
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     /// <summary>
-    /// Submits an imagery tile for the given commune, runs road+building
+    /// Submits an imagery tile for the given commune, runs building
     /// segmentation, and stores the results as pending draft features.
     /// The caller must have access to the commune. Does not touch production
     /// feature tables.

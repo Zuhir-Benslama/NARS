@@ -36,12 +36,13 @@ spec:
           command: ["/bin/sh", "-c"]
           args:
             - |
+              set -e
               if [ -z "$NARS_ROADS_WEIGHTS_URL" ]; then
                 echo "NARS_ROADS_WEIGHTS_URL is not set; cannot fetch weights" >&2
                 exit 1
               fi
               curl --fail --silent --show-error --location \
-                "$NARS_ROADS_WEIGHTS_URL" -o /srv/weights/unet_r34_multiclass.pth
+                "$NARS_ROADS_WEIGHTS_URL" -o /srv/weights/unet_bldg_base.pth
               ls -lh /srv/weights
           env:
             - name: NARS_ROADS_WEIGHTS_URL
@@ -85,7 +86,7 @@ spec:
                   name: nars-roads-secrets
                   key: internal-token
             - name: NARS_ROADS_WEIGHTS_PATH
-              value: /srv/weights/unet_r34_multiclass.pth
+              value: /srv/weights/unet_bldg_base.pth
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://otel-collector.observability:4317"
             - name: OTEL_SERVICE_NAME

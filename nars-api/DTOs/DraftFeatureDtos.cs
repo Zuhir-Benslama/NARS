@@ -28,7 +28,7 @@ public sealed class SegmentTileRequest
     public double? MaxLat { get; set; }
 }
 
-public sealed record SegmentSummaryResponse(int RoadCount, int BuildingCount, List<Guid> DraftIds);
+public sealed record SegmentSummaryResponse(int BuildingCount, List<Guid> DraftIds);
 
 public sealed record AiDraftFeatureDto(
     Guid Id,

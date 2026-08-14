@@ -48,7 +48,7 @@ COPY app ./app
 # copy at runtime. Kept empty in git; place a checkpoint here for local runs.
 COPY weights ./weights
 
-ENV NARS_ROADS_WEIGHTS_PATH=/srv/weights/unet_r34_multiclass.pth
+ENV NARS_ROADS_WEIGHTS_PATH=/srv/weights/unet_bldg_base.pth
 ENV NARS_ROADS_TILE_SIZE=1024
 ENV HOME=/home/nars-roads
 
