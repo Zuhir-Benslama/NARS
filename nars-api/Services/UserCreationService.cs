@@ -67,8 +67,10 @@ public sealed class UserCreationService(
         }
         catch (DbUpdateException ex)
         {
-            logger.LogWarning(ex, "Duplicate user during account creation (username={Username}, email={Email})",
-                username, email);
+            // Sanitize line endings to prevent log forging; email is intentionally
+            // omitted from the log (PII, and not needed for this diagnostic).
+            logger.LogWarning(ex, "Duplicate user during account creation (username={Username})",
+                username.ReplaceLineEndings(" "));
             return ManagedUserCreationResult.Failure(409, "A user with that username or email already exists.");
         }
 

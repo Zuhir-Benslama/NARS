@@ -96,7 +96,8 @@ public partial class AuthController
 
         logger.LogInformation(
             "[Auth] {AdminUser} ({AdminRole}) created {NewRole} account {NewUser} via login page",
-            admin.Username, admin.Role, newUser.Role, newUser.Username);
+            admin.Username.ReplaceLineEndings(" "), admin.Role.ReplaceLineEndings(" "),
+            newUser.Role.ReplaceLineEndings(" "), newUser.Username.ReplaceLineEndings(" "));
 
         // Same 201 envelope as POST /api/admin/users (CreateAdminResponse) so
         // both account-creation endpoints expose an identical contract.

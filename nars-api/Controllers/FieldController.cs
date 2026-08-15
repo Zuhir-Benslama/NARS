@@ -96,7 +96,7 @@ public class FieldController(
             featureId, RequiredCurrentUserId, normalizedType, body.Status, rawData, cancellationToken);
 
         logger.LogInformation("[Field] Worker {WorkerId} inspected {Type} {FeatureId} — status: {Status}",
-            CurrentUserId, body.Type, featureId, body.Status);
+            CurrentUserId, body.Type.ReplaceLineEndings(" "), featureId, body.Status.ReplaceLineEndings(" "));
 
         return StatusCode(201, new FieldInspectSubmitResponse(
             Success: true,

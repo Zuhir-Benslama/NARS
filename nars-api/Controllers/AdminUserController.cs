@@ -46,7 +46,7 @@ public class AdminUserController(
         var newUser = result.User!;
 
         logger.LogInformation("[Admin] {CallerRole} {CallerId} created {Role} {UserId}",
-            CurrentUserRole, CurrentUserId, body.Role, newUser.Id);
+            CurrentUserRole.ReplaceLineEndings(" "), CurrentUserId, body.Role.ReplaceLineEndings(" "), newUser.Id);
 
         return StatusCode(201, new CreateAdminResponse(
             Success: true,

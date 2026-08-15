@@ -10,18 +10,14 @@ let DOMPurifyInstance: ReturnType<typeof createDOMPurify>
 if (typeof window !== "undefined") {
   DOMPurifyInstance = createDOMPurify(window)
 } else {
-  // Fallback for SSR/test environments — strip all HTML tags without a DOM.
-  // Removes script/style blocks first (their content may contain ">"), then
-  // strips remaining tags. Requiring a tag name after "<" avoids treating a
-  // lone ">" in text as markup, which the naive `<[^>]*>` regex mishandled.
+  // SSR/test fallback without a DOM: there is no HTML parser available, so the
+  // only transform that is provably safe is to HTML-escape everything into
+  // inert text. Escaping is lossless for text content and guarantees no tag,
+  // attribute, or entity can be interpreted as markup by whatever renders the
+  // output. Never try to strip tags with regular expressions here — that is
+  // exactly the class of sanitizer that is known to be bypassable.
   DOMPurifyInstance = {
-    sanitize: (dirty: string) => {
-      let out = dirty.replace(/\0/g, "")
-      out = out.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "")
-      out = out.replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, "")
-      out = out.replace(/<\/?[a-z][^>]*>/gi, "")
-      return out
-    },
+    sanitize: (dirty: string) => encodeTextAttribute(dirty),
   } as ReturnType<typeof createDOMPurify>
 }
 

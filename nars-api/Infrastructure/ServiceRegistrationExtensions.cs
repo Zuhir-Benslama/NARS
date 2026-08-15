@@ -174,6 +174,12 @@ public static class ServiceRegistrationExtensions
                                                                                      {
                                                                                          options.HeaderName = "X-CSRF-Token";
                                                                                          options.Cookie.Name = "X-CSRF-TOKEN-COOKIE";
+                                                                                         // Intentionally NOT HttpOnly: this is a double-submit CSRF
+                                                                                         // token cookie that the SPA must read (via JS) to send back
+                                                                                         // in the X-CSRF-Token header. Making it HttpOnly would break
+                                                                                         // every POST/PATCH/DELETE request. The cookie carries no session
+                                                                                         // material — the access/refresh JWTs are in separate cookies.
+                                                                                         // (CodeQL cs/web/cookie-httponly-not-set — false positive.)
                                                                                          options.Cookie.HttpOnly = false;
                                                                                          options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
                                                                                      });

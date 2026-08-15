@@ -139,17 +139,23 @@ describe("sanitize", () => {
       return await import("./sanitize")
     }
 
-    it("strips all tags without a window", async () => {
+    it("escapes all markup into inert text without a window", async () => {
       const mod = await importWithoutWindow()
-      expect(mod.sanitizeApiText("<b>bold</b>")).toBe("bold")
-      expect(mod.sanitizeHtml("<strong>bold</strong> <em>italic</em>")).toBe("bold italic")
+      expect(mod.sanitizeApiText("<b>bold</b>")).toBe("&lt;b&gt;bold&lt;/b&gt;")
+      expect(mod.sanitizeHtml("<strong>bold</strong> <em>italic</em>")).toBe(
+        "&lt;strong&gt;bold&lt;/strong&gt; &lt;em&gt;italic&lt;/em&gt;",
+      )
     })
 
-    it("removes script/style blocks entirely, including content with angle brackets", async () => {
+    it("escapes script/style blocks including content with angle brackets", async () => {
       const mod = await importWithoutWindow()
       const payload = '<script>document.write("<img src=x onerror=alert(1)>")</script>safe'
-      expect(mod.sanitizeApiText(payload)).toBe("safe")
-      expect(mod.sanitizeApiText('<style>a { content: ">" }</style>')).toBe("")
+      expect(mod.sanitizeApiText(payload)).toBe(
+        "&lt;script&gt;document.write(&quot;&lt;img src=x onerror=alert(1)&gt;&quot;)&lt;/script&gt;safe",
+      )
+      expect(mod.sanitizeApiText('<style>a { content: ">" }</style>')).toBe(
+        "&lt;style&gt;a { content: &quot;&gt;&quot; }&lt;/style&gt;",
+      )
     })
 
     it("strips null bytes and leaves text intact", async () => {
