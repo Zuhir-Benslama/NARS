@@ -5,10 +5,9 @@ here runs against the app with _model == None. That is enough to exercise
 auth, validation, upload caps and the health/ready contract end to end."""
 
 import pytest
-from fastapi.testclient import TestClient
-
 from app.main import app
 from app.model import InvalidTileError, TileTooLargeError
+from fastapi.testclient import TestClient
 from helpers import make_tiff_bytes, requires_torch
 
 client = TestClient(app)
@@ -29,7 +28,7 @@ class _StubModel:
     def predict(self, raw, bbox):
         if self._predict_error is not None:
             raise self._predict_error
-        raise AssertionError("test bug: predict should not be reached")
+        raise AssertionError("test bug: predict should not be reached")  # noqa: TRY003
 
 
 def _post(**kwargs):
@@ -224,9 +223,8 @@ def test_segment_returns_500_on_inference_failure(monkeypatch):
 
 
 def test_segment_schema_rejects_malformed_feature():
-    from pydantic import ValidationError
-
     from app.schemas import SegmentResponse
+    from pydantic import ValidationError
 
     with pytest.raises(ValidationError):
         SegmentResponse.model_validate(
@@ -274,10 +272,10 @@ def test_inference_concurrency_is_bounded():
     # acquire must fail). Derives the limit from the module instead of
     # hardcoding the default so raising the env cap doesn't break the test.
     limit = roads.MAX_CONCURRENT_INFERENCES
-    acquired = []
+    acquired = [
+        roads.INFERENCE_SEMAPHORE.acquire(blocking=False) for _ in range(limit + 1)
+    ]
     try:
-        for _ in range(limit + 1):
-            acquired.append(roads.INFERENCE_SEMAPHORE.acquire(blocking=False))
         assert False in acquired, "semaphore allowed unbounded concurrency"
     finally:
         for _ in range(sum(acquired)):
@@ -314,8 +312,8 @@ def test_segment_end_to_end_returns_geojson():
     checkpoint, so weights are random and is_loaded is False — flip it to True
     to pass the fail-closed readiness gate while still exercising the whole
     predict -> postprocess -> response pipeline."""
-    from app.main import app as live_app
     import app.main as roads
+    from app.main import app as live_app
 
     with TestClient(live_app) as live:
         assert roads._models["buildings"] is not None

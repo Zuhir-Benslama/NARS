@@ -1,0 +1,28 @@
+# Included by the top-level Makefile (GNU make: single instance, shared vars). Target grouping: PostGIS backup/restore/admin + migrations. Target grouping: backend + roads test suites.
+
+
+.PHONY: test
+test: ## Run all tests
+	dotnet test nars-tests/NarsApi.Tests.csproj
+
+.PHONY: test-unit
+test-unit: ## Run only unit tests (no Postgres container)
+	dotnet test nars-tests/NarsApi.Tests.csproj --filter "Category!=Service"
+
+.PHONY: test-service
+test-service: ## Run only Postgres-backed service tests
+	dotnet test nars-tests/NarsApi.Tests.csproj --filter "Category=Service"
+
+.PHONY: test-coverage
+test-coverage: ## Run backend tests with coverage and enforce thresholds (coverlet.msbuild)
+	dotnet test nars-tests/NarsApi.Tests.csproj \
+		/p:CollectCoverage=true \
+		/p:CoverletOutputFormat=cobertura \
+		/p:CoverletOutput=TestResults/coverage.cobertura.xml
+
+.PHONY: roads-test
+roads-test: ## Run the segmentation service's Python test suite in a container
+	docker build -f "$(DOCKER_DIR)/Dockerfile.nars-roads" \
+		--target test \
+		-t "$(DOCKER_ORG)/nars-roads:test" nars-roads/
+	docker run --rm "$(DOCKER_ORG)/nars-roads:test"

@@ -3,6 +3,7 @@ using Testcontainers.PostgreSql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using NarsApi.Data;
+using DotNet.Testcontainers.Configurations;
 
 namespace NarsApi.Tests.Service;
 
@@ -13,6 +14,20 @@ namespace NarsApi.Tests.Service;
 /// </summary>
 public sealed class NarsDatabaseFixture : IAsyncLifetime
 {
+    static NarsDatabaseFixture()
+    {
+        // Testcontainers' DockerDesktopEndpointAuthenticationProvider hardcodes
+        // "/var/run/docker.sock" as the Resource Reaper's socket override (a
+        // Docker Desktop VM assumption). On rootless Docker that path doesn't
+        // exist, so the reaper's bind mount fails before any container starts.
+        // When the standard socket is absent, clear the override so the reaper
+        // derives the socket path from the (correctly resolved) daemon endpoint.
+        if (!File.Exists("/var/run/docker.sock"))
+        {
+            TestcontainersSettings.DockerSocketOverride = null;
+        }
+    }
+
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgis/postgis:17-3.5-alpine")
         .WithDatabase("nars_test")
         .WithUsername("nars")

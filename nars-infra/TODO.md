@@ -10,7 +10,7 @@ migrations, Makefile infra targets) for code quality and hardening.
 - `make infra-lint` (shell, docker, yaml, python, node, makefile, tag-guard) — pass
 - `kubectl kustomize nars-infra/k8s/` and `nars-infra/roads/` — pass
 - `k8s/certs/ca.crt` tracked is public-only (no private key); `.gitignore`
-  covers `ca.key`, `.env`, `docs/pdf/`, `docs/uml/*.{svg,png}`, `__pycache__/`, `.ruff_cache/`
+  covers `ca.key`, `.env`, `../docs/pdf/`, `../docs/uml/*.{svg,png}`, `__pycache__/`, `.ruff_cache/`
 - `.ruff_cache/` and `scripts/__pycache__/` exist on disk but are untracked
 
 ## Findings & fixes (all applied)
@@ -70,9 +70,9 @@ deployment, scripts, SQL, seed data) beyond the lint gates.
 ## Gates verified
 - `make infra-lint` (shell, docker, yaml, python, node, makefile, tag-guard) — pass
 - `kubectl kustomize` (k8s/ and roads/) — pass
-- Seed data `docs/seed_reference_data.sql`: 1541 commune rows, no duplicate
+- Seed data `../docs/seed_reference_data.sql`: 1541 commune rows, no duplicate
   `commune_id` PKs (verified programmatically); all blocks use `COPY FROM stdin`.
-- `.gitignore` still covers `ca.key`, `.env`, `docs/pdf/`, `docs/uml/*.{svg,png}`,
+- `.gitignore` still covers `ca.key`, `.env`, `../docs/pdf/`, `../docs/uml/*.{svg,png}`,
   `__pycache__/`, `.ruff_cache/`.
 - READMEs (`k8s/README.md`, `docker/README.md`) consistent with manifests.
 

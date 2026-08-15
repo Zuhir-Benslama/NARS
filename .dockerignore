@@ -29,10 +29,10 @@ nars-web/node_modules/
 nars-web/dist/
 
 # Generated documentation output
-nars-infra/docs/pdf/
-nars-infra/docs/uml/*.svg
-nars-infra/docs/uml/*.png
-nars-infra/docs/uml/*.pdf
+docs/pdf/
+docs/uml/*.svg
+docs/uml/*.png
+docs/uml/*.pdf
 
 # Generates during build — not needed in context
 nars-web/npm-debug.log*

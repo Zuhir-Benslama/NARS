@@ -1,10 +1,3 @@
-# Generated PDFs
-docs/pdf/
-
-# Generated Mermaid SVG/PNG output
-docs/uml/*.svg
-docs/uml/*.png
-
 # Python bytecode
 scripts/__pycache__/
 

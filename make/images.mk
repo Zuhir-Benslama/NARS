@@ -1,0 +1,85 @@
+# Included by the top-level Makefile (GNU make: single instance, shared vars). Target grouping: Docker image build/push/load.
+
+
+# ─── Docker Images ───────────────────────────────────────────
+
+# Override IMAGE_TAG to pin a specific version (e.g., IMAGE_TAG=abc1234).
+# Defaults to 'latest' for local dev. CI/CD should set this to the commit SHA.
+IMAGE_TAG ?= latest
+
+# DEPLOY_ENV gates use of the mutable 'latest' tag:
+#   dev (default)       — local kind loop; 'latest' allowed
+#   production/staging  — 'latest' refused; deployments must pin IMAGE_TAG=<sha>
+# Set ALLOW_LATEST=1 for a deliberate emergency manual rollout.
+DEPLOY_ENV ?= dev
+ALLOW_LATEST ?=
+
+
+.PHONY: images-build
+images-build: _warn-latest-tag ## Build all Docker images
+	@echo "→ Building images..."
+	$(SUBMAKE) _build-nars-api
+	$(SUBMAKE) _build-nars-postgis
+	$(SUBMAKE) _build-nars-vite
+	$(SUBMAKE) _build-nars-backup
+	$(SUBMAKE) _build-nars-roads
+	@echo "✓ All images built"
+
+.PHONY: _build-nars-api
+_build-nars-api:
+	@echo "  → $(DOCKER_ORG)/nars-api:$(IMAGE_TAG)"
+	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-api" \
+		-t "$(DOCKER_ORG)/nars-api:$(IMAGE_TAG)" .
+
+.PHONY: _build-nars-postgis
+_build-nars-postgis:
+	@echo "  → $(DOCKER_ORG)/nars-postgis:$(IMAGE_TAG)"
+	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-postgis" \
+		-t "$(DOCKER_ORG)/nars-postgis:$(IMAGE_TAG)" .
+
+.PHONY: _build-nars-vite
+_build-nars-vite:
+	@echo "  → $(DOCKER_ORG)/nars-vite:$(IMAGE_TAG)"
+	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-vite" \
+		-t "$(DOCKER_ORG)/nars-vite:$(IMAGE_TAG)" .
+
+.PHONY: _build-nars-backup
+_build-nars-backup:
+	@echo "  → $(DOCKER_ORG)/nars-backup:$(IMAGE_TAG)"
+	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-backup" \
+		-t "$(DOCKER_ORG)/nars-backup:$(IMAGE_TAG)" .
+
+.PHONY: _build-nars-roads
+_build-nars-roads:
+	@echo "  → $(DOCKER_ORG)/nars-roads:$(IMAGE_TAG)"
+	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-roads" \
+		-t "$(DOCKER_ORG)/nars-roads:$(IMAGE_TAG)" nars-roads/
+
+.PHONY: images-push
+images-push: _check-pinned-tag _warn-latest-tag ## Push all Docker images to registry
+	@	for img in $(REGISTRY_IMAGES); do
+		echo "→ Pushing $(DOCKER_ORG)/$$img:$(IMAGE_TAG)..."
+		docker push "$(DOCKER_ORG)/$$img:$(IMAGE_TAG)"
+	done
+	@echo "✓ All images pushed"
+
+.PHONY: images-load
+images-load: _warn-latest-tag ## Load locally built Docker images into the kind cluster
+	@for img in $(REGISTRY_IMAGES); do
+		full="$(DOCKER_ORG)/$$img:$(IMAGE_TAG)"
+		if docker image inspect "$$full" >/dev/null 2>&1; then
+			echo "→ Loading $$full into cluster..."
+			kind load docker-image "$$full" --name "$(CLUSTER_NAME)"
+		else
+			echo "  ⚠ $$full not found locally — will pull from registry"
+		fi
+	done
+	@echo "✓ Images loaded"
+
+.PHONY: frontend-update
+frontend-update: ## Rebuild nars-vite, load into kind, and rollout restart
+	$(SUBMAKE) _build-nars-vite
+	@kind load docker-image "$(DOCKER_ORG)/nars-vite:$(IMAGE_TAG)" --name "$(CLUSTER_NAME)"
+	@$(KUBECTL) rollout restart deployment nars-frontend -n "$(NAMESPACE)"
+	@$(KUBECTL) rollout status deployment nars-frontend -n "$(NAMESPACE)" --timeout=120s
+	@echo "✓ nars-vite rebuilt and deployed"

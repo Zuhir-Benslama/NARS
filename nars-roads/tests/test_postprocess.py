@@ -8,7 +8,7 @@ from rasterio.transform import Affine
 pytest.importorskip("skimage")
 pytest.importorskip("sknw")
 
-from app.postprocess import mask_to_linestrings, mask_to_polygons  # noqa: E402
+from app.postprocess import mask_to_linestrings, mask_to_polygons
 
 # pixel (row, col) maps to (x=col, y=row)
 TRANSFORM = Affine(1.0, 0.0, 0.0, 0.0, 1.0, 0.0)
@@ -65,5 +65,7 @@ def test_polygons_square_blob():
         assert 0.0 <= feature.properties["confidence"] <= 1.0
         xs = [coord[0] for coord in feature.geometry.coordinates[0]]
         ys = [coord[1] for coord in feature.geometry.coordinates[0]]
-        assert min(xs) >= 18 and max(xs) <= 42
-        assert min(ys) >= 18 and max(ys) <= 42
+        assert min(xs) >= 18
+        assert max(xs) <= 42
+        assert min(ys) >= 18
+        assert max(ys) <= 42

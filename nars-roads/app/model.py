@@ -118,10 +118,7 @@ class SegmentationModel:
         from the array's own dtype — rasterio decodes every band into the
         dataset's band-0 dtype, so that is the only scale the values actually
         carry."""
-        if arr.shape[0] >= 3:
-            arr = arr[:3]
-        else:
-            arr = np.repeat(arr[:1], 3, axis=0)
+        arr = arr[:3] if arr.shape[0] >= 3 else np.repeat(arr[:1], 3, axis=0)
 
         img = np.transpose(arr, (1, 2, 0))
         if np.issubdtype(arr.dtype, np.floating):
@@ -206,8 +203,9 @@ class SegmentationModel:
 
                     h, w = src.height, src.width
                     if h * w > MAX_DECODED_PIXELS:
-                        raise TileTooLargeError(
-                            f"Tile decodes to {h}x{w} pixels; limit is {MAX_DECODED_PIXELS}"
+                        raise TileTooLargeError(  # noqa: TRY003 - dynamic message
+                            f"Tile decodes to {h}x{w} pixels; "
+                            f"limit is {MAX_DECODED_PIXELS}"
                         )
 
                     probs = np.zeros((h, w, self.num_classes), dtype=np.float32)
@@ -226,7 +224,9 @@ class SegmentationModel:
             except RasterioIOError as exc:
                 # Decoding a garbage/truncated upload raises here; surface it
                 # as a 4xx client error instead of a 500.
-                raise InvalidTileError(f"Tile could not be decoded: {exc}") from exc
+                raise InvalidTileError(  # noqa: TRY003 - dynamic message
+                    f"Tile could not be decoded: {exc}"
+                ) from exc
 
         probs = probs / np.clip(counts, 1.0, None)
         fg_prob = probs[:, :, 1]

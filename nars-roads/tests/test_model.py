@@ -7,10 +7,9 @@ stays runnable on machines without the ML stack.
 
 import numpy as np
 import pytest
-from rasterio.transform import Affine, from_bounds
-
 from app.model import InvalidTileError, SegmentationModel, TileTooLargeError
 from helpers import DEFAULT_TRANSFORM, make_tiff_bytes, requires_torch
+from rasterio.transform import Affine, from_bounds
 
 
 def _normalize(arr):
@@ -26,7 +25,8 @@ def test_normalize_window_uint8_scales_to_unit():
     assert out.dtype == np.float32
     assert out[0, 1, 1] == pytest.approx(1.0)
     assert out[1, 3, 2] == pytest.approx(128 / 255)
-    assert out.min() >= 0.0 and out.max() <= 1.0
+    assert out.min() >= 0.0
+    assert out.max() <= 1.0
 
 
 def test_normalize_window_uint16_scales_by_bit_depth():
@@ -96,7 +96,8 @@ def test_predict_shapes_and_georeferenced_transform(model):
     building, transform = model.predict(raw, bbox=(0.0, 0.0, 1.0, 1.0))
     assert building.shape == (48, 64)
     assert building.dtype == np.float32
-    assert building.min() >= 0.0 and building.max() <= 1.0
+    assert building.min() >= 0.0
+    assert building.max() <= 1.0
     assert transform == DEFAULT_TRANSFORM
 
 
@@ -117,7 +118,7 @@ def test_predict_decodes_windows_not_whole_image(model, monkeypatch):
         seen.append(chip.shape[:2])
         return np.broadcast_to(
             np.array([0.1, 0.9], dtype=np.float32),
-            chip.shape[:2] + (2,),
+            (*chip.shape[:2], 2),
         ).copy()
 
     monkeypatch.setattr(model, "_predict_tile", fake_predict)

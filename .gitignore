@@ -37,6 +37,11 @@ backup/
 # === Data ===
 data/
 
+# === Generated documentation output (docs/) ===
+docs/pdf/
+docs/uml/*.svg
+docs/uml/*.png
+
 # === NARStreet (separate repo) ===
 narstreet/
 

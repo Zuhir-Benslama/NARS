@@ -207,16 +207,16 @@ def _segment_task(
                 )
         finally:
             INFERENCE_SEMAPHORE.release()
-    except TileTooLargeError:
+    except TileTooLargeError as exc:
         raise HTTPException(
             status_code=413,
             detail="Tile decodes to more pixels than the service accepts",
-        )
+        ) from exc
     except InvalidTileError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    except Exception:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
         logger.exception("Inference failed")
-        raise HTTPException(status_code=500, detail="Inference failed")
+        raise HTTPException(status_code=500, detail="Inference failed") from exc
 
     return FeatureCollection(features=features)
 

@@ -30,8 +30,8 @@ docker run -d --name nars-pg \
   postgis/postgis:17-3.5
 
 # 2. Initialize the database schema + reference data
-psql -h localhost -U postgres -d nars -f nars-infra/docs/nars_db.sql
-psql -h localhost -U postgres -d nars -f nars-infra/docs/seed_reference_data.sql
+psql -h localhost -U postgres -d nars -f nars-infra/scripts/create_nars_db.sql
+psql -h localhost -U postgres -d nars -f docs/seed_reference_data.sql
 
 # 3. Run the backend (starts on http://localhost:5000)
 cd nars-api
@@ -62,10 +62,10 @@ See the [Makefile](Makefile) for available targets (`cluster-down`, `cluster-reb
 
 ```
 .github/workflows/          — CI (backend, frontend, integration, security, Docker build)
+docs/                       — Scientific & code documentation (LaTeX, UML diagrams, PDF)
 nars-infra/                 — Infrastructure configs
 ├── docker/                 — Dockerfiles for nars-api, nars-web, nars-postgis
 ├── k8s/                    — Kubernetes manifests (kind-based local cluster)
-├── docs/                   — Database schema, UML diagrams, PDF documentation
 └── scripts/                — DB creation scripts, admin bootstrap, mermaid tooling
 nars-api/                   — ASP.NET Core 10 backend
 nars-web/                   — Vue 3 + TypeScript frontend
