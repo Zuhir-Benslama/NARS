@@ -21,6 +21,10 @@ vi.mock("./core/state", () => ({
     map: { remove: mockMapRemove },
     geoman: undefined,
   }),
+  tryGetCtx: () => ({
+    map: { remove: mockMapRemove },
+    geoman: undefined,
+  }),
 }))
 
 vi.mock("../i18n", () => ({ applyInitialLang: vi.fn() }))
@@ -85,5 +89,19 @@ describe("destroyMap", () => {
     await destroyMap()
 
     expect(order).toEqual(["dispose", "remove"])
+  })
+
+  it("is a no-op when the map was never initialized", async () => {
+    const state = await import("./core/state")
+    vi.spyOn(state, "tryGetCtx").mockReturnValue(null)
+
+    await destroyMap()
+
+    expect(mockDestroyDrawEvents).not.toHaveBeenCalled()
+    expect(mockUnregisterGeomanEvents).not.toHaveBeenCalled()
+    expect(mockUnregisterFieldWorkerClick).not.toHaveBeenCalled()
+    expect(mockRemoveBoundaryClickEvents).not.toHaveBeenCalled()
+    expect(mockDisposeGeoman).not.toHaveBeenCalled()
+    expect(mockMapRemove).not.toHaveBeenCalled()
   })
 })

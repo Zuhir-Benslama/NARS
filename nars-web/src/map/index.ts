@@ -1,7 +1,7 @@
 // ─── MAP ORCHESTRATOR ─────────────────────────────────────────────────────────
 
 import { applyInitialLang } from "../i18n"
-import { getCtx } from "./core/state"
+import { tryGetCtx } from "./core/state"
 import { initRotationControls, destroyRotationControls } from "./rotation"
 import { registerDrawEvents, destroyDrawEvents } from "./draw/draw-events"
 import { registerGeomanEvents, unregisterGeomanEvents } from "./core/geoman-events"
@@ -35,12 +35,13 @@ export async function initMap(): Promise<void> {
 }
 
 export async function destroyMap(): Promise<void> {
-  const { map } = getCtx()
+  const ctx = tryGetCtx()
+  if (!ctx) return
   destroyRotationControls()
   destroyDrawEvents()
   unregisterGeomanEvents()
   unregisterFieldWorkerClick()
   removeBoundaryClickEvents()
   await disposeGeoman()
-  map.remove()
+  ctx.map.remove()
 }
