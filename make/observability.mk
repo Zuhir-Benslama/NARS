@@ -110,6 +110,7 @@ observability-otel-collector: ## Install OpenTelemetry Collector
 		--namespace $(OBSERVABILITY_NAMESPACE) \
 		--version "$(OTEL_COLLECTOR_VERSION)" \
 		--values $(K8S_DIR)/helm-values/opentelemetry-collector.yaml \
+		--set image.tag="$(OTEL_COLLECTOR_IMAGE_TAG)" \
 		--timeout 10m
 
 .PHONY: observability-servicemonitor
@@ -136,7 +137,22 @@ observability-port-forward: ## Port-forward Grafana, Loki, Tempo (background)
 	nohup $(KUBECTL) port-forward -n $(OBSERVABILITY_NAMESPACE) \
 		service/tempo 3200:3200 \
 		> "$(LOG_DIR)/port-forward-tempo.log" 2>&1 & \
-	echo "✓ Port-forwards running";
+	echo "→ Waiting for port-forwards to come up...";
+	sleep 3;
+	ok=1;
+	for pf in grafana loki tempo; do \
+		log="$(LOG_DIR)/port-forward-$$pf.log"; \
+		if grep -q "Forwarding from" "$$log" 2>/dev/null; then \
+			echo "  ✓ $$pf forwarding"; \
+		else \
+			echo "  ⚠ $$pf did not start (log: $$log)"; \
+			ok=0; \
+		fi; \
+	done;
+	if [ "$$ok" -ne 1 ]; then \
+		echo "✖ One or more port-forwards failed to start — inspect the logs above"; \
+		exit 1; \
+	fi;
 	echo "  Grafana: http://localhost:3000 (run \`make grafana-password\` to retrieve credentials)";
 	echo "  Loki:    http://localhost:3100";
 	echo "  Tempo:   http://localhost:3200";

@@ -7,6 +7,18 @@
 # Defaults to 'latest' for local dev. CI/CD should set this to the commit SHA.
 IMAGE_TAG ?= latest
 
+# Shell-safe single-quoted form of IMAGE_TAG. Tags are developer/CI-supplied
+# and get interpolated into double-quoted shell contexts (awk -v, echo, grep),
+# where backticks or a stray `"` would be executed. Single-quote escaping keeps
+# every character literal. Use this instead of the raw variable in recipes.
+IMAGE_TAG_Q = '$(subst ','"'"',$(IMAGE_TAG))'
+
+# Charset guard for IMAGE_TAG, shared by _warn-latest-tag and _check-pinned-tag.
+# Evaluated against the escaped value, so a hostile tag is rejected instead of
+# being interpolated into a shell command. Same whitelist as
+# kustomize-set-image-tag's validation.
+_check_tag_cmd = echo $(IMAGE_TAG_Q) | grep -qE '[^a-zA-Z0-9._-]'
+
 # DEPLOY_ENV gates use of the mutable 'latest' tag:
 #   dev (default)       — local kind loop; 'latest' allowed
 #   production/staging  — 'latest' refused; deployments must pin IMAGE_TAG=<sha>
@@ -26,31 +38,31 @@ images-build: _warn-latest-tag ## Build all Docker images
 	@echo "✓ All images built"
 
 .PHONY: _build-nars-api
-_build-nars-api:
+_build-nars-api: _warn-latest-tag
 	@echo "  → $(DOCKER_ORG)/nars-api:$(IMAGE_TAG)"
 	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-api" \
 		-t "$(DOCKER_ORG)/nars-api:$(IMAGE_TAG)" .
 
 .PHONY: _build-nars-postgis
-_build-nars-postgis:
+_build-nars-postgis: _warn-latest-tag
 	@echo "  → $(DOCKER_ORG)/nars-postgis:$(IMAGE_TAG)"
 	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-postgis" \
 		-t "$(DOCKER_ORG)/nars-postgis:$(IMAGE_TAG)" .
 
 .PHONY: _build-nars-vite
-_build-nars-vite:
+_build-nars-vite: _warn-latest-tag
 	@echo "  → $(DOCKER_ORG)/nars-vite:$(IMAGE_TAG)"
 	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-vite" \
 		-t "$(DOCKER_ORG)/nars-vite:$(IMAGE_TAG)" .
 
 .PHONY: _build-nars-backup
-_build-nars-backup:
+_build-nars-backup: _warn-latest-tag
 	@echo "  → $(DOCKER_ORG)/nars-backup:$(IMAGE_TAG)"
 	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-backup" \
 		-t "$(DOCKER_ORG)/nars-backup:$(IMAGE_TAG)" .
 
 .PHONY: _build-nars-roads
-_build-nars-roads:
+_build-nars-roads: _warn-latest-tag
 	@echo "  → $(DOCKER_ORG)/nars-roads:$(IMAGE_TAG)"
 	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-roads" \
 		-t "$(DOCKER_ORG)/nars-roads:$(IMAGE_TAG)" nars-roads/
@@ -77,7 +89,7 @@ images-load: _warn-latest-tag ## Load locally built Docker images into the kind 
 	@echo "✓ Images loaded"
 
 .PHONY: frontend-update
-frontend-update: ## Rebuild nars-vite, load into kind, and rollout restart
+frontend-update: _warn-latest-tag ## Rebuild nars-vite, load into kind, and rollout restart
 	$(SUBMAKE) _build-nars-vite
 	@kind load docker-image "$(DOCKER_ORG)/nars-vite:$(IMAGE_TAG)" --name "$(CLUSTER_NAME)"
 	@$(KUBECTL) rollout restart deployment nars-frontend -n "$(NAMESPACE)"

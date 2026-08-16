@@ -5,15 +5,17 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <RootNamespace>NarsApi.Tests</RootNamespace>
+    <!-- Same gate as nars-api: any compiler/analyzer warning breaks the build. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!--
       Coverage thresholds for coverlet.msbuild, applied only when coverage is
       collected (`dotnet test /p:CollectCoverage=true` — see `make test-coverage`).
       These are a REGRESSION FLOOR, not a target. CI enforces coverage on the
       UNIT-ONLY run (filter Category!=Service), so the floor must fit the
       lower of the two measured runs (excludes generated code — see the Exclude
-      property below):
-        - unit-only (what CI gates on): ~63.0% line / 56.0% branch
-        - full suite incl. service tests: ~77.7% line / 68.2% branch
+      property below). Last measured 2026-08-16:
+        - unit-only (what CI gates on): ~61.5% line / 53.6% branch
+        - full suite incl. service tests: ~77.3% line / 67.1% branch
       Raise as coverage improves — do not lower. The single Threshold value
       applies to both line and branch, so it is capped by the lower (branch)
       metric of the unit-only run.

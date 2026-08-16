@@ -294,4 +294,56 @@ describe("SettingsUsers", () => {
       expect((wrapper.vm as any).selectedCommuneId).toBeNull()
     })
   })
+
+  describe("endpoint scoping", () => {
+    it("scopes daira endpoint to caller's wilaya for wilaya_admin", () => {
+      mockAppStore.mockReturnValue({
+        user: {
+          role: "wilaya_admin",
+          wilaya: { id: 9, name_fr: "Alger", name_ar: null, latitude: null, longitude: null },
+        },
+      })
+      const wrapper = mount(SettingsUsers)
+      const dairaEndpoint = (wrapper.vm as any).dairaEndpoint as (q: string) => string
+      expect(dairaEndpoint("")).toBe("/api/dairas?search=&wilaya_id=9")
+    })
+
+    it("prefers an explicitly selected wilaya over the caller's wilaya", () => {
+      mockAppStore.mockReturnValue({
+        user: {
+          role: "national_admin",
+          wilaya: { id: 9, name_fr: "Alger", name_ar: null, latitude: null, longitude: null },
+        },
+      })
+      const wrapper = mount(SettingsUsers)
+      ;(wrapper.vm as any).selectedWilayaId = 3
+      const dairaEndpoint = (wrapper.vm as any).dairaEndpoint as (q: string) => string
+      expect(dairaEndpoint("")).toBe("/api/dairas?search=&wilaya_id=3")
+    })
+
+    it("scopes commune endpoint to caller's daira for daira_admin", () => {
+      mockAppStore.mockReturnValue({
+        user: {
+          role: "daira_admin",
+          daira: { id: 12, name_fr: "Oran", name_ar: null, latitude: null, longitude: null },
+        },
+      })
+      const wrapper = mount(SettingsUsers)
+      const communeEndpoint = (wrapper.vm as any).communeEndpoint as (q: string) => string
+      expect(communeEndpoint("")).toBe("/api/communes?search=&daira_id=12")
+    })
+
+    it("prefers an explicitly selected daira over the caller's daira", () => {
+      mockAppStore.mockReturnValue({
+        user: {
+          role: "daira_admin",
+          daira: { id: 12, name_fr: "Oran", name_ar: null, latitude: null, longitude: null },
+        },
+      })
+      const wrapper = mount(SettingsUsers)
+      ;(wrapper.vm as any).selectedDairaId = 7
+      const communeEndpoint = (wrapper.vm as any).communeEndpoint as (q: string) => string
+      expect(communeEndpoint("")).toBe("/api/communes?search=&daira_id=7")
+    })
+  })
 })

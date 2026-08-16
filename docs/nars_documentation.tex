@@ -724,19 +724,23 @@ payload $c$, and secret key $k$ (a UTF-8 string of at least 32 characters):
 
 The claims set embedded in each token is:
 \begin{equation}
-  c = \{
-    \texttt{user\_id},\;
-    \texttt{username},\;
-    \texttt{name},\;
-    \texttt{email},\;
-    \texttt{commune\_id},\;
-    \texttt{exp} = t_{\text{now}} + T_{\text{access}}
-  \}
+  c = \left\{
+    \begin{array}{@{}l}
+      \texttt{user\_id},\ \texttt{username},\ \texttt{name},\ \texttt{email},\ \texttt{role},\ \texttt{security\_stamp},\\[3pt]
+      \texttt{commune\_id},\ \texttt{daira\_id},\ \texttt{wilaya\_id},\ \texttt{exp} = t_{\text{now}} + T_{\text{access}}
+    \end{array}
+  \right\}
   \label{eq:jwt_claims}
 \end{equation}
 
-where the access-token lifetime is $T_{\text{access}} = 1{,}440\ \mathrm{min}
-= 24\ \mathrm{h}$ (configurable via \texttt{Jwt:ExpiresInMinutes}).
+The \texttt{role} and \texttt{security\_stamp} claims are always present
+(the latter enables immediate rejection of tokens issued before a password
+change or lockout). The optional \texttt{commune\_id}, \texttt{daira\_id},
+and \texttt{wilaya\_id} claims are emitted only when the corresponding
+administrative scope is assigned to the user.
+
+where the access-token lifetime is $T_{\text{access}} = 60\ \mathrm{min}
+= 1\ \mathrm{h}$ (configurable via \texttt{Jwt\-:Expires\-In\-Minutes}).
 
 The token is delivered exclusively via an \texttt{HttpOnly; SameSite=Lax;
 Path=/} cookie, never in a response body field that JavaScript could
@@ -812,23 +816,30 @@ from attaching session cookies.
 \section{Rate Limiting}
 \label{sec:ratelimit}
 
-NARS uses ASP.NET Core's sliding-window rate limiter. Two policies are
-defined; \cref{tab:rate_limits} gives the default configuration values
-from \texttt{appsettings.json}.
+NARS uses ASP.NET Core's rate limiter with five named policies
+(\texttt{auth}, \texttt{clear}, \texttt{api}, \texttt{scattered},
+\texttt{logs}); \cref{tab:rate_limits} gives the default configuration
+values from \texttt{appsettings.json} (falling back to the
+\texttt{RateLimitOptions.cs} defaults for policies not present there).
+The \texttt{auth} and \texttt{api} policies are sliding-window limiters;
+\texttt{clear}, \texttt{scattered}, and \texttt{logs} are fixed-window
+limiters (equivalent to a single segment, $S = 1$).
 
 \begin{table}[H]
 \centering
 \caption{Rate-limiting policy parameters}
 \label{tab:rate_limits}
-\begin{tabular}{lrrrr}
+\begin{tabularx}{\textwidth}{lrrrX}
 \toprule
 \textbf{Policy} & $P$ (permits) & $W$ (window) & $S$ (segments) & \textbf{Scope} \\
 \midrule
-\texttt{auth}  & 5  & 30 s & 3 & \texttt{POST /api/signin}, \texttt{/signup}, \texttt{/refresh} \\
-\texttt{clear} & 3  & 10 min & 1 & \texttt{POST /api/clear} \\
-\texttt{api}   & 60 & 1 min  & 6 & All other authenticated endpoints \\
+\texttt{auth}      & 5  & 30 s  & 3 & \texttt{POST /api/signin}, \texttt{/signup}, \texttt{/refresh} \\
+\texttt{clear}     & 3  & 10 min & 1 & \texttt{POST /api/features/clear} \\
+\texttt{api}       & 60 & 1 min & 6 & All other authenticated endpoints \\
+\texttt{scattered} & 5  & 5 min & 1 & \texttt{POST /api\allowbreak/areas\allowbreak/refresh\-scattered} \\
+\texttt{logs}      & 30 & 1 min & 1 & \texttt{POST /api/logs} \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 For a sliding-window limiter with permit budget $P$, window duration
@@ -884,41 +895,71 @@ POST & \texttt{/api/signin}        & Authenticate, issue tokens   & \texttt{auth
 POST & \texttt{/api/logout}        & Revoke refresh token         & \texttt{api}  \\
 POST & \texttt{/api/refresh}       & Rotate refresh token         & \texttt{auth} \\
 GET  & \texttt{/api/current\_user} & Return authenticated profile & \texttt{api}  \\
+POST & \texttt{/api/admin/authorized-signup} & Create admin/manager user & \texttt{api} \\
 \midrule
 \multicolumn{4}{l}{\textit{Features}} \\
-POST   & \texttt{/api/save}            & Persist new feature          & \texttt{api} \\
-GET    & \texttt{/api/load}            & Paginated feature list        & \texttt{api} \\
-PUT    & \texttt{/api/update/:id}      & Update geometry or label      & \texttt{api} \\
-DELETE & \texttt{/api/delete/:id}      & Delete feature                & \texttt{api} \\
-POST   & \texttt{/api/clear}           & Delete all features           & \texttt{clear} \\
-GET    & \texttt{/api/stats}           & Per-type feature counts       & \texttt{api} \\
+POST   & \texttt{/api/features}            & Persist new feature          & \texttt{api} \\
+GET    & \texttt{/api/features}            & Paginated feature list       & \texttt{api} \\
+PUT    & \texttt{/api/features/\{id\}}     & Update geometry or label     & \texttt{api} \\
+DELETE & \texttt{/api/features/\{id\}}     & Delete feature               & \texttt{api} \\
+POST   & \texttt{/api/features/clear}      & Delete all features          & \texttt{clear} \\
+GET    & \texttt{/api/features/stats}      & Per-type feature counts      & \texttt{api} \\
+GET    & \texttt{/api/feature-types}       & Available feature types      & \texttt{api} \\
 \midrule
-\multicolumn{4}{l}{\textit{Validation}} \\
+\multicolumn{4}{l}{\textit{Validation and Spatial}} \\
 GET  & \texttt{/api/validate/area/main-urban-exists} & Urban area existence check & \texttt{api} \\
 POST & \texttt{/api/validate/road}                   & Road angle + connectivity  & \texttt{api} \\
 POST & \texttt{/api/validate/district}               & District overlap + adjacency & \texttt{api} \\
 GET  & \texttt{/api/validate/districts/coverage}     & Full coverage check        & \texttt{api} \\
+POST & \texttt{/api/road-side}                       & Road side + entrance number & \texttt{api} \\
+\midrule
+\multicolumn{4}{l}{\textit{Administrative reference data}} \\
+GET & \texttt{/api/wilayas}                 & Wilaya list                & \texttt{api} \\
+GET & \texttt{/api/dairas}                  & Da\"ira list               & \texttt{api} \\
+GET & \texttt{/api/communes}                & Commune list               & \texttt{api} \\
+GET & \texttt{/api/commune/\{id\}/boundary} & Commune boundary polygon   & \texttt{api} \\
+\midrule
+\multicolumn{4}{l}{\textit{Administration}} \\
+GET  & \texttt{/api/admin/overview}            & Cross-wilaya dashboard overview & \texttt{api} \\
+GET  & \texttt{/api/admin/wilaya/\{id\}}       & Per-wilaya admin report         & \texttt{api} \\
+GET  & \texttt{/api/admin/daira/\{id\}}        & Per-da\"ira admin report        & \texttt{api} \\
+GET  & \texttt{/api/admin/users}               & List managed users              & \texttt{api} \\
+POST & \texttt{/api/admin/users}               & Create managed user             & \texttt{api} \\
+PUT  & \texttt{/api/admin/users/\{id\}}        & Update managed user             & \texttt{api} \\
+DELETE & \texttt{/api/admin/users/\{id\}}       & Delete managed user             & \texttt{api} \\
+\midrule
+\multicolumn{4}{l}{\textit{Field inspection}} \\
+GET  & \texttt{/api/field/features}           & Field-worker feature feed       & \texttt{api} \\
+POST & \texttt{/api/field/inspect}            & Record an inspection            & \texttt{api} \\
+GET  & \texttt{/api/field/inspections/\{id\}} & Inspection history              & \texttt{api} \\
+POST & \texttt{/api/field/entrance}           & Create house entrance           & \texttt{api} \\
+\midrule
+\multicolumn{4}{l}{\textit{AI draft features}} \\
+POST & \texttt{/api/draft-features/segment}       & Submit segmentation suggestions & \texttt{api} \\
+GET  & \texttt{/api/draft-features}               & List draft features             & \texttt{api} \\
+POST & \texttt{/api/draft-features/\{id\}/accept} & Accept a draft feature          & \texttt{api} \\
+POST & \texttt{/api/draft-features/\{id\}/reject} & Reject a draft feature          & \texttt{api} \\
 \midrule
 \multicolumn{4}{l}{\textit{Auxiliary}} \\
-GET & \texttt{/api/locations}        & Commune/Daïra/Wilaya lookup  & \texttt{api} \\
-GET & \texttt{/api/spatial/commune-boundary} & Commune boundary polygon & \texttt{api} \\
-GET & \texttt{/api/scattered-status} & Background task error status & \texttt{api} \\
-GET & \texttt{/health}               & Database connectivity probe  & --- \\
+GET  & \texttt{/api/areas/scattered-status}    & Background task error status   & \texttt{api} \\
+POST & \texttt{/api/areas/refresh-scattered}   & Recompute scattered areas      & \texttt{scattered} \\
+POST & \texttt{/api/logs}                      & Client-side error log          & \texttt{logs} \\
+GET  & \texttt{/health}                       & Database connectivity probe   & --- \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
 \subsection{Pagination Model}
 
-The \texttt{/api/load} endpoint uses offset-based pagination:
+The \texttt{/api/features} endpoint uses offset-based pagination:
 
 \begin{equation}
-  \texttt{take} = \operatorname{clamp}(\texttt{take}_{\text{req}},\; 1,\; 2{,}000)
+  \texttt{take} = \operatorname{clamp}(\texttt{take}_{\text{req}},\; 1,\; 500)
   \label{eq:pagination_clamp}
 \end{equation}
 
 The response body carries both the data page and the total count (computed
-in the same CTE query via a \texttt{COUNT(*)} window), enabling clients to
+in a \texttt{COUNT(*)} CTE over the same filtered set), enabling clients to
 render pagination controls without an additional round-trip.
 
 \subsection{Feature Query Architecture}
@@ -977,7 +1018,7 @@ of SQL injection through query construction.
   {\footnotesize FeatureTypeRegistry \textbar{} FeatureQueryHelper \textbar{} SqlFragments}};
 
 \node[layer, fill=red!8]     (db)      at (0,-5.4) {%
-  \textbf{Data Layer} \quad PostgreSQL 15 + PostGIS 3 \\
+  \textbf{Data Layer} \quad PostgreSQL 17 + PostGIS 3 \\
   {\footnotesize 8 feature tables + feature\_registry + users + refresh\_tokens + communes/dairas/wilayas}};
 
 \draw[arr] (client)  -- (api);
@@ -999,14 +1040,14 @@ of SQL injection through query construction.
 \textbf{Component} & \textbf{Technology} & \textbf{Version} \\
 \midrule
 Backend runtime        & .NET (ASP.NET Core)          & 10.0 \\
-ORM / query            & Entity Framework Core + ADO.NET & 9.x \\
-Database               & PostgreSQL + PostGIS          & 15 / 3.x \\
+ORM / query            & Entity Framework Core + ADO.NET & 10.x \\
+Database               & PostgreSQL + PostGIS          & 17 / 3.x \\
 Password hashing       & BCrypt.Net-Next               & --- \\
 JWT library            & System.IdentityModel.Tokens.Jwt & --- \\
 Frontend framework     & Vue 3 (Composition API)       & 3.5.x \\
 State management       & Pinia                         & 3.x \\
 Map engine             & MapLibre GL JS                & 5.x \\
-Draw/edit layer        & Geoman for MapLibre (free)    & 0.7.x \\
+Draw/edit layer        & Geoman for MapLibre (free)    & 0.8.x \\
 Spatial utilities      & Turf.js                       & 7.x \\
 Build tool             & Vite + vue-tsc                & 8.x / 3.x \\
 XSS sanitiser          & DOMPurify                     & 3.x \\
@@ -1371,7 +1412,7 @@ Before a delete request is dispatched to the API, the entry is pushed:
 \subsection{Restore}
 
 On Ctrl+Z, the stack is popped and the entry is re-saved via
-\texttt{POST /api/save}. This allocates a \emph{new} UUID for the
+\texttt{POST /api/features}. This allocates a \emph{new} UUID for the
 restored feature:
 
 \begin{equation}
@@ -1405,34 +1446,35 @@ single session, not a durable audit trail.
 Before dispatching to the server, the frontend performs two lightweight
 checks that catch the most common user errors without a network round-trip.
 
-\subsection{Minimum Road Length}
+\subsection{Geometry Cardinality}
 
-A road is rejected on the client if its total metric length is below
-the configured minimum:
-
-\begin{equation}
-  \ell_{\text{road}} = \sum_{i=0}^{m-2} d_{\text{geo}}(p_i, p_{i+1})
-  < L_{\min} = 10\ \mathrm{m}
-  \label{eq:min_road_length}
-\end{equation}
-
-Length is computed by Turf.js \texttt{length(line, \{units: "meters"\})},
-which accumulates the Haversine distance over each segment.
-
-\subsection{Polygon Ring Closure}
-
-The PostGIS \texttt{ST\_GeomFromText} function requires the first and last
-vertices of a linear ring to be identical. The client enforces this before
-serialisation:
+A feature is rejected on the client if its coordinate sequence is too
+short to define the requested geometry (checked in
+\texttt{draw-save.ts::validateGeometry}):
 
 \begin{equation}
-  \text{If } p_0 \neq p_{m-1}:\quad \mathcal{C} \leftarrow \mathcal{C} \cup \{p_0\}
-  \label{eq:ring_closure}
+  \texttt{LineString}: \ m \geq 2, \qquad
+  \texttt{Polygon}: \ m \geq 3
+  \label{eq:min_cardinality}
 \end{equation}
 
-where equality is tested coordinate-wise (exact floating-point comparison
-on rounded \texttt{float64} values; no epsilon tolerance is needed because
-the first vertex is appended verbatim).
+where $m$ is the coordinate count. This mirrors MapLibre Geoman's own
+minimum-vertex constraints, preventing malformed geometries from reaching
+the server.
+
+\subsection{City-Centre Radius Bounds}
+
+City-centre features are stored as circles; the client rejects any radius
+outside the configured bounds (\texttt{draw-save.ts::validateGeometry}):
+
+\begin{equation}
+  r_{\min} \leq r \leq r_{\max}, \qquad
+  r_{\min} = 5\ \mathrm{m}, \quad r_{\max} = 50{,}000\ \mathrm{m}
+  \label{eq:city_radius_bounds}
+\end{equation}
+
+When a city centre is drawn as a polygon, the radius is derived from the
+circumradius of the drawn ring before this check is applied.
 
 \subsection{Two-Stage Validation Architecture}
 
@@ -1451,12 +1493,12 @@ client-side fast checks followed by server-side PostGIS spatial predicates.
   rej/.style={-{Stealth[length=5pt]}, thick, red!70!black}
 ]
 \node[box, fill=gray!15] (input)  {User draws feature};
-\node[dec, fill=yellow!20, below=of input] (c1) {Length $\geq L_{\min}$?};
-\node[dec, fill=yellow!20, below=of c1] (c2) {Ring closed?};
+\node[dec, fill=yellow!20, below=of input] (c1) {Cardinality $\geq$ min?};
+\node[dec, fill=yellow!20, below=of c1] (c2) {City-centre radius bounded?};
 \node[box, fill=blue!10, below=of c2] (api) {POST /api/validate/\{type\}};
 \node[dec, fill=yellow!20, below=of api] (s1) {Angle $\leq 90°$?};
 \node[dec, fill=yellow!20, below=of s1] (s2) {Spatial predicate?};
-\node[box, fill=green!15, below=of s2] (save) {POST /api/save};
+\node[box, fill=green!15, below=of s2] (save) {POST /api/features};
 \node[box, fill=red!15, right=2.5cm of c1] (rej1) {Client toast};
 \node[box, fill=red!15, right=2.5cm of s1] (rej2) {Server 200 \{valid: false\}};
 
@@ -1470,7 +1512,7 @@ client-side fast checks followed by server-side PostGIS spatial predicates.
 \draw[arr] (s2) -- node[left, font=\tiny]{yes} (save);
 \draw[rej] (s2) -- node[above, font=\tiny]{no} (rej2);
 \end{tikzpicture}
-\caption{Two-stage validation flow for road and district features.
+\caption{Two-stage validation flow for feature saves.
 Client-side checks (yellow) prevent trivial invalid inputs without a
 network round-trip. Server-side PostGIS checks enforce spatial correctness.}
 \label{fig:validation_flow}

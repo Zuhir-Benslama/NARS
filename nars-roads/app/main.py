@@ -198,13 +198,10 @@ def _segment_task(
             fg_prob, transform = model.predict(
                 raw, bbox=(min_lon, min_lat, max_lon, max_lat)
             )
-            if task == "buildings":
-                features = mask_to_polygons(fg_prob, transform, threshold=threshold)
-            else:
-                # Future task (e.g. roads): mask_to_linestrings(fg_prob, ...).
-                raise HTTPException(
-                    status_code=500, detail=f"No postprocessor for task '{task}'"
-                )
+            # Only the buildings postprocessor exists today. A future task
+            # (e.g. roads) would dispatch to mask_to_linestrings here, so the
+            # branch is dropped rather than left unreachable.
+            features = mask_to_polygons(fg_prob, transform, threshold=threshold)
         finally:
             INFERENCE_SEMAPHORE.release()
     except TileTooLargeError as exc:

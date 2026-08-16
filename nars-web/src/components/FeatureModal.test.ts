@@ -19,15 +19,6 @@ const createMockModalStore = () => ({
   mainUrbanExists: false,
   districtTypeKey: "district",
   roadTypeKey: "street",
-  entranceTypeKey: "main_entrance",
-  roadOptions: [] as any[],
-  selectedRoadIdx: "" as number | "",
-  entranceSide: null as "left" | "right" | null,
-  entranceNumber: null as number | null,
-  entranceSideLoading: false,
-  mainEntranceOptions: [] as any[],
-  selectedMainIdx: "" as number | "",
-  bisNumber: null as number | null,
   spaceTypeKey: "garden",
   sectorKey: "banking_postal",
   buildingTypeKey: "bank",
@@ -156,14 +147,7 @@ vi.mock("../phases", () => ({
   ],
 }))
 
-// Mock map features
-vi.mock("../map", () => ({
-  fetchRoadSide: vi.fn(),
-  computeBisNumber: vi.fn(),
-}))
-
 import FeatureModal from "../components/FeatureModal.vue"
-
 describe("FeatureModal", () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -257,19 +241,6 @@ describe("FeatureModal", () => {
     expect(wrapper.vm).toBeDefined()
   })
 
-  it("hides name field for house entrance edit mode", async () => {
-    mockModalStore.visible = true
-    mockModalStore.phaseIndex = 4 // houseEntrances
-    mockModalStore.isEdit = true
-
-    const wrapper = mount(FeatureModal)
-    await nextTick()
-
-    // Name field should not be present
-    const nameFields = wrapper.findAll("label").filter((l) => l.text().includes("Name"))
-    expect(nameFields.length).toBe(0)
-  })
-
   it("shows area type selector for areas phase", async () => {
     mockModalStore.visible = true
     mockModalStore.phaseIndex = 0 // areas
@@ -290,19 +261,6 @@ describe("FeatureModal", () => {
     const selects = wrapper.findAll("select")
     const roadTypeSelect = selects.find((s) => s.find('option[value="street"]').exists())
     expect(roadTypeSelect).toBeDefined()
-  })
-
-  it("shows road assignment selector for houseEntrances phase", async () => {
-    mockModalStore.visible = true
-    mockModalStore.phaseIndex = 4 // houseEntrances
-
-    const wrapper = mount(FeatureModal)
-    await nextTick()
-
-    const roadAssignmentSelector = wrapper.findComponent({
-      name: "RoadAssignmentSelector",
-    })
-    expect(roadAssignmentSelector.exists()).toBe(true)
   })
 
   it("shows sector and building selectors for publicBuildings phase", async () => {

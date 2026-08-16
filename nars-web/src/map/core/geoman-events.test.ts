@@ -252,6 +252,80 @@ describe("onEditEnd", () => {
     expect((entry.data.coordinates as any)[0].lng).toBe(128.0)
   })
 
+  it("flattens MultiLineString coordinates", () => {
+    mockGetActiveSnapPhases.mockReturnValue([])
+    const entry = addLayerEntry("areas", { dbId: "ml1", data: { coordinates: [] } })
+    mockGetActiveEditEntry.mockReturnValue(entry)
+    mod.registerGeomanEvents()
+    const handler = getHandler("gm:editend")
+
+    handler({
+      feature: {
+        _geoJson: {
+          geometry: {
+            type: "MultiLineString",
+            coordinates: [
+              [
+                [127.0, 36.0],
+                [127.1, 36.1],
+              ],
+              [
+                [127.2, 36.2],
+                [127.3, 36.3],
+              ],
+            ],
+          },
+        },
+      },
+    })
+
+    expect(entry.data.coordinates).toEqual([
+      { lat: 36.0, lng: 127.0 },
+      { lat: 36.1, lng: 127.1 },
+      { lat: 36.2, lng: 127.2 },
+      { lat: 36.3, lng: 127.3 },
+    ])
+  })
+
+  it("uses the first polygon's outer ring for MultiPolygon", () => {
+    const entry = addLayerEntry("areas", { dbId: "mp1", data: { coordinates: [] } })
+    mockGetActiveEditEntry.mockReturnValue(entry)
+    mod.registerGeomanEvents()
+    const handler = getHandler("gm:editend")
+
+    handler({
+      feature: {
+        _geoJson: {
+          geometry: {
+            type: "MultiPolygon",
+            coordinates: [
+              [
+                [
+                  [127.0, 36.0],
+                  [127.1, 36.1],
+                  [127.0, 36.0],
+                ],
+              ],
+              [
+                [
+                  [128.0, 37.0],
+                  [128.1, 37.1],
+                  [128.0, 37.0],
+                ],
+              ],
+            ],
+          },
+        },
+      },
+    })
+
+    expect(entry.data.coordinates).toEqual([
+      { lat: 36.0, lng: 127.0 },
+      { lat: 36.1, lng: 127.1 },
+      { lat: 36.0, lng: 127.0 },
+    ])
+  })
+
   it("does nothing when no active edit entry", () => {
     mockGetActiveEditEntry.mockReturnValue(null)
     mod.registerGeomanEvents()

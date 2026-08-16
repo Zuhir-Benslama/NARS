@@ -115,10 +115,16 @@ postgis-migration-baseline: ## Backfill EF migration history for pre-existing sc
 .PHONY: db-migrate-nars
 db-migrate-nars: ## Apply NARS SQL migrations (nars-infra/migrations/*.sql) to the deployed DB (idempotent)
 	@echo "→ Applying NARS SQL migrations from $(MIGRATIONS_DIR)..."
-	@for f in "$(MIGRATIONS_DIR)"/*.sql; do \
+	@count=0; \
+	for f in "$(MIGRATIONS_DIR)"/*.sql; do \
 		[ -f "$$f" ] || continue; \
 		echo "→ Applying $$(basename "$$f")..."; \
 		cat "$$f" | $(KUBECTL) exec -i -n "$(NAMESPACE)" deployment/postgis -- \
 			psql -U postgres -d "$(DB_NAME)" -v ON_ERROR_STOP=1 >/dev/null || exit 1; \
-	done
-	@echo "✓ NARS SQL migrations applied"
+		count=$$((count + 1)); \
+	done; \
+	if [ "$$count" -eq 0 ]; then \
+		echo "✖ No migration files found in $(MIGRATIONS_DIR) — nothing was applied"; \
+		exit 1; \
+	fi
+	@echo "✓ NARS SQL migrations applied ($$count file(s))"

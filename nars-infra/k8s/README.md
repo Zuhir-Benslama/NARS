@@ -138,10 +138,23 @@ kubectl create secret tls nars-tls -n nars \
 kubectl create secret generic nars-ca -n nars \
   --from-file=ca.crt=nars-infra/k8s/certs/ca.crt
 
+# All six keys below are required — the API and backup CronJob fail to start
+# (missing secret mounts) if any is absent. The example uses --from-literal;
+# `make secrets-apply` is the preferred path (writes keys from .env via temp
+# files so they never appear in shell history / ps).
 kubectl create secret generic nars-secrets -n nars \
   --from-literal=postgres_password="<your-password>" \
   --from-literal=ConnectionStrings__DefaultConnection="Host=postgis;Port=5432;Database=nars_db;Username=postgres;Password=<your-password>" \
   --from-literal=Jwt__SecretKey="<your-jwt-secret>" \
+  --from-literal=gpg-passphrase="<gpg-passphrase>" \
+  --from-literal=AdminSignup__SignupToken="<signup-token>" \
+  --from-literal=Segmentation__InternalToken="<internal-token>" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# Shared internal token + model weights URL for the nars-roads microservice:
+kubectl create secret generic nars-roads-secrets -n nars \
+  --from-literal=internal-token="<same internal-token as above>" \
+  --from-literal=weights-url="<model-weights-url>" \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
 

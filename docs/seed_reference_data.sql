@@ -1,9 +1,12 @@
 SET client_encoding = 'UTF8';
 -- SET standard_conforming_strings = on;  -- default since PG 9.1, commented for clarity
 
--- Idempotency: clear existing reference data before re-seeding.
--- TRUNCATE CASCADE handles FK dependencies (communes → dairas → wilayas).
--- Only runs if data already exists (first run inserts cleanly).
+-- Idempotency: clear existing reference data before re-seeding, but only
+-- INSIDE the seeding transaction so a mid-COPY failure rolls back the
+-- truncation too (a partial re-seed must never leave the reference tables
+-- empty). TRUNCATE CASCADE handles FK dependencies (communes → dairas →
+-- wilayas). Only runs if data already exists (first run inserts cleanly).
+BEGIN;
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM public.wilayas LIMIT 1) THEN
@@ -12,7 +15,6 @@ BEGIN
     END IF;
 END $$;
 
-BEGIN;
 
 COPY public.wilayas (wilaya_id, wilaya_ar, wilaya_fr, wilaya_latitude, wilaya_longitude) FROM stdin;
 1	أدرار	Adrar	26.4888155	-1.3582442
@@ -1897,7 +1899,7 @@ COPY public.communes (commune_id, daira_id, commune_code, commune_ar, commune_fr
 1261	448	3806	لرجام	Lardjem	لرجام، دائرة لرجام، تسمسيلت، الجزائر	35.7480295	1.5480772
 1262	448	3807	الملعب	Melaab	ملعب، دائرة لرجام، تسمسيلت، الجزائر	35.7176605	1.3230934
 1263	448	3808	سيدي العنتري	Sidi Lantri	سيدي العنترى، دائرة لرجام، تسمسيلت، الجزائر	35.6936399	1.5032488
-1264	448	3819	تملاحت	Tamellahet	تملاحت، دائرة تماسين، تقرت، الجزائر	33.0090644	6.0098295
+1264	448	3819	تملاحت	Tamellahet	تملاحت، دائرة لرجام، تسمسيلت، الجزائر	35.760659	1.4502798
 1265	449	3809	برج الأمير عبد القادر	Bordj El Emir Abdelkader	برج الأمير عبد القادر، دائرة برج الأمير عبد القادر، تسمسيلت، الجزائر	35.8222005	2.23692
 1266	449	3814	اليوسفية	Youssoufia	يوسوفية، دائرة برج الأمير عبد القادر، تسمسيلت، الجزائر	35.8960794	2.126545
 1267	450	3811	خميستي	Khemisti	خميستى، دائرة خميستى، تسمسيلت، 38100، الجزائر	35.680409	1.9488389
@@ -2184,4 +2186,5 @@ COMMIT;
 -- kicks in (which could take minutes on a fresh cluster).
 VACUUM ANALYZE public.wilayas;
 VACUUM ANALYZE public.dairas;
+VACUUM ANALYZE public.communes;
 

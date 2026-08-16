@@ -3,7 +3,112 @@
 Code quality issues found during review of the segmentation microservice
 (FastAPI + PyTorch inference). Grouped by severity.
 
-## Review round 4 (current)
+## Review round 6 (current)
+
+Fresh review of the test suite on top of round 5. Baseline: mypy clean,
+52 passed, 96.25% coverage (85% gate). All items resolved.
+
+## Low
+
+- [x] **Polygon skip-guards had no direct tests** (`app/postprocess.py`)
+  - `mask_to_linestrings` got a deterministic monkeypatched-graph test for
+    every degenerate guard (round 5), but the mirror guards in
+    `mask_to_polygons` (short contour, missing contours, construction
+    exception, invalid geometry) were only exercised via the happy path.
+  - **Fix:** five new tests patch `skimage.measure.find_contours` (the
+    function imports it locally, so it must be patched at the source) and
+    `app.postprocess.Polygon` to force each guard, plus a mixed two-region
+    test proving one degenerate region is skipped while the valid one is
+    still emitted. Postprocess coverage 93% -> 100%.
+
+- [x] **Dead `else` branch in `_segment_task`** (`app/main.py:205`)
+  - The only caller passes the literal `"buildings"`, so the `else` -> 500
+    for an unknown task was unreachable (0% coverage). The branch and its
+    raise are gone; the direct `mask_to_polygons` call is noted as the
+    future home of a roads dispatcher.
+
+- [x] **Weights-loading happy path untested** (`app/model.py:85-90`)
+  - `torch.load`/`load_state_dict`/`is_loaded=True` had no test; every test
+    hit the weights-not-found branch. A torch-gated test saves the model's
+    own state_dict to a tmp checkpoint and asserts a freshly constructed
+    `SegmentationModel` reports `is_loaded` and is not the same net object.
+    Model coverage 96% -> 100%.
+
+- [x] **Warning noise from third-party libraries** (`pytest.ini`)
+  - 19 warnings on every run: torch 2.4's `jit._script` deprecations
+    (backtick-quoted message) and starlette's legacy `import multipart`
+    `PendingDeprecationWarning`. Three `filterwarnings` entries (matched
+    against the backtick-quoted torch messages) quiet the suite to zero.
+
+- [x] **Auth token literal duplicated** (`tests/conftest.py`, `tests/helpers.py`,
+    `tests/test_api.py`)
+  - `"test-token"` lived in two files; changing one broke the other
+    opaquely. `helpers.AUTH_TOKEN` is now the single source of truth:
+    conftest sets `NARS_ROADS_INTERNAL_TOKEN` from it, test_api uses it in
+    request headers.
+
+## Verification
+
+- `ruff check` / `ruff format --check` (with `ruff.toml`): clean.
+- `mypy app/` (test image, full dependency stack): no issues in 5 files.
+- Test image run: 58 passed, 0 warnings, 100.00% coverage (85% gate).
+
+## Review round 5
+
+Fresh review on top of round 4. All items resolved.
+
+## Low
+
+- [x] **Dead `# noqa: TRY003` directives** (`app/model.py`, `tests/test_api.py`)
+  - ruff's default rule set does not include flake8-try, so the `TRY003`
+    directives were unused (RUF100 would flag them) yet the raises they guard
+    are intentional dynamic-message bypasses.
+  - **Fix:** added `nars-roads/ruff.toml` with `extend-select = ["TRY"]`, making
+    the directives live and meaningful instead of dead. The noqa comment on
+    the `AssertionError` test stub was restored (TRY003 applies to any
+    raise-with-message, not only raises inside `try`).
+
+- [x] **No ruff/mypy configuration; type checking unenforced** (repo root)
+  - nars-roads relied on ruff's defaults and nothing ran mypy: a type regression
+    could slip through every gate.
+  - **Fix:** `ruff.toml` (rule set documented, scoped to nars-roads/) and
+    `mypy.ini` (`ignore_missing_imports = True` for the untyped scientific
+    stack — torch, rasterio, shapely, sknw, skimage — while the app's own code
+    stays fully checked). `mypy==2.1.0` added to `requirements-dev.txt`; the
+    `Dockerfile.nars-roads` test image now runs `mypy app/` before pytest, so
+    `make roads-test`/CI enforces it.
+
+- [x] **`mask_to_linestrings` degenerate-edge guards untested**
+    (`app/postprocess.py:43,55,58,61-63`)
+  - The skip-paths (no `pts`, <2 points, zero-length line, invalid geometry,
+    construction exception) were the only uncovered lines.
+  - **Fix:** six new tests feed a monkeypatched sknw graph with crafted edges,
+    covering each guard plus a mixed graph that proves degenerate edges are
+    skipped while valid ones are still emitted. Note: shapely 2.x's
+    `is_valid` does not reject self-crossing LineStrings (GEOS checks
+    simplicity separately), so the `is_valid` guard is forced in its test.
+
+- [x] **Georeferenced transform trusted without a CRS check**
+    (`app/model.py`)
+  - A projected-CRS tile (e.g. UTM, metre units) had its embedded transform
+    trusted as-is, silently emitting meter-scale coordinates in an EPSG:4326
+    GeoJSON response. A non-identity transform with no CRS was equally
+    unverifiable.
+  - **Fix:** `SegmentationModel._embedded_transform` trusts the tile's own
+    transform only when the CRS is present and geographic (degree units);
+    projected or absent CRS falls back to the caller-supplied bbox. New tests
+    cover projected-CRS and missing-CRS tiles (fall back), and the
+    georeferenced-EPSG:4326 tile is still trusted.
+
+## Verification
+
+- `ruff check` / `ruff format --check` (with the new `ruff.toml`): clean.
+- `mypy app/` (with the new `mypy.ini`): no issues in 5 source files.
+- `make roads-test` (test image): mypy clean, 52 passed, 96.25% coverage
+  (85% gate).
+- `hadolint` on the modified `Dockerfile.nars-roads`: clean.
+
+## Review round 4
 
 Fresh review on top of round 3 (ruff clean; 31 tests pass locally with the
 torch/skimage-dependent tests skipped — full suite runs in the torch+skimage

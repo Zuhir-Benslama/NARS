@@ -6,4 +6,6 @@ fail-closed auth can be exercised deterministically.
 
 import os
 
-os.environ["NARS_ROADS_INTERNAL_TOKEN"] = "test-token"
+from helpers import AUTH_TOKEN
+
+os.environ["NARS_ROADS_INTERNAL_TOKEN"] = AUTH_TOKEN

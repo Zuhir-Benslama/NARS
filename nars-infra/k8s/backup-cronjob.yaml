@@ -38,6 +38,9 @@ metadata:
     app.kubernetes.io/component: backup
 spec:
   schedule: "0 2 * * *"
+  # Interpret the schedule in Africa/Algiers (UTC+1, no DST) instead of the
+  # kube-controller-manager's local timezone. Requires K8s >= 1.27.
+  timeZone: "Africa/Algiers"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1

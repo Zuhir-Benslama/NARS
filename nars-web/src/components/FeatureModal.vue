@@ -17,8 +17,8 @@
         {{ t(phase.hint) }}
       </div>
 
-      <!-- Name — hidden when editing a house entrance (set at creation, not editable) -->
-      <div v-if="!isHouseEntranceEdit" class="modal-field">
+      <!-- Name -->
+      <div class="modal-field">
         <label>
           {{ t("label_name") }}
           <span class="req">*</span>
@@ -52,8 +52,8 @@
         }}</span>
       </div>
 
-      <!-- Decision No. + Date — hidden when editing a house entrance or city center -->
-      <div v-if="!isHouseEntranceEdit && !isCityCenter" class="modal-row">
+      <!-- Decision No. + Date — hidden when editing a city center -->
+      <div v-if="!isCityCenter" class="modal-row">
         <div class="modal-field">
           <label>
             {{ t("label_decision_no") }}
@@ -128,9 +128,6 @@
         </select>
       </div>
 
-      <!-- House Entrances: sub-type selector + conditional fields (extracted) -->
-      <RoadAssignmentSelector v-if="phase?.key === 'houseEntrances'" />
-
       <!-- Public Buildings: sector → building cascading selectors (extracted) -->
       <BuildingTypeSelector v-if="phase?.key === 'publicBuildings'" />
 
@@ -159,18 +156,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch, onUnmounted, ref } from "vue"
+import { computed, watch, ref } from "vue"
 import { useI18n } from "vue-i18n"
 import { PHASES, DISTRICT_TYPES, ROAD_TYPES, PUBLIC_SPACE_TYPES } from "../phases"
 import { useAppStore } from "../stores/appStore"
 import { useModalStore } from "../stores/modalStore"
-import { fetchRoadSide, computeBisNumber } from "../map"
 import { useFeatureValidation } from "../composables/useFeatureValidation"
 import { useFocusTrap } from "../composables/useFocusTrap"
 import { useWindowKeydown } from "../composables/useWindowKeydown"
-import { debugWarn } from "../utils/debug"
 import AreaTypeSelector from "./modals/AreaTypeSelector.vue"
-import RoadAssignmentSelector from "./modals/RoadAssignmentSelector.vue"
 import BuildingTypeSelector from "./modals/BuildingTypeSelector.vue"
 
 const { t } = useI18n()
@@ -183,8 +177,7 @@ const phase = computed(() =>
 const modalRef = ref<HTMLElement | null>(null)
 useFocusTrap(modalRef, () => modalStore.visible)
 
-const { validate, buildModalResult, isMainUrban, isCityCenter, isHouseEntranceEdit } =
-  useFeatureValidation(modalStore)
+const { validate, buildModalResult, isMainUrban, isCityCenter } = useFeatureValidation(modalStore)
 
 // ── Computed display helpers ──────────────────────────────────────────────────
 
@@ -202,55 +195,6 @@ const isZoneWithTypeName = computed(
 )
 
 // ── Watchers ──────────────────────────────────────────────────────────────────
-
-let _roadSideController: AbortController | null = null
-
-onUnmounted(() => {
-  _roadSideController?.abort()
-})
-
-// When road selection changes → fetch side + suggested number.
-// In edit mode the side/number are already populated from existing data — skip
-// the API call so we don't overwrite them when the selector is pre-selected.
-watch(
-  () => modalStore.selectedRoadIdx,
-  async (val) => {
-    _roadSideController?.abort()
-    _roadSideController = null
-    if (val === "" || val === null) {
-      modalStore.patchFields({
-        entranceSide: null,
-        entranceNumber: null,
-        entranceSideLoading: false,
-      })
-      return
-    }
-    if (modalStore.isEdit) return
-    const roadOption = modalStore.roadOptions[Number(val)]
-    if (!roadOption) return
-    const controller = new AbortController()
-    _roadSideController = controller
-    try {
-      await fetchRoadSide(roadOption.dbId, undefined, controller.signal)
-    } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") return
-      debugWarn("[FeatureModal] fetchRoadSide failed:", e)
-    }
-  },
-)
-
-// When main entrance selection changes → compute BIS number
-// Only fires in create mode — edit mode pre-populates existing data.
-watch(
-  () => modalStore.selectedMainIdx,
-  (val) => {
-    if (val === "" || val === null) return
-    if (modalStore.isEdit) return
-    const option = modalStore.mainEntranceOptions[Number(val)]
-    if (!option) return
-    computeBisNumber(option.dbId)
-  },
-)
 
 // When area type or district type changes → auto-fill the name.
 // The zone type name is localized via t() (featureTypes.*) rather than the

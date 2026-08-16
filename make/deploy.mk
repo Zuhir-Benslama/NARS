@@ -19,6 +19,11 @@ _check-secrets: ## Fail fast if critical secrets are empty (prevents deploying w
 		echo "✖ NARS_ROADS_INTERNAL_TOKEN not set — run 'make .env' to generate it";
 		exit 1;
 	fi
+	@if [ -z "$(NARS_ROADS_WEIGHTS_URL)" ]; then
+		echo "✖ NARS_ROADS_WEIGHTS_URL not set — the roads pod's fetch-weights initContainer would never become ready";
+		echo "  Add it to .env (see .env.example for the default URL)";
+		exit 1;
+	fi
 
 
 # ─── Individual Deployment Steps ────────────────────────────
@@ -221,11 +226,11 @@ kustomize-set-image-tag: ## Persistently pin image tags in kustomization.yaml (m
 		echo "✖ IMAGE_TAG is empty — specify a tag (e.g. IMAGE_TAG=abc1234)";
 		exit 1;
 	fi
-	@if echo "$(IMAGE_TAG)" | grep -qE '[^a-zA-Z0-9._-]'; then
-		echo "✖ IMAGE_TAG='$(IMAGE_TAG)' contains invalid characters (only alphanumeric, dots, hyphens, underscores allowed)";
+	@if $(_check_tag_cmd); then
+		echo '✖ IMAGE_TAG='$(IMAGE_TAG_Q)' contains invalid characters (only alphanumeric, dots, hyphens, underscores allowed)';
 		exit 1;
 	fi
-	@if echo "$(IMAGE_TAG)" | grep -qi "^latest$$"; then
+	@if echo $(IMAGE_TAG_Q) | grep -qi "^latest$$"; then
 		echo "  ⚠ IMAGE_TAG=$(IMAGE_TAG) is 'latest' — not pinning. Set IMAGE_TAG=<commit-sha> for reproducible deployments.";
 	else
 		if ! command -v kustomize >/dev/null 2>&1; then
@@ -236,7 +241,7 @@ kustomize-set-image-tag: ## Persistently pin image tags in kustomization.yaml (m
 		echo "→ Pinning kustomize image tags to $(IMAGE_TAG)...";
 		(cd "$(K8S_DIR)" && \
 		for img in $(REGISTRY_IMAGES); do \
-			kustomize edit set image "$(DOCKER_ORG)/$$img=$(DOCKER_ORG)/$$img:$(IMAGE_TAG)"; \
+			kustomize edit set image "$(DOCKER_ORG)/$$img=$(DOCKER_ORG)/$$img":$(IMAGE_TAG_Q); \
 		done);
 		echo "✓ Image tags pinned to $(IMAGE_TAG)";
 	fi
@@ -246,7 +251,7 @@ kustomize-apply: secrets-validate _check-pinned-tag _check-local-ingresses ## Ap
 	$(SUBMAKE) postgis-pv-fix
 	@echo "→ Applying kustomization (images: $(DOCKER_ORG)/*:$(IMAGE_TAG))..."
 	@$(KUBECTL) kustomize "$(K8S_DIR)" \
-		| awk -v org="$(DOCKER_ORG)" -v tag="$(IMAGE_TAG)" -v images="$(REGISTRY_IMAGES)" \
+		| awk -v org="$(DOCKER_ORG)" -v tag=$(IMAGE_TAG_Q) -v images="$(REGISTRY_IMAGES)" \
 			'BEGIN { esc = org; gsub(/\//, "\\/", esc); n = split(images, imgs, " "); alts = imgs[1]; for (i = 2; i <= n; i++) alts = alts "|" imgs[i]; pat = "^ *-? *image: " esc "\\/(" alts "):" } $$0 ~ pat { sub(/:[^ ]*$$/, ":" tag) } /app\.kubernetes\.io\/version:/ { sub(/version:.*$$/, "version: \"" tag "\"") } { print }' \
 		| $(KUBECTL) apply -f -
 	@echo "✓ Kustomization applied"

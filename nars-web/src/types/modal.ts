@@ -1,15 +1,3 @@
-export interface RoadOption {
-  idx: number
-  label: string
-  dbId: string
-}
-
-export interface EntranceOption {
-  idx: number
-  label: string
-  dbId: string
-}
-
 export interface ModalState {
   visible: boolean
   phaseIndex: number | null
@@ -23,15 +11,6 @@ export interface ModalState {
   mainUrbanExists: boolean
   districtTypeKey: string
   roadTypeKey: string
-  entranceTypeKey: "main_entrance" | "secondary_entrance"
-  roadOptions: RoadOption[]
-  selectedRoadIdx: number | ""
-  entranceSide: "left" | "right" | null
-  entranceNumber: number | null
-  entranceSideLoading: boolean
-  mainEntranceOptions: EntranceOption[]
-  selectedMainIdx: number | ""
-  bisNumber: number | null
   spaceTypeKey: string
   sectorKey: string
   buildingTypeKey: string

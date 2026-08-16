@@ -19,7 +19,7 @@ import { t } from "../../i18n"
 import { debugError } from "../../utils/debug"
 import { PHASES } from "../../phases"
 import { buildGeoJsonFeature } from "../features/loader-build"
-import type { FeatureTypeKey, LayerEntry } from "../../types"
+import type { FeatureTypeKey, LayerEntry, LatLng } from "../../types"
 import type {
   GeomanEditEvent,
   GeomanRemoveEvent,
@@ -95,15 +95,15 @@ function onEditEnd(e: GeomanEditEvent): void {
   const layerStore = useLayerStore()
 
   if (geometry.type === "Point") {
-    const c = geometry.coordinates as [number, number]
+    const c = geometry.coordinates
     layerStore.updateFeatureData(layerEntry.dbId, { lat: c[1], lng: c[0] })
   } else if (
     geometry.type === "LineString" ||
     geometry.type === "MultiLineString" ||
     geometry.type === "MultiPoint"
   ) {
-    const coords = geometry.coordinates as [number, number][]
-    const newCoords = coords.map((c) => ({ lat: c[1], lng: c[0] }))
+    const newCoords = linearGeometryToLatLng(geometry)
+    if (newCoords.length === 0) return
 
     const activePhases = getActiveSnapPhases()
     if (activePhases.length > 0) {
@@ -135,11 +135,32 @@ function onEditEnd(e: GeomanEditEvent): void {
     layerStore.updateFeatureData(layerEntry.dbId, { coordinates: newCoords })
     featuresStore.update(layerEntry.id, { geometry })
   } else if (geometry.type === "MultiPolygon") {
-    const coords = geometry.coordinates[0][0] as [number, number][]
-    const newCoords = coords.map((c) => ({ lat: c[1], lng: c[0] }))
+    const outerRing = geometry.coordinates[0]?.[0]
+    if (!outerRing || outerRing.length === 0) return
+    const newCoords = positionsToLatLng(outerRing)
     layerStore.updateFeatureData(layerEntry.dbId, { coordinates: newCoords })
     featuresStore.update(layerEntry.id, { geometry })
   }
+}
+
+/**
+ * Convert [lng, lat] positions to the {lat, lng} shape the layer store expects.
+ */
+function positionsToLatLng(coords: GeoJSON.Position[]): LatLng[] {
+  return coords.map((c) => ({ lat: c[1], lng: c[0] }))
+}
+
+/**
+ * Flatten the editable linear geometries into a single {lat, lng} list.
+ * MultiLineString is nested arrays, so each line is flattened in order.
+ */
+function linearGeometryToLatLng(
+  geometry: GeoJSON.LineString | GeoJSON.MultiLineString | GeoJSON.MultiPoint,
+): LatLng[] {
+  if (geometry.type === "MultiLineString") {
+    return geometry.coordinates.flatMap((line) => positionsToLatLng(line))
+  }
+  return positionsToLatLng(geometry.coordinates)
 }
 
 async function onRemove(e: GeomanRemoveEvent): Promise<void> {

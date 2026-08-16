@@ -3,6 +3,9 @@ apiVersion: v1
 kind: Service
 metadata:
   name: nars-roads
+  # Explicit so standalone `kubectl apply -f nars-infra/roads/` also lands in
+  # nars (matches the parent kustomization, which applies the same namespace).
+  namespace: nars
   labels:
     app.kubernetes.io/name: nars-roads
 spec:

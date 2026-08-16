@@ -54,68 +54,11 @@ describe("modalStore", () => {
       expect(store.areaTypeKey).toBe("peri_urban")
     })
 
-    it("openEdit defaults entranceTypeKey to main_entrance when a road is assigned", () => {
-      const store = useModalStore()
-      store.openEdit(0, "db-123", {
-        type: "houseEntrances",
-        label: "Entrance",
-        roadDbId: "road-1",
-      } as any)
-      expect(store.entranceTypeKey).toBe("main_entrance")
-    })
-
-    it("openEdit defaults entranceTypeKey to secondary_entrance without a road", () => {
-      const store = useModalStore()
-      store.openEdit(0, "db-123", {
-        type: "houseEntrances",
-        label: "Entrance",
-      } as any)
-      expect(store.entranceTypeKey).toBe("secondary_entrance")
-    })
-
-    it("openEdit preserves entrance-side and numbering fields", () => {
-      const store = useModalStore()
-      store.openEdit(0, "db-123", {
-        type: "houseEntrances",
-        label: "Entrance",
-        side: "right",
-        entranceNumber: 12,
-        bisNumber: 3,
-        radius: 500,
-        spaceTypeKey: "square",
-        sectorKey: "commerce",
-        buildingTypeKey: "store",
-        entranceTypeKey: "secondary_entrance",
-      } as any)
-      expect(store.entranceSide).toBe("right")
-      expect(store.entranceNumber).toBe(12)
-      expect(store.bisNumber).toBe(3)
-      expect(store.radius).toBe(500)
-      expect(store.spaceTypeKey).toBe("square")
-      expect(store.sectorKey).toBe("commerce")
-      expect(store.buildingTypeKey).toBe("store")
-      expect(store.entranceTypeKey).toBe("secondary_entrance")
-    })
-
     it("close hides the modal", () => {
       const store = useModalStore()
       store.openCreate(0)
       store.close()
       expect(store.visible).toBe(false)
-    })
-
-    it("setRoadOptions sets options and resets selection", () => {
-      const store = useModalStore()
-      store.setRoadOptions([{ idx: 0, dbId: "r1", label: "Road 1" }])
-      expect(store.roadOptions).toHaveLength(1)
-      expect(store.selectedRoadIdx).toBe("")
-    })
-
-    it("setMainEntranceOptions sets options and resets selection", () => {
-      const store = useModalStore()
-      store.setMainEntranceOptions([{ idx: 0, dbId: "m1", label: "Main 1" }])
-      expect(store.mainEntranceOptions).toHaveLength(1)
-      expect(store.selectedMainIdx).toBe("")
     })
   })
 

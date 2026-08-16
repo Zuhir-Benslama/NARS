@@ -1,21 +1,34 @@
 #!/usr/bin/env node
 import { firefox } from 'playwright';
-import { readFileSync, writeFileSync } from 'fs';
-import { dirname, join } from 'path';
+import { existsSync, readFileSync } from 'fs';
+import { basename, dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const inputDir = process.argv[2] || join(__dirname, '..', 'docs', 'uml');
-const outputDir = process.argv[3] || inputDir;
+const defaultInputDir = join(__dirname, '..', 'docs', 'uml');
+const defaultFiles = [
+  'nars-class-diagram.md',
+  'nars-sequence-diagram.md',
+  'nars-vite-component-diagram.md',
+  'nars-vite-sequence-diagram.md',
+];
 
-const files = process.argv.length > 4
-  ? process.argv.slice(4)
-  : [
-      'nars-class-diagram.md',
-      'nars-sequence-diagram.md',
-      'nars-vite-component-diagram.md',
-      'nars-vite-sequence-diagram.md',
-    ];
+// CLI: node script.mjs [inputDir] [outputDir] [files...]
+//   or: node script.mjs <file.md> [outputDir]   (single-file convenience)
+const arg1 = process.argv[2];
+let inputDir;
+let outputDir;
+let files;
+
+if (arg1 && arg1.toLowerCase().endsWith('.md')) {
+  inputDir = dirname(arg1);
+  outputDir = process.argv[3] || inputDir;
+  files = [basename(arg1)];
+} else {
+  inputDir = arg1 || defaultInputDir;
+  outputDir = process.argv[3] || inputDir;
+  files = process.argv.length > 4 ? process.argv.slice(4) : defaultFiles;
+}
 
 async function main() {
   const browser = await firefox.launch({ headless: true, timeout: 30000 });
@@ -24,6 +37,11 @@ async function main() {
     for (const file of files) {
       const filePath = join(inputDir, file);
       console.log(`Processing ${file}...`);
+
+      if (!existsSync(filePath)) {
+        console.error(`  Skipping ${file}: not found (${filePath})`);
+        continue;
+      }
 
       const content = readFileSync(filePath, 'utf-8');
       const codeBlocks = content.match(/```mermaid\n([\s\S]*?)```/g) || [];
@@ -104,7 +122,7 @@ async function main() {
               continue;
             }
 
-            await page.waitForTimeout(500);
+            await new Promise(resolve => setTimeout(resolve, 500));
 
             const svgElement = await page.locator('#diagram svg');
             const bbox = await svgElement.evaluate(el => {

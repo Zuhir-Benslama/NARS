@@ -35,6 +35,11 @@ KUBE_PROMETHEUS_STACK_VERSION ?= 88.3.0
 LOKI_VERSION ?= 7.3.0
 TEMPO_VERSION ?= 1.24.4
 OTEL_COLLECTOR_VERSION ?= 0.169.0
+# Collector image tag is separate from the chart version — the chart's
+# appVersion (0.158.0 for 0.169.0) does NOT track the pinned image tag.
+# Kept as an explicit variable so `observability-otel-collector` and the
+# helm-values file can't silently drift apart.
+OTEL_COLLECTOR_IMAGE_TAG ?= 0.120.0
 YAMLLINT_IMAGE      ?= cytopia/yamllint:1.36.0
 RUFF_IMAGE          ?= ghcr.io/astral-sh/ruff:0.15.15
 NODE_IMAGE          ?= node:22-alpine
@@ -65,6 +70,7 @@ fi
 	echo "GRAFANA_PASSWORD=$$(_RND 12)" >> $@;
 	echo "NARS_ADMIN_SIGNUP_TOKEN=$$(_RND 32)" >> $@;
 	echo "NARS_ROADS_INTERNAL_TOKEN=$$(_RND 32)" >> $@;
+	echo "NARS_ROADS_WEIGHTS_URL=https://hf.co/nilsho01/unet-resnet34-vhr-buildings/resolve/main/unet_bldg_base.pth" >> $@;
 	chmod 600 $@;
 	echo "→ Created $@ with fresh secrets (permissions: 600)"
 

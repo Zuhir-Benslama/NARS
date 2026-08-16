@@ -98,7 +98,7 @@
         v-model="selectedCommuneId"
         :label="t('su_commune')"
         :placeholder="t('su_search_commune')"
-        endpoint="/api/communes"
+        :endpoint="communeEndpoint"
       />
 
       <div class="su-form-actions">
@@ -290,8 +290,19 @@ const dairaPlaceholder = computed(() =>
 )
 
 const dairaEndpoint = computed(() => (q: string) => {
-  const wilayaParam = selectedWilayaId.value ? `&wilaya_id=${selectedWilayaId.value}` : ""
+  // Scope the daira list to the chosen wilaya — or, for a wilaya admin who has
+  // no selector, to the caller's own wilaya.
+  const wilayaId = selectedWilayaId.value ?? appStore.user?.wilaya?.id ?? null
+  const wilayaParam = wilayaId ? `&wilaya_id=${wilayaId}` : ""
   return `/api/dairas?search=${encodeURIComponent(q)}${wilayaParam}`
+})
+
+const communeEndpoint = computed(() => (q: string) => {
+  // Scope the commune list to the chosen daira — or, for a daira admin who has
+  // no selector, to the caller's own daira.
+  const dairaId = selectedDairaId.value ?? appStore.user?.daira?.id ?? null
+  const dairaParam = dairaId ? `&daira_id=${dairaId}` : ""
+  return `/api/communes?search=${encodeURIComponent(q)}${dairaParam}`
 })
 
 watch(selectedWilayaId, () => {

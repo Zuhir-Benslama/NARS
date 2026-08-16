@@ -8,11 +8,11 @@ import pytest
 from app.main import app
 from app.model import InvalidTileError, TileTooLargeError
 from fastapi.testclient import TestClient
-from helpers import make_tiff_bytes, requires_torch
+from helpers import AUTH_TOKEN, make_tiff_bytes, requires_torch
 
 client = TestClient(app)
 
-AUTH = {"X-Internal-Token": "test-token"}
+AUTH = {"X-Internal-Token": AUTH_TOKEN}
 BBOX = {"min_lon": 0.0, "min_lat": 0.0, "max_lon": 1.0, "max_lat": 1.0}
 
 
@@ -28,7 +28,7 @@ class _StubModel:
     def predict(self, raw, bbox):
         if self._predict_error is not None:
             raise self._predict_error
-        raise AssertionError("test bug: predict should not be reached")  # noqa: TRY003
+        raise AssertionError("test bug: predict should not be reached")  # noqa: TRY003 - dynamic message
 
 
 def _post(**kwargs):
@@ -287,7 +287,7 @@ def test_missing_token_fails_closed(monkeypatch):
     import app.main as roads
 
     monkeypatch.setattr(roads, "INTERNAL_TOKEN", "")
-    assert _post(headers={"X-Internal-Token": "test-token"}).status_code == 401
+    assert _post(headers={"X-Internal-Token": AUTH_TOKEN}).status_code == 401
     assert _post().status_code == 401
 
 

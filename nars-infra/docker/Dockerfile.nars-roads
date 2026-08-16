@@ -26,14 +26,16 @@ COPY requirements-dev.txt .
 RUN pip install --no-cache-dir -r requirements-dev.txt
 
 COPY pytest.ini .
+COPY mypy.ini .
 COPY app ./app
 COPY tests ./tests
 
-# Coverage gate on the CI path: the test image enforces a floor so a
-# regression in test coverage fails `make roads-test` (CI) instead of silently
-# eroding. Local runs without pytest-cov stay unaffected (args live here, not
-# in pytest.ini addopts).
-CMD ["pytest", "-q", "tests/", "--cov=app", "--cov-report=term-missing", "--cov-fail-under=85"]
+# Quality gate on the CI path: the test image runs mypy (type-check the app
+# against the real dependency stack) then pytest with a coverage floor, so a
+# regression in types or coverage fails `make roads-test` (CI) instead of
+# silently eroding. Local runs without pytest-cov stay unaffected (args live
+# here, not in pytest.ini addopts).
+CMD ["sh", "-c", "mypy app/ && pytest -q tests/ --cov=app --cov-report=term-missing --cov-fail-under=85"]
 
 FROM base
 

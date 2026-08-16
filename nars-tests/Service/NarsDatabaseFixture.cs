@@ -9,8 +9,9 @@ namespace NarsApi.Tests.Service;
 
 /// <summary>
 /// Shared PostgreSQL container for integration tests.
-/// Uses a class-level static container so all test classes share one instance.
-/// PostGIS extension is enabled on first connection.
+/// A collection fixture (ICollectionFixture) — all test classes in the
+/// "PostgreSQL Integration" collection share this single container and run
+/// serially. PostGIS is enabled explicitly in <see cref="InitializeAsync"/>.
 /// </summary>
 public sealed class NarsDatabaseFixture : IAsyncLifetime
 {
@@ -28,7 +29,11 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
         }
     }
 
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgis/postgis:17-3.5-alpine")
+    // Digest-pinned for reproducible CI (matches the digest-pinning convention
+    // used for the prod images in nars-infra/docker). Verify the digest with:
+    //   docker buildx imagetools inspect postgis/postgis:17-3.5-alpine
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder(
+            "postgis/postgis:17-3.5-alpine@sha256:a7b31f03d1802e66d4d840ba31f20f9f3a8d3ffb2ba136596370a79356d6a327")
         .WithDatabase("nars_test")
         .WithUsername("nars")
         .WithPassword(Guid.NewGuid().ToString("N"))

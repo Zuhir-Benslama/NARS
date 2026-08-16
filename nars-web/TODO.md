@@ -59,8 +59,8 @@ findings. All findings below fixed.
   lines 74.7% (all above thresholds).
 - `npm run lint`, `npm run typecheck`, `npm run lint:css`, `npm run build`,
   `npm audit` — all clean.
-- E2E suite (`npm run test:e2e`) not run locally — requires the full stack on
-  `:5000`/`:5173` (Playwright specs exist under `e2e/`).
+- E2E suite (`npm run test:e2e`) — 16 Playwright specs under `e2e/`, run
+  locally against the dev server with API calls mocked via `page.route`.
 
 ## Review round 2
 
@@ -146,3 +146,48 @@ by severity.
 - `npm run test:run` — 958 passed (92 files), unchanged count.
 - `npm run lint`, `npm run typecheck`, `npm run lint:css` — all clean.
 - E2E suite not run locally (requires the full stack).
+
+## Review round 3
+
+All four deferred items were resolved (product decision: remove the dead code).
+Round-1/round-2 E2E notes corrected — the suite runs locally.
+
+## Fixed
+
+- [x] **Dead house-entrance modal path removed** — product decision to remove the
+  code instead of rewiring it. Deleted `RoadAssignmentSelector.vue` (+ its test),
+  the `fetchRoadSide`/`computeBisNumber` helpers and the house-entrances branch of
+  `prepareModalExtras`, the house-entrance branches in `useFeatureValidation`
+  (`isHouseEntranceEdit`, validation/build branches), the `FeatureModal.vue`
+  watchers/controller/template block, and the store state + actions
+  (`entranceTypeKey`, `roadOptions`, `selectedRoadIdx`, `entranceSide`,
+  `entranceNumber`, `entranceSideLoading`, `mainEntranceOptions`,
+  `selectedMainIdx`, `bisNumber`, `setRoadOptions`, `setMainEntranceOptions`).
+  Creation still flows through the direct `ModalResult` in `draw-modal.ts`;
+  editing remains blocked in `ctx-menu-actions.ts`.
+- [x] **`geoman-events.ts` `onEditEnd` casts `MultiLineString`/`MultiPolygon`
+  coords as `[number, number][]`** — replaced with type-safe helpers:
+  `positionsToLatLng` and `linearGeometryToLatLng` (MultiLineString flattens its
+  nested lines; MultiPolygon takes the first polygon's outer ring). Tests cover
+  both geometries.
+- [x] **`LocationSearchSelect` doesn't reflect `modelValue` on edit** — an
+  immediate watcher resolves the selected id back into the search box by listing
+  the scoped options (`?search=&take=500`) when the box is untouched, using the
+  existing `searchGen` race guard; it never clobbers text the user is typing.
+  Tests cover initial value, function endpoints, and the while-typing guard.
+- [x] **`SettingsUsers` location endpoints missing the caller's geographic
+  anchor** (new, found during round 3) — `GET /api/communes` requires `daira_id`
+  and `GET /api/dairas` requires `wilaya_id` (400 otherwise), but `daira_admin`
+  and `wilaya_admin` have no selectors to supply them. The endpoints now fall back
+  to `appStore.user.wilaya` / `appStore.user.daira` (populated from
+  `/api/current_user`), with an explicitly chosen location taking precedence.
+  Tests cover all four combinations.
+
+## Verification (round 3)
+
+- `npm run test:run` — 953 passed (91 files).
+- Coverage: statements 74.42%, branches 64.1%, functions 77.03%, lines 75.74%
+  (all above the 60/52/62/61 thresholds).
+- `npm run lint`, `npm run typecheck`, `npm run lint:css`, `npm run build` — all clean.
+- E2E suite (`npm run test:e2e`) — 16 Playwright specs pass locally with API
+  calls mocked via `page.route`.

@@ -24,8 +24,6 @@ export type {
 } from "./types/features"
 
 export type {
-  RoadOption,
-  EntranceOption,
   ModalState,
   ModalResult,
   AreaModalResult,

@@ -1,4 +1,4 @@
-# Included by the top-level Makefile (GNU make: single instance, shared vars). Target grouping: PostGIS backup/restore/admin + migrations. Target grouping: backend + roads test suites.
+# Included by the top-level Makefile (GNU make: single instance, shared vars). Target grouping: backend (nars-tests) + roads test suites.
 
 
 .PHONY: test

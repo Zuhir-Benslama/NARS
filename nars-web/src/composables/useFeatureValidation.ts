@@ -7,10 +7,6 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
     modalStore.phaseIndex !== null ? (PHASES[modalStore.phaseIndex] ?? null) : null,
   )
 
-  const isHouseEntranceEdit = computed(
-    () => phase.value?.key === "houseEntrances" && modalStore.isEdit,
-  )
-
   const isCityCenter = computed(() => phase.value?.key === "cityCenter")
 
   const isMainUrban = computed(
@@ -21,7 +17,7 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
     const errors: Record<string, string> = {}
     const key = phase.value?.key
 
-    if (!isHouseEntranceEdit.value && !isCityCenter.value) {
+    if (!isCityCenter.value) {
       const labelRequired =
         !(
           key === "districts" &&
@@ -40,21 +36,6 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
       } else if (radius > 50000) {
         errors.radius = "Must not exceed 50 km"
       }
-    }
-
-    if (!modalStore.isEdit) {
-      if (
-        key === "houseEntrances" &&
-        modalStore.entranceTypeKey === "main_entrance" &&
-        modalStore.selectedRoadIdx === ""
-      )
-        errors.road = "Required"
-      if (
-        key === "houseEntrances" &&
-        modalStore.entranceTypeKey === "secondary_entrance" &&
-        modalStore.selectedMainIdx === ""
-      )
-        errors.mainEntrance = "Required"
     }
 
     return errors
@@ -101,30 +82,6 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
       }
     }
 
-    if (key === "houseEntrances") {
-      if (modalStore.entranceTypeKey === "main_entrance") {
-        const roadOption = modalStore.roadOptions[Number(modalStore.selectedRoadIdx)]
-        return {
-          type: "houseEntrances",
-          label: modalStore.label.trim(),
-          entranceTypeKey: "main_entrance",
-          roadDbId: roadOption?.dbId,
-          roadLabel: roadOption?.label,
-          side: modalStore.entranceSide ?? undefined,
-          entranceNumber: modalStore.entranceNumber ?? undefined,
-        }
-      }
-      const mainOption = modalStore.mainEntranceOptions[Number(modalStore.selectedMainIdx)]
-      return {
-        type: "houseEntrances",
-        label: modalStore.label.trim(),
-        entranceTypeKey: "secondary_entrance",
-        mainEntranceDbId: mainOption?.dbId,
-        mainEntranceLabel: mainOption?.label,
-        bisNumber: modalStore.bisNumber ?? undefined,
-      }
-    }
-
     if (key === "publicBuildings") {
       return {
         type: "publicBuildings",
@@ -154,5 +111,5 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
     }
   }
 
-  return { validate, buildModalResult, isMainUrban, isCityCenter, isHouseEntranceEdit }
+  return { validate, buildModalResult, isMainUrban, isCityCenter }
 }

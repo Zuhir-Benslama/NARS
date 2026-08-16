@@ -68,3 +68,17 @@ Code quality issues found during review of the test project (build clean,
 - [x] **Naming drift** — `RefreshTokenServiceTests.cs` (`OriginalStamp` → top, PascalCase in `CreateToken_SecurityStampChange_RevokesOldTokens`), `AdminOverviewServiceTests.cs` (PascalCase `GetDraftReviews`), `GeometryHelperTests.cs` / `PasswordValidatorTests.cs` (fix-naming alignment) — standardized on `Method_Scenario_Expectation`.
 - [x] **Non-findings re-verified** — `TestableDraftFeaturesService` subclass in `DraftFeaturesTests.cs` is intentional (InMemory provider lacks `ExecuteUpdateAsync`; real path covered by Service tests). No `async void`, `Thread.Sleep`, sync-over-async, or `Assert.True(x == y)` anywhere in the suite. `xunit.runner.json` (parallel collections, 4 threads, 120s long-test threshold) is sane.
 - [x] Verified: build 0 warnings/0 errors; 412 unit tests pass (`--filter "Category!=Service"`); unit-only coverage 61.28% line / 53.54% branch (above the 50 floor).
+
+## Round 4 (fresh review)
+
+- [x] **`Service/NarsDatabaseFixture.cs` — Testcontainers image not digest-pinned.** `postgis/postgis:17-3.5-alpine` was a mutable tag (every infra base image in the repo is digest-pinned; prod postgis is `17-3.5@sha256:efbd2cb7…`). An upstream patch to the tag could silently change CI behavior. Fix: pinned to the amd64 digest `@sha256:a7b31f03…` (verified via `docker buildx imagetools inspect`), with a comment on how to re-verify.
+- [x] **`NarsApi.Tests.csproj` — stale coverage comment.** Claimed unit-only ~63.0% line / 56.0% branch and full ~77.7% / 68.2%; measured (2026-08-16) 61.45/53.6 and 77.28/67.05. Comment updated to the current figures (threshold 50 unchanged).
+- [x] **`Service/NarsDatabaseFixture.cs` — doc comment drift.** Said "class-level static container … PostGIS on first connection"; it's a collection fixture (`ICollectionFixture`) with PostGIS enabled explicitly in `InitializeAsync`. Comment corrected.
+- [x] **`NarsApi.Tests.csproj` — no `TreatWarningsAsErrors`.** The API project enforces it; the test project didn't. Added `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` (build stays 0 warnings).
+- [x] **`make/tests.mk:1` — stray copy-paste comment.** The "PostGIS backup/restore/admin + migrations" clause was duplicated from `db.mk`; line now describes only backend + roads test targets.
+- [x] **Stray `nars-tests/nars-tests/` directory** — leftover from an old coverage run (contained only an ignored `TestResults/coverage.cobertura.xml`, ~1.4 MB). Removed.
+
+## Verification (round 4)
+- `dotnet build` — 0 warnings / 0 errors (now enforced via TreatWarningsAsErrors)
+- Full suite — 503/503 pass (412 unit + 91 service) against the digest-pinned container image
+- Coverage (2026-08-16): unit-only 61.45% line / 53.6% branch; full 77.28% / 67.05% (both above the 50 floor)

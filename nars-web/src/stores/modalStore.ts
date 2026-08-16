@@ -2,7 +2,7 @@
 // Pinia store for the feature modal state.
 
 import { defineStore } from "pinia"
-import type { ModalState, RoadOption, EntranceOption, ModalResult, FeatureData } from "../types"
+import type { ModalState, ModalResult, FeatureData } from "../types"
 import { debugWarn } from "../utils/debug"
 
 function createDefaultModalState(): ModalState {
@@ -19,15 +19,6 @@ function createDefaultModalState(): ModalState {
     mainUrbanExists: false,
     districtTypeKey: "district",
     roadTypeKey: "street",
-    entranceTypeKey: "main_entrance",
-    roadOptions: [],
-    selectedRoadIdx: "",
-    entranceSide: null,
-    entranceNumber: null,
-    entranceSideLoading: false,
-    mainEntranceOptions: [],
-    selectedMainIdx: "",
-    bisNumber: null,
     spaceTypeKey: "garden",
     sectorKey: "banking_postal",
     buildingTypeKey: "bank",
@@ -37,9 +28,8 @@ function createDefaultModalState(): ModalState {
 }
 
 export const useModalStore = defineStore("modal", {
-  state: (): ModalState & { roadSideToken: number } => ({
+  state: (): ModalState => ({
     ...createDefaultModalState(),
-    roadSideToken: 0,
   }),
 
   getters: {
@@ -74,12 +64,6 @@ export const useModalStore = defineStore("modal", {
         areaTypeKey: existing.areaTypeKey ?? "central_urban",
         districtTypeKey: existing.districtTypeKey ?? "district",
         roadTypeKey: existing.roadTypeKey ?? "street",
-        entranceTypeKey:
-          existing.entranceTypeKey ??
-          (existing.roadDbId != null ? "main_entrance" : "secondary_entrance"),
-        entranceSide: (existing.side ?? null) as "left" | "right" | null,
-        entranceNumber: existing.entranceNumber ?? null,
-        bisNumber: existing.bisNumber ?? null,
         spaceTypeKey: existing.spaceTypeKey ?? "garden",
         sectorKey: existing.sectorKey ?? "banking_postal",
         buildingTypeKey: existing.buildingTypeKey ?? "bank",
@@ -92,16 +76,6 @@ export const useModalStore = defineStore("modal", {
       // Resolves the pending modal promise externally
       resolveModalPromise(result)
       this.visible = false
-    },
-
-    setRoadOptions(options: RoadOption[]) {
-      this.roadOptions = options
-      this.selectedRoadIdx = ""
-    },
-
-    setMainEntranceOptions(options: EntranceOption[]) {
-      this.mainEntranceOptions = options
-      this.selectedMainIdx = ""
     },
 
     patchFields(fields: Partial<ModalState>) {

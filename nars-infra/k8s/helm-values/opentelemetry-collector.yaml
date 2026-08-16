@@ -6,6 +6,10 @@ replicaCount: 2
 
 image:
   repository: otel/opentelemetry-collector-contrib
+  # Pinned image tag. `make observability-otel-collector` overrides this via
+  # --set image.tag=$(OTEL_COLLECTOR_IMAGE_TAG) (Makefile) — keep both in sync.
+  # Note this is deliberately independent of the chart version: the 0.169.0
+  # chart's appVersion is 0.158.0, which does NOT match this pinned image.
   tag: 0.120.0
 
 resources:

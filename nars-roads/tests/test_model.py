@@ -110,6 +110,26 @@ def test_predict_bbox_fallback_when_not_georeferenced(model):
 
 
 @requires_torch
+def test_predict_bbox_fallback_when_projected_crs(model):
+    # A UTM (projected, meter-unit) transform must NOT be trusted: emitting it
+    # as-is would produce meter-scale coordinates in an EPSG:4326 response.
+    raw = make_tiff_bytes(width=64, height=48, crs="EPSG:32633")
+    _, transform = model.predict(raw, bbox=(10.0, 20.0, 12.0, 21.0))
+    expected = from_bounds(10.0, 20.0, 12.0, 21.0, width=64, height=48)
+    assert transform == expected
+
+
+@requires_torch
+def test_predict_bbox_fallback_when_transform_has_no_crs(model):
+    # A non-identity transform without an accompanying CRS is unverifiable;
+    # the caller-supplied bbox wins over an opaque transform.
+    raw = make_tiff_bytes(width=64, height=48, crs=None)
+    _, transform = model.predict(raw, bbox=(10.0, 20.0, 12.0, 21.0))
+    expected = from_bounds(10.0, 20.0, 12.0, 21.0, width=64, height=48)
+    assert transform == expected
+
+
+@requires_torch
 def test_predict_decodes_windows_not_whole_image(model, monkeypatch):
     raw = make_tiff_bytes(width=100, height=80)
     seen = []
@@ -145,3 +165,16 @@ def test_predict_rejects_non_image_bytes(model):
     # endpoint can map it to a 4xx instead of crashing with a 500.
     with pytest.raises(InvalidTileError):
         model.predict(b"definitely not a tiff", bbox=(0.0, 0.0, 1.0, 1.0))
+
+
+@requires_torch
+def test_weights_load_sets_is_loaded(tmp_path, model):
+    # The happy path for checkpoint loading: a real state_dict on disk must
+    # leave is_loaded True so /ready can report the pod as serviceable.
+    import torch
+
+    checkpoint = tmp_path / "weights.pth"
+    torch.save(model.net.state_dict(), checkpoint)
+    loaded = SegmentationModel(weights_path=str(checkpoint), tile_size=32)
+    assert loaded.is_loaded
+    assert loaded.net is not model.net

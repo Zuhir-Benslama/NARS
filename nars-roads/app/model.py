@@ -174,6 +174,25 @@ class SegmentationModel:
 
         return probs.squeeze(0).permute(1, 2, 0).cpu().numpy()
 
+    @staticmethod
+    def _embedded_transform(src) -> rasterio.Affine | None:
+        """The tile's own georeferencing, but only when it can be trusted to
+        describe geographic (degree-unit) coordinates.
+
+        The service's contract is EPSG:4326 GeoJSON out, so a projected CRS
+        (e.g. UTM, metres) would silently emit meter-scale coordinates as if
+        they were degrees — a garbage result with no error. A transform with
+        no CRS is equally unverifiable. Both fall back to the caller-supplied
+        bbox (the untrusted, likely-arbitrary bbox is exactly what the
+        fallback path is for), which is always required and always correct
+        for the /segment contract."""
+        transform = src.transform
+        if not transform or transform == rasterio.Affine.identity():
+            return None
+        if src.crs is None or not src.crs.is_geographic:
+            return None
+        return transform
+
     def predict(
         self, raw_bytes: bytes, bbox: tuple[float, float, float, float]
     ) -> tuple[np.ndarray, rasterio.Affine]:
@@ -186,20 +205,18 @@ class SegmentationModel:
         window plus the prob maps. The decoded-pixel budget is enforced
         before the output arrays are allocated.
 
-        If the file is already georeferenced (GeoTIFF) we trust that
-        transform; otherwise we build one from the supplied bbox, assuming
-        EPSG:4326. For tiles larger than self.tile_size a simple
-        non-overlapping grid is used. Swap in overlap-and-blend if seam
-        artifacts show up in practice on real imagery."""
+        The tile's own transform is used only when it can be trusted to
+        describe an EPSG:4326-style geographic raster (see
+        `_embedded_transform`); otherwise one is built from the supplied
+        bbox, assuming EPSG:4326. For tiles larger than self.tile_size a
+        simple non-overlapping grid is used. Swap in overlap-and-blend if
+        seam artifacts show up in practice on real imagery."""
         with MemoryFile(raw_bytes) as memfile:
             try:
                 with memfile.open() as src:
-                    if src.transform and src.transform != rasterio.Affine.identity():
-                        transform = src.transform
-                    else:
-                        transform = from_bounds(
-                            *bbox, width=src.width, height=src.height
-                        )
+                    transform = self._embedded_transform(src) or from_bounds(
+                        *bbox, width=src.width, height=src.height
+                    )
 
                     h, w = src.height, src.width
                     if h * w > MAX_DECODED_PIXELS:

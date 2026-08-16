@@ -157,6 +157,46 @@ watch(query, (q) => {
   runSearch(q ?? "")
 })
 
+// Reflect an externally-set modelValue (e.g. when editing) into the search box.
+// The id is resolved to its display label by listing the scoped options with an
+// empty query — the wilaya/daira/commune datasets are small enough to fit one
+// page. Never clobbers text the user is already typing.
+watch(
+  () => props.modelValue,
+  async (id) => {
+    if (id == null) {
+      query.value = ""
+      options.value = []
+      return
+    }
+    if (query.value !== "") return
+    const gen = ++searchGen
+    try {
+      const base =
+        typeof props.endpoint === "function" ? props.endpoint("") : `${props.endpoint}?search=`
+      const url = `${base}${base.includes("?") ? "&" : "?"}take=500`
+      const res = await apiFetch(url)
+      const items = extractSearchOptions(await res.json())
+      if (gen !== searchGen) return
+      if (props.modelValue !== id) return
+      if (query.value !== "") return
+      const label = items.find((i) => i.id === id)?.name_fr
+      if (!label) return
+      suppressNextSearch = true
+      query.value = label
+      options.value = []
+      // If the query didn't actually change the watcher never fires; clear the
+      // flag so it can't swallow the next genuine search.
+      setTimeout(() => {
+        suppressNextSearch = false
+      }, 0)
+    } catch (e) {
+      debugWarn("[LocationSearchSelect] resolveLabel failed:", e)
+    }
+  },
+  { immediate: true },
+)
+
 function selectOption(opt: SearchOption) {
   emit("update:modelValue", opt.id)
   suppressNextSearch = true

@@ -149,4 +149,47 @@ describe("LocationSearchSelect", () => {
     await vi.advanceTimersByTimeAsync(250)
     expect(mockApiFetch).not.toHaveBeenCalled()
   })
+
+  it("resolves an initial modelValue into the search box label", async () => {
+    mockApiFetch.mockResolvedValue(
+      createMockSuccessResponse({
+        items: [
+          { id: 7, name_fr: "Alger" },
+          { id: 8, name_fr: "Oran" },
+        ],
+      }),
+    )
+    const wrapper = mountSelect({ modelValue: 7 })
+    await nextTick()
+    await nextTick()
+    expect(mockApiFetch).toHaveBeenCalledWith("/api/wilayas?search=&take=500")
+    expect((wrapper.find("input").element as HTMLInputElement).value).toBe("Alger")
+  })
+
+  it("appends take=500 to function endpoints when resolving a modelValue", async () => {
+    mockApiFetch.mockResolvedValue(createMockSuccessResponse({ items: [{ id: 5, name_fr: "X" }] }))
+    const wrapper = mountSelect({
+      modelValue: 5,
+      endpoint: (q: string) => `/api/dairas?search=${q}&wilaya_id=1`,
+    })
+    await nextTick()
+    await nextTick()
+    expect(mockApiFetch).toHaveBeenCalledWith("/api/dairas?search=&wilaya_id=1&take=500")
+    expect((wrapper.find("input").element as HTMLInputElement).value).toBe("X")
+  })
+
+  it("never clobbers text the user is already typing when modelValue changes", async () => {
+    mockApiFetch.mockResolvedValue(
+      createMockSuccessResponse({ items: [{ id: 7, name_fr: "Alger" }] }),
+    )
+    const wrapper = mountSelect()
+    await wrapper.find("input").setValue("oran")
+    await wrapper.setProps({ modelValue: 7 })
+    await vi.advanceTimersByTimeAsync(250)
+    await nextTick()
+    // Only the user's own debounced search ran — no resolve request.
+    expect(mockApiFetch).toHaveBeenCalledTimes(1)
+    expect(mockApiFetch).toHaveBeenCalledWith("/api/wilayas?search=oran")
+    expect((wrapper.find("input").element as HTMLInputElement).value).toBe("oran")
+  })
 })
