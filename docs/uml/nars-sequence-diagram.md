@@ -50,7 +50,7 @@ sequenceDiagram
     participant BackgroundQueueProcessor
     participant ScatteredAreaService
 
-    User->>FeaturesController: POST /api/save FeatureSaveRequest
+    User->>FeaturesController: POST /api/features FeatureSaveRequest
     FeaturesController->>FeaturesController: Validate ownership/permissions
 
     FeaturesController->>FeatureTypeRegistry: GetDescriptor(featureType)
@@ -90,7 +90,7 @@ sequenceDiagram
     participant PostgreSQL
     participant SqlFragments
 
-    User->>FeaturesController: GET /api/load
+    User->>FeaturesController: GET /api/features
     FeaturesController->>FeaturesController: Get CurrentUserId
 
     FeaturesController->>FeatureQueryHelper: LoadFeaturesAsync(userId)

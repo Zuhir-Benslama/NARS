@@ -40,7 +40,7 @@ sequenceDiagram
 
     alt User is commune_user
         App.vue->>App.vue: Render map UI
-        main.ts->>API: GET /api/load
+        main.ts->>API: GET /api/features
         API-->>main.ts: Features list
         main.ts->>AppStore: updateCounts()
 
@@ -116,7 +116,7 @@ sequenceDiagram
             ModalStore->>FeatureModal: Hide modal
             ModalStore-->>DrawComplete: Modal result
 
-            DrawComplete->>ApiModule: POST /api/save FeatureSaveRequest
+            DrawComplete->>ApiModule: POST /api/features FeatureSaveRequest
             ApiModule->>ApiModule: Apply CSRF, timeout, retry
             ApiModule-->>DrawComplete: 200 OK {id}
 
@@ -166,7 +166,7 @@ sequenceDiagram
         User->>Geoman: Right-click (commit)
         Geoman->>EditMode: Commit edit
         EditMode->>LayerStore: updateFeature(dbId, newGeometry)
-        EditMode->>ApiModule: PUT /api/update/{id}
+        EditMode->>ApiModule: PUT /api/features/{id}
         ApiModule-->>EditMode: 200 OK
         EditMode->>Geoman: Disable edit mode
         EditMode->>MapContext: Update highlight
@@ -175,7 +175,7 @@ sequenceDiagram
     else Delete selected
         ContextMenu->>ContextMenu: Confirm deletion
         User->>ContextMenu: Confirm
-        ContextMenu->>ApiModule: DELETE /api/delete/{id}
+        ContextMenu->>ApiModule: DELETE /api/features/{id}
         ApiModule-->>ContextMenu: 200 OK
         ContextMenu->>Undo: recordDeletion(feature)
         ContextMenu->>LayerStore: removeFeature(dbId)
@@ -266,7 +266,7 @@ sequenceDiagram
     DrawComplete->>User: Show modal
 
     User->>DrawComplete: Confirm save
-    DrawComplete->>ApiModule: POST /api/save {type: 'house_entrance', ...}
+    DrawComplete->>ApiModule: POST /api/features {type: 'house_entrance', ...}
     ApiModule-->>DrawComplete: 200 OK {id}
     DrawComplete->>LayerStore: addFeature(entrance)
 
@@ -281,5 +281,5 @@ sequenceDiagram
     HouseNumbering->>HouseNumbering: Sort by arc-length
     HouseNumbering->>HouseNumbering: Assign odd/even by side
     HouseNumbering->>LayerStore: Update each entrance
-    HouseNumbering->>ApiModule: PUT /api/update/{id} for each
+    HouseNumbering->>ApiModule: PUT /api/features/{id} for each
 ```

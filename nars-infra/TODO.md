@@ -461,12 +461,21 @@ also read (no changes applied — see Non-findings).
    coords unverifiable — Wikidata has no entry; search inconclusive).
 
 ## Non-findings (checked, no change needed)
-- `docs/uml/nars-sequence-diagram.md` and `nars-vite-sequence-diagram.md`
-  still reference `/api/save`, `/api/load`, `/api/update/{id}`,
-  `/api/delete/{id}` — out of scope for this round; candidate follow-up.
 - `docs/pdf/*` (gitignored) are older than the sources — build artifact, not
   a repo defect.
 - No duplicate `commune_id` PKs; all 1,543 commune rows carry coordinates.
+
+## Follow-up (round 7.1)
+- `docs/uml/nars-sequence-diagram.md` and `nars-vite-sequence-diagram.md`
+  referenced stale routes (`POST /api/save`, `GET /api/load`,
+  `PUT /api/update/{id}`, `DELETE /api/delete/{id}`). Fixed to the real
+  `FeaturesController` routes (`/api/features`, `/api/features/{id}`) — 8
+  occurrences. All remaining `/api/*` references in `docs/uml/` now match
+  the API (`/api/road-side`, `/api/current_user`, `/api/signin`,
+  `/api/refresh`, `/api/validate/*`, `/api/admin/authorized-signup`).
+  Verified: all four diagrams render via
+  `render-mermaid-playwright.mjs` (playwright 1.59.0 matching the cached
+  firefox-1511) with zero mermaid syntax errors.
 
 ## Verification
 - SQL in a throwaway `postgis/postgis:17-3.5-alpine` container (no volume,
