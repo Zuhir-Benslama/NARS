@@ -32,6 +32,14 @@ export default defineConfig(({ command, mode }) => {
   return {
     publicDir: "public",
 
+    pool: "forks",
+    poolOptions: {
+      forks: {
+        maxForks: 2,
+        minForks: 1,
+      },
+    },
+
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "src"),

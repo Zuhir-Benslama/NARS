@@ -21,9 +21,11 @@ public class ErrorLog
     public string Code { get; set; } = "";
 
     [Column("message")]
+    [MaxLength(4096)]
     public string Message { get; set; } = "";
 
     [Column("context")]
+    [MaxLength(4096)]
     public string? Context { get; set; }
 
     [Column("url")]

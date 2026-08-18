@@ -1,30 +1,42 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <!-- Content Security Policy:
          - script-src: 'unsafe-inline' intentionally omitted. The server MUST replace
            this header with a per-request nonce: script-src 'nonce-<RANDOM>' 'strict-dynamic'.
          - style-src: 'unsafe-inline' required for SPA dynamic style injection.
          - connect-src: data: needed for base64 tile sources. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' http: https: data: ws://127.0.0.1:* http://127.0.0.1:* https://*.arcgisonline.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com; worker-src 'self' blob:;">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' http: https: data: ws://127.0.0.1:* http://127.0.0.1:* https://*.arcgisonline.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com; worker-src 'self' blob:;"
+    />
     <title>NARS - National Addressing Reference System (Maplibre)</title>
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <!-- CSRF token injected by PagesController at request time -->
-    <meta name="csrf-token" content="">
+    <meta name="csrf-token" content="" />
     <style>
-        /* Prevent FOUC */
-        [v-cloak] { display: none !important; }
-        html, body, #map { margin: 0; padding: 0; height: 100%; width: 100%; }
+      /* Prevent FOUC */
+      [v-cloak] {
+        display: none !important;
+      }
+      html,
+      body,
+      #map {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div id="map"></div>
     <div id="app" v-cloak></div>
     <script type="module" src="/src/main.ts"></script>
-</body>
+  </body>
 </html>

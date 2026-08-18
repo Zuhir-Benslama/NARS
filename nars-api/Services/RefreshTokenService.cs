@@ -12,9 +12,19 @@ public class RefreshTokenService(
     AppDbContext db,
     IJwtService jwt,
     IOptions<JwtOptions> jwtOptions,
+    ISecurityStampCache stampCache,
     IDateTimeProvider timeProvider) : IRefreshTokenService
 {
     protected IDateTimeProvider TimeProvider => timeProvider;
+
+    /// <summary>
+    /// Produces the base64-encoded SHA-256 hash of a raw refresh token string.
+    /// </summary>
+    private static string HashRefreshToken(string rawRefreshToken) =>
+        Convert.ToBase64String(
+            System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(rawRefreshToken)));
+
     public async Task<RefreshTokenResult> RotateRefreshTokenAsync(string? rawRefreshToken, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(rawRefreshToken))
@@ -22,9 +32,7 @@ public class RefreshTokenService(
             return new RefreshTokenResult(false, "No refresh token.", null, null, null, null);
         }
 
-        var hash = Convert.ToBase64String(
-            System.Security.Cryptography.SHA256.HashData(
-                System.Text.Encoding.UTF8.GetBytes(rawRefreshToken)));
+        var hash = HashRefreshToken(rawRefreshToken);
 
         // ReadCommitted is sufficient here because the SELECT ... FOR UPDATE SKIP LOCKED
         // in FindRefreshTokenByHashAsync already serializes concurrent rotation attempts:
@@ -95,9 +103,7 @@ public class RefreshTokenService(
             return new RefreshTokenResult(false, "No refresh token.", null, null, null, null);
         }
 
-        var hash = Convert.ToBase64String(
-            System.Security.Cryptography.SHA256.HashData(
-                System.Text.Encoding.UTF8.GetBytes(rawRefreshToken)));
+        var hash = HashRefreshToken(rawRefreshToken);
 
         // Read-only: no rotation, no row lock. Concurrent page loads may all
         // validate the same token without one revoking it for the others.
@@ -158,6 +164,7 @@ public class RefreshTokenService(
             // lockout are rejected immediately (see AuthenticationExtensions
             // OnTokenValidated) instead of remaining valid until expiry.
             user.SecurityStamp = User.GenerateSecurityStamp();
+            stampCache.EvictStamp(user.Id);
         }
         await db.SaveChangesAsync(cancellationToken);
     }

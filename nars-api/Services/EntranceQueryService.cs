@@ -16,7 +16,12 @@ public sealed class EntranceQueryService(AppDbContext db) : IEntranceQueryServic
         // Only the requested side's parity series is ever consulted by
         // SuggestEntranceNumber, so filter by parity in SQL to avoid
         // materializing the road's other half of the numbers.
-        var parity = side == "left" ? 1 : 0;
+        if (!string.Equals(side, "left", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(side, "right", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("side must be 'left' or 'right'.", nameof(side));
+        }
+        var parity = string.Equals(side, "left", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
 
         var heTable = FeatureTypeRegistry.ValidateTableName(
             FeatureTypeRegistry.GetDescriptor(FeatureTypes.HouseEntrance)?.TableName ?? "house_entrances");

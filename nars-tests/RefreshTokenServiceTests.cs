@@ -45,7 +45,8 @@ public class RefreshTokenServiceTests
         AppDbContext db,
         IJwtService jwt,
         IOptions<JwtOptions> jwtOptions,
-        IDateTimeProvider timeProvider) : RefreshTokenService(db, jwt, jwtOptions, timeProvider)
+        ISecurityStampCache stampCache,
+        IDateTimeProvider timeProvider) : RefreshTokenService(db, jwt, jwtOptions, stampCache, timeProvider)
     {
         private readonly AppDbContext _db = db;
 
@@ -74,6 +75,7 @@ public class RefreshTokenServiceTests
             db,
             jwt ?? CreateJwtMock().Object,
             jwtOptions,
+            Mock.Of<ISecurityStampCache>(),
             timeProvider ?? CreateTimeProvider());
     }
 

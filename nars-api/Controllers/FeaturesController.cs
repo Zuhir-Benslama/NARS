@@ -32,11 +32,6 @@ public class FeaturesController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> SaveFeature([FromBody] FeatureSaveRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null)
-        {
-            return Problem(detail: "Request body is required.", statusCode: 400);
-        }
-
         if (!FeatureTypes.AllTypes.Contains(body.Type))
         {
             return Problem(detail: $"Unknown feature type '{body.Type}'.", statusCode: 400);
@@ -76,12 +71,9 @@ public class FeaturesController(
 
         await featureService.SaveFeatureAsync(entity, body.Type, cancellationToken);
 
-        if (body.Type == FeatureTypes.Area)
-        {
-            await featureService.QueueScatteredRefreshAsync(RequiredCurrentUserId, CurrentCommuneId);
-        }
+        await MaybeQueueScatteredRefreshAsync(body.Type);
 
-        return StatusCode(201, new SaveFeatureResponse(Success: true, Id: newId.ToString(), Message: "Feature saved successfully"));
+        return StatusCode(201, new CreateResponse(Success: true, Id: newId.ToString(), Message: "Feature saved successfully"));
     }
 
     /// <summary>Loads the authenticated user's features with pagination.</summary>
@@ -110,11 +102,6 @@ public class FeaturesController(
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> ClearFeatures([FromBody] ClearFeaturesRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null)
-        {
-            return Problem(detail: "Request body is required.", statusCode: 400);
-        }
-
         if (!body.Confirm)
         {
             return Problem(detail: "Set \"confirm\": true to delete all features.", statusCode: 400);
@@ -155,11 +142,6 @@ public class FeaturesController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateFeature(Guid featureId, [FromBody] FeatureUpdateRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null)
-        {
-            return Problem(detail: "Request body is required.", statusCode: 400);
-        }
-
         var featureType = await featureService.GetFeatureTypeAsync(featureId, cancellationToken);
         if (featureType is null)
         {
@@ -199,10 +181,7 @@ public class FeaturesController(
             return Problem(detail: "Feature not found", statusCode: 404);
         }
 
-        if (featureType == FeatureTypes.Area)
-        {
-            await featureService.QueueScatteredRefreshAsync(RequiredCurrentUserId, CurrentCommuneId);
-        }
+        await MaybeQueueScatteredRefreshAsync(featureType);
 
         return Ok(new UpdateFeatureResponse(Success: true, Id: featureId.ToString(), UpdatedAt: updatedAt));
     }
@@ -225,10 +204,7 @@ public class FeaturesController(
             return Problem(detail: "Feature not found", statusCode: 404);
         }
 
-        if (featureType == FeatureTypes.Area)
-        {
-            await featureService.QueueScatteredRefreshAsync(RequiredCurrentUserId, CurrentCommuneId);
-        }
+        await MaybeQueueScatteredRefreshAsync(featureType);
 
         return NoContent();
     }
@@ -241,5 +217,15 @@ public class FeaturesController(
         }
 
         return FeatureTypeRegistry.TryGetRoadDbId(body.Data, out var rid) ? rid : null;
+    }
+
+    private ValueTask MaybeQueueScatteredRefreshAsync(string featureType)
+    {
+        if (featureType != FeatureTypes.Area)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        return featureService.QueueScatteredRefreshAsync(RequiredCurrentUserId, CurrentCommuneId);
     }
 }

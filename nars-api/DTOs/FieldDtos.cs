@@ -6,9 +6,9 @@ namespace NarsApi.DTOs;
 
 public record FieldInspectRequest(
     [property: JsonPropertyName("feature_id")][param: Required] string FeatureId,
-    [property: JsonPropertyName("type")][param: Required] string Type,
+    [property: JsonPropertyName("type")][param: Required][param: MaxLength(30)] string Type,
     [property: JsonPropertyName("data")][property: JsonRequired][param: Required] JsonNode Data,
-    [property: JsonPropertyName("status")][param: Required] string Status
+    [property: JsonPropertyName("status")][param: Required][param: MaxLength(20)] string Status
 );
 
 public record FieldEntranceCreateRequest(
@@ -28,16 +28,4 @@ public record FieldInspectionResponse(
 
 public record FieldInspectionsResponse(
     [property: JsonPropertyName("inspections")] IReadOnlyList<FieldInspectionResponse> Inspections
-);
-
-public record FieldInspectSubmitResponse(
-    [property: JsonPropertyName("success")] bool Success,
-    [property: JsonPropertyName("id")] string Id,
-    [property: JsonPropertyName("message")] string Message
-);
-
-public record CreateEntranceResponse(
-    [property: JsonPropertyName("success")] bool Success,
-    [property: JsonPropertyName("id")] string Id,
-    [property: JsonPropertyName("message")] string Message
 );

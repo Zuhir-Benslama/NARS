@@ -78,20 +78,20 @@ npm run build:deploy
 
 ## Scripts
 
-| Script | Purpose |
-|--------|---------|
-| `dev` | Vite dev server with HMR |
-| `typecheck` | `vue-tsc --noEmit` |
-| `lint` | ESLint, `--max-warnings 0` |
-| `lint:fix` | ESLint auto-fix |
-| `format` | Prettier write |
-| `format:check` | Prettier check |
-| `test` | Vitest watch |
-| `test:run` | Vitest single run |
-| `test:coverage` | Vitest with V8 coverage |
-| `build` | Typecheck + production build |
-| `build:deploy` | Build + copy to `../nars-api/wwwroot/` |
-| `audit` | `npm audit --audit-level=high` |
+| Script          | Purpose                                |
+| --------------- | -------------------------------------- |
+| `dev`           | Vite dev server with HMR               |
+| `typecheck`     | `vue-tsc --noEmit`                     |
+| `lint`          | ESLint, `--max-warnings 0`             |
+| `lint:fix`      | ESLint auto-fix                        |
+| `format`        | Prettier write                         |
+| `format:check`  | Prettier check                         |
+| `test`          | Vitest watch                           |
+| `test:run`      | Vitest single run                      |
+| `test:coverage` | Vitest with V8 coverage                |
+| `build`         | Typecheck + production build           |
+| `build:deploy`  | Build + copy to `../nars-api/wwwroot/` |
+| `audit`         | `npm audit --audit-level=high`         |
 
 ## Testing
 

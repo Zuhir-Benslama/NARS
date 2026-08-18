@@ -173,9 +173,15 @@ export async function generateNamingPanels(): Promise<void> {
   // Persist the panels so they survive reload and get real server dbIds.
   // Persistence failures degrade gracefully: the panel stays local-only.
   if (pendingPanels.length > 0) {
-    const results = await Promise.all(pendingPanels.map((panel) => saveToDatabase(panel.data)))
-    results.forEach((result, i) => {
+    const outcomes = await Promise.allSettled(
+      pendingPanels.map((panel) => saveToDatabase(panel.data)),
+    )
+    outcomes.forEach((outcome, i) => {
       const panel = pendingPanels[i]
+      const result =
+        outcome.status === "fulfilled"
+          ? outcome.value
+          : { ok: false, error: String(outcome.reason) }
       if (result.ok && result.data?.id) {
         panel.dbId = result.data.id
         maplibreFeatures[i].properties.dbId = result.data.id

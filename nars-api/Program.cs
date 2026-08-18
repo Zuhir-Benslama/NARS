@@ -74,7 +74,7 @@ if (builder.Environment.IsProduction() && (string.IsNullOrEmpty(jwtIssuer) || st
 var logJwtWarning = string.IsNullOrEmpty(jwtIssuer) || string.IsNullOrEmpty(jwtAudience);
 
 // ── Register all services ─────────────────────────────────────
-builder.Services.AddNarsServices(builder.Configuration, connStr!, jwtSecret, jwtIssuer, jwtAudience);
+builder.Services.AddNarsServices(builder.Configuration, connStr!, jwtSecret, jwtIssuer, jwtAudience, builder.Environment);
 
 // ── Build & configure pipeline ────────────────────────────────
 var app = builder.Build();

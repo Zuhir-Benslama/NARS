@@ -39,7 +39,7 @@ public sealed class DraftFeaturesController(
 
         if (request.Tile.Length == 0)
         {
-            return BadRequest("Uploaded tile is empty");
+            return Problem(detail: "Uploaded tile is empty.", statusCode: 400);
         }
 
         if (request.MinLon is null || request.MinLat is null || request.MaxLon is null || request.MaxLat is null)
@@ -70,12 +70,12 @@ public sealed class DraftFeaturesController(
         catch (KeyNotFoundException ex)
         {
             logger.LogWarning(ex, "Segmentation target commune not found: {Reason}", ex.Message);
-            return NotFound("The requested commune was not found.");
+            return Problem(detail: "The requested commune was not found.", statusCode: 404);
         }
         catch (SegmentationServiceException ex)
         {
             logger.LogError(ex, "Segmentation service call failed for commune {CommuneId}", request.CommuneId);
-            return StatusCode(StatusCodes.Status502BadGateway, "Segmentation service is unavailable");
+            return Problem(detail: "Segmentation service is unavailable.", statusCode: 502);
         }
     }
 
@@ -145,7 +145,7 @@ public sealed class DraftFeaturesController(
         {
             DraftReviewStatus.Success => NoContent(),
             DraftReviewStatus.NotFound => NotFound(),
-            DraftReviewStatus.AlreadyReviewed => Conflict($"Draft {id} is not pending"),
+            DraftReviewStatus.AlreadyReviewed => Problem(detail: $"Draft {id} is not pending.", statusCode: 409),
             _ => Forbid(),
         };
     }

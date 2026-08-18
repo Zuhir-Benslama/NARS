@@ -15,7 +15,7 @@ public class FeatureCatalogController(
     /// <summary>Returns the full catalog of feature types with their available layers.</summary>
     [HttpGet("feature-types")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public IActionResult GetFeatureTypes() => Ok(FeatureTypeRegistry.GetCatalog());
+    public IActionResult GetFeatureTypes() => Ok(FeatureCatalog.GetCatalog());
 
     /// <summary>Loads features filtered by layer type with pagination.</summary>
     [HttpGet("features/by-layer/{layerType}")]

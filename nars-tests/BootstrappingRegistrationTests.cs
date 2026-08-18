@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Moq;
 using NarsApi.Infrastructure;
 using NarsApi.Services;
 using Xunit;
@@ -64,7 +65,8 @@ public class BootstrappingRegistrationTests : IDisposable
             TestConnStr,
             AuthTestHelper.TestJwtSecret,
             jwtIssuer: "https://issuer.test",
-            jwtAudience: "https://audience.test");
+            jwtAudience: "https://audience.test",
+            Mock.Of<IHostEnvironment>());
         return services.BuildServiceProvider();
     }
 
@@ -227,7 +229,7 @@ public class BootstrappingRegistrationTests : IDisposable
 
         Environment.SetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4317");
         using var host = Host.CreateDefaultBuilder()
-            .ConfigureServices(s => s.AddNarsServices(config, TestConnStr, AuthTestHelper.TestJwtSecret, null, null))
+            .ConfigureServices(s => s.AddNarsServices(config, TestConnStr, AuthTestHelper.TestJwtSecret, null, null, Mock.Of<IHostEnvironment>()))
             .Build();
 
         var ex = await Assert.ThrowsAsync<AggregateException>(() => host.StartAsync());

@@ -25,8 +25,7 @@ public class PagesControllerTests
     private const string LoginTemplate = "<html><head><meta name=\"csrf-token\" content=\"\"></head><body><script>app();</script></body></html>";
     private const string IndexTemplate = "<html><head><meta name=\"csrf-token\" content=\"\"></head><body><script src=\"/app.js\"></script></body></html>";
 
-    // PagesController reads templates from Directory.GetCurrentDirectory()/wwwroot
-    // (the bin output dir under `dotnet test`), which has no templates by default.
+    // PagesController reads templates from Directory.GetCurrentDirectory()/wwwroot.
     // Write them create-if-missing (never clobber a pre-existing file) and guard with
     // a lock so parallel test hosts sharing the same output dir cannot race.
     private static readonly object TemplateWriteLock = new();
@@ -35,7 +34,7 @@ public class PagesControllerTests
     {
         lock (TemplateWriteLock)
         {
-            var wwwroot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
+            var wwwroot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
             Directory.CreateDirectory(wwwroot);
             EnsureTemplate(Path.Combine(wwwroot, "login.html"), LoginTemplate);
             EnsureTemplate(Path.Combine(wwwroot, "index.html"), IndexTemplate);
@@ -96,14 +95,23 @@ public class PagesControllerTests
 
             var webHost = Mock.Of<IWebHostEnvironment>(e => e.EnvironmentName == Environments.Development);
 
+            var httpContextAccessor = new Mock<IHttpContextAccessor>();
+            httpContextAccessor.Setup(x => x.HttpContext).Returns(HttpContext);
+
+            var pageAuthService = new PageAuthService(
+                httpContextAccessor.Object,
+                Jwt.Object,
+                Refresh.Object,
+                webHost,
+                Mock.Of<ILogger<PageAuthService>>());
+
             _cache = new MemoryCache(new MemoryCacheOptions());
             Controller = new PagesController(
-                Jwt.Object,
                 Antiforgery.Object,
                 _cache,
                 webHost,
                 Mock.Of<ILogger<PagesController>>(),
-                Refresh.Object,
+                pageAuthService,
                 Options.Create(new CacheOptions()),
                 webHost)
             {

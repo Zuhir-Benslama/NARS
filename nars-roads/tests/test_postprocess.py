@@ -12,7 +12,9 @@ import networkx as nx
 
 from app.postprocess import mask_to_linestrings, mask_to_polygons
 
-# pixel (row, col) maps to (x=col, y=row)
+# pixel (row, col) maps to (x=col, y=row). y-resolution is positive because
+# these tests validate postprocessing logic (mask->vector), not georeferencing.
+# Pixel row 0 maps to y=0.5 in world coordinates.
 TRANSFORM = Affine(1.0, 0.0, 0.0, 0.0, 1.0, 0.0)
 
 

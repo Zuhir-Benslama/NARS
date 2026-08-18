@@ -64,10 +64,6 @@ public class DraftFeaturesService(
     ICommuneScopeService communeScope,
     IDateTimeProvider timeProvider) : IDraftFeaturesService
 {
-    private readonly AppDbContext _db = db;
-    private readonly ISegmentationClient _segmentationClient = segmentationClient;
-    private readonly ICommuneScopeService _communeScope = communeScope;
-    private readonly IDateTimeProvider _timeProvider = timeProvider;
 
     public async Task<SegmentSummaryResponse> SegmentTileAsync(
         string callerRole, int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
@@ -80,17 +76,17 @@ public class DraftFeaturesService(
             throw new UnauthorizedAccessException("You do not have access to this commune.");
         }
 
-        var commune = await _db.Communes.FindAsync([communeId], ct);
+        var commune = await db.Communes.FindAsync([communeId], ct);
         if (commune is null)
         {
             throw new KeyNotFoundException($"Commune {communeId} not found");
         }
 
         SegmentationResult result;
-        result = await _segmentationClient.SegmentTileAsync(
+        result = await segmentationClient.SegmentTileAsync(
             tileStream, fileName, contentType, bbox, ct);
 
-        var now = _timeProvider.UtcNow;
+        var now = timeProvider.UtcNow;
         var draftEntities = new List<AiDraftFeature>();
 
         foreach (var building in result.Buildings)
@@ -104,8 +100,8 @@ public class DraftFeaturesService(
                 createdAt: now));
         }
 
-        _db.AiDraftFeatures.AddRange(draftEntities);
-        await _db.SaveChangesAsync(ct);
+        db.AiDraftFeatures.AddRange(draftEntities);
+        await db.SaveChangesAsync(ct);
 
         return new SegmentSummaryResponse(
             BuildingCount: result.Buildings.Count,
@@ -123,7 +119,7 @@ public class DraftFeaturesService(
             throw new UnauthorizedAccessException("You do not have access to this commune.");
         }
 
-        var query = _db.AiDraftFeatures
+        var query = db.AiDraftFeatures
             .Where(f => f.CommuneId == communeId && f.Status == status);
 
         if (!string.IsNullOrEmpty(featureType))
@@ -159,7 +155,7 @@ public class DraftFeaturesService(
         string callerRole, int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
         Guid userId, Guid draftId, bool accept, CancellationToken ct)
     {
-        var draft = await _db.AiDraftFeatures.FindAsync([draftId], ct);
+        var draft = await db.AiDraftFeatures.FindAsync([draftId], ct);
         if (draft is null)
         {
             return new DraftReviewResult(DraftReviewStatus.NotFound);
@@ -180,12 +176,12 @@ public class DraftFeaturesService(
         // a pending draft, and the losing reviewer sees AlreadyReviewed instead
         // of silently overwriting the winner's decision.
         var newStatus = accept ? AiDraftFeature.StatusAccepted : AiDraftFeature.StatusRejected;
-        var reviewedAt = _timeProvider.UtcNow;
+        var reviewedAt = timeProvider.UtcNow;
         var affected = await TryReviewDraftAsync(draftId, newStatus, userId, reviewedAt, ct);
 
         if (affected == 0)
         {
-            var stillExists = await _db.AiDraftFeatures.AsNoTracking()
+            var stillExists = await db.AiDraftFeatures.AsNoTracking()
                 .AnyAsync(f => f.Id == draftId, ct);
             return stillExists
                 ? new DraftReviewResult(DraftReviewStatus.AlreadyReviewed)
@@ -204,7 +200,7 @@ public class DraftFeaturesService(
     protected virtual async Task<int> TryReviewDraftAsync(
         Guid draftId, string newStatus, Guid reviewedBy, DateTimeOffset reviewedAt, CancellationToken ct)
     {
-        return await _db.AiDraftFeatures
+        return await db.AiDraftFeatures
             .Where(f => f.Id == draftId && f.Status == AiDraftFeature.StatusPending)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(f => f.Status, newStatus)
@@ -215,6 +211,6 @@ public class DraftFeaturesService(
     private Task<bool> CanAccessCommuneAsync(
         string callerRole, int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
         int communeId, CancellationToken ct)
-        => _communeScope.CanAccessCommuneAsync(
+        => communeScope.CanAccessCommuneAsync(
             callerRole, callerCommuneId, callerDairaId, callerWilayaId, communeId, ct);
 }

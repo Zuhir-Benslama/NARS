@@ -268,6 +268,8 @@ public class AuthenticationExtensionsTests
     {
         var services = new ServiceCollection();
         services.AddSingleton(db);
+        services.AddSingleton<ISecurityStampCache>(Mock.Of<ISecurityStampCache>(
+            c => c.GetStampAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()) == Task.FromResult<string?>(null)));
         var httpContext = new DefaultHttpContext { RequestServices = services.BuildServiceProvider() };
         var context = new TokenValidatedContext(httpContext, Scheme, options) { Principal = principal };
         await options.Events.OnTokenValidated(context);

@@ -25,11 +25,6 @@ public class AdminUserController(
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateManagedUser([FromBody] CreateAdminRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null)
-        {
-            return Problem(detail: "Request body is required.", statusCode: 400);
-        }
-
         var result = await userCreationService.CreateUserAsync(
             CurrentUserRole, CurrentCommuneId, CurrentDairaId, CurrentWilayaId,
             body.Name, body.Email, body.Phone, body.Username, body.Password,
@@ -84,11 +79,6 @@ public class AdminUserController(
         Guid userId, [FromBody] UpdateAdminRequest body,
         CancellationToken cancellationToken = default)
     {
-        if (body is null)
-        {
-            return Problem(detail: "Request body is required.", statusCode: 400);
-        }
-
         var result = await authorizationService.UpdateManagedUserAsync(
             RequiredCurrentUserId, CurrentUserRole,
             CurrentCommuneId, CurrentDairaId, CurrentWilayaId,

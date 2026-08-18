@@ -138,11 +138,17 @@ observability-port-forward: ## Port-forward Grafana, Loki, Tempo (background)
 		service/tempo 3200:3200 \
 		> "$(LOG_DIR)/port-forward-tempo.log" 2>&1 & \
 	echo "→ Waiting for port-forwards to come up...";
-	sleep 3;
 	ok=1;
-	for pf in grafana loki tempo; do \
-		log="$(LOG_DIR)/port-forward-$$pf.log"; \
-		if grep -q "Forwarding from" "$$log" 2>/dev/null; then \
+	for pf in grafana loki tempo; do
+		log="$(LOG_DIR)/port-forward-$$pf.log";
+		ready=0;
+		for i in $$(seq 1 10); do
+			if grep -q "Forwarding from" "$$log" 2>/dev/null; then
+				ready=1; break;
+			fi;
+			sleep 0.5;
+		done;
+		if [ "$$ready" -eq 1 ]; then \
 			echo "  ✓ $$pf forwarding"; \
 		else \
 			echo "  ⚠ $$pf did not start (log: $$log)"; \

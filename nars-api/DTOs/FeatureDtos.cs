@@ -62,10 +62,11 @@ public record FeatureTypeDefinition(
 
 // ─── RESPONSE DTOs ────────────────────────────────────────────────────────────
 
-public record SaveFeatureResponse(
-    bool Success,
-    string Id,
-    string Message
+/// <summary>Standard envelope for 201 Created responses that return an entity ID.</summary>
+public record CreateResponse(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("message")] string Message
 );
 
 public record LoadFeaturesResponse<T>(

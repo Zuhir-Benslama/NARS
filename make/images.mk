@@ -83,7 +83,7 @@ images-load: _warn-latest-tag ## Load locally built Docker images into the kind 
 			echo "→ Loading $$full into cluster..."
 			kind load docker-image "$$full" --name "$(CLUSTER_NAME)"
 		else
-			echo "  ⚠ $$full not found locally — will pull from registry"
+			echo "  ⚠ $$full not found locally — pods will fail to start unless regcred is configured"
 		fi
 	done
 	@echo "✓ Images loaded"

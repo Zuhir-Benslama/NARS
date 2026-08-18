@@ -63,11 +63,6 @@ public class FieldController(
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> SubmitInspection([FromBody] FieldInspectRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null)
-        {
-            return Problem(detail: "Request body is required.", statusCode: 400);
-        }
-
         if (!Guid.TryParse(body.FeatureId, out var featureId))
         {
             return Problem(detail: "Invalid feature_id.", statusCode: 400);
@@ -98,7 +93,7 @@ public class FieldController(
         logger.LogInformation("[Field] Worker {WorkerId} inspected {Type} {FeatureId} — status: {Status}",
             CurrentUserId, body.Type.ReplaceLineEndings(" "), featureId, body.Status.ReplaceLineEndings(" "));
 
-        return StatusCode(201, new FieldInspectSubmitResponse(
+        return StatusCode(201, new CreateResponse(
             Success: true,
             Id: inspectionId.ToString(),
             Message: "Inspection saved."
@@ -146,11 +141,6 @@ public class FieldController(
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> CreateEntranceFromInspection([FromBody] FieldEntranceCreateRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null)
-        {
-            return Problem(detail: "Request body is required.", statusCode: 400);
-        }
-
         if (!Guid.TryParse(body.RoadId, out var roadId))
         {
             return Problem(detail: "Invalid road_id.", statusCode: 400);
@@ -182,7 +172,7 @@ public class FieldController(
             "[Field] Worker {WorkerId} created entrance {EntranceId} for road {RoadId} (owner: {OwnerId})",
             CurrentUserId, newId, roadId, roadOwner.Value.OwnerUserId);
 
-        return StatusCode(201, new CreateEntranceResponse(
+        return StatusCode(201, new CreateResponse(
             Success: true,
             Id: newId.ToString(),
             Message: "Entrance created from inspection."

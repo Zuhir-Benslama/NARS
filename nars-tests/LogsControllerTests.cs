@@ -33,6 +33,7 @@ public class LogsControllerTests
             Mock.Of<ILogger<LogsController>>(),
             Options.Create(logOptions ?? DefaultLogOptions),
             CreateFixedTime(),
+            new LogSanitizer(),
             Mock.Of<IWebHostEnvironment>());
 
         var claims = new List<Claim>();
@@ -63,17 +64,6 @@ public class LogsControllerTests
     }
 
     // ── SubmitLogs ──────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task SubmitLogs_NullBody_Returns400()
-    {
-        var ctrl = CreateController();
-
-        var result = await ctrl.SubmitLogs(null!);
-
-        var obj = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, obj.StatusCode);
-    }
 
     [Fact]
     public async Task SubmitLogs_EmptyLogs_Returns400()

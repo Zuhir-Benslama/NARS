@@ -6,7 +6,7 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public sealed class UserProfileService(AppDbContext db) : IUserProfileService
+public sealed class UserProfileService(AppDbContext db, ISecurityStampCache stampCache) : IUserProfileService
 {
     public async Task<User?> GetUserByIdAsync(Guid userId, CancellationToken ct = default) =>
         await db.Users.FindAsync([userId], ct);
@@ -93,6 +93,7 @@ public sealed class UserProfileService(AppDbContext db) : IUserProfileService
             // Rotate the security stamp so access tokens issued before the
             // password change are rejected immediately.
             user.SecurityStamp = User.GenerateSecurityStamp();
+            stampCache.EvictStamp(user.Id);
         }
 
         try

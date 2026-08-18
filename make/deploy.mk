@@ -175,7 +175,7 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 # exposure in `ps aux` / CI logs. Files are cleaned up on exit.
 	@echo "→ Creating 'nars-secrets'..."
 	@tmpdir=$$(mktemp -d);
-	trap 'rm -rf "$$tmpdir"' EXIT;
+	trap 'rm -rf "$$tmpdir" $${TMPDIR_REGCRED:-}' EXIT;
 	printf '%s' "$$POSTGRES_PASSWORD" > "$$tmpdir/postgres_password";
 	printf '%s' "Host=postgis;Port=5432;Database=$(DB_NAME);Username=postgres;Password=$$POSTGRES_PASSWORD" > "$$tmpdir/ConnectionStrings__DefaultConnection";
 	printf '%s' "$$JWT_SECRET" > "$$tmpdir/Jwt__SecretKey";
@@ -206,7 +206,6 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 	@if [ -n "$(DOCKER_TOKEN)" ]; then
 		echo "→ Creating 'regcred'...";
 		TMPDIR_REGCRED=$$(mktemp -d);
-		trap 'rm -rf "$$tmpdir" "$$TMPDIR_REGCRED"' EXIT;
 		printf '%s' "$$DOCKER_TOKEN" > "$$TMPDIR_REGCRED/docker_password";
 		printf '%s' "$$DOCKER_USERNAME" > "$$TMPDIR_REGCRED/docker_username";
 		$(KUBECTL) create secret docker-registry regcred -n "$(NAMESPACE)" \

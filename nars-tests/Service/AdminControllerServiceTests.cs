@@ -44,8 +44,8 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
 
     private AdminUserController CreateUserManagementController() => new(
             Mock.Of<Microsoft.Extensions.Logging.ILogger<AdminUserController>>(),
-            new UserAuthorizationService(_db, Mock.Of<IRefreshTokenService>(), FixedTimeProvider()),
-            new UserCreationService(_db, new UserAuthorizationService(_db, Mock.Of<IRefreshTokenService>(), FixedTimeProvider()),
+            new UserAuthorizationService(_db, Mock.Of<IRefreshTokenService>(), Mock.Of<IFeatureCleanupService>(), FixedTimeProvider()),
+            new UserCreationService(_db, new UserAuthorizationService(_db, Mock.Of<IRefreshTokenService>(), Mock.Of<IFeatureCleanupService>(), FixedTimeProvider()),
                 Mock.Of<Microsoft.Extensions.Logging.ILogger<UserCreationService>>()),
             Mock.Of<IWebHostEnvironment>());
 

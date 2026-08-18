@@ -7,6 +7,16 @@ namespace NarsApi.Services;
 
 public sealed class LocationSearchService(IDbContextFactory<AppDbContext> dbFactory) : ILocationSearchService
 {
+    /// <summary>
+    /// Escapes PostgreSQL LIKE wildcards (<c>%</c>, <c>_</c>, <c>\</c>) in the
+    /// user-supplied search term so they are matched literally rather than
+    /// interpreted as pattern metacharacters.
+    /// </summary>
+    private static string EscapeLike(string value) =>
+        value.Replace(@"\", @"\\", StringComparison.Ordinal)
+             .Replace("%", @"\%", StringComparison.Ordinal)
+             .Replace("_", @"\_", StringComparison.Ordinal);
+
     public async Task<PagedResponse<WilayaItem>> SearchWilayasAsync(string search, int skip, int take, CancellationToken ct = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -14,8 +24,9 @@ public sealed class LocationSearchService(IDbContextFactory<AppDbContext> dbFact
 
         if (!string.IsNullOrEmpty(search))
         {
-            q = q.Where(w => EF.Functions.ILike(w.WilayaFr ?? "", $"%{search}%")
-                           || EF.Functions.ILike(w.WilayaAr ?? "", $"%{search}%"));
+            var escaped = EscapeLike(search);
+            q = q.Where(w => EF.Functions.ILike(w.WilayaFr ?? "", $"%{escaped}%", @"\")
+                           || EF.Functions.ILike(w.WilayaAr ?? "", $"%{escaped}%", @"\"));
         }
 
         var total = await q.CountAsync(ct);
@@ -33,8 +44,9 @@ public sealed class LocationSearchService(IDbContextFactory<AppDbContext> dbFact
 
         if (!string.IsNullOrEmpty(search))
         {
-            q = q.Where(d => EF.Functions.ILike(d.DairaFr, $"%{search}%")
-                           || EF.Functions.ILike(d.DairaAr, $"%{search}%"));
+            var escaped = EscapeLike(search);
+            q = q.Where(d => EF.Functions.ILike(d.DairaFr, $"%{escaped}%", @"\")
+                           || EF.Functions.ILike(d.DairaAr, $"%{escaped}%", @"\"));
         }
 
         var total = await q.CountAsync(ct);
@@ -52,8 +64,9 @@ public sealed class LocationSearchService(IDbContextFactory<AppDbContext> dbFact
 
         if (!string.IsNullOrEmpty(search))
         {
-            q = q.Where(c => EF.Functions.ILike(c.CommuneFr, $"%{search}%")
-                           || EF.Functions.ILike(c.CommuneAr, $"%{search}%"));
+            var escaped = EscapeLike(search);
+            q = q.Where(c => EF.Functions.ILike(c.CommuneFr, $"%{escaped}%", @"\")
+                           || EF.Functions.ILike(c.CommuneAr, $"%{escaped}%", @"\"));
         }
 
         var total = await q.CountAsync(ct);

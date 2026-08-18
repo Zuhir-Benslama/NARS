@@ -8,6 +8,10 @@ namespace NarsApi.Services;
 /// </summary>
 public interface IBackgroundTaskQueue
 {
-    ValueTask QueueBackgroundWorkItemAsync(Func<IServiceProvider, CancellationToken, Task> workItem);
+    /// <summary>
+    /// Queues a background work item. Returns <c>true</c> if accepted,
+    /// <c>false</c> if the queue was full and the item was dropped.
+    /// </summary>
+    ValueTask<bool> QueueBackgroundWorkItemAsync(Func<IServiceProvider, CancellationToken, Task> workItem);
     ValueTask<Func<IServiceProvider, CancellationToken, Task>> DequeueAsync(CancellationToken ct);
 }

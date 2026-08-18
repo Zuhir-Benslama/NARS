@@ -65,7 +65,7 @@ public sealed class UserCreationService(
         {
             await SaveUserAsync(newUser, ct);
         }
-        catch (DbUpdateException ex)
+        catch (DbUpdateException ex) when (UserProfileService.IsUniqueViolation(ex, out _))
         {
             // Sanitize line endings to prevent log forging; email is intentionally
             // omitted from the log (PII, and not needed for this diagnostic).

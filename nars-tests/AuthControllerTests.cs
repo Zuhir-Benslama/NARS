@@ -38,17 +38,40 @@ public class AuthControllerTests
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var lockoutOptions = Options.Create(new AccountLockoutOptions());
         var jwtService = CreateJwtService(timeProvider);
-        var refreshService = new RefreshTokenService(db, jwtService, DefaultJwtOptions, timeProvider);
+        var refreshService = new RefreshTokenService(db, jwtService, DefaultJwtOptions, Mock.Of<ISecurityStampCache>(), timeProvider);
+        var authorizationService = new UserAuthorizationService(db, refreshService, Mock.Of<IFeatureCleanupService>(), timeProvider);
         return new AuthController(
             refreshService,
             jwtService,
             lockoutOptions,
-            Options.Create(new AdminSignupOptions { SignupToken = TestData.AdminSignupToken }),
             Mock.Of<ILogger<AuthController>>(),
             timeProvider,
-            new UserAuthorizationService(db, refreshService, timeProvider),
-            new UserCreationService(db, new UserAuthorizationService(db, refreshService, timeProvider), Mock.Of<ILogger<UserCreationService>>()),
+            authorizationService,
             Mock.Of<ILocationQueryService>(),
+            Mock.Of<IWebHostEnvironment>())
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext(),
+            }
+        };
+    }
+
+    private static AdminSignupController CreateSignupController(AppDbContext db)
+    {
+        var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
+        var lockoutOptions = Options.Create(new AccountLockoutOptions());
+        var jwtService = CreateJwtService(timeProvider);
+        var refreshService = new RefreshTokenService(db, jwtService, DefaultJwtOptions, Mock.Of<ISecurityStampCache>(), timeProvider);
+        var authorizationService = new UserAuthorizationService(db, refreshService, Mock.Of<IFeatureCleanupService>(), timeProvider);
+        var userCreationService = new UserCreationService(db, authorizationService, Mock.Of<ILogger<UserCreationService>>());
+        return new AdminSignupController(
+            refreshService,
+            lockoutOptions,
+            Options.Create(new AdminSignupOptions { SignupToken = TestData.AdminSignupToken }),
+            Mock.Of<ILogger<AdminSignupController>>(),
+            authorizationService,
+            userCreationService,
             Mock.Of<IWebHostEnvironment>())
         {
             ControllerContext = new ControllerContext
@@ -71,37 +94,13 @@ public class AuthControllerTests
     }
 
     [Fact]
-    public async Task SignIn_NullBody_Returns400()
-    {
-        using var db = CreateDb();
-        var controller = CreateController(db);
-
-        var result = await controller.SignIn(null!);
-
-        var objResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, objResult.StatusCode);
-    }
-
-    [Fact]
-    public async Task AuthorizedAdminSignup_NullBody_Returns400()
-    {
-        using var db = CreateDb();
-        var controller = CreateController(db);
-
-        var result = await controller.AuthorizedAdminSignup(null!, signupToken: AdminSignupToken);
-
-        var objResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, objResult.StatusCode);
-    }
-
-    [Fact]
     public async Task AuthorizedAdminSignup_ValidRequest_Returns201()
     {
         using var db = CreateDb();
         await SeedLocationDataAsync(db);
         await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
 
-        var controller = CreateController(db);
+        var controller = CreateSignupController(db);
 
         var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "admin",
@@ -128,7 +127,7 @@ public class AuthControllerTests
         await SeedLocationDataAsync(db);
         await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
 
-        var controller = CreateController(db);
+        var controller = CreateSignupController(db);
 
         var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "admin",
@@ -168,7 +167,7 @@ public class AuthControllerTests
         });
         await db.SaveChangesAsync();
 
-        var controller = CreateController(db);
+        var controller = CreateSignupController(db);
 
         var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "admin",
@@ -208,7 +207,7 @@ public class AuthControllerTests
         });
         await db.SaveChangesAsync();
 
-        var controller = CreateController(db);
+        var controller = CreateSignupController(db);
 
         var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "admin",
@@ -235,7 +234,7 @@ public class AuthControllerTests
         await SeedLocationDataAsync(db);
         await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
 
-        var controller = CreateController(db);
+        var controller = CreateSignupController(db);
 
         var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "admin",
@@ -261,7 +260,7 @@ public class AuthControllerTests
         await SeedLocationDataAsync(db);
         await SeedAdminAsync(db, username: "commune_admin", role: UserRoles.CommuneUser, communeId: CommuneId1);
 
-        var controller = CreateController(db);
+        var controller = CreateSignupController(db);
 
         var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "commune_admin",

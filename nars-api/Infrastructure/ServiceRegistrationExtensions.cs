@@ -27,7 +27,8 @@ public static class ServiceRegistrationExtensions
         string connectionString,
         string jwtSecret,
         string? jwtIssuer,
-        string? jwtAudience)
+        string? jwtAudience,
+        IHostEnvironment env)
     {
         services.AddNarsOptions(config);
         services.AddNarsOpenTelemetry(config);
@@ -36,7 +37,7 @@ public static class ServiceRegistrationExtensions
         services.AddNarsDomainServices();
         services.AddNarsHttpClients(config);
         services.AddNarsControllers();
-        services.AddNarsCors(config);
+        services.AddNarsCors(config, env);
         services.AddNarsCompression();
         services.AddNarsRateLimiting(config);
         services.AddNarsHealthChecks(connectionString);
@@ -129,6 +130,10 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IUserCreationService, UserCreationService>();
         services.AddScoped<ICommuneScopeService, CommuneScopeService>();
         services.AddScoped<IDraftFeaturesService, DraftFeaturesService>();
+        services.AddSingleton<ILogSanitizer, LogSanitizer>();
+        services.AddSingleton<ISecurityStampCache, SecurityStampCache>();
+        services.AddScoped<IPageAuthService, PageAuthService>();
+        services.AddScoped<IFeatureCleanupService, FeatureCleanupService>();
     }
 
     private static void AddNarsHttpClients(this IServiceCollection services, IConfiguration config)
@@ -149,6 +154,7 @@ public static class ServiceRegistrationExtensions
 
     private static void AddNarsControllers(this IServiceCollection services)
     {
+        services.AddHttpContextAccessor();
         services.AddMemoryCache();
         services.AddControllers()
             .AddJsonOptions(opts =>

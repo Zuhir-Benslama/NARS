@@ -92,11 +92,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasDatabaseName("ix_communes_boundaries_geometry")
             .HasMethod("GIST");
 
-        // ── refresh_tokens: index on token_hash for efficient refresh lookups ──
+        // ── refresh_tokens: indexes on token_hash for efficient refresh lookups ──
         modelBuilder.Entity<RefreshToken>()
             .HasIndex(rt => rt.TokenHash)
             .IsUnique()
             .HasDatabaseName("ix_refresh_tokens_token_hash");
+        modelBuilder.Entity<RefreshToken>()
+            .HasIndex(rt => rt.UserId)
+            .HasDatabaseName("ix_refresh_tokens_user_id");
+        modelBuilder.Entity<RefreshToken>()
+            .HasIndex(rt => rt.ExpiresAt)
+            .HasDatabaseName("ix_refresh_tokens_expires_at");
 
         // ── error_logs: indexes for common query patterns ────────────────────
         modelBuilder.Entity<ErrorLog>()
@@ -143,6 +149,23 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithMany()
             .HasForeignKey(el => el.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // ── User geographic FK constraints ────────────────────────────────────
+        modelBuilder.Entity<User>()
+            .HasOne<Commune>()
+            .WithMany()
+            .HasForeignKey(u => u.CommuneId)
+            .OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<User>()
+            .HasOne<Daira>()
+            .WithMany()
+            .HasForeignKey(u => u.DairaId)
+            .OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<User>()
+            .HasOne<Wilaya>()
+            .WithMany()
+            .HasForeignKey(u => u.WilayaId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         // ── ai_draft_features (created by SQL migration, EF just queries/updates) ─
         modelBuilder.ApplyConfiguration(new AiDraftFeatureConfiguration());

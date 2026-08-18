@@ -101,6 +101,8 @@ classDiagram
         +bool Revoked
     }
 
+    User "1" --> "many" RefreshToken
+
     Wilaya "1" --> "many" Daira
     Daira "1" --> "many" Commune
     Commune "1" --> "1" CommuneBoundary

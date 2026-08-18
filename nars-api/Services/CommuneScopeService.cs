@@ -29,7 +29,6 @@ public interface ICommuneScopeService
 
 public sealed class CommuneScopeService(AppDbContext db) : ICommuneScopeService
 {
-    private readonly AppDbContext _db = db;
 
     public Task<bool> CanAccessCommuneAsync(
         string callerRole,
@@ -50,15 +49,15 @@ public sealed class CommuneScopeService(AppDbContext db) : ICommuneScopeService
 
             case UserRoles.DairaAdmin:
                 return callerDairaId.HasValue
-                    ? _db.Communes.AnyAsync(
+                    ? db.Communes.AnyAsync(
                         c => c.CommuneId == targetCommuneId && c.DairaId == callerDairaId.Value, ct)
                     : Task.FromResult(false);
 
             case UserRoles.WilayaAdmin:
                 return callerWilayaId.HasValue
-                    ? _db.Communes.AnyAsync(
+                    ? db.Communes.AnyAsync(
                         c => c.CommuneId == targetCommuneId
-                            && _db.Dairas.Any(d => d.DairaId == c.DairaId && d.WilayaId == callerWilayaId.Value), ct)
+                            && db.Dairas.Any(d => d.DairaId == c.DairaId && d.WilayaId == callerWilayaId.Value), ct)
                     : Task.FromResult(false);
 
             default:

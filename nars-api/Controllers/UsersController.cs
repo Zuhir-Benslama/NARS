@@ -21,11 +21,6 @@ public class UsersController(IUserProfileService userProfile, IRefreshTokenServi
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateCredentials([FromBody] UpdateUserRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null)
-        {
-            return Problem(detail: "Request body is required.", statusCode: 400);
-        }
-
         var result = await userProfile.UpdateCredentialsAsync(RequiredCurrentUserId, body, cancellationToken);
         if (!result.Succeeded)
         {

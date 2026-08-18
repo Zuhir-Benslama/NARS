@@ -2,11 +2,23 @@
   <div>
     <div class="modal-field">
       <label>{{ t("label_username") }}</label>
-      <input v-model="form.username" type="text" class="modal-input" autocomplete="off" />
+      <input
+        v-model="form.username"
+        type="text"
+        class="modal-input"
+        autocomplete="off"
+        maxlength="50"
+      />
     </div>
     <div class="modal-field">
       <label>{{ t("label_email") }}</label>
-      <input v-model="form.email" type="email" class="modal-input" autocomplete="off" />
+      <input
+        v-model="form.email"
+        type="email"
+        class="modal-input"
+        autocomplete="off"
+        maxlength="254"
+      />
     </div>
     <div class="modal-field">
       <label>{{ t("label_password") }}</label>
@@ -15,6 +27,7 @@
         type="password"
         class="modal-input"
         :placeholder="t('placeholder_password')"
+        maxlength="128"
       />
     </div>
     <button class="modal-btn modal-btn-save" @click="save">

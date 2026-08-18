@@ -20,8 +20,8 @@ public class AdminUserControllerTests
 
     private static AdminUserController CreateController(AppDbContext db) =>
         new(Mock.Of<ILogger<AdminUserController>>(),
-            new UserAuthorizationService(db, Mock.Of<IRefreshTokenService>(), Mock.Of<IDateTimeProvider>()),
-            new UserCreationService(db, new UserAuthorizationService(db, Mock.Of<IRefreshTokenService>(), Mock.Of<IDateTimeProvider>()), Mock.Of<ILogger<UserCreationService>>()),
+            new UserAuthorizationService(db, Mock.Of<IRefreshTokenService>(), Mock.Of<IFeatureCleanupService>(), Mock.Of<IDateTimeProvider>()),
+            new UserCreationService(db, new UserAuthorizationService(db, Mock.Of<IRefreshTokenService>(), Mock.Of<IFeatureCleanupService>(), Mock.Of<IDateTimeProvider>()), Mock.Of<ILogger<UserCreationService>>()),
             Mock.Of<IWebHostEnvironment>())
         {
             ControllerContext = new ControllerContext
@@ -31,19 +31,6 @@ public class AdminUserControllerTests
         };
 
     // ─── CreateAdmin ────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task CreateAdmin_NullBody_Returns400()
-    {
-        using var db = CreateDb();
-        var ctrl = CreateController(db);
-        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
-
-        var result = await ctrl.CreateManagedUser(null!, default);
-
-        var problem = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, problem.StatusCode);
-    }
 
     [Fact]
     public async Task CreateAdmin_NationalToWilaya_Returns201()
@@ -249,19 +236,6 @@ public class AdminUserControllerTests
 
         var problem = Assert.IsType<ObjectResult>(result);
         Assert.Equal(404, problem.StatusCode);
-    }
-
-    [Fact]
-    public async Task UpdateAdmin_NullBody_Returns400()
-    {
-        using var db = CreateDb();
-        var ctrl = CreateController(db);
-        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.NationalAdmin);
-
-        var result = await ctrl.UpdateManagedUser(Guid.NewGuid(), null!, default);
-
-        var problem = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, problem.StatusCode);
     }
 
     [Fact]

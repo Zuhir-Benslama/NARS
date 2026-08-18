@@ -12,15 +12,13 @@ namespace NarsApi.Controllers;
 [ApiController]
 [Route("/api")]
 [Tags("Auth")]
-public partial class AuthController(
+public class AuthController(
     IRefreshTokenService refreshService,
     IJwtService jwt,
     IOptions<AccountLockoutOptions> lockoutOptions,
-    IOptions<AdminSignupOptions> adminSignupOptions,
     ILogger<AuthController> logger,
     IDateTimeProvider timeProvider,
     IUserAuthorizationService authorizationService,
-    IUserCreationService userCreationService,
     ILocationQueryService locationQuery,
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
@@ -53,11 +51,6 @@ public partial class AuthController(
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> SignIn([FromBody] SignInRequest body, CancellationToken cancellationToken = default)
     {
-        if (body is null)
-        {
-            return Problem(detail: "Request body is required.", statusCode: 400);
-        }
-
         var normalizedUsername = body.Username.ToLowerInvariant();
         var credentialResult = await authorizationService.VerifyCredentialsAsync(
             normalizedUsername, body.Password, MaxFailedAttempts, LockoutMinutes, cancellationToken);

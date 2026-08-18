@@ -10,6 +10,7 @@ namespace NarsApi.Services;
 public sealed class FeatureService(
     AppDbContext db,
     IBackgroundTaskQueue bgQueue,
+    IFeatureCleanupService cleanupService,
     ILogger<FeatureService> logger) : IFeatureService
 {
     public async Task<bool> RoadExistsAsync(Guid roadId, Guid userId, CancellationToken ct)
@@ -119,20 +120,20 @@ public sealed class FeatureService(
     {
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
 
-        var total = await FeatureTypeRegistry.DeleteAllFeaturesForUserAsync(db, userId, ct);
+        var total = await cleanupService.DeleteAllFeaturesForUserAsync(db, userId, ct);
 
         await tx.CommitAsync(ct);
         return total;
     }
 
-    public ValueTask QueueScatteredRefreshAsync(Guid userId, int? communeId)
+    public async ValueTask QueueScatteredRefreshAsync(Guid userId, int? communeId)
     {
         if (communeId is null)
         {
-            return ValueTask.CompletedTask;
+            return;
         }
 
-        return bgQueue.QueueBackgroundWorkItemAsync(async (sp, ct) =>
+        await bgQueue.QueueBackgroundWorkItemAsync(async (sp, ct) =>
         {
             try
             {

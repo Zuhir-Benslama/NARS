@@ -43,15 +43,33 @@
 
       <div class="modal-field">
         <label>{{ t("su_full_name") }}</label>
-        <input v-model="form.name" type="text" class="modal-input" autocomplete="off" />
+        <input
+          v-model="form.name"
+          type="text"
+          class="modal-input"
+          autocomplete="off"
+          maxlength="150"
+        />
       </div>
       <div class="modal-field">
         <label>{{ t("su_email") }}</label>
-        <input v-model="form.email" type="email" class="modal-input" autocomplete="off" />
+        <input
+          v-model="form.email"
+          type="email"
+          class="modal-input"
+          autocomplete="off"
+          maxlength="254"
+        />
       </div>
       <div class="modal-field">
         <label>{{ t("su_phone") }}</label>
-        <input v-model="form.phone" type="tel" class="modal-input" autocomplete="off" />
+        <input
+          v-model="form.phone"
+          type="tel"
+          class="modal-input"
+          autocomplete="off"
+          maxlength="20"
+        />
       </div>
       <div class="modal-field">
         <label>{{ t("su_username") }}</label>
@@ -60,6 +78,7 @@
           type="text"
           class="modal-input"
           autocomplete="off"
+          maxlength="50"
           :disabled="!!editingUser"
         />
       </div>
@@ -70,6 +89,7 @@
           type="password"
           class="modal-input"
           autocomplete="new-password"
+          maxlength="128"
         />
       </div>
 
@@ -363,7 +383,7 @@ function cancelEdit() {
 // ── Validation ───────────────────────────────────────────────────────────
 function validate(): string | null {
   if (!form.value.name.trim()) return t("su_err_name")
-  if (!form.value.email.includes("@")) return t("su_err_email")
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.value.email)) return t("su_err_email")
   if (!form.value.phone.trim()) return t("su_err_phone")
   if (form.value.username.length < 3) return t("su_err_username")
   if (!editingUser.value && form.value.password.length < 8) return t("su_err_password")

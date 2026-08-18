@@ -100,18 +100,6 @@ public class FieldControllerTests
     // ─── POST /api/field/inspect ─────────────────────────────────────────
 
     [Fact]
-    public async Task SubmitInspection_NullBody_Returns400()
-    {
-        var ctrl = CreateController();
-        SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
-
-        var result = await ctrl.SubmitInspection(null!);
-
-        var problem = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, problem.StatusCode);
-    }
-
-    [Fact]
     public async Task SubmitInspection_InvalidFeatureId_Returns400()
     {
         var ctrl = CreateController();
@@ -182,7 +170,7 @@ public class FieldControllerTests
 
         var created = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, created.StatusCode);
-        var response = Assert.IsType<FieldInspectSubmitResponse>(created.Value);
+        var response = Assert.IsType<CreateResponse>(created.Value);
         Assert.True(response.Success);
     }
 
@@ -297,18 +285,6 @@ public class FieldControllerTests
     // ─── POST /api/field/entrance ────────────────────────────────────────
 
     [Fact]
-    public async Task CreateEntranceFromInspection_NullBody_Returns400()
-    {
-        var ctrl = CreateController();
-        SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
-
-        var result = await ctrl.CreateEntranceFromInspection(null!);
-
-        var problem = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, problem.StatusCode);
-    }
-
-    [Fact]
     public async Task CreateEntranceFromInspection_InvalidRoadId_Returns400()
     {
         var ctrl = CreateController();
@@ -349,7 +325,7 @@ public class FieldControllerTests
 
         var created = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, created.StatusCode);
-        var response = Assert.IsType<CreateEntranceResponse>(created.Value);
+        var response = Assert.IsType<CreateResponse>(created.Value);
         Assert.True(response.Success);
     }
 

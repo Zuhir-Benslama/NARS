@@ -264,12 +264,15 @@ kubeconfig-fix: ## Patch kubeconfig for rootless Docker (port 16443 via kube-pro
 		echo "→ Rootless Docker detected — fixing kubeconfig port";
 		KUBE_PROXY="kube-proxy";
 		if ! docker ps --format "{{.Names}}" 2>/dev/null | grep -q "^$$KUBE_PROXY$$"; then
-			echo "→ Creating socat bridge (16443 -> $(CLUSTER_NAME)-control-plane:6443)...";
-			docker run -d --name "$$KUBE_PROXY" --rm \
-				-p 127.0.0.1:16443:16443 \
-				--network kind \
-				alpine/socat \
-				tcp-listen:16443,fork,reuseaddr tcp-connect:$(CLUSTER_NAME)-control-plane:6443 > /dev/null;
+		echo "→ Creating socat bridge (16443 -> $(CLUSTER_NAME)-control-plane:6443)...";
+		if ! docker run -d --name "$$KUBE_PROXY" --rm \
+			-p 127.0.0.1:16443:16443 \
+			--network kind \
+			alpine/socat \
+			tcp-listen:16443,fork,reuseaddr tcp-connect:$(CLUSTER_NAME)-control-plane:6443 > /dev/null; then
+			echo "✖ Failed to create socat bridge container";
+			exit 1;
+		fi;
 		fi;
 		KUBECONFIG=$$(mktemp);
 		trap 'rm -f "$$KUBECONFIG"' EXIT;

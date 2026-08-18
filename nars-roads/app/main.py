@@ -193,7 +193,12 @@ def _segment_task(
         # Postprocessing runs under the same permit: the prob maps (~300MB)
         # stay alive while find_contours allocates on top of them, so bounding
         # the whole pipeline keeps peak memory tight.
-        INFERENCE_SEMAPHORE.acquire()
+        acquired = INFERENCE_SEMAPHORE.acquire(timeout=30)
+        if not acquired:
+            raise HTTPException(  # noqa: TRY301 - re-raised by except HTTPException below
+                status_code=503,
+                detail="Server is at capacity; retry after a short delay",
+            )
         try:
             fg_prob, transform = model.predict(
                 raw, bbox=(min_lon, min_lat, max_lon, max_lat)
@@ -211,6 +216,8 @@ def _segment_task(
         ) from exc
     except InvalidTileError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("Inference failed")
         raise HTTPException(status_code=500, detail="Inference failed") from exc

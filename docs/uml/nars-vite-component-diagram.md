@@ -261,6 +261,26 @@ classDiagram
         Tabbed settings dialog
     }
 
+    class SettingsGeneral {
+        Theme/language settings
+    }
+
+    class SettingsAccount {
+        Profile/password changes
+    }
+
+    class SettingsUsers {
+        User CRUD + role admin
+    }
+
+    class SettingsFeatures {
+        Feature type labels
+    }
+
+    class SettingsAbout {
+        Version info
+    }
+
     class AdminDashboard {
         Role-based monitoring
     }

@@ -10,7 +10,6 @@ namespace NarsApi.Services;
 
 public sealed class ValidationService(AppDbContext db) : IValidationService
 {
-    private readonly AppDbContext _db = db;
     private readonly string _roadTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.Road)?.TableName
             ?? throw new InvalidOperationException("FeatureTypeRegistry missing Road descriptor");
     private readonly string _areaTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.Area)?.TableName
@@ -31,7 +30,7 @@ public sealed class ValidationService(AppDbContext db) : IValidationService
     /// </summary>
     private async Task<object?> ExecuteScalarAsync(string sql, List<(string name, object value)> parameters, CancellationToken ct)
     {
-        var conn = _db.Database.GetDbConnection();
+        var conn = db.Database.GetDbConnection();
         await using var handle = await conn.EnsureOpenAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = sql;
@@ -169,14 +168,14 @@ public sealed class ValidationService(AppDbContext db) : IValidationService
     }
 
     public async Task<bool> UserHasCentralUrbanAreaAsync(Guid userId, CancellationToken ct = default) =>
-        await _db.Set<Area>().AnyAsync(a => a.UserId == userId && a.Layer == FeatureTypes.AreaLayers.CentralUrban, ct);
+        await db.Set<Area>().AnyAsync(a => a.UserId == userId && a.Layer == FeatureTypes.AreaLayers.CentralUrban, ct);
 
     public Task<int> CountUserRoadsAsync(Guid userId, CancellationToken ct = default) =>
-        _db.Set<Road>().CountAsync(r => r.UserId == userId, ct);
+        db.Set<Road>().CountAsync(r => r.UserId == userId, ct);
 
     public Task<int> CountUserDistrictsAsync(Guid userId, CancellationToken ct = default) =>
-        _db.Set<District>().CountAsync(d => d.UserId == userId, ct);
+        db.Set<District>().CountAsync(d => d.UserId == userId, ct);
 
     public Task<int> CountUserUrbanAreasAsync(Guid userId, CancellationToken ct = default) =>
-        _db.Set<Area>().CountAsync(a => a.UserId == userId && (a.Layer == FeatureTypes.AreaLayers.CentralUrban || a.Layer == FeatureTypes.AreaLayers.SecondaryUrban), ct);
+        db.Set<Area>().CountAsync(a => a.UserId == userId && (a.Layer == FeatureTypes.AreaLayers.CentralUrban || a.Layer == FeatureTypes.AreaLayers.SecondaryUrban), ct);
 }

@@ -7,16 +7,27 @@ public static class CorsCompressionExtensions
 {
     /// <summary>
     /// Adds CORS with explicit origins and credentials support (required for HttpOnly cookie auth).
+    /// Logs a warning if only localhost origins are configured in non-development environments.
     /// </summary>
     public static IServiceCollection AddNarsCors(
         this IServiceCollection services,
-        IConfiguration config)
+        IConfiguration config,
+        IHostEnvironment env)
     {
         var allowedOrigins = config
             .GetSection("Cors:AllowedOrigins")
             .Get<string[]>()
             ?? ["http://localhost:5000", "http://localhost:5001",
                 "https://localhost:7000", "https://localhost:7001"];
+
+        if (!env.IsDevelopment() && allowedOrigins.All(o => o.Contains("localhost", StringComparison.OrdinalIgnoreCase)))
+        {
+            var logger = services.BuildServiceProvider().GetRequiredService<ILogger<Program>>();
+            logger.LogWarning(
+                "[Security] CORS:AllowedOrigins contains only localhost origins in {Environment} environment. " +
+                "Set Cors:AllowedOrigins to the actual production domain(s).",
+                env.EnvironmentName);
+        }
 
         services.AddCors(options =>
             options.AddDefaultPolicy(policy =>

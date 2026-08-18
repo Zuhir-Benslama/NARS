@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Services;
@@ -21,9 +22,18 @@ namespace NarsApi.Controllers;
 ///   No session required — the authorizing admin's credentials are included
 ///   in the request body so this can be called from the unauthenticated login page.
 /// </summary>
-public partial class AuthController
+[ApiController]
+[Route("/api")]
+[Tags("Auth")]
+public class AdminSignupController(
+    IRefreshTokenService refreshService,
+    IOptions<AccountLockoutOptions> lockoutOptions,
+    IOptions<AdminSignupOptions> adminSignupOptions,
+    ILogger<AdminSignupController> logger,
+    IUserAuthorizationService authorizationService,
+    IUserCreationService userCreationService,
+    IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
-    // ── POST /api/admin/authorized-signup ─────────────────────────────────────
     // CSRF protection is provided implicitly by the X-Admin-Signup custom header:
     // browsers auto-include cookies on cross-origin requests but cannot set custom
     // headers without JavaScript, so this endpoint is safe from CSRF form attacks.
@@ -44,11 +54,6 @@ public partial class AuthController
         [FromHeader(Name = "X-Admin-Signup")] string? signupToken,
         CancellationToken cancellationToken = default)
     {
-        if (body is null)
-        {
-            return Problem(detail: "Request body is required.", statusCode: 400);
-        }
-
         // Require a custom header to prevent automated scripts from targeting
         // this unauthenticated endpoint. The SPA sets this header on the form.
         if (!TokenMatches(signupToken, adminSignupOptions.Value.SignupToken))
@@ -60,7 +65,9 @@ public partial class AuthController
         //    service always runs BCrypt, even for unknown usernames).
         var adminNormalized = body.AdminUsername.ToLowerInvariant();
         var credentialResult = await authorizationService.VerifyCredentialsAsync(
-            adminNormalized, body.AdminPassword, MaxFailedAttempts, LockoutMinutes, cancellationToken);
+            adminNormalized, body.AdminPassword,
+            lockoutOptions.Value.MaxFailedAttempts, lockoutOptions.Value.LockoutMinutes,
+            cancellationToken);
 
         if (!credentialResult.IsSuccess)
         {

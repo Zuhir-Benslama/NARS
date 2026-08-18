@@ -1,173 +1,179 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Content Security Policy:
          script-src 'unsafe-inline' required for this static HTML page.
          In PRODUCTION the server MUST replace with a per-request nonce. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http: https: data:; frame-ancestors 'none';">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http: https: data:; frame-ancestors 'none';"
+    />
     <!-- CSRF token — set by the server. Client reads it and sends X-CSRF-Token on non-GET requests. -->
-    <meta name="csrf-token" content="">
+    <meta name="csrf-token" content="" />
     <title>Login - NARS</title>
     <link rel="stylesheet" href="login.css" />
-</head>
-<body>
+  </head>
+  <body>
     <div class="container">
-        <div class="form-container">
-            <div class="logo">
-                <h1>🗺️ NARS</h1>
-                <p>National Addressing Reference System</p>
-            </div>
-
-            <!-- Sign In Form -->
-            <form id="signinForm">
-                <div class="error-message" id="signinError"></div>
-                
-                <div class="form-group">
-                    <label for="signin-username">Username</label>
-                    <input type="text" id="signin-username" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="signin-password">Password</label>
-                    <input type="password" id="signin-password" required>
-                </div>
-
-                <button type="submit" class="btn">Sign In</button>
-            </form>
+      <div class="form-container">
+        <div class="logo">
+          <h1>🗺️ NARS</h1>
+          <p>National Addressing Reference System</p>
         </div>
+
+        <!-- Sign In Form -->
+        <form id="signinForm">
+          <div class="error-message" id="signinError"></div>
+
+          <div class="form-group">
+            <label for="signin-username">Username</label>
+            <input type="text" id="signin-username" required maxlength="50" />
+          </div>
+
+          <div class="form-group">
+            <label for="signin-password">Password</label>
+            <input type="password" id="signin-password" required maxlength="128" />
+          </div>
+
+          <button type="submit" class="btn">Sign In</button>
+        </form>
+      </div>
     </div>
 
     <script>
-        const signinForm = document.getElementById('signinForm');
-        const signinError = document.getElementById('signinError');
+      const signinForm = document.getElementById("signinForm")
+      const signinError = document.getElementById("signinError")
 
-        function csrfHeaders() {
-            const token = document.querySelector('meta[name="csrf-token"]')?.content;
-            return token ? { 'X-CSRF-Token': token } : {};
+      function csrfHeaders() {
+        const token = document.querySelector('meta[name="csrf-token"]')?.content
+        return token ? { "X-CSRF-Token": token } : {}
+      }
+
+      signinForm.addEventListener("submit", async (e) => {
+        e.preventDefault()
+
+        const username = document.getElementById("signin-username").value
+        const password = document.getElementById("signin-password").value
+        signinError.style.display = "none"
+
+        try {
+          const response = await fetch("/api/signin", {
+            credentials: "include",
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...csrfHeaders(),
+            },
+            body: JSON.stringify({ username, password }),
+          })
+
+          const data = await response.json()
+
+          if (response.ok) {
+            // Redirect to map
+            window.location.href = "/map"
+          } else {
+            signinError.textContent = data.detail || data.error || "Invalid username or password"
+            signinError.style.display = "block"
+          }
+        } catch (error) {
+          signinError.textContent = "Error connecting to server"
+          signinError.style.display = "block"
         }
-
-        signinForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const username = document.getElementById('signin-username').value;
-            const password = document.getElementById('signin-password').value;
-            signinError.style.display = 'none';
-
-            try {
-                const response = await fetch('/api/signin', { credentials: 'include',
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...csrfHeaders(),
-                    },
-                    body: JSON.stringify({ username, password })
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    // Redirect to map
-                    window.location.href = '/map';
-                } else {
-                    signinError.textContent = data.detail || data.error || 'Invalid username or password';
-                    signinError.style.display = 'block';
-                }
-            } catch (error) {
-                signinError.textContent = 'Error connecting to server';
-                signinError.style.display = 'block';
-            }
-        });
+      })
     </script>
 
     <!-- ── Language + Theme controls ─────────────────────────────────── -->
     <div class="login-controls">
-        <select class="lc-select" id="langSelect">
-            <option value="en">🌐 EN</option>
-            <option value="fr">🌐 FR</option>
-            <option value="ar">🌐 عر</option>
-        </select>
-        <select class="lc-select" id="themeSelect">
-            <option value="light">☀️ Light</option>
-            <option value="dark">🌙 Dark</option>
-            <option value="auto">🖥️ Auto</option>
-        </select>
+      <select class="lc-select" id="langSelect">
+        <option value="en">🌐 EN</option>
+        <option value="fr">🌐 FR</option>
+        <option value="ar">🌐 عر</option>
+      </select>
+      <select class="lc-select" id="themeSelect">
+        <option value="light">☀️ Light</option>
+        <option value="dark">🌙 Dark</option>
+        <option value="auto">🖥️ Auto</option>
+      </select>
     </div>
 
     <script>
-    // ── i18n ──────────────────────────────────────────────────────────────────
-    const STRINGS = {
+      // ── i18n ──────────────────────────────────────────────────────────────────
+      const STRINGS = {
         en: {
-            username: 'Username', password: 'Password',
-            btnSignIn: 'Sign In',
-            errInvalid: 'Invalid username or password',
-            errServer: 'Error connecting to server',
+          username: "Username",
+          password: "Password",
+          btnSignIn: "Sign In",
+          errInvalid: "Invalid username or password",
+          errServer: "Error connecting to server",
         },
         fr: {
-            username: "Nom d'utilisateur", password: 'Mot de passe',
-            btnSignIn: 'Se connecter',
-            errInvalid: "Nom d'utilisateur ou mot de passe invalide",
-            errServer: 'Erreur de connexion au serveur',
+          username: "Nom d'utilisateur",
+          password: "Mot de passe",
+          btnSignIn: "Se connecter",
+          errInvalid: "Nom d'utilisateur ou mot de passe invalide",
+          errServer: "Erreur de connexion au serveur",
         },
         ar: {
-            username: 'اسم المستخدم', password: 'كلمة المرور',
-            btnSignIn: 'دخول',
-            errInvalid: 'اسم المستخدم أو كلمة المرور غير صحيحة',
-            errServer: 'خطأ في الاتصال بالخادم',
-        }
-    }
+          username: "اسم المستخدم",
+          password: "كلمة المرور",
+          btnSignIn: "دخول",
+          errInvalid: "اسم المستخدم أو كلمة المرور غير صحيحة",
+          errServer: "خطأ في الاتصال بالخادم",
+        },
+      }
 
-    function applyLang(lang) {
+      function applyLang(lang) {
         const s = STRINGS[lang] || STRINGS.en
         const html = document.documentElement
         html.lang = lang
-        html.dir  = lang === 'ar' ? 'rtl' : 'ltr'
-        localStorage.setItem('nars_lang', lang)
+        html.dir = lang === "ar" ? "rtl" : "ltr"
+        localStorage.setItem("nars_lang", lang)
 
         // Also persist for the map app
-        document.querySelector('#signinForm .btn').textContent = s.btnSignIn
+        document.querySelector("#signinForm .btn").textContent = s.btnSignIn
 
         // Sign-in username/password labels
         document.querySelector('label[for="signin-username"]').textContent = s.username
         document.querySelector('label[for="signin-password"]').textContent = s.password
 
         // Active button state
-        const ls = document.getElementById('langSelect')
+        const ls = document.getElementById("langSelect")
         if (ls) ls.value = lang
-    }
+      }
 
-    // ── Theme ─────────────────────────────────────────────────────────────────
-    function applyTheme(mode) {
+      // ── Theme ─────────────────────────────────────────────────────────────────
+      function applyTheme(mode) {
         const html = document.documentElement
-        if (mode === 'light') {
-            html.removeAttribute('data-theme')   // light = default, no attribute needed
-        } else if (mode === 'dark') {
-            html.setAttribute('data-theme', 'dark')
+        if (mode === "light") {
+          html.removeAttribute("data-theme") // light = default, no attribute needed
+        } else if (mode === "dark") {
+          html.setAttribute("data-theme", "dark")
         } else {
-            // auto — match OS preference
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-            if (prefersDark) html.setAttribute('data-theme', 'dark')
-            else             html.removeAttribute('data-theme')
+          // auto — match OS preference
+          const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
+          if (prefersDark) html.setAttribute("data-theme", "dark")
+          else html.removeAttribute("data-theme")
         }
-        localStorage.setItem('nars_theme', mode)
-        const ts = document.getElementById('themeSelect')
+        localStorage.setItem("nars_theme", mode)
+        const ts = document.getElementById("themeSelect")
         if (ts) ts.value = mode
-    }
+      }
 
-    // ── Init ──────────────────────────────────────────────────────────────────
-    const savedLang  = localStorage.getItem('nars_lang')  || 'en'
-    const savedTheme = localStorage.getItem('nars_theme') || 'light'
-    applyLang(savedLang)
-    applyTheme(savedTheme)
+      // ── Init ──────────────────────────────────────────────────────────────────
+      const savedLang = localStorage.getItem("nars_lang") || "en"
+      const savedTheme = localStorage.getItem("nars_theme") || "light"
+      applyLang(savedLang)
+      applyTheme(savedTheme)
 
-    document.getElementById('langSelect').addEventListener('change', function() {
+      document.getElementById("langSelect").addEventListener("change", function () {
         applyLang(this.value)
-    })
-    document.getElementById('themeSelect').addEventListener('change', function() {
+      })
+      document.getElementById("themeSelect").addEventListener("change", function () {
         applyTheme(this.value)
-    })
+      })
     </script>
-
-</body>
+  </body>
 </html>

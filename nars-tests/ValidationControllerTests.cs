@@ -80,16 +80,6 @@ public class ValidationControllerTests
     // ── POST /api/validate/road ───────────────────────────────────────────
 
     [Fact]
-    public async Task ValidateRoad_NullBody_Returns400()
-    {
-        using var db = CreateDb();
-        var ctrl = CreateController(db);
-        var result = await ctrl.ValidateRoad(null!);
-        var bad = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, bad.StatusCode);
-    }
-
-    [Fact]
     public async Task ValidateRoad_LessThan2Points_Returns400()
     {
         using var db = CreateDb();
@@ -191,16 +181,6 @@ public class ValidationControllerTests
     }
 
     // ── POST /api/validate/district ───────────────────────────────────────
-
-    [Fact]
-    public async Task ValidateDistrict_NullBody_Returns400()
-    {
-        using var db = CreateDb();
-        var ctrl = CreateController(db);
-        var result = await ctrl.ValidateDistrict(null!);
-        var bad = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, bad.StatusCode);
-    }
 
     [Fact]
     public async Task ValidateDistrict_LessThan3Points_Returns400()

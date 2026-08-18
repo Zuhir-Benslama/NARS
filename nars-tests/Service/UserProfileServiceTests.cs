@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Moq;
 using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
@@ -23,7 +24,7 @@ public class UserProfileServiceTests(NarsDatabaseFixture fixture) : IAsyncLifeti
     public async Task InitializeAsync()
     {
         _db = _fixture.CreateDbContext();
-        _service = new UserProfileService(_db);
+        _service = new UserProfileService(_db, Mock.Of<ISecurityStampCache>());
     }
 
     public async Task DisposeAsync()

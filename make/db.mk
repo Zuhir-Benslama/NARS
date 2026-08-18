@@ -108,8 +108,9 @@ postgis-password-sync: ## Align postgres user password with POSTGRES_PASSWORD (f
 .PHONY: postgis-migration-baseline
 postgis-migration-baseline: ## Backfill EF migration history for pre-existing schemas
 	@echo "→ Ensuring EF migration history baseline..."
-	@cat "nars-infra/scripts/postgis-migration-baseline.sql" | $(KUBECTL) exec -i -n "$(NAMESPACE)" deployment/postgis -- \
-		psql -U postgres -d "$(DB_NAME)" -v ON_ERROR_STOP=1 >/dev/null
+	@$(KUBECTL) exec -i -n "$(NAMESPACE)" deployment/postgis -- \
+		psql -U postgres -d "$(DB_NAME)" -v ON_ERROR_STOP=1 >/dev/null \
+		< "nars-infra/scripts/postgis-migration-baseline.sql"
 	@echo "✓ EF migration history baseline ensured"
 
 .PHONY: db-migrate-nars

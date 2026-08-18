@@ -38,7 +38,7 @@ public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
 
     private FieldController CreateController()
     {
-        var featureSvc = new FeatureService(_db, Mock.Of<IBackgroundTaskQueue>(), Mock.Of<ILogger<FeatureService>>());
+        var featureSvc = new FeatureService(_db, Mock.Of<IBackgroundTaskQueue>(), Mock.Of<IFeatureCleanupService>(), Mock.Of<ILogger<FeatureService>>());
         var fieldSvc = new FieldService(_db, featureSvc, Mock.Of<ILogger<FieldService>>());
         var ctrl = new FieldController(Mock.Of<ILogger<FieldController>>(), Options.Create(new FeatureDefaultsOptions()), fieldSvc, Mock.Of<IWebHostEnvironment>());
         AuthTestHelper.SetUser(ctrl, _workerId, UserRoles.FieldWorker, communeId: 1);
@@ -111,7 +111,7 @@ public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
 
         var created = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, created.StatusCode);
-        var resp = Assert.IsType<FieldInspectSubmitResponse>(created.Value);
+        var resp = Assert.IsType<CreateResponse>(created.Value);
         Assert.True(resp.Success);
     }
 
@@ -209,7 +209,7 @@ public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
 
         var created = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, created.StatusCode);
-        var resp = Assert.IsType<CreateEntranceResponse>(created.Value);
+        var resp = Assert.IsType<CreateResponse>(created.Value);
         Assert.True(resp.Success);
 
         // Verify in DB

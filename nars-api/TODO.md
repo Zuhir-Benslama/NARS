@@ -1,62 +1,48 @@
 # NARS API TODO
 
-Code quality issues found during review (build clean, 0 warnings; 410 unit + 91 Postgres-backed tests passing). Grouped by severity.
+## HIGH — Security & Data Integrity
 
-## Medium
+- [x] **LIKE wildcard injection** — Escape `%`, `_`, `\` in user search strings before passing to `ILike` in `LocationSearchService.cs`
+- [x] **Unbounded string/JSONB fields** — Add `[MaxLength]` to `FeatureBase.Data`, `ErrorLog.Message`, `ErrorLog.Context`, `LogEntry` fields, `FieldInspectRequest.Type/Status` to prevent OOM and storage abuse
+- [x] **Password change without confirmation** — Make `CurrentPassword` required in `UpdateUserRequest` when `Password` is set; add current-password check to `UpdateAdminRequest`
+- [x] **SegmentationClient OOM** — Cap error response body read in `SegmentationClient.cs` (use `StreamReader` with max length)
+- [x] **No FK constraints on User location fields** — Add FK relationships for `User.CommuneId`, `User.DairaId`, `User.WilayaId` in `AppDbContext.OnModelCreating`
+- [x] **UserCreationService masks DB errors** — Check `IsUniqueViolation` in catch block (`UserCreationService.cs:68-75`) instead of treating all `DbUpdateException` as duplicate username (409)
+- [x] **Missing RefreshToken indexes** — Add indexes on `UserId` and `ExpiresAt` columns to avoid full table scans during pruning and user lookups
+- [x] **Silent background task drop** — `BackgroundTaskQueue` should notify callers when work items are dropped (e.g., return `false` or log with correlation ID)
 
-- [x] **`ErrorLog.Code` truncated to 100 but column is `varchar(50)`** (`Controllers/LogsController.cs:94`)
-  - **Fix:** truncated `Code` at 50 (`MaxCodeLength`) matching `ErrorLog.Code [MaxLength(50)]`.
+## MEDIUM — Performance
 
-- [x] **`FieldEntranceCreateRequest.Label` has no `MaxLength`** (`DTOs/FieldDtos.cs:17`)
-  - **Fix:** added `[param: MaxLength(500)]` matching `HouseEntrance.Label [MaxLength(500)]`.
+- [x] **N+1 admin overview query** — Replaced 6 sequential DB round-trips in `AdminOverviewService.GetNationalOverviewAsync` with a single CTE query (2 queries total: count + CTE)
+- [x] **Security stamp DB query per request** — Cache the security stamp in distributed cache with short TTL instead of querying DB on every authenticated request (`AuthenticationExtensions.cs:94-103`)
+- [ ] **Dummy BCrypt on every invalid login** — Consider a faster constant-time hash comparison for the dummy path to reduce DoS surface (~300ms CPU per unknown username) (deferred)
+- [x] **Unbounded IN clauses** — All `Contains` calls are in EF Core LINQ queries; Npgsql already translates to `= ANY(@array)` automatically
 
-## Low
+## MEDIUM — Code Duplication
 
-- [ ] **Security-stamp DB round-trip on every request** (`Infrastructure/AuthenticationExtensions.cs:75-101`)
-  - `OnTokenValidated` re-reads the user's `SecurityStamp` from the DB on every authenticated request. Deliberate tradeoff for instant token revocation.
-  - **Status:** kept as-is — caching would relax the revocation guarantee; the behavior is documented in code.
+- [x] **Remove 14 redundant null-check boilerplate** — `[ApiController]` already returns 400 for null `[FromBody]` params; remove all `if (body is null) return Problem(...)` blocks across controllers
+- [x] **Extract refresh token hash helper** — Deduplicate SHA256 hash computation in `RefreshTokenService.cs` (lines 25-27 and 98-100)
+- [x] **Extract ADO.NET boilerplate** — Already well-factored: `EnsureOpenAsync`, `SqlFragments.AddParam`, `FeatureQueryHelper` cover the core pattern; remaining per-service code is inherently service-specific
+- [x] **Remove primary constructor field shadowing** — Remove redundant `private readonly _db = db` fields in `DraftFeaturesService`, `ValidationService`, `CommuneScopeService`
+- [x] **Extract scattered-refresh trigger** — Deduplicate `if (featureType == FeatureTypes.Area) QueueScatteredRefreshAsync(...)` in `FeaturesController.cs` (3 occurrences)
 
-- [x] **Dead code**
-  - Removed: `RateLimitPolicies.Api`, `LocationQueryService.GetAllWilayasAsync`/`GetDairasByWilayaAsync`/`GetCommunesByDairaAsync` (+ interface), `FeatureQueryHelper.AddParameter`, `SqlFragments.AddParam(Guid[])`.
-  - Kept (verified in use): `RefreshTokenService.TimeProvider` (used by test subclass), `FeatureDtoConverter.IsoDateFormat` (used by `SpatialController`/`FeatureQueryHelper`).
+## MEDIUM — Structural
 
-- [x] **`DraftFeaturesService` uses `DateTimeOffset.UtcNow` directly** (`Services/DraftFeaturesService.cs`)
-  - **Fix:** injected `IDateTimeProvider` (wired via DI; test helper updated).
+- [x] **Extract auth logic from PagesController** — Move `TryAuthenticateAsync`, `ValidateAccessTokenFromCookie`, `ValidateAccessTokenFromBearerHeader`, `TryRefreshSessionAsync` into `IPageAuthService`
+- [x] **Move log sanitizer to service** — Extract `SanitizeLogField`/`SanitizeControlCharacters`/`SanitizeInto` (55 lines of stackalloc logic) from `LogsController.cs` into `ILogSanitizer`
+- [x] **Split AuthController partial class** — Move `AuthorizedAdminSignup` to its own controller (`AdminSignupController`)
+- [x] **Break up FeatureTypeRegistry** — Split 394-line god class into `FeatureTypeRegistry` (lookup), `FeatureCatalog` (UI metadata), `FeatureCleanupService` (DB deletion)
+- [x] **Standardize response envelopes** — Merged 3 identical `{ success, id, message }` create DTOs (`SaveFeatureResponse`, `FieldInspectSubmitResponse`, `CreateEntranceResponse`) into unified `CreateResponse`; fixed DraftFeaturesController raw string errors → `Problem()`. Full `ApiResponse<T>` wrapper deferred (SPA frontend dependency)
 
-- [x] **`AiDraftFeature.Id` uses `Guid.NewGuid()`** (`Models/AiDraftFeature.cs:50`)
-  - **Fix:** now `Guid.CreateVersion7()` matching the codebase convention.
+## LOW — Inconsistencies
 
-- [x] **Inconsistent stored-XSS hygiene** (`Controllers/LogsController.cs`)
-  - **Fix:** all text log fields (Code, Message, Context, Url, Method, UserAgent) now share one `SanitizeLogField` (control-char strip + HTML-encode + truncate); encoded output is re-truncated to `maxLen` so columns can't overflow after entity expansion.
-
-- [x] **Password `[MaxLength(128)]` exceeds BCrypt's 72-byte limit** (`DTOs/AuthDtos.cs`)
-  - **Fix:** capped password fields at `MaxLength(72)`; `PasswordValidator` now rejects >72 UTF-8 bytes. Test updated for the new contract.
-
-- [x] **Manual `CreatedAt`/`UpdatedAt` stamps duplicate the interceptor** (`Controllers/FeaturesController.cs`)
-  - **Fix:** dropped the manual stamp; `FeatureTypeRegistry.CreateEntity` `createdAt` param is now optional (`default`), letting `UpdatedAtInterceptor` stamp both on `SaveChanges`.
-
-- [x] **`BuildUnionAll` interpolates table names without `ValidateTableName`** (`Services/FeatureStatsService.cs`)
-  - **Fix:** table names now routed through `FeatureTypeRegistry.ValidateTableName`.
-
-- [x] **`UsersController` has no explicit null-body guard** (`Controllers/UsersController.cs:22-24`)
-  - **Fix:** added explicit null-body guard (400), matching sibling controllers.
-
-- [x] **Mixed authorization style**
-  - `Controllers/FieldController.cs` used class-level `[Authorize(Roles = UserRoles.FieldWorker)]` while `Admin`/`AdminUser` controllers had no role attributes and enforced roles only inside `UserAuthorizationService`.
-  - **Fix:** unified on declarative role gates + in-service scope checks (roles are static and declarative; geographic/target scope is data-dependent and stays in the service):
-    - `Infrastructure/UserRoles.cs`: added `AnyAdmin` and `UserManagementRoles` combined constants.
-    - `Controllers/AdminController.cs`: `Overview` now `[Authorize(Roles = UserRoles.AnyAdmin)]` (role switch still handles geo-scope + missing-scope cases).
-    - `Controllers/AdminUserController.cs`: class-level `[Authorize(Roles = UserRoles.UserManagementRoles)]` — field workers now get a consistent 403 from middleware instead of a mix of 403/empty-200 per endpoint.
-    - `Controllers/FieldController.cs`: unchanged (already declarative).
-
-- [x] **`LocationsController` doc comment advertises caching that isn't implemented**
-  - **Fix:** removed the false caching claim from the doc comment. `CacheOptions.ReferenceDataDurationHours` left in place (referenced by bootstrapping option-validation tests).
-
-- [x] **`GetUsedEntranceNumbersAsync` materializes all entrance numbers** (`Services/EntranceQueryService.cs`)
-  - **Fix:** query now filters by the requested side's parity in SQL (`left`→odd, `right`→even), which `SuggestEntranceNumber` provably never consults for the other parity — halves transferred data. `side` param added to interface/controller/test mocks.
-
-## Verification
-
-- `dotnet build --no-restore`: 0 warnings / 0 errors.
-- `dotnet format Workspace.sln --verify-no-changes`: clean.
-- 410 unit tests + 91 Postgres-backed service tests: all passing.
+- [ ] **Route param casing** — Normalize `communeId` vs `wilaya_id` to one convention (breaking API change, deferred)
+- [x] **CSP nonce injection** — Unify `<script>` vs `<script ` replacement patterns in `PagesController.cs` (lines 62, 90)
+- [ ] **Error handling in FieldService** — `SubmitInspectionAsync` throws exceptions while all other services return result objects (already handled by global exception handler, low impact)
+- [ ] **Consolidate commune DTOs** — Merge `CommuneItem`, `CommuneInfo`, `CommuneBoundaryResponse` into a shared base with optional fields (different contexts, not worth merging)
+- [ ] **CSRF for anonymous endpoints** — Add guard that rejects anonymous POST mutations in `PipelineExtensions.cs` instead of silently skipping CSRF (intentional: login/admin-signup need anonymous POST)
+- [x] **CORS localhost default** — Add startup validation that `Cors:AllowedOrigins` is set in non-development environments
+- [ ] **Duplicate user summary DTOs** — Consolidate `UserInfo` and `AdminUserSummary` into a shared type (different contexts, not worth merging)
+- [x] **Refresh token pruner dispose** — Scope disposal already handles DbContext; verified correct
+- [x] **EntranceQueryService side validation** — Validate `side` parameter is "left" or "right" instead of silently defaulting to "right"
+- [x] **Log level fallback** — Log null level as "unknown" instead of silently defaulting to "error" in `LogsController.cs:83`

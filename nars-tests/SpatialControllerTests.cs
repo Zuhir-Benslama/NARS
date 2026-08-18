@@ -43,18 +43,6 @@ public class SpatialControllerTests
     // ── POST /api/road-side ───────────────────────────────────────────────
 
     [Fact]
-    public async Task GetRoadSide_NullBody_Returns400()
-    {
-        var (ctrl, db) = CreateController();
-        using (db)
-        {
-            var result = await ctrl.GetRoadSide(null!);
-            var objResult = Assert.IsType<ObjectResult>(result);
-            Assert.Equal(400, objResult.StatusCode);
-        }
-    }
-
-    [Fact]
     public async Task GetRoadSide_RoadNotFound_Returns404()
     {
         var (ctrl, db) = CreateController();

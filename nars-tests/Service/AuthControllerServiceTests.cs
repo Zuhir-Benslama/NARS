@@ -44,7 +44,9 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
             role: UserRoles.DairaAdmin,
             dairaId: 1);
 
-        var controller = CreateController();
+        var controller = CreateSignupController();
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        controller.ControllerContext.HttpContext.Request.Headers["X-Admin-Signup"] = AdminSignupToken;
         var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "daira_admin_1",
             AdminPassword: DefaultPassword,
@@ -57,7 +59,7 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
             CommuneId: 1,
             DairaId: null,
             WilayaId: null
-        ), signupToken: AdminSignupToken);
+        ), AdminSignupToken);
 
         var statusResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, statusResult.StatusCode);
@@ -76,7 +78,9 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
             role: UserRoles.DairaAdmin,
             dairaId: 1);
 
-        var first = CreateController();
+        var first = CreateSignupController();
+        first.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        first.ControllerContext.HttpContext.Request.Headers["X-Admin-Signup"] = AdminSignupToken;
         await first.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "daira_admin_1",
             AdminPassword: DefaultPassword,
@@ -89,9 +93,11 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
             CommuneId: 1,
             DairaId: null,
             WilayaId: null
-        ), signupToken: AdminSignupToken);
+        ), AdminSignupToken);
 
-        var second = CreateController();
+        var second = CreateSignupController();
+        second.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        second.ControllerContext.HttpContext.Request.Headers["X-Admin-Signup"] = AdminSignupToken;
         var result = await second.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
             AdminUsername: "daira_admin_1",
             AdminPassword: DefaultPassword,
@@ -104,7 +110,7 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
             CommuneId: 1,
             DairaId: null,
             WilayaId: null
-        ), signupToken: AdminSignupToken);
+        ), AdminSignupToken);
 
         var conflict = Assert.IsType<ObjectResult>(result);
         Assert.Equal(409, conflict.StatusCode);
@@ -121,9 +127,13 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
 
         // Two independent contexts + controllers simulating concurrent requests
         await using var db1 = _fixture.CreateDbContext();
-        var ctrl1 = CreateController(db1);
+        var ctrl1 = CreateSignupController(db1);
+        ctrl1.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        ctrl1.ControllerContext.HttpContext.Request.Headers["X-Admin-Signup"] = TestData.AdminSignupToken;
         await using var db2 = _fixture.CreateDbContext();
-        var ctrl2 = CreateController(db2);
+        var ctrl2 = CreateSignupController(db2);
+        ctrl2.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        ctrl2.ControllerContext.HttpContext.Request.Headers["X-Admin-Signup"] = TestData.AdminSignupToken;
 
         var request = new AuthorizedAdminSignupRequest(
             AdminUsername: "race_admin",
@@ -147,8 +157,8 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
         // ever cached or wrapped so the constraint error is swallowed, this
         // becomes flaky — the 409 must come from the unique index.
         var results = await Task.WhenAll(
-            ctrl1.AuthorizedAdminSignup(request, signupToken: TestData.AdminSignupToken, CancellationToken.None),
-            ctrl2.AuthorizedAdminSignup(request, signupToken: TestData.AdminSignupToken, CancellationToken.None)
+            ctrl1.AuthorizedAdminSignup(request, TestData.AdminSignupToken, CancellationToken.None),
+            ctrl2.AuthorizedAdminSignup(request, TestData.AdminSignupToken, CancellationToken.None)
         );
 
         var statusCodes = results
@@ -283,17 +293,39 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
             jwtOpts,
             Mock.Of<ILogger<JwtService>>(),
             timeProvider);
-        var refreshService = new RefreshTokenService(db, jwt, jwtOpts, timeProvider);
+        var refreshService = new RefreshTokenService(db, jwt, jwtOpts, Mock.Of<ISecurityStampCache>(), timeProvider);
         return new AuthController(
             refreshService,
             jwt,
             Options.Create(new AccountLockoutOptions()),
-            Options.Create(new AdminSignupOptions { SignupToken = TestData.AdminSignupToken }),
             Mock.Of<ILogger<AuthController>>(),
             timeProvider,
-            new UserAuthorizationService(db, refreshService, timeProvider),
-            new UserCreationService(db, new UserAuthorizationService(db, refreshService, timeProvider), Mock.Of<ILogger<UserCreationService>>()),
+            new UserAuthorizationService(db, refreshService, Mock.Of<IFeatureCleanupService>(), timeProvider),
             Mock.Of<ILocationQueryService>(),
+            Mock.Of<IWebHostEnvironment>());
+    }
+
+    private AdminSignupController CreateSignupController() => CreateSignupController(_db);
+
+    private static AdminSignupController CreateSignupController(AppDbContext db)
+    {
+        var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
+        var jwtOpts = DefaultJwtOptions;
+        var jwt = new JwtService(
+            AuthTestHelper.TestJwtSecret,
+            null,
+            null,
+            jwtOpts,
+            Mock.Of<ILogger<JwtService>>(),
+            timeProvider);
+        var refreshService = new RefreshTokenService(db, jwt, jwtOpts, Mock.Of<ISecurityStampCache>(), timeProvider);
+        return new AdminSignupController(
+            refreshService,
+            Options.Create(new AccountLockoutOptions()),
+            Options.Create(new AdminSignupOptions { SignupToken = TestData.AdminSignupToken }),
+            Mock.Of<ILogger<AdminSignupController>>(),
+            new UserAuthorizationService(db, refreshService, Mock.Of<IFeatureCleanupService>(), timeProvider),
+            new UserCreationService(db, new UserAuthorizationService(db, refreshService, Mock.Of<IFeatureCleanupService>(), timeProvider), Mock.Of<ILogger<UserCreationService>>()),
             Mock.Of<IWebHostEnvironment>());
     }
 

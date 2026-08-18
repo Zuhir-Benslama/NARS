@@ -26,7 +26,7 @@ public class FeaturesControllerTests
         IFeatureService? featureService = null)
     {
         var ctrl = new FeaturesController(
-            featureService ?? new FeatureService(db, Mock.Of<IBackgroundTaskQueue>(), Mock.Of<ILogger<FeatureService>>()),
+            featureService ?? new FeatureService(db, Mock.Of<IBackgroundTaskQueue>(), Mock.Of<IFeatureCleanupService>(), Mock.Of<ILogger<FeatureService>>()),
             Options.Create(new FeatureDefaultsOptions()),
             timeProvider ?? Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow),
             featureStatsService ?? Mock.Of<IFeatureStatsService>(),
@@ -45,16 +45,6 @@ public class FeaturesControllerTests
     private static JsonElement Json(string raw) => System.Text.Json.JsonSerializer.Deserialize<JsonElement>(raw);
 
     // ── POST /api/save ────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task SaveFeature_NullBody_Returns400()
-    {
-        using var db = CreateInMemoryDb("FeaturesTest");
-        var ctrl = CreateController(db);
-        var result = await ctrl.SaveFeature(null!);
-        var objResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, objResult.StatusCode);
-    }
 
     [Fact]
     public async Task SaveFeature_UnknownType_Returns400()
@@ -192,16 +182,6 @@ public class FeaturesControllerTests
     // ── POST /api/clear ───────────────────────────────────────────────────
 
     [Fact]
-    public async Task ClearFeatures_NullBody_Returns400()
-    {
-        using var db = CreateInMemoryDb("FeaturesTest");
-        var ctrl = CreateController(db);
-        var result = await ctrl.ClearFeatures(null!);
-        var objResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, objResult.StatusCode);
-    }
-
-    [Fact]
     public async Task ClearFeatures_NotConfirmed_Returns400()
     {
         using var db = CreateInMemoryDb("FeaturesTest");
@@ -228,16 +208,6 @@ public class FeaturesControllerTests
     }
 
     // ── POST /api/update/{id} ─────────────────────────────────────────────
-
-    [Fact]
-    public async Task UpdateFeature_NullBody_Returns400()
-    {
-        using var db = CreateInMemoryDb("FeaturesTest");
-        var ctrl = CreateController(db);
-        var result = await ctrl.UpdateFeature(Guid.NewGuid(), null!);
-        var objResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, objResult.StatusCode);
-    }
 
     [Fact]
     public async Task UpdateFeature_NotFound_Returns404()

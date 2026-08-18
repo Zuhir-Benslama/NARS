@@ -91,11 +91,23 @@ public static class AuthenticationExtensions
                             return;
                         }
 
-                        var db = ctx.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
-                        var current = await db.Users.AsNoTracking()
-                            .Where(u => u.Id == userId.Value)
-                            .Select(u => u.SecurityStamp)
-                            .FirstOrDefaultAsync(ctx.HttpContext.RequestAborted);
+                        var stampCache = ctx.HttpContext.RequestServices.GetRequiredService<ISecurityStampCache>();
+                        var current = await stampCache.GetStampAsync(userId.Value, ctx.HttpContext.RequestAborted);
+
+                        if (current is null)
+                        {
+                            // Cache miss — query DB and populate cache for next request.
+                            var db = ctx.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                            current = await db.Users.AsNoTracking()
+                                .Where(u => u.Id == userId.Value)
+                                .Select(u => u.SecurityStamp)
+                                .FirstOrDefaultAsync(ctx.HttpContext.RequestAborted);
+
+                            if (current is not null)
+                            {
+                                stampCache.SetStamp(userId.Value, current);
+                            }
+                        }
 
                         if (current != stamp)
                         {

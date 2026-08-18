@@ -251,7 +251,7 @@ public class AdminControllerTests
         // CanCreateRole is a pure role-hierarchy check (no DB query).
         // InMemory DB is only needed to satisfy the UserAuthorizationService constructor.
         using var db = CreateInMemoryDb("AdminControllerRoleTest");
-        var svc = new UserAuthorizationService(db, Mock.Of<IRefreshTokenService>(), Mock.Of<IDateTimeProvider>());
+        var svc = new UserAuthorizationService(db, Mock.Of<IRefreshTokenService>(), Mock.Of<IFeatureCleanupService>(), Mock.Of<IDateTimeProvider>());
         Assert.Equal(expected, svc.CanCreateRole(caller, target));
     }
 }

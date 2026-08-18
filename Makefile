@@ -101,7 +101,7 @@ help: ## Show available targets
 # The targets below are split across make/*.mk for maintainability.
 # GNU make reads all of them into a single instance, so variables,
 # .ONESHELL, and cross-file prerequisites keep working unchanged.
-include make/*.mk
+-include make/*.mk
 
 # ─── Convenience Targets ──────────────────────────────────────
 

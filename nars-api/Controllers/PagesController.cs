@@ -1,15 +1,10 @@
-using System.Net;
-using System.Security.Claims;
 using System.Text.Encodings.Web;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
-using NarsApi.Data;
 using NarsApi.Infrastructure;
-using NarsApi.Models;
 using NarsApi.Services;
 
 namespace NarsApi.Controllers;
@@ -22,12 +17,11 @@ namespace NarsApi.Controllers;
 [ApiExplorerSettings(IgnoreApi = true)]
 #pragma warning disable S6931 // PagesController serves root-level paths (/, /login, /map), not API endpoints
 public class PagesController(
-    IJwtService jwt,
     IAntiforgery antiforgery,
     IMemoryCache cache,
     IHostEnvironment env,
     ILogger<PagesController> logger,
-    IRefreshTokenService refreshService,
+    IPageAuthService pageAuth,
     IOptions<CacheOptions> cacheOptions,
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
@@ -36,7 +30,7 @@ public class PagesController(
     [AllowAnonymous]
     public async Task<IActionResult> Root(CancellationToken cancellationToken = default)
     {
-        if (await TryAuthenticateAsync(cancellationToken))
+        if (await pageAuth.TryAuthenticateAsync(cancellationToken))
         {
             return Redirect("/map");
         }
@@ -58,7 +52,10 @@ public class PagesController(
             // Inject the CSRF token into the <meta name="csrf-token"> placeholder
             .Replace("<meta name=\"csrf-token\" content=\"\">",
                 $"<meta name=\"csrf-token\" content=\"{HtmlEncoder.Default.Encode(tokens.RequestToken ?? string.Empty)}\">")
-            // Inject nonce into every <script> tag so they pass the CSP check
+            // Inject nonce into every <script> tag so they pass the CSP check.
+            // Order matters: replace <script ... (with attributes) first so the
+            // bare <script> replacement doesn't create a double-nonce match.
+            .Replace("<script ", $"<script nonce=\"{nonce}\" ")
             .Replace("<script>", $"<script nonce=\"{nonce}\">");
 
         return Content(html, "text/html");
@@ -71,7 +68,7 @@ public class PagesController(
     [AllowAnonymous]
     public async Task<IActionResult> MapPage(CancellationToken cancellationToken = default)
     {
-        if (!await TryAuthenticateAsync(cancellationToken))
+        if (!await pageAuth.TryAuthenticateAsync(cancellationToken))
         {
             logger.LogDebug("[Pages] Map page not authenticated, redirecting to /login");
             return Redirect("/login");
@@ -86,8 +83,11 @@ public class PagesController(
             // Inject CSRF token into the meta placeholder
             .Replace("<meta name=\"csrf-token\" content=\"\">",
                 $"<meta name=\"csrf-token\" content=\"{HtmlEncoder.Default.Encode(tokens.RequestToken ?? string.Empty)}\">")
-            // Inject nonce into every <script> tag so they pass the CSP check
-            .Replace("<script ", $"<script nonce=\"{nonce}\" ");
+            // Inject nonce into every <script> tag so they pass the CSP check.
+            // Order matters: replace <script ... (with attributes) first so the
+            // bare <script> replacement doesn't create a double-nonce match.
+            .Replace("<script ", $"<script nonce=\"{nonce}\" ")
+            .Replace("<script>", $"<script nonce=\"{nonce}\">");
 
         return Content(html, "text/html");
     }
@@ -110,117 +110,4 @@ public class PagesController(
             return await System.IO.File.ReadAllTextAsync(path, CancellationToken.None);
         })) ?? string.Empty;
     }
-
-    private async Task<bool> TryAuthenticateAsync(CancellationToken cancellationToken)
-    {
-        // Auth for page loads is derived strictly from a freshly validated access
-        // token (cookie or header) or a silent refresh — never from a signed
-        // session cookie, which would carry no token-expiry information and keep
-        // pages authenticated after the access token has expired.
-        var principal = ValidateAccessTokenFromCookie();
-        principal ??= ValidateAccessTokenFromBearerHeader();
-
-        if (principal is not null)
-        {
-            return true;
-        }
-
-        return await TryRefreshSessionAsync(cancellationToken);
-    }
-
-    private ClaimsPrincipal? ValidateAccessTokenFromCookie()
-    {
-        var accessToken = Request.Cookies[CookieNames.AccessToken];
-        if (string.IsNullOrEmpty(accessToken))
-        {
-            return null;
-        }
-
-        var principal = jwt.ValidateToken(accessToken);
-        if (principal is not null)
-        {
-            logger.LogDebug("[Pages] access_token cookie is valid.");
-        }
-        else
-        {
-            logger.LogDebug("[Pages] access_token cookie is EXPIRED or INVALID.");
-        }
-
-        return principal;
-    }
-
-    private ClaimsPrincipal? ValidateAccessTokenFromBearerHeader()
-    {
-        var bearerHeader = Request.Headers.Authorization.FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(bearerHeader)
-            || !bearerHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-
-        var bearerToken = bearerHeader["Bearer ".Length..].Trim();
-        if (string.IsNullOrEmpty(bearerToken))
-        {
-            return null;
-        }
-
-        var principal = jwt.ValidateToken(bearerToken);
-        if (principal is not null)
-        {
-            logger.LogDebug("[Pages] Valid bearer token header found.");
-        }
-        else
-        {
-            logger.LogDebug("[Pages] Bearer token header is invalid or expired.");
-        }
-
-        // Never persist a header-supplied bearer token into the access_token
-        // cookie: the client chose to send it via header (not as a cookie), and
-        // writing it as a long-lived cookie would broaden the token's exposure.
-        return principal;
-    }
-
-    private async Task<bool> TryRefreshSessionAsync(CancellationToken cancellationToken)
-    {
-        var refreshToken = Request.Cookies[CookieNames.RefreshToken];
-        if (string.IsNullOrEmpty(refreshToken))
-        {
-            logger.LogDebug("[Pages] refresh_token cookie NOT FOUND. Cannot silent refresh.");
-            return false;
-        }
-
-        logger.LogDebug("[Pages] Found refresh_token. Attempting silent refresh...");
-
-        try
-        {
-            // Read-only page loads mint an access token WITHOUT rotating the
-            // one-time-use refresh token, so concurrent tabs (or double-fetch
-            // from /) never revoke it for each other and bounce to /login.
-            var result = await refreshService.MintAccessTokenAsync(refreshToken, cancellationToken);
-            if (!result.Success)
-            {
-                logger.LogWarning("[Pages] Refresh failed: {Detail}", result.Detail);
-                return false;
-            }
-
-            if (result.NewAccessToken is null)
-            {
-                logger.LogWarning("[Pages] Refresh succeeded but access token is missing.");
-                return false;
-            }
-
-            logger.LogDebug("[Pages] Silent refresh SUCCESS. Issuing new access cookie for {Username}", result.Username);
-            Response.Cookies.Append(CookieNames.AccessToken, result.NewAccessToken, MakeCookieOptions(jwt.AccessTokenExpiresIn));
-
-            var principal = jwt.ValidateToken(result.NewAccessToken);
-
-            return principal is not null;
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            logger.LogError(ex, "[Pages] Error during silent refresh");
-            return false;
-        }
-    }
-
 }

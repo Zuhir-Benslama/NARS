@@ -5,6 +5,7 @@ here runs against the app with _model == None. That is enough to exercise
 auth, validation, upload caps and the health/ready contract end to end."""
 
 import pytest
+import app.main as roads
 from app.main import app
 from app.model import InvalidTileError, TileTooLargeError
 from fastapi.testclient import TestClient
@@ -25,7 +26,7 @@ class _StubModel:
         self.is_loaded = is_loaded
         self._predict_error = predict_error
 
-    def predict(self, raw, bbox):
+    def predict(self, raw: bytes, bbox: tuple[float, float, float, float]):
         if self._predict_error is not None:
             raise self._predict_error
         raise AssertionError("test bug: predict should not be reached")  # noqa: TRY003 - dynamic message
@@ -46,8 +47,6 @@ def test_ready_503_without_model():
 
 
 def test_ready_200_and_health_when_model_loaded(monkeypatch):
-    import app.main as roads
-
     # The readiness contract's success side: with real weights loaded the pod
     # reports ready and health reflects the loaded model. Mirrors the 503
     # paths tested elsewhere without needing torch (stub is enough).
@@ -83,8 +82,6 @@ def test_segment_rejects_unsupported_content_type():
 
 
 def test_segment_rejects_empty_file(monkeypatch):
-    import app.main as roads
-
     # Satisfy the readiness gate so the empty-upload check is what fires.
     monkeypatch.setattr(roads, "_models", {"buildings": _StubModel()})
     resp = _post(
@@ -161,8 +158,6 @@ def test_segment_models_not_ready():
 def test_segment_rejects_unready_model(monkeypatch):
     # Constructed model whose weights never loaded must fail closed (mirrors
     # /ready) instead of serving random predictions.
-    import app.main as roads
-
     monkeypatch.setattr(roads, "_models", {"buildings": _StubModel(is_loaded=False)})
     resp = _post(
         headers=AUTH,
@@ -173,8 +168,6 @@ def test_segment_rejects_unready_model(monkeypatch):
 
 
 def test_segment_returns_413_when_decode_too_large(monkeypatch):
-    import app.main as roads
-
     monkeypatch.setattr(
         roads,
         "_models",
@@ -191,8 +184,6 @@ def test_segment_returns_413_when_decode_too_large(monkeypatch):
 def test_segment_returns_400_for_undecodable_tile(monkeypatch):
     # Content-type says TIFF but the bytes are not a readable image; the
     # resulting decode error must surface as 400, not a 500.
-    import app.main as roads
-
     monkeypatch.setattr(
         roads,
         "_models",
@@ -207,8 +198,6 @@ def test_segment_returns_400_for_undecodable_tile(monkeypatch):
 
 
 def test_segment_returns_500_on_inference_failure(monkeypatch):
-    import app.main as roads
-
     monkeypatch.setattr(
         roads,
         "_models",
@@ -264,8 +253,6 @@ def test_segment_schema_accepts_wellformed_features():
 def test_inference_concurrency_is_bounded():
     import threading
 
-    import app.main as roads
-
     assert isinstance(roads.INFERENCE_SEMAPHORE, threading.BoundedSemaphore)
     # Behavioral check that doesn't reach into private _value: the semaphore
     # must never grant more than MAX_CONCURRENT_INFERENCES permits (one more
@@ -282,18 +269,36 @@ def test_inference_concurrency_is_bounded():
             roads.INFERENCE_SEMAPHORE.release()
 
 
+def test_segment_returns_503_when_semaphore_exhausted(monkeypatch):
+    """When all inference permits are held, new requests must fail fast with
+    503 instead of blocking indefinitely in the threadpool."""
+    import threading
+    from unittest.mock import MagicMock
+
+    # Replace the semaphore with a mock whose acquire() always returns False
+    # (simulates timeout). The original is restored by monkeypatch cleanup.
+    mock_sema = MagicMock(spec=threading.BoundedSemaphore)
+    mock_sema.acquire.return_value = False
+    monkeypatch.setattr(roads, "INFERENCE_SEMAPHORE", mock_sema)
+    monkeypatch.setattr(roads, "_models", {"buildings": _StubModel()})
+
+    resp = _post(
+        headers=AUTH,
+        params=BBOX,
+        files={"tile": ("t.tif", b"x", "image/tiff")},
+    )
+    assert resp.status_code == 503
+    mock_sema.acquire.assert_called_once()
+
+
 def test_missing_token_fails_closed(monkeypatch):
     # If the token env is missing entirely, all requests are rejected.
-    import app.main as roads
-
     monkeypatch.setattr(roads, "INTERNAL_TOKEN", "")
     assert _post(headers={"X-Internal-Token": AUTH_TOKEN}).status_code == 401
     assert _post().status_code == 401
 
 
 def test_segment_rejects_oversized_upload(monkeypatch):
-    import app.main as roads
-
     monkeypatch.setattr(roads, "MAX_TILE_BYTES", 1024)
     monkeypatch.setattr(
         roads, "_models", {"buildings": _StubModel()}
@@ -312,7 +317,6 @@ def test_segment_end_to_end_returns_geojson():
     checkpoint, so weights are random and is_loaded is False — flip it to True
     to pass the fail-closed readiness gate while still exercising the whole
     predict -> postprocess -> response pipeline."""
-    import app.main as roads
     from app.main import app as live_app
 
     with TestClient(live_app) as live:
@@ -336,3 +340,83 @@ def test_segment_end_to_end_returns_geojson():
                 assert "coordinates" in feature["geometry"]
                 assert feature["properties"]["confidence"] >= 0.0
                 assert feature["properties"]["confidence"] <= 1.0
+
+
+# ── Boundary-value tests for validation helpers ────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"min_lon": -180.0, "min_lat": -90.0, "max_lon": 180.0, "max_lat": 90.0},
+        {"min_lon": 0.0, "min_lat": 0.0, "max_lon": 180.0, "max_lat": 90.0},
+        {"min_lon": -180.0, "min_lat": -90.0, "max_lon": 0.0, "max_lat": 0.0},
+    ],
+    ids=["full-world", "origin-to-max", "min-to-origin"],
+)
+def test_segment_accepts_valid_bbox_boundaries(params):
+    """Exact boundary values (-180/180, -90/90) must pass validation.
+    The request still fails 503 (model not loaded), which proves the
+    bbox was accepted."""
+    resp = _post(
+        headers=AUTH,
+        params=params,
+        files={"tile": ("t.tif", b"x", "image/tiff")},
+    )
+    assert resp.status_code == 503
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"min_lon": 0.0, "min_lat": 0.0, "max_lon": 0.0, "max_lat": 1.0},
+        {"min_lon": 0.0, "min_lat": 0.0, "max_lon": 1.0, "max_lat": 0.0},
+    ],
+    ids=["equal-lon", "equal-lat"],
+)
+def test_segment_rejects_equal_bbox_boundaries(params):
+    """min >= max on either axis must be rejected (the source uses >=, not >)."""
+    resp = _post(
+        headers=AUTH,
+        params=params,
+        files={"tile": ("t.tif", b"x", "image/tiff")},
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "threshold",
+    [0.0, 0.5, 1.0],
+    ids=["zero", "default", "one"],
+)
+def test_segment_accepts_valid_threshold_boundaries(threshold):
+    """0.0 and 1.0 are inclusive boundaries and must pass validation."""
+    resp = _post(
+        headers=AUTH,
+        params={**BBOX, "threshold": threshold},
+        files={"tile": ("t.tif", b"x", "image/tiff")},
+    )
+    assert resp.status_code == 503
+
+
+@pytest.mark.parametrize(
+    "threshold",
+    [-0.001, 1.001],
+    ids=["just-below-zero", "just-above-one"],
+)
+def test_segment_rejects_threshold_out_of_boundaries(threshold):
+    resp = _post(
+        headers=AUTH,
+        params={**BBOX, "threshold": threshold},
+        files={"tile": ("t.tif", b"x", "image/tiff")},
+    )
+    assert resp.status_code == 422
+
+
+def test_none_token_fails_closed(monkeypatch):
+    """When INTERNAL_TOKEN is None (env var unset), all requests are rejected.
+    Distinct from the empty-string case: the source checks `not INTERNAL_TOKEN`
+    which must handle both falsy values identically."""
+    monkeypatch.setattr(roads, "INTERNAL_TOKEN", None)
+    assert _post(headers={"X-Internal-Token": AUTH_TOKEN}).status_code == 401
+    assert _post().status_code == 401

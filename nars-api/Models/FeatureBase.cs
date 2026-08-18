@@ -9,7 +9,7 @@ public abstract class FeatureBase
     [Column("user_id"), ForeignKey(nameof(User))] public Guid UserId { get; set; }
     [Column("layer"), MaxLength(50), Required] public string Layer { get; set; } = string.Empty;
     [Column("label"), MaxLength(500), Required] public string Label { get; set; } = string.Empty;
-    [Column("data", TypeName = "jsonb"), Required] public string Data { get; set; } = string.Empty;
+    [Column("data", TypeName = "jsonb"), Required, MaxLength(1048576)] public string Data { get; set; } = string.Empty;
     [Column("created_at")] public DateTime CreatedAt { get; set; }
     [Column("updated_at")] public DateTime? UpdatedAt { get; set; }
     [Timestamp] public uint Version { get; set; }

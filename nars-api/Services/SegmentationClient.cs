@@ -57,7 +57,11 @@ public sealed class SegmentationClient : ISegmentationClient
 
         if (!response.IsSuccessStatusCode)
         {
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            const int maxErrorBodyLength = 4096;
+            using var reader = new StreamReader(await response.Content.ReadAsStreamAsync(cancellationToken));
+            var buffer = new char[maxErrorBodyLength];
+            var read = await reader.ReadAsync(buffer, cancellationToken);
+            var body = new string(buffer, 0, read);
             _logger.LogError(
                 "Segmentation request failed with {StatusCode}: {Body}",
                 response.StatusCode, body);

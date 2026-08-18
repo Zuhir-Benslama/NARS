@@ -44,7 +44,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var bgQueueMock = Mock.Of<IBackgroundTaskQueue>();
         var ctrl = new FeaturesController(
-            new FeatureService(_db, bgQueueMock, Mock.Of<ILogger<FeatureService>>()),
+            new FeatureService(_db, bgQueueMock, Mock.Of<IFeatureCleanupService>(), Mock.Of<ILogger<FeatureService>>()),
             Options.Create(new FeatureDefaultsOptions()),
             timeProvider,
             new FeatureStatsService(_fixture.CreateDbContextFactory()),
@@ -163,7 +163,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         // Extract the ID from the response
         var saveOk = Assert.IsType<ObjectResult>(saveResult);
         Assert.Equal(201, saveOk.StatusCode);
-        var saveResponse = Assert.IsType<SaveFeatureResponse>(saveOk.Value);
+        var saveResponse = Assert.IsType<CreateResponse>(saveOk.Value);
         var featureId = Guid.Parse(saveResponse.Id);
 
         // Delete it
@@ -200,7 +200,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(data)).RootElement));
         var saveOk = Assert.IsType<ObjectResult>(saveResult);
         Assert.Equal(201, saveOk.StatusCode);
-        var saveResponse = Assert.IsType<SaveFeatureResponse>(saveOk.Value);
+        var saveResponse = Assert.IsType<CreateResponse>(saveOk.Value);
         var roadId = Guid.Parse(saveResponse.Id);
 
         // Attach a house entrance owned by that road.
@@ -255,7 +255,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(data)).RootElement));
 
         var saveOk = Assert.IsType<ObjectResult>(saveResult);
-        var saveResponse = Assert.IsType<SaveFeatureResponse>(saveOk.Value);
+        var saveResponse = Assert.IsType<CreateResponse>(saveOk.Value);
         var featureId = Guid.Parse(saveResponse.Id);
 
         // Update the label
@@ -298,7 +298,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
             Data: System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(data)).RootElement));
 
         var saveOk = Assert.IsType<ObjectResult>(saveResult);
-        var saveResponse = Assert.IsType<SaveFeatureResponse>(saveOk.Value);
+        var saveResponse = Assert.IsType<CreateResponse>(saveOk.Value);
         var featureId = Guid.Parse(saveResponse.Id);
 
         var updateResult = await controller.UpdateFeature(featureId, new FeatureUpdateRequest(Label: "Road After", Data: null));

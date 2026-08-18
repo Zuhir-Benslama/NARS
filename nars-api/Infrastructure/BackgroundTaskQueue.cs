@@ -28,7 +28,7 @@ public class BackgroundTaskQueue : IBackgroundTaskQueue
         _queue = Channel.CreateBounded<Func<IServiceProvider, CancellationToken, Task>>(channelOptions);
     }
 
-    public ValueTask QueueBackgroundWorkItemAsync(Func<IServiceProvider, CancellationToken, Task> workItem)
+    public ValueTask<bool> QueueBackgroundWorkItemAsync(Func<IServiceProvider, CancellationToken, Task> workItem)
     {
         ArgumentNullException.ThrowIfNull(workItem);
 
@@ -38,9 +38,10 @@ public class BackgroundTaskQueue : IBackgroundTaskQueue
         if (!_queue.Writer.TryWrite(workItem))
         {
             _logger.LogWarning("Background task queue is full — work item was dropped.");
+            return ValueTask.FromResult(false);
         }
 
-        return ValueTask.CompletedTask;
+        return ValueTask.FromResult(true);
     }
 
     public async ValueTask<Func<IServiceProvider, CancellationToken, Task>> DequeueAsync(CancellationToken ct)

@@ -10,6 +10,7 @@ namespace NarsApi.Services;
 public sealed class UserAuthorizationService(
     AppDbContext db,
     IRefreshTokenService refreshService,
+    IFeatureCleanupService cleanupService,
     IDateTimeProvider timeProvider) : IUserAuthorizationService
 {
     // Stable dummy hash so BCrypt always does the full work, even for unknown users.
@@ -342,7 +343,7 @@ public sealed class UserAuthorizationService(
         // and feature_registry entries are removed explicitly. Refresh tokens,
         // inspections, and error logs are cleaned up by the ON DELETE CASCADE
         // relationships declared in AppDbContext.
-        await FeatureTypeRegistry.DeleteAllFeaturesForUserAsync(db, userId, ct);
+        await cleanupService.DeleteAllFeaturesForUserAsync(db, userId, ct);
 
         db.Users.Remove(user);
         await db.SaveChangesAsync(ct);
