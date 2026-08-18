@@ -34,12 +34,12 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
             GROUP BY d.wilaya_id
         )
         SELECT
-            w.wilaya_id, w.wilaya_fr, w.wilaya_ar,
-            a.id AS admin_id, a.username AS admin_username,
-            a.name AS admin_name, a.email AS admin_email, a.role AS admin_role,
-            COALESCE(s.daira_count, 0) AS daira_count,
-            COALESCE(s.commune_count, 0) AS commune_count,
-            COALESCE(s.commune_user_count, 0) AS commune_user_count
+            w.wilaya_id AS "WilayaId", w.wilaya_fr AS "WilayaFr", w.wilaya_ar AS "WilayaAr",
+            a.id AS "AdminId", a.username AS "AdminUsername",
+            a.name AS "AdminName", a.email AS "AdminEmail", a.role AS "AdminRole",
+            COALESCE(s.daira_count, 0) AS "DairaCount",
+            COALESCE(s.commune_count, 0) AS "CommuneCount",
+            COALESCE(s.commune_user_count, 0) AS "CommuneUserCount"
         FROM wilayas w
         LEFT JOIN admin_cte a ON a.wilaya_id = w.wilaya_id
         LEFT JOIN stats_cte s ON s.wilaya_id = w.wilaya_id

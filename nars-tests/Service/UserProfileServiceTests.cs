@@ -24,6 +24,7 @@ public class UserProfileServiceTests(NarsDatabaseFixture fixture) : IAsyncLifeti
     public async Task InitializeAsync()
     {
         _db = _fixture.CreateDbContext();
+        await SeedData.SeedBasicLocationsAsync(_db);
         _service = new UserProfileService(_db, Mock.Of<ISecurityStampCache>());
     }
 

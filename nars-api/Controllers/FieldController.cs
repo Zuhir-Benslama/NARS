@@ -141,6 +141,11 @@ public class FieldController(
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> CreateEntranceFromInspection([FromBody] FieldEntranceCreateRequest body, CancellationToken cancellationToken = default)
     {
+        if (body is null)
+        {
+            return Problem(detail: "Request body is required.", statusCode: 400);
+        }
+
         if (!Guid.TryParse(body.RoadId, out var roadId))
         {
             return Problem(detail: "Invalid road_id.", statusCode: 400);

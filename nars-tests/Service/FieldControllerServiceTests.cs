@@ -47,8 +47,8 @@ public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
 
     private async Task<Guid> CreateWorkerAsync()
     {
-        var user = await SeedData.CreateUserAsync(_db, UserRoles.FieldWorker, communeId: 1, name: "Field Worker Integration");
         await SeedData.SeedBasicLocationsAsync(_db);
+        var user = await SeedData.CreateUserAsync(_db, UserRoles.FieldWorker, communeId: 1, name: "Field Worker Integration");
         return user.Id;
     }
 
@@ -134,6 +134,15 @@ public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     public async Task SubmitInspection_WrongCommune_Returns403()
     {
         var controller = CreateController();
+
+        // Seed a second commune so the road owner can be in a different one
+        if (!await _db.Communes.AnyAsync(c => c.CommuneId == 2))
+        {
+            _db.Dairas.Add(new Daira { DairaId = 2, WilayaId = 1, DairaFr = "Bir Mourad Raïs", DairaAr = "بئر مراد رايس", DairaLatitude = 36.74, DairaLongitude = 3.05 });
+            _db.Communes.Add(new Commune { CommuneId = 2, DairaId = 2, CommuneCode = 1002, CommuneFr = "Bir Mourad Raïs Centre", CommuneAr = "بئر مراد رايس الوسطى", CommuneLatitude = 36.74, CommuneLongitude = 3.05 });
+            await _db.SaveChangesAsync();
+        }
+
         // Create a user in a different commune
         var otherOwnerId = Guid.NewGuid();
         await _db.Users.AddAsync(new User
@@ -146,7 +155,7 @@ public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
             SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.CommuneUser,
-            CommuneId = 99,
+            CommuneId = 2,
         });
 
         var roadId = Guid.NewGuid();

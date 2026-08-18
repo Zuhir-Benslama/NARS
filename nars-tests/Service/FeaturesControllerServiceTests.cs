@@ -44,7 +44,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var bgQueueMock = Mock.Of<IBackgroundTaskQueue>();
         var ctrl = new FeaturesController(
-            new FeatureService(_db, bgQueueMock, Mock.Of<IFeatureCleanupService>(), Mock.Of<ILogger<FeatureService>>()),
+            new FeatureService(_db, bgQueueMock, new FeatureCleanupService(), Mock.Of<ILogger<FeatureService>>()),
             Options.Create(new FeatureDefaultsOptions()),
             timeProvider,
             new FeatureStatsService(_fixture.CreateDbContextFactory()),
@@ -311,8 +311,8 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
 
     private async Task<Guid> CreateUserAsync()
     {
-        var user = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: 1, name: "Features Test User");
         await SeedData.SeedBasicLocationsAsync(_db);
+        var user = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: 1, name: "Features Test User");
         return user.Id;
     }
 

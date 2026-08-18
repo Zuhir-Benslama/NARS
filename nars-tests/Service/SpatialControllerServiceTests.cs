@@ -48,8 +48,8 @@ public class SpatialControllerServiceTests(NarsDatabaseFixture fixture) : IAsync
 
     private async Task<Guid> CreateUserAsync()
     {
-        var user = await SeedData.CreateUserAsync(_db, UserRoles.FieldWorker, communeId: 1, name: "Spatial Test User");
         await SeedData.SeedBasicLocationsAsync(_db);
+        var user = await SeedData.CreateUserAsync(_db, UserRoles.FieldWorker, communeId: 1, name: "Spatial Test User");
         return user.Id;
     }
 

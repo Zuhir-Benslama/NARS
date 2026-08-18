@@ -20,6 +20,7 @@ public class FeatureStatsServiceTests(NarsDatabaseFixture fixture) : IAsyncLifet
     public async Task InitializeAsync()
     {
         _db = _fixture.CreateDbContext();
+        await SeedData.SeedBasicLocationsAsync(_db);
         _userId1 = Guid.NewGuid();
         _userId2 = Guid.NewGuid();
 
