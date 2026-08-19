@@ -46,7 +46,7 @@ jobs:
   infra-lint:
     name: Infra — Shell, Docker, YAML, Python, Node & Makefile Lint
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
