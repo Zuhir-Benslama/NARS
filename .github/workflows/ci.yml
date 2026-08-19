@@ -16,6 +16,7 @@ jobs:
   backend-lint:
     name: Backend — Build & Test
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -45,6 +46,7 @@ jobs:
   infra-lint:
     name: Infra — Shell, Docker, YAML, Python, Node & Makefile Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 
@@ -81,6 +83,7 @@ jobs:
   security-scan:
     name: Security — Gitleaks + Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
@@ -98,6 +101,7 @@ jobs:
   integration-tests:
     name: Backend — Service Tests (Postgres)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -130,6 +134,7 @@ jobs:
   roads-test:
     name: Roads — Segmentation Service Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -139,6 +144,7 @@ jobs:
   frontend-lint:
     name: Frontend — Typecheck, Lint & Test
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: nars-web
@@ -180,6 +186,7 @@ jobs:
   docker-build:
     name: Build & Push Docker Images
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs:
       - backend-lint
       - roads-test
