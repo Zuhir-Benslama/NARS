@@ -29,7 +29,7 @@ def mask_to_linestrings(
     from skimage.morphology import remove_small_objects, skeletonize
 
     binary = prob_mask > threshold
-    binary = remove_small_objects(binary, min_size=MIN_ROAD_COMPONENT_PX)
+    binary = remove_small_objects(binary, max_size=MIN_ROAD_COMPONENT_PX - 1)
     if not binary.any():
         return []
 
@@ -77,11 +77,11 @@ def mask_to_polygons(
     prob_mask: np.ndarray, transform: rasterio.Affine, threshold: float = 0.5
 ) -> list[Feature]:
     from skimage.measure import find_contours, label
-    from skimage.morphology import binary_closing, remove_small_objects
+    from skimage.morphology import closing, remove_small_objects
 
     binary = prob_mask > threshold
-    binary = binary_closing(binary)
-    binary = remove_small_objects(binary, min_size=MIN_BUILDING_COMPONENT_PX)
+    binary = closing(binary)
+    binary = remove_small_objects(binary, max_size=MIN_BUILDING_COMPONENT_PX - 1)
     if not binary.any():
         return []
 
