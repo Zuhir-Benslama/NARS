@@ -24,6 +24,7 @@ public static class PipelineExtensions
         var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
 
         LogJwtWarning(startupLogger, logJwtWarning);
+        LogCorsOriginWarning(app.Services, startupLogger);
         await VerifyDatabaseConnectionAsync(app, startupLogger);
         UseExceptionHandling(app);
         // Security headers must run before static files so /index.html, /login.html
@@ -43,6 +44,18 @@ public static class PipelineExtensions
         if (logJwtWarning)
         {
             logger.LogWarning("JWT Issuer/Audience validation is disabled. Set Jwt:Issuer and Jwt:Audience for defense-in-depth.");
+        }
+    }
+
+    private static void LogCorsOriginWarning(IServiceProvider services, ILogger<Program> logger)
+    {
+        var warning = services.GetService<CorsOriginWarning>();
+        if (warning is not null)
+        {
+            logger.LogWarning(
+                "[Security] CORS:AllowedOrigins contains only localhost origins in {Environment} environment. " +
+                "Set Cors:AllowedOrigins to the actual production domain(s).",
+                warning.EnvironmentName);
         }
     }
 

@@ -4,23 +4,29 @@
 classDiagram
     %% ===== TYPES =====
     class FeatureData {
-        +string type
+        +FeatureTypeKey type
         +string label
-        +string decisionNumber
-        +string decisionDate
-        +LatLng[] coordinates
-        +number lat
-        +number lng
-        +number radius
-        +string areaTypeKey
-        +string districtTypeKey
-        +string roadTypeKey
-        +string roadDbId
-        +string side
-        +number entranceNumber
-        +string sectorKey
-        +string buildingTypeKey
-        +string geometry
+        +string? decisionNumber
+        +string? decisionDate
+        +LatLng[]? coordinates
+        +number? lat
+        +number? lng
+        +number? radius
+        +string? areaTypeKey
+        +string? districtTypeKey
+        +string? roadTypeKey
+        +string? roadDbId
+        +string? roadLabel
+        +left | right? side
+        +number? entranceNumber
+        +string? mainEntranceDbId
+        +string? mainEntranceLabel
+        +number? bisNumber
+        +string? entranceTypeKey
+        +string? spaceTypeKey
+        +string? sectorKey
+        +string? buildingTypeKey
+        +string? geometry
     }
 
     class LayerEntry {
@@ -38,21 +44,21 @@ classDiagram
     }
 
     class UserInfo {
-        +string id
+        +number id
         +string username
         +string name
         +string email
         +string role
-        +CommuneInfo commune
-        +DairaInfo? daira
-        +WilayaInfo? wilaya
+        +LocationInfo commune
+        +LocationInfo? daira
+        +LocationInfo? wilaya
     }
 
     class NarsError {
-        +string code
-        +string context
+        +ErrorCode code
+        +ErrorContext context
         +Date timestamp
-        +Error? cause
+        +unknown? cause
     }
 
     FeatureData o-- LayerEntry
@@ -61,16 +67,19 @@ classDiagram
     class AppStore {
         State
         +number currentPhase
-        +FeatureCounts counts
         +UserInfo? user
-        +string municipalityName
+        +string communeName
         +bool isLoading
         +bool loadError
+        +string? referenceRoadDbId
+        Getters
+        +isAuthenticated
+        +isAdminUser
+        +counts (from LayerStore)
         Actions
         +setUser(UserInfo)
         +setLoading(bool)
-        +updateCounts()
-        +reset()
+        +setCurrentPhase(number)
     }
 
     class ModalStore {
@@ -82,13 +91,11 @@ classDiagram
         +string label
         +string? areaTypeKey
         +string? roadTypeKey
-        +string? entranceTypeKey
-        +RoadOption[] roadOptions
         Actions
-        +openCreate(phaseIndex)
-        +openEdit(dbId)
-        +close()
-        +resetFields()
+        +openCreate(phaseIndex, extras?)
+        +openEdit(phaseIndex, dbId, existing)
+        +close(result?)
+        +patchFields(Partial~ModalState~)
     }
 
     class LayerStore {
@@ -118,8 +125,6 @@ classDiagram
     }
 
     class ValidationModule {
-        +validateRoad(coordinates)
-        +validateDistrict(coordinates, type)
         +checkDistrictCoverage()
         +checkMainUrbanExists()
         +getRoadSide(roadId, lat, lng)
@@ -127,18 +132,29 @@ classDiagram
 
     class ErrorModule {
         +createNetworkError()
-        +createValidationError()
         +createAuthError()
+        +createNotFoundError()
+        +createServerError()
+        +createTimeoutError()
+        +createConflictError()
         +withRetry(fn, maxRetries)
         +logError(error)
     }
 
     class MapContext {
         +Map map
-        +MaplibreGeoman geoman
-        +Record~string, Source~ sources
-        +Record~string, GeoJSON~ cachedGeoJSON
-        +StyleDefinition[] styles
+        +Geoman? geoman
+        +boundariesSource?
+        +scatteredSource?
+        +featuresSource?
+        +endpointsSource?
+        +boundariesGeoJson?
+        +scatteredGeoJson?
+        +Popup? popup
+        +satelliteStyle?
+        +streetStyle?
+        +lightStyle?
+        +darkStyle?
     }
 
     %% ===== MAP MODULES =====
@@ -149,32 +165,27 @@ classDiagram
 
     class DrawEvents {
         +watchDrawType()
-        +handleRightClick()
-        +handleLeftClick()
     }
 
     class DrawComplete {
         +completeDrawingWithGeometry(geometry)
-        -openModal()
-        -saveFeature(data)
     }
 
     class GeomanEvents {
-        +handleGmCreate()
-        +handleGmEditEnd()
-        +handleGmRemove()
     }
 
     class EditMode {
-        +enterEditMode(feature)
-        +commitEdit()
-        +cancelEdit()
+        +enableEditMode(featureId?)
+        +commitEditMode()
+        +cancelEditMode()
     }
 
     class Snapping {
-        +updateSnapTargets()
-        +getNearestSnap(point)
-        +freezeSnap()
+        +enableSnapping()
+        +disableSnapping()
+        +findNearestSnap(point)
+        +resetSnapping()
+        +enableCrosshair()
     }
 
     class PhaseNav {
@@ -184,13 +195,12 @@ classDiagram
     }
 
     class HouseNumbering {
-        +assignNumbers(entrances, road)
-        +projectEntrancesOntoRoad()
+        +setHouseNumbers()
     }
 
     class Undo {
-        +recordDeletion(feature)
-        +restoreLastDeleted()
+        +recordDelete(entry, phaseKey)
+        +undo()
     }
 
     MapInit --> MapContext
@@ -218,10 +228,6 @@ classDiagram
     class UseTheme {
         +theme
         +setTheme(value)
-    }
-
-    class UseApiFetch {
-        +useApiFetch(path, options)
     }
 
     %% ===== COMPONENTS =====
@@ -289,10 +295,6 @@ classDiagram
         Central/Secondary urban
     }
 
-    class RoadAssignmentSelector {
-        Pick road for entrance
-    }
-
     class BuildingTypeSelector {
         Cascading sector->type
     }
@@ -309,6 +311,27 @@ classDiagram
         Commune report list
     }
 
+    class ContextMenu {
+        Right-click context menu
+        Edit / Delete actions
+    }
+
+    class EditSaveButton {
+        Commit/cancel edit button
+    }
+
+    class FieldPanel {
+        Field-worker feature feed
+    }
+
+    class ToastContainer {
+        Toast notifications
+    }
+
+    class ConfirmDialog {
+        Confirmation dialogs
+    }
+
     App --> ProfileMenu
     App --> FeatureModal
     App --> PhaseBar
@@ -316,9 +339,13 @@ classDiagram
     App --> TileControl
     App --> SettingsModal
     App --> AdminDashboard
+    App --> ContextMenu
+    App --> EditSaveButton
+    App --> FieldPanel
+    App --> ToastContainer
+    App --> ConfirmDialog
 
     FeatureModal --> AreaTypeSelector
-    FeatureModal --> RoadAssignmentSelector
     FeatureModal --> BuildingTypeSelector
 
     SettingsModal --> SettingsGeneral
@@ -349,9 +376,8 @@ classDiagram
     }
 
     class Toast {
-        +success(msg)
-        +error(msg)
-        +confirm(msg)
+        +showToast(message, type)
+        +showConfirm(message)
     }
 
     class Config {

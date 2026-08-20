@@ -59,17 +59,8 @@ public abstract class NarsControllerBase(
             : null;
 
     /// <summary>Creates a consistent CookieOptions with secure defaults for auth cookies.</summary>
-#pragma warning disable S2092 // Intentional: Secure is conditional on IsProduction() || IsHttps
-    protected CookieOptions MakeCookieOptions(TimeSpan maxAge) => new()
-    {
-        HttpOnly = true,
-        Secure = environment.IsProduction() || Request.IsHttps,
-        SameSite = SameSiteMode.Lax,
-        MaxAge = maxAge,
-        Path = "/",
-        IsEssential = true,
-    };
-#pragma warning restore S2092
+    protected CookieOptions MakeCookieOptions(TimeSpan maxAge)
+        => CookieHelper.MakeCookieOptions(maxAge, environment.IsProduction() || Request.IsHttps);
 
     /// <summary>Writes the access + refresh auth cookies with consistent secure options.</summary>
     protected void AppendAuthCookies(string accessToken, string refreshToken, TimeSpan accessMaxAge, TimeSpan refreshMaxAge)

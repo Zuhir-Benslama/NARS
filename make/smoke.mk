@@ -7,6 +7,7 @@ SMOKE_BASE_URL ?= http://localhost:$(APP_PORT)
 
 .PHONY: smoke-test
 smoke-test: ## Post-deploy smoke test: verify /health, frontend, and API auth
+	@command -v curl >/dev/null 2>&1 || { echo "✖ curl is not installed (required for smoke tests)"; exit 1; }
 	@echo "→ Running smoke tests against $(SMOKE_BASE_URL)..."
 	@echo ""
 	@failed=0;

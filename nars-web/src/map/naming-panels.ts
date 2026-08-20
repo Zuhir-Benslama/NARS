@@ -193,13 +193,19 @@ export async function generateNamingPanels(): Promise<void> {
     })
 
     for (const panel of pendingPanels) {
-      layerStore.addFeature("namingPanels", panel)
+      if (!panel.dbId.startsWith("local_")) {
+        layerStore.addFeature("namingPanels", panel)
+      }
     }
   }
 
-  // Batch-add so the GeoJSON source is rewritten once instead of once per panel.
-  if (maplibreFeatures.length > 0) {
-    useFeaturesStore().batchAdd(maplibreFeatures)
+  // Batch-add only successfully persisted panels so the GeoJSON source is
+  // rewritten once instead of once per panel.
+  const persistedFeatures = maplibreFeatures.filter(
+    (f) => f.properties.dbId && !f.properties.dbId.startsWith("local_"),
+  )
+  if (persistedFeatures.length > 0) {
+    useFeaturesStore().batchAdd(persistedFeatures)
   }
 }
 

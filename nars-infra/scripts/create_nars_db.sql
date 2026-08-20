@@ -385,7 +385,7 @@ CREATE INDEX IF NOT EXISTS ix_inspections_feature_created
     ON public.inspections (feature_id, created_at DESC);
 
 -- ══════════════════════════════════════════════════════════════════════════════
--- 9.  Error logs (written by NarsApi.LogsController on unhandled exceptions)
+-- 8.  Error logs (written by NarsApi.LogsController on unhandled exceptions)
 -- ══════════════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS public.error_logs
@@ -408,7 +408,7 @@ CREATE TABLE IF NOT EXISTS public.error_logs
 );
 
 -- ══════════════════════════════════════════════════════════════════════════════
--- 10.  Indices for error_logs (admin dashboard queries)
+-- 9.  Indices for error_logs (admin dashboard queries)
 -- ══════════════════════════════════════════════════════════════════════════════
 
 CREATE INDEX IF NOT EXISTS ix_error_logs_created_at ON public.error_logs (created_at);
@@ -416,7 +416,7 @@ CREATE INDEX IF NOT EXISTS ix_error_logs_user_id    ON public.error_logs (user_i
 CREATE INDEX IF NOT EXISTS ix_error_logs_level      ON public.error_logs (level);
 
 -- ══════════════════════════════════════════════════════════════════════════════
--- 11.  AI draft features (segmentation suggestions awaiting human review)
+-- 10.  AI draft features (segmentation suggestions awaiting human review)
 -- ══════════════════════════════════════════════════════════════════════════════
 -- Mirrors nars-infra/migrations/0001_create_ai_draft_features.sql. Draft rows
 -- written by the nars-roads segmentation service are never promoted to the

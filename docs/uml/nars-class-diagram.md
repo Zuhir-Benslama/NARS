@@ -12,6 +12,7 @@ classDiagram
         +string Data
         +DateTime CreatedAt
         +DateTime? UpdatedAt
+        +uint Version
     }
 
     %% ===== CONCRETE FEATURES =====
@@ -137,13 +138,13 @@ classDiagram
     %% ===== SERVICES =====
     class IScatteredAreaService {
         <<interface>>
-        +Task RefreshAsync(Guid userId, int communeId)
-        +LastError
+        +Task~bool~ RefreshAsync(Guid userId, int communeId, CancellationToken)
+        +GetLastError(Guid, int) (DateTimeOffset, string)?
     }
 
     class ScatteredAreaService {
-        +Task RefreshAsync(Guid userId, int communeId)
-        -ComputeScatteredGeometry(int communeId)
+        +Task~bool~ RefreshAsync(Guid userId, int communeId, CancellationToken)
+        +GetLastError(Guid, int) (DateTimeOffset, string)?
     }
 
     IScatteredAreaService <|.. ScatteredAreaService
@@ -155,12 +156,12 @@ classDiagram
 
     class IBackgroundTaskQueue {
         <<interface>>
-        +ValueTask QueueBackgroundWorkItemAsync(workItem)
+        +ValueTask~bool~ QueueBackgroundWorkItemAsync(workItem)
         +ValueTask~Func~ DequeueAsync(CancellationToken)
     }
 
     class BackgroundTaskQueue {
-        +ValueTask QueueBackgroundWorkItemAsync(workItem)
+        +ValueTask~bool~ QueueBackgroundWorkItemAsync(workItem)
         +ValueTask~Func~ DequeueAsync(CancellationToken)
     }
 
@@ -173,7 +174,7 @@ classDiagram
 
     %% ===== INFRASTRUCTURE =====
     class FeatureTypeRegistry {
-        +Register(string, Type, string)
+        <<static>>
         +GetDescriptor(string) FeatureTypeDescriptor
     }
 
@@ -185,22 +186,22 @@ classDiagram
     }
 
     class FeatureQueryHelper {
-        +Task~List~ LoadFeaturesAsync(userId)
-        +Task~PagedResult~ QueryFeaturesAsync(query)
+        <<static>>
+        +LoadAllFeaturesAsync(conn, userId, skip, take, ct)
+        +LoadByLayerAsync(conn, userId, layer, skip, take, ct)
     }
 
     class PasswordValidator {
-        +Validate(string password) bool
+        <<static>>
+        +Validate(string password) string?
     }
 
     class SqlFragments {
         <<static>>
+        +PolygonFromDataTemplate
+        +LineStringFromDataTemplate
         +PolygonFromData
         +LineStringFromData
-    }
-
-    class FeatureDtoConverter {
-        +Convert(FeatureBase entity) object
     }
 
     class UserRoles {
@@ -215,7 +216,6 @@ classDiagram
     ScatteredAreaService --> SqlFragments
     FeatureQueryHelper --> SqlFragments
     FeatureQueryHelper --> FeatureTypeRegistry
-    FeatureDtoConverter --> FeatureTypeRegistry
 
     %% ===== CONTROLLERS =====
     class ControllerBase {
@@ -235,15 +235,24 @@ classDiagram
         +Task SignIn(SignInRequest)
         +Task Logout()
         +Task Refresh()
-        +Task AdminSignup(AuthorizedAdminSignupRequest)
         +Task CurrentUser()
     }
 
+    class AdminSignupController {
+        +Task AdminSignup(AuthorizedAdminSignupRequest)
+    }
+
     class AdminController {
-        +Task GetOverview()
-        +Task GetWilayaReport(int id)
-        +Task GetDairaReport(int id)
-        +Task CreateUser(CreateAdminRequest)
+        +Task Overview(int skip, int take)
+        +Task GetWilaya(int wilayaId)
+        +Task GetDaira(int dairaId)
+    }
+
+    class AdminUserController {
+        +Task CreateManagedUser(CreateAdminRequest)
+        +Task GetManageableUsers()
+        +Task UpdateManagedUser(Guid userId)
+        +Task DeleteManagedUser(Guid userId)
     }
 
     class FeaturesController {
@@ -283,6 +292,24 @@ classDiagram
         +Task UpdateProfile(UpdateUserRequest)
     }
 
+    class FieldController {
+        +Task GetFeatures()
+        +Task Inspect()
+        +Task GetInspections(Guid featureId)
+        +Task CreateEntrance()
+    }
+
+    class DraftFeaturesController {
+        +Task Segment(SegmentationRequest)
+        +Task List()
+        +Task Accept(Guid id)
+        +Task Reject(Guid id)
+    }
+
+    class LogsController {
+        +Task SubmitLog(ClientLogEntry)
+    }
+
     class PagesController {
         +Task Index()
         +Task Login()
@@ -290,16 +317,21 @@ classDiagram
     }
 
     ControllerBase <|-- NarsControllerBase
-    ControllerBase <|-- AuthController
-    ControllerBase <|-- LocationsController
-    ControllerBase <|-- PagesController
 
+    NarsControllerBase <|-- AuthController
+    NarsControllerBase <|-- AdminSignupController
     NarsControllerBase <|-- AdminController
+    NarsControllerBase <|-- AdminUserController
     NarsControllerBase <|-- FeaturesController
     NarsControllerBase <|-- FeatureCatalogController
     NarsControllerBase <|-- ValidationController
     NarsControllerBase <|-- SpatialController
+    NarsControllerBase <|-- LocationsController
     NarsControllerBase <|-- UsersController
+    NarsControllerBase <|-- FieldController
+    NarsControllerBase <|-- DraftFeaturesController
+    NarsControllerBase <|-- LogsController
+    NarsControllerBase <|-- PagesController
 
     AuthController --> JwtService
     AuthController --> AppDbContext
@@ -311,4 +343,5 @@ classDiagram
     ValidationController --> FeatureQueryHelper
     SpatialController --> IScatteredAreaService
     SpatialController --> FeatureQueryHelper
+    DraftFeaturesController --> FeatureTypeRegistry
 ```

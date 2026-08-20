@@ -36,6 +36,11 @@ logger = logging.getLogger("nars-roads.model")
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
+# Threshold for detecting byte-scaled float input. Values in (1.0, this
+# threshold] are treated as sensor noise on a [0,1] raster and clipped;
+# values above this threshold are assumed to be [0,255] and rescaled.
+FLOAT_BYTE_SCALE_THRESHOLD = 2.0
+
 # Hard ceiling on decoded pixels (H x W) per tile. The upload-size cap bounds
 # the compressed bytes, but a highly compressible TIFF can decompress to
 # gigabytes, so we also bound the decoded footprint before allocating the
@@ -132,7 +137,7 @@ class SegmentationModel:
             img = np.nan_to_num(img, nan=0.0, posinf=1.0, neginf=0.0)
             mx = float(img.max())
             if mx > 1.0:
-                if mx > 2.0:
+                if mx > FLOAT_BYTE_SCALE_THRESHOLD:
                     img = img / 255.0
                 img = np.clip(img, 0.0, 1.0)
         else:

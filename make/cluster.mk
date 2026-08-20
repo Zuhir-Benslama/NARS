@@ -63,8 +63,11 @@ cluster-down: proxy-down _pre-cluster-down-backup ## Delete the kind cluster (au
 	@docker rm -f kube-proxy 2>/dev/null || true
 	@echo "✓ Cluster deleted (postgis data preserved at $(POSTGRES_DATA_DIR))"
 
-# Shared pg_dump + gzip logic. Expects $$POD and $$PASS to be set in shell scope;
-# $$PREFIX (optional) disambiguates the output filename so two backups taken in
+# Shared pg_dump + gzip logic.
+# REQUIRED shell variables (must be set before expansion):
+#   $$POD  — postgis pod name (from POSTGIS_GET_POD_CMD)
+#   $$PASS — postgres password (from k8s secret)
+#   $$PREFIX (optional) — disambiguates the output filename so two backups taken in
 # the same second can never overwrite each other (manual_ vs auto_). The
 # nanosecond timestamp (%N) additionally makes same-second runs of the same
 # target unique, so `make db-backup` twice in a row can never clobber an

@@ -159,7 +159,7 @@ public static class FeatureQueryHelper
                 Layer: layerVal,
                 Label: label,
                 Data: data,
-                CreatedAt: createdAt.ToString(FeatureDtoConverter.IsoDateFormat)
+                CreatedAt: createdAt.ToString(JsonHelper.IsoDateFormat)
             ));
         }
 

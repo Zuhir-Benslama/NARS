@@ -165,8 +165,7 @@ export async function undo(): Promise<void> {
       const style = getDefaultStyle(phase?.color ?? "#8e44ad")
 
       const geometry = entryDataToGeometry(entry.data, entry.type)
-      const featuresStore = useFeaturesStore()
-      featuresStore.add({
+      useFeaturesStore().add({
         id: newId,
         geometry,
         properties: {

@@ -319,13 +319,14 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
             Mock.Of<ILogger<JwtService>>(),
             timeProvider);
         var refreshService = new RefreshTokenService(db, jwt, jwtOpts, Mock.Of<ISecurityStampCache>(), timeProvider);
+        var authSvc = new UserAuthorizationService(db, refreshService, Mock.Of<IFeatureCleanupService>(), timeProvider);
         return new AdminSignupController(
             refreshService,
             Options.Create(new AccountLockoutOptions()),
             Options.Create(new AdminSignupOptions { SignupToken = TestData.AdminSignupToken }),
             Mock.Of<ILogger<AdminSignupController>>(),
-            new UserAuthorizationService(db, refreshService, Mock.Of<IFeatureCleanupService>(), timeProvider),
-            new UserCreationService(db, new UserAuthorizationService(db, refreshService, Mock.Of<IFeatureCleanupService>(), timeProvider), Mock.Of<ILogger<UserCreationService>>()),
+            authSvc,
+            new UserCreationService(db, authSvc, Mock.Of<ILogger<UserCreationService>>()),
             Mock.Of<IWebHostEnvironment>());
     }
 
@@ -353,7 +354,6 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
         await _db.SaveChangesAsync();
         return user;
     }
-
 
     private static DefaultHttpContext CreateHttpContext(List<Claim> claims)
     {

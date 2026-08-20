@@ -66,7 +66,7 @@ describe("generateNamingPanels", () => {
     expect(panel.dbId).toBe("db-panel-1")
   })
 
-  it("keeps a panel local-only when persistence fails", async () => {
+  it("excludes panels from store when persistence fails", async () => {
     mockApiFetch.mockResolvedValue({ ok: false, status: 500, json: vi.fn().mockResolvedValue({}) })
     const store = useLayerStore()
     store.addFeature(
@@ -80,9 +80,8 @@ describe("generateNamingPanels", () => {
 
     await generateNamingPanels()
 
-    expect(mockBatchAdd).toHaveBeenCalledTimes(1)
-    expect(store.$state.namingPanels).toHaveLength(3)
-    expect(store.$state.namingPanels[0].dbId).toMatch(/^local_/)
+    expect(mockBatchAdd).not.toHaveBeenCalled()
+    expect(store.$state.namingPanels).toHaveLength(0)
   })
 
   it("batches all generated panels into a single setData", async () => {

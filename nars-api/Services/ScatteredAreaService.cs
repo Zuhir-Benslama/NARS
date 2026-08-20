@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Data;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using NarsApi.Data;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
@@ -11,28 +11,34 @@ namespace NarsApi.Services;
 public sealed class ScatteredAreaService(
     IDbContextFactory<AppDbContext> dbFactory,
     IDateTimeProvider timeProvider,
+    IMemoryCache cache,
     ILogger<ScatteredAreaService> logger)
     : IScatteredAreaService
 {
     private const string DefaultLabel = "Scattered Area";
     private const string GenericErrorMessage = "An error occurred during scattered area recomputation.";
 
-    // Upper bound on retained error entries. Entries are only removed when the
-    // same (user, commune) refreshes again, so without a cap a long-running
-    // process would accumulate one entry per never-retried failure forever.
-    private const int MaxErrorEntries = 1000;
+    // TTL-based cache entries per (user, commune). Entries auto-expire after 1
+    // hour instead of accumulating forever, bounded by IMemoryCache's internal
+    // size limit and the sliding expiration.
+    private static readonly TimeSpan ErrorCacheDuration = TimeSpan.FromHours(1);
 
-    // Error state keyed per (user, commune) so one account's failure is never
-    // surfaced to another. Only a generic message is stored; the real exception
-    // goes to the logger.
-    private readonly ConcurrentDictionary<(Guid UserId, int CommuneId), (DateTimeOffset Timestamp, string Message)> _lastErrors = new();
+    private static string ErrorCacheKey(Guid userId, int communeId) => $"scattered-error:{userId}:{communeId}";
+
+    private sealed record ErrorEntry(DateTimeOffset Timestamp, string Message);
 
     public (DateTimeOffset Timestamp, string Message)? GetLastError(Guid userId, int communeId)
-        => _lastErrors.TryGetValue((userId, communeId), out var error) ? error : null;
+    {
+        if (cache.TryGetValue<ErrorEntry>(ErrorCacheKey(userId, communeId), out var entry) && entry is not null)
+        {
+            return (entry.Timestamp, entry.Message);
+        }
+        return null;
+    }
 
     public async Task<bool> RefreshAsync(Guid userId, int communeId, CancellationToken cancellationToken = default)
     {
-        _lastErrors.TryRemove((userId, communeId), out _);
+        cache.Remove(ErrorCacheKey(userId, communeId));
 
         try
         {
@@ -121,7 +127,8 @@ public sealed class ScatteredAreaService(
             await tx.CommitAsync(cancellationToken);
             return true;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException
+            and not OutOfMemoryException and not StackOverflowException)
         {
             RecordError(userId, communeId);
 
@@ -132,20 +139,13 @@ public sealed class ScatteredAreaService(
 
     private void RecordError(Guid userId, int communeId)
     {
-        _lastErrors[(userId, communeId)] = (timeProvider.UtcNow, GenericErrorMessage);
-
-        if (_lastErrors.Count <= MaxErrorEntries)
-        {
-            return;
-        }
-
-        // Evict the oldest error entries so the dictionary stays bounded.
-        foreach (var kvp in _lastErrors
-                     .OrderBy(kvp => kvp.Value.Timestamp)
-                     .Take(_lastErrors.Count - MaxErrorEntries))
-        {
-            _lastErrors.TryRemove(kvp.Key, out _);
-        }
+        cache.Set(
+            ErrorCacheKey(userId, communeId),
+            new ErrorEntry(timeProvider.UtcNow, GenericErrorMessage),
+            new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = ErrorCacheDuration,
+            });
     }
 
     /// <summary>

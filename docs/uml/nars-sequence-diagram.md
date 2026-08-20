@@ -117,34 +117,34 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor Admin
-    participant AuthController
+    participant AdminSignupController
     participant AppDbContext
     participant PasswordValidator
     participant UserRoles
 
-    Admin->>AuthController: POST /api/admin/authorized-signup
-    Note over AuthController: Requires JWT authentication
+    Admin->>AdminSignupController: POST /api/admin/authorized-signup
+    Note over AdminSignupController: Requires JWT authentication
 
-    AuthController->>AuthController: Get current user role/scope
-    Admin->>AuthController: CreateAdminRequest {role, name, email, ...}
+    AdminSignupController->>AdminSignupController: Get current user role/scope
+    Admin->>AdminSignupController: CreateAdminRequest {role, name, email, ...}
 
-    AuthController->>AuthController: Validate hierarchy
-    Note over AuthController: national_admin -> wilaya_admin<br/>wilaya_admin -> daira_admin<br/>daira_admin -> commune_user
+    AdminSignupController->>AdminSignupController: Validate hierarchy
+    Note over AdminSignupController: national_admin -> wilaya_admin<br/>wilaya_admin -> daira_admin<br/>daira_admin -> commune_user
 
     alt Invalid hierarchy
-        AuthController-->>Admin: 403 Forbidden
+        AdminSignupController-->>Admin: 403 Forbidden
     else Email already exists
-        AuthController-->>Admin: 409 Conflict
+        AdminSignupController-->>Admin: 409 Conflict
     else Scope mismatch
-        AuthController-->>Admin: 403 Forbidden
+        AdminSignupController-->>Admin: 403 Forbidden
     else Valid
-        AuthController->>PasswordValidator: Validate(password)
+        AdminSignupController->>PasswordValidator: Validate(password)
         alt Weak password
-            AuthController-->>Admin: 400 Bad Request
+            AdminSignupController-->>Admin: 400 Bad Request
         else Strong password
-            AuthController->>AppDbContext: Create user with BCrypt hash
-            AuthController->>AppDbContext: SaveChangesAsync()
-            AuthController-->>Admin: 200 OK {user}
+            AdminSignupController->>AppDbContext: Create user with BCrypt hash
+            AdminSignupController->>AppDbContext: SaveChangesAsync()
+            AdminSignupController-->>Admin: 200 OK {user}
         end
     end
 ```

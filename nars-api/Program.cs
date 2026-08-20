@@ -73,6 +73,14 @@ if (builder.Environment.IsProduction() && (string.IsNullOrEmpty(jwtIssuer) || st
 
 var logJwtWarning = string.IsNullOrEmpty(jwtIssuer) || string.IsNullOrEmpty(jwtAudience);
 
+var segmentationToken = builder.Configuration["Segmentation:InternalToken"];
+if (builder.Environment.IsProduction() && string.IsNullOrEmpty(segmentationToken))
+{
+    throw new InvalidOperationException(
+        "Segmentation:InternalToken is not configured in production. " +
+        "Set the NARS_ROADS_INTERNAL_TOKEN environment variable or configure Segmentation:InternalToken in appsettings.Production.json.");
+}
+
 // ── Register all services ─────────────────────────────────────
 builder.Services.AddNarsServices(builder.Configuration, connStr!, jwtSecret, jwtIssuer, jwtAudience, builder.Environment);
 

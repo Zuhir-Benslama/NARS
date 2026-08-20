@@ -6,6 +6,9 @@ namespace NarsApi.Infrastructure;
 
 public static class JsonHelper
 {
+    /// <summary>ISO 8601 round-trip format string for date/time serialization.</summary>
+    internal const string IsoDateFormat = "o";
+
     public static JsonNode? DeserializeSafe(string json, ILogger? logger = null)
     {
         try { return JsonSerializer.Deserialize<JsonNode>(json); }

@@ -95,7 +95,7 @@ public class SpatialController(
             ? null
             : scatteredService.GetLastError(RequiredCurrentUserId, communeId.Value);
         return Ok(new ScatteredStatusResponse(
-            LastErrorTime: error?.Timestamp.ToString(FeatureDtoConverter.IsoDateFormat),
+            LastErrorTime: error?.Timestamp.ToString(JsonHelper.IsoDateFormat),
             LastErrorMessage: error.HasValue ? "An error occurred during computation." : null,
             HasError: error.HasValue
         ));

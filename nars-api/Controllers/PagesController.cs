@@ -97,6 +97,7 @@ public class PagesController(
     private async Task<string> LoadPageTemplateAsync(string cacheKey, string fileName, CancellationToken cancellationToken)
     {
         var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", fileName);
+        // Dev: read from disk on every request for hot-reload (no caching).
         if (env.IsDevelopment())
         {
             return await System.IO.File.ReadAllTextAsync(path, cancellationToken);

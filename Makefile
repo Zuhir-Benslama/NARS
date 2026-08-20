@@ -70,7 +70,7 @@ fi
 	echo "GRAFANA_PASSWORD=$$(_RND 12)" >> $@;
 	echo "NARS_ADMIN_SIGNUP_TOKEN=$$(_RND 32)" >> $@;
 	echo "NARS_ROADS_INTERNAL_TOKEN=$$(_RND 32)" >> $@;
-	echo "NARS_ROADS_WEIGHTS_URL=https://hf.co/nilsho01/unet-resnet34-vhr-buildings/resolve/main/unet_bldg_base.pth" >> $@;
+	echo "NARS_ROADS_WEIGHTS_URL=$${NARS_ROADS_WEIGHTS_URL:-https://hf.co/nilsho01/unet-resnet34-vhr-buildings/resolve/main/unet_bldg_base.pth}" >> $@;
 	chmod 600 $@;
 	echo "→ Created $@ with fresh secrets (permissions: 600)"
 

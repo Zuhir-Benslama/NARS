@@ -177,7 +177,7 @@ sequenceDiagram
         User->>ContextMenu: Confirm
         ContextMenu->>ApiModule: DELETE /api/features/{id}
         ApiModule-->>ContextMenu: 200 OK
-        ContextMenu->>Undo: recordDeletion(feature)
+        ContextMenu->>Undo: recordDelete(entry, phaseKey)
         ContextMenu->>LayerStore: removeFeature(dbId)
         LayerStore->>MapContext: Remove from GeoJSON
         MapContext-->>User: Feature removed

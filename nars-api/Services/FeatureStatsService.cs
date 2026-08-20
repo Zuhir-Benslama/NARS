@@ -29,8 +29,8 @@ public sealed class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactor
         var paramIndex = 0;
         foreach (var type in _featureTypes)
         {
-            cmd.Parameters.AddWithValue($"t{paramIndex}", type);
-            cmd.Parameters.AddWithValue($"u{paramIndex}", userId);
+            cmd.Parameters.Add(new NpgsqlParameter<string>($"t{paramIndex}", type));
+            cmd.Parameters.Add(new NpgsqlParameter<Guid>($"u{paramIndex}", userId));
             paramIndex++;
         }
 
@@ -67,8 +67,8 @@ public sealed class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactor
         var paramIndex = 0;
         foreach (var type in _featureTypes)
         {
-            cmd.Parameters.AddWithValue($"tp{paramIndex}", type);
-            cmd.Parameters.AddWithValue($"u{paramIndex}", userIds);
+            cmd.Parameters.Add(new NpgsqlParameter<string>($"tp{paramIndex}", type));
+            cmd.Parameters.Add(new NpgsqlParameter<Guid[]>($"u{paramIndex}", userIds));
             paramIndex++;
         }
 

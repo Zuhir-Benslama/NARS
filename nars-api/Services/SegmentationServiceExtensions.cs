@@ -25,7 +25,8 @@ public static class SegmentationServiceExtensions
             }
 
             client.Timeout = TimeSpan.FromSeconds(60); // large tiles + CPU inference can be slow
-        });
+        })
+        .AddStandardResilienceHandler();
 
         return services;
     }

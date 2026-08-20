@@ -79,6 +79,13 @@ public static class GeometryHelper
     }
 
     /// <summary>
+    /// Upper bound for entrance numbers. Preserves parity: odd numbers for left
+    /// side, even for right. Beyond this limit, the opposite parity series would
+    /// collide if numbers wrapped around.
+    /// </summary>
+    private const int MaxEntranceNumber = 100_000;
+
+    /// <summary>
     /// Suggests the next available entrance number (odd for left, even for right).
     /// Parity is preserved even past 10,000 so an exhausted series never collides
     /// with the opposite parity (e.g. 10000 must not be reused by the odd series).
@@ -86,7 +93,7 @@ public static class GeometryHelper
     public static int SuggestEntranceNumber(string side, HashSet<int> usedNumbers)
     {
         var suggested = side == "left" ? 1 : 2;
-        while (usedNumbers.Contains(suggested) && suggested < 100_000)
+        while (usedNumbers.Contains(suggested) && suggested < MaxEntranceNumber)
         {
             suggested += 2;
         }

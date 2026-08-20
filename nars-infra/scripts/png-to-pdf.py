@@ -12,7 +12,7 @@ except ImportError:
 
 
 def main() -> None:
-    args = sys.argv[1:]
+    args: list[str] = sys.argv[1:]
     if not args or args[0] in ("-h", "--help"):
         print(f"Usage: {sys.argv[0]} <input-dir>", file=sys.stderr)
         print("Converts all PNG files in <input-dir> to PDF.", file=sys.stderr)

@@ -18,10 +18,12 @@ public class AdminUserControllerTests
 {
     private static AppDbContext CreateDb() => CreateInMemoryDb("AdminUserTest");
 
-    private static AdminUserController CreateController(AppDbContext db) =>
-        new(Mock.Of<ILogger<AdminUserController>>(),
-            new UserAuthorizationService(db, Mock.Of<IRefreshTokenService>(), Mock.Of<IFeatureCleanupService>(), Mock.Of<IDateTimeProvider>()),
-            new UserCreationService(db, new UserAuthorizationService(db, Mock.Of<IRefreshTokenService>(), Mock.Of<IFeatureCleanupService>(), Mock.Of<IDateTimeProvider>()), Mock.Of<ILogger<UserCreationService>>()),
+    private static AdminUserController CreateController(AppDbContext db)
+    {
+        var authSvc = new UserAuthorizationService(db, Mock.Of<IRefreshTokenService>(), Mock.Of<IFeatureCleanupService>(), Mock.Of<IDateTimeProvider>());
+        return new(Mock.Of<ILogger<AdminUserController>>(),
+            authSvc,
+            new UserCreationService(db, authSvc, Mock.Of<ILogger<UserCreationService>>()),
             Mock.Of<IWebHostEnvironment>())
         {
             ControllerContext = new ControllerContext
@@ -29,6 +31,7 @@ public class AdminUserControllerTests
                 HttpContext = new DefaultHttpContext()
             }
         };
+    }
 
     // ─── CreateAdmin ────────────────────────────────────────────────────
 
@@ -65,7 +68,7 @@ public class AdminUserControllerTests
             Email = "existing@test.com",
             Name = "Existing",
             Phone = TestData.DefaultPhone,
-            PasswordHash = "hash",
+            PasswordHash = DummyPasswordHash,
             SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.WilayaAdmin,
             WilayaId = 1,
@@ -146,7 +149,7 @@ public class AdminUserControllerTests
             Email = "wa1@test.com",
             Name = "WA1",
             Phone = TestData.DefaultPhone,
-            PasswordHash = "hash",
+            PasswordHash = DummyPasswordHash,
             SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.WilayaAdmin,
             WilayaId = 1,
@@ -158,7 +161,7 @@ public class AdminUserControllerTests
             Email = "cu1@test.com",
             Name = "CU1",
             Phone = TestData.DefaultPhone,
-            PasswordHash = "hash",
+            PasswordHash = DummyPasswordHash,
             SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.CommuneUser,
             CommuneId = 1,
@@ -188,7 +191,7 @@ public class AdminUserControllerTests
                 Email = "wa1@test.com",
                 Name = "WA1",
                 Phone = TestData.DefaultPhone,
-                PasswordHash = "hash",
+                PasswordHash = DummyPasswordHash,
                 SecurityStamp = User.GenerateSecurityStamp(),
                 Role = UserRoles.WilayaAdmin,
                 WilayaId = 1,
@@ -200,7 +203,7 @@ public class AdminUserControllerTests
                 Email = "wa2@test.com",
                 Name = "WA2",
                 Phone = TestData.DefaultPhone,
-                PasswordHash = "hash",
+                PasswordHash = DummyPasswordHash,
                 SecurityStamp = User.GenerateSecurityStamp(),
                 Role = UserRoles.WilayaAdmin,
                 WilayaId = 1,
@@ -250,7 +253,7 @@ public class AdminUserControllerTests
             Email = "target@test.com",
             Name = "Original",
             Phone = TestData.DefaultPhone,
-            PasswordHash = "hash",
+            PasswordHash = DummyPasswordHash,
             SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.WilayaAdmin,
             WilayaId = 1,
@@ -299,7 +302,7 @@ public class AdminUserControllerTests
             Email = "cu@test.com",
             Name = "Commune User",
             Phone = TestData.DefaultPhone,
-            PasswordHash = "hash",
+            PasswordHash = DummyPasswordHash,
             SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.CommuneUser,
             CommuneId = 5,
@@ -347,7 +350,7 @@ public class AdminUserControllerTests
             Email = "cu@test.com",
             Name = "Commune User",
             Phone = TestData.DefaultPhone,
-            PasswordHash = "hash",
+            PasswordHash = DummyPasswordHash,
             SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.CommuneUser,
             CommuneId = 5,
@@ -394,7 +397,7 @@ public class AdminUserControllerTests
             Email = "fw@test.com",
             Name = "Field Worker",
             Phone = TestData.DefaultPhone,
-            PasswordHash = "hash",
+            PasswordHash = DummyPasswordHash,
             SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.FieldWorker,
             CommuneId = 1,
@@ -429,7 +432,7 @@ public class AdminUserControllerTests
             Email = "caller@test.com",
             Name = "Caller",
             Phone = TestData.DefaultPhone,
-            PasswordHash = "hash",
+            PasswordHash = DummyPasswordHash,
             SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.DairaAdmin,
             DairaId = 1,
@@ -442,7 +445,7 @@ public class AdminUserControllerTests
             Email = "cu@test.com",
             Name = "Commune User",
             Phone = TestData.DefaultPhone,
-            PasswordHash = "hash",
+            PasswordHash = DummyPasswordHash,
             SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.CommuneUser,
             CommuneId = 99,
@@ -474,7 +477,7 @@ public class AdminUserControllerTests
             Email = "caller@test.com",
             Name = "Caller",
             Phone = TestData.DefaultPhone,
-            PasswordHash = "hash",
+            PasswordHash = DummyPasswordHash,
             SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.DairaAdmin,
             DairaId = 1,
@@ -487,7 +490,7 @@ public class AdminUserControllerTests
             Email = "cu@test.com",
             Name = "Commune User",
             Phone = TestData.DefaultPhone,
-            PasswordHash = "hash",
+            PasswordHash = DummyPasswordHash,
             SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.CommuneUser,
             CommuneId = 5,
@@ -540,7 +543,7 @@ public class AdminUserControllerTests
             Email = "national@test.com",
             Name = "National",
             Phone = TestData.DefaultPhone,
-            PasswordHash = "hash",
+            PasswordHash = DummyPasswordHash,
             SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.NationalAdmin,
         });
@@ -568,7 +571,7 @@ public class AdminUserControllerTests
             Email = "caller@test.com",
             Name = "Caller",
             Phone = TestData.DefaultPhone,
-            PasswordHash = "hash",
+            PasswordHash = DummyPasswordHash,
             SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.DairaAdmin,
             DairaId = 1,
@@ -581,7 +584,7 @@ public class AdminUserControllerTests
             Email = "cu@test.com",
             Name = "Commune User",
             Phone = TestData.DefaultPhone,
-            PasswordHash = "hash",
+            PasswordHash = DummyPasswordHash,
             SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.CommuneUser,
             CommuneId = 99,

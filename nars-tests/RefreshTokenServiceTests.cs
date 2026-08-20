@@ -18,6 +18,9 @@ public class RefreshTokenServiceTests
 
     private static AppDbContext CreateDb() => CreateInMemoryDb("RefreshTokenTest");
 
+    private static string HashRefreshToken(string raw) =>
+        Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(raw)));
+
     private static Mock<IJwtService> CreateJwtMock()
     {
         var mock = new Mock<IJwtService>();
@@ -110,9 +113,7 @@ public class RefreshTokenServiceTests
         var db = CreateDb();
         await SeedUserAsync(db);
         const string raw = "valid-refresh-token";
-        var hash = Convert.ToBase64String(
-            System.Security.Cryptography.SHA256.HashData(
-                System.Text.Encoding.UTF8.GetBytes(raw)));
+        var hash = HashRefreshToken(raw);
         db.RefreshTokens.Add(new RefreshToken
         {
             Id = Guid.NewGuid(),
@@ -275,9 +276,7 @@ public class RefreshTokenServiceTests
         {
             await svc.RotateRefreshTokenAsync(raw);
 
-            var hash = Convert.ToBase64String(
-                System.Security.Cryptography.SHA256.HashData(
-                    System.Text.Encoding.UTF8.GetBytes(raw)));
+            var hash = HashRefreshToken(raw);
             var oldToken = await db.RefreshTokens.FirstAsync(rt => rt.TokenHash == hash);
             Assert.True(oldToken.Revoked);
         }
@@ -306,9 +305,7 @@ public class RefreshTokenServiceTests
             await SeedUserAsync(db, uid);
         }
         var raw = $"{(revoked ? "revoked" : "expired")}-token-{Guid.NewGuid():N}";
-        var hash = Convert.ToBase64String(
-            System.Security.Cryptography.SHA256.HashData(
-                System.Text.Encoding.UTF8.GetBytes(raw)));
+        var hash = HashRefreshToken(raw);
         db.RefreshTokens.Add(new RefreshToken
         {
             Id = Guid.NewGuid(),
@@ -409,9 +406,7 @@ public class RefreshTokenServiceTests
             Assert.False(result.Success);
             Assert.Equal("Account is temporarily locked.", result.Detail);
 
-            var hash = Convert.ToBase64String(
-                System.Security.Cryptography.SHA256.HashData(
-                    System.Text.Encoding.UTF8.GetBytes(raw)));
+            var hash = HashRefreshToken(raw);
             var stored = await db.RefreshTokens.FirstAsync(rt => rt.TokenHash == hash);
             Assert.True(stored.Revoked);
             Assert.Equal(0, await db.RefreshTokens.CountAsync(rt => !rt.Revoked));

@@ -20,13 +20,11 @@ public static class CorsCompressionExtensions
             ?? ["http://localhost:5000", "http://localhost:5001",
                 "https://localhost:7000", "https://localhost:7001"];
 
+        // Capture configuration state for post-build validation (avoids
+        // BuildServiceProvider() anti-pattern). Checked in ConfigureNarsPipelineAsync.
         if (!env.IsDevelopment() && allowedOrigins.All(o => o.Contains("localhost", StringComparison.OrdinalIgnoreCase)))
         {
-            var logger = services.BuildServiceProvider().GetRequiredService<ILogger<Program>>();
-            logger.LogWarning(
-                "[Security] CORS:AllowedOrigins contains only localhost origins in {Environment} environment. " +
-                "Set Cors:AllowedOrigins to the actual production domain(s).",
-                env.EnvironmentName);
+            services.AddSingleton(new CorsOriginWarning { EnvironmentName = env.EnvironmentName });
         }
 
         services.AddCors(options =>
@@ -66,4 +64,14 @@ public static class CorsCompressionExtensions
 
         return services;
     }
+}
+
+/// <summary>
+/// Marker type captured during DI registration when CORS origins contain only
+/// localhost in a non-development environment. Logged as a warning once after
+/// the service provider is built (avoids BuildServiceProvider() anti-pattern).
+/// </summary>
+internal sealed class CorsOriginWarning
+{
+    public required string EnvironmentName { get; init; }
 }

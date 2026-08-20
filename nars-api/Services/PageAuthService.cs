@@ -131,15 +131,6 @@ public sealed class PageAuthService(
         return principal;
     }
 
-#pragma warning disable S2092 // Intentional: Secure is conditional on IsProduction() || IsHttps
-    private CookieOptions MakeCookieOptions(TimeSpan maxAge) => new()
-    {
-        HttpOnly = true,
-        Secure = env.IsProduction() || HttpContext.Request.IsHttps,
-        SameSite = SameSiteMode.Lax,
-        MaxAge = maxAge,
-        Path = "/",
-        IsEssential = true,
-    };
-#pragma warning restore S2092
+    private CookieOptions MakeCookieOptions(TimeSpan maxAge)
+        => CookieHelper.MakeCookieOptions(maxAge, env.IsProduction() || HttpContext.Request.IsHttps);
 }

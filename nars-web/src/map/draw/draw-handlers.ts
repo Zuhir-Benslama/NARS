@@ -124,8 +124,7 @@ function findNearestFeatureAtPoint(
         nearestDbId = fDbId
         nearestPhaseKey = fPhaseKey
       }
-    }
-    if (f.geometry.type === "LineString") {
+    } else if (f.geometry.type === "LineString") {
       const coords = f.geometry.coordinates as [number, number][]
       for (let i = 0; i < coords.length - 1; i++) {
         const p1 = map.project([coords[i][0], coords[i][1]])
@@ -137,8 +136,7 @@ function findNearestFeatureAtPoint(
           nearestPhaseKey = fPhaseKey
         }
       }
-    }
-    if (f.geometry.type === "Polygon") {
+    } else if (f.geometry.type === "Polygon") {
       const rings = (f.geometry as GeoJSON.Polygon).coordinates
       for (const ring of rings) {
         for (let i = 0; i < ring.length - 1; i++) {

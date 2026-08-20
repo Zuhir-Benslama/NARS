@@ -10,10 +10,14 @@ from pydantic import BaseModel
 
 
 class FeatureGeometry(BaseModel):
-    """GeoJSON geometry object: a type name plus its coordinates."""
+    """GeoJSON geometry object: a type name plus its coordinates.
+
+    The service produces Polygon and LineString geometries. Coordinates use
+    the nested list structure defined by GeoJSON (RFC 7946): LineStrings
+    have [[lng, lat], ...], Polygons have [[[lng, lat], ...], ...]."""
 
     type: str
-    coordinates: Any
+    coordinates: list[list[float]] | list[list[list[float]]]
 
 
 class Feature(BaseModel):

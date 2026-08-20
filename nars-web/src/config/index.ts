@@ -123,6 +123,16 @@ export const EXPORT_CONFIG = {
   titleBarOffsetMm: 14,
 } as const
 
+// ─── CITY CENTER CONFIGURATION ───────────────────────────────────────────────
+
+export const CITY_CENTER_CONFIG = {
+  /** Minimum allowed radius in meters */
+  minRadiusM: 5,
+
+  /** Maximum allowed radius in meters */
+  maxRadiusM: 50_000,
+} as const
+
 // ─── EDIT VISUAL CONFIGURATION ───────────────────────────────────────────────
 
 export const EDIT_CONFIG = {

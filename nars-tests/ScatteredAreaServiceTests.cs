@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -15,9 +16,11 @@ public class ScatteredAreaServiceTests
 {
     private static ScatteredAreaService CreateService(
         IDbContextFactory<AppDbContext>? dbFactory = null,
-        IDateTimeProvider? timeProvider = null) => new(
+        IDateTimeProvider? timeProvider = null,
+        IMemoryCache? cache = null) => new(
             dbFactory ?? Mock.Of<IDbContextFactory<AppDbContext>>(),
             timeProvider ?? Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow),
+            cache ?? new MemoryCache(new MemoryCacheOptions()),
             Mock.Of<ILogger<ScatteredAreaService>>());
 
     [Fact]
@@ -119,29 +122,17 @@ public class ScatteredAreaServiceTests
     }
 
     [Fact]
-    public async Task LastError_ExceedingCap_EvictsOldestEntries()
+    public async Task LastError_CacheEnabled_IsStoredAndRetrievable()
     {
         var factory = new Mock<IDbContextFactory<AppDbContext>>();
         factory.Setup(f => f.CreateDbContextAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Simulated database failure"));
 
-        var now = FixedUtcNow;
-        var ticking = new Mock<IDateTimeProvider>();
-        ticking.Setup(t => t.UtcNow).Returns(() => now = now.AddSeconds(1));
+        var cache = new MemoryCache(new MemoryCacheOptions());
+        var service = CreateService(dbFactory: factory.Object, cache: cache);
 
-        var service = CreateService(dbFactory: factory.Object, timeProvider: ticking.Object);
-
-        // 1005 distinct failing keys exceeds the 1000-entry cap.
-        const int keys = 1005;
-        var ids = Enumerable.Range(0, keys).Select(_ => Guid.NewGuid()).ToArray();
-        for (var i = 0; i < keys; i++)
-        {
-            Assert.False(await service.RefreshAsync(ids[i], 1));
-        }
-
-        // The newest entry survives; the very first (oldest) entries were evicted.
-        Assert.NotNull(service.GetLastError(ids[^1], 1));
-        Assert.Null(service.GetLastError(ids[0], 1));
-        Assert.Null(service.GetLastError(ids[1], 1));
+        var userId = Guid.NewGuid();
+        Assert.False(await service.RefreshAsync(userId, 1));
+        Assert.NotNull(service.GetLastError(userId, 1));
     }
 }

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NarsApi.DTOs;
 using NarsApi.Services;
@@ -7,6 +8,7 @@ namespace NarsApi.Controllers;
 /// <summary>
 /// Handles user profile and credential updates.
 /// </summary>
+[Authorize]
 [ApiController]
 [Route("/api")]
 [Tags("Users")]

@@ -176,16 +176,20 @@ def _segment_task(
     if model is None or not model.is_loaded:
         raise HTTPException(status_code=503, detail=f"{task} model not ready")
 
-    # Authoritative size cap: read one byte past the limit and reject if the
-    # upload is bigger, so we never buffer an unbounded tile into memory.
-    raw = tile.file.read(MAX_TILE_BYTES + 1)
-    if len(raw) > MAX_TILE_BYTES:
-        raise HTTPException(
-            status_code=413,
-            detail=f"Tile exceeds the {MAX_TILE_BYTES} byte limit",
-        )
+    # Authoritative size cap: read up to the limit and reject if the upload
+    # is bigger, so we never buffer an unbounded tile into memory.
+    raw = tile.file.read(MAX_TILE_BYTES)
     if not raw:
         raise HTTPException(status_code=400, detail="Empty file upload")
+    if len(raw) >= MAX_TILE_BYTES:
+        # The upload may be exactly at the limit or larger. Check one more
+        # byte to distinguish the two cases.
+        extra = tile.file.read(1)
+        if extra:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Tile exceeds the {MAX_TILE_BYTES} byte limit",
+            )
 
     try:
         # Cap concurrent inferences so a burst of large tiles can't OOM the

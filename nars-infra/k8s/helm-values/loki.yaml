@@ -1,0 +1,51 @@
+---
+deploymentMode: SingleBinary
+
+loki:
+  commonConfig:
+    replication_factor: 1
+  auth_enabled: false
+  useTestSchema: true
+  ruler:
+    enabled: false
+  storage:
+    type: filesystem
+    bucketNames:
+      chunks: loki-chunks
+      admin: loki-admin
+
+singleBinary:
+  replicas: 1
+  persistence:
+    volumeClaimsEnabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi
+
+write:
+  replicas: 0
+
+read:
+  replicas: 0
+
+backend:
+  replicas: 0
+
+chunksCache:
+  enabled: false
+
+resultsCache:
+  enabled: false
+
+test:
+  enabled: false
+
+monitoring:
+  lokiCanary:
+    enabled: false
+  selfMonitoring:
+    enabled: false

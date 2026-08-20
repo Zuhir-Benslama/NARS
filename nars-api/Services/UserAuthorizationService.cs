@@ -50,7 +50,7 @@ public sealed class UserAuthorizationService(
             case (UserRoles.CommuneUser, UserRoles.FieldWorker):
                 if (requireExactFieldWorkerCommune && communeId != callerCommuneId)
                 {
-                    return Forbid("Field workers must remain in your commune.");
+                    return AuthorizationDenied("Field workers must remain in your commune.");
                 }
 
                 return Valid();
@@ -58,18 +58,18 @@ public sealed class UserAuthorizationService(
             case (UserRoles.DairaAdmin, UserRoles.CommuneUser):
                 if (!communeId.HasValue)
                 {
-                    return Error("commune_id is required for commune_user.");
+                    return ValidationError("commune_id is required for commune_user.");
                 }
 
                 var commune = await db.Communes.FindAsync([communeId.Value], ct);
                 if (commune is null)
                 {
-                    return Error("Commune not found.");
+                    return ValidationError("Commune not found.");
                 }
 
                 if (commune.DairaId != callerDairaId)
                 {
-                    return Forbid("That commune does not belong to your daira.");
+                    return AuthorizationDenied("That commune does not belong to your daira.");
                 }
 
                 return Valid();
@@ -77,18 +77,18 @@ public sealed class UserAuthorizationService(
             case (UserRoles.WilayaAdmin, UserRoles.DairaAdmin):
                 if (!dairaId.HasValue)
                 {
-                    return Error("daira_id is required for daira_admin.");
+                    return ValidationError("daira_id is required for daira_admin.");
                 }
 
                 var daira = await db.Dairas.FindAsync([dairaId.Value], ct);
                 if (daira is null)
                 {
-                    return Error("Daira not found.");
+                    return ValidationError("Daira not found.");
                 }
 
                 if (daira.WilayaId != callerWilayaId)
                 {
-                    return Forbid("That daira does not belong to your wilaya.");
+                    return AuthorizationDenied("That daira does not belong to your wilaya.");
                 }
 
                 return Valid();
@@ -96,13 +96,13 @@ public sealed class UserAuthorizationService(
             case (UserRoles.NationalAdmin, UserRoles.WilayaAdmin):
                 if (!wilayaId.HasValue)
                 {
-                    return Error("wilaya_id is required for wilaya_admin.");
+                    return ValidationError("wilaya_id is required for wilaya_admin.");
                 }
 
                 return Valid();
 
             default:
-                return Error($"Unsupported role transition ({callerRole} → {targetRole}).");
+                return ValidationError($"Unsupported role transition ({callerRole} → {targetRole}).");
         }
     }
 
@@ -352,6 +352,6 @@ public sealed class UserAuthorizationService(
     }
 
     private static ScopeValidationResult Valid() => new(null, false);
-    private static ScopeValidationResult Error(string msg) => new(msg, false);
-    private static ScopeValidationResult Forbid(string msg) => new(msg, true);
+    private static ScopeValidationResult ValidationError(string msg) => new(msg, false);
+    private static ScopeValidationResult AuthorizationDenied(string msg) => new(msg, true);
 }

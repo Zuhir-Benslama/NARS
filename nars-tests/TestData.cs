@@ -13,6 +13,8 @@ public static class TestData
     // ── Passwords ──────────────────────────────────────────────────────
     public const string DefaultPassword = "Str0ng!Pass";
     public const string AltPassword = "StrongP@ss1";
+    /// <summary>Placeholder hash for test users that never authenticate via password.</summary>
+    public const string DummyPasswordHash = "hash";
 
     // ── Auth tokens ────────────────────────────────────────────────────
     public const string AdminSignupToken = "nars-admin-signup-v1";

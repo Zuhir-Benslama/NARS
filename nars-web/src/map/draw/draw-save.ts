@@ -8,8 +8,6 @@ import type { FeatureDataByType, ModalResult } from "../../types"
 import { getCtx } from "../core/state"
 import { useFeaturesStore } from "../../stores/featuresStore"
 
-const CITY_CENTER_MIN_RADIUS_M = 5
-const CITY_CENTER_MAX_RADIUS_M = 50_000
 import { buildDrawControl, clearEdgeVisibilityPoll } from "./draw-control"
 import { refreshLayerVisibility } from "../rendering/labels"
 import { computeCircleRing, computeCircleRadius, closeRing } from "../rendering/geometry"
@@ -20,7 +18,7 @@ import { debugError } from "../../utils/debug"
 import { t } from "../../i18n"
 import { updateEndpointMarkers } from "../roads/road-directions"
 import { buildFeatureData } from "../features/feature-data"
-import { DRAW_CONFIG } from "../../config"
+import { DRAW_CONFIG, CITY_CENTER_CONFIG } from "../../config"
 import { saveToDatabase } from "../features/feature-persistence"
 import { openModalForFeature } from "./draw-modal"
 import { getDrawingPhase, setSavingFeature, repatchMarker } from "./draw-state"
@@ -349,12 +347,12 @@ function validateGeometry(
       const centerLng = sumLng / coords.length
       radius = computeCircleRadius(centerLat, centerLng, coords)
     }
-    if (!radius || Number.isNaN(radius) || radius < CITY_CENTER_MIN_RADIUS_M) {
+    if (!radius || Number.isNaN(radius) || radius < CITY_CENTER_CONFIG.minRadiusM) {
       showToast(t("map_city_center_too_small"), "error")
       cleanup()
       return false
     }
-    if (radius > CITY_CENTER_MAX_RADIUS_M) {
+    if (radius > CITY_CENTER_CONFIG.maxRadiusM) {
       showToast(t("map_city_center_too_large"), "error")
       cleanup()
       return false

@@ -56,28 +56,7 @@ observability-loki: ## Install Loki (logs)
 	@helm upgrade --install loki grafana/loki \
 		--namespace $(OBSERVABILITY_NAMESPACE) \
 		--version "$(LOKI_VERSION)" \
-		--set deploymentMode=SingleBinary \
-		--set loki.commonConfig.replication_factor=1 \
-		--set loki.auth_enabled=false \
-		--set loki.storage.type=filesystem \
-		--set loki.storage.bucketNames.chunks=loki-chunks \
-		--set loki.storage.bucketNames.admin=loki-admin \
-		--set loki.useTestSchema=true \
-		--set loki.ruler.enabled=false \
-		--set singleBinary.replicas=1 \
-		--set singleBinary.persistence.volumeClaimsEnabled=false \
-		--set singleBinary.resources.requests.cpu=50m \
-		--set singleBinary.resources.requests.memory=128Mi \
-		--set singleBinary.resources.limits.cpu=200m \
-		--set singleBinary.resources.limits.memory=512Mi \
-		--set write.replicas=0 \
-		--set read.replicas=0 \
-		--set backend.replicas=0 \
-		--set chunksCache.enabled=false \
-		--set resultsCache.enabled=false \
-		--set test.enabled=false \
-		--set monitoring.lokiCanary.enabled=false \
-		--set monitoring.selfMonitoring.enabled=false \
+		--values $(K8S_DIR)/helm-values/loki.yaml \
 		--timeout 10m
 
 .PHONY: observability-tempo

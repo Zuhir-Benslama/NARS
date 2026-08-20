@@ -9,6 +9,7 @@ import logging
 
 import numpy as np
 import rasterio
+from shapely.errors import GEOSException
 from shapely.geometry import LineString, Polygon, mapping
 
 from app.schemas import Feature
@@ -58,7 +59,7 @@ def mask_to_linestrings(
                 continue
             geometry = mapping(line)
             confidence = float(prob_mask[pts[:, 0], pts[:, 1]].mean())
-        except Exception:
+        except (GEOSException, ValueError, TypeError):
             logger.debug("Skipping degenerate road edge", exc_info=True)
             continue
         features.append(
@@ -103,7 +104,7 @@ def mask_to_polygons(
 
         try:
             poly = Polygon(coords).simplify(SIMPLIFY_TOLERANCE, preserve_topology=True)
-        except Exception:
+        except (GEOSException, ValueError, TypeError):
             logger.debug("Skipping malformed building polygon", exc_info=True)
             continue
 
