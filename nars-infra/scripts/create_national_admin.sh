@@ -218,6 +218,11 @@ password = os.environ["NARS_ADMIN_PASSWORD_VAL"]
 
 new_id   = str(uuid.uuid4())
 pwd_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=11)).decode()
+# Matches User.GenerateSecurityStamp() (Guid.NewGuid().ToString("N")).
+# Required: OnTokenValidated rejects tokens whose security_stamp claim is
+# empty, so a row created without this column can sign in but never pass
+# authentication.
+security_stamp = uuid.uuid4().hex
 
 try:
     conn = connect_db()
@@ -232,13 +237,15 @@ try:
         INSERT INTO users (
             id, name, email, phone, username, password_hash,
             role, commune_id, daira_id, wilaya_id,
-            created_at, failed_login_attempts, locked_until
+            created_at, failed_login_attempts, locked_until,
+            security_stamp
         ) VALUES (
             %s, %s, %s, %s, %s, %s,
             'national_admin', NULL, NULL, NULL,
-            NOW(), 0, NULL
+            NOW(), 0, NULL,
+            %s
         )
-    """, (new_id, name, email, phone, username, pwd_hash))
+    """, (new_id, name, email, phone, username, pwd_hash, security_stamp))
 
     conn.commit(); conn.close()
     print(new_id)

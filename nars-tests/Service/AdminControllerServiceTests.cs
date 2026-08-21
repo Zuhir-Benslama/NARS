@@ -42,10 +42,13 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     private static IDateTimeProvider FixedTimeProvider() =>
         Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
 
+    private UserAuthorizationService CreateUserAuthorizationService() =>
+        new(_db, Mock.Of<IRefreshTokenService>(), Mock.Of<IFeatureCleanupService>(), FixedTimeProvider());
+
     private AdminUserController CreateUserManagementController() => new(
             Mock.Of<Microsoft.Extensions.Logging.ILogger<AdminUserController>>(),
-            new UserAuthorizationService(_db, Mock.Of<IRefreshTokenService>(), Mock.Of<IFeatureCleanupService>(), FixedTimeProvider()),
-            new UserCreationService(_db, new UserAuthorizationService(_db, Mock.Of<IRefreshTokenService>(), Mock.Of<IFeatureCleanupService>(), FixedTimeProvider()),
+            CreateUserAuthorizationService(),
+            new UserCreationService(_db, CreateUserAuthorizationService(),
                 Mock.Of<Microsoft.Extensions.Logging.ILogger<UserCreationService>>()),
             Mock.Of<IWebHostEnvironment>());
 
@@ -237,6 +240,62 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         var okResult = Assert.IsType<OkObjectResult>(result);
         var payload = Assert.IsType<NationalOverviewResponse>(okResult.Value);
         Assert.Equal(2, payload.Wilayas.Count);
+    }
+
+    [Fact]
+    public async Task Overview_NationalAdmin_DuplicateWilayaAdmins_PicksEarliestCreated()
+    {
+        // Two wilaya_admins on one wilaya are allowed (non-unique filtered
+        // index); the national overview must deterministically surface the
+        // earliest-created one. Requires real PostgreSQL — the overview query
+        // uses DISTINCT ON, which the InMemory provider cannot execute.
+        var suffix = Guid.NewGuid().ToString("N");
+        var early = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = $"early_{suffix[..8]}",
+            Name = "Early Admin",
+            Email = $"early-{suffix[..12]}@test.com",
+            Phone = DefaultPhone,
+            PasswordHash = DummyPasswordHash,
+            SecurityStamp = User.GenerateSecurityStamp(),
+            Role = UserRoles.WilayaAdmin,
+            WilayaId = WilayaId1,
+            CreatedAt = FixedUtcNow,
+        };
+        var late = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = $"late_{suffix[..8]}",
+            Name = "Late Admin",
+            Email = $"late-{suffix[..12]}@test.com",
+            Phone = DefaultPhone,
+            PasswordHash = DummyPasswordHash,
+            SecurityStamp = User.GenerateSecurityStamp(),
+            Role = UserRoles.WilayaAdmin,
+            WilayaId = WilayaId1,
+            CreatedAt = FixedUtcNow.AddHours(1),
+        };
+        _db.Users.AddRange(early, late);
+        await _db.SaveChangesAsync();
+
+        var caller = await CreateUserAsync(UserRoles.NationalAdmin);
+        var controller = CreateOverviewController();
+        AuthTestHelper.SetUser(controller, caller);
+
+        var result = await controller.Overview();
+
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var payload = Assert.IsType<NationalOverviewResponse>(okResult.Value);
+        var wilaya1 = payload.Wilayas.First(w => w.WilayaId == WilayaId1);
+        Assert.NotNull(wilaya1.WilayaAdmin);
+        Assert.Equal(early.Username, wilaya1.WilayaAdmin!.Username);
+        Assert.Equal(1, wilaya1.DairaCount);
+        Assert.Equal(1, wilaya1.CommuneCount);
+
+        // The other seeded wilaya has no admin and must not inherit one.
+        var wilaya2 = payload.Wilayas.First(w => w.WilayaId == WilayaId2);
+        Assert.Null(wilaya2.WilayaAdmin);
     }
 
     [Fact]

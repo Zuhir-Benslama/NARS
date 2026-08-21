@@ -87,7 +87,9 @@ db-admin: .env prerequisites ## Create national admin with one-time generated cr
 	@ADMIN_PASSWORD="$$(openssl rand -base64 12)"
 	@export ADMIN_USERNAME ADMIN_PASSWORD
 	@echo "  Username: $${ADMIN_USERNAME}"
-	@echo "  Password: $${ADMIN_PASSWORD}"
+	# SECURITY: do not echo the password here. create_national_admin.sh prints
+	# it to stderr only, so piping this target's stdout (e.g. `| tee x.log`)
+	# never captures the credential — same convention as db-get-password.
 	@echo ""
 	@bash nars-infra/scripts/create_national_admin.sh
 	@echo ""

@@ -16,48 +16,10 @@ public class AdminOverviewServiceTests
     private static AdminOverviewService CreateService(AppDbContext db) =>
         new(db, Mock.Of<IFeatureStatsService>());
 
-    [Fact(Skip = "InMemory provider does not support SqlQueryRaw — tested via AdminControllerServiceTests")]
-    public async Task GetNationalOverviewAsync_DuplicateWilayaAdmins_PicksEarliestCreated()
-    {
-        using var db = CreateDb();
-        db.Wilayas.Add(new Wilaya { WilayaId = 1, WilayaFr = "Wilaya", WilayaAr = "ولاية" });
-        db.Users.AddRange(
-            new User
-            {
-                Id = Guid.NewGuid(),
-                Username = "admin1",
-                Name = "Admin One",
-                Email = "a1@test.com",
-                Phone = DefaultPhone,
-                PasswordHash = "hash",
-                SecurityStamp = User.GenerateSecurityStamp(),
-                Role = UserRoles.WilayaAdmin,
-                WilayaId = 1,
-                CreatedAt = FixedUtcNow,
-            },
-            new User
-            {
-                Id = Guid.NewGuid(),
-                Username = "admin2",
-                Name = "Admin Two",
-                Email = "a2@test.com",
-                Phone = DefaultPhone,
-                PasswordHash = "hash",
-                SecurityStamp = User.GenerateSecurityStamp(),
-                Role = UserRoles.WilayaAdmin,
-                WilayaId = 1,
-                CreatedAt = FixedUtcNow.AddHours(1),
-            });
-        await db.SaveChangesAsync();
-        var service = CreateService(db);
-
-        var (items, total) = await service.GetNationalOverviewAsync();
-
-        Assert.Equal(1, total);
-        var summary = Assert.Single(items);
-        Assert.NotNull(summary.WilayaAdmin);
-        Assert.Equal("admin1", summary.WilayaAdmin!.Username);
-    }
+    // Note: GetNationalOverviewAsync uses SqlQueryRaw (DISTINCT ON), which the
+    // InMemory provider cannot execute — its duplicate-wilaya-admin behavior is
+    // covered by Overview_NationalAdmin_DuplicateWilayaAdmins_PicksEarliestCreated
+    // in Service/AdminControllerServiceTests.cs (PostgreSQL Testcontainers).
 
     [Fact]
     public async Task GetWilayaReportAsync_DuplicateDairaAdmins_PicksEarliestCreated()

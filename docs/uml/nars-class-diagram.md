@@ -57,6 +57,7 @@ classDiagram
         +DateTime CreatedAt
         +int? FailedLoginAttempts
         +DateTime? LockedUntil
+        +string SecurityStamp
     }
 
     class Wilaya {
@@ -150,8 +151,9 @@ classDiagram
     IScatteredAreaService <|.. ScatteredAreaService
 
     class JwtService {
-        +string GenerateToken(User user)
-        +ClaimsPrincipal ValidateToken(string token)
+        +string CreateToken(userId, username, name, email, communeId, securityStamp, role, dairaId, wilayaId)
+        +ClaimsPrincipal? ValidateToken(string token)
+        +(string rawToken, string hash) CreateRefreshToken()
     }
 
     class IBackgroundTaskQueue {
