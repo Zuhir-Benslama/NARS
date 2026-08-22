@@ -174,10 +174,6 @@ export function resetSnapping(): void {
   enableSnapping()
 }
 
-export function isSnappingActive(): boolean {
-  return useSnapStore().snapActive
-}
-
 function onSnapMove(e: MouseEvent): void {
   const store = useSnapStore()
   store.patchSnapState({ snapPendingCoords: { x: e.clientX, y: e.clientY } })

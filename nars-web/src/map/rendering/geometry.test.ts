@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, vi } from "vitest"
 import {
   pointInMunicipalLimit,
   pointInScatteredArea,
-  renderScatteredAreas,
+  clearScatteredAreas,
+  addScatteredArea,
   computeCircleRing,
   computeCircleRingForEdit,
   closeRing,
@@ -11,14 +12,9 @@ import {
   computeCircleCenter,
   resetGeometryState,
   displayCommuneBoundary,
-  refreshScatteredAreas,
 } from "./geometry"
 import { mockApiFetch, createMockSuccessResponse } from "../../test/setup"
 import { _setCtx } from "../core/state"
-
-const mockShowToast = vi.hoisted(() => vi.fn())
-
-vi.mock("../../lib/toast", () => ({ showToast: mockShowToast }))
 
 const TOLERANCE_M = 50
 
@@ -29,9 +25,9 @@ describe("geometry", () => {
     })
   })
 
-  describe("renderScatteredAreas & pointInScatteredArea", () => {
+  describe("addScatteredArea & pointInScatteredArea", () => {
     beforeEach(() => {
-      renderScatteredAreas("")
+      clearScatteredAreas()
     })
 
     it("parses a Polygon GeoJSON string", () => {
@@ -46,7 +42,7 @@ describe("geometry", () => {
           ],
         ],
       })
-      renderScatteredAreas(geojson)
+      addScatteredArea(geojson)
       expect(pointInScatteredArea(5, 2)).toBe(true)
       expect(pointInScatteredArea(20, 20)).toBe(false)
     })
@@ -65,7 +61,7 @@ describe("geometry", () => {
           ],
         ],
       })
-      renderScatteredAreas(geojson)
+      addScatteredArea(geojson)
       expect(pointInScatteredArea(5, 2)).toBe(true)
     })
 
@@ -87,28 +83,28 @@ describe("geometry", () => {
           ],
         ],
       })
-      renderScatteredAreas(geojson)
+      addScatteredArea(geojson)
       expect(pointInScatteredArea(10, 1)).toBe(true)
       expect(pointInScatteredArea(10, 10)).toBe(false)
     })
 
     it("handles empty/null geometry string", () => {
-      renderScatteredAreas("")
+      clearScatteredAreas()
       expect(pointInScatteredArea(0, 0)).toBe(false)
     })
 
     it("handles invalid JSON gracefully", () => {
-      renderScatteredAreas("not-json")
+      addScatteredArea("not-json")
       expect(pointInScatteredArea(0, 0)).toBe(false)
     })
 
     it("handles Polygon with no type field gracefully", () => {
-      renderScatteredAreas(JSON.stringify({}))
+      addScatteredArea(JSON.stringify({}))
       expect(pointInScatteredArea(0, 0)).toBe(false)
     })
 
     it("accepts GeoJSON.Geometry object directly", () => {
-      renderScatteredAreas({
+      addScatteredArea({
         type: "Polygon",
         coordinates: [
           [
@@ -120,6 +116,44 @@ describe("geometry", () => {
         ],
       })
       expect(pointInScatteredArea(5, 2)).toBe(true)
+    })
+
+    it("accumulates across multiple features until cleared", () => {
+      // Regression for the loadFromDatabase clobber bug: each scattered
+      // feature is appended individually, so two disjoint polygons loaded in
+      // sequence must BOTH stay hit-testable. The old self-resetting
+      // renderScatteredAreas silently kept only the last one.
+      const polyA: GeoJSON.Geometry = {
+        type: "Polygon",
+        coordinates: [
+          [
+            [0, 0],
+            [10, 0],
+            [5, 10],
+            [0, 0],
+          ],
+        ],
+      }
+      const polyB: GeoJSON.Geometry = {
+        type: "Polygon",
+        coordinates: [
+          [
+            [20, 20],
+            [30, 20],
+            [25, 30],
+            [20, 20],
+          ],
+        ],
+      }
+      addScatteredArea(polyA)
+      addScatteredArea(polyB)
+      expect(pointInScatteredArea(5, 2)).toBe(true) // inside A
+      expect(pointInScatteredArea(25, 22)).toBe(true) // inside B
+      expect(pointInScatteredArea(15, 15)).toBe(false)
+
+      clearScatteredAreas()
+      expect(pointInScatteredArea(5, 2)).toBe(false)
+      expect(pointInScatteredArea(25, 22)).toBe(false)
     })
   })
 
@@ -367,51 +401,6 @@ describe("geometry", () => {
 
       expect(mockMap.fitBounds).toHaveBeenCalledTimes(1)
       expect(pointInMunicipalLimit(0.5, 0.5)).toBe(true)
-    })
-  })
-
-  describe("refreshScatteredAreas", () => {
-    beforeEach(() => {
-      mockApiFetch.mockReset()
-      resetGeometryState()
-    })
-
-    it("renders scattered polygons from the response", async () => {
-      const geojson = {
-        type: "Polygon",
-        coordinates: [
-          [
-            [0, 0],
-            [10, 0],
-            [5, 10],
-            [0, 0],
-          ],
-        ],
-      }
-      mockApiFetch.mockResolvedValue(
-        createMockSuccessResponse({ geojson: JSON.stringify(geojson) }),
-      )
-
-      await refreshScatteredAreas()
-
-      expect(mockApiFetch).toHaveBeenCalledWith("/api/areas/refresh-scattered", { method: "POST" })
-      expect(pointInScatteredArea(5, 2)).toBe(true)
-    })
-
-    it("skips rendering when the response has no geojson", async () => {
-      mockApiFetch.mockResolvedValue(createMockSuccessResponse({ geojson: null }))
-
-      await refreshScatteredAreas()
-
-      expect(pointInScatteredArea(5, 2)).toBe(false)
-    })
-
-    it("handles fetch failures gracefully", async () => {
-      mockApiFetch.mockRejectedValue(new Error("boom"))
-      mockShowToast.mockClear()
-
-      await expect(refreshScatteredAreas()).resolves.toBeUndefined()
-      expect(mockShowToast).toHaveBeenCalledWith("map_scatter_refresh_failed", "error")
     })
   })
 })

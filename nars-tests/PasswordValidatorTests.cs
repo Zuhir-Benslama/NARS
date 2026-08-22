@@ -63,7 +63,8 @@ public class PasswordValidatorTests
 
     [Fact]
     public void WhitespacePassword_ReturnsError() =>
-        Assert.NotNull(PasswordValidator.Validate("   "));
+        Assert.Equal("Password must be at least 8 characters.",
+            PasswordValidator.Validate("   "));
 
     [Fact]
     public void VeryLongPassword_RejectedBeyondBcryptLimit()

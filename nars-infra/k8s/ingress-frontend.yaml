@@ -2,6 +2,9 @@
 # ─── Frontend Ingress ──────────────────────────────────────────────────
 # Serves nars.dz (SPA + API) with TLS but NO mTLS (browser-facing).
 # /api/* routes to the API service; /(.*) routes to the SPA.
+# /health is deliberately NOT routed here — it would expose the API's
+# health status publicly and defeat the CIDR-restricted dedicated
+# nars-api-health ingress. External monitoring must use api.nars.dz/health.
 # HSTS is served by the ingress controller via
 # nginx.ingress.kubernetes.io/configuration-snippet or the global
 # controller --enable-hsts flag. ssl-redirect ensures HTTP → HTTPS.
@@ -24,13 +27,6 @@ spec:
     - host: nars.dz
       http:
         paths:
-          - path: /health
-            pathType: Exact
-            backend:
-              service:
-                name: nars-api
-                port:
-                  number: 8080
           - path: /login
             pathType: Exact
             backend:
@@ -57,6 +53,9 @@ spec:
 # Serves localhost without TLS for local development access.
 # No host restriction — catches any host (192.168.x.x, etc.) so
 # LAN devices and ADB-reversed ports reach the SPA.
+# /health is not routed here (see nars-frontend above) — local health
+# checks go through the host-less nars-api-local ingress instead,
+# which `make smoke-test` relies on.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -72,13 +71,6 @@ spec:
     - host: localhost
       http:
         paths:
-          - path: /health
-            pathType: Exact
-            backend:
-              service:
-                name: nars-api
-                port:
-                  number: 8080
           - path: /login
             pathType: Exact
             backend:
@@ -102,13 +94,6 @@ spec:
                   number: 80
     - http:
         paths:
-          - path: /health
-            pathType: Exact
-            backend:
-              service:
-                name: nars-api
-                port:
-                  number: 8080
           - path: /login
             pathType: Exact
             backend:

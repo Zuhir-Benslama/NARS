@@ -4,7 +4,6 @@ namespace NarsApi.Infrastructure;
 
 public class CacheOptions
 {
-    [Range(1, 168)] public int ReferenceDataDurationHours { get; set; } = 1;
     [Range(1, 168)] public int PageTemplateDurationHours { get; set; } = 1;
 }
 
@@ -15,8 +14,11 @@ public class LocationsOptions
 
 public class JwtOptions
 {
-    [Range(1, 1440)] public int ExpiresInMinutes { get; set; } = 1440;
-    [Range(1, 365)] public int RefreshExpiresInDays { get; set; } = 30;
+    // Defaults are deliberately conservative (matching appsettings.json) so a
+    // missing/unbound Jwt section fails safe with short-lived tokens instead
+    // of silently minting day-long access tokens.
+    [Range(1, 1440)] public int ExpiresInMinutes { get; set; } = 60;
+    [Range(1, 365)] public int RefreshExpiresInDays { get; set; } = 7;
 
     /// <summary>
     /// JWT signing algorithm. Allowlisted to the symmetric HS* family that the
@@ -38,13 +40,10 @@ public class FeatureDefaultsOptions
 public class LoggingOptions
 {
     [Range(1, 1000)] public int MaxBatchSize { get; set; } = 50;
-    [Range(100, 100_000)] public int MaxEntryLength { get; set; } = 10_000;
-}
 
-public class HttpClientOptions
-{
-    [Range(1, 300)] public int TileProxyTimeoutSeconds { get; set; } = 15;
-    [Range(1, 300)] public int SatelliteTimeoutSeconds { get; set; } = 30;
+    // Must not exceed the error_logs column width (varchar(4096)) or the
+    // LogEntry DTO [MaxLength(4096)] annotations — all three are aligned here.
+    [Range(100, 100_000)] public int MaxEntryLength { get; set; } = 4_096;
 }
 
 public class ValidationOptions

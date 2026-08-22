@@ -1,8 +1,9 @@
 // ─── LOADER BUILD ─────────────────────────────────────────────────────────────
 // Builds GeoJSON features from loaded database entries with proper styling.
 
-import { PHASES } from "../../phases"
-import { computeCircleRing, closeRing } from "../rendering/geometry"
+import { PHASES, CITY_CENTER_COLOR } from "../../phases"
+import { CITY_CENTER_CONFIG } from "../../config"
+import { featureDataToGeometry } from "./feature-data"
 import { getFeatureStyle } from "../draw/draw-save"
 import { sanitizeApiText } from "../../utils/sanitize"
 import { debugLog } from "../../utils/debug"
@@ -37,31 +38,30 @@ export function buildGeoJsonFeature(
     if (phase.key === "cityCenter") {
       const radius = data.radius
       if (radius && radius > 0) {
-        const ring = closeRing(computeCircleRing(data.lat, data.lng, radius))
         return {
           type: "Feature" as const,
-          geometry: { type: "LineString" as const, coordinates: ring },
+          geometry: featureDataToGeometry(data, "circle"),
           properties: {
             dbId,
             phaseKey: phase.key,
             label: sanitizedLabel,
             geomType: "LineString",
-            lineColor: "#e74c3c",
-            lineWidth: 6,
+            lineColor: CITY_CENTER_COLOR,
+            lineWidth: CITY_CENTER_CONFIG.ringStrokeWidth,
             radius,
           },
         }
       }
       return {
         type: "Feature" as const,
-        geometry: { type: "Point" as const, coordinates: [data.lng, data.lat] },
+        geometry: featureDataToGeometry(data, "circle"),
         properties: {
           dbId,
           phaseKey: phase.key,
           label: sanitizedLabel,
           geomType: "Point",
           ...style,
-          circleColor: "#e74c3c",
+          circleColor: CITY_CENTER_COLOR,
           circleRadius: 12,
           textColor: "#000000",
         },
@@ -70,10 +70,7 @@ export function buildGeoJsonFeature(
 
     return {
       type: "Feature" as const,
-      geometry: {
-        type: "Point" as const,
-        coordinates: [data.lng, data.lat],
-      },
+      geometry: featureDataToGeometry(data, "marker"),
       properties: {
         dbId,
         phaseKey: phase.key,
@@ -86,10 +83,7 @@ export function buildGeoJsonFeature(
     if (phase.drawType === "polyline") {
       return {
         type: "Feature" as const,
-        geometry: {
-          type: "LineString" as const,
-          coordinates: data.coordinates.map((c) => [c.lng, c.lat]),
-        },
+        geometry: featureDataToGeometry(data, "line"),
         properties: {
           dbId,
           phaseKey: phase.key,
@@ -99,13 +93,9 @@ export function buildGeoJsonFeature(
         },
       }
     } else {
-      const ring = data.coordinates.map((c) => [c.lng, c.lat])
       return {
         type: "Feature" as const,
-        geometry: {
-          type: "Polygon" as const,
-          coordinates: [closeRing(ring as [number, number][])],
-        },
+        geometry: featureDataToGeometry(data, "polygon"),
         properties: {
           dbId,
           phaseKey: phase.key,

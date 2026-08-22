@@ -6,18 +6,14 @@ import { apiFetch } from "../../api"
 import { getCtx } from "../core/state"
 import { useFeaturesStore } from "../../stores/featuresStore"
 import { useLayerStore } from "../../stores/layerStore"
-import {
-  computeCircleRing,
-  computeCircleRadius,
-  closeRing,
-  computeCircleCenter,
-} from "../rendering/geometry"
+import { computeCircleRadius, computeCircleCenter } from "../rendering/geometry"
 import { showToast } from "../../lib/toast"
 import { t } from "../../i18n"
 import { debugError } from "../../utils/debug"
 import { PHASES } from "../../phases"
 import { buildDrawControl } from "../draw/draw-control"
 import { repatchMarker } from "../draw/draw-complete"
+import { featureDataToGeometry } from "../features/feature-data"
 import type { LayerEntry, LatLng } from "../../types"
 import {
   getActiveEditEntry,
@@ -102,6 +98,10 @@ async function readGeomanGeometry(entry: LayerEntry): Promise<boolean> {
     useLayerStore().updateFeature(entry.data.type, entry.dbId, patch)
   } catch (err) {
     debugError("Failed to read Geoman geometry:", err)
+    // Without the fresh geometry the commit below would silently PUT the
+    // STALE pre-edit data and report success. Abort instead and say why.
+    showToast(t("map_geometry_save_failed"), "error")
+    return false
   }
   return true
 }
@@ -129,41 +129,14 @@ async function saveGeometry(entry: LayerEntry): Promise<boolean> {
 function updateFeatureGeometry(entry: LayerEntry): void {
   const featuresStore = useFeaturesStore()
   const d = entry.data as { lat?: number; lng?: number; radius?: number; coordinates?: LatLng[] }
-  if (d.lat != null && d.lng != null) {
-    if (entry.type === "circle" && d.radius) {
-      const ring = closeRing(computeCircleRing(d.lat, d.lng, d.radius))
-      featuresStore.update(entry.id, {
-        geometry: { type: "LineString", coordinates: ring },
-      })
-    } else {
-      const geom: GeoJSON.Point = {
-        type: "Point",
-        coordinates: [d.lng, d.lat],
-      }
-      featuresStore.update(entry.id, { geometry: geom })
-    }
-  } else if (d.coordinates && d.coordinates.length > 0) {
-    const coords = d.coordinates.map((c) => [c.lng, c.lat])
-    if (entry.type === "line") {
-      featuresStore.update(entry.id, {
-        geometry: { type: "LineString" as const, coordinates: coords },
-      })
-    } else if (entry.type === "circle") {
-      featuresStore.update(entry.id, {
-        geometry: {
-          type: "LineString" as const,
-          coordinates: closeRing(coords as [number, number][]),
-        },
-      })
-    } else {
-      featuresStore.update(entry.id, {
-        geometry: {
-          type: "Polygon" as const,
-          coordinates: [closeRing(coords as [number, number][])],
-        },
-      })
-    }
-  }
+  // Shared mapper — this used to be a fourth divergent copy of the
+  // FeatureData→GeoJSON mapping (see feature-data.ts).
+  featuresStore.update(entry.id, {
+    geometry: featureDataToGeometry(
+      { lat: d.lat, lng: d.lng, radius: d.radius, coordinates: d.coordinates },
+      entry.type,
+    ),
+  })
 }
 
 export async function commitEditMode(): Promise<void> {
@@ -214,12 +187,15 @@ export async function cancelEditMode(): Promise<void> {
   if (snapshot && snapshot.length > 0) {
     if (entry.type === "marker") {
       // Point features are stored as lat/lng; drag-end overwrote them, so
-      // restore the original position (and drop the coordinates array that
-      // the generic cancel path used to leave behind on markers).
+      // restore the original position and drop the coordinates array that
+      // the generic cancel path leaves behind on markers.
       useLayerStore().updateFeature(entry.data.type, entry.dbId, {
         lat: snapshot[0].lat,
         lng: snapshot[0].lng,
       })
+      // Key REMOVAL, not an undefined patch: updateFeature merges via
+      // Object.assign, which would keep the key present with an undefined
+      // value. If updateFeature ever gains delete semantics, fold this in.
       delete entry.data.coordinates
     } else {
       useLayerStore().updateFeature(entry.data.type, entry.dbId, { coordinates: snapshot })

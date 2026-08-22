@@ -6,11 +6,10 @@ import { apiFetch } from "../api"
 import { getUserMessageKey } from "../lib/errors"
 import { showToast } from "../lib/toast"
 import { useLayerStore } from "../stores/layerStore"
-import { useUndoStore } from "../stores/undoStore"
+import { useUndoStore, MAX_UNDO_ENTRIES } from "../stores/undoStore"
 import { useFeaturesStore } from "../stores/featuresStore"
-import { toApiSaveShape } from "./features/feature-data"
+import { toApiSaveShape, featureDataToGeometry } from "./features/feature-data"
 import { PHASES } from "../phases"
-import { computeCircleRing, closeRing } from "./rendering/geometry"
 import { getDefaultStyle } from "./draw/draw-save"
 import { t } from "../i18n"
 import { debugLog, debugError, debugWarn } from "../utils/debug"
@@ -23,19 +22,74 @@ export function resetUndoStack(): void {
   useUndoStore().$reset()
 }
 
-export function hasUndo(): boolean {
-  return useUndoStore().hasUndo
-}
-
-export function getUndoLabel(): string | null {
-  return useUndoStore().undoLabel
-}
-
 // ─── RECORD ───────────────────────────────────────────────────────────────────
+
+/**
+ * When the undo stack overflows, the oldest deleted feature is evicted and
+ * its deletion becomes permanent (no Ctrl+Z recovery). Any surviving
+ * entrances still referencing its DB ID must be detached now — otherwise they
+ * dangle forever, whereas within the restorable window the restore path
+ * repairs references instead. This is the delete-side counterpart of the
+ * repair logic in undo().
+ */
+async function detachReferencesForEvicted(evicted: {
+  entry: LayerEntry
+  phaseKey: FeatureTypeKey
+}): Promise<void> {
+  const layerStore = useLayerStore()
+  const oldDbId = evicted.entry.dbId
+
+  const fixes: { entrance: LayerEntry<HouseEntranceFeatureData> }[] = []
+  for (const entrance of layerStore.$state.houseEntrances || []) {
+    if (evicted.phaseKey === "roads" && entrance.data.roadDbId === oldDbId) {
+      layerStore.updateFeature("houseEntrances", entrance.dbId, { roadDbId: undefined })
+      fixes.push({ entrance })
+    }
+    if (evicted.phaseKey === "houseEntrances" && entrance.data.mainEntranceDbId === oldDbId) {
+      layerStore.updateFeature("houseEntrances", entrance.dbId, {
+        mainEntranceDbId: undefined,
+        mainEntranceLabel: undefined,
+      })
+      fixes.push({ entrance })
+    }
+  }
+  if (fixes.length === 0) return
+
+  debugLog(
+    `[UNDO] Evicted delete of "${evicted.entry.data.label}" — detaching ${fixes.length} cross-reference(s)`,
+  )
+  try {
+    const results = await Promise.allSettled(
+      fixes.map(({ entrance }) =>
+        apiFetch(`/api/features/${entrance.dbId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ data: entrance.data }),
+        }),
+      ),
+    )
+    const failures = results.filter((r) => r.status === "rejected").length
+    if (failures > 0) debugError(`Failed to persist ${failures} detached reference(s).`)
+
+    useFeaturesStore().batchUpdate(
+      fixes.map(({ entrance }) => ({
+        id: entrance.id,
+        properties: { roadDbId: "", mainEntranceDbId: "", mainEntranceLabel: "" },
+      })),
+    )
+  } catch (err) {
+    debugError("Failed to detach cross-references for evicted undo entry:", err)
+  }
+}
 
 /** Call BEFORE a feature is deleted. Captures the entry for Ctrl+Z restore. */
 export function recordDelete(entry: LayerEntry, phaseKey: FeatureTypeKey): void {
-  useUndoStore().recordDelete(entry, phaseKey)
+  const store = useUndoStore()
+  if (store.undoStack.length >= MAX_UNDO_ENTRIES) {
+    const evicted = store.shiftUndo()
+    if (evicted) void detachReferencesForEvicted(evicted)
+  }
+  store.recordDelete(entry, phaseKey)
 }
 
 // ─── UNDO (Ctrl+Z) ───────────────────────────────────────────────────────────
@@ -193,25 +247,5 @@ function entryDataToGeometry(
   data: import("../types").FeatureData,
   type: "polygon" | "line" | "circle" | "marker",
 ): GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon {
-  if (type === "marker") {
-    return {
-      type: "Point" as const,
-      coordinates: [data.lng ?? 0, data.lat ?? 0],
-    }
-  }
-  if (type === "circle" && data.lat != null && data.lng != null && data.radius) {
-    const ring = closeRing(computeCircleRing(data.lat, data.lng, data.radius))
-    return { type: "LineString" as const, coordinates: ring }
-  }
-  if (data.coordinates && data.coordinates.length > 0) {
-    const coords = data.coordinates.map((c) => [c.lng, c.lat] as [number, number])
-    if (type === "line") {
-      return { type: "LineString" as const, coordinates: coords }
-    }
-    return { type: "Polygon" as const, coordinates: [closeRing(coords)] }
-  }
-  return {
-    type: "Point" as const,
-    coordinates: [data.lng ?? 0, data.lat ?? 0],
-  }
+  return featureDataToGeometry(data, type)
 }

@@ -40,12 +40,21 @@ OTEL_COLLECTOR_VERSION ?= 0.169.0
 # Kept as an explicit variable so `observability-otel-collector` and the
 # helm-values file can't silently drift apart.
 OTEL_COLLECTOR_IMAGE_TAG ?= 0.120.0
-YAMLLINT_IMAGE      ?= cytopia/yamllint:1.36.0
-RUFF_IMAGE          ?= ghcr.io/astral-sh/ruff:0.15.15
-NODE_IMAGE          ?= node:22-alpine
+# Lint/proxy tool images — tag+digest pinned for reproducible linting, same
+# convention as the k8s manifests. Digests verified against the named tags.
+# NOTE: cytopia/yamllint publishes NO yamllint-version tags; major tag `1`
+# is pinned by digest instead. hadolint/shellcheck were previously untagged/
+# :stable (moving). alpine/socat was untagged (=latest) in two recipes.
+YAMLLINT_IMAGE      ?= cytopia/yamllint:1@sha256:596fb19eb71e55ba5b2fa56d8c18a615ec82adc8d3bf2d73918cb78c8f3240fb
+RUFF_IMAGE          ?= ghcr.io/astral-sh/ruff:0.15.15@sha256:ad419fa4f7d7ae24904bf18ce4c3a5e51538df83d11348e4c4a7f1e5d4a48207
+NODE_IMAGE          ?= node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32
+HADOLINT_IMAGE      ?= hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d
+SHELLCHECK_IMAGE    ?= koalaman/shellcheck:v0.11.0@sha256:61862eba1fcf09a484ebcc6feea46f1782532571a34ed51fedf90dd25f925a8d
+SOCAT_IMAGE         ?= alpine/socat:1.8.1.3@sha256:3d9e7966201dd3a065df591020a09fd3c70845de7e7086e3531ea69db774406b
 OBSERVABILITY_NAMESPACE ?= observability
 LOG_DIR             ?= /tmp/nars
 MIGRATIONS_DIR      ?= nars-infra/migrations
+SCRIPTS_DIR         ?= nars-infra/scripts
 POSTGIS_GET_POD_CMD = $(KUBECTL) get pod -n "$(NAMESPACE)" -l app.kubernetes.io/name=postgis -o jsonpath='{.items[0].metadata.name}' 2>/dev/null
 
 # ─── Secrets ──────────────────────────────────────────────────
@@ -61,7 +70,10 @@ else \
 fi
 
 # _RND shell function + $$(_RND N) expansion rely on .ONESHELL.
+# umask 077 ensures the file is never readable by other users between
+# creation and the explicit chmod below.
 .env:
+	@umask 077;
 	@echo "# Auto-generated — DO NOT COMMIT" > $@;
 	_RND() { $(_rnd_cmd); };
 	echo "POSTGRES_PASSWORD=$$(_RND 32)" >> $@;

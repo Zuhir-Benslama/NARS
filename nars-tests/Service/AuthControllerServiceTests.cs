@@ -127,11 +127,11 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
 
         // Two independent contexts + controllers simulating concurrent requests
         await using var db1 = _fixture.CreateDbContext();
-        var ctrl1 = CreateSignupController(db1);
+        var ctrl1 = AuthTestHelper.CreateAdminSignupController(db1);
         ctrl1.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         ctrl1.ControllerContext.HttpContext.Request.Headers["X-Admin-Signup"] = TestData.AdminSignupToken;
         await using var db2 = _fixture.CreateDbContext();
-        var ctrl2 = CreateSignupController(db2);
+        var ctrl2 = AuthTestHelper.CreateAdminSignupController(db2);
         ctrl2.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         ctrl2.ControllerContext.HttpContext.Request.Headers["X-Admin-Signup"] = TestData.AdminSignupToken;
 
@@ -244,7 +244,7 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
 
         var claims = new List<Claim> { new(ClaimNames.UserId, user.Id.ToString()) };
         var httpContext = CreateHttpContext(claims);
-        var logoutController = CreateController(db);
+        var logoutController = AuthTestHelper.CreateAuthController(db);
         logoutController.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
         var result = await logoutController.Logout();
@@ -280,55 +280,9 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
         Assert.Equal("current_user@test.com", payload.Email);
     }
 
-    private AuthController CreateController() => CreateController(_db);
+    private AuthController CreateController() => AuthTestHelper.CreateAuthController(_db);
 
-    private static AuthController CreateController(AppDbContext db)
-    {
-        var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
-        var jwtOpts = DefaultJwtOptions;
-        var jwt = new JwtService(
-            AuthTestHelper.TestJwtSecret,
-            null,
-            null,
-            jwtOpts,
-            Mock.Of<ILogger<JwtService>>(),
-            timeProvider);
-        var refreshService = new RefreshTokenService(db, jwt, jwtOpts, Mock.Of<ISecurityStampCache>(), timeProvider);
-        return new AuthController(
-            refreshService,
-            jwt,
-            Options.Create(new AccountLockoutOptions()),
-            Mock.Of<ILogger<AuthController>>(),
-            timeProvider,
-            new UserAuthorizationService(db, refreshService, Mock.Of<IFeatureCleanupService>(), timeProvider),
-            Mock.Of<ILocationQueryService>(),
-            Mock.Of<IWebHostEnvironment>());
-    }
-
-    private AdminSignupController CreateSignupController() => CreateSignupController(_db);
-
-    private static AdminSignupController CreateSignupController(AppDbContext db)
-    {
-        var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
-        var jwtOpts = DefaultJwtOptions;
-        var jwt = new JwtService(
-            AuthTestHelper.TestJwtSecret,
-            null,
-            null,
-            jwtOpts,
-            Mock.Of<ILogger<JwtService>>(),
-            timeProvider);
-        var refreshService = new RefreshTokenService(db, jwt, jwtOpts, Mock.Of<ISecurityStampCache>(), timeProvider);
-        var authSvc = new UserAuthorizationService(db, refreshService, Mock.Of<IFeatureCleanupService>(), timeProvider);
-        return new AdminSignupController(
-            refreshService,
-            Options.Create(new AccountLockoutOptions()),
-            Options.Create(new AdminSignupOptions { SignupToken = TestData.AdminSignupToken }),
-            Mock.Of<ILogger<AdminSignupController>>(),
-            authSvc,
-            new UserCreationService(db, authSvc, Mock.Of<ILogger<UserCreationService>>()),
-            Mock.Of<IWebHostEnvironment>());
-    }
+    private AdminSignupController CreateSignupController() => AuthTestHelper.CreateAdminSignupController(_db);
 
     private async Task SeedReferenceDataAsync() => await SeedData.SeedBasicLocationsAsync(_db);
 
@@ -367,7 +321,7 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
 
     private AuthController CreateSignInController()
     {
-        var ctrl = CreateController(_db);
+        var ctrl = AuthTestHelper.CreateAuthController(_db);
         ctrl.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext(),

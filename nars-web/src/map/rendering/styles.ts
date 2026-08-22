@@ -1,9 +1,6 @@
-// ─── STYLES, ICONS, POPUP ────────────────────────────────────────────────────
+// ─── STYLES, ICONS ───────────────────────────────────────────────────────────
 
-import { AREA_TYPES, PHASES } from "../../phases"
-import type { FeatureData } from "../../types"
-import { t } from "../../i18n"
-import { escapeHtml } from "../../utils/sanitize"
+import { AREA_TYPES } from "../../phases"
 
 // ─── POLYGON STYLES ───────────────────────────────────────────────────────────
 
@@ -20,52 +17,4 @@ export function areaStyle(areaTypeKey: string): {
     lineColor: at.color,
     lineWidth: 2.5,
   }
-}
-
-// ─── ICONS ────────────────────────────────────────────────────────────────────
-
-const ENTRANCE_COLOR = PHASES.find((p) => p.key === "houseEntrances")?.color ?? "#27ae60"
-
-export function createEntranceIconHtml(label: string | number, color = ENTRANCE_COLOR): string {
-  const text =
-    escapeHtml(
-      String(label ?? "")
-        .trim()
-        .slice(0, 6),
-    ) || "?"
-  const w = text.length <= 2 ? 16 : text.length <= 4 ? 22 : 28
-  return `
-        <div class="entrance-marker" style="
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background: ${color};
-            color: white;
-            width: ${w}px;
-            height: 16px;
-            border-radius: 8px;
-            font-size: 10px;
-            font-weight: bold;
-            border: 2px solid white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        ">${text}</div>
-    `
-}
-
-// ─── POPUP BUILDER ────────────────────────────────────────────────────────────
-
-export function buildPopupContent(data: FeatureData, phase: (typeof PHASES)[number]): string {
-  const esc = escapeHtml
-  const lines = [`<b>${esc(data.label ?? "")}</b>`, `<small>${t(phase.label)}</small>`]
-  if (data.decisionNumber)
-    lines.push(`<small>${t("popup_decision")}: ${esc(data.decisionNumber)}</small>`)
-  if (data.decisionDate) lines.push(`<small>${t("popup_date")}: ${esc(data.decisionDate)}</small>`)
-  if (data.roadLabel) lines.push(`<small>${t("popup_road")}: ${esc(data.roadLabel)}</small>`)
-  if (data.side)
-    lines.push(
-      `<small>${t("popup_side")}: ${esc(data.side)} (${t(data.side === "left" ? "popup_side_odd" : "popup_side_even")})</small>`,
-    )
-  if (data.mainEntranceLabel)
-    lines.push(`<small>${t("popup_main_entrance")}: ${esc(data.mainEntranceLabel)}</small>`)
-  return lines.join("<br>")
 }

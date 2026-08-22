@@ -20,65 +20,19 @@ public class AuthControllerTests
 {
     private static AppDbContext CreateDb() => CreateInMemoryDb("AuthTest");
 
-    private static JwtService CreateJwtService(IDateTimeProvider? timeProvider = null)
-    {
-        timeProvider ??= Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
-        var jwtOptions = DefaultJwtOptions;
-        return new JwtService(
-            AuthTestHelper.TestJwtSecret,
-            null,
-            null,
-            jwtOptions,
-            Mock.Of<ILogger<JwtService>>(),
-            timeProvider);
-    }
+    private static AuthController CreateController(AppDbContext db) =>
+        AttachContext(AuthTestHelper.CreateAuthController(db));
 
-    private static AuthController CreateController(AppDbContext db)
-    {
-        var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
-        var lockoutOptions = Options.Create(new AccountLockoutOptions());
-        var jwtService = CreateJwtService(timeProvider);
-        var refreshService = new RefreshTokenService(db, jwtService, DefaultJwtOptions, Mock.Of<ISecurityStampCache>(), timeProvider);
-        var authorizationService = new UserAuthorizationService(db, refreshService, Mock.Of<IFeatureCleanupService>(), timeProvider);
-        return new AuthController(
-            refreshService,
-            jwtService,
-            lockoutOptions,
-            Mock.Of<ILogger<AuthController>>(),
-            timeProvider,
-            authorizationService,
-            Mock.Of<ILocationQueryService>(),
-            Mock.Of<IWebHostEnvironment>())
-        {
-            ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext(),
-            }
-        };
-    }
+    private static AdminSignupController CreateSignupController(AppDbContext db) =>
+        AttachContext(AuthTestHelper.CreateAdminSignupController(db));
 
-    private static AdminSignupController CreateSignupController(AppDbContext db)
+    private static T AttachContext<T>(T controller) where T : ControllerBase
     {
-        var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
-        var lockoutOptions = Options.Create(new AccountLockoutOptions());
-        var jwtService = CreateJwtService(timeProvider);
-        var refreshService = new RefreshTokenService(db, jwtService, DefaultJwtOptions, Mock.Of<ISecurityStampCache>(), timeProvider);
-        var authorizationService = new UserAuthorizationService(db, refreshService, Mock.Of<IFeatureCleanupService>(), timeProvider);
-        var userCreationService = new UserCreationService(db, authorizationService, Mock.Of<ILogger<UserCreationService>>());
-        return new AdminSignupController(
-            refreshService,
-            lockoutOptions,
-            Options.Create(new AdminSignupOptions { SignupToken = TestData.AdminSignupToken }),
-            Mock.Of<ILogger<AdminSignupController>>(),
-            authorizationService,
-            userCreationService,
-            Mock.Of<IWebHostEnvironment>())
+        controller.ControllerContext = new ControllerContext
         {
-            ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext(),
-            }
+            HttpContext = new DefaultHttpContext(),
         };
+        return controller;
     }
 
     [Fact]
@@ -102,19 +56,8 @@ public class AuthControllerTests
 
         var controller = CreateSignupController(db);
 
-        var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
-            AdminUsername: "admin",
-            AdminPassword: TestData.DefaultPassword,
-            Name: "Test User",
-            Email: TestData.DefaultEmail,
-            Phone: TestData.AltPhone,
-            Username: "testuser",
-            Password: TestData.AltPassword,
-            Role: UserRoles.CommuneUser,
-            CommuneId: CommuneId1,
-            DairaId: null,
-            WilayaId: null
-        ), signupToken: AdminSignupToken);
+        var result = await controller.AuthorizedAdminSignup(
+            ValidAdminSignup(), signupToken: AdminSignupToken);
 
         var statusCodeResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, statusCodeResult.StatusCode);
@@ -129,19 +72,8 @@ public class AuthControllerTests
 
         var controller = CreateSignupController(db);
 
-        var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
-            AdminUsername: "admin",
-            AdminPassword: TestData.DefaultPassword,
-            Name: "Test User",
-            Email: TestData.DefaultEmail,
-            Phone: AltPhone,
-            Username: "testuser",
-            Password: "weak",
-            Role: UserRoles.CommuneUser,
-            CommuneId: CommuneId1,
-            DairaId: null,
-            WilayaId: null
-        ), signupToken: AdminSignupToken);
+        var result = await controller.AuthorizedAdminSignup(
+            ValidAdminSignup(password: "weak"), signupToken: AdminSignupToken);
 
         var objResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(400, objResult.StatusCode);
@@ -169,19 +101,9 @@ public class AuthControllerTests
 
         var controller = CreateSignupController(db);
 
-        var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
-            AdminUsername: "admin",
-            AdminPassword: DefaultPassword,
-            Name: "New User",
-            Email: "new@example.com",
-            Phone: AltPhone,
-            Username: "existinguser",
-            Password: AltPassword,
-            Role: UserRoles.CommuneUser,
-            CommuneId: CommuneId1,
-            DairaId: null,
-            WilayaId: null
-        ), signupToken: AdminSignupToken);
+        var result = await controller.AuthorizedAdminSignup(
+            ValidAdminSignup(username: "existinguser", email: "new@example.com"),
+            signupToken: AdminSignupToken);
 
         var conflict = Assert.IsType<ObjectResult>(result);
         Assert.Equal(409, conflict.StatusCode);
@@ -209,19 +131,9 @@ public class AuthControllerTests
 
         var controller = CreateSignupController(db);
 
-        var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
-            AdminUsername: "admin",
-            AdminPassword: DefaultPassword,
-            Name: "New User",
-            Email: "dupe@example.com",
-            Phone: AltPhone,
-            Username: "newuser",
-            Password: AltPassword,
-            Role: UserRoles.CommuneUser,
-            CommuneId: CommuneId1,
-            DairaId: null,
-            WilayaId: null
-        ), signupToken: AdminSignupToken);
+        var result = await controller.AuthorizedAdminSignup(
+            ValidAdminSignup(username: "newuser", email: "dupe@example.com"),
+            signupToken: AdminSignupToken);
 
         var conflict = Assert.IsType<ObjectResult>(result);
         Assert.Equal(409, conflict.StatusCode);
@@ -236,19 +148,8 @@ public class AuthControllerTests
 
         var controller = CreateSignupController(db);
 
-        var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
-            AdminUsername: "admin",
-            AdminPassword: DefaultPassword,
-            Name: "Test User",
-            Email: TestData.DefaultEmail,
-            Phone: AltPhone,
-            Username: "testuser",
-            Password: AltPassword,
-            Role: UserRoles.CommuneUser,
-            CommuneId: CommuneId2,
-            DairaId: null,
-            WilayaId: null
-        ), signupToken: AdminSignupToken);
+        var result = await controller.AuthorizedAdminSignup(
+            ValidAdminSignup(communeId: CommuneId2), signupToken: AdminSignupToken);
 
         Assert.IsType<ForbidResult>(result);
     }
@@ -262,19 +163,11 @@ public class AuthControllerTests
 
         var controller = CreateSignupController(db);
 
-        var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
-            AdminUsername: "commune_admin",
-            AdminPassword: DefaultPassword,
-            Name: "Field Worker",
-            Email: TestData.DefaultEmail,
-            Phone: AltPhone,
-            Username: "fieldworker",
-            Password: AltPassword,
-            Role: UserRoles.FieldWorker,
-            CommuneId: CommuneId2,
-            DairaId: null,
-            WilayaId: null
-        ), signupToken: AdminSignupToken);
+        var result = await controller.AuthorizedAdminSignup(
+            ValidAdminSignup(
+                username: "fieldworker", role: UserRoles.FieldWorker,
+                communeId: CommuneId2, adminUsername: "commune_admin", name: "Field Worker"),
+            signupToken: AdminSignupToken);
 
         Assert.IsType<ForbidResult>(result);
         Assert.False(await db.Users.AnyAsync(u => u.Username == "fieldworker"));

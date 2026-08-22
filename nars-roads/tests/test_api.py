@@ -298,6 +298,16 @@ def test_missing_token_fails_closed(monkeypatch):
     assert _post().status_code == 401
 
 
+def test_non_ascii_token_rejected_not_500():
+    """A header byte > 0x7F reaches the app latin-1-decoded ("tok\\xe9" ->
+    "toké"). secrets.compare_digest(str, str) raises TypeError on non-ASCII,
+    which used to escape the dependency as an unhandled 500; the comparison
+    runs on UTF-8 bytes, so this must be a clean 401. The header is passed
+    as raw bytes because httpx itself refuses non-ASCII str values."""
+    resp = _post(headers={"X-Internal-Token": b"tok\xe9"})
+    assert resp.status_code == 401
+
+
 def test_segment_rejects_oversized_upload(monkeypatch):
     monkeypatch.setattr(roads, "MAX_TILE_BYTES", 1024)
     monkeypatch.setattr(

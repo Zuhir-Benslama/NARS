@@ -56,6 +56,5 @@ export type {
   ValidateDistrictResponse,
   DistrictCoverageResponse,
   RoadSideResponse,
-  ScatteredRefreshResponse,
   DbFeature,
 } from "./types/api"

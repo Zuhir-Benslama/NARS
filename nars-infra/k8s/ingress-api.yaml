@@ -50,8 +50,8 @@ metadata:
   namespace: nars
   annotations:
     # No ssl-redirect — health checks must work over plain HTTP for monitoring
-    # systems that don't support HTTPS. The /health endpoint exposes no
-    # sensitive data.
+    # systems that don't support HTTPS. /health returns only the aggregate
+    # status string ("Healthy"/"Unhealthy") — no per-check details.
     # ⚠ These CIDRs are kind cluster defaults (pod: 10.244.0.0/16, svc: 10.96.0.0/12).
     # MUST be overridden via kustomize patch for production clusters.
     # Detect your cluster CIDRs:

@@ -16,6 +16,9 @@ const BATCH_LIMIT = 20
 const FLUSH_INTERVAL_MS = 30_000
 const MAX_RETRIES = 1
 const REQUEST_TIMEOUT_MS = 5_000
+// The Fetch spec rejects keepalive bodies over 64KB outright; stay safely
+// under it and trim entries rather than losing the whole final batch.
+const MAX_KEEPALIVE_BYTES = 60_000
 
 const batch: LogEntry[] = []
 let timer: ReturnType<typeof setTimeout> | null = null
@@ -78,16 +81,39 @@ async function flush(): Promise<void> {
 }
 
 if (typeof window !== "undefined") {
-  window.addEventListener("beforeunload", () => {
+  // pagehide, not beforeunload: it also fires on mobile Safari and when the
+  // tab enters the back/forward cache, where beforeunload is skipped.
+  window.addEventListener("pagehide", () => {
     if (timer) clearTimeout(timer)
-    if (batch.length > 0) {
-      const pending = batch.splice(0)
+    timer = null
+    if (batch.length === 0) return
+    const pending = batch.splice(0)
 
-      const blob = new Blob([JSON.stringify({ logs: pending })], { type: "application/json" })
-      // sendBeacon cannot set headers, so CSRF is passed via a cookie (SameSite=Lax).
-      // Do NOT pass the token as a query parameter — it leaks via Referer, logs, and CDNs.
-      navigator.sendBeacon(`${getApiBaseUrl()}/api/logs`, blob)
+    const headers: Record<string, string> = { "Content-Type": "application/json" }
+    const csrfToken = getCsrfToken()
+    if (csrfToken) headers["X-CSRF-Token"] = csrfToken
+
+    // keepalive lets the request outlive the document AND carry headers.
+    // sendBeacon could do neither: without X-CSRF-Token the server's
+    // antiforgery middleware rejected every authenticated final batch with
+    // 403, so pending logs were silently lost on every page close. Do NOT
+    // pass the token as a query parameter — it leaks via Referer and logs.
+    let body = JSON.stringify({ logs: pending })
+    while (pending.length > 0 && body.length > MAX_KEEPALIVE_BYTES) {
+      pending.pop()
+      body = JSON.stringify({ logs: pending })
     }
+    if (pending.length === 0) return
+
+    void fetch(`${getApiBaseUrl()}/api/logs`, {
+      method: "POST",
+      credentials: "include",
+      headers,
+      body,
+      keepalive: true,
+    }).catch(() => {
+      // Nothing left to do at unload — never log the logger here either.
+    })
   })
 }
 
@@ -108,14 +134,31 @@ export function resetLoggerState(): void {
   flushing = false
 }
 
+/**
+ * Drop the query string before shipping a URL to the server: it can carry
+ * user input (e.g. ?search=… terms) and the log pipeline's privacy posture
+ * matches telemetry's, which already strips queries before export.
+ */
+function stripUrlQuery(url: string | null | undefined): string | null {
+  if (!url) return null
+  const queryStart = url.indexOf("?")
+  return queryStart === -1 ? url : url.slice(0, queryStart)
+}
+
 export function captureError(error: NarsError, additionalContext?: ErrorContext): void {
   const fullContext = { ...error.context, ...additionalContext }
+  // url/method travel in their own dedicated (sanitized) fields; keeping them
+  // out of the free-form context blob prevents the raw query string from
+  // sneaking back in through JSON.stringify.
+  const restContext = { ...fullContext }
+  delete restContext.url
+  delete restContext.method
   push({
     level: "error",
     code: error.code,
     message: error.message,
-    context: Object.keys(fullContext).length > 0 ? JSON.stringify(fullContext) : null,
-    url: fullContext.url ?? null,
+    context: Object.keys(restContext).length > 0 ? JSON.stringify(restContext) : null,
+    url: stripUrlQuery(fullContext.url),
     method: fullContext.method ?? null,
   })
 }

@@ -192,7 +192,10 @@ class SegmentationModel:
         fallback path is for), which is always required and always correct
         for the /segment contract."""
         transform = src.transform
-        if not transform or transform == rasterio.Affine.identity():
+        # src.transform is never None (rasterio falls back to identity when
+        # the file carries no georeferencing), so only equality can detect
+        # "no usable transform".
+        if transform == rasterio.Affine.identity():
             return None
         if src.crs is None or not src.crs.is_geographic:
             return None

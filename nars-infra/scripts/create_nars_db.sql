@@ -421,6 +421,12 @@ CREATE INDEX IF NOT EXISTS ix_error_logs_level      ON public.error_logs (level)
 -- Mirrors nars-infra/migrations/0001_create_ai_draft_features.sql. Draft rows
 -- written by the nars-roads segmentation service are never promoted to the
 -- production feature tables until a field worker / commune admin accepts them.
+--
+-- ⚠ NAMES MUST STAY IN SYNC with that migration file: both are applied to the
+-- same databases (this script runs at Docker image init; `make
+-- db-migrate-nars` re-applies the migration) and are idempotent BY NAME —
+-- divergent index/constraint names silently create duplicates instead of
+-- no-oping.
 
 CREATE TABLE IF NOT EXISTS public.ai_draft_features
 (

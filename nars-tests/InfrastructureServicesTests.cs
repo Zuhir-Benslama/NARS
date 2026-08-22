@@ -6,6 +6,7 @@ using NarsApi.Data;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
 using NarsApi.Services;
+using static NarsApi.Tests.TestData;
 using Xunit;
 
 namespace NarsApi.Tests;
@@ -20,18 +21,6 @@ public class InfrastructureServicesTests
 {
     private static IDateTimeProvider CreateFixedTime() =>
         Mock.Of<IDateTimeProvider>(p => p.UtcNow == TestData.FixedUtcNow);
-
-    private static DbContextOptions<AppDbContext> CreateInMemoryOptions(string prefix, SaveChangesInterceptor? interceptor = null)
-    {
-        var builder = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase($"{prefix}_{Guid.NewGuid()}")
-            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
-        if (interceptor is not null)
-        {
-            builder.AddInterceptors(interceptor);
-        }
-        return builder.Options;
-    }
 
     private static Road NewRoad(Guid userId, string label) => new()
     {
@@ -131,8 +120,7 @@ public class InfrastructureServicesTests
         public async Task SavingChanges_SetsTimestampsOnAddedEntries()
         {
             var userId = Guid.NewGuid();
-            var options = CreateInMemoryOptions("updated_at_interceptor", new UpdatedAtInterceptor(CreateFixedTime()));
-            await using var db = new AppDbContext(options);
+            await using var db = CreateInMemoryDb("updated_at_interceptor", new UpdatedAtInterceptor(CreateFixedTime()));
 
             var addedRoad = NewRoad(userId, "added");
             db.Roads.Add(addedRoad);
@@ -160,8 +148,7 @@ public class InfrastructureServicesTests
         public async Task SavingChanges_SetsUpdatedAtOnModifiedFeature()
         {
             var userId = Guid.NewGuid();
-            var options = CreateInMemoryOptions("updated_at_interceptor", new UpdatedAtInterceptor(CreateFixedTime()));
-            await using var db = new AppDbContext(options);
+            await using var db = CreateInMemoryDb("updated_at_interceptor", new UpdatedAtInterceptor(CreateFixedTime()));
 
             var road = NewRoad(userId, "modified");
             db.Roads.Add(road);
@@ -181,8 +168,7 @@ public class InfrastructureServicesTests
         public async Task SavingChanges_PreservesExistingCreatedAtOnAdded()
         {
             var userId = Guid.NewGuid();
-            var options = CreateInMemoryOptions("updated_at_interceptor", new UpdatedAtInterceptor(CreateFixedTime()));
-            await using var db = new AppDbContext(options);
+            await using var db = CreateInMemoryDb("updated_at_interceptor", new UpdatedAtInterceptor(CreateFixedTime()));
 
             var road = NewRoad(userId, "kept");
             road.CreatedAt = TestData.FixedUtcNow.AddDays(-3);
@@ -207,8 +193,7 @@ public class InfrastructureServicesTests
         [Fact]
         public async Task LogBatchAsync_EmptyList_ReturnsWithoutSaving()
         {
-            var options = CreateInMemoryOptions("error_log_service");
-            await using var db = new AppDbContext(options);
+            await using var db = CreateInMemoryDb("error_log_service");
             var service = CreateService(db, maxBatchSize: 50);
 
             await service.LogBatchAsync([]);
@@ -219,8 +204,7 @@ public class InfrastructureServicesTests
         [Fact]
         public async Task LogBatchAsync_PersistsAllEntriesWithinLimit()
         {
-            var options = CreateInMemoryOptions("error_log_service");
-            await using var db = new AppDbContext(options);
+            await using var db = CreateInMemoryDb("error_log_service");
             var service = CreateService(db, maxBatchSize: 100);
 
             await service.LogBatchAsync([NewEntry("e1"), NewEntry("e2")]);
@@ -231,8 +215,7 @@ public class InfrastructureServicesTests
         [Fact]
         public async Task LogBatchAsync_TruncatesToMaxBatchSize()
         {
-            var options = CreateInMemoryOptions("error_log_service");
-            await using var db = new AppDbContext(options);
+            await using var db = CreateInMemoryDb("error_log_service");
             var service = CreateService(db, maxBatchSize: 2);
 
             await service.LogBatchAsync([NewEntry("e1"), NewEntry("e2"), NewEntry("e3")]);

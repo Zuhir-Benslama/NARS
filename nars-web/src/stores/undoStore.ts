@@ -8,18 +8,13 @@ interface DeletedFeature {
 
 const MAX_UNDO_ENTRIES = 100
 
+/** Undo entries beyond this depth are evicted (oldest first) — see undo.ts. */
+export { MAX_UNDO_ENTRIES }
+
 export const useUndoStore = defineStore("undo", {
   state: () => ({
     undoStack: [] as DeletedFeature[],
   }),
-
-  getters: {
-    hasUndo: (state) => state.undoStack.length > 0,
-    undoLabel: (state) => {
-      const last = state.undoStack[state.undoStack.length - 1]
-      return last ? `Restore "${last.entry.data.label}"` : null
-    },
-  },
 
   actions: {
     recordDelete(entry: LayerEntry, phaseKey: FeatureTypeKey): void {
@@ -30,6 +25,10 @@ export const useUndoStore = defineStore("undo", {
     },
     popUndo(): DeletedFeature | undefined {
       return this.undoStack.pop()
+    },
+    /** Remove the OLDEST entry without deleting any feature (stack overflow). */
+    shiftUndo(): DeletedFeature | undefined {
+      return this.undoStack.shift()
     },
   },
 })

@@ -26,8 +26,10 @@ public class PagesControllerTests
     private const string IndexTemplate = "<html><head><meta name=\"csrf-token\" content=\"\"></head><body><script src=\"/app.js\"></script></body></html>";
 
     // PagesController reads templates from Directory.GetCurrentDirectory()/wwwroot.
-    // Write them create-if-missing (never clobber a pre-existing file) and guard with
-    // a lock so parallel test hosts sharing the same output dir cannot race.
+    // The lock serializes template setup across test classes within this test
+    // host; it cannot synchronize separate processes, but combined with the
+    // create-if-missing write below (never clobber a pre-existing file) any
+    // interleaving converges on the same content.
     private static readonly object TemplateWriteLock = new();
 
     static PagesControllerTests()

@@ -2,6 +2,7 @@ import { computed } from "vue"
 import type { ModalState, ModalResult } from "../types"
 import { PHASES } from "../phases"
 import { CITY_CENTER_CONFIG } from "../config"
+import { cityCenterRadiusError } from "../lib/city-center"
 
 export function useFeatureValidation(modalStore: ModalState & { phaseIndex: number | null }) {
   const phase = computed(() =>
@@ -31,10 +32,11 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
     }
 
     if (key === "cityCenter") {
-      const radius = modalStore.radius
-      if (!radius || Number.isNaN(radius) || radius < CITY_CENTER_CONFIG.minRadiusM) {
+      // Shared rule with draw-save's toast validation (lib/city-center.ts).
+      const radiusError = cityCenterRadiusError(modalStore.radius)
+      if (radiusError === "too_small") {
         errors.radius = `Must be at least ${CITY_CENTER_CONFIG.minRadiusM} meters`
-      } else if (radius > CITY_CENTER_CONFIG.maxRadiusM) {
+      } else if (radiusError === "too_large") {
         errors.radius = `Must not exceed ${CITY_CENTER_CONFIG.maxRadiusM / 1000} km`
       }
     }

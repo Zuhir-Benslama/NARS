@@ -42,6 +42,53 @@ function parseErrorResponse(body: string, status: number): { message: string; co
   }
 }
 
+// ─── SILENT SESSION REFRESH ───────────────────────────────────────────────────
+
+// Single-flight: N parallel requests expiring together must share ONE
+// /api/refresh round trip instead of stampeding the endpoint and producing
+// N redirect + error-log pairs. Resolves true only when the session was
+// actually renewed.
+let refreshInFlight: Promise<boolean> | null = null
+let loginRedirectLogged = false
+
+export function refreshSession(): Promise<boolean> {
+  refreshInFlight ??= (async () => {
+    try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT)
+      const res = await fetch(apiUrl("/api/refresh"), {
+        method: "POST",
+        credentials: "include",
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+      return res.ok
+    } catch {
+      // Offline / aborted / 5xx — the caller decides what failure means.
+      return false
+    }
+  })().finally(() => {
+    refreshInFlight = null
+  })
+  return refreshInFlight
+}
+
+/** Hard fallback once the refresh cookie is also dead: bounce to login. */
+function redirectToLogin(context: { url: string; method: string }): never {
+  const error = createAuthError("Session expired. Redirecting to login.", {
+    ...context,
+    status: 401,
+  })
+  // Parallel 401s all land here; ship exactly one error-log batch for them.
+  if (!loginRedirectLogged) {
+    loginRedirectLogged = true
+    logError(error)
+  }
+  // Idempotent assignment — safe even when several callers race here.
+  window.location.href = getLoginPath()
+  throw error
+}
+
 // ─── RESPONSE HANDLING ────────────────────────────────────────────────────────
 
 async function handleResponse(
@@ -50,16 +97,11 @@ async function handleResponse(
 ): Promise<Response> {
   if (response.ok) return response
 
-  // 401 = session expired → redirect to login
+  // 401 after a refresh attempt (or with no recoverable session) → login.
+  // The silent-refresh path lives in executeRequest, which replays the
+  // request once before this fallback runs.
   if (response.status === 401) {
-    window.location.href = getLoginPath()
-    // Throw to prevent further execution
-    const error = createAuthError("Session expired. Redirecting to login.", {
-      ...context,
-      status: 401,
-    })
-    logError(error)
-    throw error
+    redirectToLogin(context)
   }
 
   const body = await response.text()
@@ -137,14 +179,6 @@ export async function apiFetch(path: string, options: ApiFetchOptions = {}): Pro
   const context = { url, method }
 
   const executeRequest = async (): Promise<Response> => {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), timeout)
-
-    // Merge timeout signal with external signal (e.g. for AbortController from callers)
-    const combinedSignal = externalSignal
-      ? AbortSignal.any([controller.signal, externalSignal])
-      : controller.signal
-
     // Build headers — add CSRF token for state-changing requests
     const csrfToken = getCsrfToken()
     const csrfHeaders: Record<string, string> = {}
@@ -168,23 +202,43 @@ export async function apiFetch(path: string, options: ApiFetchOptions = {}): Pro
     }
 
     const hasBody = method === "POST" || method === "PUT" || method === "PATCH"
-    try {
-      const response = await fetch(url, {
-        ...fetchOptions,
-        credentials: "include",
-        signal: combinedSignal,
-        headers: {
-          ...fetchOptions.headers,
-          ...(hasBody ? { "Content-Type": "application/json" } : {}),
-          ...csrfHeaders,
-        },
-      })
 
-      clearTimeout(timeoutId)
+    const sendRequest = async (): Promise<Response> => {
+      // Fresh timeout per attempt: the silent-refresh replay gets its own
+      // full budget, and a caller abort is merged in via AbortSignal.any.
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), timeout)
+      try {
+        return await fetch(url, {
+          ...fetchOptions,
+          credentials: "include",
+          signal: externalSignal
+            ? AbortSignal.any([controller.signal, externalSignal])
+            : controller.signal,
+          headers: {
+            ...fetchOptions.headers,
+            ...(hasBody ? { "Content-Type": "application/json" } : {}),
+            ...csrfHeaders,
+          },
+        })
+      } finally {
+        clearTimeout(timeoutId)
+      }
+    }
+
+    try {
+      let response = await sendRequest()
+
+      // Access token expired mid-session: attempt one silent refresh and
+      // replay the request once before the hard-redirect fallback in
+      // handleResponse. A single replay cannot loop, and concurrent callers
+      // share the same refresh via refreshSession's single-flight promise.
+      if (response.status === 401 && (await refreshSession())) {
+        response = await sendRequest()
+      }
+
       return await handleResponse(response, context)
     } catch (error) {
-      clearTimeout(timeoutId)
-
       // Caller-initiated abort (stale request superseded, unmount, etc.) —
       // surface the original AbortError so callers can detect their own
       // cancellation, and so withRetry never treats it as a transient timeout.

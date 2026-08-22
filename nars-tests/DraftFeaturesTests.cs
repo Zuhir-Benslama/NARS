@@ -16,7 +16,8 @@ public class DraftFeaturesServiceTests
     /// A testable subclass that replaces the PostgreSQL-specific conditional
     /// ExecuteUpdateAsync with an equivalent tracked update usable with the
     /// InMemory provider (which does not implement ExecuteUpdateAsync). The
-    /// real PostgreSQL code path is covered by integration tests.
+    /// production transition itself is exercised against PostgreSQL in
+    /// Service/DraftFeaturesServiceTests.
     /// </summary>
     private sealed class TestableDraftFeaturesService(
         AppDbContext db,

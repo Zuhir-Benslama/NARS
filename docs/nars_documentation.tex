@@ -894,6 +894,7 @@ POST & \texttt{/api/signin}        & Authenticate, issue tokens   & \texttt{auth
 POST & \texttt{/api/logout}        & Revoke refresh token         & \texttt{api}  \\
 POST & \texttt{/api/refresh}       & Rotate refresh token         & \texttt{auth} \\
 GET  & \texttt{/api/current\_user} & Return authenticated profile & \texttt{api}  \\
+PUT  & \texttt{/api/user/profile}  & Update own username/email/password & \texttt{api}  \\
 POST & \texttt{/api/admin/authorized-signup} & Create admin/manager user & \texttt{api} \\
 \midrule
 \multicolumn{4}{l}{\textit{Features}} \\
@@ -903,6 +904,7 @@ PUT    & \texttt{/api/features/\{id\}}     & Update geometry or label     & \tex
 DELETE & \texttt{/api/features/\{id\}}     & Delete feature               & \texttt{api} \\
 POST   & \texttt{/api/features/clear}      & Delete all features          & \texttt{clear} \\
 GET    & \texttt{/api/features/stats}      & Per-type feature counts      & \texttt{api} \\
+GET    & \texttt{/api/features/by-layer/\{layer\}} & Paginated features filtered by layer & \texttt{api} \\
 GET    & \texttt{/api/feature-types}       & Available feature types      & \texttt{api} \\
 \midrule
 \multicolumn{4}{l}{\textit{Validation and Spatial}} \\
@@ -1495,7 +1497,7 @@ client-side fast checks followed by server-side PostGIS spatial predicates.
 \node[dec, fill=yellow!20, below=of input] (c1) {Cardinality $\geq$ min?};
 \node[dec, fill=yellow!20, below=of c1] (c2) {City-centre radius bounded?};
 \node[box, fill=blue!10, below=of c2] (api) {POST /api/validate/\{type\}};
-\node[dec, fill=yellow!20, below=of api] (s1) {Angle $\leq 90°$?};
+\node[dec, fill=yellow!20, below=of api] (s1) {Angle $\leq 90^{\circ}$?};
 \node[dec, fill=yellow!20, below=of s1] (s2) {Spatial predicate?};
 \node[box, fill=green!15, below=of s2] (save) {POST /api/features};
 \node[box, fill=red!15, right=2.5cm of c1] (rej1) {Client toast};

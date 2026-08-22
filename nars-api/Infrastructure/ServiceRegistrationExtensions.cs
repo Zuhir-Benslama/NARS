@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NarsApi.Services;
 using OpenTelemetry.Metrics;
@@ -33,7 +34,14 @@ public static class ServiceRegistrationExtensions
         services.AddNarsOptions(config);
         services.AddNarsOpenTelemetry(config);
         services.AddNarsDatabase(connectionString);
-        services.AddNarsJwtAuthentication(jwtSecret, issuer: jwtIssuer, audience: jwtAudience);
+        // Cluster-wide security-stamp invalidation: the DB trigger (migration
+        // AddStampEvictionNotifyTrigger) notifies this listener on stamp change.
+        services.AddHostedService(sp => new StampEvictionListener(
+            connectionString,
+            sp.GetRequiredService<ISecurityStampCache>(),
+            sp.GetRequiredService<ILogger<StampEvictionListener>>()));
+        var jwtAlgorithm = config.GetSection("Jwt").Get<JwtOptions>()?.Algorithm ?? "HS256";
+        services.AddNarsJwtAuthentication(jwtSecret, issuer: jwtIssuer, audience: jwtAudience, algorithm: jwtAlgorithm);
         services.AddNarsDomainServices();
         services.AddNarsHttpClients(config);
         services.AddNarsControllers();
@@ -138,17 +146,6 @@ public static class ServiceRegistrationExtensions
 
     private static void AddNarsHttpClients(this IServiceCollection services, IConfiguration config)
     {
-        var httpOpts = config.GetSection("HttpClient").Get<HttpClientOptions>() ?? new HttpClientOptions();
-        services.AddHttpClient("tile-proxy", client =>
-        {
-            client.Timeout = TimeSpan.FromSeconds(httpOpts.TileProxyTimeoutSeconds);
-            client.DefaultRequestHeaders.Add("User-Agent", "NARS-TileProxy/1.0");
-        });
-        services.AddHttpClient("satellite", client =>
-        {
-            client.Timeout = TimeSpan.FromSeconds(httpOpts.SatelliteTimeoutSeconds);
-            client.DefaultRequestHeaders.Add("User-Agent", "NARS-Satellite/1.0");
-        });
         services.AddSegmentationClient(config);
     }
 

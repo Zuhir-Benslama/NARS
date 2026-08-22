@@ -84,7 +84,7 @@ public class FieldControllerTests
         mockFieldService.Setup(s => s.QueryFeaturesAsync(descriptor, 1, 0, 500, default))
             .ReturnsAsync((
             [
-                new("r1", UserId.ToString(), FeatureTypes.RoadLayers.Street, "Road 1", System.Text.Json.JsonDocument.Parse("{}").RootElement, FixedUtcNow, null),
+                new("r1", UserId.ToString(), FeatureTypes.RoadLayers.Street, "Road 1", ToJsonElement("{}"), FixedUtcNow, null),
             ], 1));
         var ctrl = CreateController(fieldService: mockFieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);

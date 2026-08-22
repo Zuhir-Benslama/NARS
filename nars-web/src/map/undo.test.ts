@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { createPinia, setActivePinia } from "pinia"
 import type { FeatureTypeKey, LayerEntry } from "../types/features"
+import { useUndoStore } from "../stores/undoStore"
 
 const mockFeaturesStoreAdd = vi.fn()
 const mockFeaturesStoreBatchUpdate = vi.fn()
@@ -18,21 +19,21 @@ vi.mock("../lib/toast", () => ({
   showToast: mockToast,
 }))
 
-vi.mock("./features/feature-data", () => ({
-  toApiSaveShape: mockToApiSaveShape,
-}))
+vi.mock("./features/feature-data", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./features/feature-data")>()
+  return {
+    ...actual,
+    toApiSaveShape: mockToApiSaveShape,
+  }
+})
 
 let resetUndoStack: () => void
-let hasUndo: () => boolean
-let getUndoLabel: () => string | null
 let recordDelete: (entry: LayerEntry, phaseKey: FeatureTypeKey) => void
 let undo: () => Promise<void>
 
 async function loadModule() {
   const mod = await import("./undo")
   resetUndoStack = mod.resetUndoStack
-  hasUndo = mod.hasUndo
-  getUndoLabel = mod.getUndoLabel
   recordDelete = mod.recordDelete
   undo = mod.undo
 }
@@ -68,42 +69,9 @@ describe("undo", () => {
   describe("resetUndoStack", () => {
     it("clears the stack", () => {
       recordDelete(makeEntry(), "areas")
-      expect(hasUndo()).toBe(true)
+      expect(useUndoStore().undoStack).toHaveLength(1)
       resetUndoStack()
-      expect(hasUndo()).toBe(false)
-    })
-  })
-
-  describe("hasUndo", () => {
-    it("returns false when stack is empty", () => {
-      expect(hasUndo()).toBe(false)
-    })
-
-    it("returns true after recording a delete", () => {
-      recordDelete(makeEntry(), "areas")
-      expect(hasUndo()).toBe(true)
-    })
-  })
-
-  describe("getUndoLabel", () => {
-    it("returns null when stack is empty", () => {
-      expect(getUndoLabel()).toBeNull()
-    })
-
-    it("returns label of the last deleted feature", () => {
-      recordDelete(
-        makeEntry({
-          data: {
-            type: "areas",
-            label: "My Area",
-            decisionNumber: "",
-            decisionDate: "",
-            areaTypeKey: "central_urban",
-          },
-        }),
-        "areas",
-      )
-      expect(getUndoLabel()).toBe('Restore "My Area"')
+      expect(useUndoStore().undoStack).toHaveLength(0)
     })
   })
 
@@ -111,8 +79,11 @@ describe("undo", () => {
     it("pushes entry and phase key onto the stack", () => {
       const entry = makeEntry()
       recordDelete(entry, "roads")
-      expect(hasUndo()).toBe(true)
-      expect(getUndoLabel()).toContain(entry.data.label)
+      expect(useUndoStore().undoStack).toHaveLength(1)
+      expect(useUndoStore().undoStack[0]).toMatchObject({
+        entry: { id: entry.id },
+        phaseKey: "roads",
+      })
     })
   })
 

@@ -248,10 +248,12 @@ kustomize-set-image-tag: ## Persistently pin image tags in kustomization.yaml (m
 .PHONY: kustomize-apply
 kustomize-apply: secrets-validate _check-pinned-tag _check-local-ingresses ## Apply k8s manifests via kustomize (pin tags with IMAGE_TAG=<sha>)
 	$(SUBMAKE) postgis-pv-fix
-	@echo "→ Applying kustomization (images: $(DOCKER_ORG)/*:$(IMAGE_TAG))..."
+	@echo "→ Applying kustomization (images: $(DOCKER_ORG)/*:"$(IMAGE_TAG_Q)")..."
+	# Tag rewriting lives in nars-infra/scripts/kustomize-tag-rewrite.awk
+	# (documented + diff-tested against the former inline awk program).
 	@$(KUBECTL) kustomize "$(K8S_DIR)" \
 		| awk -v org="$(DOCKER_ORG)" -v tag=$(IMAGE_TAG_Q) -v images="$(REGISTRY_IMAGES)" \
-			'BEGIN { esc = org; gsub(/\//, "\\/", esc); n = split(images, imgs, " "); alts = imgs[1]; for (i = 2; i <= n; i++) alts = alts "|" imgs[i]; pat = "^ *-? *image: " esc "\\/(" alts "):" } $$0 ~ pat { sub(/:[^ ]*$$/, ":" tag) } /app\.kubernetes\.io\/version:/ { sub(/version:.*$$/, "version: \"" tag "\"") } { print }' \
+			-f "$(SCRIPTS_DIR)/kustomize-tag-rewrite.awk" \
 		| $(KUBECTL) apply -f -
 	@echo "✓ Kustomization applied"
 
@@ -262,6 +264,8 @@ kustomize-apply: secrets-validate _check-pinned-tag _check-local-ingresses ## Ap
 		$(SUBMAKE) postgis-password-sync
 		$(SUBMAKE) postgis-migration-baseline
 		$(SUBMAKE) db-migrate-nars
+	else
+		echo "  ⚠ postgis deployment not found — skipping password sync, baseline, and migrations";
 	fi
 
 	@echo "→ Waiting for app deployments..."

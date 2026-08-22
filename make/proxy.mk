@@ -30,7 +30,7 @@ proxy-up: port-forward-start ## Start Docker socat bridge: host:$(APP_PORT) → 
 		-p 0.0.0.0:$(APP_TLS_PORT):$(APP_TLS_PORT) \
 		--network kind \
 		--entrypoint sh \
-		alpine/socat \
+		$(SOCAT_IMAGE) \
 		-c "socat tcp-l:$(APP_PORT),fork,reuseaddr tcp:$(CLUSTER_NAME)-control-plane:$(APP_PORT) & socat tcp-l:$(APP_TLS_PORT),fork,reuseaddr tcp:$(CLUSTER_NAME)-control-plane:$(APP_TLS_PORT) & wait -n" > /dev/null
 	@echo "→ Waiting for proxy to be ready..."
 	@for i in $$(seq 1 15); do
@@ -52,7 +52,7 @@ proxy-up: port-forward-start ## Start Docker socat bridge: host:$(APP_PORT) → 
 	fi
 	@echo ""
 	@echo "✓ App accessible at http://localhost:$(APP_PORT)/"
-	@echo "  Health:      http://localhost:$(APP_PORT)/api/health"
+	@echo "  Health:      http://localhost:$(APP_PORT)/health"
 	@echo "  Mobile app:  make adb-reverse    (if connected via USB)"
 	@echo "  Smoke test:  make smoke-test"
 	@echo "  Stop proxy:  make proxy-down"

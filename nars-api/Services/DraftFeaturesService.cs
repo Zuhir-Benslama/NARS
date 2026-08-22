@@ -155,7 +155,10 @@ public class DraftFeaturesService(
         string callerRole, int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
         Guid userId, Guid draftId, bool accept, CancellationToken ct)
     {
-        var draft = await db.AiDraftFeatures.FindAsync([draftId], ct);
+        // Read-only: the status transition below goes through a conditional
+        // ExecuteUpdateAsync, so the draft is loaded without change tracking.
+        var draft = await db.AiDraftFeatures.AsNoTracking()
+            .FirstOrDefaultAsync(f => f.Id == draftId, ct);
         if (draft is null)
         {
             return new DraftReviewResult(DraftReviewStatus.NotFound);

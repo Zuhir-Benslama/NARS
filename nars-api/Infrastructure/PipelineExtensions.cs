@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
@@ -24,7 +25,6 @@ public static class PipelineExtensions
         var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
 
         LogJwtWarning(startupLogger, logJwtWarning);
-        LogCorsOriginWarning(app.Services, startupLogger);
         await VerifyDatabaseConnectionAsync(app, startupLogger);
         UseExceptionHandling(app);
         // Security headers must run before static files so /index.html, /login.html
@@ -44,18 +44,6 @@ public static class PipelineExtensions
         if (logJwtWarning)
         {
             logger.LogWarning("JWT Issuer/Audience validation is disabled. Set Jwt:Issuer and Jwt:Audience for defense-in-depth.");
-        }
-    }
-
-    private static void LogCorsOriginWarning(IServiceProvider services, ILogger<Program> logger)
-    {
-        var warning = services.GetService<CorsOriginWarning>();
-        if (warning is not null)
-        {
-            logger.LogWarning(
-                "[Security] CORS:AllowedOrigins contains only localhost origins in {Environment} environment. " +
-                "Set Cors:AllowedOrigins to the actual production domain(s).",
-                warning.EnvironmentName);
         }
     }
 
@@ -312,11 +300,39 @@ public static class PipelineExtensions
     }
 
     private static void UseCsrfValidation(WebApplication app)
-        => app.Use(async (ctx, next) =>
+    {
+        // Single source of truth with the CORS policy. Browsers attach an
+        // Origin header to every cross-site request, so rejecting state-changing
+        // /api requests whose Origin is neither explicitly allowed nor this
+        // deployment's own origin blocks login CSRF and every other
+        // unauthenticated cross-site write (antiforgery tokens only cover
+        // authenticated requests). Non-browser clients send no Origin at all.
+        var allowedOrigins = app.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+
+        app.Use(async (ctx, next) =>
         {
             var method = ctx.Request.Method.ToUpperInvariant();
             var isAuthenticated = ctx.User.Identity?.IsAuthenticated == true;
             var isApiPath = ctx.Request.Path.StartsWithSegments("/api");
+
+            if (!app.Environment.IsDevelopment() && isApiPath && IsUnsafeMethod(method))
+            {
+                var requestOrigin = $"{ctx.Request.Scheme}://{ctx.Request.Host.Value}";
+                if (IsForeignOrigin(ctx.Request.Headers.Origin.ToString(), requestOrigin, allowedOrigins))
+                {
+                    ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    var problem = new Microsoft.AspNetCore.Mvc.ProblemDetails
+                    {
+                        Detail = "Cross-origin request rejected.",
+                        Status = 403,
+                        Title = "Forbidden",
+                        Type = "https://tools.ietf.org/html/rfc7231#section-6.5.3",
+                    };
+                    await ctx.Response.WriteAsJsonAsync(problem, JsonOptions);
+                    return;
+                }
+            }
+
             if (ShouldValidateCsrf(
                     method,
                     isAuthenticated,
@@ -342,6 +358,31 @@ public static class PipelineExtensions
             }
             await next();
         });
+    }
+
+    private static bool IsUnsafeMethod(string method) => method is not ("GET" or "HEAD" or "OPTIONS" or "TRACE");
+
+    /// <summary>
+    /// Decides whether a request's <c>Origin</c> must be rejected. Absent
+    /// Origin means a non-browser client (curl, native apps) — always allowed.
+    /// Present Origin must match either an explicitly allowed origin or the
+    /// origin this request was addressed to (same-origin SPA traffic).
+    /// </summary>
+    internal static bool IsForeignOrigin(string? origin, string requestOrigin, IReadOnlyList<string> allowedOrigins)
+    {
+        if (string.IsNullOrWhiteSpace(origin))
+        {
+            return false;
+        }
+
+        return !MatchesOrigin(origin, requestOrigin) && !allowedOrigins.Any(o => MatchesOrigin(origin, o));
+    }
+
+    private static bool MatchesOrigin(string origin, string expected)
+    {
+        static string Normalize(string value) => value.Trim().TrimEnd('/').ToLowerInvariant();
+        return Normalize(origin) == Normalize(expected);
+    }
 
     /// <summary>
     /// Decides whether the CSRF middleware must validate the request's
@@ -389,6 +430,18 @@ public static class PipelineExtensions
         }
 
         app.MapControllers();
+
+        // Liveness answers "is the process responsive" and must NOT probe
+        // dependencies — otherwise a database blip would restart healthy pods.
+        // Readiness answers "can this pod serve traffic" and includes the DB.
+        //
+        // /health and /api/health remain DB-aware, unauthenticated BY DESIGN:
+        // the k8s startup probe and the external monitoring ingress
+        // (nars-infra/k8s/ingress-api.yaml) require anonymous plain-HTTP
+        // access. The response carries only the aggregate status string — no
+        // per-check details — so exposure is limited to up/down state.
+        app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
+        app.MapHealthChecks("/health/ready");
         app.MapHealthChecks("/health");
         app.MapHealthChecks("/api/health");
     }

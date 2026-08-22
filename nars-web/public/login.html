@@ -5,10 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Content Security Policy:
          script-src 'unsafe-inline' required for this static HTML page.
-         In PRODUCTION the server MUST replace with a per-request nonce. -->
+         In PRODUCTION the server MUST replace with a per-request nonce.
+         connect-src is same-origin only — the login form posts to /api on
+         this origin; no third-party endpoints are legitimate here. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http: https: data:; frame-ancestors 'none';"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none';"
     />
     <!-- CSRF token — set by the server. Client reads it and sends X-CSRF-Token on non-GET requests. -->
     <meta name="csrf-token" content="" />
@@ -69,13 +71,21 @@
             body: JSON.stringify({ username, password }),
           })
 
-          const data = await response.json()
-
           if (response.ok) {
             // Redirect to map
             window.location.href = "/map"
           } else {
-            signinError.textContent = data.detail || data.error || "Invalid username or password"
+            // Status-mapped generic messages only. Echoing data.detail here
+            // would surface internal details (lockout reasons, user-existence
+            // hints from upstream identity errors) to unauthenticated users.
+            const lang = localStorage.getItem("nars_lang") || "en"
+            const s = STRINGS[lang] || STRINGS.en
+            signinError.textContent =
+              response.status === 429
+                ? s.errTooMany
+                : response.status === 401 || response.status === 400
+                  ? s.errInvalid
+                  : s.errGeneric
             signinError.style.display = "block"
           }
         } catch (error) {
@@ -107,6 +117,8 @@
           password: "Password",
           btnSignIn: "Sign In",
           errInvalid: "Invalid username or password",
+          errTooMany: "Too many attempts. Please try again later.",
+          errGeneric: "Sign-in failed. Please try again.",
           errServer: "Error connecting to server",
         },
         fr: {
@@ -114,6 +126,8 @@
           password: "Mot de passe",
           btnSignIn: "Se connecter",
           errInvalid: "Nom d'utilisateur ou mot de passe invalide",
+          errTooMany: "Trop de tentatives. Veuillez réessayer plus tard.",
+          errGeneric: "Échec de la connexion. Veuillez réessayer.",
           errServer: "Erreur de connexion au serveur",
         },
         ar: {
@@ -121,6 +135,8 @@
           password: "كلمة المرور",
           btnSignIn: "دخول",
           errInvalid: "اسم المستخدم أو كلمة المرور غير صحيحة",
+          errTooMany: "عدد كبير من المحاولات. يرجى المحاولة لاحقاً.",
+          errGeneric: "فشل تسجيل الدخول. يرجى المحاولة مرة أخرى.",
           errServer: "خطأ في الاتصال بالخادم",
         },
       }

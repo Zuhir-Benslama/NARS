@@ -125,14 +125,6 @@ describe("setSnapExclude", () => {
   })
 })
 
-describe("isSnappingActive", () => {
-  it("returns snapActive from store", () => {
-    expect(mod.isSnappingActive()).toBe(false)
-    useSnapStore().snapActive = true
-    expect(mod.isSnappingActive()).toBe(true)
-  })
-})
-
 describe("getActiveSnapPhases", () => {
   it("returns all non-empty phases in edit mode", () => {
     useEditStore().isEditMode = true

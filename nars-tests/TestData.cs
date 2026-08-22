@@ -2,8 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;
 using NarsApi.Data;
+using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
+using System.Text.Json;
 
 namespace NarsApi.Tests;
 
@@ -72,14 +74,55 @@ public static class TestData
     public static readonly DateTime FixedUtcNow = new(2025, 6, 1, 12, 0, 0, DateTimeKind.Utc);
     public static readonly DateTimeOffset FixedUtcNowOffset = new(2025, 6, 1, 12, 0, 0, TimeSpan.Zero);
 
-    // ── Helpers ────────────────────────────────────────────────────────
-    public static AppDbContext CreateInMemoryDb(string prefix)
+    /// <summary>
+    /// Parses json into a detached <see cref="JsonElement"/>. The intermediate
+    /// JsonDocument is disposed immediately; Clone() keeps the element valid.
+    /// </summary>
+    public static JsonElement ToJsonElement(string json)
     {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.Clone();
+    }
+
+    /// <summary>Serializes value to JSON and returns a detached JsonElement.</summary>
+    public static JsonElement ToJsonElement<T>(T value) => ToJsonElement(JsonSerializer.Serialize(value));
+
+    /// <summary>
+    /// Canonical AuthorizedAdminSignupRequest for tests. Only the scenario-
+    /// relevant fields need overriding; the rest are consistent valid defaults.
+    /// </summary>
+    public static AuthorizedAdminSignupRequest ValidAdminSignup(
+        string? username = null,
+        string? password = null,
+        string? email = null,
+        string? name = null,
+        int? communeId = null,
+        string role = UserRoles.CommuneUser,
+        string adminUsername = "admin")
+        => new(
+            AdminUsername: adminUsername,
+            AdminPassword: DefaultPassword,
+            Name: name ?? "Test User",
+            Email: email ?? DefaultEmail,
+            Phone: AltPhone,
+            Username: username ?? "testuser",
+            Password: password ?? AltPassword,
+            Role: role,
+            CommuneId: communeId ?? CommuneId1,
+            DairaId: null,
+            WilayaId: null);
+
+    // ── Helpers ────────────────────────────────────────────────────────
+    public static AppDbContext CreateInMemoryDb(string prefix, SaveChangesInterceptor? interceptor = null)
+    {
+        var builder = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase($"{prefix}_{Guid.NewGuid()}")
-            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
-            .Options;
-        return new AppDbContext(options);
+            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
+        if (interceptor is not null)
+        {
+            builder.AddInterceptors(interceptor);
+        }
+        return new AppDbContext(builder.Options);
     }
 
     public static IDbContextFactory<AppDbContext> CreateInMemoryDbFactory(string prefix)

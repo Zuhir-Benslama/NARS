@@ -167,8 +167,7 @@ cluster-port-forward: ## Deprecated — use 'proxy-up' directly.
 cluster-stop: ## Scale all deployments to 0 (stop pods, keep cluster)
 	@echo "→ Stopping all pods..."
 	@for deploy in $(SCALABLE_DEPLOYS); do
-		exists=$$($(KUBECTL) get deployment "$$deploy" -n "$(NAMESPACE)" 2>/dev/null && echo "true" || echo "false")
-		if [ "$$exists" = "false" ]; then
+		if ! $(KUBECTL) get deployment "$$deploy" -n "$(NAMESPACE)" >/dev/null 2>&1; then
 			echo "  ⚠ $$deploy not found, skipping"
 			continue
 		fi
@@ -271,7 +270,7 @@ kubeconfig-fix: ## Patch kubeconfig for rootless Docker (port 16443 via kube-pro
 		if ! docker run -d --name "$$KUBE_PROXY" --rm \
 			-p 127.0.0.1:16443:16443 \
 			--network kind \
-			alpine/socat \
+			$(SOCAT_IMAGE) \
 			tcp-listen:16443,fork,reuseaddr tcp-connect:$(CLUSTER_NAME)-control-plane:6443 > /dev/null; then
 			echo "✖ Failed to create socat bridge container";
 			exit 1;

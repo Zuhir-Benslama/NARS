@@ -25,19 +25,27 @@ public static class FeatureQueryHelper
     {
         var cte = BuildUnionAllCte();
         var layerFilter = withLayer ? " AND layer = @layer" : "";
+        // Two result sets so total_count is correct even when OFFSET lands past
+        // the last row (a cross join of the count onto feature rows would emit
+        // zero rows — and therefore report a total of 0 — on an empty page).
+        // The CTE is repeated because its scope ends at each statement boundary.
         return $"""
             WITH all_features AS ({cte}),
             filtered AS (
                 SELECT id, label, data, created_at, layer, feature_type
                 FROM all_features
                 WHERE user_id = @uid{layerFilter}
-            ),
-            total AS (
-                SELECT COUNT(*) AS total_count FROM filtered
             )
-            SELECT f.id, f.label, f.data, f.created_at, f.layer, f.feature_type, t.total_count
-            FROM filtered f, total t
-            ORDER BY f.created_at, f.id
+            SELECT COUNT(*) AS total_count FROM filtered;
+            WITH all_features AS ({cte}),
+            filtered AS (
+                SELECT id, label, data, created_at, layer, feature_type
+                FROM all_features
+                WHERE user_id = @uid{layerFilter}
+            )
+            SELECT id, label, data, created_at, layer, feature_type
+            FROM filtered
+            ORDER BY created_at, id
             OFFSET @skip LIMIT @take
             """;
     }
@@ -106,26 +114,25 @@ public static class FeatureQueryHelper
         SqlFragments.AddParam(cmd, "@take", take);
 
         var rows = new List<FeatureResult>();
-        var totalCount = 0;
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
+
+        // First result set: the total matching row count (independent of paging).
+        await reader.ReadAsync(ct);
+        var totalOrdinal = reader.GetOrdinal("total_count");
+        var totalCount = Convert.ToInt32(reader.GetInt64(totalOrdinal));
+
+        // Second result set: the paged feature rows.
+        await reader.NextResultAsync(ct);
         var idOrdinal = reader.GetOrdinal("id");
         var labelOrdinal = reader.GetOrdinal("label");
         var dataOrdinal = reader.GetOrdinal("data");
         var createdAtOrdinal = reader.GetOrdinal("created_at");
         var layerOrdinal = reader.GetOrdinal("layer");
         var typeOrdinal = reader.GetOrdinal("feature_type");
-        var totalOrdinal = reader.GetOrdinal("total_count");
 
         while (await reader.ReadAsync(ct))
         {
-            if (rows.Count == 0)
-            {
-                // total_count is a constant from the CTE (one row joined onto
-                // every output row) — read it once instead of on each row.
-                totalCount = Convert.ToInt32(reader.GetInt64(totalOrdinal));
-            }
-
             var idValue = reader.GetValue(idOrdinal);
             Guid id = idValue switch
             {

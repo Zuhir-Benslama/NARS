@@ -76,10 +76,10 @@ public class FeaturesController(
         return StatusCode(201, new CreateResponse(Success: true, Id: newId.ToString(), Message: "Feature saved successfully"));
     }
 
-    /// <summary>Loads the authenticated user's features with pagination.</summary>
+    /// <summary>Loads the authenticated user's features with pagination (page size capped by Pagination.Clamp).</summary>
     [HttpGet("")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> LoadFeatures([FromQuery] int skip = 0, [FromQuery] int take = 1000, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> LoadFeatures([FromQuery] int skip = 0, [FromQuery] int take = 500, CancellationToken cancellationToken = default)
     {
         (skip, take) = Pagination.Clamp(skip, take);
 

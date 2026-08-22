@@ -8,37 +8,6 @@ import type maplibregl from "maplibre-gl"
 // ─── PRIMITIVES ───────────────────────────────────────────────────────────────
 
 /**
- * Closest point on segment [a, b] to cursor point (cursorX, cursorY) in pixel space.
- * Returns pixel coordinates of the closest point, or null if segment is degenerate.
- */
-export function closestOnSegment(
-  cursorX: number,
-  cursorY: number,
-  aLng: number,
-  aLat: number,
-  bLng: number,
-  bLat: number,
-  project: (ll: [number, number]) => { x: number; y: number },
-  unproject: (pt: [number, number]) => maplibregl.LngLat,
-): { x: number; y: number; lng: number; lat: number } | null {
-  try {
-    const pa = project([aLng, aLat])
-    const pb = project([bLng, bLat])
-    const dx = pb.x - pa.x,
-      dy = pb.y - pa.y
-    const lenSq = dx * dx + dy * dy
-    if (lenSq === 0) return { x: pa.x, y: pa.y, lng: aLng, lat: aLat }
-    const t = Math.max(0, Math.min(1, ((cursorX - pa.x) * dx + (cursorY - pa.y) * dy) / lenSq))
-    const ex = pa.x + t * dx,
-      ey = pa.y + t * dy
-    const ll = unproject([ex, ey])
-    return { x: ex, y: ey, lng: ll.lng, lat: ll.lat }
-  } catch {
-    return null
-  }
-}
-
-/**
  * Closest point on a circle's visual perimeter (pixel space).
  * The circle is defined by center (centerLng, centerLat) and radius in meters.
  */

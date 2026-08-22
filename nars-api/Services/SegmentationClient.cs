@@ -69,12 +69,34 @@ public sealed class SegmentationClient : ISegmentationClient
                 $"Segmentation service returned {(int)response.StatusCode}");
         }
 
+        // A 200 response can still carry a malformed or unexpected payload
+        // (truncated JSON, missing "buildings" key, wrong shape). Surface these
+        // as SegmentationServiceException — NOT KeyNotFoundException, which the
+        // controller maps to "commune not found" for genuine scope errors.
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+        JsonDocument doc;
+        try
+        {
+            doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+        }
+        catch (JsonException ex)
+        {
+            throw new SegmentationServiceException("Segmentation service returned malformed JSON.", ex);
+        }
 
-        var buildings = ExtractFeatures(doc.RootElement.GetProperty("buildings").GetProperty("features"), "building");
-
-        return new SegmentationResult(buildings);
+        using (doc)
+        {
+            try
+            {
+                var buildings = ExtractFeatures(doc.RootElement.GetProperty("buildings").GetProperty("features"), "building");
+                return new SegmentationResult(buildings);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                throw new SegmentationServiceException(
+                    "Segmentation service response has an unexpected shape.", ex);
+            }
+        }
     }
 
     private static List<SegmentedFeature> ExtractFeatures(JsonElement featureArray, string featureType)
@@ -95,4 +117,6 @@ public sealed class SegmentationClient : ISegmentationClient
 public sealed class SegmentationServiceException : Exception
 {
     public SegmentationServiceException(string message) : base(message) { }
+
+    public SegmentationServiceException(string message, Exception innerException) : base(message, innerException) { }
 }

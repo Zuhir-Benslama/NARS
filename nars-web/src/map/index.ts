@@ -17,11 +17,10 @@ export { bindContextMenu } from "./context-menu/context-menu"
 export { buildFeatureData, toApiSaveShape } from "./features/feature-data"
 export { saveToDatabase } from "./features/feature-persistence"
 export { prepareModalExtras } from "./features/feature-modal"
-export { createEntranceIconHtml, areaStyle } from "./rendering/styles"
+export { areaStyle } from "./rendering/styles"
 export { loadFromDatabase, loadUserAndCommune } from "./features/loader"
 export { navigatePhase, goToPhase, setPhase } from "../phases-nav/navigation"
 export { setHouseNumbers, getFeatureType } from "./house-numbering"
-export { updateDrawingPreview } from "./map-layers"
 
 // ─── FULL INITIALIZATION / CLEANUP ────────────────────────────────────────────
 

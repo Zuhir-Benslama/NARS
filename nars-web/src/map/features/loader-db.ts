@@ -9,7 +9,7 @@ import { useLayerStore, LAYER_KEYS } from "../../stores/layerStore"
 import type { LayerState } from "../../stores/layerStore"
 import { type MaplibreFeature } from "../core/state"
 import { useFeaturesStore } from "../../stores/featuresStore"
-import { renderScatteredAreas } from "../rendering/geometry"
+import { addScatteredArea, clearScatteredAreas } from "../rendering/geometry"
 import { refreshLayerVisibility } from "../rendering/labels"
 import { getFeatureType } from "../house-numbering"
 import { debugError, debugLog } from "../../utils/debug"
@@ -58,7 +58,7 @@ function processFeature(
       typeof feature.data === "string" ? JSON.parse(feature.data) : feature.data
 
     if (feature.layer === "scattered") {
-      if (rawData.geometry) renderScatteredAreas(rawData.geometry)
+      if (rawData.geometry) addScatteredArea(rawData.geometry)
       return "scattered"
     }
 
@@ -123,6 +123,10 @@ export async function loadFromDatabase(): Promise<void> {
       layerStore.clearLayer(key)
     }
     featuresStore.clear()
+    // Reset hit-testing state once for the whole load; each scattered feature
+    // below APPENDS via processFeature. (The previous per-feature reset made
+    // multiple scattered features clobber each other — only the last survived.)
+    clearScatteredAreas()
 
     const maplibreFeatures: MaplibreFeature[] = []
 

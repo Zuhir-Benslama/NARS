@@ -156,10 +156,28 @@ public class RefreshTokenService(
 
     public async Task RecordFailedLoginAsync(User user, int maxFailedAttempts, int lockoutMinutes, DateTimeOffset utcNow, CancellationToken cancellationToken = default)
     {
+        // While a lockout is active, ignore further failures: counting them
+        // would let anyone who knows a username extend the lockout indefinitely
+        // with a steady trickle of bad passwords.
+        var now = utcNow.UtcDateTime;
+        if (user.LockedUntil.HasValue && user.LockedUntil.Value > now)
+        {
+            return;
+        }
+
+        // A lockout that has already expired starts a fresh counting cycle,
+        // so re-locking requires another full sequence of failed attempts.
+        if (user.LockedUntil.HasValue && user.LockedUntil.Value <= now)
+        {
+            user.FailedLoginAttempts = 0;
+            user.LockedUntil = null;
+        }
+
         user.FailedLoginAttempts = (user.FailedLoginAttempts ?? 0) + 1;
         if (user.FailedLoginAttempts >= maxFailedAttempts)
         {
-            user.LockedUntil = utcNow.UtcDateTime.AddMinutes(lockoutMinutes);
+            user.LockedUntil = now.AddMinutes(lockoutMinutes);
+            user.FailedLoginAttempts = 0;
             // Rotate the security stamp so any access tokens issued before the
             // lockout are rejected immediately (see AuthenticationExtensions
             // OnTokenValidated) instead of remaining valid until expiry.

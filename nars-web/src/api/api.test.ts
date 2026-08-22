@@ -11,8 +11,10 @@ import { apiFetch, apiUrl } from "../api"
 import { createConflictError } from "../lib/errors"
 import { getApiBaseUrl, getLoginPath } from "../config"
 
-function mockResponse(status: number, body: string | object): Response {
-  const bodyStr = typeof body === "string" ? body : JSON.stringify(body)
+function mockResponse(status: number, body: string | object = ""): Response {
+  // 204/304 forbid a body — the Response constructor throws RangeError.
+  const bodyless = status === 204 || status === 304
+  const bodyStr = bodyless ? null : typeof body === "string" ? body : JSON.stringify(body)
   return new Response(bodyStr, {
     status,
     headers: { "Content-Type": "application/json" },
@@ -141,6 +143,91 @@ describe("apiFetch", () => {
   it("redirects to login on 401 and throws an auth error", async () => {
     const mockFetch = vi.fn(() => Promise.resolve(mockResponse(401, {})))
     vi.stubGlobal("fetch", mockFetch)
+
+    const locationMock = { href: "" }
+    const originalLocation = window.location
+    Object.defineProperty(window, "location", { value: locationMock, writable: true })
+    try {
+      await expect(apiFetch("/secret", { skipRetry: true })).rejects.toMatchObject({
+        code: "AUTH_ERROR",
+      })
+      expect(locationMock.href).toBe(getLoginPath())
+    } finally {
+      Object.defineProperty(window, "location", { value: originalLocation, writable: true })
+    }
+  })
+
+  it("silently refreshes once and replays the request when the access token expired", async () => {
+    let endpointCalls = 0
+    const mockFetch = vi.fn((url: string) => {
+      if (url.endsWith("/api/refresh")) return Promise.resolve(mockResponse(200, {}))
+      endpointCalls += 1
+      // First attempt runs on the dead token; replay hits the fresh one.
+      return Promise.resolve(mockResponse(endpointCalls === 1 ? 401 : 200, { data: "ok" }))
+    })
+    vi.stubGlobal("fetch", mockFetch)
+
+    const res = await apiFetch("/secret", { skipRetry: true })
+    expect(res.status).toBe(200)
+    await expect(res.json()).resolves.toEqual({ data: "ok" })
+    expect(mockFetch.mock.calls.filter(([u]) => String(u).endsWith("/api/refresh"))).toHaveLength(1)
+    expect(endpointCalls).toBe(2)
+  })
+
+  it("does not redirect while a silent refresh recovers the session", async () => {
+    let endpointCalls = 0
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url.endsWith("/api/refresh")) return Promise.resolve(mockResponse(200, {}))
+        endpointCalls += 1
+        return Promise.resolve(mockResponse(endpointCalls === 1 ? 401 : 204))
+      }),
+    )
+
+    const locationMock = { href: "" }
+    const originalLocation = window.location
+    Object.defineProperty(window, "location", { value: locationMock, writable: true })
+    try {
+      const res = await apiFetch("/secret", { skipRetry: true })
+      expect(res.status).toBe(204)
+      expect(locationMock.href).toBe("")
+    } finally {
+      Object.defineProperty(window, "location", { value: originalLocation, writable: true })
+    }
+  })
+
+  it("shares a single refresh round trip across parallel expirations (single-flight)", async () => {
+    let refreshCalls = 0
+    let endpointCalls = 0
+    const mockFetch = vi.fn((url: string) => {
+      if (url.endsWith("/api/refresh")) {
+        refreshCalls += 1
+        // Small delay so both requests race into the same in-flight promise.
+        return new Promise((resolve) => setTimeout(() => resolve(mockResponse(200, {})), 5))
+      }
+      endpointCalls += 1
+      const n = endpointCalls
+      return new Promise((resolve) =>
+        setTimeout(() => resolve(mockResponse(n <= 2 ? 401 : 200, {})), 5),
+      )
+    })
+    vi.stubGlobal("fetch", mockFetch)
+
+    const [a, b] = await Promise.all([
+      apiFetch("/one", { skipRetry: true }),
+      apiFetch("/two", { skipRetry: true }),
+    ])
+    expect(a.status).toBe(200)
+    expect(b.status).toBe(200)
+    expect(refreshCalls).toBe(1)
+  })
+
+  it("redirects to login when the replay after a successful refresh is still unauthorized", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(mockResponse(401, {}))),
+    )
 
     const locationMock = { href: "" }
     const originalLocation = window.location

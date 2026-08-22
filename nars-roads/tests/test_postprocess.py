@@ -203,11 +203,12 @@ def test_polygons_bad_region_keeps_valid_one(monkeypatch):
     from skimage.measure import find_contours as real_find_contours
 
     prob = np.zeros((60, 60), dtype=np.float32)
-    prob[5:25, 5:25] = 0.9  # top square -> forced short contour (skipped)
-    prob[35:55, 35:55] = 0.9  # bottom square -> real contour (kept)
+    prob[5:15, 5:15] = 0.9  # top small square -> forced short contour (skipped)
+    prob[35:55, 35:55] = 0.9  # bottom large square -> real contour (kept)
 
     def fake_find_contours(region_mask, level=0.5):
-        if int(np.argwhere(region_mask)[0][0]) < 30:
+        # Regions arrive as bounding-box crops; tell them apart by shape.
+        if region_mask.shape[0] < 15:
             return [[(10, 10), (11, 11), (12, 12)]]
         return real_find_contours(region_mask.astype(np.float32), level)
 
@@ -215,3 +216,36 @@ def test_polygons_bad_region_keeps_valid_one(monkeypatch):
     features = mask_to_polygons(prob, TRANSFORM)
     assert len(features) == 1
     assert features[0].geometry.type == "Polygon"
+
+
+def test_polygons_disjoint_blobs_keep_absolute_coordinates():
+    # Regions are processed on bounding-box crops for performance; the emitted
+    # polygons must still land at absolute world positions, not crop-local
+    # ones. Two well-separated squares: every coordinate must sit inside its
+    # own padded window, proving the crop offset was applied per region.
+    prob = np.zeros((80, 80), dtype=np.float32)
+    prob[5:15, 5:15] = 0.9  # rows/cols 5..14
+    prob[60:75, 50:70] = 0.9  # rows 60..74, cols 50..69
+    features = mask_to_polygons(prob, TRANSFORM)
+    assert len(features) == 2
+
+    windows = [
+        {"x": (4, 16), "y": (4, 16)},
+        {"x": (49, 71), "y": (59, 76)},
+    ]
+    matched_windows = set()
+    for feature in features:
+        ring = feature.geometry.coordinates[0]
+        xs = [coord[0] for coord in ring]
+        ys = [coord[1] for coord in ring]
+        inside = [
+            i
+            for i, w in enumerate(windows)
+            if min(xs) >= w["x"][0]
+            and max(xs) <= w["x"][1]
+            and min(ys) >= w["y"][0]
+            and max(ys) <= w["y"][1]
+        ]
+        assert len(inside) == 1, f"polygon outside any expected window: {ring[:4]}"
+        matched_windows.add(inside[0])
+    assert matched_windows == {0, 1}

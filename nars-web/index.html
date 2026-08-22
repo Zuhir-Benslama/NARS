@@ -10,10 +10,13 @@
          - script-src: 'unsafe-inline' intentionally omitted. The server MUST replace
            this header with a per-request nonce: script-src 'nonce-<RANDOM>' 'strict-dynamic'.
          - style-src: 'unsafe-inline' required for SPA dynamic style injection.
-         - connect-src: data: needed for base64 tile sources. -->
+         - connect-src: enumerated tile-CDN hosts + data: for base64 tiles;
+           localhost entries cover the Vite dev server/HMR socket only.
+         - No bare http:/https: schemes: an open connect-src lets any injected
+           script exfiltrate data anywhere, defeating CSP's containment purpose. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' http: https: data: ws://127.0.0.1:* http://127.0.0.1:* https://*.arcgisonline.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com; worker-src 'self' blob:;"
+      content="default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' data: ws://127.0.0.1:* http://127.0.0.1:* ws://localhost:* http://localhost:* https://*.arcgisonline.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com; worker-src 'self' blob:;"
     />
     <title>NARS - National Addressing Reference System (Maplibre)</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />

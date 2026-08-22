@@ -29,7 +29,6 @@ public class RefreshTokenServiceTests
             It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<string>(),
             It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<int?>()))
             .Returns("new-access-token");
-        mock.Setup(j => j.AccessTokenExpiresIn).Returns(TimeSpan.FromMinutes(60));
         return mock;
     }
 
@@ -203,11 +202,30 @@ public class RefreshTokenServiceTests
     [Fact]
     public async Task MintAccessTokenAsync_ConcurrentPageLoads_AllSucceed()
     {
-        var (svc, db, raw) = await SeedWithValidTokenAsync();
+        // Each concurrent request runs against its own context/service,
+        // mirroring the one-DbContext-per-request lifetime in production.
+        // (Sharing a single context across parallel calls tests nothing:
+        // DbContext is not thread-safe.)
+        var (db, factory) = CreateInMemoryDbPair("RefreshTokenConcurrent");
         using (db)
         {
-            var results = await Task.WhenAll(
-                Enumerable.Range(0, 5).Select(_ => svc.MintAccessTokenAsync(raw)));
+            await SeedUserAsync(db);
+            const string raw = "valid-refresh-token";
+            db.RefreshTokens.Add(new RefreshToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = UserId,
+                TokenHash = HashRefreshToken(raw),
+                ExpiresAt = FixedUtcNow.AddDays(30),
+                CreatedAt = FixedUtcNow,
+            });
+            await db.SaveChangesAsync();
+
+            var results = await Task.WhenAll(Enumerable.Range(0, 5).Select(async _ =>
+            {
+                await using var requestDb = factory.CreateDbContext();
+                return await CreateService(requestDb).MintAccessTokenAsync(raw);
+            }));
 
             Assert.All(results, r =>
             {
@@ -587,7 +605,7 @@ public class RefreshTokenServiceTests
     }
 
     [Fact]
-    public async Task RecordFailedLoginAsync_AtThreshold_LocksUser()
+    public async Task RecordFailedLoginAsync_AtThreshold_LocksUserAndResetsCounter()
     {
         using var db = CreateDb();
         var user = await SeedUserAsync(db, securityStamp: OriginalStamp, failedLoginAttempts: 4);
@@ -595,9 +613,43 @@ public class RefreshTokenServiceTests
 
         await svc.RecordFailedLoginAsync(user, maxFailedAttempts: 5, lockoutMinutes: 15, FixedUtcNowOffset);
 
-        Assert.Equal(5, user.FailedLoginAttempts);
+        // Counter resets so re-locking after expiry requires a full new sequence.
+        Assert.Equal(0, user.FailedLoginAttempts);
         Assert.Equal(FixedUtcNowOffset.DateTime.AddMinutes(15), user.LockedUntil);
         Assert.NotEqual(OriginalStamp, user.SecurityStamp);
+    }
+
+    [Fact]
+    public async Task RecordFailedLoginAsync_WhileLocked_IgnoresFailure()
+    {
+        using var db = CreateDb();
+        var lockedUntil = FixedUtcNow.AddMinutes(10);
+        var user = await SeedUserAsync(db, securityStamp: OriginalStamp, failedLoginAttempts: 0, lockedUntil: lockedUntil);
+        var svc = CreateService(db);
+
+        await svc.RecordFailedLoginAsync(user, maxFailedAttempts: 5, lockoutMinutes: 15, FixedUtcNowOffset);
+
+        // An active lockout must not be extendable by further bad passwords.
+        Assert.Equal(0, user.FailedLoginAttempts);
+        Assert.Equal(lockedUntil, user.LockedUntil);
+        Assert.Equal(OriginalStamp, user.SecurityStamp);
+    }
+
+    [Fact]
+    public async Task RecordFailedLoginAsync_ExpiredLockout_StartsFreshCycle()
+    {
+        using var db = CreateDb();
+        var user = await SeedUserAsync(db, securityStamp: OriginalStamp,
+            failedLoginAttempts: 5, lockedUntil: FixedUtcNow.AddMinutes(-1));
+        var svc = CreateService(db);
+
+        await svc.RecordFailedLoginAsync(user, maxFailedAttempts: 5, lockoutMinutes: 15, FixedUtcNowOffset);
+
+        // After the previous lockout expired, one failure must not immediately
+        // re-lock; a fresh sequence of failures is required.
+        Assert.Equal(1, user.FailedLoginAttempts);
+        Assert.Null(user.LockedUntil);
+        Assert.Equal(OriginalStamp, user.SecurityStamp);
     }
 
     // ── ResetFailedAttemptsIfNeededAsync ────────────────────────────────

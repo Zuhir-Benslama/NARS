@@ -25,7 +25,12 @@ public class DtoValidationTests
     private static List<ValidationResult> ValidateRecord<T>(T record)
     {
         var results = new List<ValidationResult>();
-        var ctor = typeof(T).GetConstructors().First();
+        // A record's primary (positional) constructor has the most parameters;
+        // ordering by count keeps the choice deterministic if extra ctors
+        // (e.g. copy constructors) ever appear.
+        var ctor = typeof(T).GetConstructors()
+            .OrderByDescending(c => c.GetParameters().Length)
+            .First();
         foreach (var param in ctor.GetParameters())
         {
             var required = param.GetCustomAttribute<RequiredAttribute>();

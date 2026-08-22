@@ -8,8 +8,6 @@ export interface GeoJSONSourceLike {
   setData(data: GeoJSON.FeatureCollection | GeoJSON.Feature): void
 }
 
-export const POLYLINE_WIDTH = 8
-
 export interface MapContext {
   map: maplibregl.Map
   geoman?: Geoman

@@ -10,15 +10,17 @@ import { useFeaturesStore } from "../../stores/featuresStore"
 
 import { buildDrawControl, clearEdgeVisibilityPoll } from "./draw-control"
 import { refreshLayerVisibility } from "../rendering/labels"
-import { computeCircleRing, computeCircleRadius, closeRing } from "../rendering/geometry"
+import { computeCircleRadius, closeRing } from "../rendering/geometry"
+import { CITY_CENTER_COLOR } from "../../phases"
 import { getFeatureType } from "../house-numbering"
 import { getUserMessageKey } from "../../lib/errors"
 import { showToast } from "../../lib/toast"
 import { debugError } from "../../utils/debug"
 import { t } from "../../i18n"
 import { updateEndpointMarkers } from "../roads/road-directions"
-import { buildFeatureData } from "../features/feature-data"
+import { buildFeatureData, featureDataToGeometry } from "../features/feature-data"
 import { DRAW_CONFIG, CITY_CENTER_CONFIG } from "../../config"
+import { cityCenterRadiusError } from "../../lib/city-center"
 import { saveToDatabase } from "../features/feature-persistence"
 import { openModalForFeature } from "./draw-modal"
 import { getDrawingPhase, setSavingFeature, repatchMarker } from "./draw-state"
@@ -146,12 +148,11 @@ function applyCityCenterOverride(
 ): { style: Record<string, unknown>; storeGeometry: GeoJSON.Geometry } {
   const d = featureData as { radius?: number; lat?: number; lng?: number }
   if (!d.radius || d.lat == null || d.lng == null) return { style, storeGeometry }
-  const ring = closeRing(computeCircleRing(d.lat, d.lng, d.radius))
   return {
-    storeGeometry: { type: "LineString", coordinates: ring },
+    storeGeometry: featureDataToGeometry(d, "circle"),
     style: {
-      lineColor: "#e74c3c",
-      lineWidth: 6,
+      lineColor: CITY_CENTER_COLOR,
+      lineWidth: CITY_CENTER_CONFIG.ringStrokeWidth,
       textColor: "#333333",
       radius: d.radius,
     },
@@ -347,12 +348,15 @@ function validateGeometry(
       const centerLng = sumLng / coords.length
       radius = computeCircleRadius(centerLat, centerLng, coords)
     }
-    if (!radius || Number.isNaN(radius) || radius < CITY_CENTER_CONFIG.minRadiusM) {
+    // Shared rule — the modal validation in useFeatureValidation enforces the
+    // same limits with inline errors instead of toasts.
+    const radiusError = cityCenterRadiusError(radius)
+    if (radiusError === "too_small") {
       showToast(t("map_city_center_too_small"), "error")
       cleanup()
       return false
     }
-    if (radius > CITY_CENTER_CONFIG.maxRadiusM) {
+    if (radiusError === "too_large") {
       showToast(t("map_city_center_too_large"), "error")
       cleanup()
       return false

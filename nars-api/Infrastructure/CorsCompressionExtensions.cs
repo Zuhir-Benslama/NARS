@@ -7,7 +7,8 @@ public static class CorsCompressionExtensions
 {
     /// <summary>
     /// Adds CORS with explicit origins and credentials support (required for HttpOnly cookie auth).
-    /// Logs a warning if only localhost origins are configured in non-development environments.
+    /// Fails fast outside Development when CORS origins are not explicitly configured:
+    /// silently serving cross-origin credentials to localhost defaults would fail open.
     /// </summary>
     public static IServiceCollection AddNarsCors(
         this IServiceCollection services,
@@ -20,11 +21,14 @@ public static class CorsCompressionExtensions
             ?? ["http://localhost:5000", "http://localhost:5001",
                 "https://localhost:7000", "https://localhost:7001"];
 
-        // Capture configuration state for post-build validation (avoids
-        // BuildServiceProvider() anti-pattern). Checked in ConfigureNarsPipelineAsync.
+        // A non-development deployment without explicit origins would accept
+        // cross-origin credentialed requests from localhost defaults. Fail at
+        // startup instead — matching how missing Jwt:Issuer/Audience is handled.
         if (!env.IsDevelopment() && allowedOrigins.All(o => o.Contains("localhost", StringComparison.OrdinalIgnoreCase)))
         {
-            services.AddSingleton(new CorsOriginWarning { EnvironmentName = env.EnvironmentName });
+            throw new InvalidOperationException(
+                $"Cors:AllowedOrigins must be configured to the actual origin(s) in the {env.EnvironmentName} environment. " +
+                "The localhost defaults are only safe for development.");
         }
 
         services.AddCors(options =>
@@ -64,14 +68,4 @@ public static class CorsCompressionExtensions
 
         return services;
     }
-}
-
-/// <summary>
-/// Marker type captured during DI registration when CORS origins contain only
-/// localhost in a non-development environment. Logged as a warning once after
-/// the service provider is built (avoids BuildServiceProvider() anti-pattern).
-/// </summary>
-internal sealed class CorsOriginWarning
-{
-    public required string EnvironmentName { get; init; }
 }

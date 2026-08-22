@@ -26,17 +26,6 @@ public class LocationsController(
     ILocationSearchService locationSearch,
     IWebHostEnvironment environment) : ControllerBase
 {
-
-    internal static string EscapeLikeWildcards(string input)
-    {
-        // Escape the escape character FIRST so a user-supplied backslash cannot
-        // neutralize the escaping of a following % or _ (e.g. "50\%" must match
-        // the literal text, not "50" + any single character).
-        return input.Replace("\\", "\\\\", StringComparison.Ordinal)
-                    .Replace("%", "\\%", StringComparison.Ordinal)
-                    .Replace("_", "\\_", StringComparison.Ordinal);
-    }
-
     /// <summary>
     /// Validates the search length and escapes LIKE wildcards. Returns an error
     /// <see cref="IActionResult"/> when the search is too long, or null on success
@@ -45,7 +34,7 @@ public class LocationsController(
     private IActionResult? ValidateSearch(string? search, out string sanitized)
     {
         search ??= "";
-        sanitized = EscapeLikeWildcards(search);
+        sanitized = SqlFragments.EscapeLikeWildcards(search);
         var maxSearchLength = locationsOptions.Value.MaxSearchLength;
         if (search.Length > maxSearchLength)
         {

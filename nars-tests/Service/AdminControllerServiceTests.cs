@@ -43,7 +43,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
 
     private UserAuthorizationService CreateUserAuthorizationService() =>
-        new(_db, Mock.Of<IRefreshTokenService>(), Mock.Of<IFeatureCleanupService>(), FixedTimeProvider());
+        new(_db, Mock.Of<IRefreshTokenService>(), Mock.Of<IFeatureCleanupService>(), FixedTimeProvider(), Mock.Of<ISecurityStampCache>());
 
     private AdminUserController CreateUserManagementController() => new(
             Mock.Of<Microsoft.Extensions.Logging.ILogger<AdminUserController>>(),

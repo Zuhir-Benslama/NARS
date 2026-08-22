@@ -62,7 +62,8 @@ public class ProgramStartupValidationTests : IDisposable
             }
 
             throw new Xunit.Sdk.XunitException(
-                $"Expected InvalidOperationException containing '{messageFragment}', got: {ex}");
+                $"Expected InvalidOperationException containing '{messageFragment}', got "
+                + $"{(ex?.GetType().FullName ?? "no exception")}: {ex?.Message}");
         }
     }
 
@@ -71,7 +72,13 @@ public class ProgramStartupValidationTests : IDisposable
     {
         ClearEnv("NARS_DB_PASSWORD");
 
-        var factory = new WebApplicationFactory<Program>();
+        // Inject the placeholder connection string explicitly so the test does
+        // not depend on ambient appsettings/env providing it (hermetic like
+        // the Jwt tests below).
+        var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(b => b.UseSetting(
+                "ConnectionStrings:DefaultConnection",
+                "Host=localhost;Database=nars;Username=nars;Password=${NARS_DB_PASSWORD}"));
         var ex = ExpectStartupFailure(factory, "Database password is not configured");
         Assert.Contains("NARS_DB_PASSWORD", ex.Message, StringComparison.Ordinal);
     }

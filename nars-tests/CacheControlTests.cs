@@ -16,6 +16,7 @@ public class CacheControlTests
     [InlineData("assets/AdminDashboard-efgh5678.css", "public, max-age=31536000, immutable")]
     [InlineData("assets/rolldown-runtime-ijkl9012.js", "public, max-age=31536000, immutable")]
     [InlineData("assets/vendor-geoman-mnop3456.css", "public, max-age=31536000, immutable")]
+    [InlineData("assets/InterVariable-pqrst6789.woff2", "public, max-age=31536000, immutable")]
     public void ContentFingerprintedBundles_AreImmutable(string fileName, string expected)
     {
         Assert.Equal(expected, PipelineExtensions.CacheControlForStaticAsset(fileName));
@@ -27,6 +28,7 @@ public class CacheControlTests
     [InlineData("app.mjs")]
     [InlineData("app.css")]
     [InlineData("assets/index.js")]
+    [InlineData("fonts/InterVariable.woff2")]
     public void UnHashedAssets_AreRevalidated(string fileName)
     {
         Assert.Equal("public, no-cache", PipelineExtensions.CacheControlForStaticAsset(fileName));

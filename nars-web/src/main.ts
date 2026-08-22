@@ -4,15 +4,15 @@ import { createApp } from "vue"
 import { createPinia } from "pinia"
 import App from "./App.vue"
 import "./app.css"
-import { i18n } from "./i18n"
+import { i18n, t } from "./i18n"
 import router from "./router"
 import { initTheme } from "./composables/useTheme"
 import { initMap, loadFromDatabase, loadUserAndCommune, displayCommuneBoundary } from "./map"
 import { useAppStore } from "./stores/appStore"
-import { apiUrl } from "./api"
+import { apiUrl, refreshSession } from "./api"
+import { API_CONFIG, getLoginPath } from "./config"
 import { logError, createServerError } from "./lib/errors"
 import { showToast } from "./lib/toast"
-import { getLoginPath } from "./config"
 import { debugLog, debugError } from "./utils/debug"
 import { initTelemetry } from "./lib/telemetry"
 import { vClickOutside } from "./directives/clickOutside"
@@ -24,21 +24,24 @@ initTheme()
 // ─── Auth guard (before Vue mounts) ──────────────────────────────────────────
 
 async function checkAuth(): Promise<{ ok: boolean; user?: UserInfo }> {
+  // Boot traffic must never hang the app on a dead backend: bound every
+  // bootstrap request with the same default timeout apiFetch uses.
+  const bootTimeout = () => AbortSignal.timeout(API_CONFIG.defaultTimeout)
+
   let authCheck = await fetch(apiUrl("/api/current_user"), {
     credentials: "include",
+    signal: bootTimeout(),
   })
 
   if (authCheck.status === 401) {
     debugLog("[Auth] Access token expired, attempting silent refresh...")
-    const refreshResponse = await fetch(apiUrl("/api/refresh"), {
-      method: "POST",
-      credentials: "include",
-    })
-
-    if (refreshResponse.ok) {
+    // Shares the single-flight promise with mid-session refreshes, so a boot
+    // colliding with an in-flight retry never double-hits /api/refresh.
+    if (await refreshSession()) {
       debugLog("[Auth] Silent refresh successful, retrying auth check")
       authCheck = await fetch(apiUrl("/api/current_user"), {
         credentials: "include",
+        signal: bootTimeout(),
       })
     }
   }
@@ -82,9 +85,13 @@ function createVueApp(pinia: ReturnType<typeof createPinia>) {
 
 async function initializeApp(): Promise<void> {
   try {
-    await loadUserAndCommune()
-
+    // checkAuth() already fetched /api/current_user and populated the store
+    // before mount; only hit the endpoint again when boot ran without one.
     const appStore = useAppStore()
+    if (!appStore.isAuthenticated) {
+      await loadUserAndCommune()
+    }
+
     const role = appStore.user?.role ?? "commune_user"
 
     if (role === "commune_user") {
@@ -103,7 +110,7 @@ async function initializeApp(): Promise<void> {
       error instanceof Error ? error : new Error(String(error)),
     )
     logError(narsError)
-    showToast("Failed to load map. Please refresh the page.", "error")
+    showToast(t("app_init_failed"), "error")
   }
 }
 

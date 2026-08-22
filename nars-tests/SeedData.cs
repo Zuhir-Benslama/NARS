@@ -95,22 +95,23 @@ public static class SeedData
 
     public static async Task<User> CreateUserAsync(AppDbContext db, string role,
         int? communeId = null, int? dairaId = null, int? wilayaId = null,
-        string? name = null)
+        string? name = null, Guid? id = null, string? username = null,
+        string? securityStamp = null)
     {
         var suffix = Guid.NewGuid().ToString("N");
         var user = new User
         {
-            Id = Guid.NewGuid(),
+            Id = id ?? Guid.NewGuid(),
             Name = name ?? $"User {suffix[..8]}",
             Email = $"{suffix[..12]}@test.com",
             Phone = TestData.DefaultPhone,
-            Username = $"user_{suffix[..12]}",
+            Username = username ?? $"user_{suffix[..12]}",
             PasswordHash = DefaultPasswordHash,
             Role = role,
             CommuneId = communeId,
             DairaId = dairaId,
             WilayaId = wilayaId,
-            SecurityStamp = User.GenerateSecurityStamp(),
+            SecurityStamp = securityStamp ?? User.GenerateSecurityStamp(),
         };
         db.Users.Add(user);
         await db.SaveChangesAsync();

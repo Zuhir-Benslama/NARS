@@ -4,7 +4,8 @@
 import { apiFetch } from "../../api"
 import { useSelectionStore } from "../../stores/selectionStore"
 import { openEditModal } from "../../stores/modalStore"
-import { PHASES } from "../../phases"
+import { PHASES, CITY_CENTER_COLOR } from "../../phases"
+import { CITY_CENTER_CONFIG } from "../../config"
 import { getCtx } from "../core/state"
 import { useFeaturesStore } from "../../stores/featuresStore"
 import { useLayerStore, LAYER_KEYS } from "../../stores/layerStore"
@@ -15,7 +16,7 @@ import { t } from "../../i18n"
 import { recordDelete } from "../undo"
 import { enableEditMode } from "../draw/draw-events"
 import type { LayerEntry } from "../../types"
-import { computeCircleRing, closeRing } from "../rendering/geometry"
+import { featureDataToGeometry } from "../features/feature-data"
 import { debugError } from "../../utils/debug"
 import { updateEndpointMarkers } from "../roads/road-directions"
 
@@ -91,15 +92,14 @@ export async function editFeatureInfo(dbId: string): Promise<void> {
     const featuresStore = useFeaturesStore()
     const d = entry.data as { radius?: number; lat?: number; lng?: number; label: string }
     if (entry.type === "circle" && d.radius && d.lat && d.lng) {
-      const ring = closeRing(computeCircleRing(d.lat, d.lng, d.radius))
       featuresStore.update(entry.id, {
-        geometry: { type: "LineString", coordinates: ring },
+        geometry: featureDataToGeometry(d, "circle"),
         properties: {
           phaseKey: "cityCenter",
           label: entry.data.label,
           geomType: "LineString",
-          lineColor: PHASES.find((p) => p.key === "cityCenter")?.color ?? "#e74c3c",
-          lineWidth: 6,
+          lineColor: CITY_CENTER_COLOR,
+          lineWidth: CITY_CENTER_CONFIG.ringStrokeWidth,
         },
       })
     } else {

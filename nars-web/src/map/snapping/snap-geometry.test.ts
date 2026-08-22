@@ -1,49 +1,12 @@
 import { describe, it, expect } from "vitest"
 import type maplibregl from "maplibre-gl"
-import {
-  closestOnSegment,
-  closestOnCirclePerimeter,
-  pixelDist,
-  closestOnSegmentProjected,
-} from "./snap-geometry"
+import { closestOnCirclePerimeter, pixelDist, closestOnSegmentProjected } from "./snap-geometry"
 
 const project = (ll: [number, number]) => ({ x: ll[0], y: -ll[1] })
 const unproject = (pt: [number, number]) =>
   ({ lng: pt[0], lat: -pt[1] }) as unknown as maplibregl.LngLat
 
 describe("snap-geometry", () => {
-  describe("closestOnSegment", () => {
-    it("returns the endpoint when segment is degenerate", () => {
-      const result = closestOnSegment(0, 0, 10, 20, 10, 20, project, unproject)
-      expect(result).not.toBeNull()
-      expect(result!.x).toBe(10)
-      expect(result!.y).toBe(-20)
-      expect(result!.lng).toBe(10)
-      expect(result!.lat).toBe(20)
-    })
-
-    it("returns the closest point on a horizontal segment", () => {
-      const result = closestOnSegment(15, 0, 10, 0, 20, 0, project, unproject)
-      expect(result).not.toBeNull()
-      expect(result!.lng).toBeCloseTo(15, 1)
-      expect(result!.lat).toBeCloseTo(0, 1)
-    })
-
-    it("returns null when project/unproject throw", () => {
-      const badProject = () => {
-        throw new Error("map not ready")
-      }
-      const result = closestOnSegment(0, 0, 1, 2, 3, 4, badProject, unproject)
-      expect(result).toBeNull()
-    })
-
-    it("clamps the closest point to segment endpoints", () => {
-      const result = closestOnSegment(100, 0, 10, 0, 20, 0, project, unproject)
-      expect(result).not.toBeNull()
-      expect(result!.lng).toBeCloseTo(20, 1)
-    })
-  })
-
   describe("pixelDist", () => {
     it("computes pixel distance between cursor and projected point", () => {
       const dist = pixelDist(10, 10, 5, 5, project)

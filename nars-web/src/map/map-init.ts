@@ -15,6 +15,8 @@ import { debugWarn } from "../utils/debug"
 
 let currentActiveStyle: maplibregl.StyleSpecification | undefined
 let _styleSwitchInFlight = false
+let _pendingStyleKey: string | null = null
+let _pendingWaiters: (() => void)[] = []
 
 let _setBaseLayer: (key: string) => void | Promise<void> = () => {
   debugWarn("setBaseLayer called before map initialization")
@@ -47,6 +49,9 @@ function buildRasterStyle(
 
 export function resetMapInit(): void {
   currentActiveStyle = undefined
+  _styleSwitchInFlight = false
+  _pendingStyleKey = null
+  _pendingWaiters = []
   _setBaseLayer = (_key: string) => {
     debugWarn("setBaseLayer called before map initialization")
   }
@@ -191,8 +196,14 @@ async function switchBaseLayer(
   if (!next || next === currentActiveStyle) return
   if (!ctx.map) return
   if (_styleSwitchInFlight) {
-    debugWarn("[MAP] Style switch already in progress — ignoring concurrent request")
-    return
+    // Don't drop the user's selection: remember the LATEST requested style,
+    // apply it once the in-flight switch finishes, and resolve the caller
+    // only when its request has actually been applied (or superseded).
+    _pendingStyleKey = key
+    debugWarn("[MAP] Style switch already in progress — queued:", key)
+    return new Promise<void>((resolve) => {
+      _pendingWaiters.push(resolve)
+    })
   }
   _styleSwitchInFlight = true
   const previous = currentActiveStyle
@@ -245,5 +256,16 @@ async function switchBaseLayer(
     await initGeoman(map, geomanOptions)
   } finally {
     _styleSwitchInFlight = false
+    const waiters = _pendingWaiters
+    _pendingWaiters = []
+    const pending = _pendingStyleKey
+    _pendingStyleKey = null
+    if (pending) {
+      void switchBaseLayer(pending, geomanOptions).finally(() => {
+        waiters.forEach((w) => w())
+      })
+    } else {
+      waiters.forEach((w) => w())
+    }
   }
 }

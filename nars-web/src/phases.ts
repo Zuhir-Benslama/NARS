@@ -96,6 +96,13 @@ export const PHASES: Phase[] = [
   },
 ]
 
+/**
+ * Single source for the city-center stroke color. The phase table owns the
+ * color; feature styling (loader, draw-save, context-menu) must reference
+ * this constant instead of hardcoding "#e74c3c" again.
+ */
+export const CITY_CENTER_COLOR = PHASES.find((p) => p.key === "cityCenter")?.color ?? "#e74c3c"
+
 // ─── getApiLayerToPhase ───────────────────────────────────────────────
 // Auto-generated from feature-types.ts — no manual sync needed when
 // adding new sub-types. Maps every DB layer value to its phase key.

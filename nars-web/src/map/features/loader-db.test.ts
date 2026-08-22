@@ -3,7 +3,8 @@ import { setActivePinia, createPinia } from "pinia"
 
 const {
   mockApiFetch,
-  mockRenderScatteredAreas,
+  mockClearScatteredAreas,
+  mockAddScatteredArea,
   mockRefreshLayerVisibility,
   mockGetFeatureType,
   mockDebugError,
@@ -15,7 +16,8 @@ const {
   mockFeaturesStoreClear,
 } = vi.hoisted(() => ({
   mockApiFetch: vi.fn(),
-  mockRenderScatteredAreas: vi.fn(),
+  mockClearScatteredAreas: vi.fn(),
+  mockAddScatteredArea: vi.fn(),
   mockRefreshLayerVisibility: vi.fn(),
   mockGetFeatureType: vi.fn(),
   mockDebugError: vi.fn(),
@@ -28,7 +30,10 @@ const {
 }))
 
 vi.mock("../../api", () => ({ apiFetch: mockApiFetch }))
-vi.mock("../rendering/geometry", () => ({ renderScatteredAreas: mockRenderScatteredAreas }))
+vi.mock("../rendering/geometry", () => ({
+  clearScatteredAreas: mockClearScatteredAreas,
+  addScatteredArea: mockAddScatteredArea,
+}))
 vi.mock("../rendering/labels", () => ({ refreshLayerVisibility: mockRefreshLayerVisibility }))
 vi.mock("../house-numbering", () => ({ getFeatureType: mockGetFeatureType }))
 vi.mock("../../utils/debug", () => ({
@@ -112,8 +117,39 @@ describe("loader-db", () => {
 
     await loadFromDatabase()
 
-    expect(mockRenderScatteredAreas).toHaveBeenCalledWith(feature.data.geometry)
+    // Clear happens once per load; each scattered feature is appended.
+    expect(mockClearScatteredAreas).toHaveBeenCalledTimes(1)
+    expect(mockAddScatteredArea).toHaveBeenCalledWith(feature.data.geometry)
     expect(mockFeaturesStoreBatchAdd).toHaveBeenCalledWith([])
+  })
+
+  it("clears scattered state exactly once across multiple scattered features", async () => {
+    const features = [1, 2].map((n) => ({
+      id: String(n),
+      layer: "scattered",
+      data: {
+        geometry: {
+          type: "Polygon",
+          coordinates: [
+            [
+              [0, 0],
+              [1, 0],
+              [1, 1],
+              [0, 0],
+            ],
+          ],
+        },
+      },
+    }))
+    mockApiFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve(features) })
+
+    await loadFromDatabase()
+
+    // Regression for the clobber bug: the old per-feature reset meant N
+    // scattered features left only the last one hit-testable. Now state is
+    // reset once before the loop and appended per feature.
+    expect(mockClearScatteredAreas).toHaveBeenCalledTimes(1)
+    expect(mockAddScatteredArea).toHaveBeenCalledTimes(2)
   })
 
   it("handles unknown layer gracefully", async () => {

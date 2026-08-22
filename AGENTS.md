@@ -64,7 +64,7 @@ These rules exist because data has been destroyed multiple times. Violating them
 ### Environment
 
 - Rootless Docker on Fedora — container uid 0 ≠ host root
-- Kind cluster name: `nars-cluster`
+- Kind cluster name: `nars`
 - Namespace: `nars`
 - Database: PostGIS in `nars_db`
 

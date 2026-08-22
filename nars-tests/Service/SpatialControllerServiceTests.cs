@@ -104,6 +104,23 @@ public class SpatialControllerServiceTests(NarsDatabaseFixture fixture) : IAsync
     }
 
     [Fact]
+    public void GetScatteredStatus_RecordedError_IsReported()
+    {
+        var error = (Timestamp: FixedUtcNowOffset, Message: "An error occurred during computation.");
+        var scatteredMock = new Mock<IScatteredAreaService>(MockBehavior.Strict);
+        scatteredMock.Setup(s => s.GetLastError(_userId, 1)).Returns(error);
+
+        var controller = CreateController(scatteredMock.Object);
+        var result = controller.GetScatteredStatus();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var resp = Assert.IsType<ScatteredStatusResponse>(ok.Value);
+        Assert.True(resp.HasError);
+        Assert.Equal("An error occurred during computation.", resp.LastErrorMessage);
+        Assert.Equal(FixedUtcNowOffset.ToString(JsonHelper.IsoDateFormat), resp.LastErrorTime);
+    }
+
+    [Fact]
     public async Task RefreshScattered_ValidRequest_Returns200()
     {
         var scatteredMock = new Mock<IScatteredAreaService>(MockBehavior.Strict);

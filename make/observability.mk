@@ -65,22 +65,9 @@ observability-tempo: ## Install Tempo (traces)
 	@helm upgrade --install tempo grafana/tempo \
 		--namespace $(OBSERVABILITY_NAMESPACE) \
 		--version "$(TEMPO_VERSION)" \
-		--set tempo.replicas=1 \
-		--set tempo.resources.requests.cpu=50m \
-		--set tempo.resources.requests.memory=128Mi \
-		--set tempo.resources.limits.cpu=200m \
-		--set tempo.resources.limits.memory=512Mi \
-		--set tempo.storage.trace.backend=local \
-		--set tempo.storage.trace.local.path=/var/tempo/traces \
-		--set tempo.storage.trace.wal.path=/var/tempo/wal \
-		--set tempo.ingester.max_block_duration=5m \
-		--set tempo.readinessProbe.initialDelaySeconds=60 \
-		--set tempo.readinessProbe.failureThreshold=10 \
-		--set tempo.livenessProbe.initialDelaySeconds=60 \
-		--set tempo.livenessProbe.failureThreshold=10 \
-		--set memBallastSizeMbs=128 \
-		--set test.enabled=false \
+		--values $(K8S_DIR)/helm-values/tempo.yaml \
 		--timeout 10m
+	@echo "✓ Tempo installed"
 
 .PHONY: observability-otel-collector
 observability-otel-collector: ## Install OpenTelemetry Collector

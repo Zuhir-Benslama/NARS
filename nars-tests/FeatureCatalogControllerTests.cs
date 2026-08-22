@@ -88,7 +88,7 @@ public class FeatureCatalogControllerTests
         var features = new List<FeatureResult>
         {
             new("id-1", FeatureTypes.Area, FeatureTypes.AreaLayers.CentralUrban, "Area 1",
-                System.Text.Json.JsonDocument.Parse("{}").RootElement, "2025-06-01T12:00:00Z"),
+                ToJsonElement("{}"), "2025-06-01T12:00:00Z"),
         };
         var mock = new Mock<IFeatureStatsService>();
         mock.Setup(s => s.LoadByLayerAsync(
@@ -121,6 +121,11 @@ public class FeatureCatalogControllerTests
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<LoadFeaturesResponse<FeatureResult>>(ok.Value);
         Assert.Equal(500, resp.Take);
+
+        // The clamped page size must be what reaches the service, not just
+        // what the response echoes back.
+        mock.Verify(s => s.LoadByLayerAsync(
+            userId, FeatureTypes.RoadLayers.Boulevard, 0, 500, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

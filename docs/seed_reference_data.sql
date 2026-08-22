@@ -6,12 +6,32 @@ SET client_encoding = 'UTF8';
 -- truncation too (a partial re-seed must never leave the reference tables
 -- empty). TRUNCATE CASCADE handles FK dependencies (communes → dairas →
 -- wilayas). Only runs if data already exists (first run inserts cleanly).
+--
+-- SAFETY GUARD: TRUNCATE ... CASCADE follows the FK graph, so on any
+-- database with real data it would silently wipe users and everything
+-- hanging off them (refresh_tokens, roads, inspections, ai_draft_features,
+-- ...) — not just the reference rows. Abort instead when application
+-- tables are populated; re-seeding reference data on a live database is
+-- an operator decision that must go through the backup/restore flow.
+-- public.communes_boundaries is derived from communes and is the only
+-- dependent table this script may legitimately clear.
 BEGIN;
 DO $$
+DECLARE
+    users_count    bigint;
+    drafts_count   bigint;
 BEGIN
     IF EXISTS (SELECT 1 FROM public.wilayas LIMIT 1) THEN
-        RAISE NOTICE 'Seed data already present — truncating and re-seeding.';
-        TRUNCATE public.communes, public.dairas, public.wilayas CASCADE;
+        SELECT count(*) INTO users_count  FROM public.users;
+        SELECT count(*) INTO drafts_count FROM public.ai_draft_features;
+        IF users_count > 0 OR drafts_count > 0 THEN
+            RAISE EXCEPTION
+                'Reference re-seed aborted: % user row(s) and % ai_draft_feature row(s) depend on the reference tables. TRUNCATE CASCADE would destroy them.',
+                users_count, drafts_count
+                USING HINT = 'Back up first (make db-backup), then clear application data deliberately before re-seeding.';
+        END IF;
+        RAISE NOTICE 'Seed data already present — truncating reference tables and communes_boundaries.';
+        TRUNCATE public.communes_boundaries, public.communes, public.dairas, public.wilayas CASCADE;
     END IF;
 END $$;
 

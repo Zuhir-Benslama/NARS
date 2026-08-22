@@ -21,6 +21,12 @@ export const useAppStore = defineStore("app", {
     isAdminUser: (state) =>
       state.user !== null &&
       ["national_admin", "wilaya_admin", "daira_admin"].includes(state.user.role),
+    // Mirrors the server's UserManagementRoles policy (AdminUserController):
+    // commune_user may manage its own field_worker accounts even though it is
+    // not an "admin" for routing/dashboard purposes.
+    canManageUsers: (state) =>
+      state.user !== null &&
+      ["national_admin", "wilaya_admin", "daira_admin", "commune_user"].includes(state.user.role),
     communeName: (state) => state.user?.commune?.name_fr || state.user?.commune?.name_ar || "",
     // Derived from the layer store (single source of truth for features).
     // Previously duplicated state that had to be manually re-synced at every

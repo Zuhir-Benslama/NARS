@@ -8,9 +8,11 @@
 IMAGE_TAG ?= latest
 
 # Shell-safe single-quoted form of IMAGE_TAG. Tags are developer/CI-supplied
-# and get interpolated into double-quoted shell contexts (awk -v, echo, grep),
+# and get interpolated into shell contexts (awk -v, echo, grep, docker -t),
 # where backticks or a stray `"` would be executed. Single-quote escaping keeps
-# every character literal. Use this instead of the raw variable in recipes.
+# every character literal. Recipes compose it by breaking out of surrounding
+# double quotes: "…org/name:"$(IMAGE_TAG_Q). Charset-guard prerequisites
+# (_warn-latest-tag / _check-pinned-tag) additionally reject hostile tags.
 IMAGE_TAG_Q = '$(subst ','"'"',$(IMAGE_TAG))'
 
 # Charset guard for IMAGE_TAG, shared by _warn-latest-tag and _check-pinned-tag.
@@ -39,46 +41,46 @@ images-build: _warn-latest-tag ## Build all Docker images
 
 .PHONY: _build-nars-api
 _build-nars-api: _warn-latest-tag
-	@echo "  → $(DOCKER_ORG)/nars-api:$(IMAGE_TAG)"
+	@echo "  → $(DOCKER_ORG)/nars-api:"$(IMAGE_TAG_Q)
 	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-api" \
-		-t "$(DOCKER_ORG)/nars-api:$(IMAGE_TAG)" .
+		-t "$(DOCKER_ORG)/nars-api:"$(IMAGE_TAG_Q) .
 
 .PHONY: _build-nars-postgis
 _build-nars-postgis: _warn-latest-tag
-	@echo "  → $(DOCKER_ORG)/nars-postgis:$(IMAGE_TAG)"
+	@echo "  → $(DOCKER_ORG)/nars-postgis:"$(IMAGE_TAG_Q)
 	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-postgis" \
-		-t "$(DOCKER_ORG)/nars-postgis:$(IMAGE_TAG)" .
+		-t "$(DOCKER_ORG)/nars-postgis:"$(IMAGE_TAG_Q) .
 
 .PHONY: _build-nars-vite
 _build-nars-vite: _warn-latest-tag
-	@echo "  → $(DOCKER_ORG)/nars-vite:$(IMAGE_TAG)"
+	@echo "  → $(DOCKER_ORG)/nars-vite:"$(IMAGE_TAG_Q)
 	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-vite" \
-		-t "$(DOCKER_ORG)/nars-vite:$(IMAGE_TAG)" .
+		-t "$(DOCKER_ORG)/nars-vite:"$(IMAGE_TAG_Q) .
 
 .PHONY: _build-nars-backup
 _build-nars-backup: _warn-latest-tag
-	@echo "  → $(DOCKER_ORG)/nars-backup:$(IMAGE_TAG)"
+	@echo "  → $(DOCKER_ORG)/nars-backup:"$(IMAGE_TAG_Q)
 	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-backup" \
-		-t "$(DOCKER_ORG)/nars-backup:$(IMAGE_TAG)" .
+		-t "$(DOCKER_ORG)/nars-backup:"$(IMAGE_TAG_Q) .
 
 .PHONY: _build-nars-roads
 _build-nars-roads: _warn-latest-tag
-	@echo "  → $(DOCKER_ORG)/nars-roads:$(IMAGE_TAG)"
+	@echo "  → $(DOCKER_ORG)/nars-roads:"$(IMAGE_TAG_Q)
 	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-roads" \
-		-t "$(DOCKER_ORG)/nars-roads:$(IMAGE_TAG)" nars-roads/
+		-t "$(DOCKER_ORG)/nars-roads:"$(IMAGE_TAG_Q) nars-roads/
 
 .PHONY: images-push
 images-push: _check-pinned-tag _warn-latest-tag ## Push all Docker images to registry
 	@	for img in $(REGISTRY_IMAGES); do
-		echo "→ Pushing $(DOCKER_ORG)/$$img:$(IMAGE_TAG)..."
-		docker push "$(DOCKER_ORG)/$$img:$(IMAGE_TAG)"
+		echo "→ Pushing $(DOCKER_ORG)/$$img:"$(IMAGE_TAG_Q)"..."
+		docker push "$(DOCKER_ORG)/$$img:"$(IMAGE_TAG_Q)
 	done
 	@echo "✓ All images pushed"
 
 .PHONY: images-load
 images-load: _warn-latest-tag ## Load locally built Docker images into the kind cluster
 	@for img in $(REGISTRY_IMAGES); do
-		full="$(DOCKER_ORG)/$$img:$(IMAGE_TAG)"
+		full="$(DOCKER_ORG)/$$img:"$(IMAGE_TAG_Q)
 		if docker image inspect "$$full" >/dev/null 2>&1; then
 			echo "→ Loading $$full into cluster..."
 			kind load docker-image "$$full" --name "$(CLUSTER_NAME)"
@@ -91,7 +93,7 @@ images-load: _warn-latest-tag ## Load locally built Docker images into the kind 
 .PHONY: frontend-update
 frontend-update: _warn-latest-tag ## Rebuild nars-vite, load into kind, and rollout restart
 	$(SUBMAKE) _build-nars-vite
-	@kind load docker-image "$(DOCKER_ORG)/nars-vite:$(IMAGE_TAG)" --name "$(CLUSTER_NAME)"
+	@kind load docker-image "$(DOCKER_ORG)/nars-vite:"$(IMAGE_TAG_Q)" --name "$(CLUSTER_NAME)"
 	@$(KUBECTL) rollout restart deployment nars-frontend -n "$(NAMESPACE)"
 	@$(KUBECTL) rollout status deployment nars-frontend -n "$(NAMESPACE)" --timeout=120s
 	@echo "✓ nars-vite rebuilt and deployed"

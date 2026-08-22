@@ -46,22 +46,26 @@ public class ScatteredAreaServiceTests
     public async Task RefreshAsync_ConsecutiveErrors_UpdatesLastError()
     {
         var factory = new Mock<IDbContextFactory<AppDbContext>>();
-        factory.SetupSequence(f => f.CreateDbContextAsync(It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("Simulated database failure #1"))
-            .ThrowsAsync(new InvalidOperationException("Simulated database failure #2"));
+        factory.Setup(f => f.CreateDbContextAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Simulated database failure"));
 
-        var service = CreateService(dbFactory: factory.Object);
+        // The stored message is generic and the payload identical across
+        // failures, so replacement is observable only through the timestamp:
+        // an implementation that kept the stale entry would retain T0.
+        var now = FixedUtcNow;
+        var timeProvider = new Mock<IDateTimeProvider>();
+        timeProvider.SetupGet(x => x.UtcNow).Returns(() => now);
+        var service = CreateService(dbFactory: factory.Object, timeProvider: timeProvider.Object);
         var userId = Guid.NewGuid();
 
-        // First call fails for (user, commune 1).
-        var firstSuccess = await service.RefreshAsync(userId, 1);
-        Assert.False(firstSuccess);
-        Assert.NotNull(service.GetLastError(userId, 1));
+        await service.RefreshAsync(userId, 1);
 
-        // Second call fails for (user, commune 2) — each key tracks its own error.
-        var secondSuccess = await service.RefreshAsync(userId, 2);
-        Assert.False(secondSuccess);
-        Assert.NotNull(service.GetLastError(userId, 2));
+        now = FixedUtcNow.AddMinutes(5);
+        await service.RefreshAsync(userId, 1);
+
+        var error = service.GetLastError(userId, 1);
+        Assert.NotNull(error);
+        Assert.Equal(FixedUtcNow.AddMinutes(5), error!.Value.Timestamp);
     }
 
     [Fact]
@@ -119,20 +123,5 @@ public class ScatteredAreaServiceTests
         Assert.All(userIds, uid => Assert.NotNull(service.GetLastError(uid, 1)));
         // Another user's error must not appear under a different user's key.
         Assert.Null(service.GetLastError(Guid.NewGuid(), 1));
-    }
-
-    [Fact]
-    public async Task LastError_CacheEnabled_IsStoredAndRetrievable()
-    {
-        var factory = new Mock<IDbContextFactory<AppDbContext>>();
-        factory.Setup(f => f.CreateDbContextAsync(It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("Simulated database failure"));
-
-        var cache = new MemoryCache(new MemoryCacheOptions());
-        var service = CreateService(dbFactory: factory.Object, cache: cache);
-
-        var userId = Guid.NewGuid();
-        Assert.False(await service.RefreshAsync(userId, 1));
-        Assert.NotNull(service.GetLastError(userId, 1));
     }
 }

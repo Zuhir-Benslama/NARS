@@ -1,0 +1,33 @@
+---
+# Tempo (traces). Extracted from the former inline `--set` flags in
+# make/observability.mk so this file is linted by yamllint and reviewable,
+# consistent with the other files in helm-values/. Dev-tuned: single small
+# instance with local (emptyDir-style) trace storage.
+tempo:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi
+  storage:
+    trace:
+      backend: local
+      local:
+        path: /var/tempo/traces
+      wal:
+        path: /var/tempo/wal
+  ingester:
+    max_block_duration: 5m
+  readinessProbe:
+    initialDelaySeconds: 60
+    failureThreshold: 10
+  livenessProbe:
+    initialDelaySeconds: 60
+    failureThreshold: 10
+
+# Do not deploy the chart's smoke-test pods.
+test:
+  enabled: false

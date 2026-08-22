@@ -113,16 +113,6 @@ export const DRAW_CONFIG = {
   drawModeResetDelayMs: 200,
 } as const
 
-// ─── EXPORT CONFIGURATION ────────────────────────────────────────────────────
-
-export const EXPORT_CONFIG = {
-  a0Scale: 3,
-  a3Scale: 2,
-  jpegQuality: 0.92,
-  imageTimeoutMs: 15000,
-  titleBarOffsetMm: 14,
-} as const
-
 // ─── CITY CENTER CONFIGURATION ───────────────────────────────────────────────
 
 export const CITY_CENTER_CONFIG = {
@@ -131,6 +121,9 @@ export const CITY_CENTER_CONFIG = {
 
   /** Maximum allowed radius in meters */
   maxRadiusM: 50_000,
+
+  /** Stroke width of the city-center ring rendered as a LineString */
+  ringStrokeWidth: 6,
 } as const
 
 // ─── EDIT VISUAL CONFIGURATION ───────────────────────────────────────────────

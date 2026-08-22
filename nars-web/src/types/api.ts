@@ -26,12 +26,6 @@ export interface RoadSideResponse {
   suggestedNumber: number
 }
 
-export interface ScatteredRefreshResponse {
-  success: boolean
-  geojson: string | null
-  message: string
-}
-
 export interface DbFeature {
   id: string
   layer: string

@@ -157,12 +157,6 @@ public static class FeatureTypeRegistry
     private static readonly IReadOnlyList<string> _allTableNames = [.. _registry.Values.Select(d => d.TableName)];
 
     /// <summary>
-    /// Returns the table names for all registered feature types.
-    /// Used to build dynamic SQL that must stay in sync with the registry.
-    /// </summary>
-    public static IReadOnlyList<string> GetAllTableNames() => _allTableNames;
-
-    /// <summary>
     /// Validates a table name against the known allowlist to prevent SQL injection
     /// from any future dynamic table name sources.
     /// </summary>

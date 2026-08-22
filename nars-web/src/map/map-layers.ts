@@ -211,14 +211,7 @@ export function initSources(): void {
   const ctx = getCtx()
   const map = ctx.map
 
-  for (const name of [
-    "boundaries",
-    "scattered",
-    "features",
-    "drawing-preview",
-    "selection",
-    "endpoints",
-  ]) {
+  for (const name of ["boundaries", "scattered", "features", "selection", "endpoints"]) {
     if (!map.getSource(name)) {
       map.addSource(name, {
         type: "geojson",
@@ -235,7 +228,6 @@ export function initSources(): void {
   debugLog("[initSources] ctx.featuresSource set:", !!ctx.featuresSource)
 
   addFeatureLayers(map)
-  addDrawingPreviewLayer(map)
   addEndpointLayers(map)
 }
 
@@ -258,48 +250,4 @@ export function addFeatureLayers(map: maplibregl.Map): void {
   }
 
   addBoundaryClickEvents(map)
-}
-
-export function addDrawingPreviewLayer(map: maplibregl.Map): void {
-  const layers = map.getStyle().layers || []
-  const firstSymbolId = layers.find((l) => l.type === "symbol")?.id
-  map.addLayer(
-    {
-      id: "drawing-preview-line",
-      type: "line",
-      source: "drawing-preview",
-      paint: {
-        "line-color": "#3498db",
-        "line-width": 3,
-        "line-dasharray": [3, 2],
-        "line-opacity": 0.8,
-      },
-    },
-    firstSymbolId,
-  )
-}
-
-export function updateDrawingPreview(geometry: [number, number][] | null): void {
-  const source = getGeoJSON(getCtx().map, "drawing-preview")
-  if (!source) return
-  const features: GeoJSON.Feature[] =
-    geometry && geometry.length > 0
-      ? [
-          geometry.length >= 3
-            ? {
-                type: "Feature" as const,
-                geometry: {
-                  type: "Polygon" as const,
-                  coordinates: [[...geometry, geometry[0]]],
-                },
-                properties: {},
-              }
-            : {
-                type: "Feature" as const,
-                geometry: { type: "LineString" as const, coordinates: geometry },
-                properties: {},
-              },
-        ]
-      : []
-  source.setData({ type: "FeatureCollection", features })
 }

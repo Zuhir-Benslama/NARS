@@ -29,9 +29,15 @@ public sealed class FieldService(
 
         await using var cmd = conn.CreateCommand();
 #pragma warning disable S2077 // Table name is allowlist-validated; parameters used for values
+        // Two result sets so the total is correct even when OFFSET lands past
+        // the last row (COUNT(*) OVER() would emit no rows — and therefore
+        // report a total of 0 — on an empty page).
         cmd.CommandText = $"""
-            SELECT f.id, f.user_id, f.layer, f.label, f.data, f.created_at, f.updated_at,
-                   COUNT(*) OVER() AS total
+            SELECT COUNT(*)
+            FROM {tableName} f
+            JOIN users u ON u.id = f.user_id
+            WHERE u.commune_id = @commune_id;
+            SELECT f.id, f.user_id, f.layer, f.label, f.data, f.created_at, f.updated_at
             FROM {tableName} f
             JOIN users u ON u.id = f.user_id
             WHERE u.commune_id = @commune_id
@@ -46,17 +52,17 @@ public sealed class FieldService(
         SqlFragments.AddParam(cmd, "@take", take);
 
         var items = new List<FieldFeatureResult>();
-        var total = 0;
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
-        var totalOrdinal = reader.GetOrdinal("total");
+
+        // First result set: total matching rows (independent of paging).
+        await reader.ReadAsync(ct);
+        var total = Convert.ToInt32(reader.GetInt64(0));
+
+        // Second result set: the paged feature rows.
+        await reader.NextResultAsync(ct);
         while (await reader.ReadAsync(ct))
         {
-            if (total == 0)
-            {
-                total = Convert.ToInt32(reader.GetInt64(totalOrdinal));
-            }
-
             var id = reader.GetGuid(0);
             var rawData = await reader.IsDBNullAsync(4, ct) ? "{}" : reader.GetString(4);
             JsonElement? data = null;

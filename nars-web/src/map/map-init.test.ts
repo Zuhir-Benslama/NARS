@@ -90,7 +90,7 @@ describe("switchBaseLayer", () => {
     resetMapInit()
   })
 
-  it("ignores a concurrent style switch while one is in flight", async () => {
+  it("applies the latest concurrent style switch after the in-flight one", async () => {
     // Wire the internal setBaseLayer implementation via initMap.
     const initPromise = initMap()
     const mapLoadHandler = mockOnce.mock.calls.find((c) => c[0] === "load")?.[1] as
@@ -110,18 +110,25 @@ describe("switchBaseLayer", () => {
 
     expect(mockSetStyle).toHaveBeenCalledTimes(1)
 
-    // Let the first switch finish.
-    const styleHandler = styleLoadHandlers[0]
-    expect(styleHandler).toBeDefined()
-    styleHandler!()
+    // Let the first switch finish. Its completion kicks off the queued
+    // "dark" switch, which synchronously registers its own style.load
+    // handler and calls setStyle before suspending.
+    styleLoadHandlers[0]!()
     await first
+    await Promise.resolve()
+
+    // Latest selection was applied — a second full switch cycle ran.
+    expect(mockSetStyle).toHaveBeenCalledTimes(2)
+    const darkHandler = styleLoadHandlers[1]
+    expect(darkHandler).toBeDefined()
+    darkHandler!()
+
+    // Resolves only once the queued request has been fully applied.
     await second
 
-    // Concurrent request was dropped — exactly one full switch cycle.
-    expect(mockSetStyle).toHaveBeenCalledTimes(1)
-    expect(mockInitSources).toHaveBeenCalledTimes(1)
-    expect(mockUpdateSource).toHaveBeenCalledTimes(1)
-    expect(mockCreateGeoman).toHaveBeenCalledTimes(1) // post-switch rebuild only
+    expect(mockInitSources).toHaveBeenCalledTimes(2)
+    expect(mockUpdateSource).toHaveBeenCalledTimes(2)
+    expect(mockCreateGeoman).toHaveBeenCalledTimes(2)
   })
 
   it("allows a subsequent switch after the previous one completed", async () => {

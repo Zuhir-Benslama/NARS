@@ -76,7 +76,9 @@ const appStore = useAppStore()
 
 const activeTab = ref("general")
 
-const isAdmin = computed(() => appStore.isAdminUser)
+// Users tab follows the server's UserManagementRoles (includes commune_user,
+// which may create field_worker accounts for its own commune).
+const canManageUsers = computed(() => appStore.canManageUsers)
 
 const baseTabs = [
   { id: "general", tKey: "tab_general", icon: "⚙️" },
@@ -87,7 +89,7 @@ const baseTabs = [
 const adminTab = { id: "users", tKey: "tab_users", icon: "👥" }
 
 const tabs = computed(() =>
-  isAdmin.value ? [baseTabs[0], baseTabs[1], adminTab, baseTabs[2], baseTabs[3]] : baseTabs,
+  canManageUsers.value ? [baseTabs[0], baseTabs[1], adminTab, baseTabs[2], baseTabs[3]] : baseTabs,
 )
 
 function onTabKeydown(e: KeyboardEvent) {

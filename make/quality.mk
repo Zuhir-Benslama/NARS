@@ -19,34 +19,47 @@ infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, ma
 	$(SUBMAKE) infra-lint-tag-guard
 	$(SUBMAKE) infra-lint-local-ingress-guard
 
+# File lists resolved by make ($(wildcard)) at parse time and /mnt-prefixed
+# for container use. Shell globs like /mnt/**/*.yaml must NOT be used in
+# docker fallbacks: they expand against the HOST filesystem (where /mnt is
+# unrelated) and reach the container as a literal unexpanded pattern, which
+# none of these tools glob internally. This bug silently broke the
+# shellcheck/hadolint/yamllint docker fallbacks before.
+SHELL_SCRIPTS     := $(wildcard nars-infra/scripts/*.sh)
+DOCKERFILES       := $(wildcard nars-infra/docker/Dockerfile.*)
+YAML_FILES        := $(wildcard nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml nars-infra/roads/*.yaml)
+NODE_SCRIPTS      := $(wildcard nars-infra/scripts/*.mjs)
+SHELL_SCRIPTS_MNT := $(patsubst %,/mnt/%,$(SHELL_SCRIPTS))
+DOCKERFILES_MNT   := $(patsubst %,/mnt/%,$(DOCKERFILES))
+YAML_FILES_MNT    := $(patsubst %,/mnt/%,$(YAML_FILES))
+
 .PHONY: infra-lint-shell
 infra-lint-shell: ## Shell-check nars-infra/scripts/*.sh
 	@if command -v shellcheck >/dev/null 2>&1; then
-		shellcheck nars-infra/scripts/*.sh
+		shellcheck $(SHELL_SCRIPTS)
 	else
-		docker run --rm -v "$$(pwd):/mnt" koalaman/shellcheck:stable \
-			/mnt/nars-infra/scripts/*.sh
+		docker run --rm -v "$$(pwd):/mnt" $(SHELLCHECK_IMAGE) $(SHELL_SCRIPTS_MNT)
 	fi
 
 .PHONY: infra-lint-docker
 infra-lint-docker: ## Lint Dockerfiles with hadolint
 	@if command -v hadolint >/dev/null 2>&1; then
-		hadolint --failure-threshold error nars-infra/docker/Dockerfile.*
+		hadolint --failure-threshold error $(DOCKERFILES)
 	else
 		docker run --rm \
 			-v "$$(pwd):/mnt" \
-			-v "$$(pwd)/nars-infra/.hadolint.yaml:/home/hadolint/.hadolint.yaml:ro" \
-			hadolint/hadolint \
-			hadolint --failure-threshold error /mnt/nars-infra/docker/Dockerfile.*
+			-v "$$(pwd)/nars-infra/.hadolint.yaml:/cfg/hadolint.yaml:ro" \
+			$(HADOLINT_IMAGE) hadolint --config /cfg/hadolint.yaml \
+			--failure-threshold error $(DOCKERFILES_MNT)
 	fi
 
 .PHONY: infra-lint-yaml
 infra-lint-yaml: ## Lint k8s YAML with yamllint (uses .yamllint.yaml config)
 	@if command -v yamllint >/dev/null 2>&1; then
-		yamllint -c nars-infra/.yamllint.yaml nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml nars-infra/roads/*.yaml
+		yamllint -c nars-infra/.yamllint.yaml $(YAML_FILES)
 	else
 		docker run --rm -v "$$(pwd):/mnt" $(YAMLLINT_IMAGE) \
-			-c /mnt/nars-infra/.yamllint.yaml /mnt/nars-infra/k8s/*.yaml /mnt/nars-infra/k8s/helm-values/*.yaml /mnt/nars-infra/roads/*.yaml
+			-c /mnt/nars-infra/.yamllint.yaml $(YAML_FILES_MNT)
 	fi
 
 .PHONY: infra-lint-python
@@ -61,11 +74,12 @@ infra-lint-python: ## Lint Python scripts with ruff (check + format)
 
 .PHONY: infra-lint-node
 infra-lint-node: ## Syntax-check Node helper scripts
-	@if command -v node >/dev/null 2>&1; then
-		for f in nars-infra/scripts/*.mjs; do node --check "$$f"; done
+	@if [ -z "$(NODE_SCRIPTS)" ]; then echo "✓ No .mjs scripts to check"; exit 0; fi
+	if command -v node >/dev/null 2>&1; then
+		for f in $(NODE_SCRIPTS); do node --check "$$f"; done
 	else
 		docker run --rm -v "$$(pwd):/mnt" $(NODE_IMAGE) \
-			sh -c 'for f in /mnt/nars-infra/scripts/*.mjs; do node --check "$$f"; done'
+			sh -c 'for f in $(NODE_SCRIPTS); do node --check "/mnt/$$f"; done'
 	fi
 
 .PHONY: infra-lint-makefile

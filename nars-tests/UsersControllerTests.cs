@@ -48,7 +48,7 @@ public class UsersControllerTests
             Email = email,
             Name = "Test User",
             Phone = DefaultPhone,
-            PasswordHash = "old-hash",
+            PasswordHash = DummyPasswordHash,
             Role = UserRoles.CommuneUser,
             CommuneId = CommuneId1,
         };
@@ -222,15 +222,18 @@ public class UsersControllerTests
 
         var ctrl = CreateController(userProfile: mock.Object, userId: userId);
 
-        var result = await ctrl.UpdateCredentials(
-            new UpdateUserRequest("updateduser", "new@example.com", null, null), default);
+        // Records compare by value: this verifies the controller forwards the
+        // request to the service untouched (no normalization at the
+        // controller layer — that is UserProfileService's job).
+        var request = new UpdateUserRequest("updateduser", "new@example.com", null, null);
+        var result = await ctrl.UpdateCredentials(request, default);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<UpdateCredentialsResponse>(ok.Value);
         Assert.True(resp.Success);
         Assert.Equal("updateduser", resp.User!.Username);
         Assert.Equal("new@example.com", resp.User.Email);
-        mock.Verify(s => s.UpdateCredentialsAsync(userId, It.IsAny<UpdateUserRequest>(), It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(s => s.UpdateCredentialsAsync(userId, request, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -250,64 +253,5 @@ public class UsersControllerTests
 
         Assert.IsType<OkObjectResult>(result);
         refreshTokens.Verify(s => s.RevokeAllUserTokensAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task UpdateCredentials_WithSameUsername_ReturnsServiceUser()
-    {
-        var userId = Guid.NewGuid();
-        var user = CreateUser(userId, username: "sameuser");
-        var mock = new Mock<IUserProfileService>();
-        mock.Setup(s => s.UpdateCredentialsAsync(userId, It.IsAny<UpdateUserRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Success(user));
-
-        var ctrl = CreateController(userProfile: mock.Object, userId: userId);
-
-        var result = await ctrl.UpdateCredentials(
-            new UpdateUserRequest("sameuser", null, null, null), default);
-
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<UpdateCredentialsResponse>(ok.Value);
-        Assert.True(resp.Success);
-        Assert.Equal("sameuser", resp.User!.Username);
-    }
-
-    [Fact]
-    public async Task UpdateCredentials_WithMixedCaseEmail_ReturnsServiceUser()
-    {
-        var userId = Guid.NewGuid();
-        var user = CreateUser(userId, email: "mixed@example.com");
-        var mock = new Mock<IUserProfileService>();
-        mock.Setup(s => s.UpdateCredentialsAsync(userId, It.IsAny<UpdateUserRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Success(user));
-
-        var ctrl = CreateController(userProfile: mock.Object, userId: userId);
-
-        var result = await ctrl.UpdateCredentials(
-            new UpdateUserRequest(null, "  MiXeD@Example.COM ", null, null), default);
-
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<UpdateCredentialsResponse>(ok.Value);
-        Assert.Equal("mixed@example.com", resp.User!.Email);
-    }
-
-    [Fact]
-    public async Task UpdateCredentials_WithSameEmail_ReturnsServiceUser()
-    {
-        var userId = Guid.NewGuid();
-        var user = CreateUser(userId, email: "same@example.com");
-        var mock = new Mock<IUserProfileService>();
-        mock.Setup(s => s.UpdateCredentialsAsync(userId, It.IsAny<UpdateUserRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Success(user));
-
-        var ctrl = CreateController(userProfile: mock.Object, userId: userId);
-
-        var result = await ctrl.UpdateCredentials(
-            new UpdateUserRequest(null, "same@example.com", null, null), default);
-
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<UpdateCredentialsResponse>(ok.Value);
-        Assert.True(resp.Success);
-        Assert.Equal("same@example.com", resp.User!.Email);
     }
 }

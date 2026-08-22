@@ -69,6 +69,18 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
             // instead of passing CI (EnsureCreatedAsync would have built the
             // schema straight from the model and skipped the migration SQL).
             await db.Database.MigrateAsync();
+
+            // The EF chain deliberately does NOT own ai_draft_features — it is
+            // created by nars-infra/migrations/0001_create_ai_draft_features.sql,
+            // applied in production via `make db-migrate-nars` (see
+            // AiDraftFeatureConfiguration). Re-apply that same idempotent script
+            // so the test schema matches a migrated production cluster.
+            var sqlPath = FindInfraSqlPath(
+                "nars-infra", "migrations", "0001_create_ai_draft_features.sql");
+            await using var draftCmd = conn.CreateCommand();
+            draftCmd.CommandText = await File.ReadAllTextAsync(sqlPath);
+            await draftCmd.ExecuteNonQueryAsync();
+
             _initialized = true;
         }
         catch
@@ -130,6 +142,27 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
     }
 
     /// <summary>
+    /// Locates a file under the repository's nars-infra directory by walking up
+    /// from the test output directory to the repo root.
+    /// </summary>
+    private static string FindInfraSqlPath(params string[] relativeParts)
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null)
+        {
+            var candidate = Path.Combine(new[] { dir.FullName }.Concat(relativeParts).ToArray());
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+            dir = dir.Parent!;
+        }
+
+        throw new InvalidOperationException(
+            $"Could not locate {Path.Combine(relativeParts)} — walk up from {AppContext.BaseDirectory} found no repo root.");
+    }
+
+    /// <summary>
     /// Truncates all non-system tables in the public schema.
     /// Callers must reseed reference data and auth users afterwards.
     /// </summary>
@@ -142,12 +175,16 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
             "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
         ).ToListAsync();
 
-        if (tables.Count == 0)
+        // The migrations history table must survive: it records which EF
+        // migrations the fixture already applied, and wiping it would make any
+        // future MigrateAsync re-run the whole chain against existing tables.
+        var userTables = tables.Where(t => t != "__EFMigrationsHistory").ToList();
+        if (userTables.Count == 0)
         {
             return;
         }
 
-        var tableList = string.Join(", ", tables.Select(t => $"\"{t}\""));
+        var tableList = string.Join(", ", userTables.Select(t => $"\"{t}\""));
 #pragma warning disable EF1002 // Table names are trusted (from information_schema) and double-quoted
         await db.Database.ExecuteSqlRawAsync(
             $"TRUNCATE TABLE {tableList} RESTART IDENTITY CASCADE");

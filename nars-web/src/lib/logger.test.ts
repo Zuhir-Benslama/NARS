@@ -14,6 +14,10 @@ async function freshLogger() {
   return await import("./logger")
 }
 
+function firePagehide(): void {
+  window.dispatchEvent(new Event("pagehide"))
+}
+
 describe("logger", () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -121,6 +125,76 @@ describe("logger", () => {
       await logger.flushLogs()
 
       expect(mockFetch).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe("pagehide flush", () => {
+    it("sends pending entries via fetch keepalive with the CSRF header, not sendBeacon", async () => {
+      const logger = await freshLogger()
+      document.head.insertAdjacentHTML("beforeend", '<meta name="csrf-token" content="tok-123">')
+
+      logger.captureError(new NarsError(ErrorCode.UNKNOWN, "last words"))
+      firePagehide()
+
+      // keepalive fetch is fire-and-forget; the call itself is synchronous.
+      expect(navigator.sendBeacon).not.toHaveBeenCalled()
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+      const [, init] = mockFetch.mock.calls[0]
+      expect(init).toMatchObject({
+        method: "POST",
+        credentials: "include",
+        keepalive: true,
+      })
+      expect(init.headers).toMatchObject({
+        "Content-Type": "application/json",
+        "X-CSRF-Token": "tok-123",
+      })
+      expect(JSON.parse(init.body).logs).toHaveLength(1)
+      document.querySelector('meta[name="csrf-token"]')?.remove()
+    })
+
+    it("trims entries until the keepalive body fits the 64KB budget", async () => {
+      const logger = await freshLogger()
+      // 19 entries: below BATCH_LIMIT so nothing auto-flushes and the whole
+      // batch is still pending when pagehide fires.
+      for (let i = 0; i < 19; i++) {
+        logger.captureError(new NarsError(ErrorCode.UNKNOWN, "x".repeat(8_000)))
+      }
+      firePagehide()
+
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+      const [, init] = mockFetch.mock.calls[0]
+      expect(init.keepalive).toBe(true)
+      expect(init.body.length).toBeLessThanOrEqual(60_000)
+      expect(JSON.parse(init.body).logs.length).toBeLessThan(19)
+    })
+
+    it("does nothing when the batch is empty", async () => {
+      await freshLogger()
+      firePagehide()
+      expect(mockFetch).not.toHaveBeenCalled()
+    })
+  })
+
+  describe("privacy", () => {
+    it("strips query strings from the url field and keeps them out of the context blob", async () => {
+      const logger = await freshLogger()
+      logger.captureError(
+        new NarsError(ErrorCode.NETWORK, "search failed", {
+          url: "https://api.test/api/features?search=secret-term",
+          method: "GET",
+          action: "load",
+        }),
+      )
+      await logger.flushLogs()
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+      expect(body.logs[0].url).toBe("https://api.test/api/features")
+      const ctx = JSON.parse(body.logs[0].context)
+      expect(ctx.url).toBeUndefined()
+      expect(ctx.method).toBeUndefined()
+      expect(JSON.stringify(body)).not.toContain("secret-term")
+      expect(ctx.action).toBe("load")
     })
   })
 })

@@ -104,8 +104,12 @@ def verify_internal_token(
     network, but we still gate it so a compromised pod elsewhere in the mesh
     can't call it for free. Fails closed: if the token is not configured, all
     requests are rejected rather than silently allowing unauthenticated use."""
+    # Compare bytes, not str: h11 decodes header values as latin-1, so a
+    # single non-ASCII byte in X-Internal-Token reaches us as e.g. "é" —
+    # and secrets.compare_digest(str, str) raises TypeError on non-ASCII,
+    # which would turn a bad token into an unhandled 500 instead of a 401.
     if not INTERNAL_TOKEN or not secrets.compare_digest(
-        x_internal_token or "", INTERNAL_TOKEN
+        (x_internal_token or "").encode("utf-8"), INTERNAL_TOKEN.encode("utf-8")
     ):
         raise HTTPException(status_code=401, detail="Invalid internal token")
 

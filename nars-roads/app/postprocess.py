@@ -79,6 +79,7 @@ def mask_to_polygons(
 ) -> list[Feature]:
     from skimage.measure import find_contours, label
     from skimage.morphology import closing, remove_small_objects
+    from scipy import ndimage
 
     binary = prob_mask > threshold
     binary = closing(binary)
@@ -89,15 +90,34 @@ def mask_to_polygons(
     labeled = label(binary)
 
     features = []
-    for region_id in range(1, labeled.max() + 1):
-        region_mask = labeled == region_id
-        contours = find_contours(region_mask.astype(np.float32), 0.5)
+    # Iterate regions by bounding-box slice instead of scanning the full
+    # mask per label (`labeled == region_id` is O(regions x H x W) and a
+    # dense multi-megapixel tile can produce thousands of labels). Contour
+    # and confidence work then happen on the bbox-sized crop only; crop-local
+    # coordinates are shifted back into full-mask space below.
+    for region_id, (rows, cols) in enumerate(ndimage.find_objects(labeled), start=1):
+        if rows is None or cols is None:
+            continue
+        region_mask = labeled[rows, cols] == region_id
+
+        # Pad with background before contouring: a region that fills its
+        # entire bounding box (a plain solid building footprint) makes its
+        # crop uniformly True, which has no 0.5-level crossing at all. The
+        # ring reproduces the surrounding-zero context the full-mask scan
+        # used to provide; coordinates shift back by the same pixel.
+        padded = np.pad(region_mask.astype(np.float32), 1)
+        contours = find_contours(padded, 0.5)
         if not contours:
             continue
 
         contour = max(contours, key=len)
         coords = [
-            rasterio.transform.xy(transform, float(r), float(c)) for r, c in contour
+            rasterio.transform.xy(
+                transform,
+                float(r) + rows.start - 1,
+                float(c) + cols.start - 1,
+            )
+            for r, c in contour
         ]
         if len(coords) < 4:
             continue
@@ -111,7 +131,7 @@ def mask_to_polygons(
         if not poly.is_valid or poly.area == 0 or poly.geom_type != "Polygon":
             continue
 
-        confidence = float(prob_mask[region_mask].mean())
+        confidence = float(prob_mask[rows, cols][region_mask].mean())
         features.append(
             Feature(
                 geometry=mapping(poly),

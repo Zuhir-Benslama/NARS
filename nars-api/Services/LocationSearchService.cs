@@ -1,22 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
 using NarsApi.DTOs;
+using NarsApi.Infrastructure;
 using NarsApi.Models;
 
 namespace NarsApi.Services;
 
 public sealed class LocationSearchService(IDbContextFactory<AppDbContext> dbFactory) : ILocationSearchService
 {
-    /// <summary>
-    /// Escapes PostgreSQL LIKE wildcards (<c>%</c>, <c>_</c>, <c>\</c>) in the
-    /// user-supplied search term so they are matched literally rather than
-    /// interpreted as pattern metacharacters.
-    /// </summary>
-    private static string EscapeLike(string value) =>
-        value.Replace(@"\", @"\\", StringComparison.Ordinal)
-             .Replace("%", @"\%", StringComparison.Ordinal)
-             .Replace("_", @"\_", StringComparison.Ordinal);
-
     public async Task<PagedResponse<WilayaItem>> SearchWilayasAsync(string search, int skip, int take, CancellationToken ct = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -24,7 +15,7 @@ public sealed class LocationSearchService(IDbContextFactory<AppDbContext> dbFact
 
         if (!string.IsNullOrEmpty(search))
         {
-            var escaped = EscapeLike(search);
+            var escaped = SqlFragments.EscapeLikeWildcards(search);
             q = q.Where(w => EF.Functions.ILike(w.WilayaFr ?? "", $"%{escaped}%", @"\")
                            || EF.Functions.ILike(w.WilayaAr ?? "", $"%{escaped}%", @"\"));
         }
@@ -44,7 +35,7 @@ public sealed class LocationSearchService(IDbContextFactory<AppDbContext> dbFact
 
         if (!string.IsNullOrEmpty(search))
         {
-            var escaped = EscapeLike(search);
+            var escaped = SqlFragments.EscapeLikeWildcards(search);
             q = q.Where(d => EF.Functions.ILike(d.DairaFr, $"%{escaped}%", @"\")
                            || EF.Functions.ILike(d.DairaAr, $"%{escaped}%", @"\"));
         }
@@ -64,7 +55,7 @@ public sealed class LocationSearchService(IDbContextFactory<AppDbContext> dbFact
 
         if (!string.IsNullOrEmpty(search))
         {
-            var escaped = EscapeLike(search);
+            var escaped = SqlFragments.EscapeLikeWildcards(search);
             q = q.Where(c => EF.Functions.ILike(c.CommuneFr, $"%{escaped}%", @"\")
                            || EF.Functions.ILike(c.CommuneAr, $"%{escaped}%", @"\"));
         }

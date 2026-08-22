@@ -169,9 +169,9 @@ public class AuthenticationExtensionsTests
 
         // The "Pages" cookie scheme was dead config (PagesController uses
         // [AllowAnonymous] + manual JwtService validation) and has been removed.
-        // Assert it stays gone while JWT bearer remains the only registered scheme.
-        Assert.Contains(schemes, s => s.Name == JwtBearerDefaults.AuthenticationScheme);
-        Assert.DoesNotContain(schemes, s => s.Name == "Pages");
+        // JWT bearer must be the only registered scheme.
+        var scheme = Assert.Single(schemes);
+        Assert.Equal(JwtBearerDefaults.AuthenticationScheme, scheme.Name);
     }
 
     [Fact]
@@ -223,36 +223,9 @@ public class AuthenticationExtensionsTests
         Assert.Equal("alice", principal.Identity?.Name);
     }
 
-    [Fact]
-    public void JwtService_RejectsTamperedToken()
-    {
-        using var sp = BuildProvider(Issuer, Audience);
-        var jwt = sp.GetRequiredService<IJwtService>();
-
-        var token = jwt.CreateToken(
-            Guid.NewGuid(), "alice", "Alice", "alice@test.com",
-            communeId: null, securityStamp: "test-security-stamp",
-            role: UserRoles.CommuneUser, dairaId: null, wilayaId: null);
-
-        var tampered = token[..^1] + (token[^1] == 'A' ? 'B' : 'A');
-
-        Assert.Null(jwt.ValidateToken(tampered));
-    }
-
-    [Fact]
-    public void JwtService_IssuesOpaqueRefreshTokens()
-    {
-        using var sp = BuildProvider(Issuer, Audience);
-        var jwt = sp.GetRequiredService<IJwtService>();
-
-        var (raw1, hash1) = jwt.CreateRefreshToken();
-        var (raw2, hash2) = jwt.CreateRefreshToken();
-
-        Assert.False(string.IsNullOrEmpty(raw1));
-        Assert.False(string.IsNullOrEmpty(raw2));
-        Assert.NotEqual(raw1, raw2);
-        Assert.NotEqual(hash1, hash2);
-    }
+    // Tamper-rejection and refresh-token uniqueness are covered canonically in
+    // JwtServiceTests; JwtService_RoundTrip above already proves the DI-registered
+    // instance creates AND validates tokens.
 
     private static ClaimsPrincipal PrincipalWith(Guid userId, string stamp) =>
         new(new ClaimsIdentity(new[]
@@ -264,13 +237,14 @@ public class AuthenticationExtensionsTests
         }, "Bearer"));
 
     private static async Task<TokenValidatedContext> RunOnTokenValidatedAsync(
-        JwtBearerOptions options, AppDbContext db, ClaimsPrincipal principal)
+        JwtBearerOptions options, AppDbContext db, ClaimsPrincipal principal, string? cachedStamp = null)
     {
         var services = new ServiceCollection();
         services.AddSingleton(db);
         services.AddSingleton<ISecurityStampCache>(Mock.Of<ISecurityStampCache>(
-            c => c.GetStampAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()) == Task.FromResult<string?>(null)));
-        var httpContext = new DefaultHttpContext { RequestServices = services.BuildServiceProvider() };
+            c => c.GetStampAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()) == Task.FromResult(cachedStamp)));
+        await using var sp = services.BuildServiceProvider();
+        var httpContext = new DefaultHttpContext { RequestServices = sp };
         var context = new TokenValidatedContext(httpContext, Scheme, options) { Principal = principal };
         await options.Events.OnTokenValidated(context);
         return context;
@@ -280,21 +254,10 @@ public class AuthenticationExtensionsTests
     public async Task OnTokenValidated_MatchingStamp_DoesNotFail()
     {
         using var db = CreateInMemoryDb("StampMatch");
-        db.Users.Add(new User
-        {
-            Id = Guid.NewGuid(),
-            Username = "alice",
-            Name = "Alice",
-            Email = "a@test.com",
-            Phone = "0555000000",
-            PasswordHash = "hash",
-            Role = UserRoles.CommuneUser,
-            SecurityStamp = "stamp-abc",
-        });
-        await db.SaveChangesAsync();
+        var user = await SeedData.CreateUserAsync(db, UserRoles.CommuneUser,
+            username: "alice", securityStamp: "stamp-abc");
         using var sp = BuildProvider();
         var options = GetJwtOptions(sp);
-        var user = await db.Users.SingleAsync();
 
         var ctx = await RunOnTokenValidatedAsync(options, db, PrincipalWith(user.Id, "stamp-abc"));
 
@@ -305,21 +268,10 @@ public class AuthenticationExtensionsTests
     public async Task OnTokenValidated_MismatchedStamp_FailsAuthentication()
     {
         using var db = CreateInMemoryDb("StampMismatch");
-        db.Users.Add(new User
-        {
-            Id = Guid.NewGuid(),
-            Username = "alice",
-            Name = "Alice",
-            Email = "a@test.com",
-            Phone = "0555000000",
-            PasswordHash = "hash",
-            Role = UserRoles.CommuneUser,
-            SecurityStamp = "stamp-rotated",
-        });
-        await db.SaveChangesAsync();
+        var user = await SeedData.CreateUserAsync(db, UserRoles.CommuneUser,
+            username: "alice", securityStamp: "stamp-rotated");
         using var sp = BuildProvider();
         var options = GetJwtOptions(sp);
-        var user = await db.Users.SingleAsync();
 
         var ctx = await RunOnTokenValidatedAsync(options, db, PrincipalWith(user.Id, "stamp-old"));
 
@@ -352,6 +304,35 @@ public class AuthenticationExtensionsTests
 
         var ctx = await RunOnTokenValidatedAsync(
             options, db, PrincipalWith(Guid.NewGuid(), "stamp-any"));
+
+        Assert.NotNull(ctx.Result);
+        Assert.NotNull(ctx.Result!.Failure);
+        Assert.Equal("Session has been invalidated (security stamp rotated).", ctx.Result.Failure!.Message);
+    }
+
+    [Fact]
+    public async Task OnTokenValidated_CacheHit_MatchingStamp_SucceedsWithoutDbLookup()
+    {
+        // Empty DB proves the cached stamp short-circuits the database query.
+        using var db = CreateInMemoryDb("StampCacheHitMatch");
+        using var sp = BuildProvider();
+        var options = GetJwtOptions(sp);
+
+        var ctx = await RunOnTokenValidatedAsync(
+            options, db, PrincipalWith(Guid.NewGuid(), "stamp-abc"), cachedStamp: "stamp-abc");
+
+        Assert.Null(ctx.Result);
+    }
+
+    [Fact]
+    public async Task OnTokenValidated_CacheHit_MismatchedStamp_FailsAuthentication()
+    {
+        using var db = CreateInMemoryDb("StampCacheHitMismatch");
+        using var sp = BuildProvider();
+        var options = GetJwtOptions(sp);
+
+        var ctx = await RunOnTokenValidatedAsync(
+            options, db, PrincipalWith(Guid.NewGuid(), "stamp-old"), cachedStamp: "stamp-rotated");
 
         Assert.NotNull(ctx.Result);
         Assert.NotNull(ctx.Result!.Failure);

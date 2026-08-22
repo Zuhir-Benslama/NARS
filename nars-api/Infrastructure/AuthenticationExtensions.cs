@@ -17,12 +17,20 @@ public static class AuthenticationExtensions
     /// <summary>
     /// Adds JWT Bearer authentication reading tokens from HttpOnly cookies.
     /// </summary>
+    /// <param name="algorithm">
+    /// The configured signing algorithm (Jwt:Algorithm). Validation accepts ONLY
+    /// this algorithm — the same one JwtService signs with — so both validation
+    /// paths stay consistent and cross-algorithm tokens are rejected everywhere.
+    /// </param>
     public static IServiceCollection AddNarsJwtAuthentication(
         this IServiceCollection services,
         string jwtSecret,
         string? issuer = null,
-        string? audience = null)
+        string? audience = null,
+        string algorithm = "HS256")
     {
+        var signingAlgorithm = MapSigningAlgorithm(algorithm);
+
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
@@ -39,9 +47,9 @@ public static class AuthenticationExtensions
                     ValidateIssuer = !string.IsNullOrEmpty(issuer),
                     ValidateAudience = !string.IsNullOrEmpty(audience),
                     ClockSkew = TimeSpan.Zero,
-                    // Restrict validation to the symmetric HS algorithms the
-                    // signing key supports, closing off algorithm swaps.
-                    ValidAlgorithms = [SecurityAlgorithms.HmacSha256, SecurityAlgorithms.HmacSha384, SecurityAlgorithms.HmacSha512],
+                    // Restrict validation to exactly the configured HS algorithm
+                    // the tokens are signed with, closing off algorithm swaps.
+                    ValidAlgorithms = [signingAlgorithm],
                     // Claims are kept verbatim (MapInboundClaims=false above), so tell the
                     // principal which raw claim types map to role and name. Without this,
                     // RoleClaimType defaults to the ClaimTypes.Role URI and every
@@ -154,4 +162,18 @@ public static class AuthenticationExtensions
 
         return services;
     }
+
+    /// <summary>
+    /// Maps the configuration key (HS256/HS384/HS512 — the same values
+    /// <see cref="JwtOptions.Algorithm"/> allowlists via DataAnnotations) to the
+    /// corresponding SecurityAlgorithms identifier. Unknown values fail fast.
+    /// </summary>
+    private static string MapSigningAlgorithm(string algorithm) => algorithm switch
+    {
+        "HS256" => SecurityAlgorithms.HmacSha256,
+        "HS384" => SecurityAlgorithms.HmacSha384,
+        "HS512" => SecurityAlgorithms.HmacSha512,
+        _ => throw new InvalidOperationException(
+            $"Unsupported Jwt:Algorithm '{algorithm}'. Expected HS256, HS384 or HS512."),
+    };
 }

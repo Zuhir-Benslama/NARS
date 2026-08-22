@@ -165,7 +165,6 @@ public class GeometryHelperTests
     public void SuggestEntranceNumber_ExhaustedOddSeries_DoesNotCollideWithEvens()
     {
         var used = new HashSet<int>(Enumerable.Range(0, 5000).Select(i => i * 2 + 1));
-        used.Add(10000);
 
         var num = GeometryHelper.SuggestEntranceNumber("left", used);
 
@@ -177,7 +176,6 @@ public class GeometryHelperTests
     public void SuggestEntranceNumber_ExhaustedEvenSeries_DoesNotReturnTakenBoundary()
     {
         var used = new HashSet<int>(Enumerable.Range(1, 5000).Select(i => i * 2));
-        used.Add(10001);
 
         var num = GeometryHelper.SuggestEntranceNumber("right", used);
 

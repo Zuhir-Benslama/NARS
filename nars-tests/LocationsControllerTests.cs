@@ -82,15 +82,7 @@ public class LocationsControllerTests
     [InlineData("50\\%", "50\\\\\\%")]
     [InlineData("plain", "plain")]
     public void EscapeLikeWildcards_EscapesWildcardsAndBackslash(string input, string expected)
-        => Assert.Equal(expected, LocationsController.EscapeLikeWildcards(input));
-
-    [Fact]
-    public void EscapeLikeWildcards_BackslashBeforeWildcard_DoesNotNeutralizeEscaping()
-    {
-        // The escaped result must match the literal text "50\%", never act as
-        // "50" followed by the any-character wildcard.
-        Assert.Equal("50\\\\\\%", LocationsController.EscapeLikeWildcards("50\\%"));
-    }
+        => Assert.Equal(expected, SqlFragments.EscapeLikeWildcards(input));
 
     [Fact]
     public async Task GetWilayas_NoSearch_ReturnsAllWilayas()
@@ -264,13 +256,38 @@ public class LocationsControllerTests
     }
 
     [Fact]
-    public async Task GetCommuneBoundary_NotFound_Returns404()
+    public async Task GetCommuneBoundary_UnknownCommune_Returns404()
     {
+        // Default mock: GetCommuneByIdAsync returns null → shallow "commune not found" 404.
+        var ctrl = CreateController();
+
+        var result = await ctrl.GetCommuneBoundary(TestData.NonExistentId);
+
+        var objResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(404, objResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetCommuneBoundary_BoundaryMissingWithoutCoordinates_Returns404()
+    {
+        // Commune exists but has neither a stored boundary nor fallback
+        // coordinates → the deeper boundary-not-found 404 must fire.
+        var locationQueryMock = new Mock<ILocationQueryService>();
+        locationQueryMock.Setup(s => s.GetCommuneByIdAsync(TestData.NonExistentId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Models.Commune
+            {
+                CommuneId = TestData.NonExistentId,
+                DairaId = 1,
+                CommuneFr = "No Boundary",
+                CommuneLatitude = null,
+                CommuneLongitude = null,
+            });
+
         var boundaryMock = new Mock<IBoundaryService>();
         boundaryMock.Setup(b => b.GetBoundaryGeoJsonAsync(TestData.NonExistentId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
 
-        var ctrl = CreateController(boundaryService: boundaryMock.Object);
+        var ctrl = CreateController(boundaryService: boundaryMock.Object, locationQuery: locationQueryMock.Object);
 
         var result = await ctrl.GetCommuneBoundary(TestData.NonExistentId);
 

@@ -18,9 +18,10 @@ override:
     - dl3008
 
     # DL3018: Pin versions in apk add.
-    # Alpine packages in utility/backup images (e.g., gnupg in nars-backup)
-    # are intentionally unpinned to pick up security fixes. Pinning would
-    # require per-release updates for no practical benefit in these images.
+    # Alpine packages in utility/backup images ARE pinned where listed
+    # (e.g., gnupg=2.4.9-r1 in nars-backup). The override stays as a safety
+    # net so a future unpinned apk add in a utility image warns instead of
+    # failing the build.
     - dl3018
 
     # DL3045: COPY to a non-root user directory without chown.

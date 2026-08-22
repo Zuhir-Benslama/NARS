@@ -11,7 +11,8 @@ public sealed class UserAuthorizationService(
     AppDbContext db,
     IRefreshTokenService refreshService,
     IFeatureCleanupService cleanupService,
-    IDateTimeProvider timeProvider) : IUserAuthorizationService
+    IDateTimeProvider timeProvider,
+    ISecurityStampCache stampCache) : IUserAuthorizationService
 {
     // Stable dummy hash so BCrypt always does the full work, even for unknown users.
     // Prevents username enumeration via response-time side-channel.
@@ -142,8 +143,10 @@ public sealed class UserAuthorizationService(
         return new PagedResponse<AdminUserSummary>(items, total, skip, take);
     }
 
-    public async Task<User?> FindUserByIdAsync(Guid userId, CancellationToken ct = default)
-        => await db.Users.FindAsync([userId], ct);
+    // Read-only lookups (profile response, delete authorization) never mutate
+    // through the tracker, so skip change-tracking overhead.
+    public Task<User?> FindUserByIdAsync(Guid userId, CancellationToken ct = default)
+        => db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId, ct);
 
     public async Task<User?> FindUserByUsernameAsync(string normalizedUsername, CancellationToken ct = default)
         => await db.Users.FirstOrDefaultAsync(u => u.Username == normalizedUsername, ct);
@@ -160,7 +163,18 @@ public sealed class UserAuthorizationService(
         var hashToCheck = user?.PasswordHash ?? DummyHash;
         var passwordValid = BCrypt.Net.BCrypt.Verify(password, hashToCheck);
 
-        // Only record failed logins for actual password mismatches.
+        // Lockout check runs after BCrypt to preserve timing-attack resistance.
+        // It must also run BEFORE recording a failure: once an account is
+        // locked, further wrong passwords are ignored entirely, so the lockout
+        // always runs its fixed course instead of being extendable forever by
+        // anyone who knows the username.
+        if (user is not null && user.LockedUntil.HasValue && user.LockedUntil > timeProvider.UtcNow)
+        {
+            return CredentialCheckResult.Locked();
+        }
+
+        // Only record failed logins for actual password mismatches on
+        // non-locked accounts (see above).
         if (user is not null && !passwordValid)
         {
             await refreshService.RecordFailedLoginAsync(user, maxFailedAttempts, lockoutMinutes, timeProvider.UtcNow, ct);
@@ -169,14 +183,6 @@ public sealed class UserAuthorizationService(
         if (user is null || !passwordValid)
         {
             return CredentialCheckResult.Invalid();
-        }
-
-        // Lockout check — run after BCrypt to preserve timing-attack resistance.
-        // A locked user who supplies the correct password is reported as locked
-        // without extending their lockout, so a lockout never renews itself.
-        if (user.LockedUntil.HasValue && user.LockedUntil > timeProvider.UtcNow)
-        {
-            return CredentialCheckResult.Locked();
         }
 
         return CredentialCheckResult.Success(user);
@@ -285,7 +291,13 @@ public sealed class UserAuthorizationService(
             target.Phone = body.Phone;
         }
 
-        // Apply role + geography.
+        // Apply role + geography. Capture the pre-update privileges so we can
+        // detect whether anything that feeds access-token claims actually changed.
+        var originalRole = target.Role;
+        var originalWilayaId = target.WilayaId;
+        var originalDairaId = target.DairaId;
+        var originalCommuneId = target.CommuneId;
+
         if (body.Role is not null)
         {
             var geoCheck = GeographicValidator.Validate(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
@@ -312,6 +324,20 @@ public sealed class UserAuthorizationService(
             target.CommuneId = body.CommuneId;
         }
 
+        // A privilege change (role or geographic scope) must invalidate the
+        // target's existing sessions: rotate the security stamp so outstanding
+        // access tokens carrying the old claims are rejected on their next
+        // request, and revoke refresh tokens so the session cannot be renewed.
+        // The caller already re-authenticated with their password above.
+        var privilegesChanged = target.Role != originalRole
+            || target.WilayaId != originalWilayaId
+            || target.DairaId != originalDairaId
+            || target.CommuneId != originalCommuneId;
+        if (privilegesChanged)
+        {
+            target.SecurityStamp = User.GenerateSecurityStamp();
+        }
+
         try
         {
             await db.SaveChangesAsync(ct);
@@ -324,6 +350,12 @@ public sealed class UserAuthorizationService(
             return constraintName?.Contains("email", StringComparison.OrdinalIgnoreCase) == true
                 ? UserUpdateResult.Failure(UserUpdateErrorCode.EmailConflict, "Email already exists.")
                 : UserUpdateResult.Failure(UserUpdateErrorCode.EmailConflict, "User already exists.");
+        }
+
+        if (privilegesChanged)
+        {
+            stampCache.EvictStamp(target.Id);
+            await refreshService.RevokeAllUserTokensAsync(target.Id, ct);
         }
 
         return UserUpdateResult.Success();

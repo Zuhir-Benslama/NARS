@@ -56,7 +56,7 @@ public class BootstrappingRegistrationTests : IDisposable
         return builder.Build();
     }
 
-    private static ServiceProvider BuildProvider(IConfiguration? config = null)
+    private static ServiceProvider BuildProvider(IConfiguration? config = null, string environmentName = "Development")
     {
         Environment.SetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4317");
         var services = new ServiceCollection();
@@ -66,8 +66,35 @@ public class BootstrappingRegistrationTests : IDisposable
             AuthTestHelper.TestJwtSecret,
             jwtIssuer: "https://issuer.test",
             jwtAudience: "https://audience.test",
-            Mock.Of<IHostEnvironment>());
+            Mock.Of<IHostEnvironment>(e => e.EnvironmentName == environmentName));
         return services.BuildServiceProvider();
+    }
+
+    [Fact]
+    public void AddNarsServices_ProductionWithLocalhostOnlyOrigins_Throws()
+    {
+        // Fail-fast guard: a production deployment must not silently fall back
+        // to the localhost CORS defaults with AllowCredentials.
+        Assert.Throws<InvalidOperationException>(() =>
+            BuildProvider(environmentName: "Production"));
+    }
+
+    [Fact]
+    public async Task AddNarsServices_ProductionWithExplicitOrigins_RegistersCorsPolicy()
+    {
+        var config = BuildConfig(b => b.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["Cors:AllowedOrigins:0"] = "https://nars.dz",
+                ["Cors:AllowedOrigins:1"] = "https://api.nars.dz",
+            }));
+
+        using var sp = BuildProvider(config, environmentName: "Production");
+
+        var policyProvider = sp.GetRequiredService<ICorsPolicyProvider>();
+        var policy = await policyProvider.GetPolicyAsync(new DefaultHttpContext(), policyName: null);
+        Assert.NotNull(policy);
+        Assert.Contains(policy!.Origins, o => o == "https://nars.dz");
     }
 
     [Fact]
@@ -117,7 +144,7 @@ public class BootstrappingRegistrationTests : IDisposable
         Assert.Equal(30, jwtOptions.RefreshExpiresInDays);
 
         var cacheOptions = sp.GetRequiredService<IOptions<CacheOptions>>().Value;
-        Assert.Equal(1, cacheOptions.ReferenceDataDurationHours);
+        Assert.Equal(1, cacheOptions.PageTemplateDurationHours);
 
         Assert.Equal(TimeSpan.FromMinutes(60), sp.GetRequiredService<IJwtService>().AccessTokenExpiresIn);
     }
@@ -208,33 +235,31 @@ public class BootstrappingRegistrationTests : IDisposable
     }
 
     [Fact]
-    public void AddNarsServices_RegistersHttpClientsWithConfiguredTimeouts()
+    public void AddNarsServices_RegistersSegmentationHttpClientOnly()
     {
         using var sp = BuildProvider();
-        var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
 
-        using var tileProxy = httpClientFactory.CreateClient("tile-proxy");
-        Assert.Equal(TimeSpan.FromSeconds(20), tileProxy.Timeout);
-
-        using var satellite = httpClientFactory.CreateClient("satellite");
-        Assert.Equal(TimeSpan.FromSeconds(30), satellite.Timeout);
+        // Only the typed nars-roads client is registered; the former named
+        // "tile-proxy"/"satellite" clients had no consumers and were removed.
+        Assert.NotNull(sp.GetRequiredService<ISegmentationClient>());
     }
 
     [Fact]
     public async Task AddNarsServices_InvalidOptions_FailsStartupValidation()
     {
-        // Cache:ReferenceDataDurationHours is [Range(1,168)] — 999 must fail on start.
+        // Locations:MaxSearchLength is [Range(1,1000)] — 0 must fail on start.
         var config = BuildConfig(b => b.AddInMemoryCollection(
-            new Dictionary<string, string?> { ["Cache:ReferenceDataDurationHours"] = "999" }));
+            new Dictionary<string, string?> { ["Locations:MaxSearchLength"] = "0" }));
 
         Environment.SetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4317");
         using var host = Host.CreateDefaultBuilder()
-            .ConfigureServices(s => s.AddNarsServices(config, TestConnStr, AuthTestHelper.TestJwtSecret, null, null, Mock.Of<IHostEnvironment>()))
+            .ConfigureServices(s => s.AddNarsServices(config, TestConnStr, AuthTestHelper.TestJwtSecret, null, null,
+                Mock.Of<IHostEnvironment>(e => e.EnvironmentName == "Development")))
             .Build();
 
         var ex = await Assert.ThrowsAsync<AggregateException>(() => host.StartAsync());
         Assert.Contains(ex.InnerExceptions,
             e => e is OptionsValidationException ove
-                 && ove.Message.Contains("ReferenceDataDurationHours", StringComparison.Ordinal));
+                 && ove.Message.Contains("MaxSearchLength", StringComparison.Ordinal));
     }
 }

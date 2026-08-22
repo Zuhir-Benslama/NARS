@@ -7,10 +7,7 @@ import { apiFetch } from "../../api"
 import { GEOMETRY_CONFIG } from "../../config"
 import { debugError } from "../../utils/debug"
 import { useAppStore } from "../../stores/appStore"
-import { showToast } from "../../lib/toast"
-import { t } from "../../i18n"
 import maplibregl from "maplibre-gl"
-import type { ScatteredRefreshResponse } from "../../types"
 
 // ─── MUNICIPALITY BOUNDARY ────────────────────────────────────────────────────
 // Module-level state mutated by loadMunicipalLimit() / loadScatteredPolygons().
@@ -64,8 +61,18 @@ export function pointInScatteredArea(lat: number, lng: number): boolean {
   )
 }
 
-export function renderScatteredAreas(geoJsonStr: string | GeoJSON.Geometry): void {
+/** Reset scattered-area hit-testing state. Call once per full data load. */
+export function clearScatteredAreas(): void {
   _scatteredPolygons = []
+}
+
+/**
+ * Parse one scattered feature's geometry and append its polygons to the
+ * hit-testing set. Appending (not replacing) is essential: loadFromDatabase
+ * calls this once PER scattered feature, and a self-resetting version made
+ * N>1 scattered features clobber each other until only the last survived.
+ */
+export function addScatteredArea(geoJsonStr: string | GeoJSON.Geometry): void {
   if (!geoJsonStr) return
   try {
     const geojson: GeoJSON.Geometry =
@@ -181,18 +188,6 @@ function computeBoundsFromGeometry(geojson: GeoJSON.Geometry): maplibregl.LngLat
   }
 
   return hasCoords ? bounds : null
-}
-
-export async function refreshScatteredAreas(): Promise<void> {
-  try {
-    const data = (await apiFetch("/api/areas/refresh-scattered", {
-      method: "POST",
-    }).then((r) => r.json())) as ScatteredRefreshResponse
-    if (data.geojson) renderScatteredAreas(data.geojson)
-  } catch (e) {
-    debugError("Scatter refresh error:", e)
-    showToast(t("map_scatter_refresh_failed"), "error")
-  }
 }
 
 // ─── CIRCLE RING COMPUTATION ─────────────────────────────────────────────────

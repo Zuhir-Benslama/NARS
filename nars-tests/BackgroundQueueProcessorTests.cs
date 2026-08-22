@@ -48,6 +48,7 @@ public class BackgroundQueueProcessorTests
 
         await tcs.Task.WaitAsync(TestTimeout);
         await processor.StopAsync(CancellationToken.None);
+        await processor.DisposeAsync();
     }
 
     [Fact]
@@ -70,6 +71,7 @@ public class BackgroundQueueProcessorTests
 
         await secondItemExecuted.Task.WaitAsync(TestTimeout);
         await processor.StopAsync(CancellationToken.None);
+        await processor.DisposeAsync();
     }
 
     [Fact]
@@ -108,6 +110,7 @@ public class BackgroundQueueProcessorTests
         allowCompletion.SetResult();
         await workItemFinished.Task.WaitAsync(TestTimeout);
         await stopTask.WaitAsync(TestTimeout);
+        await processor.DisposeAsync();
     }
 
     [Fact]

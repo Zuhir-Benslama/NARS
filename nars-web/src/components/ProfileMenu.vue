@@ -111,7 +111,13 @@ useWindowKeydown({
   },
 })
 
+const loggingOut = ref(false)
+
 async function onLogout() {
+  // Guard against double-activation (fast double-click, Enter+click): two
+  // concurrent POST /api/logout calls race and can flash conflicting toasts.
+  if (loggingOut.value) return
+  loggingOut.value = true
   try {
     const res = await apiFetch("/api/logout", { method: "POST" })
     if (res.ok) {
@@ -122,6 +128,8 @@ async function onLogout() {
     }
   } catch {
     showToast(t("alert_logout_failed"), "error")
+  } finally {
+    loggingOut.value = false
   }
 }
 </script>

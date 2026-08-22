@@ -25,13 +25,13 @@ NARS (National Addressing Reference System) is a full-stack geospatial applicati
 # 1. Start a PostGIS database
 docker run -d --name nars-pg \
   -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=nars \
-  -p 5432:5432 \
-  postgis/postgis:17-3.5
+   -e POSTGRES_DB=nars_db \
+   -p 5432:5432 \
+   postgis/postgis:17-3.5
 
 # 2. Initialize the database schema + reference data
-psql -h localhost -U postgres -d nars -f nars-infra/scripts/create_nars_db.sql
-psql -h localhost -U postgres -d nars -f docs/seed_reference_data.sql
+psql -h localhost -U postgres -d nars_db -f nars-infra/scripts/create_nars_db.sql
+psql -h localhost -U postgres -d nars_db -f docs/seed_reference_data.sql
 
 # 3. Run the backend (starts on http://localhost:5000)
 cd nars-api

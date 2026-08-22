@@ -12,6 +12,22 @@ namespace NarsApi.Infrastructure;
 internal static class SqlFragments
 {
     /// <summary>
+    /// Escapes PostgreSQL LIKE wildcards (<c>%</c>, <c>_</c>, <c>\</c>) in a
+    /// user-supplied search term so they are matched literally rather than
+    /// interpreted as pattern metacharacters. Single source of truth for all
+    /// ILIKE search paths (locations, boundary lookups).
+    /// </summary>
+    internal static string EscapeLikeWildcards(string input)
+    {
+        // Escape the escape character FIRST so a user-supplied backslash cannot
+        // neutralize the escaping of a following % or _ (e.g. "50\%" must match
+        // the literal text, not "50" + any single character).
+        return input.Replace("\\", "\\\\", StringComparison.Ordinal)
+                    .Replace("%", "\\%", StringComparison.Ordinal)
+                    .Replace("_", "\\_", StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// IN-clause for the urban area layers ('central_urban', 'secondary_urban').
     /// Sourced from <see cref="AreaLayers.Urban"/> so the SQL and the model
     /// cannot drift apart.
