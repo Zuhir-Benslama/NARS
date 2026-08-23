@@ -8,7 +8,9 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public sealed class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactory) : IFeatureStatsService
+public sealed class FeatureStatsService(
+    IDbContextFactory<AppDbContext> dbFactory,
+    ILogger<FeatureStatsService>? logger = null) : IFeatureStatsService
 {
     private static readonly string[] _featureTypes =
     [
@@ -118,14 +120,14 @@ public sealed class FeatureStatsService(IDbContextFactory<AppDbContext> dbFactor
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var conn = db.Database.GetDbConnection();
-        return await FeatureQueryHelper.LoadAllFeaturesAsync(conn, userId, skip, take, ct);
+        return await FeatureQueryHelper.LoadAllFeaturesAsync(conn, userId, skip, take, ct, logger);
     }
 
     public async Task<(List<FeatureResult> features, int totalCount)> LoadByLayerAsync(Guid userId, string layer, int skip, int take, CancellationToken ct = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var conn = db.Database.GetDbConnection();
-        return await FeatureQueryHelper.LoadByLayerAsync(conn, userId, layer, skip, take, ct);
+        return await FeatureQueryHelper.LoadByLayerAsync(conn, userId, layer, skip, take, ct, logger);
     }
 
     private static string BuildUnionAll(Func<int, string, string> branchBuilder)

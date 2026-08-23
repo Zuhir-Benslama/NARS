@@ -1,11 +1,34 @@
 #!/usr/bin/env node
-import { firefox } from 'playwright';
+// Renders ```mermaid blocks from docs/uml/*.md to PNG via headless Firefox.
+//
+// Run from anywhere: node nars-infra/scripts/render-mermaid-playwright.mjs
+// [inputDir] [outputDir] — see CLI parsing below. Exit status is non-zero
+// when any requested file is missing, a diagram fails to render, or nothing
+// renders at all, so silent breakage (e.g. a moved docs/ directory) fails
+// pipelines instead of passing vacuously.
 import { existsSync, readFileSync } from 'fs';
 import { basename, dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const defaultInputDir = join(__dirname, '..', 'docs', 'uml');
+
+// playwright is a devDependency of nars-web. ESM bare-specifier resolution
+// walks up from THIS file's directory (nars-infra/scripts/) and never reaches
+// nars-web/node_modules, so fall back to resolving it through createRequire
+// anchored at nars-web's package.json. The plain import() attempt first keeps
+// the script working unchanged if a resolvable install ever appears above.
+let firefox;
+try {
+  ({ firefox } = await import('playwright'));
+} catch {
+  const { createRequire } = await import('node:module');
+  const narsWebRequire = createRequire(
+    new URL('../../nars-web/package.json', import.meta.url),
+  );
+  ({ firefox } = narsWebRequire('playwright'));
+}
+
+const defaultInputDir = join(__dirname, '..', '..', 'docs', 'uml');
 const defaultFiles = [
   'nars-class-diagram.md',
   'nars-sequence-diagram.md',
@@ -31,6 +54,9 @@ if (arg1 && arg1.toLowerCase().endsWith('.md')) {
 }
 
 async function main() {
+  let rendered = 0;
+  let failures = 0;
+
   const browser = await firefox.launch({ headless: true, timeout: 30000 });
 
   try {
@@ -40,6 +66,7 @@ async function main() {
 
       if (!existsSync(filePath)) {
         console.error(`  Skipping ${file}: not found (${filePath})`);
+        failures++;
         continue;
       }
 
@@ -119,6 +146,7 @@ async function main() {
             const error = await page.evaluate(() => window.__error);
             if (error) {
               console.error(`  Error: ${error}`);
+              failures++;
               continue;
             }
 
@@ -132,8 +160,10 @@ async function main() {
 
             await svgElement.screenshot({ path: outputPath, type: 'png' });
             console.log(`  -> ${outputName} (${bbox.width}x${bbox.height})`);
+            rendered++;
           } catch (err) {
             console.error(`  Error rendering: ${err.message}`);
+            failures++;
           }
         }
       } finally {
@@ -144,7 +174,19 @@ async function main() {
     await browser.close();
   }
 
-  console.log('Done.');
+  if (failures > 0) {
+    console.error(`Done with ${failures} failure(s); ${rendered} diagram(s) rendered.`);
+    process.exitCode = 1;
+    return;
+  }
+
+  if (rendered === 0) {
+    console.error('Done, but no diagrams were rendered — check inputDir/files.');
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log(`Done. ${rendered} diagram(s) rendered.`);
 }
 
 main().catch(err => {

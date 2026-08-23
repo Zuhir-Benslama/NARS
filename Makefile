@@ -51,6 +51,10 @@ NODE_IMAGE          ?= node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb8
 HADOLINT_IMAGE      ?= hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d
 SHELLCHECK_IMAGE    ?= koalaman/shellcheck:v0.11.0@sha256:61862eba1fcf09a484ebcc6feea46f1782532571a34ed51fedf90dd25f925a8d
 SOCAT_IMAGE         ?= alpine/socat:1.8.1.3@sha256:3d9e7966201dd3a065df591020a09fd3c70845de7e7086e3531ea69db774406b
+# checkmake v0.3.0 — official images moved to quay.io (Docker Hub mrtazz/* is
+# discontinued). The image bakes "/Makefile" into its ENTRYPOINT array, so the
+# target overrides --entrypoint; see infra-lint-checkmake.
+CHECKMAKE_IMAGE     ?= quay.io/checkmake/checkmake:v0.3.0@sha256:375280dd16214aefd5729b69a3ad8fc95c89c8d4b9cb8b1d1639e20c6ec910f9
 OBSERVABILITY_NAMESPACE ?= observability
 LOG_DIR             ?= /tmp/nars
 MIGRATIONS_DIR      ?= nars-infra/migrations

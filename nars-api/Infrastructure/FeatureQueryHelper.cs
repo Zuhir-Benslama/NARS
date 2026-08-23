@@ -1,6 +1,7 @@
 using System.Data.Common;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using NarsApi.DTOs;
 
 namespace NarsApi.Infrastructure;
@@ -75,7 +76,8 @@ public static class FeatureQueryHelper
         Guid userId,
         int skip,
         int take,
-        CancellationToken ct = default) => await ExecuteQueryAsync(conn, _loadFeaturesSql, userId, layer: null, skip, take, ct);
+        CancellationToken ct = default,
+        ILogger? logger = null) => await ExecuteQueryAsync(conn, _loadFeaturesSql, userId, layer: null, skip, take, ct, logger);
 
     /// <summary>
     /// Loads features for a specific layer with pagination.
@@ -87,7 +89,8 @@ public static class FeatureQueryHelper
         string layer,
         int skip,
         int take,
-        CancellationToken ct = default) => await ExecuteQueryAsync(conn, _loadByLayerSql, userId, layer, skip, take, ct);
+        CancellationToken ct = default,
+        ILogger? logger = null) => await ExecuteQueryAsync(conn, _loadByLayerSql, userId, layer, skip, take, ct, logger);
 
     private static async Task<(List<FeatureResult> features, int totalCount)> ExecuteQueryAsync(
         DbConnection conn,
@@ -96,7 +99,8 @@ public static class FeatureQueryHelper
         string? layer,
         int skip,
         int take,
-        CancellationToken ct)
+        CancellationToken ct,
+        ILogger? logger)
     {
         await using var handle = await conn.EnsureOpenAsync(ct);
 
@@ -154,9 +158,13 @@ public static class FeatureQueryHelper
                 {
                     data = JsonSerializer.Deserialize<JsonElement>(dataJson);
                 }
-                catch (JsonException)
+                catch (JsonException ex)
                 {
-                    // Corrupt stored data must not take the endpoint down; degrade to {}.
+                    // Corrupt stored data must not take the endpoint down; degrade
+                    // gracefully but log so operators can locate the bad row.
+                    logger?.LogWarning(ex,
+                        "Corrupt feature data JSON for feature {FeatureId} (type {FeatureType}); returning empty object",
+                        id, type);
                 }
             }
 

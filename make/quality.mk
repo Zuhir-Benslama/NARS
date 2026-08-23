@@ -9,13 +9,14 @@ lint: ## Run cross-project linting (.NET format + infra linters)
 	$(SUBMAKE) infra-lint
 
 .PHONY: infra-lint
-infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, makefile, tag guard)
+infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, makefile, checkmake, tag guard)
 	$(SUBMAKE) infra-lint-shell
 	$(SUBMAKE) infra-lint-docker
 	$(SUBMAKE) infra-lint-yaml
 	$(SUBMAKE) infra-lint-python
 	$(SUBMAKE) infra-lint-node
 	$(SUBMAKE) infra-lint-makefile
+	$(SUBMAKE) infra-lint-checkmake
 	$(SUBMAKE) infra-lint-tag-guard
 	$(SUBMAKE) infra-lint-local-ingress-guard
 
@@ -94,6 +95,15 @@ infra-lint-makefile: ## Validate Makefile syntax with dry-run
 	@make -Rr --warn-undefined-variables -n help 2>&1 | grep -i 'warning.*undefined' | grep -v GNUMAKEFLAGS \
 		&& { echo "✖ Undefined variable references found (see above)"; exit 1; } \
 		|| echo "✓ No undefined variable references"
+
+.PHONY: infra-lint-checkmake
+infra-lint-checkmake: ## Lint the root Makefile with checkmake (config: checkmake.ini)
+	@if command -v checkmake >/dev/null 2>&1; then
+		checkmake --config=checkmake.ini Makefile
+	else
+		docker run --rm -v "$$(pwd):/mnt":ro --entrypoint /checkmake \
+			$(CHECKMAKE_IMAGE) --config=/mnt/checkmake.ini /mnt/Makefile
+	fi
 
 
 # Internal: warn when the mutable 'latest' tag is in use (build/push/load).

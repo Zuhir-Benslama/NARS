@@ -1,10 +1,13 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Moq;
 using NarsApi.Data;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
 using NarsApi.Services;
 using static NarsApi.Tests.TestData;
 using Xunit;
+using System.Text.Json;
 
 namespace NarsApi.Tests.Service;
 
@@ -115,5 +118,47 @@ public class FeatureStatsServiceTests(NarsDatabaseFixture fixture) : IAsyncLifet
         Assert.Equal(0, stats.Districts);
         Assert.Equal(0, stats.Roads);
         Assert.Equal(0, stats.Total);
+    }
+
+    [Fact]
+    public async Task LoadAllFeaturesAsync_CorruptFeatureData_ReturnsEmptyObjectAndLogsWarning()
+    {
+        // Simulates out-of-band corruption reaching the read path: Postgres
+        // imposes no nesting limit on jsonb, but System.Text.Json refuses to
+        // parse beyond depth 64, so this row is unreadable by the API even
+        // though it is perfectly valid jsonb. The query must degrade the bad
+        // row to an empty object and log a warning naming it, without
+        // dropping the healthy rows in the same page.
+        const int depth = 100;
+        var deepJson = new string('[', depth) + new string(']', depth);
+        var corruptId = Guid.CreateVersion7();
+        _db.Areas.Add(new Area { Id = corruptId, UserId = _userId1, Layer = FeatureTypes.AreaLayers.CentralUrban, Label = "CORRUPT", Data = deepJson, CreatedAt = FixedUtcNow });
+        await _db.SaveChangesAsync();
+
+        var loggerMock = new Mock<ILogger<FeatureStatsService>>();
+        var svc = new FeatureStatsService(_fixture.CreateDbContextFactory(), loggerMock.Object);
+
+        var (features, totalCount) = await svc.LoadAllFeaturesAsync(_userId1, skip: 0, take: 10);
+
+        Assert.Equal(4, totalCount);
+        Assert.Equal(4, features.Count);
+
+        var corruptRow = features.Single(f => f.Id == corruptId.ToString());
+        Assert.Equal(JsonValueKind.Object, corruptRow.Data.ValueKind);
+        Assert.False(corruptRow.Data.EnumerateObject().Any());
+
+        foreach (var healthy in features.Where(f => f.Id != corruptId.ToString()))
+        {
+            Assert.True(healthy.Data.EnumerateObject().Any() || healthy.Data.ValueKind == JsonValueKind.Object);
+        }
+
+        loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((state, _) => state.ToString()!.Contains(corruptId.ToString())),
+                It.Is<Exception>(ex => ex is JsonException),
+                (Func<It.IsAnyType, Exception?, string>)It.IsAny<object>()),
+            Times.Once);
     }
 }
