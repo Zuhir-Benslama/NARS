@@ -45,7 +45,7 @@ observability-prometheus-stack: .env _check-secrets ## Install Prometheus + Graf
 	helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
 		--namespace $(OBSERVABILITY_NAMESPACE) \
 		--version "$(KUBE_PROMETHEUS_STACK_VERSION)" \
-		--values $(K8S_DIR)/helm-values/kube-prometheus-stack.yaml \
+		--values "$(K8S_DIR)/helm-values/kube-prometheus-stack.yaml" \
 		--set-file grafana.adminPassword="$$tmpdir/grafana_password" \
 		--timeout 10m
 	@echo "✓ kube-prometheus-stack installed"
@@ -56,7 +56,7 @@ observability-loki: ## Install Loki (logs)
 	@helm upgrade --install loki grafana/loki \
 		--namespace $(OBSERVABILITY_NAMESPACE) \
 		--version "$(LOKI_VERSION)" \
-		--values $(K8S_DIR)/helm-values/loki.yaml \
+		--values "$(K8S_DIR)/helm-values/loki.yaml" \
 		--timeout 10m
 
 .PHONY: observability-tempo
@@ -65,7 +65,7 @@ observability-tempo: ## Install Tempo (traces)
 	@helm upgrade --install tempo grafana/tempo \
 		--namespace $(OBSERVABILITY_NAMESPACE) \
 		--version "$(TEMPO_VERSION)" \
-		--values $(K8S_DIR)/helm-values/tempo.yaml \
+		--values "$(K8S_DIR)/helm-values/tempo.yaml" \
 		--timeout 10m
 	@echo "✓ Tempo installed"
 
@@ -75,15 +75,15 @@ observability-otel-collector: ## Install OpenTelemetry Collector
 	@helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
 		--namespace $(OBSERVABILITY_NAMESPACE) \
 		--version "$(OTEL_COLLECTOR_VERSION)" \
-		--values $(K8S_DIR)/helm-values/opentelemetry-collector.yaml \
+		--values "$(K8S_DIR)/helm-values/opentelemetry-collector.yaml" \
 		--set image.tag="$(OTEL_COLLECTOR_IMAGE_TAG)" \
 		--timeout 10m
 
 .PHONY: observability-servicemonitor
 observability-servicemonitor: ## Apply OTel metrics Service + ServiceMonitor (requires prometheus CRDs)
 	@echo "→ Applying OTel metrics Service and ServiceMonitor..."
-	@$(KUBECTL) apply -f - < $(K8S_DIR)/otel-metrics-service.yaml
-	@$(KUBECTL) apply -f - < $(K8S_DIR)/servicemonitor.yaml
+	@$(KUBECTL) apply -f - < "$(K8S_DIR)/otel-metrics-service.yaml"
+	@$(KUBECTL) apply -f - < "$(K8S_DIR)/servicemonitor.yaml"
 	@echo "✓ OTel metrics Service + ServiceMonitor applied"
 
 .PHONY: observability-port-forward

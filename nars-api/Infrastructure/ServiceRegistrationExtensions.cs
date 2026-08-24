@@ -45,7 +45,8 @@ public static class ServiceRegistrationExtensions
         services.AddNarsDomainServices();
         services.AddNarsHttpClients(config);
         services.AddNarsControllers();
-        services.AddNarsCors(config, env);
+        var corsOptions = config.GetSection("Cors").Get<CorsOptions>() ?? new CorsOptions();
+        services.AddNarsCors(corsOptions, env);
         services.AddNarsCompression();
         services.AddNarsRateLimiting(config);
         services.AddNarsHealthChecks(connectionString);
@@ -81,6 +82,8 @@ public static class ServiceRegistrationExtensions
         services.AddOptions<CspOptions>().Bind(config.GetSection("Csp"))
             .ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<ProxyOptions>().Bind(config.GetSection("ForwardedHeaders"))
+            .ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<CorsOptions>().Bind(config.GetSection("Cors"))
             .ValidateDataAnnotations().ValidateOnStart();
     }
 

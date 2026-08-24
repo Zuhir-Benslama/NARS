@@ -301,13 +301,14 @@ public static class PipelineExtensions
 
     private static void UseCsrfValidation(WebApplication app)
     {
-        // Single source of truth with the CORS policy. Browsers attach an
-        // Origin header to every cross-site request, so rejecting state-changing
-        // /api requests whose Origin is neither explicitly allowed nor this
-        // deployment's own origin blocks login CSRF and every other
-        // unauthenticated cross-site write (antiforgery tokens only cover
-        // authenticated requests). Non-browser clients send no Origin at all.
-        var allowedOrigins = app.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+        // Single source of truth with the CORS policy: both read the bound
+        // CorsOptions.AllowedOrigins. Browsers attach an Origin header to
+        // every cross-site request, so rejecting state-changing /api requests
+        // whose Origin is neither explicitly allowed nor this deployment's own
+        // origin blocks login CSRF and every other unauthenticated cross-site
+        // write (antiforgery tokens only cover authenticated requests).
+        // Non-browser clients send no Origin at all.
+        var allowedOrigins = app.Services.GetRequiredService<IOptions<CorsOptions>>().Value.AllowedOrigins;
 
         app.Use(async (ctx, next) =>
         {

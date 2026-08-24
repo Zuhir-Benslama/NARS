@@ -9,17 +9,16 @@ public static class CorsCompressionExtensions
     /// Adds CORS with explicit origins and credentials support (required for HttpOnly cookie auth).
     /// Fails fast outside Development when CORS origins are not explicitly configured:
     /// silently serving cross-origin credentials to localhost defaults would fail open.
+    /// The <paramref name="corsOptions"/> instance is the same bound <c>Cors</c>
+    /// configuration section the CSRF origin-rejection middleware resolves via
+    /// <c>IOptions&lt;CorsOptions&gt;</c>, so both enforce one allowlist.
     /// </summary>
     public static IServiceCollection AddNarsCors(
         this IServiceCollection services,
-        IConfiguration config,
+        CorsOptions corsOptions,
         IHostEnvironment env)
     {
-        var allowedOrigins = config
-            .GetSection("Cors:AllowedOrigins")
-            .Get<string[]>()
-            ?? ["http://localhost:5000", "http://localhost:5001",
-                "https://localhost:7000", "https://localhost:7001"];
+        var allowedOrigins = corsOptions.AllowedOrigins;
 
         // A non-development deployment without explicit origins would accept
         // cross-origin credentialed requests from localhost defaults. Fail at

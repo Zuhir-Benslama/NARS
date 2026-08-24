@@ -86,6 +86,20 @@ public class AdminSignupOptions
     [Required] public string SignupToken { get; set; } = string.Empty;
 }
 
+public class CorsOptions
+{
+    // Single allowlist shared by the CORS policy (CorsCompressionExtensions)
+    // and the CSRF origin-rejection middleware (PipelineExtensions) so both
+    // always enforce the same origins. Defaults are dev-only localhost, and
+    // AddNarsCors fails fast when a non-development deployment still resolves
+    // to these defaults.
+    public string[] AllowedOrigins { get; set; } =
+    [
+        "http://localhost:5000", "http://localhost:5001",
+        "https://localhost:7000", "https://localhost:7001",
+    ];
+}
+
 public class CspOptions
 {
     public string DefaultSrc { get; set; } = "'self'";

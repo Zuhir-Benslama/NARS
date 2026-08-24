@@ -14,6 +14,9 @@ using Moq;
 using NarsApi.Infrastructure;
 using NarsApi.Services;
 using Xunit;
+// Disambiguate from Microsoft.AspNetCore.Cors.Infrastructure.CorsOptions
+// (imported above for ICorsPolicyProvider assertions).
+using CorsOptions = NarsApi.Infrastructure.CorsOptions;
 
 namespace NarsApi.Tests;
 
@@ -145,6 +148,9 @@ public class BootstrappingRegistrationTests : IDisposable
 
         var cacheOptions = sp.GetRequiredService<IOptions<CacheOptions>>().Value;
         Assert.Equal(1, cacheOptions.PageTemplateDurationHours);
+
+        var cors = sp.GetRequiredService<IOptions<CorsOptions>>().Value;
+        Assert.Contains("http://localhost:3000", cors.AllowedOrigins);
 
         Assert.Equal(TimeSpan.FromMinutes(60), sp.GetRequiredService<IJwtService>().AccessTokenExpiresIn);
     }
