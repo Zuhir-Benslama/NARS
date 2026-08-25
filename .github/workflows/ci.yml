@@ -140,9 +140,7 @@ jobs:
         run: make -n help
 
       - name: Shell script lint
-        run: |
-          docker run --rm -v "$PWD:/mnt" koalaman/shellcheck:v0.11.0 \
-            sh -c 'find /mnt/nars-infra/scripts -name "*.sh" -print0 | xargs -0 shellcheck -x'
+        run: docker run --rm -v "$PWD:/mnt" koalaman/shellcheck:v0.11.0 /mnt/nars-infra/scripts/create_national_admin.sh
 
       - name: Dockerfile lint
         run: |

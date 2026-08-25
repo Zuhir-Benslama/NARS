@@ -42,7 +42,7 @@ def _env_int(key: str, default: int) -> int:
     try:
         return int(raw)
     except ValueError:
-        raise RuntimeError(
+        raise RuntimeError(  # noqa: TRY003 - dynamic env var name
             f"Environment variable {key} must be an integer, got: {raw!r}"
         ) from None
 
