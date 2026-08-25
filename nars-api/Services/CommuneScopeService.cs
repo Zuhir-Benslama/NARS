@@ -27,10 +27,10 @@ public interface ICommuneScopeService
         CancellationToken ct = default);
 }
 
-public sealed class CommuneScopeService(AppDbContext db) : ICommuneScopeService
+public sealed class CommuneScopeService(IDbContextFactory<AppDbContext> dbFactory) : ICommuneScopeService
 {
 
-    public Task<bool> CanAccessCommuneAsync(
+    public async Task<bool> CanAccessCommuneAsync(
         string callerRole,
         int? callerCommuneId,
         int? callerDairaId,
@@ -41,27 +41,31 @@ public sealed class CommuneScopeService(AppDbContext db) : ICommuneScopeService
         switch (callerRole)
         {
             case UserRoles.NationalAdmin:
-                return Task.FromResult(true);
+                return true;
 
             case UserRoles.CommuneUser:
             case UserRoles.FieldWorker:
-                return Task.FromResult(callerCommuneId == targetCommuneId);
+                return callerCommuneId == targetCommuneId;
 
             case UserRoles.DairaAdmin:
-                return callerDairaId.HasValue
-                    ? db.Communes.AnyAsync(
-                        c => c.CommuneId == targetCommuneId && c.DairaId == callerDairaId.Value, ct)
-                    : Task.FromResult(false);
+            {
+                if (!callerDairaId.HasValue) return false;
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+                return await db.Communes.AnyAsync(
+                    c => c.CommuneId == targetCommuneId && c.DairaId == callerDairaId.Value, ct);
+            }
 
             case UserRoles.WilayaAdmin:
-                return callerWilayaId.HasValue
-                    ? db.Communes.AnyAsync(
-                        c => c.CommuneId == targetCommuneId
-                            && db.Dairas.Any(d => d.DairaId == c.DairaId && d.WilayaId == callerWilayaId.Value), ct)
-                    : Task.FromResult(false);
+            {
+                if (!callerWilayaId.HasValue) return false;
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+                return await db.Communes.AnyAsync(
+                    c => c.CommuneId == targetCommuneId
+                        && db.Dairas.Any(d => d.DairaId == c.DairaId && d.WilayaId == callerWilayaId.Value), ct);
+            }
 
             default:
-                return Task.FromResult(false);
+                return false;
         }
     }
 }

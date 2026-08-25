@@ -4,8 +4,9 @@ deploymentMode: SingleBinary
 loki:
   commonConfig:
     replication_factor: 1
+  # ⚠ Enable auth_enabled in production to prevent unauthorized log access:
+  #   --set loki.auth_enabled=true
   auth_enabled: false
-  useTestSchema: true
   ruler:
     enabled: false
   storage:

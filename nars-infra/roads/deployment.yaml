@@ -22,6 +22,7 @@ spec:
         app.kubernetes.io/component: segmentation
     spec:
       # No cluster API access is needed — do not mount the default SA token.
+      serviceAccountName: nars-roads
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true

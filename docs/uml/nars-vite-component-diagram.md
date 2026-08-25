@@ -36,50 +36,58 @@ classDiagram
         +string type
     }
 
-    class Phase {
-        +string key
-        +string drawType
-        +string geometryType
-        +string color
+    class MaplibreFeature {
+        +string id
+        +FeatureData data
+        +string type
     }
 
-    class UserInfo {
-        +number id
-        +string username
-        +string name
-        +string email
-        +string role
-        +LocationInfo commune
-        +LocationInfo? daira
-        +LocationInfo? wilaya
-    }
-
-    class NarsError {
-        +ErrorCode code
-        +ErrorContext context
-        +Date timestamp
-        +unknown? cause
+    class DeletedFeature {
+        +LayerEntry entry
+        +string phaseKey
     }
 
     FeatureData o-- LayerEntry
+    LayerEntry o-- MaplibreFeature
 
     %% ===== PINIA STORES =====
     class AppStore {
         State
         +number currentPhase
         +UserInfo? user
-        +string communeName
         +bool isLoading
         +bool loadError
         +string? referenceRoadDbId
+        +string? referenceEntranceDbId
+        +bool boundaryEventsRegistered
         Getters
         +isAuthenticated
         +isAdminUser
-        +counts (from LayerStore)
+        +canManageUsers
+        +communeName
+        +cityCenterLatLng
+        +counts (from featuresStore)
         Actions
         +setUser(UserInfo)
         +setLoading(bool)
+        +setLoadError(bool)
         +setCurrentPhase(number)
+        +setReferenceRoad(dbId)
+        +setReferenceEntrance(dbId)
+    }
+
+    class FeaturesStore {
+        State
+        +MaplibreFeature[] features
+        Actions
+        +add(feature)
+        +batchAdd(features)
+        +clear()
+        +remove(dbId)
+        +update(dbId, data)
+        +batchUpdate(features)
+        +getAll(phase)
+        +updateSource()
     }
 
     class ModalStore {
@@ -90,7 +98,16 @@ classDiagram
         +string? editDbId
         +string label
         +string? areaTypeKey
+        +bool mainUrbanExists
+        +string? districtTypeKey
         +string? roadTypeKey
+        +string? spaceTypeKey
+        +string? sectorKey
+        +string? buildingTypeKey
+        +number? radius
+        +string? decisionNumber
+        +string? decisionDate
+        +Record~string,string~ errors
         Actions
         +openCreate(phaseIndex, extras?)
         +openEdit(phaseIndex, dbId, existing)
@@ -108,70 +125,173 @@ classDiagram
         +LayerEntry[] publicBuildings
         +LayerEntry[] publicSpaces
         +LayerEntry[] namingPanels
+        Getters
+        +mainEntrances
+        +secondaryEntrances
+        +areaCount, districtCount, roadCount...
         Actions
         +addFeature(LayerEntry)
         +removeFeature(dbId)
         +updateFeature(dbId, data)
+        +updateFeatureData(dbId, data)
         +clearLayer(phase)
         +getFeature(dbId)
     }
 
-    %% ===== SERVICES =====
+    class DrawStore {
+        State
+        +object geomanMarkerPointer
+        +object repatchMarkerPointer
+        +string? drawingPhase
+        +bool savingFeature
+        +string? lastPhaseKey
+        +number modeSwitchToken
+        Getters
+        +snappingEnabled (delegates to snapStore)
+        Actions
+        +registerGeomanMarker(ptr)
+        +setSnappingEnabled(bool)
+        +setDrawingPhase(phase)
+        +setSavingFeature(bool)
+    }
+
+    class EditStore {
+        State
+        +bool isEditMode
+        +string? activeGeomanFeatureId
+        +LayerEntry? activeEditEntry
+        +LatLng[]? activeEditCoordsSnapshot
+        +number? draggedVertexIndex
+        Actions
+        +setIsEditMode(bool)
+        +setActiveGeomanFeatureId(id)
+        +setActiveEditEntry(entry)
+    }
+
+    class SnapStore {
+        State
+        +bool snappingEnabled
+        +bool crosshairActive
+        +bool snapActive
+        +LatLng? snapLatLng
+        +bool snapFrozen
+        Actions
+        +setSnappingEnabled(bool)
+        +setEditDragActive(bool)
+        +patchSnapState(partial)
+    }
+
+    class UndoStore {
+        State
+        +DeletedFeature[] undoStack
+        Actions
+        +recordDelete(entry, phaseKey)
+        +popUndo()
+        +shiftUndo()
+    }
+
+    class SelectionStore {
+        State
+        +string? selectedFeatureDbId
+        Actions
+        +setSelectedFeatureDbId(dbId)
+    }
+
+    class RotationStore {
+        State
+        +number currentBearing
+        Actions
+        +setBearing(deg)
+        +resetRotation()
+    }
+
+    class FieldStore {
+        State
+        +SelectedFeature? selectedFeature
+        Getters
+        +hasSelection
+        +featureType
+        Actions
+        +selectFeature(feature)
+        +clearSelection()
+    }
+
+    class ToastStore {
+        State
+        +ToastItem[] toasts
+        +number nextId
+        Actions
+        +addToast(message, type)
+        +removeToast(id)
+        +clearAll()
+    }
+
+    class ConfirmStore {
+        State
+        +bool visible
+        +string message
+        +string okText
+        Actions
+        +show(message) Promise~bool~
+        +confirm()
+        +cancel()
+    }
+
+    class ContextMenuStore {
+        State
+        +bool visible
+        +number x, y
+        +CtxMenuItem[] items
+        Actions
+        +show(x, y, items)
+        +hide()
+    }
+
+    %% ===== API SERVICE =====
     class ApiModule {
         +apiFetch(path, options)
+        +refreshSession()
+        +apiUrl(path)
         -applyCSRF(options)
-        -retryWithBackoff(fn)
         -classifyError(response)
     }
 
-    class ValidationModule {
-        +checkDistrictCoverage()
-        +checkMainUrbanExists()
-        +getRoadSide(roadId, lat, lng)
-    }
-
-    class ErrorModule {
-        +createNetworkError()
-        +createAuthError()
-        +createNotFoundError()
-        +createServerError()
-        +createTimeoutError()
-        +createConflictError()
-        +withRetry(fn, maxRetries)
-        +logError(error)
-    }
-
+    %% ===== MAP MODULES =====
     class MapContext {
         +Map map
         +Geoman? geoman
         +boundariesSource?
-        +scatteredSource?
         +featuresSource?
         +endpointsSource?
-        +boundariesGeoJson?
-        +scatteredGeoJson?
         +Popup? popup
-        +satelliteStyle?
-        +streetStyle?
-        +lightStyle?
-        +darkStyle?
     }
 
-    %% ===== MAP MODULES =====
     class MapInit {
         +initMap()
+        +destroyMap()
         +setBaseLayer(key)
     }
 
     class DrawEvents {
-        +watchDrawType()
+        +registerDrawEvents()
+        +destroyDrawEvents()
     }
 
-    class DrawComplete {
-        +completeDrawingWithGeometry(geometry)
+    class DrawSave {
+        +completeDrawingWithGeometry(geometry, drawType, featureData)
+        +normalizeGeometry(geometry, drawType)
+        +getFeatureStyle(phase, modalResult)
     }
 
-    class GeomanEvents {
+    class DrawControl {
+        +buildDrawControl(phase)
+        +resetDrawControl()
+    }
+
+    class DrawHandlers {
+        +registerDrawHandlers()
+        +destroyDrawHandlers()
+        +pointToSegmentDist(...)
     }
 
     class EditMode {
@@ -183,15 +303,45 @@ classDiagram
     class Snapping {
         +enableSnapping()
         +disableSnapping()
-        +findNearestSnap(point)
+        +findNearestSnap(cursorX, cursorY, phaseKeys)
         +resetSnapping()
         +enableCrosshair()
+        +disableCrosshair()
+        +installSnapInterceptors()
+    }
+
+    class SnapSearch {
+        +findNearestSnap(...)
+        +mergeExternalSnapWithDrawFirstVertex(...)
+    }
+
+    class SnapGeometry {
+        +closestOnCirclePerimeter(...)
+        +closestOnSegmentProjected(...)
+        +pixelDist(...)
+    }
+
+    class FeatureDataModule {
+        +featureDataToGeometry(data, kind)
+        +buildFeatureData(geometry, phase, modalResult)
+        +toApiSaveShape(fd)
+    }
+
+    class FeaturePersistence {
+        +saveToDatabase(featureData)
+    }
+
+    class FeatureLoader {
+        +loadFromDatabase()
+        +loadUserAndCommune()
     }
 
     class PhaseNav {
         +navigatePhase(direction)
         +goToPhase(target)
         +setPhase(index)
+        +savePhase(index)
+        +loadPhase()
     }
 
     class HouseNumbering {
@@ -203,31 +353,64 @@ classDiagram
         +undo()
     }
 
-    MapInit --> MapContext
-    DrawEvents --> MapContext
-    DrawComplete --> MapContext
-    DrawComplete --> ModalStore
-    DrawComplete --> LayerStore
-    GeomanEvents --> MapContext
-    GeomanEvents --> DrawComplete
-    EditMode --> MapContext
-    EditMode --> LayerStore
-    Snapping --> MapContext
-    PhaseNav --> AppStore
-    PhaseNav --> ValidationModule
-    HouseNumbering --> LayerStore
-    HouseNumbering --> ValidationModule
-    Undo --> LayerStore
-    Undo --> ApiModule
+    class RoadDirections {
+        +computeAndApplyRoadDirections()
+        +updateEndpointMarkers()
+    }
 
-    MapInit --> ApiModule
-    DrawComplete --> ApiModule
-    EditMode --> ApiModule
+    class RoadGraph {
+        +buildConnectionGraph(roads)
+    }
+
+    class RoadOrient {
+        +orientFromCityCenter(center, radius, graph, segs, visited)
+        +geographicDirection(seg)
+    }
+
+    class Labels {
+        +refreshLayerVisibility()
+    }
+
+    class Geometry {
+        +displayCommuneBoundary(communeId)
+        +pointInMunicipalLimit(lat, lng)
+        +pointInScatteredArea(lat, lng)
+        +clearScatteredAreas()
+        +addScatteredArea(geoJsonStr)
+        +computeCircleRing(lat, lng, radiusMeters)
+        +haversineDistance(lat1, lng1, lat2, lng2)
+    }
+
+    class ContextMenu {
+        +showContextMenu(x, y, dbId, phaseKey)
+        +bindContextMenu(e, dbId, phaseKey)
+        +showMapContextMenu(x, y, phase)
+    }
+
+    class NamingPanels {
+        +generateNamingPanels()
+    }
 
     %% ===== COMPOSABLES =====
     class UseTheme {
         +theme
         +setTheme(value)
+        +initTheme()
+    }
+
+    class UseWindowKeydown {
+        +useWindowKeydown(keyMap, enabled?)
+    }
+
+    class UseFeatureValidation {
+        +validate()
+        +buildModalResult()
+        +isMainUrban
+        +isCityCenter
+    }
+
+    class UseFocusTrap {
+        +useFocusTrap(containerRef, isActive)
     }
 
     %% ===== COMPONENTS =====
@@ -311,7 +494,7 @@ classDiagram
         Commune report list
     }
 
-    class ContextMenu {
+    class ContextMenuCmp {
         Right-click context menu
         Edit / Delete actions
     }
@@ -324,29 +507,74 @@ classDiagram
         Field-worker feature feed
     }
 
+    class RoadInspectionForm {
+        Road inspection
+    }
+
+    class EntranceInspectionForm {
+        Entrance inspection
+    }
+
+    class NamingPanelInspectionForm {
+        Naming panel inspection
+    }
+
     class ToastContainer {
         Toast notifications
     }
 
-    class ConfirmDialog {
+    class ConfirmDialogCmp {
         Confirmation dialogs
     }
 
-    App --> ProfileMenu
-    App --> FeatureModal
+    class WilayaDetailPage {
+        Wilaya drill-down
+    }
+
+    %% ===== COMPONENT -> STORE/COMPOSABLE WIRING =====
+    App --> AppStore
+    App --> FeaturesStore
+    App --> ModalStore
+    App --> FieldStore
+    App --> ToastStore
+    App --> ConfirmStore
+    App --> ContextMenuStore
+    App --> SelectionStore
+    App --> RotationStore
+
     App --> PhaseBar
+    App --> FeatureModal
     App --> InfoPanel
+    App --> ProfileMenu
     App --> TileControl
     App --> SettingsModal
     App --> AdminDashboard
-    App --> ContextMenu
+    App --> ContextMenuCmp
     App --> EditSaveButton
     App --> FieldPanel
     App --> ToastContainer
-    App --> ConfirmDialog
+    App --> ConfirmDialogCmp
+    App --> WilayaDetailPage
 
     FeatureModal --> AreaTypeSelector
     FeatureModal --> BuildingTypeSelector
+    FeatureModal --> UseFeatureValidation
+    FeatureModal --> ModalStore
+
+    FieldPanel --> FieldStore
+    FieldPanel --> RoadInspectionForm
+    FieldPanel --> EntranceInspectionForm
+    FieldPanel --> NamingPanelInspectionForm
+
+    PhaseBar --> AppStore
+    PhaseBar --> PhaseNav
+    InfoPanel --> FeaturesStore
+    AdminDashboard --> AppStore
+    AdminDashboard --> StatPill
+    AdminDashboard --> DairaList
+    AdminDashboard --> CommuneList
+    ProfileMenu --> AppStore
+    ProfileMenu --> ApiModule
 
     SettingsModal --> SettingsGeneral
     SettingsModal --> SettingsAccount
@@ -354,30 +582,67 @@ classDiagram
     SettingsModal --> SettingsFeatures
     SettingsModal --> SettingsAbout
 
-    AdminDashboard --> StatPill
-    AdminDashboard --> DairaList
-    AdminDashboard --> CommuneList
+    SettingsGeneral --> UseTheme
 
-    %% ===== STORE RELATIONSHIPS =====
-    App --> AppStore
-    App --> ModalStore
-    App --> LayerStore
-    FeatureModal --> ModalStore
-    PhaseBar --> AppStore
-    InfoPanel --> AppStore
-    AdminDashboard --> AppStore
-    ProfileMenu --> AppStore
-    ProfileMenu --> ApiModule
+    %% ===== MAP MODULE WIRING =====
+    MapInit --> MapContext
+    MapInit --> DrawControl
+    MapInit --> Labels
+    MapInit --> Geometry
+    MapInit --> DrawEvents
+    MapInit --> DrawHandlers
 
-    %% ===== LAYERED ARCHITECTURE =====
+    DrawEvents --> DrawSave
+    DrawEvents --> EditMode
+    DrawEvents --> Snapping
+
+    DrawSave --> FeatureDataModule
+    DrawSave --> FeaturePersistence
+    DrawSave --> LayerStore
+    DrawSave --> ModalStore
+
+    EditMode --> MapContext
+    EditMode --> LayerStore
+    EditMode --> ApiModule
+
+    Snapping --> SnapSearch
+    Snapping --> SnapGeometry
+    Snapping --> SnapStore
+
+    FeaturePersistence --> ApiModule
+    FeatureLoader --> ApiModule
+    FeatureLoader --> FeaturesStore
+    FeatureLoader --> LayerStore
+
+    PhaseNav --> AppStore
+    PhaseNav --> Labels
+    PhaseNav --> DrawControl
+    PhaseNav --> UseFeatureValidation
+
+    HouseNumbering --> LayerStore
+    HouseNumbering --> ApiModule
+
+    Undo --> LayerStore
+    Undo --> ApiModule
+    Undo --> UndoStore
+
+    ContextMenu --> EditMode
+    ContextMenu --> ApiModule
+    ContextMenu --> LayerStore
+    ContextMenu --> UndoStore
+    ContextMenu --> RoadDirections
+
+    RoadDirections --> RoadGraph
+    RoadDirections --> RoadOrient
+    RoadDirections --> MapContext
+
+    NamingPanels --> LayerStore
+    NamingPanels --> MapContext
+
+    %% ===== ARCHITECTURE LAYERS =====
     class I18n {
         +t(key)
         +locale
-    }
-
-    class Toast {
-        +showToast(message, type)
-        +showConfirm(message)
     }
 
     class Config {
@@ -387,8 +652,6 @@ classDiagram
         Colors
     }
 
-    ApiModule --> ErrorModule
-    ApiModule --> Toast
-    ValidationModule --> ApiModule
-    Toast --> I18n
+    ApiModule --> I18n
+    ToastStore --> I18n
 ```

@@ -8,16 +8,20 @@ using NarsApi.Models;
 namespace NarsApi.Services;
 
 public sealed class FeatureService(
-    AppDbContext db,
+    IDbContextFactory<AppDbContext> dbFactory,
     IBackgroundTaskQueue bgQueue,
     IFeatureCleanupService cleanupService,
     ILogger<FeatureService> logger) : IFeatureService
 {
     public async Task<bool> RoadExistsAsync(Guid roadId, Guid userId, CancellationToken ct)
-        => await db.Roads.AnyAsync(r => r.Id == roadId && r.UserId == userId, ct);
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        return await db.Roads.AnyAsync(r => r.Id == roadId && r.UserId == userId, ct);
+    }
 
     public async Task<Guid> SaveFeatureAsync(FeatureBase entity, string featureType, CancellationToken ct)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
 
         FeatureTypeRegistry.AddToDbContext(db, entity);
@@ -30,12 +34,14 @@ public sealed class FeatureService(
 
     public async Task<string?> GetFeatureTypeAsync(Guid featureId, CancellationToken ct)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
         var reg = await db.FeatureRegistry.FindAsync([featureId], ct);
         return reg?.FeatureType;
     }
 
     public async Task<bool> OwnsFeatureAsync(Guid featureId, string featureType, Guid userId, CancellationToken ct)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
         var dbSet = FeatureTypeRegistry.GetDbSet(db, featureType);
         return dbSet is not null
             && await dbSet.AnyAsync(f => f.Id == featureId && f.UserId == userId, ct);
@@ -43,6 +49,7 @@ public sealed class FeatureService(
 
     public async Task<bool> UpdateFeatureAsync(UpdateFeatureCommand command, CancellationToken ct)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
 
         var query = command.Descriptor.GetDbSet(db);
@@ -80,6 +87,7 @@ public sealed class FeatureService(
 
     public async Task<bool> DeleteFeatureAsync(Guid featureId, Guid userId, string featureType, CancellationToken ct)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
 
         var dbSet = FeatureTypeRegistry.GetDbSet(db, featureType);
@@ -118,6 +126,7 @@ public sealed class FeatureService(
 
     public async Task<int> ClearAllFeaturesAsync(Guid userId, CancellationToken ct)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
 
         var total = await cleanupService.DeleteAllFeaturesForUserAsync(db, userId, ct);

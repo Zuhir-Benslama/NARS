@@ -3,10 +3,13 @@
   "version": "1.0.0",
   "description": "NARS — National Addressing Reference System (Maplibre GL JS version)",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
-    "build:deploy": "vue-tsc --noEmit && vite build && rm -rf ../../nars-api/wwwroot/assets && cp -r dist/* ../../nars-api/wwwroot/",
+    "build:deploy": "vue-tsc --noEmit && vite build && cp -r dist/* ../../nars-api/wwwroot/tmp && rm -rf ../../nars-api/wwwroot/assets && mv ../../nars-api/wwwroot/tmp ../../nars-api/wwwroot/assets",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint src/ e2e/ --report-unused-disable-directives --max-warnings 0 && prettier --check \"src/**/*.{ts,vue,css}\" \"e2e/**/*.ts\"",

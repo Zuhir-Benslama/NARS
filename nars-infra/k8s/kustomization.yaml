@@ -10,6 +10,7 @@ labels:
 resources:
   - namespace.yaml
   - configmap.yaml
+  - service-account.yaml
   - postgis-pv.yaml
   - postgis.yaml
   - app-deployment.yaml
@@ -20,7 +21,6 @@ resources:
   - ingress-frontend.yaml
   # nars-api-local and nars-frontend-local are created by
   # the same files (multi-doc YAML)
-  - service-account.yaml
   - network-policy.yaml
   - resource-quota.yaml
   - hpa.yaml

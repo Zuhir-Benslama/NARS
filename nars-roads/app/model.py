@@ -31,6 +31,12 @@ from rasterio.windows import Window
 if TYPE_CHECKING:
     import torch
 
+__all__ = [
+    "SegmentationModel",
+    "InvalidTileError",
+    "TileTooLargeError",
+]
+
 logger = logging.getLogger("nars-roads.model")
 
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
@@ -46,7 +52,20 @@ FLOAT_BYTE_SCALE_THRESHOLD = 2.0
 # gigabytes, so we also bound the decoded footprint before allocating the
 # output arrays. 25M pixels keeps the working set well under the pod's 4Gi
 # limit while still accommodating far larger tiles than the service sees.
-MAX_DECODED_PIXELS = int(os.environ.get("NARS_ROADS_MAX_DECODED_PIXELS", "25000000"))
+def _env_int(key: str, default: int) -> int:
+    """Parse an integer environment variable with a clear startup error."""
+    raw = os.environ.get(key)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        raise RuntimeError(
+            f"Environment variable {key} must be an integer, got: {raw!r}"
+        ) from None
+
+
+MAX_DECODED_PIXELS = _env_int("NARS_ROADS_MAX_DECODED_PIXELS", 25_000_000)
 
 
 class TileTooLargeError(ValueError):
@@ -154,7 +173,7 @@ class SegmentationModel:
     def _predict_tile(self, img: np.ndarray) -> np.ndarray:
         """Run the net on one tile, resizing to the model's expected input
         size and back, returning per-class probabilities
-        (H, W, self.num_classes)."""
+        (H, W, self.num_classes) as float32."""
         torch = _import_torch()
         import torch.nn.functional as F
 

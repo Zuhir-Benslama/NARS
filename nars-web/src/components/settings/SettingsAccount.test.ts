@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { mount } from "@vue/test-utils"
+import { mount, flushPromises } from "@vue/test-utils"
 import { nextTick } from "vue"
 import { setActivePinia, createPinia } from "pinia"
 
@@ -123,7 +123,7 @@ describe("SettingsAccount", () => {
     await inputs[0].setValue("validuser")
     await inputs[1].setValue("valid@email.com")
     await wrapper.find(".modal-btn-save").trigger("click")
-    await nextTick()
+    await flushPromises()
     expect(mockShowToast).toHaveBeenCalledWith("alert_account_updated", "success")
   })
 
@@ -146,7 +146,7 @@ describe("SettingsAccount", () => {
     await inputs[1].setValue("valid@email.com")
     await inputs[2].setValue("tempPass123")
     await wrapper.find(".modal-btn-save").trigger("click")
-    await nextTick()
+    await flushPromises()
     expect((inputs[2].element as HTMLInputElement).value).toBe("")
   })
 

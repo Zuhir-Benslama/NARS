@@ -24,7 +24,7 @@ public class User
     /// <summary>Role: commune_user | daira_admin | wilaya_admin | national_admin</summary>
     [Column("role"), MaxLength(20), Required] public string Role { get; set; } = NarsApi.Infrastructure.UserRoles.CommuneUser;
     [Column("created_at")] public DateTime CreatedAt { get; set; }
-    [Column("failed_login_attempts")] public int? FailedLoginAttempts { get; set; }
+    [Column("failed_login_attempts")] public int FailedLoginAttempts { get; set; }
     [Column("locked_until")] public DateTime? LockedUntil { get; set; }
     /// <summary>
     /// Random per-user value embedded in issued JWTs and re-checked against the

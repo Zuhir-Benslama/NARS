@@ -101,7 +101,7 @@ infra-lint-checkmake: ## Lint the root Makefile with checkmake (config: checkmak
 	@if command -v checkmake >/dev/null 2>&1; then
 		checkmake --config=checkmake.ini Makefile
 	else
-		docker run --rm -v "$$(pwd):/mnt":ro --entrypoint /checkmake \
+		docker run --rm -v "$$(pwd):/mnt:ro" --entrypoint /checkmake \
 			$(CHECKMAKE_IMAGE) --config=/mnt/checkmake.ini /mnt/Makefile
 	fi
 

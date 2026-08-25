@@ -295,7 +295,7 @@ kubeconfig-fix: ## Patch kubeconfig for rootless Docker (port 16443 via kube-pro
 .PHONY: postgis-pv-fix
 postgis-pv-fix: ## Fix postgis PV permissions inside kind container (rootless Docker workaround)
 	@echo "→ Fixing postgis PV permissions..."
-	@if docker exec $(CLUSTER_NAME)-control-plane sh -c ' \
+	@if docker exec "$(CLUSTER_NAME)-control-plane" sh -c ' \
 		if [ -d /mnt/nars/postgis/data ]; then
 			chown -R 999:999 /mnt/nars/postgis/data;
 			chmod 700 /mnt/nars/postgis/data;

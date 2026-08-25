@@ -1,6 +1,6 @@
 <template>
   <div class="daira-list">
-    <details v-for="daira in dairas" :key="daira.daira_id" class="daira-block" open>
+    <details v-for="daira in dairas" :key="daira.daira_id" class="daira-block">
       <summary class="daira-header">
         <span class="daira-name">{{ daira.daira_name_fr }}</span>
         <span class="daira-name-ar">{{ daira.daira_name_ar }}</span>

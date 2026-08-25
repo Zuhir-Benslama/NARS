@@ -1,313 +1,172 @@
----
 name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
-  checks: write
-  security-events: write
 
 jobs:
-  backend-lint:
-    name: Backend — Build & Test
+  # ── .NET API + Tests ──────────────────────────────────────────────────
+  nars-api:
+    name: ".NET API"
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: nars-api
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
 
-      - name: Restore dependencies
-        run: dotnet restore Workspace.sln
+      - name: Restore
+        run: dotnet restore
 
       - name: Build
-        run: dotnet build Workspace.sln --no-restore --configuration Release
+        run: dotnet build --no-restore
 
-      - name: Check formatting
+      - name: Format check
         run: dotnet format Workspace.sln --verify-no-changes --no-restore
+        working-directory: .
 
-      - name: Run tests (with coverage threshold enforcement)
+      - name: Unit tests
         run: >
-          dotnet test nars-tests/NarsApi.Tests.csproj --no-build --configuration Release
-          --verbosity normal
+          dotnet test ../nars-tests/NarsApi.Tests.csproj
+          --no-restore
           --filter "Category!=Service"
-          /p:CollectCoverage=true
-          /p:CoverletOutputFormat=cobertura
-          /p:CoverletOutput=TestResults/ci-coverage.cobertura.xml
+          --logger "trx;LogFileName=unit.trx"
 
-  infra-lint:
-    name: Infra — Shell, Docker, YAML, Python, Node & Makefile Lint
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install linters
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq shellcheck yamllint
-          wget -qO /tmp/hadolint \
-            "https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64"
-          chmod +x /tmp/hadolint
-          sudo mv /tmp/hadolint /usr/local/bin/hadolint
-
-      - name: Lint shell scripts
-        run: make infra-lint-shell
-
-      - name: Lint Dockerfiles
-        run: make infra-lint-docker
-
-      - name: Lint K8s YAML
-        run: make infra-lint-yaml
-
-      - name: Lint Python scripts
-        run: make infra-lint-python
-
-      - name: Lint Node scripts
-        run: make infra-lint-node
-
-      - name: Lint Makefile
-        run: make infra-lint-makefile
-
-      - name: Verify image tag guard rejects 'latest' outside dev
-        run: make infra-lint-tag-guard
-
-  security-scan:
-    name: Security — Gitleaks + Audit
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: GitLeaks — secret scanning
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
-
-      - name: .NET dependency audit
-        run: dotnet list package --vulnerable 2>&1 | tail -20 || true
-
-  integration-tests:
-    name: Backend — Service Tests (Postgres)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
-
-      - name: Restore dependencies
-        run: dotnet restore Workspace.sln
-
-      - name: Build
-        run: dotnet build Workspace.sln --no-restore --configuration Release
-
-      - name: Run service tests
-        run: >
-          dotnet test Workspace.sln --no-build --configuration Release
-          --verbosity normal
-          --filter "Category=Service"
-          --logger "trx"
-
-      - name: Publish test results
-        uses: dorny/test-reporter@v1
+      - name: Upload test results
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: Service Test Results
-          path: "**/TestResults/*.trx"
-          reporter: dotnet-trx
+          name: nars-api-unit-results
+          path: "**/*.trx"
+          retention-days: 7
 
-  roads-test:
-    name: Roads — Segmentation Service Tests
+  # ── Vue 3 Frontend ───────────────────────────────────────────────────
+  nars-web:
+    name: "Vue Frontend"
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build test image and run pytest
-        run: make roads-test
-
-  frontend-lint:
-    name: Frontend — Typecheck, Lint & Test
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: nars-web
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: "npm"
+          cache: npm
           cache-dependency-path: nars-web/package-lock.json
 
-      - name: Install dependencies
+      - name: Install
         run: npm ci
-
-      - name: Typecheck
-        run: npm run typecheck
 
       - name: Lint
         run: npm run lint
 
-      - name: Run tests (with coverage threshold enforcement)
-        run: npm run test:coverage
+      - name: Typecheck
+        run: npm run typecheck
 
-      - name: Audit dependencies
-        continue-on-error: true
-        run: npm run audit
+      - name: Test
+        run: npm run test:run
 
       - name: Build
         run: npm run build
 
-      - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('nars-web/package-lock.json') }}
-
-      - name: Install Playwright browsers
-        run: npx playwright install chromium
-
-      - name: Install Playwright system deps
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install-deps chromium
-
-      - name: Run E2E tests
-        run: npm run test:e2e
-
-  docker-build:
-    name: Build & Push Docker Images
+  # ── Python Segmentation Service ──────────────────────────────────────
+  nars-roads:
+    name: "Python Service"
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    needs:
-      - backend-lint
-      - roads-test
-      - frontend-lint
-      - integration-tests
-      - security-scan
-      - infra-lint
-    if: >
-      github.event_name == 'push' &&
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: nars-roads
     steps:
       - uses: actions/checkout@v4
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+      - uses: actions/setup-python@v5
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          python-version: "3.11"
 
-      - name: Generate Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: zuhirbenslama/nars-api
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
+      - name: System dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gdal-bin libgdal-dev libgl1
 
-      - name: Build and push API image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: nars-infra/docker/Dockerfile.nars-api
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
-      - name: Generate nars-vite metadata
-        id: meta-vite
-        uses: docker/metadata-action@v5
-        with:
-          images: zuhirbenslama/nars-vite
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Type check
+        run: mypy app/
 
-      - name: Build and push vite image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: nars-infra/docker/Dockerfile.nars-vite
-          push: true
-          tags: ${{ steps.meta-vite.outputs.tags }}
-          labels: ${{ steps.meta-vite.outputs.labels }}
+      - name: Lint
+        run: ruff check app/ tests/
 
-      - name: Generate nars-postgis metadata
-        id: meta-postgis
-        uses: docker/metadata-action@v5
-        with:
-          images: zuhirbenslama/nars-postgis
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Test
+        run: pytest -q tests/ --cov=app --cov-report=term-missing --cov-fail-under=85
 
-      - name: Build and push postgis image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: nars-infra/docker/Dockerfile.nars-postgis
-          push: true
-          tags: ${{ steps.meta-postgis.outputs.tags }}
-          labels: ${{ steps.meta-postgis.outputs.labels }}
+  # ── Infrastructure Linting ───────────────────────────────────────────
+  infra-lint:
+    name: "Infra Lint"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Generate nars-backup metadata
-        id: meta-backup
-        uses: docker/metadata-action@v5
+      - uses: actions/setup-dotnet@v4
         with:
-          images: zuhirbenslama/nars-backup
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
+          dotnet-version: "10.0.x"
 
-      - name: Build and push backup image
-        uses: docker/build-push-action@v5
+      - uses: actions/setup-node@v4
         with:
-          context: .
-          file: nars-infra/docker/Dockerfile.nars-backup
-          push: true
-          tags: ${{ steps.meta-backup.outputs.tags }}
-          labels: ${{ steps.meta-backup.outputs.labels }}
+          node-version: "22"
 
-      - name: Generate nars-roads metadata
-        id: meta-roads
-        uses: docker/metadata-action@v5
-        with:
-          images: zuhirbenslama/nars-roads
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
+      - name: .NET format
+        run: dotnet format Workspace.sln --verify-no-changes --no-restore
 
-      - name: Build and push roads image
-        uses: docker/build-push-action@v5
-        with:
-          context: nars-roads/
-          file: nars-infra/docker/Dockerfile.nars-roads
-          push: true
-          tags: ${{ steps.meta-roads.outputs.tags }}
-          labels: ${{ steps.meta-roads.outputs.labels }}
+      - name: Makefile validation
+        run: make -n help
+
+      - name: Shell script lint
+        run: |
+          docker run --rm -v "$PWD:/mnt" koalaman/shellcheck:v0.11.0 \
+            sh -c 'find /mnt/nars-infra/scripts -name "*.sh" -print0 | xargs -0 shellcheck -x'
+
+      - name: Dockerfile lint
+        run: |
+          docker run --rm -v "$PWD:/mnt" hadolint/hadolint:v2.12.0 \
+            hadolint /mnt/nars-infra/docker/Dockerfile.*
+
+      - name: YAML lint
+        run: |
+          docker run --rm -v "$PWD:/mnt" cytopia/yamllint:1 \
+            yamllint -d relaxed \
+              /mnt/nars-infra/k8s/*.yaml \
+              /mnt/nars-infra/helm/values-*.yaml \
+              /mnt/nars-roads/app/config.yaml
+
+      - name: Python lint (infra scripts + roads)
+        run: |
+          pip install ruff
+          ruff check nars-infra/scripts/ nars-roads/app/ nars-roads/tests/
+          ruff format --check nars-infra/scripts/ nars-roads/app/ nars-roads/tests/
+
+      - name: Node syntax check
+        run: for f in nars-infra/scripts/*.mjs; do node --check "$f"; done

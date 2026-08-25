@@ -566,27 +566,30 @@ public class RefreshTokenServiceTests
     [Fact]
     public async Task SaveUserAsync_PersistsNewUser()
     {
-        using var db = CreateDb();
-        var user = new User
+        var (db, factory) = CreateInMemoryDbPair("RefreshTokenTest");
+        await using (db)
         {
-            Id = UserId,
-            Username = "newuser",
-            Name = "New User",
-            Email = DefaultEmail,
-            Phone = AltPhone,
-            PasswordHash = "pw-hash",
-            Role = UserRoles.CommuneUser,
-            CommuneId = 2,
-            SecurityStamp = User.GenerateSecurityStamp(),
-        };
+            var user = new User
+            {
+                Id = UserId,
+                Username = "newuser",
+                Name = "New User",
+                Email = DefaultEmail,
+                Phone = AltPhone,
+                PasswordHash = "pw-hash",
+                Role = UserRoles.CommuneUser,
+                CommuneId = 2,
+                SecurityStamp = User.GenerateSecurityStamp(),
+            };
 
-        var svc = new UserCreationService(db, Mock.Of<IUserAuthorizationService>(), Mock.Of<ILogger<UserCreationService>>());
-        await svc.SaveUserAsync(user);
+            var svc = new UserCreationService(factory, Mock.Of<IUserAuthorizationService>(), Mock.Of<ILogger<UserCreationService>>());
+            await svc.SaveUserAsync(user);
 
-        var stored = await db.Users.FindAsync(UserId);
-        Assert.NotNull(stored);
-        Assert.Equal("newuser", stored.Username);
-        Assert.Equal(DefaultEmail, stored.Email);
+            var stored = await db.Users.FindAsync(UserId);
+            Assert.NotNull(stored);
+            Assert.Equal("newuser", stored.Username);
+            Assert.Equal(DefaultEmail, stored.Email);
+        }
     }
 
     // ── RecordFailedLoginAsync ──────────────────────────────────────────

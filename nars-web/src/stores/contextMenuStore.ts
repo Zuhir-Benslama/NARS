@@ -19,7 +19,7 @@ export const useContextMenuStore = defineStore("contextMenu", {
     show(x: number, y: number, items: CtxMenuItem[]): void {
       this.x = x
       this.y = y
-      this.items = items
+      this.items = [...items]
       this.visible = true
     },
     hide(): void {

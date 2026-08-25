@@ -5,11 +5,12 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public sealed class EntranceQueryService(AppDbContext db) : IEntranceQueryService
+public sealed class EntranceQueryService(IDbContextFactory<AppDbContext> dbFactory) : IEntranceQueryService
 {
     public async Task<HashSet<int>> GetUsedEntranceNumbersAsync(Guid userId, Guid roadId, string side, CancellationToken ct = default)
     {
         var usedNumbers = new HashSet<int>();
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
         var conn = db.Database.GetDbConnection();
         await using var handle = await conn.EnsureOpenAsync(ct);
 

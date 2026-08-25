@@ -40,6 +40,11 @@ function createInitialState(): LayerState {
   }
 }
 
+/** Typed accessor that avoids `as unknown as` casts on dynamic layer keys. */
+function layerEntries(state: LayerState, layer: keyof LayerState): LayerEntry[] {
+  return state[layer] as unknown as LayerEntry[]
+}
+
 export const LAYER_KEYS: (keyof LayerState)[] = [
   "areas",
   "cityCenter",
@@ -87,18 +92,17 @@ export const useLayerStore = defineStore("layer", {
 
   actions: {
     addFeature(layer: keyof LayerState, entry: LayerEntry) {
-      ;(this[layer] as unknown as LayerEntry[]).push(entry)
+      layerEntries(this, layer).push(entry)
     },
 
     removeFeature(layer: keyof LayerState, dbId: string) {
-      const idx = (this[layer] as unknown as LayerEntry[]).findIndex((e) => e.dbId === dbId)
-      if (idx !== -1) {
-        ;(this[layer] as unknown as LayerEntry[]).splice(idx, 1)
-      }
+      const entries = layerEntries(this, layer)
+      const idx = entries.findIndex((e) => e.dbId === dbId)
+      if (idx !== -1) entries.splice(idx, 1)
     },
 
     updateFeature(layer: keyof LayerState, dbId: string, data: Partial<FeatureDataByType>) {
-      const entry = (this[layer] as unknown as LayerEntry[]).find((e) => e.dbId === dbId)
+      const entry = layerEntries(this, layer).find((e) => e.dbId === dbId)
       if (entry) {
         Object.assign(entry.data, data)
       }

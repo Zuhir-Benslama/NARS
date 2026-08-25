@@ -312,15 +312,22 @@ function snapLngLat(e: Record<string, unknown>): void {
   }
 }
 
+/** Early-exit wrapper: avoids reading the Pinia store on every click
+ *  when snapping is not active (the common case). */
+function onSnapEvent(e: Record<string, unknown>): void {
+  if (!useSnapStore().snapActive) return
+  snapLngLat(e)
+}
+
 export function installSnapInterceptors(): void {
   const { map } = getCtx()
 
-  map.on("click", snapLngLat)
-  map.on("mousedown", snapLngLat)
+  map.on("click", onSnapEvent)
+  map.on("mousedown", onSnapEvent)
 }
 
 export function uninstallSnapInterceptors(): void {
   const { map } = getCtx()
-  map.off("click", snapLngLat)
-  map.off("mousedown", snapLngLat)
+  map.off("click", onSnapEvent)
+  map.off("mousedown", onSnapEvent)
 }

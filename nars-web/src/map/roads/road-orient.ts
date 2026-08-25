@@ -86,7 +86,7 @@ export function orientFromCityCenter(
 
   const distToCC = new Map<string, number>()
   for (const k of graph.nodes())
-    distToCC.set(k, turfDistance.distance(toPt(center), toPt(fromNk(k))))
+    distToCC.set(k, turfDistance.distance(toPt(center), toPt(fromNk(k)), { units: "meters" }))
 
   const visitedRoads = new Set<string>()
 

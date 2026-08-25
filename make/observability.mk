@@ -34,17 +34,17 @@ helm-repos: ## Ensure required Helm chart repos are configured
 
 .PHONY: observability-namespace
 observability-namespace: ## Ensure observability namespace exists (idempotent)
-	@$(KUBECTL) create namespace $(OBSERVABILITY_NAMESPACE) --dry-run=client -o yaml | $(KUBECTL) apply -f -
+	@$(KUBECTL) create namespace "$(OBSERVABILITY_NAMESPACE)" --dry-run=client -o yaml | $(KUBECTL) apply -f -
 
 .PHONY: observability-prometheus-stack
 observability-prometheus-stack: .env _check-secrets ## Install Prometheus + Grafana + AlertManager
 	@echo "→ Installing kube-prometheus-stack..."
+	@if [ -z "$$GRAFANA_PASSWORD" ]; then echo "✖ GRAFANA_PASSWORD is empty — run 'make .env' to generate it"; exit 1; fi
 	@tmpdir=$$(mktemp -d);
 	trap 'rm -rf "$$tmpdir"' EXIT;
 	printf '%s' "$$GRAFANA_PASSWORD" > "$$tmpdir/grafana_password";
 	helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
-		--namespace $(OBSERVABILITY_NAMESPACE) \
-		--version "$(KUBE_PROMETHEUS_STACK_VERSION)" \
+		--namespace "$(OBSERVABILITY_NAMESPACE)" \
 		--values "$(K8S_DIR)/helm-values/kube-prometheus-stack.yaml" \
 		--set-file grafana.adminPassword="$$tmpdir/grafana_password" \
 		--timeout 10m
@@ -54,7 +54,7 @@ observability-prometheus-stack: .env _check-secrets ## Install Prometheus + Graf
 observability-loki: ## Install Loki (logs)
 	@echo "→ Installing Loki..."
 	@helm upgrade --install loki grafana/loki \
-		--namespace $(OBSERVABILITY_NAMESPACE) \
+		--namespace "$(OBSERVABILITY_NAMESPACE)" \
 		--version "$(LOKI_VERSION)" \
 		--values "$(K8S_DIR)/helm-values/loki.yaml" \
 		--timeout 10m
@@ -63,7 +63,7 @@ observability-loki: ## Install Loki (logs)
 observability-tempo: ## Install Tempo (traces)
 	@echo "→ Installing Tempo..."
 	@helm upgrade --install tempo grafana/tempo \
-		--namespace $(OBSERVABILITY_NAMESPACE) \
+		--namespace "$(OBSERVABILITY_NAMESPACE)" \
 		--version "$(TEMPO_VERSION)" \
 		--values "$(K8S_DIR)/helm-values/tempo.yaml" \
 		--timeout 10m
@@ -73,7 +73,7 @@ observability-tempo: ## Install Tempo (traces)
 observability-otel-collector: ## Install OpenTelemetry Collector
 	@echo "→ Installing OpenTelemetry Collector..."
 	@helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
-		--namespace $(OBSERVABILITY_NAMESPACE) \
+		--namespace "$(OBSERVABILITY_NAMESPACE)" \
 		--version "$(OTEL_COLLECTOR_VERSION)" \
 		--values "$(K8S_DIR)/helm-values/opentelemetry-collector.yaml" \
 		--set image.tag="$(OTEL_COLLECTOR_IMAGE_TAG)" \
@@ -89,18 +89,19 @@ observability-servicemonitor: ## Apply OTel metrics Service + ServiceMonitor (re
 .PHONY: observability-port-forward
 observability-port-forward: ## Port-forward Grafana, Loki, Tempo (background)
 	@mkdir -p "$(LOG_DIR)";
+	@umask 077;
 	echo "→ Starting observability port-forwards (background)...";
 	pkill -f "port-forward.*observability.*grafana" 2>/dev/null || true;
 	pkill -f "port-forward.*observability.*loki-gateway" 2>/dev/null || true;
 	pkill -f "port-forward.*observability.*tempo" 2>/dev/null || true;
 	sleep 0.5;
-	nohup $(KUBECTL) port-forward -n $(OBSERVABILITY_NAMESPACE) \
+	nohup $(KUBECTL) port-forward -n "$(OBSERVABILITY_NAMESPACE)" \
 		service/prometheus-stack-grafana 3000:3000 \
 		> "$(LOG_DIR)/port-forward-grafana.log" 2>&1 & \
-	nohup $(KUBECTL) port-forward -n $(OBSERVABILITY_NAMESPACE) \
+	nohup $(KUBECTL) port-forward -n "$(OBSERVABILITY_NAMESPACE)" \
 		service/loki-gateway 3100:80 \
 		> "$(LOG_DIR)/port-forward-loki.log" 2>&1 & \
-	nohup $(KUBECTL) port-forward -n $(OBSERVABILITY_NAMESPACE) \
+	nohup $(KUBECTL) port-forward -n "$(OBSERVABILITY_NAMESPACE)" \
 		service/tempo 3200:3200 \
 		> "$(LOG_DIR)/port-forward-tempo.log" 2>&1 & \
 	echo "→ Waiting for port-forwards to come up...";

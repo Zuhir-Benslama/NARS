@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Moq;
 using NarsApi.Controllers;
 using NarsApi.DTOs;
@@ -23,6 +24,7 @@ public class UsersControllerTests
         var ctrl = new UsersController(
             userProfile ?? Mock.Of<IUserProfileService>(),
             refreshTokens ?? Mock.Of<IRefreshTokenService>(),
+            Mock.Of<ILogger<UsersController>>(),
             Mock.Of<IWebHostEnvironment>());
 
         if (authenticated)
@@ -65,7 +67,7 @@ public class UsersControllerTests
 
         // [Authorize] on NarsControllerBase returns 401 via middleware in production.
         // Unit tests bypass the middleware pipeline, so RequiredCurrentUserId throws.
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
             ctrl.UpdateCredentials(new UpdateUserRequest("newuser", null, null, null), default));
     }
 

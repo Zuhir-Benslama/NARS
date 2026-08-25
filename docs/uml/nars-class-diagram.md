@@ -42,6 +42,38 @@ classDiagram
         +string FeatureType
     }
 
+    %% ===== NON-FEATURE MODELS =====
+    class Inspection {
+        +Guid Id
+        +Guid UserId
+        +Guid FeatureId
+        +string FeatureType
+        +string Status
+        +string? Notes
+        +DateTime CreatedAt
+    }
+
+    class ErrorLog {
+        +Guid Id
+        +Guid UserId
+        +string Level
+        +string Message
+        +string? Source
+        +string? StackTrace
+        +DateTime CreatedAt
+    }
+
+    class AiDraftFeature {
+        +Guid Id
+        +string FeatureType
+        +string Status
+        +int CommuneId
+        +string? GeometryJson
+        +string? Label
+        +DateTime CreatedAt
+        +DateTime? UpdatedAt
+    }
+
     %% ===== LOCATION MODELS =====
     class User {
         +Guid Id
@@ -103,30 +135,37 @@ classDiagram
         +bool Revoked
     }
 
-    User "1" --> "many" RefreshToken
+    User "1" --> "0..*" RefreshToken : has
+    User "1" --> "0..*" Inspection : creates
+    User "1" --> "0..*" ErrorLog : creates
+    User --> Commune : CommuneId?
+    User --> Daira : DairaId?
+    User --> Wilaya : WilayaId?
 
-    Wilaya "1" --> "many" Daira
-    Daira "1" --> "many" Commune
-    Commune "1" --> "1" CommuneBoundary
+    Wilaya "1" --> "0..*" Daira
+    Daira "1" --> "0..*" Commune
+    Commune "1" --> "0..1" CommuneBoundary
 
     %% ===== DATABASE CONTEXT =====
     class AppDbContext {
-        +DbSet~User~ Users
-        +DbSet~Wilaya~ Wilayas
-        +DbSet~Daira~ Dairas
-        +DbSet~Commune~ Communes
+        +DbSet~FeatureRegistry~ FeatureRegistry
         +DbSet~Area~ Areas
-        +DbSet~Road~ Roads
         +DbSet~District~ Districts
+        +DbSet~CityCenter~ CityCenters
+        +DbSet~Road~ Roads
         +DbSet~HouseEntrance~ HouseEntrances
         +DbSet~PublicBuilding~ PublicBuildings
         +DbSet~PublicSpace~ PublicSpaces
         +DbSet~NamingPanel~ NamingPanels
-        +DbSet~CityCenter~ CityCenters
-        +DbSet~FeatureRegistry~ FeatureRegistry
+        +DbSet~Inspection~ Inspections
+        +DbSet~ErrorLog~ ErrorLogs
+        +DbSet~User~ Users
         +DbSet~RefreshToken~ RefreshTokens
+        +DbSet~Wilaya~ Wilayas
+        +DbSet~Daira~ Dairas
+        +DbSet~Commune~ Communes
         +DbSet~CommuneBoundary~ CommuneBoundaries
-        +OnModelCreating(ModelBuilder)
+        +DbSet~AiDraftFeature~ AiDraftFeatures
     }
 
     AppDbContext o-- FeatureBase
@@ -135,49 +174,344 @@ classDiagram
     AppDbContext o-- Daira
     AppDbContext o-- Commune
     AppDbContext o-- RefreshToken
+    AppDbContext o-- Inspection
+    AppDbContext o-- ErrorLog
+    AppDbContext o-- AiDraftFeature
 
     %% ===== SERVICES =====
+    class IJwtService {
+        <<interface>>
+        +CreateToken(userId, username, name, email, communeId, securityStamp, role, dairaId, wilayaId) string
+        +ValidateToken(string) ClaimsPrincipal?
+        +CreateRefreshToken() (string raw, string hash)
+    }
+
+    class JwtService {
+        +CreateToken(...) string
+        +ValidateToken(string) ClaimsPrincipal?
+        +CreateRefreshToken() (string raw, string hash)
+    }
+    IJwtService <|.. JwtService
+
+    class IRefreshTokenService {
+        <<interface>>
+        +IssueRefreshTokenAsync(userId) RefreshTokenResult
+        +RotateRefreshTokenAsync(rawToken) RefreshTokenResult
+        +MintAccessTokenAsync(rawToken) RefreshTokenResult
+        +RecordFailedLoginAsync(userId) Task
+        +ResetFailedAttemptsIfNeededAsync(user) Task
+        +PruneExpiredTokensAsync() Task
+    }
+
+    class RefreshTokenService {
+        +IssueRefreshTokenAsync(userId) RefreshTokenResult
+        +RotateRefreshTokenAsync(rawToken) RefreshTokenResult
+        +MintAccessTokenAsync(rawToken) RefreshTokenResult
+        +RecordFailedLoginAsync(userId) Task
+        +ResetFailedAttemptsIfNeededAsync(user) Task
+        +PruneExpiredTokensAsync() Task
+    }
+    IRefreshTokenService <|.. RefreshTokenService
+
+    class IFeatureService {
+        <<interface>>
+        +SaveFeatureAsync(request, userId) CreateResponse
+        +UpdateFeatureAsync(id, request, userId) UpdateFeatureResponse
+        +DeleteFeatureAsync(id, userId) Task
+        +LoadFeaturesAsync(userId, skip, take) LoadFeaturesResponse
+        +LoadByLayerAsync(userId, layer, skip, take) LoadFeaturesResponse
+        +ClearFeaturesAsync(request, userId) Task
+        +GetStatsAsync(userId) FeatureStatsResponse
+    }
+
+    class IFeatureStatsService {
+        <<interface>>
+        +GetStatsAsync(userId) FeatureStatsResponse
+    }
+
+    class IFeatureCleanupService {
+        <<interface>>
+        +DeleteAllUserFeaturesAsync(userId) Task
+    }
+
+    class IUserAuthorizationService {
+        <<interface>>
+        +VerifyCredentialsAsync(username, password, maxAttempts, lockoutMinutes) CredentialResult
+        +GetUserClaimsAsync(user) IEnumerable~Claim~
+        +CreateManagedUserAsync(request, creatorId) Task
+        +UpdateManagedUserAsync(userId, request, callerId) Task
+        +DeleteManagedUserAsync(userId, callerId) Task
+        +GetManageableUsersAsync(callerId) IEnumerable~UserInfo~
+    }
+
+    class IUserCreationService {
+        <<interface>>
+        +CreateUserAsync(request, creatorId) Task~User~
+        +CreateAdminAsync(request) Task~User~
+    }
+
+    class IUserProfileService {
+        <<interface>>
+        +UpdateProfileAsync(userId, request) UserInfo
+        +UpdateCredentialsAsync(userId, request) UpdateCredentialsResponse
+    }
+
+    class IValidationService {
+        <<interface>>
+        +CheckMainUrbanExistsAsync(userId) MainUrbanExistsResponse
+        +CheckDistrictCoverageAsync(userId) DistrictCoverageResponse
+        +ValidateRoadAsync(request, userId) ValidateRoadResponse
+        +ValidateDistrictAsync(request, userId) ValidateDistrictResponse
+    }
+
+    class IFieldService {
+        <<interface>>
+        +GetFeaturesAsync(userId) IEnumerable~FieldFeatureResult~
+        +InspectAsync(request, userId) FieldInspectionResponse
+        +GetInspectionsAsync(featureId, userId) FieldInspectionsResponse
+        +CreateEntranceAsync(request, userId) FeatureResult
+    }
+
     class IScatteredAreaService {
         <<interface>>
-        +Task~bool~ RefreshAsync(Guid userId, int communeId, CancellationToken)
-        +GetLastError(Guid, int) (DateTimeOffset, string)?
+        +RefreshAsync(userId, communeId, ct) Task~bool~
+        +GetLastError(userId, communeId) (DateTimeOffset, string)?
     }
 
     class ScatteredAreaService {
-        +Task~bool~ RefreshAsync(Guid userId, int communeId, CancellationToken)
-        +GetLastError(Guid, int) (DateTimeOffset, string)?
+        +RefreshAsync(userId, communeId, ct) Task~bool~
+        +GetLastError(userId, communeId) (DateTimeOffset, string)?
     }
-
     IScatteredAreaService <|.. ScatteredAreaService
 
-    class JwtService {
-        +string CreateToken(userId, username, name, email, communeId, securityStamp, role, dairaId, wilayaId)
-        +ClaimsPrincipal? ValidateToken(string token)
-        +(string rawToken, string hash) CreateRefreshToken()
+    class IRoadQueryService {
+        <<interface>>
+        +GetRoadSideAsync(request, userId) RoadSideResponse
+    }
+
+    class IEntranceQueryService {
+        <<interface>>
+        +SuggestEntranceNumberAsync(roadId, lat, lng) int
+    }
+
+    class IAdminOverviewService {
+        <<interface>>
+        +GetOverviewAsync(skip, take) NationalOverviewResponse
+        +GetWilayaAsync(wilayaId) WilayaReport
+        +GetDairaAsync(dairaId) DairaReport
+    }
+
+    class IErrorLogService {
+        <<interface>>
+        +SubmitLogsAsync(batch, userId) Task
+    }
+
+    class ICommuneScopeService {
+        <<interface>>
+        +GetCommuneIdAsync(userId) int?
+    }
+
+    class IDraftFeaturesService {
+        <<interface>>
+        +SegmentTileAsync(request, userId) SegmentSummaryResponse
+        +ListAsync(userId) IEnumerable~AiDraftFeatureDto~
+        +AcceptAsync(id, userId) Task
+        +RejectAsync(id, userId) Task
+    }
+
+    class ISegmentationClient {
+        <<interface>>
+        +SegmentAsync(tileData, ct) SegmentationResult
+    }
+
+    class ISecurityStampCache {
+        <<interface>>
+        +GetStampAsync(userId) Task~string?
+        +EvictStamp(userId) Task
+    }
+
+    class IPageAuthService {
+        <<interface>>
+        +TryAuthenticateAsync(HttpContext) Task~bool~
     }
 
     class IBackgroundTaskQueue {
         <<interface>>
-        +ValueTask~bool~ QueueBackgroundWorkItemAsync(workItem)
-        +ValueTask~Func~ DequeueAsync(CancellationToken)
+        +QueueBackgroundWorkItemAsync(workItem) ValueTask~bool~
+        +DequeueAsync(ct) ValueTask~Func~
     }
 
     class BackgroundTaskQueue {
-        +ValueTask~bool~ QueueBackgroundWorkItemAsync(workItem)
-        +ValueTask~Func~ DequeueAsync(CancellationToken)
+        +QueueBackgroundWorkItemAsync(workItem) ValueTask~bool~
+        +DequeueAsync(ct) ValueTask~Func~
     }
+    IBackgroundTaskQueue <|.. BackgroundTaskQueue
 
     class BackgroundQueueProcessor {
-        +Task ExecuteAsync(CancellationToken)
+        +ExecuteAsync(ct) Task
+    }
+    BackgroundQueueProcessor --> IBackgroundTaskQueue
+
+    class ILogSanitizer {
+        <<interface>>
+        +Sanitize(message) string
     }
 
-    IBackgroundTaskQueue <|.. BackgroundTaskQueue
-    BackgroundQueueProcessor --> IBackgroundTaskQueue
+    class IDateTimeProvider {
+        <<interface>>
+        +UtcNow DateTime
+    }
+
+    %% ===== CONTROLLERS =====
+    class ControllerBase {
+        <<abstract>>
+    }
+
+    class NarsControllerBase {
+        <<abstract>>
+        #Guid? CurrentUserId
+        #Guid RequiredCurrentUserId
+        #string CurrentUserRole
+        #int? CurrentCommuneId
+        #int? CurrentDairaId
+        #int? CurrentWilayaId
+    }
+
+    class AuthController {
+        +SignIn(SignInRequest) Task
+        +Logout() Task
+        +Refresh() Task
+        +CurrentUser() Task
+    }
+
+    class AdminSignupController {
+        +AdminSignup(AuthorizedAdminSignupRequest) Task
+    }
+
+    class AdminController {
+        +Overview(skip, take) Task
+        +GetWilaya(wilayaId) Task
+        +GetDaira(dairaId) Task
+    }
+
+    class AdminUserController {
+        +CreateManagedUser(CreateAdminRequest) Task
+        +GetManageableUsers() Task
+        +UpdateManagedUser(userId, UpdateAdminRequest) Task
+        +DeleteManagedUser(userId) Task
+    }
+
+    class FeaturesController {
+        +Save(FeatureSaveRequest) Task
+        +Update(id, FeatureUpdateRequest) Task
+        +Delete(id) Task
+        +Load(skip, take) Task
+        +LoadByLayer(layerType, skip, take) Task
+        +Clear(ClearFeaturesRequest) Task
+        +GetStats() Task
+    }
+
+    class FeatureCatalogController {
+        +GetFeatureTypes() Task
+    }
+
+    class ValidationController {
+        +CheckMainUrbanExists() Task
+        +CheckDistrictCoverage() Task
+        +ValidateRoad(ValidateRoadRequest) Task
+        +ValidateDistrict(ValidateDistrictRequest) Task
+    }
+
+    class SpatialController {
+        +GetRoadSide(RoadSideRequest) Task
+        +RefreshScattered() Task
+    }
+
+    class LocationsController {
+        +GetWilayas() Task
+        +GetDairas(wilayaId?) Task
+        +GetCommunes(dairaId?) Task
+        +GetCommuneBoundary(id) Task
+        +SearchLocations(query) Task
+    }
+
+    class UsersController {
+        +UpdateProfile(UpdateUserRequest) Task
+        +UpdateCredentials(UpdateCredentialsRequest) Task
+    }
+
+    class FieldController {
+        +GetFeatures() Task
+        +Inspect(FieldInspectRequest) Task
+        +GetInspections(featureId) Task
+        +CreateEntrance(FieldEntranceCreateRequest) Task
+    }
+
+    class DraftFeaturesController {
+        +Segment(SegmentTileRequest) Task
+        +List() Task
+        +Accept(id) Task
+        +Reject(id) Task
+    }
+
+    class LogsController {
+        +SubmitLogs(LogBatch) Task
+    }
+
+    class PagesController {
+        +Index() Task
+        +Login() Task
+        +Map() Task
+    }
+
+    ControllerBase <|-- NarsControllerBase
+    ControllerBase <|-- LocationsController
+
+    NarsControllerBase <|-- AuthController
+    NarsControllerBase <|-- AdminSignupController
+    NarsControllerBase <|-- AdminController
+    NarsControllerBase <|-- AdminUserController
+    NarsControllerBase <|-- FeaturesController
+    NarsControllerBase <|-- FeatureCatalogController
+    NarsControllerBase <|-- ValidationController
+    NarsControllerBase <|-- SpatialController
+    NarsControllerBase <|-- UsersController
+    NarsControllerBase <|-- FieldController
+    NarsControllerBase <|-- DraftFeaturesController
+    NarsControllerBase <|-- LogsController
+    NarsControllerBase <|-- PagesController
+
+    %% ===== CONTROLLER DEPENDENCIES =====
+    AuthController --> IJwtService
+    AuthController --> IRefreshTokenService
+    AuthController --> IUserAuthorizationService
+    AdminSignupController --> IUserCreationService
+    AdminSignupController --> IUserAuthorizationService
+    AdminController --> IAdminOverviewService
+    AdminUserController --> IUserAuthorizationService
+    AdminUserController --> IUserCreationService
+    FeaturesController --> IFeatureService
+    FeaturesController --> IFeatureStatsService
+    ValidationController --> IValidationService
+    SpatialController --> IRoadQueryService
+    SpatialController --> IScatteredAreaService
+    SpatialController --> IEntranceQueryService
+    FieldController --> IFieldService
+    LocationsController --> IBoundaryService
+    LocationsController --> ILocationQueryService
+    LocationsController --> ILocationSearchService
+    UsersController --> IUserProfileService
+    UsersController --> IRefreshTokenService
+    DraftFeaturesController --> IDraftFeaturesService
+    PagesController --> IPageAuthService
+    LogsController --> IErrorLogService
 
     %% ===== INFRASTRUCTURE =====
     class FeatureTypeRegistry {
         <<static>>
         +GetDescriptor(string) FeatureTypeDescriptor
+        +GetAllDescriptors() FeatureTypeDescriptor[]
+        +IsValidTableName(string) bool
     }
 
     class FeatureTypeDescriptor {
@@ -202,8 +536,7 @@ classDiagram
         <<static>>
         +PolygonFromDataTemplate
         +LineStringFromDataTemplate
-        +PolygonFromData
-        +LineStringFromData
+        +UrbanAreaLayersSqlIn
     }
 
     class UserRoles {
@@ -212,138 +545,14 @@ classDiagram
         +DairaAdmin
         +WilayaAdmin
         +NationalAdmin
+        +FieldWorker
+        +IsAdmin(string) bool
+        +IsDraftReviewer(string) bool
+        +IsCommuneScoped(string) bool
     }
 
     ScatteredAreaService --> FeatureQueryHelper
     ScatteredAreaService --> SqlFragments
     FeatureQueryHelper --> SqlFragments
     FeatureQueryHelper --> FeatureTypeRegistry
-
-    %% ===== CONTROLLERS =====
-    class ControllerBase {
-        <<abstract>>
-    }
-
-    class NarsControllerBase {
-        <<abstract>>
-        +Guid CurrentUserId
-        +string CurrentUserRole
-        +int? CurrentCommuneId
-        +int? CurrentDairaId
-        +int? CurrentWilayaId
-    }
-
-    class AuthController {
-        +Task SignIn(SignInRequest)
-        +Task Logout()
-        +Task Refresh()
-        +Task CurrentUser()
-    }
-
-    class AdminSignupController {
-        +Task AdminSignup(AuthorizedAdminSignupRequest)
-    }
-
-    class AdminController {
-        +Task Overview(int skip, int take)
-        +Task GetWilaya(int wilayaId)
-        +Task GetDaira(int dairaId)
-    }
-
-    class AdminUserController {
-        +Task CreateManagedUser(CreateAdminRequest)
-        +Task GetManageableUsers()
-        +Task UpdateManagedUser(Guid userId)
-        +Task DeleteManagedUser(Guid userId)
-    }
-
-    class FeaturesController {
-        +Task Save(FeatureSaveRequest)
-        +Task Update(Guid id, FeatureUpdateRequest)
-        +Task Delete(Guid id)
-        +Task Load()
-        +Task Clear(ClearFeaturesRequest)
-        +Task GetStats()
-    }
-
-    class FeatureCatalogController {
-        +Task GetFeatureTypes()
-        +Task LoadByLayer(string layerType)
-    }
-
-    class ValidationController {
-        +Task CheckMainUrbanExists()
-        +Task CheckDistrictCoverage()
-        +Task ValidateRoad(ValidateRoadRequest)
-        +Task ValidateDistrict(ValidateDistrictRequest)
-    }
-
-    class SpatialController {
-        +Task GetRoadSide(RoadSideRequest)
-        +Task RefreshScatteredAreas()
-    }
-
-    class LocationsController {
-        +Task GetWilayas()
-        +Task GetDairas()
-        +Task GetCommunes()
-        +Task GetCommuneBoundary(int id)
-    }
-
-    class UsersController {
-        +Task UpdateProfile(UpdateUserRequest)
-    }
-
-    class FieldController {
-        +Task GetFeatures()
-        +Task Inspect()
-        +Task GetInspections(Guid featureId)
-        +Task CreateEntrance()
-    }
-
-    class DraftFeaturesController {
-        +Task Segment(SegmentationRequest)
-        +Task List()
-        +Task Accept(Guid id)
-        +Task Reject(Guid id)
-    }
-
-    class LogsController {
-        +Task SubmitLog(ClientLogEntry)
-    }
-
-    class PagesController {
-        +Task Index()
-        +Task Login()
-        +Task Map()
-    }
-
-    ControllerBase <|-- NarsControllerBase
-
-    NarsControllerBase <|-- AuthController
-    NarsControllerBase <|-- AdminSignupController
-    NarsControllerBase <|-- AdminController
-    NarsControllerBase <|-- AdminUserController
-    NarsControllerBase <|-- FeaturesController
-    NarsControllerBase <|-- FeatureCatalogController
-    NarsControllerBase <|-- ValidationController
-    NarsControllerBase <|-- SpatialController
-    NarsControllerBase <|-- LocationsController
-    NarsControllerBase <|-- UsersController
-    NarsControllerBase <|-- FieldController
-    NarsControllerBase <|-- DraftFeaturesController
-    NarsControllerBase <|-- LogsController
-    NarsControllerBase <|-- PagesController
-
-    AuthController --> JwtService
-    AuthController --> AppDbContext
-    AdminController --> AppDbContext
-    FeaturesController --> AppDbContext
-    FeaturesController --> IScatteredAreaService
-    FeaturesController --> IBackgroundTaskQueue
-    FeaturesController --> FeatureTypeRegistry
-    ValidationController --> FeatureQueryHelper
-    SpatialController --> IScatteredAreaService
-    SpatialController --> FeatureQueryHelper
-    DraftFeaturesController --> FeatureTypeRegistry
 ```

@@ -70,8 +70,13 @@ export const useFeaturesStore = defineStore("features", {
         properties?: Partial<MaplibreFeature["properties"]>
       }>,
     ) {
+      // Build an index once so each patch is O(1) instead of scanning the
+      // full features array per patch (O(n×m) → O(n+m)).
+      const index = new Map<string, MaplibreFeature>()
+      for (const f of this.features) index.set(f.id, f)
+
       for (const patch of patches) {
-        const f = this.features.find((f) => f.id === patch.id)
+        const f = index.get(patch.id)
         if (!f) {
           debugWarn("featuresStore.batchUpdate: feature not found", patch.id)
           continue
@@ -82,7 +87,7 @@ export const useFeaturesStore = defineStore("features", {
       this.updateSource()
     },
 
-    getAll(): MaplibreFeature[] {
+    getAll(): readonly MaplibreFeature[] {
       return this.features
     },
 

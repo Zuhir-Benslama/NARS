@@ -29,14 +29,14 @@
         :placeholder="t('placeholder_feature_label')"
       />
     </div>
-    <button class="modal-btn modal-btn-save" @click="add">
+    <button class="modal-btn modal-btn-save" :disabled="saving" @click="add">
       {{ t("btn_add_feature") }}
     </button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive } from "vue"
+import { reactive, ref } from "vue"
 import { useI18n } from "vue-i18n"
 import { apiFetch } from "../../api"
 import { showToast } from "../../lib/toast"
@@ -44,9 +44,11 @@ import { showToast } from "../../lib/toast"
 const { t } = useI18n()
 
 const form = reactive({ category: "districts", label: "" })
+const saving = ref(false)
 
 async function add() {
-  if (!form.label.trim()) return
+  if (saving.value || !form.label.trim()) return
+  saving.value = true
   try {
     const res = await apiFetch("/api/feature-types/custom", {
       method: "POST",
@@ -61,6 +63,8 @@ async function add() {
     }
   } catch {
     showToast(t("error_add_feature_failed"), "error")
+  } finally {
+    saving.value = false
   }
 }
 </script>

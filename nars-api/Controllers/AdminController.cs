@@ -11,6 +11,7 @@ namespace NarsApi.Controllers;
 [Tags("Admin")]
 public class AdminController(
     IAdminOverviewService overviewService,
+    ILogger<AdminController> logger,
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     /// <summary>Returns a role-scoped administrative overview of the hierarchy.</summary>
@@ -28,6 +29,7 @@ public class AdminController(
     {
         var role = CurrentUserRole;
         var dairaId = CurrentDairaId;
+        logger.LogInformation("[Admin] User {UserId} ({Role}) accessed admin overview", CurrentUserId, role);
         return role switch
         {
             UserRoles.DairaAdmin when dairaId is null =>

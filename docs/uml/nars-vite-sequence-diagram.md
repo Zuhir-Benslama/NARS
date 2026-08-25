@@ -8,28 +8,35 @@ sequenceDiagram
     actor User
     participant main.ts
     participant Browser
-    participant API (/api/current_user)
-    participant App.vue
     participant AppStore
+    participant ApiModule
     participant MapInit
+    participant FeatureLoader
 
     User->>Browser: Navigate to URL
     Browser->>main.ts: Load
     main.ts->>main.ts: Apply saved theme (prevent flash)
 
-    main.ts->>API: GET /api/current_user (credentials: include)
-    alt 200 OK
-        API-->>main.ts: UserInfo
-        main.ts->>AppStore: setUser(UserInfo)
-    else 401 Unauthorized
-        main.ts->>API: POST /api/refresh
-        alt 200 OK (refresh succeeds)
-            API-->>main.ts: New JWT + UserInfo
-            main.ts->>AppStore: setUser(UserInfo)
-        else 401 (refresh expired)
-            API-->>main.ts: 401
-            main.ts->>Browser: Redirect to /login
-            Note over Browser: End of flow
+    main.ts->>AppStore: checkAuth()
+    AppStore->>ApiModule: GET /api/current_user (credentials: include)
+
+    alt 200 OK (access token valid)
+        ApiModule-->>AppStore: UserInfo
+        AppStore->>AppStore: setUser(UserInfo)
+    else 401 (token expired or missing)
+        ApiModule-->>AppStore: 401
+        AppStore->>ApiModule: POST /api/refresh (single-flight)
+        Note over ApiModule: refreshSession() deduplicates concurrent calls
+
+        alt Refresh succeeds (200)
+            ApiModule-->>AppStore: new JWT in cookies
+            AppStore->>ApiModule: GET /api/current_user (retry with new token)
+            ApiModule-->>AppStore: UserInfo
+            AppStore->>AppStore: setUser(UserInfo)
+        else Refresh fails (401)
+            ApiModule-->>AppStore: 401
+            AppStore-->>User: Redirect to /login
+            Note over User: End of flow
         end
     end
 
@@ -38,25 +45,29 @@ sequenceDiagram
     main.ts->>Browser: mount(App)
     Browser->>App.vue: Render
 
-    alt User is commune_user
+    alt User is commune_user or field_worker
         App.vue->>App.vue: Render map UI
-        main.ts->>API: GET /api/features
-        API-->>main.ts: Features list
-        main.ts->>AppStore: updateCounts()
+        main.ts->>FeatureLoader: loadUserAndCommune()
+        FeatureLoader->>ApiModule: GET /api/current_user
+        ApiModule-->>FeatureLoader: UserInfo
+        FeatureLoader->>AppStore: setUser(UserInfo)
+
+        main.ts->>FeatureLoader: loadFromDatabase()
+        FeatureLoader->>ApiModule: GET /api/features
+        ApiModule-->>FeatureLoader: FeatureResult[]
+        FeatureLoader->>FeatureLoader: Build GeoJSON + populate stores
 
         main.ts->>MapInit: initMap()
         MapInit->>MapInit: Create MapLibre (center Algeria, zoom 5)
         MapInit->>MapInit: Initialize Geoman
-        MapInit->>MapInit: Create GeoJSON sources
-        MapInit->>MapInit: Add render layers
+        MapInit->>MapInit: Create GeoJSON sources + render layers
         MapInit->>MapInit: Register draw events, geoman events
 
-        main.ts->>main.ts: Load features into layerStore
         main.ts->>main.ts: Restore phase from localStorage
-        main.ts->>main.ts: Sync counts, refresh visibility
+        main.ts->>MapInit: refreshLayerVisibility()
     else Admin user
         App.vue->>App.vue: Render AdminDashboard
-        Note over App.vue,API: No map initialization
+        Note over App.vue: No map initialization
     end
 ```
 
@@ -67,63 +78,61 @@ sequenceDiagram
     autonumber
     actor User
     participant PhaseBar
-    participant AppStore
-    participant DrawEvents
+    participant PhaseNav
+    participant DrawControl
+    participant DrawHandlers
     participant Geoman
-    participant DrawComplete
+    participant DrawSave
     participant ModalStore
     participant FeatureModal
-    participant Validation
+    participant UseFeatureValidation
     participant ApiModule
+    participant FeaturesStore
     participant LayerStore
-    participant MapContext
 
     User->>PhaseBar: Click phase button
-    PhaseBar->>AppStore: Get current phase
-    AppStore-->>PhaseBar: phaseIndex
-    PhaseBar->>PhaseBar: Trigger watchDrawType
-    PhaseBar->>Geoman: Enable draw mode (drawType)
+    PhaseBar->>PhaseNav: goToPhase(index)
+    PhaseNav->>DrawControl: buildDrawControl(phase)
+    DrawControl->>Geoman: Enable draw mode (drawType)
     Geoman-->>User: Crosshair cursor + snap guides
 
     User->>Geoman: Draw shape on map
-    Geoman->>Geoman: Capture vertices
+    Geoman->>DrawHandlers: Capture vertices + snapping
 
     alt Right-click (during draw)
-        Geoman->>DrawEvents: Remove last vertex
+        Geoman->>DrawHandlers: Remove last vertex
     else Finish drawing
-        Geoman->>DrawEvents: gm:create event
-        DrawEvents->>DrawEvents: Normalize geometry
-        Note over DrawEvents: Circle->Point+radius<br/>MultiPolygon->Polygon
-        DrawEvents->>DrawComplete: completeDrawingWithGeometry(geometry)
+        Geoman->>DrawSave: gm:create event
+        DrawSave->>DrawSave: normalizeGeometry(geometry, drawType)
+        Note over DrawSave: Circle->Point+radius<br/>MultiPolygon->Polygon
 
-        DrawComplete->>ModalStore: openCreate(phaseIndex, geometry)
+        DrawSave->>ModalStore: openCreate(phaseIndex, geometry)
         ModalStore->>FeatureModal: Show modal with pre-filled fields
         FeatureModal-->>User: Display form
 
         User->>FeatureModal: Fill fields
         User->>FeatureModal: Click Save
 
-        FeatureModal->>FeatureModal: Validate fields
+        FeatureModal->>UseFeatureValidation: validate()
+        UseFeatureValidation->>ApiModule: POST /api/validate/...
+        ApiModule-->>UseFeatureValidation: Valid/Invalid
+
         alt Invalid
-            FeatureModal->>FeatureModal: Show errors
+            UseFeatureValidation-->>FeatureModal: Show errors
         else Valid
-            FeatureModal->>Validation: Validate shape
-            Validation->>ApiModule: POST /api/validate/...
-            ApiModule->>ApiModule: Server validation
-            ApiModule-->>Validation: Valid
+            FeatureModal->>ModalStore: close({success: true, data})
+            ModalStore-->>DrawSave: Modal result
 
-            FeatureModal->>ModalStore: resolve({success, data})
-            ModalStore->>FeatureModal: Hide modal
-            ModalStore-->>DrawComplete: Modal result
-
-            DrawComplete->>ApiModule: POST /api/features FeatureSaveRequest
+            DrawSave->>DrawSave: buildFeatureData(geometry, phase, modalResult)
+            DrawSave->>DrawSave: toApiSaveShape(featureData)
+            DrawSave->>ApiModule: POST /api/features FeatureSaveRequest
             ApiModule->>ApiModule: Apply CSRF, timeout, retry
-            ApiModule-->>DrawComplete: 200 OK {id}
+            ApiModule-->>DrawSave: 200 OK {id}
 
-            DrawComplete->>LayerStore: addFeature(LayerEntry)
-            LayerStore->>MapContext: Update GeoJSON source
-            MapContext-->>User: Feature rendered on map
-            DrawComplete->>AppStore: updateCounts()
+            DrawSave->>FeaturesStore: add(MaplibreFeature)
+            DrawSave->>LayerStore: addFeature(LayerEntry)
+            DrawSave->>LayerStore: updateSource()
+            LayerStore-->>User: Feature rendered on map
         end
     end
 ```
@@ -134,43 +143,37 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor User
-    participant MapContext
     participant ContextMenu
     participant EditMode
     participant Geoman
     participant Snapping
     participant LayerStore
     participant ApiModule
+    participant Undo
 
-    User->>MapContext: Click feature on map
-    MapContext->>MapContext: Select feature
-    MapContext->>MapContext: Highlight (yellow dashed)
-
-    User->>ContextMenu: Right-click feature
-    ContextMenu->>ContextMenu: Show menu [Edit, Delete]
+    User->>ContextMenu: Right-click feature on map
+    ContextMenu->>ContextMenu: showContextMenu(x, y, dbId, phaseKey)
 
     alt Edit selected
-        ContextMenu->>EditMode: enterEditMode(feature)
+        ContextMenu->>EditMode: enableEditMode(dbId)
         EditMode->>LayerStore: getFeature(dbId)
-        LayerStore-->>EditMode: FeatureData
+        LayerStore-->>EditMode: LayerEntry
 
         EditMode->>Geoman: Import feature as editable
         Geoman-->>EditMode: Vertex handles shown
-        EditMode->>Snapping: Enable vertex snapping
+        EditMode->>Snapping: installSnapInterceptors()
 
         User->>Geoman: Drag vertex
         Geoman->>EditMode: gm:editend
         EditMode->>EditMode: Update live geometry
-        EditMode->>Snapping: Apply snap if near target
 
         User->>Geoman: Right-click (commit)
-        Geoman->>EditMode: Commit edit
+        Geoman->>EditMode: commitEditMode()
         EditMode->>LayerStore: updateFeature(dbId, newGeometry)
         EditMode->>ApiModule: PUT /api/features/{id}
         ApiModule-->>EditMode: 200 OK
         EditMode->>Geoman: Disable edit mode
-        EditMode->>MapContext: Update highlight
-        MapContext-->>User: Updated feature visible
+        EditMode-->>User: Updated feature visible
 
     else Delete selected
         ContextMenu->>ContextMenu: Confirm deletion
@@ -179,8 +182,8 @@ sequenceDiagram
         ApiModule-->>ContextMenu: 200 OK
         ContextMenu->>Undo: recordDelete(entry, phaseKey)
         ContextMenu->>LayerStore: removeFeature(dbId)
-        LayerStore->>MapContext: Remove from GeoJSON
-        MapContext-->>User: Feature removed
+        LayerStore->>LayerStore: updateSource()
+        LayerStore-->>User: Feature removed
     end
 ```
 
@@ -192,11 +195,12 @@ sequenceDiagram
     actor User
     participant PhaseBar
     participant PhaseNav
-    participant Validation
+    participant UseFeatureValidation
     participant ApiModule
     participant AppStore
     participant LocalStorage
-    participant MapInit
+    participant DrawControl
+    participant Labels
 
     User->>PhaseBar: Click "next" phase
     PhaseBar->>PhaseNav: navigatePhase(+1)
@@ -204,19 +208,19 @@ sequenceDiagram
     PhaseNav->>PhaseNav: Check prerequisites
 
     alt Advancing from areas (0->1)
-        PhaseNav->>Validation: checkMainUrbanExists()
-        Validation->>ApiModule: GET /api/validate/area/main-urban-exists
-        ApiModule-->>Validation: {hasCentralUrban: bool}
+        PhaseNav->>UseFeatureValidation: isMainUrban
+        UseFeatureValidation->>ApiModule: GET /api/validate/area/main-urban-exists
+        ApiModule-->>UseFeatureValidation: {hasCentralUrban: bool}
         alt No central urban area
-            Validation-->>PhaseNav: false
+            UseFeatureValidation-->>PhaseNav: false
             PhaseNav-->>User: Show warning toast
         end
     else Advancing from districts (1->2)
-        PhaseNav->>Validation: checkDistrictCoverage()
-        Validation->>ApiModule: GET /api/validate/districts/coverage
-        ApiModule-->>Validation: {covered: bool}
+        PhaseNav->>UseFeatureValidation: checkDistrictCoverage()
+        UseFeatureValidation->>ApiModule: GET /api/validate/districts/coverage
+        ApiModule-->>UseFeatureValidation: {covered: bool}
         alt Incomplete coverage
-            Validation-->>PhaseNav: false
+            UseFeatureValidation-->>PhaseNav: false
             PhaseNav-->>User: Show warning toast
         end
     else Advancing from roads (3->4)
@@ -235,9 +239,9 @@ sequenceDiagram
 
     PhaseNav->>AppStore: setPhase(targetIndex)
     AppStore->>LocalStorage: Save phase per commune
-    PhaseNav->>MapInit: Build draw control for new phase
-    PhaseNav->>MapInit: Refresh layer visibility
-    MapInit-->>User: UI updated for new phase
+    PhaseNav->>DrawControl: buildDrawControl(newPhase)
+    PhaseNav->>Labels: refreshLayerVisibility()
+    Labels-->>User: UI updated for new phase
 ```
 
 ## 5. House Number Assignment Flow
@@ -246,40 +250,68 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor User
-    participant User (draws entrance)
     participant Geoman
-    participant DrawComplete
-    participant Validation
+    participant DrawSave
+    participant UseFeatureValidation
     participant ApiModule
     participant HouseNumbering
     participant LayerStore
 
     User->>Geoman: Draw entrance marker near road
-    Geoman->>DrawComplete: gm:create event
+    Geoman->>DrawSave: gm:create event
 
-    DrawComplete->>Validation: getRoadSide(roadId, lat, lng)
-    Validation->>ApiModule: POST /api/road-side {roadId, lat, lng}
-    ApiModule-->>Validation: {side: 'left'/'right', entranceNumber}
-    Validation-->>DrawComplete: {side, number}
+    DrawSave->>UseFeatureValidation: getRoadSide(roadId, lat, lng)
+    UseFeatureValidation->>ApiModule: POST /api/road-side {roadId, lat, lng}
+    ApiModule-->>UseFeatureValidation: {side: 'left'/'right', entranceNumber}
+    UseFeatureValidation-->>DrawSave: {side, number}
 
-    DrawComplete->>DrawComplete: Open modal with auto-filled side + number
-    DrawComplete->>User: Show modal
+    DrawSave->>DrawSave: Open modal with auto-filled side + number
+    DrawSave->>User: Show modal
 
-    User->>DrawComplete: Confirm save
-    DrawComplete->>ApiModule: POST /api/features {type: 'house_entrance', ...}
-    ApiModule-->>DrawComplete: 200 OK {id}
-    DrawComplete->>LayerStore: addFeature(entrance)
-
-    alt Scattered area needs refresh
-        Note over ApiModule,LayerStore: Backend triggers async refresh
-    end
+    User->>DrawSave: Confirm save
+    DrawSave->>ApiModule: POST /api/features {type: 'house_entrance', ...}
+    ApiModule-->>DrawSave: 200 OK {id}
+    DrawSave->>LayerStore: addFeature(entrance)
 
     Note over User: For bulk numbering:
-    User->>HouseNumbering: Trigger bulk assignment
+    User->>HouseNumbering: Trigger setHouseNumbers()
     HouseNumbering->>LayerStore: Get unassigned entrances
-    HouseNumbering->>Validation: Project onto reference road
-    HouseNumbering->>HouseNumbering: Sort by arc-length
-    HouseNumbering->>HouseNumbering: Assign odd/even by side
+    HouseNumbering->>UseFeatureValidation: Project onto reference road
+    HouseNumbering->>HouseNumbering: Sort by arc-length, assign odd/even
     HouseNumbering->>LayerStore: Update each entrance
     HouseNumbering->>ApiModule: PUT /api/features/{id} for each
+```
+
+## 6. Session Refresh Flow (Single-Flight)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Tab1 as Tab 1
+    participant Tab2 as Tab 2
+    participant refreshPromise as refreshSession()
+    participant ApiModule
+    participant Server
+
+    Note over Tab1,Tab2: Both tabs detect 401 simultaneously
+
+    Tab1->>refreshPromise: apiFetch() fails -> POST /api/refresh
+    Tab2->>refreshPromise: apiFetch() fails -> POST /api/refresh
+
+    Note over refreshPromise: Single-flight dedup:<br/>first caller starts request,<br/>second caller waits on same Promise
+
+    refreshPromise->>ApiModule: POST /api/refresh (only once)
+    ApiModule->>Server: Cookie: refresh_token=...
+    Server->>Server: SHA-256 hash + validate
+    Server->>Server: Revoke old token + issue new
+    Server-->>ApiModule: 200 OK + Set-Cookie headers
+    ApiModule-->>refreshPromise: Success
+
+    refreshPromise-->>Tab1: Resolve (new token in cookies)
+    refreshPromise-->>Tab2: Resolve (same result)
+
+    Tab1->>ApiModule: Retry original request with new cookie
+    Tab2->>ApiModule: Retry original request with new cookie
+    ApiModule-->>Tab1: 200 OK (data)
+    ApiModule-->>Tab2: 200 OK (data)
 ```

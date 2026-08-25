@@ -10,7 +10,7 @@ using Xunit;
 
 namespace NarsApi.Tests;
 
-public class DraftFeaturesServiceTests
+public class DraftFeaturesUnitTests
 {
     /// <summary>
     /// A testable subclass that replaces the PostgreSQL-specific conditional
@@ -20,34 +20,32 @@ public class DraftFeaturesServiceTests
     /// Service/DraftFeaturesServiceTests.
     /// </summary>
     private sealed class TestableDraftFeaturesService(
-        AppDbContext db,
+        IDbContextFactory<AppDbContext> dbFactory,
         ISegmentationClient segmentationClient,
-        IDateTimeProvider timeProvider) : DraftFeaturesService(db, segmentationClient, new CommuneScopeService(db), timeProvider)
+        IDateTimeProvider timeProvider) : DraftFeaturesService(dbFactory, segmentationClient, new CommuneScopeService(dbFactory), timeProvider)
     {
-        private readonly AppDbContext _db = db;
-
         protected override async Task<int> TryReviewDraftAsync(
-            Guid draftId, string newStatus, Guid reviewedBy, DateTimeOffset reviewedAt, CancellationToken ct)
+            AppDbContext db, Guid draftId, string newStatus, Guid reviewedBy, DateTimeOffset reviewedAt, CancellationToken ct)
         {
-            var draft = await _db.AiDraftFeatures.FirstOrDefaultAsync(
+            var draft = await db.AiDraftFeatures.FirstOrDefaultAsync(
                 f => f.Id == draftId && f.Status == AiDraftFeature.StatusPending, ct);
             if (draft is null)
             {
                 return 0;
             }
 
-            var entry = _db.Entry(draft);
+            var entry = db.Entry(draft);
             entry.Property(f => f.Status).CurrentValue = newStatus;
             entry.Property(f => f.ReviewedBy).CurrentValue = reviewedBy;
             entry.Property(f => f.ReviewedAt).CurrentValue = reviewedAt;
-            await _db.SaveChangesAsync(ct);
+            await db.SaveChangesAsync(ct);
             return 1;
         }
     }
 
-    private static DraftFeaturesService CreateService(AppDbContext db, ISegmentationClient? segmentationClient = null) =>
+    private static DraftFeaturesService CreateService(AppDbContext db, ISegmentationClient? segmentationClient = null, IDbContextFactory<AppDbContext>? factory = null) =>
         new TestableDraftFeaturesService(
-            db,
+            factory ?? new TestDbContextFactory(db),
             segmentationClient ?? Mock.Of<ISegmentationClient>(),
             Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow));
 
@@ -73,143 +71,175 @@ public class DraftFeaturesServiceTests
     [Fact]
     public async Task ListDrafts_OutOfScopeCommune_ThrowsUnauthorized()
     {
-        using var db = CreateInMemoryDb("DraftsListOutOfScope");
-        await SeedAsync(db);
-        var svc = CreateService(db);
+        var (db, factory) = CreateInMemoryDbPair("DraftsListOutOfScope");
+        await using (db)
+        {
+            await SeedAsync(db);
+            var svc = CreateService(db, factory: factory);
 
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.ListDraftsAsync(UserRoles.FieldWorker, CommuneId100, null, null, CommuneId101, null, AiDraftFeature.StatusPending, default));
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                svc.ListDraftsAsync(UserRoles.FieldWorker, CommuneId100, null, null, CommuneId101, null, AiDraftFeature.StatusPending, default));
+        }
     }
 
     [Fact]
     public async Task ListDrafts_InScopeCommune_ReturnsDrafts()
     {
-        using var db = CreateInMemoryDb("DraftsListInScope");
-        await SeedAsync(db);
-        var draftId = await AddDraftAsync(db, CommuneId100);
-        var svc = CreateService(db);
+        var (db, factory) = CreateInMemoryDbPair("DraftsListInScope");
+        await using (db)
+        {
+            await SeedAsync(db);
+            var draftId = await AddDraftAsync(db, CommuneId100);
+            var svc = CreateService(db, factory: factory);
 
-        var drafts = await svc.ListDraftsAsync(UserRoles.FieldWorker, CommuneId100, null, null, CommuneId100, null, AiDraftFeature.StatusPending, default);
+            var drafts = await svc.ListDraftsAsync(UserRoles.FieldWorker, CommuneId100, null, null, CommuneId100, null, AiDraftFeature.StatusPending, default);
 
-        var draft = Assert.Single(drafts.Items);
-        Assert.Equal(draftId, draft.Id);
+            var draft = Assert.Single(drafts.Items);
+            Assert.Equal(draftId, draft.Id);
+        }
     }
 
     [Fact]
     public async Task SegmentTile_OutOfScopeCommune_ThrowsUnauthorized()
     {
-        using var db = CreateInMemoryDb("DraftsSegmentOutOfScope");
-        await SeedAsync(db);
-        var svc = CreateService(db);
-        using var stream = new MemoryStream([1, 2, 3]);
+        var (db, factory) = CreateInMemoryDbPair("DraftsSegmentOutOfScope");
+        await using (db)
+        {
+            await SeedAsync(db);
+            var svc = CreateService(db, factory: factory);
+            using var stream = new MemoryStream([1, 2, 3]);
 
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.SegmentTileAsync(UserRoles.CommuneUser, CommuneId100, null, null, CommuneId101,
-                stream, "tile.png", "image/png", (1, 1, 2, 2), default));
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                svc.SegmentTileAsync(UserRoles.CommuneUser, CommuneId100, null, null, CommuneId101,
+                    stream, "tile.png", "image/png", (1, 1, 2, 2), default));
+        }
     }
 
     [Fact]
     public async Task SegmentTile_UnknownCommune_ThrowsKeyNotFound()
     {
-        using var db = CreateInMemoryDb("DraftsSegmentUnknownCommune");
-        await SeedAsync(db);
-        var svc = CreateService(db);
-        using var stream = new MemoryStream([1, 2, 3]);
+        var (db, factory) = CreateInMemoryDbPair("DraftsSegmentUnknownCommune");
+        await using (db)
+        {
+            await SeedAsync(db);
+            var svc = CreateService(db, factory: factory);
+            using var stream = new MemoryStream([1, 2, 3]);
 
-        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            svc.SegmentTileAsync(UserRoles.NationalAdmin, null, null, null, NonExistentId,
-                stream, "tile.png", "image/png", (1, 1, 2, 2), default));
+            await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+                svc.SegmentTileAsync(UserRoles.NationalAdmin, null, null, null, NonExistentId,
+                    stream, "tile.png", "image/png", (1, 1, 2, 2), default));
+        }
     }
 
     [Fact]
     public async Task SegmentTile_InScopeCommune_PersistsDrafts()
     {
-        using var db = CreateInMemoryDb("DraftsSegmentInScope");
-        await SeedAsync(db);
-        var segmentation = new Mock<ISegmentationClient>();
-        segmentation.Setup(s => s.SegmentTileAsync(It.IsAny<Stream>(), "tile.png", "image/png", It.IsAny<(double, double, double, double)>(), default))
-            .ReturnsAsync(new SegmentationResult(
-                Buildings: [new SegmentedFeature("""{"type":"Polygon"}""", 0.8, AiDraftFeature.TypeBuilding)]));
-        var svc = CreateService(db, segmentation.Object);
-        using var stream = new MemoryStream([1, 2, 3]);
+        var (db, factory) = CreateInMemoryDbPair("DraftsSegmentInScope");
+        await using (db)
+        {
+            await SeedAsync(db);
+            var segmentation = new Mock<ISegmentationClient>();
+            segmentation.Setup(s => s.SegmentTileAsync(It.IsAny<Stream>(), "tile.png", "image/png", It.IsAny<(double, double, double, double)>(), default))
+                .ReturnsAsync(new SegmentationResult(
+                    Buildings: [new SegmentedFeature("""{"type":"Polygon"}""", 0.8, AiDraftFeature.TypeBuilding)]));
+            var svc = CreateService(db, segmentation.Object, factory);
+            using var stream = new MemoryStream([1, 2, 3]);
 
-        var summary = await svc.SegmentTileAsync(UserRoles.NationalAdmin, null, null, null, CommuneId100,
-            stream, "tile.png", "image/png", (1.0, 1.0, 2.0, 2.0), default);
+            var summary = await svc.SegmentTileAsync(UserRoles.NationalAdmin, null, null, null, CommuneId100,
+                stream, "tile.png", "image/png", (1.0, 1.0, 2.0, 2.0), default);
 
-        Assert.Equal(1, summary.BuildingCount);
-        Assert.Single(summary.DraftIds);
-        var saved = await db.AiDraftFeatures.ToListAsync();
-        Assert.Single(saved);
-        Assert.Equal(CommuneId100, saved[0].CommuneId);
+            Assert.Equal(1, summary.BuildingCount);
+            Assert.Single(summary.DraftIds);
+            var saved = await db.AiDraftFeatures.ToListAsync();
+            Assert.Single(saved);
+            Assert.Equal(CommuneId100, saved[0].CommuneId);
+        }
     }
 
     [Fact]
     public async Task AcceptDraft_OutOfScopeCommune_ReturnsForbidden()
     {
-        using var db = CreateInMemoryDb("DraftsAcceptOutOfScope");
-        await SeedAsync(db);
-        var draftId = await AddDraftAsync(db, CommuneId101);
-        var svc = CreateService(db);
+        var (db, factory) = CreateInMemoryDbPair("DraftsAcceptOutOfScope");
+        await using (db)
+        {
+            await SeedAsync(db);
+            var draftId = await AddDraftAsync(db, CommuneId101);
+            var svc = CreateService(db, factory: factory);
 
-        var result = await svc.AcceptDraftAsync(UserRoles.FieldWorker, CommuneId100, null, null, UserId, draftId, default);
+            var result = await svc.AcceptDraftAsync(UserRoles.FieldWorker, CommuneId100, null, null, UserId, draftId, default);
 
-        Assert.Equal(DraftReviewStatus.Forbidden, result.Status);
+            Assert.Equal(DraftReviewStatus.Forbidden, result.Status);
+        }
     }
 
     [Fact]
     public async Task AcceptDraft_InScopeCommune_Succeeds()
     {
-        using var db = CreateInMemoryDb("DraftsAcceptInScope");
-        await SeedAsync(db);
-        var draftId = await AddDraftAsync(db, CommuneId100);
-        var svc = CreateService(db);
+        var (db, factory) = CreateInMemoryDbPair("DraftsAcceptInScope");
+        await using (db)
+        {
+            await SeedAsync(db);
+            var draftId = await AddDraftAsync(db, CommuneId100);
+            var svc = CreateService(db, factory: factory);
 
-        var result = await svc.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, UserId, draftId, default);
+            var result = await svc.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, UserId, draftId, default);
 
-        Assert.Equal(DraftReviewStatus.Success, result.Status);
-        var draft = await db.AiDraftFeatures.FindAsync(draftId);
-        Assert.Equal(AiDraftFeature.StatusAccepted, draft!.Status);
-        Assert.Equal(UserId, draft.ReviewedBy);
+            Assert.Equal(DraftReviewStatus.Success, result.Status);
+            db.ChangeTracker.Clear();
+            var draft = await db.AiDraftFeatures.FindAsync(draftId);
+            Assert.Equal(AiDraftFeature.StatusAccepted, draft!.Status);
+            Assert.Equal(UserId, draft.ReviewedBy);
+        }
     }
 
     [Fact]
     public async Task RejectDraft_InScopeCommune_Succeeds()
     {
-        using var db = CreateInMemoryDb("DraftsRejectInScope");
-        await SeedAsync(db);
-        var draftId = await AddDraftAsync(db, CommuneId100);
-        var svc = CreateService(db);
+        var (db, factory) = CreateInMemoryDbPair("DraftsRejectInScope");
+        await using (db)
+        {
+            await SeedAsync(db);
+            var draftId = await AddDraftAsync(db, CommuneId100);
+            var svc = CreateService(db, factory: factory);
 
-        var result = await svc.RejectDraftAsync(UserRoles.WilayaAdmin, null, null, WilayaId1, UserId, draftId, default);
+            var result = await svc.RejectDraftAsync(UserRoles.WilayaAdmin, null, null, WilayaId1, UserId, draftId, default);
 
-        Assert.Equal(DraftReviewStatus.Success, result.Status);
-        var draft = await db.AiDraftFeatures.FindAsync(draftId);
-        Assert.Equal(AiDraftFeature.StatusRejected, draft!.Status);
+            Assert.Equal(DraftReviewStatus.Success, result.Status);
+            db.ChangeTracker.Clear();
+            var draft = await db.AiDraftFeatures.FindAsync(draftId);
+            Assert.Equal(AiDraftFeature.StatusRejected, draft!.Status);
+        }
     }
 
     [Fact]
     public async Task AcceptDraft_UnknownDraft_ReturnsNotFound()
     {
-        using var db = CreateInMemoryDb("DraftsAcceptUnknown");
-        await SeedAsync(db);
-        var svc = CreateService(db);
+        var (db, factory) = CreateInMemoryDbPair("DraftsAcceptUnknown");
+        await using (db)
+        {
+            await SeedAsync(db);
+            var svc = CreateService(db, factory: factory);
 
-        var result = await svc.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, UserId, Guid.NewGuid(), default);
+            var result = await svc.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, UserId, Guid.NewGuid(), default);
 
-        Assert.Equal(DraftReviewStatus.NotFound, result.Status);
+            Assert.Equal(DraftReviewStatus.NotFound, result.Status);
+        }
     }
 
     [Fact]
     public async Task AcceptDraft_AlreadyReviewed_ReturnsAlreadyReviewed()
     {
-        using var db = CreateInMemoryDb("DraftsAcceptTwice");
-        await SeedAsync(db);
-        var draftId = await AddDraftAsync(db, CommuneId100);
-        var svc = CreateService(db);
+        var (db, factory) = CreateInMemoryDbPair("DraftsAcceptTwice");
+        await using (db)
+        {
+            await SeedAsync(db);
+            var draftId = await AddDraftAsync(db, CommuneId100);
+            var svc = CreateService(db, factory: factory);
 
-        await svc.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, UserId, draftId, default);
-        var result = await svc.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, UserId, draftId, default);
+            await svc.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, UserId, draftId, default);
+            var result = await svc.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, UserId, draftId, default);
 
-        Assert.Equal(DraftReviewStatus.AlreadyReviewed, result.Status);
+            Assert.Equal(DraftReviewStatus.AlreadyReviewed, result.Status);
+        }
     }
 }

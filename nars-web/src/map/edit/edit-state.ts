@@ -51,7 +51,7 @@ export function disableEditMode(): void {
   if (!geoman) return
   const store = useEditStore()
   unpatchMarkerPointerSnap()
-  geoman.disableGlobalEditMode()
+  void geoman.disableGlobalEditMode()
   store.setIsEditMode(false)
   setEditModeActive(false)
   store.setActiveGeomanFeatureId(null)

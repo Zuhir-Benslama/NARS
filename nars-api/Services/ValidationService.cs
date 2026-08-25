@@ -8,7 +8,7 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public sealed class ValidationService(AppDbContext db) : IValidationService
+public sealed class ValidationService(IDbContextFactory<AppDbContext> dbFactory) : IValidationService
 {
     private readonly string _roadTable = FeatureTypeRegistry.GetDescriptor(FeatureTypes.Road)?.TableName
             ?? throw new InvalidOperationException("FeatureTypeRegistry missing Road descriptor");
@@ -30,6 +30,7 @@ public sealed class ValidationService(AppDbContext db) : IValidationService
     /// </summary>
     private async Task<object?> ExecuteScalarAsync(string sql, List<(string name, object value)> parameters, CancellationToken ct)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
         var conn = db.Database.GetDbConnection();
         await using var handle = await conn.EnsureOpenAsync(ct);
         await using var cmd = conn.CreateCommand();
@@ -167,15 +168,27 @@ public sealed class ValidationService(AppDbContext db) : IValidationService
         return result is bool b && b;
     }
 
-    public async Task<bool> UserHasCentralUrbanAreaAsync(Guid userId, CancellationToken ct = default) =>
-        await db.Set<Area>().AnyAsync(a => a.UserId == userId && a.Layer == FeatureTypes.AreaLayers.CentralUrban, ct);
+    public async Task<bool> UserHasCentralUrbanAreaAsync(Guid userId, CancellationToken ct = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        return await db.Set<Area>().AnyAsync(a => a.UserId == userId && a.Layer == FeatureTypes.AreaLayers.CentralUrban, ct);
+    }
 
-    public Task<int> CountUserRoadsAsync(Guid userId, CancellationToken ct = default) =>
-        db.Set<Road>().CountAsync(r => r.UserId == userId, ct);
+    public async Task<int> CountUserRoadsAsync(Guid userId, CancellationToken ct = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        return await db.Set<Road>().CountAsync(r => r.UserId == userId, ct);
+    }
 
-    public Task<int> CountUserDistrictsAsync(Guid userId, CancellationToken ct = default) =>
-        db.Set<District>().CountAsync(d => d.UserId == userId, ct);
+    public async Task<int> CountUserDistrictsAsync(Guid userId, CancellationToken ct = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        return await db.Set<District>().CountAsync(d => d.UserId == userId, ct);
+    }
 
-    public Task<int> CountUserUrbanAreasAsync(Guid userId, CancellationToken ct = default) =>
-        db.Set<Area>().CountAsync(a => a.UserId == userId && (a.Layer == FeatureTypes.AreaLayers.CentralUrban || a.Layer == FeatureTypes.AreaLayers.SecondaryUrban), ct);
+    public async Task<int> CountUserUrbanAreasAsync(Guid userId, CancellationToken ct = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        return await db.Set<Area>().CountAsync(a => a.UserId == userId && (a.Layer == FeatureTypes.AreaLayers.CentralUrban || a.Layer == FeatureTypes.AreaLayers.SecondaryUrban), ct);
+    }
 }

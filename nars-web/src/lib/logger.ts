@@ -27,7 +27,7 @@ let flushing = false
 function push(entry: LogEntry): void {
   batch.push(entry)
   if (batch.length >= BATCH_LIMIT) {
-    flush()
+    void flush()
   } else if (!timer) {
     timer = setTimeout(flush, FLUSH_INTERVAL_MS)
   }

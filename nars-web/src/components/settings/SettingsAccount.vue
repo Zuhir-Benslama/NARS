@@ -30,14 +30,14 @@
         maxlength="128"
       />
     </div>
-    <button class="modal-btn modal-btn-save" @click="save">
+    <button class="modal-btn modal-btn-save" :disabled="saving" @click="save">
       {{ t("btn_update_creds") }}
     </button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive, watch } from "vue"
+import { reactive, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useAppStore } from "../../stores/appStore"
 import { apiFetch } from "../../api"
@@ -50,6 +50,7 @@ const props = defineProps<{ visible: boolean }>()
 const appStore = useAppStore()
 
 const form = reactive({ username: "", email: "", password: "" })
+const saving = ref(false)
 
 function syncFromStore() {
   if (appStore.user) {
@@ -83,12 +84,14 @@ function validateForm(): string | null {
 }
 
 async function save() {
+  if (saving.value) return
   const validationError = validateForm()
   if (validationError) {
     showToast(validationError, "error")
     return
   }
 
+  saving.value = true
   const body: Record<string, string> = {
     username: form.username.trim(),
     email: form.email.trim(),
@@ -99,10 +102,14 @@ async function save() {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  }).catch(() => {
-    showToast(t("alert_account_updated_failed") || "Update failed", "error")
-    return null
   })
+    .catch(() => {
+      showToast(t("alert_account_updated_failed") || "Update failed", "error")
+      return null
+    })
+    .finally(() => {
+      saving.value = false
+    })
   if (!res) return
   if (res.ok) {
     if (appStore.user) {

@@ -43,12 +43,12 @@ FROM base
 # (see nars-infra/roads/deployment.yaml) — the image USER must match.
 RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin nars-roads
 
-COPY app ./app
+COPY --chown=nars-roads:nars-roads app ./app
 # Dev fallback only: the deployed pod fetches real weights via the
 # fetch-weights initContainer into an emptyDir mounted at /srv/weights
 # (see nars-infra/roads/deployment.yaml). The emptyDir mount shadows this
 # copy at runtime. Kept empty in git; place a checkpoint here for local runs.
-COPY weights ./weights
+COPY --chown=nars-roads:nars-roads weights ./weights
 
 ENV NARS_ROADS_WEIGHTS_PATH=/srv/weights/unet_bldg_base.pth
 ENV NARS_ROADS_TILE_SIZE=1024
@@ -56,7 +56,7 @@ ENV HOME=/home/nars-roads
 
 # Writable scratch space for GDAL/rasterio temp artifacts (the pod mounts an
 # emptyDir at /tmp and the deployment points TMPDIR there).
-RUN mkdir -p /tmp && chown -R nars-roads:nars-roads /srv /tmp
+RUN chown nars-roads:nars-roads /tmp
 
 USER nars-roads
 

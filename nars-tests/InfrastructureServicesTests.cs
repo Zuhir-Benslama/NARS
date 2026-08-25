@@ -187,40 +187,49 @@ public class InfrastructureServicesTests
     {
         private static ErrorLog NewEntry(string message) => new() { Id = Guid.NewGuid(), Message = message };
 
-        private static ErrorLogService CreateService(AppDbContext db, int maxBatchSize) =>
-            new(db, Options.Create(new LoggingOptions { MaxBatchSize = maxBatchSize }));
+        private static ErrorLogService CreateService(IDbContextFactory<AppDbContext> factory, int maxBatchSize) =>
+            new(factory, Options.Create(new LoggingOptions { MaxBatchSize = maxBatchSize }));
 
         [Fact]
         public async Task LogBatchAsync_EmptyList_ReturnsWithoutSaving()
         {
-            await using var db = CreateInMemoryDb("error_log_service");
-            var service = CreateService(db, maxBatchSize: 50);
+            var (db, factory) = CreateInMemoryDbPair("error_log_service");
+            await using (db)
+            {
+                var service = CreateService(factory, maxBatchSize: 50);
 
-            await service.LogBatchAsync([]);
+                await service.LogBatchAsync([]);
 
-            Assert.Equal(0, await db.ErrorLogs.CountAsync());
+                Assert.Equal(0, await db.ErrorLogs.CountAsync());
+            }
         }
 
         [Fact]
         public async Task LogBatchAsync_PersistsAllEntriesWithinLimit()
         {
-            await using var db = CreateInMemoryDb("error_log_service");
-            var service = CreateService(db, maxBatchSize: 100);
+            var (db, factory) = CreateInMemoryDbPair("error_log_service");
+            await using (db)
+            {
+                var service = CreateService(factory, maxBatchSize: 100);
 
-            await service.LogBatchAsync([NewEntry("e1"), NewEntry("e2")]);
+                await service.LogBatchAsync([NewEntry("e1"), NewEntry("e2")]);
 
-            Assert.Equal(2, await db.ErrorLogs.CountAsync());
+                Assert.Equal(2, await db.ErrorLogs.CountAsync());
+            }
         }
 
         [Fact]
         public async Task LogBatchAsync_TruncatesToMaxBatchSize()
         {
-            await using var db = CreateInMemoryDb("error_log_service");
-            var service = CreateService(db, maxBatchSize: 2);
+            var (db, factory) = CreateInMemoryDbPair("error_log_service");
+            await using (db)
+            {
+                var service = CreateService(factory, maxBatchSize: 2);
 
-            await service.LogBatchAsync([NewEntry("e1"), NewEntry("e2"), NewEntry("e3")]);
+                await service.LogBatchAsync([NewEntry("e1"), NewEntry("e2"), NewEntry("e3")]);
 
-            Assert.Equal(2, await db.ErrorLogs.CountAsync());
+                Assert.Equal(2, await db.ErrorLogs.CountAsync());
+            }
         }
     }
 }

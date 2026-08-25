@@ -12,7 +12,11 @@ namespace NarsApi.Controllers;
 [ApiController]
 [Route("/api")]
 [Tags("Users")]
-public class UsersController(IUserProfileService userProfile, IRefreshTokenService refreshTokens, IWebHostEnvironment webHost) : NarsControllerBase(webHost)
+public class UsersController(
+    IUserProfileService userProfile,
+    IRefreshTokenService refreshTokens,
+    ILogger<UsersController> logger,
+    IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     /// <summary>Updates the authenticated user's username, email, and/or password.</summary>
     [HttpPut("user/profile")]
@@ -42,6 +46,7 @@ public class UsersController(IUserProfileService userProfile, IRefreshTokenServi
         {
             // Revoke all refresh tokens so sessions using the old password die immediately.
             await refreshTokens.RevokeAllUserTokensAsync(result.User!.Id, cancellationToken);
+            logger.LogInformation("[Users] User {UserId} changed their password", CurrentUserId);
         }
 
         return Ok(new UpdateCredentialsResponse(

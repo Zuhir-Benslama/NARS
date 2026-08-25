@@ -245,10 +245,10 @@ function onKeydown(e: KeyboardEvent) {
 }
 useWindowKeydown({
   Enter: (e) => {
-    if (modalStore.visible) onKeydown(e)
+    onKeydown(e)
   },
   Escape: (e) => {
-    if (modalStore.visible) onKeydown(e)
+    onKeydown(e)
   },
 })
 </script>

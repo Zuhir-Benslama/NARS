@@ -28,6 +28,7 @@ def main() -> None:
         print(f"No PNG files found in '{input_dir}'")
         sys.exit(0)
 
+    failures = 0
     for png in pngs:
         pdf = png.with_suffix(".pdf")
         print(f"Converting {png.name} -> {pdf.name}...")
@@ -36,8 +37,11 @@ def main() -> None:
                 img.convert("RGB").save(pdf, "PDF", resolution=150)
         except Exception as e:
             print(f"Error: cannot open '{png.name}' — {e}", file=sys.stderr)
-            continue
+            failures += 1
 
+    if failures:
+        print(f"Done with {failures} failure(s).", file=sys.stderr)
+        sys.exit(1)
     print("Done.")
 
 

@@ -5,8 +5,8 @@ namespace NarsApi.DTOs;
 
 public record RoadSideRequest(
     [Required][property: JsonPropertyName("roadId")][property: JsonRequired] Guid RoadId,
-    [Required][property: JsonPropertyName("lat")][property: JsonRequired] double Lat,
-    [Required][property: JsonPropertyName("lng")][property: JsonRequired] double Lng
+    [Required][property: JsonPropertyName("lat")][property: JsonRequired][property: Range(-90.0, 90.0)] double Lat,
+    [Required][property: JsonPropertyName("lng")][property: JsonRequired][property: Range(-180.0, 180.0)] double Lng
 );
 
 public record RoadSideResponse(

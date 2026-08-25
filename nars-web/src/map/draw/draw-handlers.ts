@@ -225,7 +225,7 @@ function onContextMenu(e: MouseEvent): void {
     if (nearest) {
       showContextMenu(e.clientX, e.clientY, nearest.dbId, nearest.phaseKey)
     } else {
-      showMapContextMenu(e.clientX, e.clientY, phase)
+      void showMapContextMenu(e.clientX, e.clientY, phase)
     }
   }
 }
@@ -313,7 +313,7 @@ function onKeyDown(e: KeyboardEvent): void {
 
   if (e.key === "z" && (e.ctrlKey || e.metaKey)) {
     e.preventDefault()
-    undo()
+    void undo()
   }
 }
 

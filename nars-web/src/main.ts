@@ -116,7 +116,7 @@ async function initializeApp(): Promise<void> {
 
 // ─── Startup sequence ────────────────────────────────────────────────────────
 
-;(async () => {
+void (async () => {
   let authResult: { ok: boolean; user?: UserInfo }
   try {
     authResult = await checkAuth()

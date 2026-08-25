@@ -91,7 +91,7 @@ db-admin: .env prerequisites ## Create national admin with one-time generated cr
 	# it to stderr only, so piping this target's stdout (e.g. `| tee x.log`)
 	# never captures the credential — same convention as db-get-password.
 	@echo ""
-	@bash nars-infra/scripts/create_national_admin.sh
+	@bash "$(SCRIPTS_DIR)/create_national_admin.sh"
 	@echo ""
 	@echo "→ Done. Save the credentials above — they will not be shown again."
 
@@ -104,7 +104,7 @@ postgis-password-sync: ## Align postgres user password with POSTGRES_PASSWORD (f
 	@echo "→ Syncing postgres password..."
 	@printf '%s\n' "$$POSTGRES_PASSWORD" | \
 		$(KUBECTL) exec -i -n "$(NAMESPACE)" deployment/postgis -- \
-		bash -c 'read -r _pgpw; printf "ALTER USER postgres WITH PASSWORD '\''%s'\'';\n" "$$_pgpw" | psql -U postgres -d postgres -v ON_ERROR_STOP=1' >/dev/null
+		bash -c 'read -r _pgpw; _escaped="$${_pgpw//\'/\'\'}"; printf "ALTER USER postgres WITH PASSWORD '\''%s'\'';\n" "$$_escaped" | psql -U postgres -d postgres -v ON_ERROR_STOP=1' >/dev/null
 	@echo "✓ Postgres password synced"
 
 .PHONY: postgis-migration-baseline
@@ -112,7 +112,7 @@ postgis-migration-baseline: ## Backfill EF migration history for pre-existing sc
 	@echo "→ Ensuring EF migration history baseline..."
 	@$(KUBECTL) exec -i -n "$(NAMESPACE)" deployment/postgis -- \
 		psql -U postgres -d "$(DB_NAME)" -v ON_ERROR_STOP=1 >/dev/null \
-		< "nars-infra/scripts/postgis-migration-baseline.sql"
+		< "$(SCRIPTS_DIR)/postgis-migration-baseline.sql"
 	@echo "✓ EF migration history baseline ensured"
 
 .PHONY: db-migrate-nars
@@ -122,8 +122,8 @@ db-migrate-nars: ## Apply NARS SQL migrations (nars-infra/migrations/*.sql) to t
 	for f in "$(MIGRATIONS_DIR)"/*.sql; do \
 		[ -f "$$f" ] || continue; \
 		echo "→ Applying $$(basename "$$f")..."; \
-		cat "$$f" | $(KUBECTL) exec -i -n "$(NAMESPACE)" deployment/postgis -- \
-			psql -U postgres -d "$(DB_NAME)" -v ON_ERROR_STOP=1 >/dev/null || exit 1; \
+		$(KUBECTL) exec -i -n "$(NAMESPACE)" deployment/postgis -- \
+			psql -U postgres -d "$(DB_NAME)" -v ON_ERROR_STOP=1 >/dev/null < "$$f" || exit 1; \
 		count=$$((count + 1)); \
 	done; \
 	if [ "$$count" -eq 0 ]; then \

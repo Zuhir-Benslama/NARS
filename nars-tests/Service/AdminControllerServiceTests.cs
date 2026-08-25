@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Moq;
 using NarsApi.Controllers;
 using NarsApi.Data;
@@ -36,7 +37,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     private AdminController CreateOverviewController()
     {
         var featureStats = new FeatureStatsService(_fixture.CreateDbContextFactory());
-        return new AdminController(new AdminOverviewService(_db, featureStats), Mock.Of<IWebHostEnvironment>());
+        return new AdminController(new AdminOverviewService(_db, featureStats), Mock.Of<ILogger<AdminController>>(), Mock.Of<IWebHostEnvironment>());
     }
 
     private static IDateTimeProvider FixedTimeProvider() =>
@@ -48,7 +49,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
     private AdminUserController CreateUserManagementController() => new(
             Mock.Of<Microsoft.Extensions.Logging.ILogger<AdminUserController>>(),
             CreateUserAuthorizationService(),
-            new UserCreationService(_db, CreateUserAuthorizationService(),
+            new UserCreationService(_fixture.CreateDbContextFactory(), CreateUserAuthorizationService(),
                 Mock.Of<Microsoft.Extensions.Logging.ILogger<UserCreationService>>()),
             Mock.Of<IWebHostEnvironment>());
 

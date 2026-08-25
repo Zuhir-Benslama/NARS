@@ -147,7 +147,7 @@ export const PUBLIC_BUILDING_SECTORS: PublicBuildingSector[] = [
     label: "National Education",
     buildings: [
       { key: "college", label: "College" },
-      { key: "library", label: "Libraries" },
+      { key: "school_library", label: "Libraries" },
       { key: "school", label: "School" },
     ],
   },

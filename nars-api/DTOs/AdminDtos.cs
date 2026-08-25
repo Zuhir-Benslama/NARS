@@ -14,7 +14,7 @@ public record CreateAdminRequest(
     [Required(AllowEmptyStrings = false), EmailAddress, MaxLength(255)][property: JsonRequired][property: JsonPropertyName("email")] string Email,
     [Required(AllowEmptyStrings = false), Phone, MaxLength(50)][property: JsonRequired][property: JsonPropertyName("phone")] string Phone,
     [Required(AllowEmptyStrings = false), MaxLength(100)][property: JsonRequired][property: JsonPropertyName("username")] string Username,
-    [Required(AllowEmptyStrings = false), MaxLength(128)][property: JsonRequired][property: JsonPropertyName("password")] string Password,
+    [Required(AllowEmptyStrings = false), MaxLength(72)][property: JsonRequired][property: JsonPropertyName("password")] string Password,
     [Required(AllowEmptyStrings = false), MaxLength(20)][property: JsonRequired][property: JsonPropertyName("role")] string Role,
     /// <summary>Required when role = commune_user.</summary>
     [property: JsonPropertyName("commune_id")] int? CommuneId,
@@ -43,7 +43,7 @@ public record UpdateAdminRequest(
     [property: JsonPropertyName("daira_id")] int? DairaId,
     [property: JsonPropertyName("wilaya_id")] int? WilayaId,
     [property: JsonPropertyName("password")]
-    [MaxLength(128)] string? Password
+    [MaxLength(72)] string? Password
 );
 
 // ─── ADMIN USER SUMMARY ──────────────────────────────────────────────────────

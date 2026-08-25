@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Moq;
 using NarsApi.Controllers;
 using NarsApi.DTOs;
@@ -19,6 +20,7 @@ public class AdminControllerTests
     private static AdminController CreateController(
         IAdminOverviewService? overview = null) =>
         new(overview ?? Mock.Of<IAdminOverviewService>(),
+            Mock.Of<ILogger<AdminController>>(),
             Mock.Of<IWebHostEnvironment>())
         {
             ControllerContext = new ControllerContext

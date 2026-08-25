@@ -184,7 +184,7 @@ describe("ProfileMenu", () => {
   it("closes dropdown on Escape", async () => {
     const wrapper = mount(ProfileMenu, { global: globalOpts })
     await wrapper.find(".profile-button").trigger("click")
-    wrapper.find(".profile-dropdown").trigger("keydown", { key: "Escape" })
+    await wrapper.find(".profile-dropdown").trigger("keydown", { key: "Escape" })
     await nextTick()
     expect(wrapper.find(".profile-dropdown").classes()).not.toContain("show")
   })

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -55,7 +56,7 @@ public static class AuthTestHelper
     }
 
     /// <summary>AdminSignupController over the same real service stack.</summary>
-    public static AdminSignupController CreateAdminSignupController(AppDbContext db)
+    public static AdminSignupController CreateAdminSignupController(AppDbContext db, IDbContextFactory<AppDbContext>? factory = null)
     {
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var jwtService = CreateJwtService(timeProvider);
@@ -67,7 +68,7 @@ public static class AuthTestHelper
             Options.Create(new AdminSignupOptions { SignupToken = TestData.AdminSignupToken }),
             Mock.Of<ILogger<AdminSignupController>>(),
             authorizationService,
-            new UserCreationService(db, authorizationService, Mock.Of<ILogger<UserCreationService>>()),
+            new UserCreationService(factory ?? new TestDbContextFactory(db), authorizationService, Mock.Of<ILogger<UserCreationService>>()),
             Mock.Of<IWebHostEnvironment>());
     }
 

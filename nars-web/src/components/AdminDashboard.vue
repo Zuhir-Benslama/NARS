@@ -10,6 +10,11 @@
 
     <div v-if="error" class="admin-error">{{ error }}</div>
 
+    <div v-if="loading" class="admin-loading">
+      <span class="spinner" />
+      {{ t("admin.loading") }}
+    </div>
+
     <!-- NATIONAL ADMIN: wilaya summary cards -->
     <template v-if="isNational && nationalData">
       <div class="section-title">
@@ -268,6 +273,28 @@ onUnmounted(() => abortCtrl?.abort())
   color: var(--text-muted);
   padding: 2rem;
   font-size: 0.95rem;
+}
+.admin-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3rem;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--glass-border);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .section-title {
   font-size: 1.1rem;

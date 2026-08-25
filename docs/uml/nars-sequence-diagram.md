@@ -1,43 +1,167 @@
 # NARS Backend - Sequence Diagrams
 
-## 1. Authentication Flow
+## 1. Sign-In Flow
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User
     participant AuthController
-    participant AppDbContext
+    participant UserAuthorizationService
+    participant RefreshTokenService
     participant JwtService
-    participant PasswordValidator
+    participant SecurityStampCache
+    participant PostgreSQL
 
     User->>AuthController: POST /api/signin {username, password}
-    AuthController->>AppDbContext: FindUserByUsername(username)
-    AppDbContext-->>AuthController: User entity
+    Note over AuthController: Rate limit: Auth policy (5 req / 30 s)
+
+    AuthController->>AuthController: Normalize username to lowercase
+    AuthController->>UserAuthorizationService: VerifyCredentialsAsync(username, password, maxAttempts, lockoutMinutes)
+
+    UserAuthorizationService->>PostgreSQL: SELECT * FROM users WHERE username = ?
+    PostgreSQL-->>UserAuthorizationService: User or null
 
     alt User not found
-        AuthController-->>User: 401 Unauthorized
-    else Invalid credentials
-        AuthController->>AppDbContext: IncrementFailedLoginAttempts()
-        alt Too many attempts
-            AppDbContext->>AppDbContext: LockAccount(30 min)
+        UserAuthorizationService->>UserAuthorizationService: BCrypt.Verify against DummyHash (constant-time)
+        UserAuthorizationService-->>AuthController: Invalid
+    else Wrong password
+        UserAuthorizationService->>UserAuthorizationService: BCrypt.Verify (constant-time mismatch)
+        UserAuthorizationService->>RefreshTokenService: RecordFailedLoginAsync(userId)
+        RefreshTokenService->>PostgreSQL: UPDATE users SET failed_attempts++, locked_until = ?
+        alt Max attempts reached
+            RefreshTokenService->>SecurityStampCache: EvictStamp(userId)
+            RefreshTokenService->>PostgreSQL: UPDATE users SET security_stamp = new_guid
+            Note over PostgreSQL: All existing JWTs invalidated
         end
-        AuthController-->>User: 401 Unauthorized
+        UserAuthorizationService-->>AuthController: Invalid
     else Account locked
-        AuthController-->>User: 423 Locked
+        UserAuthorizationService-->>AuthController: Locked
     else Valid credentials
-        AuthController->>AppDbContext: ResetFailedLoginAttempts()
-        AuthController->>JwtService: GenerateToken(user)
-        JwtService-->>AuthController: JWT token
-        AuthController->>AuthController: Generate refresh token (SHA-256)
-        AuthController->>AppDbContext: StoreRefreshToken(userId, hash)
+        UserAuthorizationService-->>AuthController: Success(user)
+    end
 
-        Note over AuthController,User: Set HttpOnly, SameSite=Lax cookies
-        AuthController-->>User: 200 OK (JWT + refresh token cookies)
+    alt !success
+        AuthController-->>User: 401 "Invalid username or password"
+        Note over AuthController: Identical message for all failure modes
+    else success
+        AuthController->>RefreshTokenService: ResetFailedAttemptsIfNeededAsync(user)
+        RefreshTokenService->>PostgreSQL: UPDATE users SET failed_attempts = 0, locked_until = NULL
+
+        AuthController->>JwtService: CreateToken(userId, username, name, email, communeId, securityStamp, role, ...)
+        JwtService->>JwtService: Build claims + sign with HS256
+        JwtService-->>AuthController: JWT access token (60 min expiry)
+
+        AuthController->>RefreshTokenService: IssueRefreshTokenAsync(userId)
+        RefreshTokenService->>JwtService: CreateRefreshToken()
+        JwtService->>JwtService: 64 random bytes (CSPRNG) + SHA-256 hash
+        JwtService-->>RefreshTokenService: (rawToken, hash)
+        RefreshTokenService->>PostgreSQL: INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
+        RefreshTokenService-->>AuthController: rawToken
+
+        AuthController->>AuthController: Set-Cookie: access_token (HttpOnly, Secure, SameSite=Lax)
+        AuthController->>AuthController: Set-Cookie: refresh_token (HttpOnly, Secure, SameSite=Lax)
+
+        opt User has CommuneId
+            AuthController->>PostgreSQL: SELECT commune/daira/wilaya names
+        end
+
+        AuthController-->>User: 200 OK {success, user: {id, username, name, email, role, commune}}
     end
 ```
 
-## 2. Feature Creation Flow
+## 2. Refresh Token Rotation Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client
+    participant AuthController
+    participant RefreshTokenService
+    participant JwtService
+    participant PostgreSQL
+
+    Client->>AuthController: POST /api/refresh (Cookie: refresh_token=...)
+    Note over AuthController: Rate limit: Auth policy
+
+    AuthController->>AuthController: Read raw token from cookie
+    AuthController->>RefreshTokenService: RotateRefreshTokenAsync(rawToken)
+
+    RefreshTokenService->>RefreshTokenService: SHA-256 hash the raw token
+
+    RefreshTokenService->>PostgreSQL: BEGIN READ COMMITTED
+    RefreshTokenService->>PostgreSQL: SELECT * FROM refresh_tokens WHERE token_hash = ? AND expires_at > now() FOR UPDATE SKIP LOCKED
+
+    alt Token not found
+        RefreshTokenService-->>AuthController: Invalid or expired
+        AuthController-->>Client: 401 Unauthorized
+    else Token found but already revoked (REPLAY ATTACK)
+        RefreshTokenService->>PostgreSQL: Revoke ALL user tokens
+        RefreshTokenService-->>AuthController: Replay detected
+        AuthController-->>Client: 401 Unauthorized
+    else Token found, not revoked
+        RefreshTokenService->>PostgreSQL: Load user, check lockout
+        alt User is locked
+            RefreshTokenService->>PostgreSQL: Revoke this token
+            RefreshTokenService-->>AuthController: Account locked
+            AuthController-->>Client: 401 Unauthorized
+        else User OK
+            RefreshTokenService->>PostgreSQL: UPDATE refresh_tokens SET revoked = true WHERE token_hash = ?
+            RefreshTokenService->>JwtService: CreateRefreshToken()
+            JwtService-->>RefreshTokenService: (newRaw, newHash)
+            RefreshTokenService->>PostgreSQL: INSERT INTO refresh_tokens (newHash, expires_at)
+            RefreshTokenService->>PostgreSQL: COMMIT
+            RefreshTokenService->>JwtService: CreateToken(userId, username, ...)
+            JwtService-->>RefreshTokenService: newAccessToken
+            RefreshTokenService-->>AuthController: (newRaw, newAccessToken, expiry)
+        end
+    end
+
+    AuthController->>AuthController: Set-Cookie: access_token (new JWT)
+    AuthController->>AuthController: Set-Cookie: refresh_token (new raw token)
+    AuthController-->>Client: 200 OK {success: true, token_type: "bearer"}
+```
+
+## 3. Security Stamp Validation (Every Authenticated Request)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Middleware
+    participant JwtService
+    participant SecurityStampCache
+    participant PostgreSQL
+    participant Controller
+
+    Middleware->>JwtService: ValidateToken(accessToken)
+    JwtService-->>Middleware: ClaimsPrincipal or null
+
+    alt Token invalid or expired
+        Middleware-->>Controller: 401 Unauthorized
+    else Token valid
+        Middleware->>Middleware: Extract user_id + security_stamp claims
+        alt Claims missing
+            Middleware-->>Controller: 401 "Missing identity claims"
+        else Claims present
+            Middleware->>SecurityStampCache: GetStampAsync(userId)
+            alt Cache hit
+                SecurityStampCache-->>Middleware: currentStamp
+            else Cache miss
+                SecurityStampCache->>PostgreSQL: SELECT security_stamp FROM users WHERE id = ?
+                PostgreSQL-->>SecurityStampCache: stamp
+                SecurityStampCache-->>Middleware: currentStamp (cached 30s)
+            end
+
+            alt Stamp mismatch (session invalidated)
+                Middleware-->>Controller: 401 "Session invalidated (security stamp rotated)"
+            else Stamp matches
+                Middleware->>Controller: Continue to action
+            end
+        end
+    end
+```
+
+## 4. Feature Creation Flow
 
 ```mermaid
 sequenceDiagram
@@ -78,7 +202,7 @@ sequenceDiagram
     end
 ```
 
-## 3. Feature Load Flow (Cross-Table Query)
+## 5. Feature Load Flow (Cross-Table Query)
 
 ```mermaid
 sequenceDiagram
@@ -111,45 +235,47 @@ sequenceDiagram
     FeaturesController-->>User: 200 OK {features: [...]}
 ```
 
-## 4. Admin User Creation Flow
+## 6. Admin User Creation Flow
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Admin
-    participant AdminSignupController
-    participant AppDbContext
+    participant AdminUserController
+    participant IUserCreationService
+    participant IUserAuthorizationService
     participant PasswordValidator
-    participant UserRoles
+    participant PostgreSQL
 
-    Admin->>AdminSignupController: POST /api/admin/authorized-signup
-    Note over AdminSignupController: Requires JWT authentication
+    Admin->>AdminUserController: POST /api/admin/users CreateAdminRequest
+    Note over AdminUserController: Requires JWT + UserManagementRoles
 
-    AdminSignupController->>AdminSignupController: Get current user role/scope
-    Admin->>AdminSignupController: CreateAdminRequest {role, name, email, ...}
-
-    AdminSignupController->>AdminSignupController: Validate hierarchy
-    Note over AdminSignupController: national_admin -> wilaya_admin<br/>wilaya_admin -> daira_admin<br/>daira_admin -> commune_user
+    AdminUserController->>IUserAuthorizationService: CreateManagedUserAsync(request, creatorId)
+    IUserAuthorizationService->>IUserAuthorizationService: Validate hierarchy
+    Note over IUserAuthorizationService: national_admin -> wilaya_admin<br/>wilaya_admin -> daira_admin<br/>daira_admin -> commune_user
 
     alt Invalid hierarchy
-        AdminSignupController-->>Admin: 403 Forbidden
+        IUserAuthorizationService-->>AdminUserController: 403 Forbidden
     else Email already exists
-        AdminSignupController-->>Admin: 409 Conflict
+        IUserAuthorizationService-->>AdminUserController: 409 Conflict
     else Scope mismatch
-        AdminSignupController-->>Admin: 403 Forbidden
+        IUserAuthorizationService-->>AdminUserController: 403 Forbidden
     else Valid
-        AdminSignupController->>PasswordValidator: Validate(password)
+        IUserAuthorizationService->>IUserCreationService: CreateUserAsync(request, creatorId)
+        IUserCreationService->>PasswordValidator: Validate(password)
         alt Weak password
-            AdminSignupController-->>Admin: 400 Bad Request
+            IUserCreationService-->>IUserAuthorizationService: 400 Bad Request
         else Strong password
-            AdminSignupController->>AppDbContext: Create user with BCrypt hash
-            AdminSignupController->>AppDbContext: SaveChangesAsync()
-            AdminSignupController-->>Admin: 200 OK {user}
+            IUserCreationService->>PostgreSQL: Hash password with BCrypt
+            IUserCreationService->>PostgreSQL: INSERT INTO users
+            IUserCreationService-->>IUserAuthorizationService: User
         end
+        IUserAuthorizationService-->>AdminUserController: UserInfo
+        AdminUserController-->>Admin: 200 OK {user}
     end
 ```
 
-## 5. Road-Side Determination Flow
+## 7. Road-Side Determination Flow
 
 ```mermaid
 sequenceDiagram
@@ -158,7 +284,7 @@ sequenceDiagram
     participant SpatialController
     participant FeatureQueryHelper
     participant PostgreSQL
-    participant Turf.js equivalent
+    participant GeometryHelper
 
     User->>SpatialController: POST /api/road-side RoadSideRequest
     Note over SpatialController: {roadId, lat, lng}
@@ -167,14 +293,17 @@ sequenceDiagram
     FeatureQueryHelper->>PostgreSQL: SELECT geometry FROM roads WHERE id = ?
     PostgreSQL-->>FeatureQueryHelper: LineString geometry
 
-    SpatialController->>SpatialController: Project point onto line
-    SpatialController->>SpatialController: Compute cross product
-    Note over SpatialController: Cross product determines<br/>left or right side of road
+    SpatialController->>GeometryHelper: FindNearestSegmentIndex(lat, lng, coords)
+    GeometryHelper-->>SpatialController: nearest index
 
-    SpatialController->>FeatureQueryHelper: Get existing entrances on road side
-    FeatureQueryHelper->>PostgreSQL: SELECT COUNT FROM house_entrances<br/>WHERE road_id = ? AND side = ?
-    PostgreSQL-->>FeatureQueryHelper: Count
+    SpatialController->>GeometryHelper: DetermineSide(lat, lng, segStart, segEnd)
+    Note over GeometryHelper: Cross product determines<br/>left or right side of road
+    GeometryHelper-->>SpatialController: side (left/right)
 
-    SpatialController->>SpatialController: Compute next entrance number
+    SpatialController->>GeometryHelper: SuggestEntranceNumber(roadId, side)
+    GeometryHelper->>PostgreSQL: SELECT COUNT FROM house_entrances WHERE road_id = ? AND side = ?
+    PostgreSQL-->>GeometryHelper: existing count
+    GeometryHelper-->>SpatialController: next number
+
     SpatialController-->>User: 200 OK {side, entranceNumber}
 ```

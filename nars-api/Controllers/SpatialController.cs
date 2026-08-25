@@ -36,6 +36,12 @@ public class SpatialController(
             return Problem(detail: "Request body is required.", statusCode: 400);
         }
 
+        if (double.IsNaN(body.Lat) || double.IsInfinity(body.Lat) ||
+            double.IsNaN(body.Lng) || double.IsInfinity(body.Lng))
+        {
+            return Problem(detail: "Invalid coordinate values.", statusCode: 400);
+        }
+
         var road = await roadQuery.GetUserRoadByIdAsync(body.RoadId, RequiredCurrentUserId, cancellationToken);
 
         if (road is null)
@@ -60,12 +66,6 @@ public class SpatialController(
         {
             logger.LogDebug(ex, "Rejected invalid road coordinates: {Reason}", ex.Message);
             return Problem(detail: "Road coordinates are invalid.", statusCode: 400);
-        }
-
-        if (double.IsNaN(body.Lat) || double.IsInfinity(body.Lat) ||
-            double.IsNaN(body.Lng) || double.IsInfinity(body.Lng))
-        {
-            return Problem(detail: "Invalid coordinate values.", statusCode: 400);
         }
 
         var nearestIdx = GeometryHelper.FindNearestSegmentIndex(body.Lat, body.Lng, roadCoords);

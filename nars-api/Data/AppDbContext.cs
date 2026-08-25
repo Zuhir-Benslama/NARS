@@ -117,9 +117,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         // ── inspections: index on feature_id for history lookups ──────────────
         modelBuilder.Entity<Inspection>()
-            .HasIndex(i => i.FeatureId)
-            .HasDatabaseName("ix_inspections_feature_id");
-        modelBuilder.Entity<Inspection>()
             .HasIndex(i => i.UserId)
             .HasDatabaseName("ix_inspections_user_id");
         // Composite index: FeatureId ASC (false = not descending), CreatedAt DESC (true = descending).
@@ -166,6 +163,29 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithMany()
             .HasForeignKey(u => u.WilayaId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // ── Geographic hierarchy FK constraints ───────────────────────────────
+        // Daira → Wilaya: Restrict prevents cascade-deleting all dairas when a
+        // wilaya is removed (which would chain to communes and then users).
+        modelBuilder.Entity<Daira>()
+            .HasOne<Wilaya>()
+            .WithMany()
+            .HasForeignKey(d => d.WilayaId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Daira>()
+            .HasIndex(d => d.WilayaId)
+            .HasDatabaseName("ix_dairas_wilaya_id");
+
+        // Commune → Daira: Restrict prevents cascade-deleting all communes
+        // (and their users via SetNull) when a daira is removed.
+        modelBuilder.Entity<Commune>()
+            .HasOne<Daira>()
+            .WithMany()
+            .HasForeignKey(c => c.DairaId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Commune>()
+            .HasIndex(c => c.DairaId)
+            .HasDatabaseName("ix_communes_daira_id");
 
         // ── ai_draft_features (created by SQL migration, EF just queries/updates) ─
         modelBuilder.ApplyConfiguration(new AiDraftFeatureConfiguration());

@@ -40,6 +40,8 @@ global:
     fsGroup: 65534
     seccompProfile:
       type: RuntimeDefault
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
 
 prometheus:
   prometheusSpec:
@@ -61,16 +63,18 @@ prometheus:
       fsGroup: 65534
       seccompProfile:
         type: RuntimeDefault
+      allowPrivilegeEscalation: false
 
 alertmanager:
-  # Disabled — no alert routing configured. Re-enable when alerting rules are ready.
+  # Disabled — no external notification channels configured.
+  # Enable when email/Slack/PagerDuty routes are ready.
   enabled: false
 
 defaultRules:
-  create: false
+  create: true
 
 nodeExporter:
-  enabled: false
+  enabled: true
 
 kubeStateMetrics:
-  enabled: false
+  enabled: true

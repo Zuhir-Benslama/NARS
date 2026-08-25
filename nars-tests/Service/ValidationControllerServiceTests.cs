@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Controllers;
@@ -41,7 +42,8 @@ public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : IAs
     {
         var ctrl = new ValidationController(
             Options.Create(new ValidationOptions()),
-            new ValidationService(_db),
+            new ValidationService(_fixture.CreateDbContextFactory()),
+            Mock.Of<ILogger<ValidationController>>(),
             Mock.Of<IWebHostEnvironment>());
         AuthTestHelper.SetUser(ctrl, userId, UserRoles.CommuneUser, communeId: 1);
         return ctrl;
@@ -130,7 +132,7 @@ public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : IAs
         // was `Touches OR (BoundaryIntersects AND EXISTS(urban area))`, so any
         // touching district short-circuited past the urban-area gate.
         var userId = await CreateTestUserAsync();
-        var service = new ValidationService(_db);
+        var service = new ValidationService(_fixture.CreateDbContextFactory());
 
         var existingSquare = new[]
         {
@@ -170,7 +172,7 @@ public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : IAs
     public async Task CheckDistrictAdjacency_TouchingWithinSharedUrbanArea_ReturnsTrue()
     {
         var userId = await CreateTestUserAsync();
-        var service = new ValidationService(_db);
+        var service = new ValidationService(_fixture.CreateDbContextFactory());
 
         var urbanSquare = new[]
         {

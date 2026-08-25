@@ -26,11 +26,10 @@ export function debugError(...args: unknown[]): void {
 }
 
 /**
- * Debug warning logging - only logs in development mode.
- * Use this instead of console.warn for application warnings.
+ * Debug warning logging — always logs (even in production).
+ * Warnings indicate potential issues that should be visible in field
+ * telemetry, not just during local development.
  */
 export function debugWarn(...args: unknown[]): void {
-  if (DEBUG) {
-    console.warn(...args)
-  }
+  console.warn(...args)
 }

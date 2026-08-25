@@ -59,7 +59,7 @@ describe("showToast", () => {
 
 describe("showConfirm", () => {
   it("opens the confirm store with message and okText", () => {
-    showConfirm("Are you sure?")
+    void showConfirm("Are you sure?")
     const store = useConfirmStore()
     expect(store.visible).toBe(true)
     expect(store.message).toBe("Are you sure?")
@@ -67,7 +67,7 @@ describe("showConfirm", () => {
   })
 
   it("uses custom ok button text", () => {
-    showConfirm("Proceed?", "Yes, delete")
+    void showConfirm("Proceed?", "Yes, delete")
     const store = useConfirmStore()
     expect(store.okText).toBe("Yes, delete")
   })

@@ -42,7 +42,7 @@ spec:
   # kube-controller-manager's local timezone. Requires K8s >= 1.27.
   timeZone: "Africa/Algiers"
   concurrencyPolicy: Forbid
-  successfulJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 1
   startingDeadlineSeconds: 3600
   jobTemplate:

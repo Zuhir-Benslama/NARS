@@ -6,7 +6,7 @@
 --   psql -U postgres -f create_nars_db.sql
 --
 -- Or with password prompt:
---   PGPASSWORD=yourpassword psql -U postgres -f create_nars_db.sql
+--   PGPASSWORD=... psql -U postgres -f create_nars_db.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -129,6 +129,9 @@ CREATE TABLE IF NOT EXISTS public.users
     CONSTRAINT users_pkey        PRIMARY KEY (id),
     CONSTRAINT users_email_key   UNIQUE (email),
     CONSTRAINT users_username_key UNIQUE (username),
+    CONSTRAINT chk_user_role CHECK (
+        role IN ('commune_user', 'field_worker', 'daira_admin', 'wilaya_admin', 'national_admin')
+    ),
     -- Enforce that each role carries the correct geographic anchor.
     CONSTRAINT chk_user_geographic_role CHECK (
         CASE role
@@ -172,7 +175,7 @@ CREATE TABLE IF NOT EXISTS public.refresh_tokens
 (
     id          uuid                     NOT NULL,
     user_id     uuid                     NOT NULL,
-    token_hash  text                     NOT NULL,  -- SHA-256 hex (64 chars); use TEXT to avoid overflow if algorithm changes
+    token_hash  character varying(64)     NOT NULL,
     expires_at  timestamp with time zone NOT NULL,
     created_at  timestamp with time zone NOT NULL DEFAULT now(),
     revoked     boolean                  NOT NULL DEFAULT false,
@@ -182,10 +185,12 @@ CREATE TABLE IF NOT EXISTS public.refresh_tokens
         ON UPDATE NO ACTION ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS ix_refresh_tokens_token_hash
+CREATE UNIQUE INDEX IF NOT EXISTS ix_refresh_tokens_token_hash
     ON public.refresh_tokens (token_hash);
 CREATE INDEX IF NOT EXISTS ix_refresh_tokens_user_id
     ON public.refresh_tokens (user_id);
+CREATE INDEX IF NOT EXISTS ix_refresh_tokens_expires_at
+    ON public.refresh_tokens (expires_at);
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 6.  Feature registry (cross-type UUID index)
@@ -206,7 +211,7 @@ CREATE TABLE IF NOT EXISTS public.feature_registry
 CREATE TABLE IF NOT EXISTS public.areas
 (
     id         uuid                     NOT NULL,
-    user_id    uuid,
+    user_id    uuid                     NOT NULL,
     layer      character varying(50)    NOT NULL,
     label      character varying(500)   NOT NULL,
     data       jsonb                    NOT NULL,
@@ -225,7 +230,7 @@ CREATE INDEX IF NOT EXISTS ix_areas_user_layer ON public.areas (user_id, layer);
 CREATE TABLE IF NOT EXISTS public.districts
 (
     id         uuid                     NOT NULL,
-    user_id    uuid,
+    user_id    uuid                     NOT NULL,
     layer      character varying(50)    NOT NULL,
     label      character varying(500)   NOT NULL,
     data       jsonb                    NOT NULL,
@@ -243,7 +248,7 @@ CREATE INDEX IF NOT EXISTS ix_districts_user_id ON public.districts (user_id);
 CREATE TABLE IF NOT EXISTS public.city_centers
 (
     id         uuid                     NOT NULL,
-    user_id    uuid,
+    user_id    uuid                     NOT NULL,
     layer      character varying(50)    NOT NULL DEFAULT 'city_center',
     label      character varying(500)   NOT NULL DEFAULT 'City Center',
     data       jsonb                    NOT NULL,
@@ -261,7 +266,7 @@ CREATE INDEX IF NOT EXISTS ix_city_centers_user_id ON public.city_centers (user_
 CREATE TABLE IF NOT EXISTS public.roads
 (
     id         uuid                     NOT NULL,
-    user_id    uuid,
+    user_id    uuid                     NOT NULL,
     layer      character varying(50)    NOT NULL,
     label      character varying(500)   NOT NULL,
     data       jsonb                    NOT NULL,
@@ -280,7 +285,7 @@ CREATE INDEX IF NOT EXISTS ix_roads_user_layer ON public.roads (user_id, layer);
 CREATE TABLE IF NOT EXISTS public.house_entrances
 (
     id         uuid                     NOT NULL,
-    user_id    uuid,
+    user_id    uuid                     NOT NULL,
     road_id    uuid,
     layer      character varying(50)    NOT NULL,
     label      character varying(500)   NOT NULL,
@@ -293,7 +298,7 @@ CREATE TABLE IF NOT EXISTS public.house_entrances
         ON UPDATE NO ACTION ON DELETE CASCADE,
     CONSTRAINT house_entrances_road_fk FOREIGN KEY (road_id)
         REFERENCES public.roads (id)
-        ON UPDATE NO ACTION ON DELETE CASCADE
+        ON UPDATE NO ACTION ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS ix_house_entrances_user_id    ON public.house_entrances (user_id);
@@ -304,7 +309,7 @@ CREATE INDEX IF NOT EXISTS ix_house_entrances_user_layer ON public.house_entranc
 CREATE TABLE IF NOT EXISTS public.public_buildings
 (
     id         uuid                     NOT NULL,
-    user_id    uuid,
+    user_id    uuid                     NOT NULL,
     layer      character varying(50)    NOT NULL DEFAULT 'public_building',
     label      character varying(500)   NOT NULL,
     data       jsonb                    NOT NULL,
@@ -322,7 +327,7 @@ CREATE INDEX IF NOT EXISTS ix_public_buildings_user_id ON public.public_building
 CREATE TABLE IF NOT EXISTS public.public_spaces
 (
     id         uuid                     NOT NULL,
-    user_id    uuid,
+    user_id    uuid                     NOT NULL,
     layer      character varying(50)    NOT NULL,
     label      character varying(500)   NOT NULL,
     data       jsonb                    NOT NULL,
@@ -340,7 +345,7 @@ CREATE INDEX IF NOT EXISTS ix_public_spaces_user_id ON public.public_spaces (use
 CREATE TABLE IF NOT EXISTS public.naming_panels
 (
     id         uuid                     NOT NULL,
-    user_id    uuid,
+    user_id    uuid                     NOT NULL,
     layer      character varying(50)    NOT NULL DEFAULT 'naming_panel',
     label      character varying(500)   NOT NULL,
     data       jsonb                    NOT NULL,
@@ -376,8 +381,6 @@ CREATE TABLE IF NOT EXISTS public.inspections
         ON UPDATE NO ACTION ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS ix_inspections_feature_id
-    ON public.inspections (feature_id);
 CREATE INDEX IF NOT EXISTS ix_inspections_user_id
     ON public.inspections (user_id);
 -- Optimizes "latest inspections per feature" queries (feature_id ASC, created_at DESC)
@@ -394,8 +397,8 @@ CREATE TABLE IF NOT EXISTS public.error_logs
     user_id     uuid,
     level       character varying(20)    NOT NULL,
     code        character varying(50)    NOT NULL,
-    message     text                     NOT NULL,
-    context     text,
+    message     character varying(4096) NOT NULL,
+    context     character varying(4096),
     url         character varying(2048),
     method      character varying(10),
     ip_address  character varying(45),

@@ -3,4 +3,9 @@
 # This avoids installing gnupg at runtime on every CronJob execution.
 FROM postgres:17-alpine@sha256:af194ccf3e2d7fe367012c7b88ce8b816c5c889b18a5b316799a1f0d7eac746a
 
+LABEL org.opencontainers.image.title="NARS Backup" \
+      org.opencontainers.image.description="GPG-encrypted pg_dump backups" \
+      org.opencontainers.image.source="https://github.com/zuhirbenslama/nars"
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN apk add --no-cache gnupg=2.4.9-r1

@@ -105,7 +105,7 @@ describe("undo", () => {
       mockFetch.mockImplementationOnce(
         () =>
           new Promise((resolve) => {
-            firstGate.then(() =>
+            void firstGate.then(() =>
               resolve({ ok: true, json: vi.fn().mockResolvedValue({ id: "new-1" }) }),
             )
           }),

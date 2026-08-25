@@ -47,6 +47,22 @@ spec:
       app.kubernetes.io/name: postgis
       app.kubernetes.io/component: database
 ---
+# nars-roads runs 1 replica. Same protection as PostGIS — scale up before draining.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nars-roads
+  namespace: nars
+  labels:
+    app.kubernetes.io/name: nars-roads
+    app.kubernetes.io/component: segmentation
+spec:
+  maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nars-roads
+      app.kubernetes.io/component: segmentation
+---
 # otel-collector PDB lives in the observability namespace, managed separately.
 # Do not include it here — applying via nars kustomization would create an
 # orphan resource or fail if the namespace does not exist.

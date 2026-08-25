@@ -4,6 +4,7 @@
     <div class="su-section">
       <h3 class="su-section-title">{{ t("su_user_list_title") }} ({{ users.length }})</h3>
       <div v-if="fetchUsersError" class="su-feedback su-error">{{ fetchUsersError }}</div>
+      <div v-else-if="loadingUsers" class="su-empty">{{ t("admin.loading") }}</div>
       <div v-else-if="users.length === 0" class="su-empty">{{ t("admin.no_data") }}</div>
       <div v-for="u in users" :key="u.user_id" class="su-user-row">
         <div class="su-user-info">

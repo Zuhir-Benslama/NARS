@@ -9,7 +9,7 @@ using NarsApi.Models;
 namespace NarsApi.Services;
 
 public sealed class FieldService(
-    AppDbContext db,
+    IDbContextFactory<AppDbContext> dbFactory,
     IFeatureService featureService,
     ILogger<FieldService> logger) : IFieldService
 {
@@ -24,6 +24,7 @@ public sealed class FieldService(
         FeatureTypeDescriptor descriptor, int communeId, int skip, int take, CancellationToken ct = default)
     {
         var tableName = FeatureTypeRegistry.ValidateTableName(descriptor.TableName);
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
         var conn = db.Database.GetDbConnection();
         await using var handle = await conn.EnsureOpenAsync(ct);
 
@@ -92,6 +93,7 @@ public sealed class FieldService(
         }
 
         var tableName = FeatureTypeRegistry.ValidateTableName(descriptor.TableName);
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
         var conn = db.Database.GetDbConnection();
         await using var handle = await conn.EnsureOpenAsync(ct);
 
@@ -117,7 +119,10 @@ public sealed class FieldService(
         return (ownerId, communeId);
     }
 
-    public async Task<List<FieldInspectionResponse>> GetInspectionsAsync(Guid featureId, int skip, int take, CancellationToken ct = default) => await db.Inspections
+    public async Task<List<FieldInspectionResponse>> GetInspectionsAsync(Guid featureId, int skip, int take, CancellationToken ct = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        return await db.Inspections
             .Where(i => i.FeatureId == featureId)
             .OrderByDescending(i => i.CreatedAt)
             .ThenByDescending(i => i.Id)
@@ -132,9 +137,11 @@ public sealed class FieldService(
                 CreatedAt: i.CreatedAt
             ))
             .ToListAsync(ct);
+    }
 
     public async Task<(Guid OwnerUserId, int? CommuneId)?> GetRoadOwnerAsync(Guid roadId, CancellationToken ct = default)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
         var result = await (
             from r in db.Roads
             join u in db.Users on r.UserId equals u.Id
@@ -149,6 +156,7 @@ public sealed class FieldService(
     {
         var newId = Guid.CreateVersion7();
 
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
 
         db.HouseEntrances.Add(new HouseEntrance
@@ -185,6 +193,8 @@ public sealed class FieldService(
         {
             throw new ArgumentException($"Invalid inspection status. Must be one of: {string.Join(", ", ValidInspectionStatuses)}", nameof(status));
         }
+
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
 
         var inspection = new Inspection
         {

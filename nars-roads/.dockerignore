@@ -1,6 +1,20 @@
 __pycache__/
 *.pyc
+*.pyo
 .venv/
 .git/
+.gitignore
 *.ipynb
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+# tests/ is NOT excluded — needed by the test stage (--target test)
+# weights/ excluded — fetched by initContainer at runtime, not needed in build context
+weights/
+docs/
+*.md
+LICENSE
+.env
+.env.*
+Dockerfile
+Makefile

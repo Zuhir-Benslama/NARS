@@ -39,7 +39,7 @@ public class SpatialControllerServiceTests(NarsDatabaseFixture fixture) : IAsync
         var ctrl = new SpatialController(
             new RoadQueryService(_db),
             scatteredService ?? Mock.Of<IScatteredAreaService>(),
-            new EntranceQueryService(_db),
+            new EntranceQueryService(_fixture.CreateDbContextFactory()),
             Mock.Of<IWebHostEnvironment>(),
             Mock.Of<ILogger<SpatialController>>());
         AuthTestHelper.SetUser(ctrl, _userId, UserRoles.FieldWorker, communeId: 1);
@@ -154,10 +154,12 @@ public class SpatialControllerServiceTests(NarsDatabaseFixture fixture) : IAsync
     [Fact]
     public async Task RefreshScattered_NoCommuneId_Returns400()
     {
+        // Intentionally bypasses CreateController() — this test requires
+        // NationalAdmin with no communeId, whereas the helper sets FieldWorker+communeId:1.
         var controller = new SpatialController(
             new RoadQueryService(_db),
             Mock.Of<IScatteredAreaService>(),
-            new EntranceQueryService(_db),
+            new EntranceQueryService(_fixture.CreateDbContextFactory()),
             Mock.Of<IWebHostEnvironment>(),
             Mock.Of<ILogger<SpatialController>>());
         AuthTestHelper.SetUser(controller, _userId, UserRoles.NationalAdmin);

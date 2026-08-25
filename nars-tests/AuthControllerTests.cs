@@ -23,8 +23,8 @@ public class AuthControllerTests
     private static AuthController CreateController(AppDbContext db) =>
         AttachContext(AuthTestHelper.CreateAuthController(db));
 
-    private static AdminSignupController CreateSignupController(AppDbContext db) =>
-        AttachContext(AuthTestHelper.CreateAdminSignupController(db));
+    private static AdminSignupController CreateSignupController(AppDbContext db, IDbContextFactory<AppDbContext>? factory = null) =>
+        AttachContext(AuthTestHelper.CreateAdminSignupController(db, factory));
 
     private static T AttachContext<T>(T controller) where T : ControllerBase
     {
@@ -50,127 +50,145 @@ public class AuthControllerTests
     [Fact]
     public async Task AuthorizedAdminSignup_ValidRequest_Returns201()
     {
-        using var db = CreateDb();
-        await SeedLocationDataAsync(db);
-        await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
+        var (db, factory) = CreateInMemoryDbPair("AuthTest");
+        await using (db)
+        {
+            await SeedLocationDataAsync(db);
+            await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
 
-        var controller = CreateSignupController(db);
+            var controller = CreateSignupController(db, factory);
 
-        var result = await controller.AuthorizedAdminSignup(
-            ValidAdminSignup(), signupToken: AdminSignupToken);
+            var result = await controller.AuthorizedAdminSignup(
+                ValidAdminSignup(), signupToken: AdminSignupToken);
 
-        var statusCodeResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(201, statusCodeResult.StatusCode);
+            var statusCodeResult = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(201, statusCodeResult.StatusCode);
+        }
     }
 
     [Fact]
     public async Task AuthorizedAdminSignup_WeakPassword_Returns400()
     {
-        using var db = CreateDb();
-        await SeedLocationDataAsync(db);
-        await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
+        var (db, factory) = CreateInMemoryDbPair("AuthTest");
+        await using (db)
+        {
+            await SeedLocationDataAsync(db);
+            await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
 
-        var controller = CreateSignupController(db);
+            var controller = CreateSignupController(db, factory);
 
-        var result = await controller.AuthorizedAdminSignup(
-            ValidAdminSignup(password: "weak"), signupToken: AdminSignupToken);
+            var result = await controller.AuthorizedAdminSignup(
+                ValidAdminSignup(password: "weak"), signupToken: AdminSignupToken);
 
-        var objResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, objResult.StatusCode);
+            var objResult = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(400, objResult.StatusCode);
+        }
     }
 
     [Fact]
     public async Task AuthorizedAdminSignup_DuplicateUsername_Returns409()
     {
-        using var db = CreateDb();
-        await SeedLocationDataAsync(db);
-        await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
-        await db.Users.AddAsync(new User
+        var (db, factory) = CreateInMemoryDbPair("AuthTest");
+        await using (db)
         {
-            Id = Guid.NewGuid(),
-            Name = "Existing",
-            Email = "existing@example.com",
-            Phone = TestData.DefaultPhone,
-            Username = "existinguser",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
-            SecurityStamp = User.GenerateSecurityStamp(),
-            Role = UserRoles.CommuneUser,
-            CommuneId = CommuneId1,
-        });
-        await db.SaveChangesAsync();
+            await SeedLocationDataAsync(db);
+            await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
+            await db.Users.AddAsync(new User
+            {
+                Id = Guid.NewGuid(),
+                Name = "Existing",
+                Email = "existing@example.com",
+                Phone = TestData.DefaultPhone,
+                Username = "existinguser",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
+                SecurityStamp = User.GenerateSecurityStamp(),
+                Role = UserRoles.CommuneUser,
+                CommuneId = CommuneId1,
+            });
+            await db.SaveChangesAsync();
 
-        var controller = CreateSignupController(db);
+            var controller = CreateSignupController(db, factory);
 
-        var result = await controller.AuthorizedAdminSignup(
-            ValidAdminSignup(username: "existinguser", email: "new@example.com"),
-            signupToken: AdminSignupToken);
+            var result = await controller.AuthorizedAdminSignup(
+                ValidAdminSignup(username: "existinguser", email: "new@example.com"),
+                signupToken: AdminSignupToken);
 
-        var conflict = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(409, conflict.StatusCode);
+            var conflict = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(409, conflict.StatusCode);
+        }
     }
 
     [Fact]
     public async Task AuthorizedAdminSignup_DuplicateEmail_Returns409()
     {
-        using var db = CreateDb();
-        await SeedLocationDataAsync(db);
-        await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
-        await db.Users.AddAsync(new User
+        var (db, factory) = CreateInMemoryDbPair("AuthTest");
+        await using (db)
         {
-            Id = Guid.NewGuid(),
-            Name = "Existing",
-            Email = "dupe@example.com",
-            Phone = TestData.DefaultPhone,
-            Username = "existinguser",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
-            SecurityStamp = User.GenerateSecurityStamp(),
-            Role = UserRoles.CommuneUser,
-            CommuneId = CommuneId1,
-        });
-        await db.SaveChangesAsync();
+            await SeedLocationDataAsync(db);
+            await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
+            await db.Users.AddAsync(new User
+            {
+                Id = Guid.NewGuid(),
+                Name = "Existing",
+                Email = "dupe@example.com",
+                Phone = TestData.DefaultPhone,
+                Username = "existinguser",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
+                SecurityStamp = User.GenerateSecurityStamp(),
+                Role = UserRoles.CommuneUser,
+                CommuneId = CommuneId1,
+            });
+            await db.SaveChangesAsync();
 
-        var controller = CreateSignupController(db);
+            var controller = CreateSignupController(db, factory);
 
-        var result = await controller.AuthorizedAdminSignup(
-            ValidAdminSignup(username: "newuser", email: "dupe@example.com"),
-            signupToken: AdminSignupToken);
+            var result = await controller.AuthorizedAdminSignup(
+                ValidAdminSignup(username: "newuser", email: "dupe@example.com"),
+                signupToken: AdminSignupToken);
 
-        var conflict = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(409, conflict.StatusCode);
+            var conflict = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(409, conflict.StatusCode);
+        }
     }
 
     [Fact]
     public async Task AuthorizedAdminSignup_CommuneOutsideAdminScope_Returns403()
     {
-        using var db = CreateDb();
-        await SeedLocationDataAsync(db);
-        await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
+        var (db, factory) = CreateInMemoryDbPair("AuthTest");
+        await using (db)
+        {
+            await SeedLocationDataAsync(db);
+            await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
 
-        var controller = CreateSignupController(db);
+            var controller = CreateSignupController(db, factory);
 
-        var result = await controller.AuthorizedAdminSignup(
-            ValidAdminSignup(communeId: CommuneId2), signupToken: AdminSignupToken);
+            var result = await controller.AuthorizedAdminSignup(
+                ValidAdminSignup(communeId: CommuneId2), signupToken: AdminSignupToken);
 
-        Assert.IsType<ForbidResult>(result);
+            Assert.IsType<ForbidResult>(result);
+        }
     }
 
     [Fact]
     public async Task AuthorizedAdminSignup_FieldWorker_ForbiddenForCommuneUserAdmin()
     {
-        using var db = CreateDb();
-        await SeedLocationDataAsync(db);
-        await SeedAdminAsync(db, username: "commune_admin", role: UserRoles.CommuneUser, communeId: CommuneId1);
+        var (db, factory) = CreateInMemoryDbPair("AuthTest");
+        await using (db)
+        {
+            await SeedLocationDataAsync(db);
+            await SeedAdminAsync(db, username: "commune_admin", role: UserRoles.CommuneUser, communeId: CommuneId1);
 
-        var controller = CreateSignupController(db);
+            var controller = CreateSignupController(db, factory);
 
-        var result = await controller.AuthorizedAdminSignup(
-            ValidAdminSignup(
-                username: "fieldworker", role: UserRoles.FieldWorker,
-                communeId: CommuneId2, adminUsername: "commune_admin", name: "Field Worker"),
-            signupToken: AdminSignupToken);
+            var result = await controller.AuthorizedAdminSignup(
+                ValidAdminSignup(
+                    username: "fieldworker", role: UserRoles.FieldWorker,
+                    communeId: CommuneId2, adminUsername: "commune_admin", name: "Field Worker"),
+                signupToken: AdminSignupToken);
 
-        Assert.IsType<ForbidResult>(result);
-        Assert.False(await db.Users.AnyAsync(u => u.Username == "fieldworker"));
+            Assert.IsType<ForbidResult>(result);
+            Assert.False(await db.Users.AnyAsync(u => u.Username == "fieldworker"));
+        }
     }
 
     [Fact]

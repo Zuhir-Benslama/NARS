@@ -12,13 +12,15 @@ results into ai_draft_features and for auth/business rules. This service
 is only reachable from inside the cluster network.
 """
 
+import concurrent.futures
 import logging
 import os
 import secrets
 import threading
 from contextlib import asynccontextmanager
+from typing import Annotated
 
-from fastapi import Depends, FastAPI, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, UploadFile
 
 from app.model import (
     InvalidTileError,
@@ -31,16 +33,34 @@ from app.schemas import FeatureCollection, SegmentResponse
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("nars-roads")
 
+
+def _env_int(key: str, default: int) -> int:
+    """Parse an integer environment variable with a clear startup error."""
+    raw = os.environ.get(key)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        raise RuntimeError(
+            f"Environment variable {key} must be an integer, got: {raw!r}"
+        ) from None
+
+
 INTERNAL_TOKEN = os.environ.get("NARS_ROADS_INTERNAL_TOKEN")
-TILE_SIZE = int(os.environ.get("NARS_ROADS_TILE_SIZE", "1024"))
+TILE_SIZE = _env_int("NARS_ROADS_TILE_SIZE", 1024)
 # Upper bound on a single tile upload. Inference reads the whole tile into
 # memory, so an oversized upload is a pod-level memory-exhaustion risk.
-MAX_TILE_BYTES = int(os.environ.get("NARS_ROADS_MAX_TILE_BYTES", str(50 * 1024 * 1024)))
+MAX_TILE_BYTES = _env_int("NARS_ROADS_MAX_TILE_BYTES", 50 * 1024 * 1024)
 # How many inferences may run concurrently before requests queue in the
 # threadpool. Sized for the pod memory limit; raise/lower per deployment.
 MAX_CONCURRENT_INFERENCES = max(
-    1, int(os.environ.get("NARS_ROADS_MAX_CONCURRENT_INFERENCES", "2"))
+    1, _env_int("NARS_ROADS_MAX_CONCURRENT_INFERENCES", 2)
 )
+# Wall-clock ceiling on a single predict() call.  A pathological tile that
+# hangs the model would otherwise hold a semaphore slot indefinitely; with
+# MAX_CONCURRENT_INFERENCES=2 just two such tiles exhaust all capacity.
+INFERENCE_TIMEOUT = _env_int("NARS_ROADS_INFERENCE_TIMEOUT", 120)
 
 # Model registry: feature type -> how to build its model. Each entry is an
 # independent binary (foreground/background) checkpoint, so one task can be
@@ -68,6 +88,14 @@ _models: dict[str, SegmentationModel] = {}
 # threadpool concurrency on a 4Gi pod is an OOM risk. A small semaphore caps
 # how many inferences run in parallel; the rest queue in the threadpool.
 INFERENCE_SEMAPHORE = threading.BoundedSemaphore(MAX_CONCURRENT_INFERENCES)
+
+# Dedicated executor for wrapping predict() with a wall-clock timeout.
+# max_workers matches the semaphore so at most MAX_CONCURRENT_INFERENCES
+# timeout-watchdog threads exist at any time.
+_TIMEOUT_POOL = concurrent.futures.ThreadPoolExecutor(
+    max_workers=MAX_CONCURRENT_INFERENCES,
+    thread_name_prefix="infer-timeout",
+)
 
 
 @asynccontextmanager
@@ -111,6 +139,7 @@ def verify_internal_token(
     if not INTERNAL_TOKEN or not secrets.compare_digest(
         (x_internal_token or "").encode("utf-8"), INTERNAL_TOKEN.encode("utf-8")
     ):
+        logger.warning("Rejected request with invalid internal token")
         raise HTTPException(status_code=401, detail="Invalid internal token")
 
 
@@ -127,14 +156,6 @@ def ready() -> dict:
     if not _buildings_loaded():
         raise HTTPException(status_code=503, detail="Model weights not loaded")
     return {"status": "ready", "model_loaded": True}
-
-
-def _validate_threshold(threshold: float) -> float:
-    if not 0.0 <= threshold <= 1.0:
-        raise HTTPException(
-            status_code=422, detail="threshold must be between 0.0 and 1.0"
-        )
-    return threshold
 
 
 def _validate_bbox(
@@ -166,7 +187,6 @@ def _segment_task(
 ) -> FeatureCollection:
     """Run inference for one registered task and convert the foreground mask
     to vector features. Shared by every /segment/<task> endpoint."""
-    _validate_threshold(threshold)
     _validate_bbox(min_lon, min_lat, max_lon, max_lat)
 
     if tile.content_type not in ("image/tiff", "image/png", "image/jpeg"):
@@ -208,9 +228,27 @@ def _segment_task(
                 detail="Server is at capacity; retry after a short delay",
             )
         try:
-            fg_prob, transform = model.predict(
-                raw, bbox=(min_lon, min_lat, max_lon, max_lat)
+            # Submit predict() to a bounded executor so we can enforce a
+            # wall-clock timeout.  A pathological tile that hangs the model
+            # would otherwise hold a semaphore slot forever; with
+            # MAX_CONCURRENT_INFERENCES=2, two such tiles starve all
+            # capacity.  On timeout the client gets a 504; the abandoned
+            # thread will eventually finish and the executor reclaims the
+            # worker.
+            future = _TIMEOUT_POOL.submit(
+                model.predict, raw, bbox=(min_lon, min_lat, max_lon, max_lat)
             )
+            try:
+                fg_prob, transform = future.result(timeout=INFERENCE_TIMEOUT)
+            except concurrent.futures.TimeoutError:
+                future.cancel()
+                raise HTTPException(  # noqa: TRY301 - re-raised by except HTTPException below
+                    status_code=504,
+                    detail=(
+                        f"Inference did not complete within "
+                        f"{INFERENCE_TIMEOUT}s"
+                    ),
+                )
             # Only the buildings postprocessor exists today. A future task
             # (e.g. roads) would dispatch to mask_to_linestrings here, so the
             # branch is dropped rather than left unreachable.
@@ -244,7 +282,7 @@ def segment_buildings(
     min_lat: float,
     max_lon: float,
     max_lat: float,
-    threshold: float = 0.5,
+    threshold: Annotated[float, Query(ge=0.0, le=1.0)] = 0.5,
 ) -> SegmentResponse:
     """
     Run building inference on a single georeferenced tile.

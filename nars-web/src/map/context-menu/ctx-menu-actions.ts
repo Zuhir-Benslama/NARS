@@ -56,7 +56,7 @@ export function enableEditGeometry(dbId: string): void {
     return
   }
 
-  enableEditMode(entry.id)
+  void enableEditMode(entry.id)
   showToast(t("map_edit_mode_hint"), "info")
 }
 

@@ -17,6 +17,7 @@ public class FeaturesController(
     IOptions<FeatureDefaultsOptions> featureDefaults,
     IDateTimeProvider timeProvider,
     IFeatureStatsService featureStatsService,
+    ILogger<FeaturesController> logger,
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     private readonly int _maxFeatureDataSize = featureDefaults.Value.MaxFeatureDataSize;
@@ -71,6 +72,8 @@ public class FeaturesController(
 
         await featureService.SaveFeatureAsync(entity, body.Type, cancellationToken);
 
+        logger.LogInformation("[Features] User {UserId} created {Type} {Id}", CurrentUserId, body.Type, newId);
+
         await MaybeQueueScatteredRefreshAsync(body.Type);
 
         return StatusCode(201, new CreateResponse(Success: true, Id: newId.ToString(), Message: "Feature saved successfully"));
@@ -108,6 +111,8 @@ public class FeaturesController(
         }
 
         var total = await featureService.ClearAllFeaturesAsync(RequiredCurrentUserId, cancellationToken);
+
+        logger.LogInformation("[Features] User {UserId} cleared all features ({Total} deleted)", CurrentUserId, total);
 
         return Ok(ApiResponse.Ok($"Deleted {total} features"));
     }
@@ -203,6 +208,8 @@ public class FeaturesController(
         {
             return Problem(detail: "Feature not found", statusCode: 404);
         }
+
+        logger.LogInformation("[Features] User {UserId} deleted {Type} {Id}", CurrentUserId, featureType, featureId);
 
         await MaybeQueueScatteredRefreshAsync(featureType);
 

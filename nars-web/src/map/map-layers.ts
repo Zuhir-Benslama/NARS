@@ -4,7 +4,11 @@ import { debugLog } from "../utils/debug"
 import { addBoundaryClickEvents } from "./map-boundary"
 
 function getGeoJSON(map: maplibregl.Map, id: string): maplibregl.GeoJSONSource {
-  return map.getSource(id) as maplibregl.GeoJSONSource
+  const source = map.getSource(id)
+  if (!source || source.type !== "geojson") {
+    throw new Error(`[map-layers] Source "${id}" not found or not GeoJSON`)
+  }
+  return source as maplibregl.GeoJSONSource
 }
 
 const FEATURE_LAYERS: maplibregl.LayerSpecification[] = [

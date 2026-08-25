@@ -5,6 +5,8 @@ Roads:     threshold -> clean -> skeletonize -> graph -> simplified LineStrings
 Buildings: threshold -> clean -> connected components -> simplified Polygons
 """
 
+from __future__ import annotations
+
 import logging
 
 import numpy as np
@@ -13,6 +15,8 @@ from shapely.errors import GEOSException
 from shapely.geometry import LineString, Polygon, mapping
 
 from app.schemas import Feature
+
+__all__ = ["mask_to_linestrings", "mask_to_polygons"]
 
 logger = logging.getLogger("nars-roads.postprocess")
 
@@ -110,6 +114,11 @@ def mask_to_polygons(
         if not contours:
             continue
 
+        # Pick the longest contour: `find_contours` returns iso-level
+        # crossings and for a mostly-solid binary mask the longest ring
+        # almost always traces the true outer boundary while shorter
+        # contours are either sub-0.5 internal noise or incomplete rings
+        # from non-convex shapes that `closing` filled.
         contour = max(contours, key=len)
         coords = [
             rasterio.transform.xy(

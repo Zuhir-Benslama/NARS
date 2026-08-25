@@ -43,21 +43,8 @@ public class PagesController(
     [AllowAnonymous]
     public async Task<IActionResult> LoginPage(CancellationToken cancellationToken = default)
     {
-        var tokens = antiforgery.GetAndStoreTokens(HttpContext);
-        var nonce = HttpContext.Items["csp-nonce"] as string ?? string.Empty;
-
         var template = (await LoadPageTemplateAsync("login_html", "login.html", cancellationToken)) ?? string.Empty;
-
-        var html = template
-            // Inject the CSRF token into the <meta name="csrf-token"> placeholder
-            .Replace("<meta name=\"csrf-token\" content=\"\">",
-                $"<meta name=\"csrf-token\" content=\"{HtmlEncoder.Default.Encode(tokens.RequestToken ?? string.Empty)}\">")
-            // Inject nonce into every <script> tag so they pass the CSP check.
-            // Order matters: replace <script ... (with attributes) first so the
-            // bare <script> replacement doesn't create a double-nonce match.
-            .Replace("<script ", $"<script nonce=\"{nonce}\" ")
-            .Replace("<script>", $"<script nonce=\"{nonce}\">");
-
+        var html = await InjectSecurityMarkersAsync(template);
         return Content(html, "text/html");
     }
 
@@ -74,25 +61,29 @@ public class PagesController(
             return Redirect("/login");
         }
 
+        var template = (await LoadPageTemplateAsync("index_html", "index.html", cancellationToken)) ?? string.Empty;
+        var html = await InjectSecurityMarkersAsync(template);
+        return Content(html, "text/html");
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private async Task<string> InjectSecurityMarkersAsync(string template)
+    {
         var tokens = antiforgery.GetAndStoreTokens(HttpContext);
         var nonce = HttpContext.Items["csp-nonce"] as string ?? string.Empty;
+        var encodedNonce = HtmlEncoder.Default.Encode(nonce);
 
-        var template = (await LoadPageTemplateAsync("index_html", "index.html", cancellationToken)) ?? string.Empty;
-
-        var html = template
-            // Inject CSRF token into the meta placeholder
+        return template
+            // Inject the CSRF token into the <meta name="csrf-token"> placeholder
             .Replace("<meta name=\"csrf-token\" content=\"\">",
                 $"<meta name=\"csrf-token\" content=\"{HtmlEncoder.Default.Encode(tokens.RequestToken ?? string.Empty)}\">")
             // Inject nonce into every <script> tag so they pass the CSP check.
             // Order matters: replace <script ... (with attributes) first so the
             // bare <script> replacement doesn't create a double-nonce match.
-            .Replace("<script ", $"<script nonce=\"{nonce}\" ")
-            .Replace("<script>", $"<script nonce=\"{nonce}\">");
-
-        return Content(html, "text/html");
+            .Replace("<script ", $"<script nonce=\"{encodedNonce}\" ")
+            .Replace("<script>", $"<script nonce=\"{encodedNonce}\">");
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private async Task<string> LoadPageTemplateAsync(string cacheKey, string fileName, CancellationToken cancellationToken)
     {

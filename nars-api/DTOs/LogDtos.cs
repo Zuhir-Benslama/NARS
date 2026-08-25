@@ -9,7 +9,7 @@ public record LogBatch(
 );
 
 public record LogEntry(
-    [property: JsonPropertyName("level")][MaxLength(20)] string? Level,
+    [property: JsonPropertyName("level")][MaxLength(20)][RegularExpression("^(error|warn|info|debug|trace)$")] string? Level,
     [property: JsonPropertyName("code")][MaxLength(50)] string? Code,
     [property: JsonPropertyName("message")]
     [Required(AllowEmptyStrings = false), MaxLength(4096)] string Message,

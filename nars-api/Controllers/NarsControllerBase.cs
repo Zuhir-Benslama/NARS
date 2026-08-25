@@ -23,7 +23,7 @@ public abstract class NarsControllerBase(
 
     /// <summary>The authenticated user's database ID, guaranteed non-null.</summary>
     protected Guid RequiredCurrentUserId =>
-        CurrentUserId ?? throw new UnauthorizedAccessException("user_id claim missing — endpoint requires authentication.");
+        CurrentUserId ?? throw new InvalidOperationException("user_id claim missing — endpoint requires authentication.");
 
     /// <summary>The authenticated user's username.</summary>
     protected string CurrentUsername =>
@@ -44,7 +44,7 @@ public abstract class NarsControllerBase(
     /// <summary>The commune ID, guaranteed non-null.</summary>
     protected int RequiredCommuneId =>
         CurrentCommuneId
-            ?? throw new UnauthorizedAccessException("commune_id claim missing — endpoint requires commune_user role.");
+            ?? throw new InvalidOperationException("commune_id claim missing — endpoint requires commune_user role.");
 
     /// <summary>The daira ID for daira_admin accounts, or null for other roles.</summary>
     protected int? CurrentDairaId =>

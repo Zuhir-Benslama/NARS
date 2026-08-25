@@ -1,5 +1,5 @@
 // ─── INTERNATIONALISATION ─────────────────────────────────────────────────────
-// Built on vue-i18n v10 (Composition API mode, legacy: false).
+// Built on vue-i18n v11 (Composition API mode, legacy: false).
 //
 // Public API — unchanged for all existing callers:
 //   t(key, replacements?)  — usable in any .ts file (not only components)
@@ -11,7 +11,7 @@
 // importing t() — that way Vue's dependency tracking works properly in templates.
 // The exported t() here is for non-component TypeScript files (map/*.ts etc.)
 
-import { type Ref } from "vue"
+import { type WritableComputedRef } from "vue"
 import { createI18n } from "vue-i18n"
 import en from "./en.json"
 import { debugError } from "../utils/debug"
@@ -72,7 +72,7 @@ export function t(key: string, replacements?: Record<string, string | number>): 
   return String(i18n.global.t(key, replacements ?? {}))
 }
 
-export const currentLang = i18n.global.locale as Ref<string>
+export const currentLang: WritableComputedRef<string> = i18n.global.locale
 
 // ─── LANGUAGE SWITCHING ───────────────────────────────────────────────────────
 
@@ -90,7 +90,7 @@ const loadedLocales = new Set<string>(["en"])
 export async function setLang(lang: string): Promise<void> {
   // English already loaded statically - just set it
   if (lang === "en") {
-    ;(i18n.global.locale as Ref<string>).value = "en"
+    i18n.global.locale.value = "en"
     try {
       localStorage.setItem("nars_lang", lang)
     } catch {}
@@ -113,7 +113,7 @@ export async function setLang(lang: string): Promise<void> {
     }
   }
 
-  ;(i18n.global.locale as Ref<string>).value = lang
+  i18n.global.locale.value = lang
   try {
     localStorage.setItem("nars_lang", lang)
   } catch {}

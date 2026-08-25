@@ -6,7 +6,7 @@ using NarsApi.Models;
 namespace NarsApi.Services;
 
 public sealed class UserCreationService(
-    AppDbContext db,
+    IDbContextFactory<AppDbContext> dbFactory,
     IUserAuthorizationService authorizationService,
     ILogger<UserCreationService> logger)
     : IUserCreationService
@@ -106,6 +106,7 @@ public sealed class UserCreationService(
         // 2. Uniqueness (normalised to lowercase for case-insensitive matching).
         var normalizedUsername = username.ToLowerInvariant();
         var normalizedEmail = email.ToLowerInvariant();
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var existing = await db.Users
             .FirstOrDefaultAsync(u => u.Username == normalizedUsername || u.Email == normalizedEmail, cancellationToken);
         if (existing is not null)
@@ -142,6 +143,7 @@ public sealed class UserCreationService(
 
     public async Task SaveUserAsync(User user, CancellationToken cancellationToken = default)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         db.Users.Add(user);
         await db.SaveChangesAsync(cancellationToken);
     }

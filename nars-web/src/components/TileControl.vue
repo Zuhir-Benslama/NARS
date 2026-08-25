@@ -9,14 +9,30 @@
     >
       <img src="/tiles.svg" class="tile-icon" alt="layers" />
     </button>
-    <div v-if="open" class="tile-dropdown" role="listbox" :aria-label="t('tile_layers')">
+    <div
+      v-if="open"
+      ref="dropdownRef"
+      class="tile-dropdown"
+      role="listbox"
+      :aria-label="t('tile_layers')"
+      @keydown.escape="open = false"
+      @keydown.up.prevent="moveFocus(-1)"
+      @keydown.down.prevent="moveFocus(1)"
+    >
       <div
-        v-for="layer in layers"
+        v-for="(layer, idx) in layers"
         :key="layer.key"
+        :ref="
+          (el) => {
+            if (el) optionRefs[idx] = el as HTMLElement
+          }
+        "
         :class="['tile-item', { active: activeKey === layer.key }]"
         role="option"
+        :tabindex="0"
         :aria-selected="activeKey === layer.key"
         @click="select(layer.key)"
+        @keydown.enter="select(layer.key)"
       >
         <span class="tile-dot" :style="{ background: layer.color }" />
         {{ t(layer.labelKey) }}
@@ -26,13 +42,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue"
+import { ref, nextTick } from "vue"
 import { useI18n } from "vue-i18n"
 import { setBaseLayer } from "../map/index"
 
 const { t } = useI18n()
 const open = ref(false)
 const activeKey = ref("satellite")
+const optionRefs = ref<HTMLElement[]>([])
 
 const layers = [
   { key: "satellite", labelKey: "layer_satellite", color: "#e67e22" },
@@ -47,6 +64,19 @@ function handleClickOutside() {
 
 function toggle() {
   open.value = !open.value
+  if (open.value) {
+    nextTick(() => {
+      const activeIdx = layers.findIndex((l) => l.key === activeKey.value)
+      optionRefs.value[activeIdx]?.focus()
+    })
+  }
+}
+
+function moveFocus(delta: number) {
+  const current = document.activeElement
+  const idx = optionRefs.value.indexOf(current as HTMLElement)
+  const next = (idx + delta + layers.length) % layers.length
+  optionRefs.value[next]?.focus()
 }
 
 function select(key: string) {

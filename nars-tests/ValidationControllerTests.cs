@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Controllers;
@@ -19,12 +21,14 @@ public class ValidationControllerTests
     private const double SharpTurnAngleDegrees = 45.0;
     private static ValidationController CreateController(
         AppDbContext db,
+        IDbContextFactory<AppDbContext>? factory = null,
         IValidationService? validationService = null,
         ValidationOptions? options = null)
     {
         var ctrl = new ValidationController(
             Options.Create(options ?? new ValidationOptions()),
-            validationService ?? new ValidationService(db),
+            validationService ?? new ValidationService(factory ?? new TestDbContextFactory(db)),
+            Mock.Of<ILogger<ValidationController>>(),
             Mock.Of<IWebHostEnvironment>())
         {
             ControllerContext = new ControllerContext
@@ -39,42 +43,47 @@ public class ValidationControllerTests
         return ctrl;
     }
 
-    private static AppDbContext CreateDb() => CreateInMemoryDb("ValidationTest");
+    private static (AppDbContext db, IDbContextFactory<AppDbContext> factory) CreateDb() => CreateInMemoryDbPair("ValidationTest");
 
     // ── GET /api/validate/area/main-urban-exists ──────────────────────────
 
     [Fact]
     public async Task MainUrbanExists_WhenNoArea_ReturnsFalse()
     {
-        using var db = CreateDb();
-        var ctrl = CreateController(db);
-        var result = await ctrl.MainUrbanExists();
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var payload = Assert.IsType<MainUrbanExistsResponse>(ok.Value);
-        Assert.False(payload.Exists);
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var ctrl = CreateController(db, factory);
+            var result = await ctrl.MainUrbanExists();
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var payload = Assert.IsType<MainUrbanExistsResponse>(ok.Value);
+            Assert.False(payload.Exists);
+        }
     }
 
     [Fact]
     public async Task MainUrbanExists_WhenAreaExists_ReturnsTrue()
     {
-        using var db = CreateDb();
-
-        db.Areas.Add(new Area
+        var (db, factory) = CreateDb();
+        await using (db)
         {
-            Id = Guid.NewGuid(),
-            UserId = UserId,
-            Layer = FeatureTypes.AreaLayers.CentralUrban,
-            Data = "{}",
-            Label = "urban",
-            UpdatedAt = FixedUtcNow
-        });
-        await db.SaveChangesAsync();
+            db.Areas.Add(new Area
+            {
+                Id = Guid.NewGuid(),
+                UserId = UserId,
+                Layer = FeatureTypes.AreaLayers.CentralUrban,
+                Data = "{}",
+                Label = "urban",
+                UpdatedAt = FixedUtcNow
+            });
+            await db.SaveChangesAsync();
 
-        var ctrl = CreateController(db);
-        var result = await ctrl.MainUrbanExists();
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var payload = Assert.IsType<MainUrbanExistsResponse>(ok.Value);
-        Assert.True(payload.Exists);
+            var ctrl = CreateController(db, factory);
+            var result = await ctrl.MainUrbanExists();
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var payload = Assert.IsType<MainUrbanExistsResponse>(ok.Value);
+            Assert.True(payload.Exists);
+        }
     }
 
     // ── POST /api/validate/road ───────────────────────────────────────────
@@ -82,102 +91,119 @@ public class ValidationControllerTests
     [Fact]
     public async Task ValidateRoad_LessThan2Points_Returns400()
     {
-        using var db = CreateDb();
-        var ctrl = CreateController(db);
-        var body = new ValidateRoadRequest([new CoordDto(36.0, 3.0)]);
-        var result = await ctrl.ValidateRoad(body);
-        var bad = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, bad.StatusCode);
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var ctrl = CreateController(db, factory);
+            var body = new ValidateRoadRequest([new CoordDto(36.0, 3.0)]);
+            var result = await ctrl.ValidateRoad(body);
+            var bad = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(400, bad.StatusCode);
+        }
     }
 
     [Fact]
     public async Task ValidateRoad_NaNCoordinate_Returns400()
     {
-        using var db = CreateDb();
-        var ctrl = CreateController(db);
-        var body = new ValidateRoadRequest([
-            new CoordDto(36.0, 3.0),
-            new CoordDto(double.NaN, 3.0)
-        ]);
-        var result = await ctrl.ValidateRoad(body);
-        var bad = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, bad.StatusCode);
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var ctrl = CreateController(db, factory);
+            var body = new ValidateRoadRequest([
+                new CoordDto(36.0, 3.0),
+                new CoordDto(double.NaN, 3.0)
+            ]);
+            var result = await ctrl.ValidateRoad(body);
+            var bad = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(400, bad.StatusCode);
+        }
     }
 
     [Fact]
     public async Task ValidateRoad_InfinityCoordinate_Returns400()
     {
-        using var db = CreateDb();
-        var ctrl = CreateController(db);
-        var body = new ValidateRoadRequest([
-            new CoordDto(36.0, 3.0),
-            new CoordDto(double.PositiveInfinity, 3.0)
-        ]);
-        var result = await ctrl.ValidateRoad(body);
-        var bad = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, bad.StatusCode);
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var ctrl = CreateController(db, factory);
+            var body = new ValidateRoadRequest([
+                new CoordDto(36.0, 3.0),
+                new CoordDto(double.PositiveInfinity, 3.0)
+            ]);
+            var result = await ctrl.ValidateRoad(body);
+            var bad = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(400, bad.StatusCode);
+        }
     }
 
     [Fact]
     public async Task ValidateRoad_NoExistingRoads_ReturnsValid()
     {
-        using var db = CreateDb();
-        var ctrl = CreateController(db);
-        var body = new ValidateRoadRequest([
-            new CoordDto(36.0, 3.0),
-            new CoordDto(36.1, 3.1)
-        ]);
-        var result = await ctrl.ValidateRoad(body);
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<ValidateRoadResponse>(ok.Value);
-        Assert.True(resp.Valid);
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var ctrl = CreateController(db, factory);
+            var body = new ValidateRoadRequest([
+                new CoordDto(36.0, 3.0),
+                new CoordDto(36.1, 3.1)
+            ]);
+            var result = await ctrl.ValidateRoad(body);
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<ValidateRoadResponse>(ok.Value);
+            Assert.True(resp.Valid);
+        }
     }
 
     [Fact]
     public async Task ValidateRoad_SharpTurn_ReturnsInvalid()
     {
-        using var db = CreateDb();
-        var ctrl = CreateController(db, options: new ValidationOptions { RoadTurnAngleDegrees = SharpTurnAngleDegrees });
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var ctrl = CreateController(db, factory, options: new ValidationOptions { RoadTurnAngleDegrees = SharpTurnAngleDegrees });
 
-        var body = new ValidateRoadRequest([
-            new CoordDto(36.0, 3.0),
-            new CoordDto(36.0, 3.1),
-            new CoordDto(36.1, 3.1)
-        ]);
-        var result = await ctrl.ValidateRoad(body);
+            var body = new ValidateRoadRequest([
+                new CoordDto(36.0, 3.0),
+                new CoordDto(36.0, 3.1),
+                new CoordDto(36.1, 3.1)
+            ]);
+            var result = await ctrl.ValidateRoad(body);
 
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<ValidateRoadResponse>(ok.Value);
-        Assert.False(resp.Valid);
-        Assert.NotNull(resp.Error);
-        Assert.Contains("turn", resp.Error, StringComparison.OrdinalIgnoreCase);
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<ValidateRoadResponse>(ok.Value);
+            Assert.False(resp.Valid);
+            Assert.NotNull(resp.Error);
+            Assert.Contains("turn", resp.Error, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     [Fact]
     public async Task ValidateRoad_NotConnected_ReturnsInvalid()
     {
-        using var db = CreateDb();
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var validationMock = new Mock<IValidationService>();
+            validationMock.Setup(v => v.CountUserRoadsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(1);
+            validationMock.Setup(v => v.CheckRoadConnectivityAsync(
+                    It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<double>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(false);
 
-        var validationMock = new Mock<IValidationService>();
-        validationMock.Setup(v => v.CountUserRoadsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1);
-        validationMock.Setup(v => v.CheckRoadConnectivityAsync(
-                It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<double>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
+            var ctrl2 = CreateController(db, factory, validationService: validationMock.Object);
 
-        var ctrl2 = CreateController(db, validationService: validationMock.Object);
+            var body = new ValidateRoadRequest([
+                new CoordDto(36.0, 3.0),
+                new CoordDto(36.1, 3.1)
+            ]);
+            var result = await ctrl2.ValidateRoad(body);
 
-        var body = new ValidateRoadRequest([
-            new CoordDto(36.0, 3.0),
-            new CoordDto(36.1, 3.1)
-        ]);
-        var result = await ctrl2.ValidateRoad(body);
-
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<ValidateRoadResponse>(ok.Value);
-        Assert.False(resp.Valid);
-        Assert.NotNull(resp.Error);
-        Assert.Contains("connect", resp.Error, StringComparison.OrdinalIgnoreCase);
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<ValidateRoadResponse>(ok.Value);
+            Assert.False(resp.Valid);
+            Assert.NotNull(resp.Error);
+            Assert.Contains("connect", resp.Error, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     // ── POST /api/validate/district ───────────────────────────────────────
@@ -185,56 +211,64 @@ public class ValidationControllerTests
     [Fact]
     public async Task ValidateDistrict_LessThan3Points_Returns400()
     {
-        using var db = CreateDb();
-        var ctrl = CreateController(db);
-        var body = new ValidateDistrictRequest([new CoordDto(36.0, 3.0), new CoordDto(36.1, 3.1)], "residential");
-        var result = await ctrl.ValidateDistrict(body);
-        var bad = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(400, bad.StatusCode);
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var ctrl = CreateController(db, factory);
+            var body = new ValidateDistrictRequest([new CoordDto(36.0, 3.0), new CoordDto(36.1, 3.1)], "residential");
+            var result = await ctrl.ValidateDistrict(body);
+            var bad = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(400, bad.StatusCode);
+        }
     }
 
     [Fact]
     public async Task ValidateDistrict_NoExistingDistricts_ReturnsValid()
     {
-        using var db = CreateDb();
-        var ctrl = CreateController(db);
-        var body = new ValidateDistrictRequest([
-            new CoordDto(36.0, 3.0),
-            new CoordDto(36.0, 3.1),
-            new CoordDto(36.1, 3.1)
-        ], "residential");
-        var result = await ctrl.ValidateDistrict(body);
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<ValidateDistrictResponse>(ok.Value);
-        Assert.True(resp.Valid);
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var ctrl = CreateController(db, factory);
+            var body = new ValidateDistrictRequest([
+                new CoordDto(36.0, 3.0),
+                new CoordDto(36.0, 3.1),
+                new CoordDto(36.1, 3.1)
+            ], "residential");
+            var result = await ctrl.ValidateDistrict(body);
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<ValidateDistrictResponse>(ok.Value);
+            Assert.True(resp.Valid);
+        }
     }
 
     [Fact]
     public async Task ValidateDistrict_Overlap_ReturnsInvalid()
     {
-        using var db = CreateDb();
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var validationMock = new Mock<IValidationService>();
+            validationMock.Setup(v => v.CountUserDistrictsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(1);
+            validationMock.Setup(v => v.CheckDistrictOverlapAsync(
+                    It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
 
-        var validationMock = new Mock<IValidationService>();
-        validationMock.Setup(v => v.CountUserDistrictsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1);
-        validationMock.Setup(v => v.CheckDistrictOverlapAsync(
-                It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+            var ctrl2 = CreateController(db, factory, validationService: validationMock.Object);
 
-        var ctrl2 = CreateController(db, validationService: validationMock.Object);
+            var body = new ValidateDistrictRequest([
+                new CoordDto(36.0, 3.0),
+                new CoordDto(36.0, 3.1),
+                new CoordDto(36.1, 3.1)
+            ], "residential");
+            var result = await ctrl2.ValidateDistrict(body);
 
-        var body = new ValidateDistrictRequest([
-            new CoordDto(36.0, 3.0),
-            new CoordDto(36.0, 3.1),
-            new CoordDto(36.1, 3.1)
-        ], "residential");
-        var result = await ctrl2.ValidateDistrict(body);
-
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<ValidateDistrictResponse>(ok.Value);
-        Assert.False(resp.Valid);
-        Assert.NotNull(resp.Error);
-        Assert.Contains("overlap", resp.Error, StringComparison.OrdinalIgnoreCase);
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<ValidateDistrictResponse>(ok.Value);
+            Assert.False(resp.Valid);
+            Assert.NotNull(resp.Error);
+            Assert.Contains("overlap", resp.Error, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     // ── GET /api/validate/districts/coverage ──────────────────────────────
@@ -242,34 +276,39 @@ public class ValidationControllerTests
     [Fact]
     public async Task DistrictsCoverage_NoUrbanAreas_ReturnsCovered()
     {
-        using var db = CreateDb();
-        var ctrl = CreateController(db);
-        var result = await ctrl.DistrictsCoverage();
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<DistrictCoverageResponse>(ok.Value);
-        Assert.True(resp.Covered);
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var ctrl = CreateController(db, factory);
+            var result = await ctrl.DistrictsCoverage();
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<DistrictCoverageResponse>(ok.Value);
+            Assert.True(resp.Covered);
+        }
     }
 
     [Fact]
     public async Task DistrictsCoverage_NoDistricts_ReturnsNotCovered()
     {
-        using var db = CreateDb();
-
-        db.Areas.Add(new Area
+        var (db, factory) = CreateDb();
+        await using (db)
         {
-            Id = Guid.NewGuid(),
-            UserId = UserId,
-            Layer = FeatureTypes.AreaLayers.CentralUrban,
-            Data = "{}",
-            Label = "urban",
-            UpdatedAt = FixedUtcNow
-        });
-        await db.SaveChangesAsync();
+            db.Areas.Add(new Area
+            {
+                Id = Guid.NewGuid(),
+                UserId = UserId,
+                Layer = FeatureTypes.AreaLayers.CentralUrban,
+                Data = "{}",
+                Label = "urban",
+                UpdatedAt = FixedUtcNow
+            });
+            await db.SaveChangesAsync();
 
-        var ctrl = CreateController(db);
-        var result = await ctrl.DistrictsCoverage();
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var resp = Assert.IsType<DistrictCoverageResponse>(ok.Value);
-        Assert.False(resp.Covered);
+            var ctrl = CreateController(db, factory);
+            var result = await ctrl.DistrictsCoverage();
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<DistrictCoverageResponse>(ok.Value);
+            Assert.False(resp.Covered);
+        }
     }
 }

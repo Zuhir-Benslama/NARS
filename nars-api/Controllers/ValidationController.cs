@@ -13,6 +13,7 @@ namespace NarsApi.Controllers;
 public class ValidationController(
     IOptions<ValidationOptions> validationOptions,
     IValidationService validationService,
+    ILogger<ValidationController> logger,
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     private double DistrictBoundaryToleranceMeters => validationOptions.Value.DistrictBoundaryToleranceMeters;
@@ -41,6 +42,7 @@ public class ValidationController(
     {
         if (body.Coordinates.Count < 2)
         {
+            logger.LogDebug("Road validation rejected: only {Count} coordinates provided", body.Coordinates.Count);
             return Problem(detail: "A road must have at least 2 points.", statusCode: 400);
         }
 

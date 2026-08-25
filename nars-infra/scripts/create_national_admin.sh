@@ -50,23 +50,25 @@ command -v python3 >/dev/null 2>&1 || die "python3 not found."
 # Auto-install Python dependencies into a temporary virtualenv (avoids
 # --break-system-packages and keeps system Python clean).
 VENV_DIR=""
+MISSING=""
 for pkg in psycopg2-binary bcrypt; do
     module="${pkg%%-*}"
     if ! python3 -c "import sys; __import__(sys.argv[1])" "${module}" 2>/dev/null; then
-        if [[ -z "${VENV_DIR}" ]]; then
-            VENV_DIR=$(mktemp -d)
-            python3 -m venv "${VENV_DIR}"
-            # shellcheck disable=SC1091
-            source "${VENV_DIR}/bin/activate"
-        fi
-        warn "Python package '${pkg}' not found. Installing..."
-        if pip install "${pkg}" --quiet; then
-            success "${pkg} installed."
-        else
-            die "Failed to install ${pkg}. Run: pip install ${pkg}"
-        fi
+        MISSING="${MISSING} ${pkg}"
     fi
 done
+if [[ -n "${MISSING}" ]]; then
+    VENV_DIR=$(mktemp -d)
+    python3 -m venv "${VENV_DIR}"
+    # shellcheck disable=SC1091
+    source "${VENV_DIR}/bin/activate"
+    warn "Missing Python packages:${MISSING}. Installing all dependencies..."
+    if pip install psycopg2-binary bcrypt --quiet; then
+        success "All dependencies installed."
+    else
+        die "Failed to install dependencies. Run: pip install psycopg2-binary bcrypt"
+    fi
+fi
 # Use the venv python for all subsequent calls, even if no install was needed
 if [[ -n "${VENV_DIR}" ]]; then
     PYTHON="${VENV_DIR}/bin/python3"
@@ -97,7 +99,7 @@ export NARS_DB_USER="$DB_USER"
 # ── Shared Python database helper ─────────────────────────────────────────────
 # Temp module with connect_db() so we don't duplicate the connection logic.
 DB_HELPER_DIR=$(mktemp -d)
-trap 'rm -rf "${DB_HELPER_DIR}" "${VENV_DIR}"' EXIT INT TERM HUP
+trap 'rm -rf "${DB_HELPER_DIR}" "${VENV_DIR}"; unset NARS_DB_PASSWORD_VAL NARS_ADMIN_PASSWORD_VAL NARS_ADMIN_NAME NARS_ADMIN_EMAIL NARS_ADMIN_PHONE NARS_ADMIN_USERNAME' EXIT INT TERM HUP
 
 cat > "${DB_HELPER_DIR}/db_helper.py" << 'PYHELP'
 import os, psycopg2
@@ -157,7 +159,7 @@ else
     [[ -n "${ADMIN_NAME}" ]] || die "Name cannot be empty."
 
     read -r -p "  Email:         " ADMIN_EMAIL
-    [[ "${ADMIN_EMAIL}" =~ ^[^@]+@[^@]+\.[^@]+$ ]] || die "Invalid email address."
+    [[ "${ADMIN_EMAIL}" =~ ^[^@]+@[^@]+\.[^@]+(\.[^@]+)*$ ]] || die "Invalid email address."
 
     read -r -p "  Phone:         " ADMIN_PHONE
     [[ -n "${ADMIN_PHONE}" ]] || die "Phone cannot be empty."

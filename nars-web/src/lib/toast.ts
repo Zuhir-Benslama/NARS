@@ -29,7 +29,7 @@ export function showConfirm(message: string, okText = "Confirm"): Promise<boolea
       document.addEventListener(
         "DOMContentLoaded",
         () => {
-          showConfirm(message, okText).then(resolve)
+          void showConfirm(message, okText).then(resolve)
         },
         { once: true },
       )

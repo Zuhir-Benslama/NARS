@@ -84,7 +84,7 @@ describe("modalStore", () => {
 
     it("second awaitModalResult replaces the first pending promise", async () => {
       const store = useModalStore()
-      awaitModalResult() // first is replaced
+      void awaitModalResult() // first is replaced
       const secondPromise = awaitModalResult()
       store.close(emptyResult)
       await expect(secondPromise).resolves.toEqual(emptyResult)

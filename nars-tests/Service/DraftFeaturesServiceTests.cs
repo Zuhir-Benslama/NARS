@@ -29,25 +29,16 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : IAsyncLife
         await _fixture.CleanTablesAsync();
     }
 
-    private static DraftFeaturesService CreateService(AppDbContext db) =>
-        new(db,
+    private static DraftFeaturesService CreateService(IDbContextFactory<AppDbContext> factory) =>
+        new(factory,
             Mock.Of<ISegmentationClient>(),
-            new CommuneScopeService(db),
+            new CommuneScopeService(factory),
             Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow));
 
     /// <summary>Own context per service: mirrors production (context per request).</summary>
-    private async Task<DraftFeaturesService> CreateIsolatedServiceAsync()
+    private DraftFeaturesService CreateIsolatedService()
     {
-        var db = _fixture.CreateDbContext();
-        try
-        {
-            return CreateService(db);
-        }
-        catch
-        {
-            await db.DisposeAsync();
-            throw;
-        }
+        return CreateService(_fixture.CreateDbContextFactory());
     }
 
     private static async Task<Guid> AddPendingDraftAsync(AppDbContext db, int communeId)
@@ -83,8 +74,7 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : IAsyncLife
         var (reviewerId, _) = await SeedReviewerAndCommuneAsync(seedDb, CommuneId100);
         var draftId = await AddPendingDraftAsync(seedDb, CommuneId100);
 
-        await using var svcDb = _fixture.CreateDbContext();
-        var svc = CreateService(svcDb);
+        var svc = CreateService(_fixture.CreateDbContextFactory());
 
         var result = await svc.AcceptDraftAsync(
             UserRoles.NationalAdmin, null, null, null, reviewerId, draftId, default);
@@ -106,8 +96,7 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : IAsyncLife
         var (reviewerId, _) = await SeedReviewerAndCommuneAsync(seedDb, CommuneId100);
         var draftId = await AddPendingDraftAsync(seedDb, CommuneId100);
 
-        await using var svcDb = _fixture.CreateDbContext();
-        var svc = CreateService(svcDb);
+        var svc = CreateService(_fixture.CreateDbContextFactory());
 
         var result = await svc.RejectDraftAsync(
             UserRoles.WilayaAdmin, null, null, WilayaId1, reviewerId, draftId, default);
@@ -129,12 +118,12 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : IAsyncLife
         var secondReviewer = await SeedData.CreateUserAsync(seedDb, UserRoles.CommuneUser);
         var draftId = await AddPendingDraftAsync(seedDb, CommuneId100);
 
-        await using var firstDb = _fixture.CreateDbContext();
-        await using var secondDb = _fixture.CreateDbContext();
+        var factory1 = _fixture.CreateDbContextFactory();
+        var factory2 = _fixture.CreateDbContextFactory();
 
-        var first = await CreateService(firstDb).AcceptDraftAsync(
+        var first = await CreateService(factory1).AcceptDraftAsync(
             UserRoles.NationalAdmin, null, null, null, firstReviewerId, draftId, default);
-        var second = await CreateService(secondDb).AcceptDraftAsync(
+        var second = await CreateService(factory2).AcceptDraftAsync(
             UserRoles.NationalAdmin, null, null, null, secondReviewer.Id, draftId, default);
 
         Assert.Equal(DraftReviewStatus.Success, first.Status);
@@ -157,12 +146,10 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : IAsyncLife
         var reviewer2Id = reviewer2.Id;
         var draftId = await AddPendingDraftAsync(seedDb, CommuneId100);
 
-        // Two independent service instances with their own contexts, racing the
-        // same pending draft through the real conditional UPDATE.
-        await using var db1 = _fixture.CreateDbContext();
-        await using var db2 = _fixture.CreateDbContext();
-        var svc1 = CreateService(db1);
-        var svc2 = CreateService(db2);
+        var factory1 = _fixture.CreateDbContextFactory();
+        var factory2 = _fixture.CreateDbContextFactory();
+        var svc1 = CreateService(factory1);
+        var svc2 = CreateService(factory2);
 
         var results = await Task.WhenAll(
             svc1.AcceptDraftAsync(UserRoles.DairaAdmin, null, DairaId10, null, reviewer1Seed, draftId, default),
@@ -182,8 +169,7 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : IAsyncLife
     [Fact]
     public async Task ReviewDraft_UnknownDraft_ReturnsNotFound()
     {
-        await using var svcDb = _fixture.CreateDbContext();
-        var svc = CreateService(svcDb);
+        var svc = CreateService(_fixture.CreateDbContextFactory());
 
         var result = await svc.AcceptDraftAsync(
             UserRoles.NationalAdmin, null, null, null, UserId, Guid.NewGuid(), default);

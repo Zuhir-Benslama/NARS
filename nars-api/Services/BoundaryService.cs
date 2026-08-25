@@ -4,10 +4,11 @@ using NarsApi.Infrastructure;
 
 namespace NarsApi.Services;
 
-public sealed class BoundaryService(AppDbContext db) : IBoundaryService
+public sealed class BoundaryService(IDbContextFactory<AppDbContext> dbFactory) : IBoundaryService
 {
     public async Task<string?> GetBoundaryGeoJsonAsync(int communeId, CancellationToken ct = default)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
         var conn = db.Database.GetDbConnection();
         await using var handle = await conn.EnsureOpenAsync(ct);
 

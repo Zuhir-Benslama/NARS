@@ -45,6 +45,9 @@ docs/uml/*.png
 # === NARStreet (separate repo) ===
 narstreet/
 
+# === Sisyphus (AI session state) ===
+.sisyphus/
+
 # === General / IDE ===
 
 .idea/

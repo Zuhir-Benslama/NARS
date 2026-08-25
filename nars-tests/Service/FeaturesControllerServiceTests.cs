@@ -43,11 +43,13 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
     {
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var bgQueueMock = Mock.Of<IBackgroundTaskQueue>();
+        var factory = _fixture.CreateDbContextFactory();
         var ctrl = new FeaturesController(
-            new FeatureService(_db, bgQueueMock, new FeatureCleanupService(), Mock.Of<ILogger<FeatureService>>()),
+            new FeatureService(factory, bgQueueMock, new FeatureCleanupService(), Mock.Of<ILogger<FeatureService>>()),
             Options.Create(new FeatureDefaultsOptions()),
             timeProvider,
             new FeatureStatsService(_fixture.CreateDbContextFactory()),
+            Mock.Of<ILogger<FeaturesController>>(),
             Mock.Of<IWebHostEnvironment>());
         AuthTestHelper.SetUser(ctrl, _userId, UserRoles.CommuneUser, communeId: 1);
         return ctrl;
@@ -225,7 +227,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
 
         // Attach a house entrance owned by that road.
         var fieldService = new FieldService(
-            _db,
+            _fixture.CreateDbContextFactory(),
             Mock.Of<IFeatureService>(),
             Mock.Of<ILogger<FieldService>>());
         var entranceId = await fieldService.CreateEntranceAsync(roadId, _userId, _userId, "Entrance A", "{}");

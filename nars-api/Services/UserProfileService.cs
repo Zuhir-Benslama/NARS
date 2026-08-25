@@ -6,22 +6,38 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public sealed class UserProfileService(AppDbContext db, ISecurityStampCache stampCache) : IUserProfileService
+public sealed class UserProfileService(IDbContextFactory<AppDbContext> dbFactory, ISecurityStampCache stampCache) : IUserProfileService
 {
-    public async Task<User?> GetUserByIdAsync(Guid userId, CancellationToken ct = default) =>
-        await db.Users.FindAsync([userId], ct);
+    public async Task<User?> GetUserByIdAsync(Guid userId, CancellationToken ct = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        return await db.Users.FindAsync([userId], ct);
+    }
 
-    public Task<bool> IsUsernameTakenAsync(string username, CancellationToken ct = default) =>
-        db.Users.AnyAsync(u => u.Username == username, ct);
+    public async Task<bool> IsUsernameTakenAsync(string username, CancellationToken ct = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        return await db.Users.AnyAsync(u => u.Username == username, ct);
+    }
 
-    public Task<bool> IsEmailTakenAsync(string email, CancellationToken ct = default) =>
-        db.Users.AnyAsync(u => u.Email == email, ct);
+    public async Task<bool> IsEmailTakenAsync(string email, CancellationToken ct = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        return await db.Users.AnyAsync(u => u.Email == email, ct);
+    }
 
-    public async Task UpdateUserAsync(User user, CancellationToken ct = default) => await db.SaveChangesAsync(ct);
+    public async Task UpdateUserAsync(User user, CancellationToken ct = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        db.Users.Update(user);
+        await db.SaveChangesAsync(ct);
+    }
 
     public async Task<UpdateCredentialsResult> UpdateCredentialsAsync(Guid userId, UpdateUserRequest request, CancellationToken ct = default)
     {
-        var user = await GetUserByIdAsync(userId, ct);
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+
+        var user = await db.Users.FindAsync([userId], ct);
         if (user is null)
         {
             return new UpdateCredentialsResult(CredentialUpdateError.UserNotFound);
@@ -39,7 +55,7 @@ public sealed class UserProfileService(AppDbContext db, ISecurityStampCache stam
             var normalized = request.Username.Trim().ToLowerInvariant();
             if (normalized != user.Username)
             {
-                if (await IsUsernameTakenAsync(normalized, ct))
+                if (await db.Users.AnyAsync(u => u.Username == normalized, ct))
                 {
                     return new UpdateCredentialsResult(CredentialUpdateError.DuplicateUsername);
                 }
@@ -60,7 +76,7 @@ public sealed class UserProfileService(AppDbContext db, ISecurityStampCache stam
             var normalizedEmail = request.Email.Trim().ToLowerInvariant();
             if (normalizedEmail != user.Email)
             {
-                if (await IsEmailTakenAsync(normalizedEmail, ct))
+                if (await db.Users.AnyAsync(u => u.Email == normalizedEmail, ct))
                 {
                     return new UpdateCredentialsResult(CredentialUpdateError.DuplicateEmail);
                 }
@@ -98,7 +114,7 @@ public sealed class UserProfileService(AppDbContext db, ISecurityStampCache stam
 
         try
         {
-            await UpdateUserAsync(user, ct);
+            await db.SaveChangesAsync(ct);
         }
         catch (DbUpdateException ex) when (IsUniqueViolation(ex, out var constraintName))
         {

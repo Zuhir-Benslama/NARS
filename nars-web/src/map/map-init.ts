@@ -136,7 +136,7 @@ export async function initMap(): Promise<void> {
       clearTimeout(loadTimer)
       resolve()
     }
-    ctx.map.once("load", onLoad)
+    void ctx.map.once("load", onLoad)
     loadTimer = setTimeout(() => {
       ctx.map.off("load", onLoad)
       debugWarn("[MAP] Map load event timed out after 15 s")
@@ -226,7 +226,7 @@ async function switchBaseLayer(
       )
     })
 
-    map.once("style.load", styleListener)
+    void map.once("style.load", styleListener)
     map.setStyle(next)
     let styleOk = false
     try {

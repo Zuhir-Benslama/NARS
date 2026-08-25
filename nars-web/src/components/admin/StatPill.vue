@@ -32,12 +32,12 @@ const colorClass = computed(() =>
   color: var(--text-primary);
 }
 .pill-blue {
-  background: var(--glass-bg);
-  color: var(--text-primary);
+  background: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
 }
 .pill-green {
-  background: var(--glass-bg);
-  color: var(--text-primary);
+  background: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
 }
 .stat-value {
   font-size: 1.1rem;

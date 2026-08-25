@@ -127,11 +127,13 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
 
         // Two independent contexts + controllers simulating concurrent requests
         await using var db1 = _fixture.CreateDbContext();
-        var ctrl1 = AuthTestHelper.CreateAdminSignupController(db1);
+        var factory1 = _fixture.CreateDbContextFactory();
+        var ctrl1 = AuthTestHelper.CreateAdminSignupController(db1, factory1);
         ctrl1.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         ctrl1.ControllerContext.HttpContext.Request.Headers["X-Admin-Signup"] = TestData.AdminSignupToken;
         await using var db2 = _fixture.CreateDbContext();
-        var ctrl2 = AuthTestHelper.CreateAdminSignupController(db2);
+        var factory2 = _fixture.CreateDbContextFactory();
+        var ctrl2 = AuthTestHelper.CreateAdminSignupController(db2, factory2);
         ctrl2.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         ctrl2.ControllerContext.HttpContext.Request.Headers["X-Admin-Signup"] = TestData.AdminSignupToken;
 
@@ -282,7 +284,7 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
 
     private AuthController CreateController() => AuthTestHelper.CreateAuthController(_db);
 
-    private AdminSignupController CreateSignupController() => AuthTestHelper.CreateAdminSignupController(_db);
+    private AdminSignupController CreateSignupController() => AuthTestHelper.CreateAdminSignupController(_db, _fixture.CreateDbContextFactory());
 
     private async Task SeedReferenceDataAsync() => await SeedData.SeedBasicLocationsAsync(_db);
 

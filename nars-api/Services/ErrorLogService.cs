@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NarsApi.Data;
 using NarsApi.Infrastructure;
@@ -5,7 +6,7 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public sealed class ErrorLogService(AppDbContext db, IOptions<LoggingOptions> loggingOptions) : IErrorLogService
+public sealed class ErrorLogService(IDbContextFactory<AppDbContext> dbFactory, IOptions<LoggingOptions> loggingOptions) : IErrorLogService
 {
     public async Task LogBatchAsync(List<ErrorLog> entries, CancellationToken ct = default)
     {
@@ -20,6 +21,7 @@ public sealed class ErrorLogService(AppDbContext db, IOptions<LoggingOptions> lo
             entries = [.. entries.Take(maxSize)];
         }
 
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
         db.ErrorLogs.AddRange(entries);
         await db.SaveChangesAsync(ct);
     }

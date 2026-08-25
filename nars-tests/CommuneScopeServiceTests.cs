@@ -8,7 +8,7 @@ namespace NarsApi.Tests;
 
 public class CommuneScopeServiceTests
 {
-    private static CommuneScopeService CreateService(AppDbContext db) => new(db);
+    private static CommuneScopeService CreateService(AppDbContext db) => new(new TestDbContextFactory(db));
 
     private static async Task SeedLocationsAsync(AppDbContext db)
     {

@@ -322,7 +322,7 @@ def test_segment_rejects_oversized_upload(monkeypatch):
 
 
 @requires_torch
-def test_segment_end_to_end_returns_geojson():
+def test_segment_end_to_end_returns_geojson(monkeypatch: pytest.MonkeyPatch):
     """Full request path with the model actually loaded. The test image has no
     checkpoint, so weights are random and is_loaded is False — flip it to True
     to pass the fail-closed readiness gate while still exercising the whole
@@ -331,7 +331,9 @@ def test_segment_end_to_end_returns_geojson():
 
     with TestClient(live_app) as live:
         assert roads._models["buildings"] is not None
-        roads._models["buildings"].is_loaded = True
+        # Use monkeypatch so the mutation is scoped to this test and doesn't
+        # leak into later tests that verify the default is_loaded=False.
+        monkeypatch.setattr(roads._models["buildings"], "is_loaded", True)
         resp = live.post(
             "/segment/buildings",
             params={**BBOX, "threshold": 0.5},

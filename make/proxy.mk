@@ -6,9 +6,9 @@ PROXY_CONTAINER ?= kind-proxy
 .PHONY: port-forward-start
 port-forward-start: ## Start kubectl port-forward inside the kind container (background)
 	@echo "→ Starting port-forward inside kind container..."
-	@docker exec $(CLUSTER_NAME)-control-plane sh -c 'pkill -f "port-forward.*ingress-nginx" 2>/dev/null; true' 2>/dev/null || true
+	@docker exec "$(CLUSTER_NAME)-control-plane" sh -c 'pkill -f "port-forward.*ingress-nginx" 2>/dev/null; true' 2>/dev/null || true
 	@sleep 0.5
-	@docker exec -d $(CLUSTER_NAME)-control-plane kubectl port-forward --address 0.0.0.0 \
+	@docker exec -d "$(CLUSTER_NAME)-control-plane" kubectl port-forward --address 0.0.0.0 \
 		-n ingress-nginx service/ingress-nginx-controller $(APP_PORT):80 > /dev/null 2>&1
 	@docker exec -d $(CLUSTER_NAME)-control-plane kubectl port-forward --address 0.0.0.0 \
 		-n ingress-nginx service/ingress-nginx-controller $(APP_TLS_PORT):443 > /dev/null 2>&1
@@ -17,7 +17,7 @@ port-forward-start: ## Start kubectl port-forward inside the kind container (bac
 
 .PHONY: port-forward-stop
 port-forward-stop: ## Stop port-forward inside the kind container
-	@docker exec $(CLUSTER_NAME)-control-plane sh -c 'pkill -f "port-forward.*ingress-nginx" 2>/dev/null; true' 2>/dev/null || true
+	@docker exec "$(CLUSTER_NAME)-control-plane" sh -c 'pkill -f "port-forward.*ingress-nginx" 2>/dev/null; true' 2>/dev/null || true
 	@echo "✓ Port-forward stopped"
 
 .PHONY: proxy-up

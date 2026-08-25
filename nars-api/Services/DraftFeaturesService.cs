@@ -59,7 +59,7 @@ public enum DraftReviewStatus
 }
 
 public class DraftFeaturesService(
-    AppDbContext db,
+    IDbContextFactory<AppDbContext> dbFactory,
     ISegmentationClient segmentationClient,
     ICommuneScopeService communeScope,
     IDateTimeProvider timeProvider) : IDraftFeaturesService
@@ -75,6 +75,8 @@ public class DraftFeaturesService(
         {
             throw new UnauthorizedAccessException("You do not have access to this commune.");
         }
+
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
 
         var commune = await db.Communes.FindAsync([communeId], ct);
         if (commune is null)
@@ -119,6 +121,8 @@ public class DraftFeaturesService(
             throw new UnauthorizedAccessException("You do not have access to this commune.");
         }
 
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+
         var query = db.AiDraftFeatures
             .Where(f => f.CommuneId == communeId && f.Status == status);
 
@@ -155,6 +159,8 @@ public class DraftFeaturesService(
         string callerRole, int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
         Guid userId, Guid draftId, bool accept, CancellationToken ct)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+
         // Read-only: the status transition below goes through a conditional
         // ExecuteUpdateAsync, so the draft is loaded without change tracking.
         var draft = await db.AiDraftFeatures.AsNoTracking()
@@ -180,7 +186,7 @@ public class DraftFeaturesService(
         // of silently overwriting the winner's decision.
         var newStatus = accept ? AiDraftFeature.StatusAccepted : AiDraftFeature.StatusRejected;
         var reviewedAt = timeProvider.UtcNow;
-        var affected = await TryReviewDraftAsync(draftId, newStatus, userId, reviewedAt, ct);
+        var affected = await TryReviewDraftAsync(db, draftId, newStatus, userId, reviewedAt, ct);
 
         if (affected == 0)
         {
@@ -201,7 +207,7 @@ public class DraftFeaturesService(
     /// which does not implement ExecuteUpdateAsync.
     /// </summary>
     protected virtual async Task<int> TryReviewDraftAsync(
-        Guid draftId, string newStatus, Guid reviewedBy, DateTimeOffset reviewedAt, CancellationToken ct)
+        AppDbContext db, Guid draftId, string newStatus, Guid reviewedBy, DateTimeOffset reviewedAt, CancellationToken ct)
     {
         return await db.AiDraftFeatures
             .Where(f => f.Id == draftId && f.Status == AiDraftFeature.StatusPending)
