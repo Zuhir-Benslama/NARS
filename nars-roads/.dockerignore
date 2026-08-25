@@ -9,8 +9,10 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 # tests/ is NOT excluded — needed by the test stage (--target test)
-# weights/ excluded — fetched by initContainer at runtime, not needed in build context
-weights/
+# weights/ is a dev fallback (empty dir with .gitkeep). The initContainer
+# fetches real weights at runtime into an emptyDir, but the COPY in
+# Dockerfile.nars-roads needs the directory present in the build context.
+# weights/*.pth
 docs/
 *.md
 LICENSE
