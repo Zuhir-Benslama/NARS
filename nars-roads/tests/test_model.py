@@ -7,9 +7,10 @@ stays runnable on machines without the ML stack.
 
 import numpy as np
 import pytest
-from app.model import InvalidTileError, SegmentationModel, TileTooLargeError
 from helpers import DEFAULT_TRANSFORM, make_tiff_bytes, requires_torch
 from rasterio.transform import Affine, from_bounds
+
+from app.model import InvalidTileError, SegmentationModel, TileTooLargeError
 
 
 def _normalize(arr):

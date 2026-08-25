@@ -199,7 +199,6 @@ def test_polygons_bad_region_keeps_valid_one(monkeypatch):
     # One degenerate region must not prevent the valid region's polygon from
     # being emitted — the guard's reason to exist.
     import skimage.measure
-
     from skimage.measure import find_contours as real_find_contours
 
     prob = np.zeros((60, 60), dtype=np.float32)

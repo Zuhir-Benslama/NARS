@@ -81,9 +81,9 @@ def mask_to_linestrings(
 def mask_to_polygons(
     prob_mask: np.ndarray, transform: rasterio.Affine, threshold: float = 0.5
 ) -> list[Feature]:
+    from scipy import ndimage
     from skimage.measure import find_contours, label
     from skimage.morphology import closing, remove_small_objects
-    from scipy import ndimage
 
     binary = prob_mask > threshold
     binary = closing(binary)

@@ -5,11 +5,12 @@ here runs against the app with _model == None. That is enough to exercise
 auth, validation, upload caps and the health/ready contract end to end."""
 
 import pytest
+from fastapi.testclient import TestClient
+from helpers import AUTH_TOKEN, make_tiff_bytes, requires_torch
+
 import app.main as roads
 from app.main import app
 from app.model import InvalidTileError, TileTooLargeError
-from fastapi.testclient import TestClient
-from helpers import AUTH_TOKEN, make_tiff_bytes, requires_torch
 
 client = TestClient(app)
 
@@ -212,8 +213,9 @@ def test_segment_returns_500_on_inference_failure(monkeypatch):
 
 
 def test_segment_schema_rejects_malformed_feature():
-    from app.schemas import SegmentResponse
     from pydantic import ValidationError
+
+    from app.schemas import SegmentResponse
 
     with pytest.raises(ValidationError):
         SegmentResponse.model_validate(

@@ -11,9 +11,9 @@ from typing import Any, Literal
 from pydantic import BaseModel
 
 __all__ = [
-    "FeatureGeometry",
     "Feature",
     "FeatureCollection",
+    "FeatureGeometry",
     "SegmentResponse",
 ]
 
