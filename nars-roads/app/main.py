@@ -240,7 +240,7 @@ def _segment_task(
                 fg_prob, transform = future.result(timeout=INFERENCE_TIMEOUT)
             except concurrent.futures.TimeoutError:
                 future.cancel()
-                raise HTTPException(  # noqa: TRY301 - re-raised by except HTTPException below
+                raise HTTPException(
                     status_code=504,
                     detail=(f"Inference did not complete within {INFERENCE_TIMEOUT}s"),
                 )

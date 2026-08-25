@@ -35,7 +35,7 @@ def main() -> None:
         try:
             with Image.open(png) as img:
                 img.convert("RGB").save(pdf, "PDF", resolution=150)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - Pillow raises broad exceptions
             print(f"Error: cannot open '{png.name}' — {e}", file=sys.stderr)
             failures += 1
 

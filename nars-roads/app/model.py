@@ -32,8 +32,8 @@ if TYPE_CHECKING:
     import torch
 
 __all__ = [
-    "SegmentationModel",
     "InvalidTileError",
+    "SegmentationModel",
     "TileTooLargeError",
 ]
 
