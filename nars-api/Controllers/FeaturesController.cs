@@ -72,7 +72,8 @@ public class FeaturesController(
 
         await featureService.SaveFeatureAsync(entity, body.Type, cancellationToken);
 
-        logger.LogInformation("[Features] User {UserId} created {Type} {Id}", CurrentUserId, body.Type, newId);
+        var safeTypeForLog = body.Type.Replace("\r", " ").Replace("\n", " ");
+        logger.LogInformation("[Features] User {UserId} created {Type} {Id}", CurrentUserId, safeTypeForLog, newId);
 
         await MaybeQueueScatteredRefreshAsync(body.Type);
 
