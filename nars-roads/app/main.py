@@ -54,9 +54,7 @@ TILE_SIZE = _env_int("NARS_ROADS_TILE_SIZE", 1024)
 MAX_TILE_BYTES = _env_int("NARS_ROADS_MAX_TILE_BYTES", 50 * 1024 * 1024)
 # How many inferences may run concurrently before requests queue in the
 # threadpool. Sized for the pod memory limit; raise/lower per deployment.
-MAX_CONCURRENT_INFERENCES = max(
-    1, _env_int("NARS_ROADS_MAX_CONCURRENT_INFERENCES", 2)
-)
+MAX_CONCURRENT_INFERENCES = max(1, _env_int("NARS_ROADS_MAX_CONCURRENT_INFERENCES", 2))
 # Wall-clock ceiling on a single predict() call.  A pathological tile that
 # hangs the model would otherwise hold a semaphore slot indefinitely; with
 # MAX_CONCURRENT_INFERENCES=2 just two such tiles exhaust all capacity.
@@ -244,10 +242,7 @@ def _segment_task(
                 future.cancel()
                 raise HTTPException(  # noqa: TRY301 - re-raised by except HTTPException below
                     status_code=504,
-                    detail=(
-                        f"Inference did not complete within "
-                        f"{INFERENCE_TIMEOUT}s"
-                    ),
+                    detail=(f"Inference did not complete within {INFERENCE_TIMEOUT}s"),
                 )
             # Only the buildings postprocessor exists today. A future task
             # (e.g. roads) would dispatch to mask_to_linestrings here, so the

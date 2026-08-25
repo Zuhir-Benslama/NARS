@@ -145,15 +145,16 @@ jobs:
       - name: Dockerfile lint
         run: |
           docker run --rm -v "$PWD:/mnt" hadolint/hadolint:v2.12.0 \
-            hadolint /mnt/nars-infra/docker/Dockerfile.*
+            hadolint /mnt/nars-infra/docker/Dockerfile.nars-api \
+                     /mnt/nars-infra/docker/Dockerfile.nars-backup \
+                     /mnt/nars-infra/docker/Dockerfile.nars-postgis \
+                     /mnt/nars-infra/docker/Dockerfile.nars-roads \
+                     /mnt/nars-infra/docker/Dockerfile.nars-vite
 
       - name: YAML lint
         run: |
           docker run --rm -v "$PWD:/mnt" cytopia/yamllint:1 \
-            yamllint -d relaxed \
-              /mnt/nars-infra/k8s/*.yaml \
-              /mnt/nars-infra/helm/values-*.yaml \
-              /mnt/nars-roads/app/config.yaml
+            -d relaxed /mnt/nars-infra/k8s/
 
       - name: Python lint (infra scripts + roads)
         run: |

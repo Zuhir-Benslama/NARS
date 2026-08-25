@@ -47,6 +47,7 @@ IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 # values above this threshold are assumed to be [0,255] and rescaled.
 FLOAT_BYTE_SCALE_THRESHOLD = 2.0
 
+
 # Hard ceiling on decoded pixels (H x W) per tile. The upload-size cap bounds
 # the compressed bytes, but a highly compressible TIFF can decompress to
 # gigabytes, so we also bound the decoded footprint before allocating the
