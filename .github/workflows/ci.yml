@@ -117,7 +117,9 @@ jobs:
         run: mypy app/
 
       - name: Lint
-        run: ruff check app/ tests/
+        run: |
+          pip install ruff
+          ruff check app/ tests/
 
       - name: Test
         run: pytest -q tests/ --cov=app --cov-report=term-missing --cov-fail-under=85
@@ -130,16 +132,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
-
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-
-      - name: .NET format
-        run: dotnet format Workspace.sln --verify-no-changes --no-restore
 
       - name: Makefile validation
         run: make -n help

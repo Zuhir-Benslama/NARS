@@ -113,7 +113,7 @@ export async function setLang(lang: string): Promise<void> {
     }
   }
 
-  i18n.global.locale.value = lang
+  i18n.global.locale.value = lang as typeof i18n.global.locale.value
   try {
     localStorage.setItem("nars_lang", lang)
   } catch {}

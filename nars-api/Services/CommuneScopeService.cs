@@ -48,21 +48,21 @@ public sealed class CommuneScopeService(IDbContextFactory<AppDbContext> dbFactor
                 return callerCommuneId == targetCommuneId;
 
             case UserRoles.DairaAdmin:
-            {
-                if (!callerDairaId.HasValue) return false;
-                await using var db = await dbFactory.CreateDbContextAsync(ct);
-                return await db.Communes.AnyAsync(
-                    c => c.CommuneId == targetCommuneId && c.DairaId == callerDairaId.Value, ct);
-            }
+                {
+                    if (!callerDairaId.HasValue) return false;
+                    await using var db = await dbFactory.CreateDbContextAsync(ct);
+                    return await db.Communes.AnyAsync(
+                        c => c.CommuneId == targetCommuneId && c.DairaId == callerDairaId.Value, ct);
+                }
 
             case UserRoles.WilayaAdmin:
-            {
-                if (!callerWilayaId.HasValue) return false;
-                await using var db = await dbFactory.CreateDbContextAsync(ct);
-                return await db.Communes.AnyAsync(
-                    c => c.CommuneId == targetCommuneId
-                        && db.Dairas.Any(d => d.DairaId == c.DairaId && d.WilayaId == callerWilayaId.Value), ct);
-            }
+                {
+                    if (!callerWilayaId.HasValue) return false;
+                    await using var db = await dbFactory.CreateDbContextAsync(ct);
+                    return await db.Communes.AnyAsync(
+                        c => c.CommuneId == targetCommuneId
+                            && db.Dairas.Any(d => d.DairaId == c.DairaId && d.WilayaId == callerWilayaId.Value), ct);
+                }
 
             default:
                 return false;
