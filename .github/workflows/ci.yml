@@ -4,24 +4,24 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
 
 jobs:
-  # ── .NET API + Tests ──────────────────────────────────────────────────
-  nars-api:
-    name: ".NET API"
+  # ─── .NET (nars-api + nars-tests) ──────────────────────────
+  dotnet:
+    name: .NET
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: nars-api
     steps:
       - uses: actions/checkout@v4
 
@@ -29,39 +29,40 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      - name: Restore
-        run: dotnet restore
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: dotnet-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
+          restore-keys: dotnet-${{ runner.os }}-
 
-      - name: Build
-        run: dotnet build --no-restore
+      - run: dotnet restore Workspace.sln
 
       - name: Format check
         run: dotnet format Workspace.sln --verify-no-changes --no-restore
-        working-directory: .
 
-      - name: Unit tests
+      - name: Build
+        run: dotnet build Workspace.sln --no-restore
+
+      - name: Unit tests + coverage
         run: >
-          dotnet test ../nars-tests/NarsApi.Tests.csproj
+          dotnet test nars-tests/NarsApi.Tests.csproj
           --no-restore
           --filter "Category!=Service"
-          --logger "trx;LogFileName=unit.trx"
+          /p:CollectCoverage=true
+          /p:CoverletOutputFormat=cobertura
+          /p:CoverletOutput=${{ github.workspace }}/coverage.cobertura.xml
 
-      - name: Upload test results
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: nars-api-unit-results
-          path: "**/*.trx"
-          retention-days: 7
+          name: dotnet-coverage
+          path: coverage.cobertura.xml
+          if-no-files-found: ignore
 
-  # ── Vue 3 Frontend ───────────────────────────────────────────────────
-  nars-web:
-    name: "Vue Frontend"
+  # ─── Frontend (nars-web) ────────────────────────────────────
+  web:
+    name: Frontend
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: nars-web
     steps:
       - uses: actions/checkout@v4
 
@@ -71,29 +72,37 @@ jobs:
           cache: npm
           cache-dependency-path: nars-web/package-lock.json
 
-      - name: Install
-        run: npm ci
+      - run: npm ci
+        working-directory: nars-web
 
-      - name: Lint
-        run: npm run lint
-
-      - name: Typecheck
+      - name: Type-check
         run: npm run typecheck
+        working-directory: nars-web
 
-      - name: Test
-        run: npm run test:run
+      - name: Lint (ESLint + Prettier)
+        run: npm run lint
+        working-directory: nars-web
+
+      - name: Lint (Stylelint)
+        run: npm run lint:css
+        working-directory: nars-web
 
       - name: Build
         run: npm run build
+        working-directory: nars-web
 
-  # ── Python Segmentation Service ──────────────────────────────────────
-  nars-roads:
-    name: "Python Service"
+      - name: Unit tests
+        run: npm run test:run
+        working-directory: nars-web
+
+      - name: Audit
+        run: npm run audit
+        working-directory: nars-web
+
+  # ─── Roads type-check (nars-roads) ────────────────────────
+  roads:
+    name: Roads
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: nars-roads
     steps:
       - uses: actions/checkout@v4
 
@@ -101,66 +110,103 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: System dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            gdal-bin libgdal-dev libgl1
+      - name: Install mypy
+        run: pip install mypy
 
-      - name: Install Python deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+      - name: Mypy
+        run: mypy app/ tests/
+        working-directory: nars-roads
 
-      - name: Type check
-        run: mypy app/
-
-      - name: Lint
-        run: |
-          pip install ruff==0.16.4
-          ruff check app/ tests/
-
-      - name: Test
-        run: pytest -q tests/ --cov=app --cov-report=term-missing --cov-fail-under=85
-
-  # ── Infrastructure Linting ───────────────────────────────────────────
+  # ─── Infra lint (shell, docker, yaml, python, node, make) ──
   infra-lint:
-    name: "Infra Lint"
+    name: Infra lint
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
 
-      - name: Makefile validation
-        run: make -n help
-
-      - name: Shell script lint
-        run: docker run --rm -v "$PWD:/mnt" koalaman/shellcheck:v0.11.0 /mnt/nars-infra/scripts/create_national_admin.sh
-
-      - name: Dockerfile lint
+      - name: Install lint tools
         run: |
-          docker run --rm -v "$PWD:/mnt" hadolint/hadolint:v2.12.0 \
-            hadolint /mnt/nars-infra/docker/Dockerfile.nars-api \
-                     /mnt/nars-infra/docker/Dockerfile.nars-backup \
-                     /mnt/nars-infra/docker/Dockerfile.nars-postgis \
-                     /mnt/nars-infra/docker/Dockerfile.nars-roads \
-                     /mnt/nars-infra/docker/Dockerfile.nars-vite
+          pip install yamllint ruff checkmake
 
-      - name: YAML lint
-        run: |
-          docker run --rm -v "$PWD:/mnt" cytopia/yamllint:1 \
-            -d relaxed /mnt/nars-infra/k8s/
+          # shellcheck
+          SC_VERSION=v0.11.0
+          curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/${SC_VERSION}/shellcheck-${SC_VERSION}.linux.x86_64.tar.xz" \
+            | tar -xJ --strip-components=1 -C /usr/local/bin shellcheck-${SC_VERSION}/shellcheck
 
-      - name: Python lint (infra scripts + roads)
+          # hadolint
+          HL_VERSION=v2.12.0
+          sudo curl -fsSL -o /usr/local/bin/hadolint "https://github.com/hadolint/hadolint/releases/download/${HL_VERSION}/hadolint-Linux-x86_64" \
+            && sudo chmod +x /usr/local/bin/hadolint
+
+      - name: Shellcheck
+        run: shellcheck nars-infra/scripts/*.sh
+
+      - name: Hadolint
+        run: hadolint --failure-threshold error nars-infra/docker/Dockerfile.*
+
+      - name: Yamllint
+        run: >
+          yamllint -c nars-infra/.yamllint.yaml
+          nars-infra/k8s/*.yaml
+          nars-infra/k8s/helm-values/*.yaml
+          nars-infra/roads/*.yaml
+
+      - name: Ruff
         run: |
-          pip install ruff==0.16.4
           ruff check nars-infra/scripts/ nars-roads/app/ nars-roads/tests/
           ruff format --check nars-infra/scripts/ nars-roads/app/ nars-roads/tests/
 
       - name: Node syntax check
-        run: for f in nars-infra/scripts/*.mjs; do node --check "$f"; done
+        run: |
+          for f in nars-infra/scripts/*.mjs; do node --check "$f"; done
+
+      - name: Makefile syntax
+        run: |
+          make -n help > /dev/null 2>&1
+          echo "✓ Makefile syntax OK"
+
+      - name: Undefined variables
+        run: |
+          make -Rr --warn-undefined-variables -n help 2>&1 \
+            | grep -i 'warning.*undefined' | grep -v GNUMAKEFLAGS \
+            && { echo "✖ Undefined variable references found"; exit 1; } \
+            || echo "✓ No undefined variable references"
+
+      - name: Checkmake
+        run: checkmake --config=checkmake.ini Makefile
+
+      - name: Tag guard
+        run: |
+          DEPLOY_ENV=production IMAGE_TAG=latest ALLOW_LATEST= make _check-pinned-tag 2>/dev/null && {
+            echo "✖ _check-pinned-tag unexpectedly accepted latest in production"
+            exit 1
+          } || echo "✓ latest rejected in production"
+
+          DEPLOY_ENV=production IMAGE_TAG=abc123 ALLOW_LATEST= make _check-pinned-tag
+          echo "✓ pinned tag accepted in production"
+
+          DEPLOY_ENV=production IMAGE_TAG='a`rm`b' ALLOW_LATEST= make _check-pinned-tag 2>/dev/null && {
+            echo "✖ _check-pinned-tag unexpectedly accepted hostile tag"
+            exit 1
+          } || echo "✓ hostile tag rejected"
+
+          DEPLOY_ENV=production IMAGE_TAG=latest ALLOW_LATEST=1 make _check-pinned-tag
+          echo "✓ ALLOW_LATEST=1 override accepted"
+
+      - name: Local ingress guard
+        run: |
+          DEPLOY_ENV=production make _check-local-ingresses 2>/dev/null && {
+            echo "✖ _check-local-ingresses unexpectedly accepted local ingresses in production"
+            exit 1
+          } || echo "✓ local ingresses rejected in production"
+
+          DEPLOY_ENV=dev make _check-local-ingresses
+          echo "✓ local ingresses allowed in dev"

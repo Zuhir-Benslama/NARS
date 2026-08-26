@@ -34,7 +34,7 @@ export default defineConfig(({ command, mode }) => {
 
     poolOptions: {
       forks: {
-        maxForks: 2,
+        maxForks: 4,
         minForks: 1,
       },
     },
