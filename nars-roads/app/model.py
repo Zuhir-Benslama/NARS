@@ -28,6 +28,8 @@ from rasterio.io import MemoryFile
 from rasterio.transform import from_bounds
 from rasterio.windows import Window
 
+from app.config import env_int
+
 if TYPE_CHECKING:
     import torch
 
@@ -53,20 +55,7 @@ FLOAT_BYTE_SCALE_THRESHOLD = 2.0
 # gigabytes, so we also bound the decoded footprint before allocating the
 # output arrays. 25M pixels keeps the working set well under the pod's 4Gi
 # limit while still accommodating far larger tiles than the service sees.
-def _env_int(key: str, default: int) -> int:
-    """Parse an integer environment variable with a clear startup error."""
-    raw = os.environ.get(key)
-    if raw is None:
-        return default
-    try:
-        return int(raw)
-    except ValueError:
-        raise RuntimeError(  # noqa: TRY003 - dynamic env var name
-            f"Environment variable {key} must be an integer, got: {raw!r}"
-        ) from None
-
-
-MAX_DECODED_PIXELS = _env_int("NARS_ROADS_MAX_DECODED_PIXELS", 25_000_000)
+MAX_DECODED_PIXELS = env_int("NARS_ROADS_MAX_DECODED_PIXELS", 25_000_000)
 
 
 class TileTooLargeError(ValueError):

@@ -226,7 +226,8 @@ public class FieldController(
     {
         if (!FieldService.ValidInspectionStatuses.Contains(status))
         {
-            return Problem(detail: "Status must be 'good' or 'issue'.", statusCode: 400);
+            var allowed = string.Join(", ", FieldService.ValidInspectionStatuses.Select(s => $"'{s}'"));
+            return Problem(detail: $"Status must be one of: {allowed}.", statusCode: 400);
         }
 
         return null;

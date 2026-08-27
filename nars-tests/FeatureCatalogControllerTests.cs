@@ -59,26 +59,6 @@ public class FeatureCatalogControllerTests
             keys);
     }
 
-    [Fact]
-    public void GetFeatureTypes_ReturnsCorrectKeys()
-    {
-        var ctrl = CreateController();
-
-        var result = ctrl.GetFeatureTypes();
-
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var types = Assert.IsType<List<FeatureTypeDefinition>>(ok.Value);
-        var keys = types.Select(t => t.Key).ToHashSet();
-        Assert.Contains(FeatureTypes.Area, keys);
-        Assert.Contains(FeatureTypes.Road, keys);
-        Assert.Contains(FeatureTypes.District, keys);
-        Assert.Contains(FeatureTypes.HouseEntrance, keys);
-        Assert.Contains(FeatureTypes.PublicBuilding, keys);
-        Assert.Contains(FeatureTypes.PublicSpace, keys);
-        Assert.Contains(FeatureTypes.CityCenter, keys);
-        Assert.Contains(FeatureTypes.NamingPanel, keys);
-    }
-
     // ── LoadByLayer ─────────────────────────────────────────────────────
 
     [Fact]

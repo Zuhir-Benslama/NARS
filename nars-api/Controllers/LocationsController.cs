@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using NarsApi.DTOs;
@@ -163,6 +164,7 @@ public class LocationsController(
     // Development-only endpoint for inspecting commune boundary geometry.
 
     /// <summary>Development-only endpoint for inspecting commune boundary geometry details.</summary>
+    [Authorize]
     [HttpGet("commune/{communeId:int}/boundary-debug")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

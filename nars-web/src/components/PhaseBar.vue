@@ -36,7 +36,6 @@ const steps = computed(() =>
     active: i === appStore.currentPhase,
     locked: i > appStore.currentPhase,
     badge: i < appStore.currentPhase ? "✓" : String(i + 1),
-    connectorDone: i < appStore.currentPhase,
   })),
 )
 

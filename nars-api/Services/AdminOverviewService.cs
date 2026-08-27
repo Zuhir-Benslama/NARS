@@ -47,6 +47,52 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
         ORDER BY w.wilaya_id
         """;
 
+    /// <summary>
+    /// Flat CTE returning daira + daira admin + commune + commune user rows
+    /// for a single wilaya. Replaces 4 sequential round-trips (dairas, daira
+    /// admins, communes, commune users) with 1.
+    /// </summary>
+    private const string WilayaReportSql = """
+        WITH daira_admins AS (
+            SELECT DISTINCT ON (u.daira_id)
+                u.daira_id, u.id AS admin_id, u.username AS admin_username,
+                u.name AS admin_name, u.email AS admin_email, u.role AS admin_role
+            FROM users u
+            WHERE u.role = 'daira_admin' AND u.daira_id IS NOT NULL
+              AND u.daira_id IN (SELECT d.daira_id FROM dairas d WHERE d.wilaya_id = @wid)
+            ORDER BY u.daira_id, u.created_at
+        )
+        SELECT
+            d.daira_id AS "DairaId", d.daira_fr AS "DairaFr", d.daira_ar AS "DairaAr",
+            da.admin_id AS "DairaAdminId", da.admin_username AS "DairaAdminUsername",
+            da.admin_name AS "DairaAdminName", da.admin_email AS "DairaAdminEmail",
+            da.admin_role AS "DairaAdminRole",
+            c.commune_id AS "CommuneId", c.commune_fr AS "CommuneFr", c.commune_ar AS "CommuneAr",
+            cu.id AS "UserId", cu.username AS "UserUsername", cu.name AS "UserName",
+            cu.email AS "UserEmail", cu.role AS "UserRole"
+        FROM dairas d
+        LEFT JOIN daira_admins da ON da.daira_id = d.daira_id
+        LEFT JOIN communes c ON c.daira_id = d.daira_id
+        LEFT JOIN users cu ON cu.commune_id = c.commune_id AND cu.role = 'commune_user'
+        WHERE d.wilaya_id = @wid
+        ORDER BY d.daira_fr, c.commune_fr, cu.name
+        """;
+
+    /// <summary>
+    /// Flat query returning commune + commune user rows for a single daira.
+    /// Replaces 2 sequential round-trips (communes, commune users) with 1.
+    /// </summary>
+    private const string CommuneUsersSql = """
+        SELECT
+            c.commune_id AS "CommuneId", c.commune_fr AS "CommuneFr", c.commune_ar AS "CommuneAr",
+            cu.id AS "UserId", cu.username AS "UserUsername", cu.name AS "UserName",
+            cu.email AS "UserEmail", cu.role AS "UserRole"
+        FROM communes c
+        LEFT JOIN users cu ON cu.commune_id = c.commune_id AND cu.role = 'commune_user'
+        WHERE c.daira_id = @did
+        ORDER BY c.commune_fr, cu.name
+        """;
+
     public async Task<(List<WilayaSummary> Items, int Total)> GetNationalOverviewAsync(int skip = 0, int take = 500, CancellationToken cancellationToken = default)
     {
         var total = await db.Wilayas.CountAsync(cancellationToken);
@@ -100,6 +146,20 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
             return null;
         }
 
+        // Single CTE replaces 4 sequential round-trips (dairas, daira admins,
+        // communes, commune users). Feature counts remain a separate query.
+#pragma warning disable S2077 // Table and column names are hardcoded constants
+        var rows = await db.Database.SqlQueryRaw<WilayaReportRow>(
+                WilayaReportSql,
+                new NpgsqlParameter("@wid", wilayaId))
+            .ToListAsync(cancellationToken);
+#pragma warning restore S2077
+
+        var userIds = rows.Where(r => r.UserId.HasValue).Select(r => r.UserId!.Value).Distinct().ToArray();
+        var featureCounts = userIds.Length > 0
+            ? await featureStatsService.GetUserFeatureCountsAsync(userIds, cancellationToken)
+            : [];
+
         // Project to a slim AdminInfo and order by CreatedAt so the chosen
         // admin is deterministic when duplicates exist (mirrors the national view).
         var admin = await db.Users.AsNoTracking()
@@ -108,34 +168,39 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
             .Select(u => new AdminInfo(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role))
             .FirstOrDefaultAsync(cancellationToken);
 
-        var dairas = await db.Dairas.AsNoTracking().Where(d => d.WilayaId == wilayaId)
-            .OrderBy(d => d.DairaFr).ToListAsync(cancellationToken);
+        var dairaGroups = rows.GroupBy(r => r.DairaId).ToList();
+        var dairaReports = new List<DairaReport>(dairaGroups.Count);
 
-        var dairaIds = dairas.Select(d => d.DairaId).ToArray();
-
-        // Grouping tolerates duplicate admins per daira (non-unique filtered index).
-        var dairaAdminList = await db.Users
-            .AsNoTracking()
-            .Where(u => u.Role == UserRoles.DairaAdmin && u.DairaId.HasValue && dairaIds.Contains(u.DairaId.Value))
-            .Select(u => new AdminPick(null, u.DairaId, u.Id, u.Username, u.Name, u.Email, u.Role, u.CreatedAt))
-            .ToListAsync(cancellationToken);
-        var dairaAdmins = dairaAdminList.GroupBy(u => u.DairaId!.Value)
-            .ToDictionary(g => g.Key, g => g.OrderBy(u => u.CreatedAt).First());
-
-        var communeReports = await BuildCommunesForDairasAsync(dairaIds, cancellationToken);
-
-        var dairaReports = dairas.Select(daira =>
+        foreach (var group in dairaGroups)
         {
-            var da = dairaAdmins.GetValueOrDefault(daira.DairaId);
+            var first = group.First();
+            var dairaAdmin = first.DairaAdminId is not null
+                ? new AdminInfo(first.DairaAdminId.Value.ToString(), first.DairaAdminUsername!, first.DairaAdminName!, first.DairaAdminEmail!, first.DairaAdminRole!)
+                : null;
 
-            return new DairaReport(
-                DairaId: daira.DairaId,
-                DairaNameFr: daira.DairaFr ?? "",
-                DairaNameAr: daira.DairaAr ?? "",
-                DairaAdmin: da is null ? null : da.ToAdminInfo(),
-                Communes: communeReports.GetValueOrDefault(daira.DairaId) ?? []
-            );
-        }).ToList();
+            var communeGroups = group
+                .Where(r => r.CommuneId.HasValue)
+                .GroupBy(r => r.CommuneId!.Value)
+                .ToList();
+
+            var communeReports = new List<CommuneReport>(communeGroups.Count);
+            foreach (var cg in communeGroups)
+            {
+                var cFirst = cg.First();
+                var users = cg.Where(r => r.UserId.HasValue).Select(r =>
+                {
+                    var uid = r.UserId!.Value;
+                    featureCounts.TryGetValue(uid, out var stats);
+                    return stats ?? new UserFeatureStats(
+                        uid.ToString(), r.UserUsername!, r.UserName!, r.UserEmail!, r.UserRole!,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0);
+                }).ToList();
+
+                communeReports.Add(new CommuneReport(cFirst.CommuneId!.Value, cFirst.CommuneFr ?? "", cFirst.CommuneAr ?? "", users));
+            }
+
+            dairaReports.Add(new DairaReport(first.DairaId, first.DairaFr ?? "", first.DairaAr ?? "", dairaAdmin, communeReports));
+        }
 
         return new WilayaReport(
             WilayaId: wilayaId,
@@ -162,89 +227,48 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
             .Select(u => new AdminInfo(u.Id.ToString(), u.Username, u.Name, u.Email, u.Role))
             .FirstOrDefaultAsync(cancellationToken);
 
-        var communesByDaira = await BuildCommunesForDairasAsync([dairaId], cancellationToken);
-        var communes = communesByDaira.GetValueOrDefault(dairaId) ?? [];
+        // Single query replaces 2 sequential round-trips (communes, commune users).
+#pragma warning disable S2077 // Table and column names are hardcoded constants
+        var rows = await db.Database.SqlQueryRaw<CommuneUserRow>(
+                CommuneUsersSql,
+                new NpgsqlParameter("@did", dairaId))
+            .ToListAsync(cancellationToken);
+#pragma warning restore S2077
+
+        var userIds = rows.Where(r => r.UserId.HasValue).Select(r => r.UserId!.Value).Distinct().ToArray();
+        var featureCounts = userIds.Length > 0
+            ? await featureStatsService.GetUserFeatureCountsAsync(userIds, cancellationToken)
+            : [];
+
+        var communeGroups = rows.GroupBy(r => r.CommuneId).ToList();
+        var communeReports = new List<CommuneReport>(communeGroups.Count);
+
+        foreach (var cg in communeGroups)
+        {
+            var cFirst = cg.First();
+            var users = cg.Where(r => r.UserId.HasValue).Select(r =>
+            {
+                var uid = r.UserId!.Value;
+                featureCounts.TryGetValue(uid, out var stats);
+                return stats ?? new UserFeatureStats(
+                    uid.ToString(), r.UserUsername!, r.UserName!, r.UserEmail!, r.UserRole!,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0);
+            }).ToList();
+
+            communeReports.Add(new CommuneReport(cFirst.CommuneId, cFirst.CommuneFr ?? "", cFirst.CommuneAr ?? "", users));
+        }
 
         return new DairaReport(
             DairaId: dairaId,
             DairaNameFr: daira.DairaFr,
             DairaNameAr: daira.DairaAr,
             DairaAdmin: admin,
-            Communes: communes
+            Communes: communeReports
         );
     }
 
-    private async Task<Dictionary<int, List<CommuneReport>>> BuildCommunesForDairasAsync(int[] dairaIds, CancellationToken cancellationToken = default)
-    {
-        var communes = await db.Communes.AsNoTracking().Where(c => dairaIds.Contains(c.DairaId))
-            .OrderBy(c => c.CommuneFr).ToListAsync(cancellationToken);
-
-        var communeIds = communes.Select(c => c.CommuneId).ToArray();
-
-        var users = await db.Users
-            .Where(u => u.CommuneId.HasValue && communeIds.Contains(u.CommuneId.Value))
-            .Where(u => u.Role == UserRoles.CommuneUser)
-            .Select(u => new { u.Id, u.Username, u.Name, u.Email, u.Role, u.CommuneId })
-            .ToListAsync(cancellationToken);
-
-        var userGroups = users.GroupBy(u => u.CommuneId!.Value)
-            .ToDictionary(g => g.Key, g => g.ToList());
-
-        var allUserIds = users.Select(u => u.Id).ToArray();
-        var featureCounts = allUserIds.Length > 0
-            ? await featureStatsService.GetUserFeatureCountsAsync(allUserIds, cancellationToken)
-            : [];
-
-        var result = new Dictionary<int, List<CommuneReport>>();
-        foreach (var communeGroup in communes.GroupBy(c => c.DairaId))
-        {
-            var reports = communeGroup.Select(commune =>
-            {
-                var communeUsers = userGroups.GetValueOrDefault(commune.CommuneId);
-                var userStats = (communeUsers ?? []).Select(u =>
-                {
-                    featureCounts.TryGetValue(u.Id, out var stats);
-                    return stats ?? new UserFeatureStats(
-                        u.Id.ToString(), u.Username, u.Name, u.Email, u.Role,
-                        0, 0, 0, 0, 0, 0, 0, 0, 0
-                    );
-                }).ToList();
-
-                return new CommuneReport(
-                    CommuneId: commune.CommuneId,
-                    CommuneNameFr: commune.CommuneFr ?? "",
-                    CommuneNameAr: commune.CommuneAr ?? "",
-                    Users: userStats
-                );
-            }).ToList();
-
-            result[communeGroup.Key] = reports;
-        }
-
-        return result;
-    }
-
     /// <summary>
-    /// Slim admin projection used to build the overview reports. Loads only the
-    /// display fields (no PasswordHash) and keeps CreatedAt for deterministic
-    /// earliest-admin selection when duplicates exist.
-    /// </summary>
-    private sealed record AdminPick(
-        int? WilayaId,
-        int? DairaId,
-        Guid Id,
-        string Username,
-        string Name,
-        string Email,
-        string Role,
-        DateTime CreatedAt)
-    {
-        public AdminInfo ToAdminInfo() => new(Id.ToString(), Username, Name, Email, Role);
-    }
-
-    /// <summary>
-    /// EF Core entity type for the CTE query result. Maps flat SQL columns
-    /// to the WilayaSummary DTO after materialization.
+    /// EF Core entity type for the national overview CTE query result.
     /// </summary>
     private sealed record WilayaOverviewRow(
         int WilayaId,
@@ -258,4 +282,40 @@ public sealed class AdminOverviewService(AppDbContext db, IFeatureStatsService f
         int DairaCount,
         int CommuneCount,
         int CommuneUserCount);
+
+    /// <summary>
+    /// EF Core entity type for the wilaya report CTE. Flat rows containing
+    /// daira + daira admin + commune + commune user data.
+    /// </summary>
+    private sealed record WilayaReportRow(
+        int DairaId,
+        string DairaFr,
+        string DairaAr,
+        Guid? DairaAdminId,
+        string? DairaAdminUsername,
+        string? DairaAdminName,
+        string? DairaAdminEmail,
+        string? DairaAdminRole,
+        int? CommuneId,
+        string? CommuneFr,
+        string? CommuneAr,
+        Guid? UserId,
+        string? UserUsername,
+        string? UserName,
+        string? UserEmail,
+        string? UserRole);
+
+    /// <summary>
+    /// EF Core entity type for the commune user query. Flat rows containing
+    /// commune + commune user data for a single daira.
+    /// </summary>
+    private sealed record CommuneUserRow(
+        int CommuneId,
+        string CommuneFr,
+        string CommuneAr,
+        Guid? UserId,
+        string? UserUsername,
+        string? UserName,
+        string? UserEmail,
+        string? UserRole);
 }

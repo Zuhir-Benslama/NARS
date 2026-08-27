@@ -22,6 +22,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, UploadFile
 
+from app.config import env_int
 from app.model import (
     InvalidTileError,
     SegmentationModel,
@@ -34,31 +35,18 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("nars-roads")
 
 
-def _env_int(key: str, default: int) -> int:
-    """Parse an integer environment variable with a clear startup error."""
-    raw = os.environ.get(key)
-    if raw is None:
-        return default
-    try:
-        return int(raw)
-    except ValueError:
-        raise RuntimeError(  # noqa: TRY003 - dynamic env var name
-            f"Environment variable {key} must be an integer, got: {raw!r}"
-        ) from None
-
-
 INTERNAL_TOKEN = os.environ.get("NARS_ROADS_INTERNAL_TOKEN")
-TILE_SIZE = _env_int("NARS_ROADS_TILE_SIZE", 1024)
+TILE_SIZE = env_int("NARS_ROADS_TILE_SIZE", 1024)
 # Upper bound on a single tile upload. Inference reads the whole tile into
 # memory, so an oversized upload is a pod-level memory-exhaustion risk.
-MAX_TILE_BYTES = _env_int("NARS_ROADS_MAX_TILE_BYTES", 50 * 1024 * 1024)
+MAX_TILE_BYTES = env_int("NARS_ROADS_MAX_TILE_BYTES", 50 * 1024 * 1024)
 # How many inferences may run concurrently before requests queue in the
 # threadpool. Sized for the pod memory limit; raise/lower per deployment.
-MAX_CONCURRENT_INFERENCES = max(1, _env_int("NARS_ROADS_MAX_CONCURRENT_INFERENCES", 2))
+MAX_CONCURRENT_INFERENCES = max(1, env_int("NARS_ROADS_MAX_CONCURRENT_INFERENCES", 2))
 # Wall-clock ceiling on a single predict() call.  A pathological tile that
 # hangs the model would otherwise hold a semaphore slot indefinitely; with
 # MAX_CONCURRENT_INFERENCES=2 just two such tiles exhaust all capacity.
-INFERENCE_TIMEOUT = _env_int("NARS_ROADS_INFERENCE_TIMEOUT", 120)
+INFERENCE_TIMEOUT = env_int("NARS_ROADS_INFERENCE_TIMEOUT", 120)
 
 # Model registry: feature type -> how to build its model. Each entry is an
 # independent binary (foreground/background) checkpoint, so one task can be

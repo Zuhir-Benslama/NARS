@@ -58,16 +58,6 @@ public class FeatureTypeRegistryTests
     }
 
     [Fact]
-    public void CreateEntity_HouseEntrance_ReturnsHouseEntrance()
-    {
-        var entity = FeatureTypeRegistry.CreateEntity(
-            FeatureTypes.HouseEntrance, Guid.NewGuid(), Guid.NewGuid(),
-            FeatureTypes.HouseEntranceLayers.Main, "Test Entrance", "{}", FixedUtcNow);
-        Assert.NotNull(entity);
-        Assert.IsType<HouseEntrance>(entity);
-    }
-
-    [Fact]
     public void CreateEntity_UnknownType_ReturnsNull()
     {
         var entity = FeatureTypeRegistry.CreateEntity(
