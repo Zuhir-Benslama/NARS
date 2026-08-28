@@ -1,5 +1,5 @@
 SET client_encoding = 'UTF8';
--- SET standard_conforming_strings = on;  -- default since PG 9.1, commented for clarity
+-- SET standard_conforming_strings = on;  -- default in PG 9.1+, kept commented
 
 -- Idempotency: clear existing reference data before re-seeding, but only
 -- INSIDE the seeding transaction so a mid-COPY failure rolls back the
@@ -36,7 +36,8 @@ BEGIN
 END $$;
 
 
-COPY public.wilayas (wilaya_id, wilaya_ar, wilaya_fr, wilaya_latitude, wilaya_longitude) FROM stdin;
+COPY public.wilayas (wilaya_id, wilaya_ar, wilaya_fr, wilaya_latitude,
+    wilaya_longitude) FROM stdin;
 1	أدرار	Adrar	26.4888155	-1.3582442
 2	الشلف	Chlef	36.20342	1.2680696
 3	الأغواط	Laghouat	33.7504405	2.6431094
@@ -96,7 +97,8 @@ COPY public.wilayas (wilaya_id, wilaya_ar, wilaya_fr, wilaya_latitude, wilaya_lo
 57	المغير	El Mghair	33.9496809	5.921089
 58	المنيعة	El Menia	30.5841144	2.88219452
 \.
-COPY public.dairas (daira_id, wilaya_id, daira_ar, daira_fr, daira_name, daira_latitude, daira_longitude) FROM stdin;
+COPY public.dairas (daira_id, wilaya_id, daira_ar, daira_fr, daira_name,
+    daira_latitude, daira_longitude) FROM stdin;
 1	1	أدرار	Adrar	دائرة أدرار, أدرار, الجزائر	27.9324975	-1.423011
 3	1	رقان	Reggane	دائرة رقان, أدرار, 01200, الجزائر	25.531637	-2.0991725
 4	1	تسابيت	Tsabit	دائرة تسابيت, أدرار, 01015, الجزائر	28.498805	-1.1266723
@@ -655,7 +657,8 @@ COPY public.dairas (daira_id, wilaya_id, daira_ar, daira_fr, daira_name, daira_l
 543	58	المنصورة	Mansourah	منصورة, دائرة منصورة, المنيعة, الجزائر	32.0088523	3.2750023
 544	58	المنيعة (ولاية منتدبة)	El Menia (Wilaya Déléguée)	دائرة المنيعة, المنيعة, الجزائر	30.5437321	3.0185968
 \.
-COPY public.communes (commune_id, daira_id, commune_code, commune_ar, commune_fr, commune_name, commune_latitude, commune_longitude) FROM stdin;
+COPY public.communes (commune_id, daira_id, commune_code, commune_ar,
+    commune_fr, commune_name, commune_latitude, commune_longitude) FROM stdin;
 1	1	101	أدرار	Adrar	أدرار، دائرة أدرار، أدرار، 01000، الجزائر	27.8733807	-0.2874884
 2	1	122	بودة	Bouda	بودة، دائرة أدرار، أدرار، الجزائر	28.010002	-0.426797
 3	1	121	أولاد أحمد تيمي	Ouled Ahmed Timmi	أولاد أحمد تيمي، دائرة أدرار، أدرار، الجزائر	27.8510411	-0.2812795
@@ -2207,4 +2210,3 @@ COMMIT;
 VACUUM ANALYZE public.wilayas;
 VACUUM ANALYZE public.dairas;
 VACUUM ANALYZE public.communes;
-
