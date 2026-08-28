@@ -288,6 +288,257 @@ public class ValidationControllerTests
     }
 
     [Fact]
+    public async Task ValidateRoad_OutOfRangeLatitude_Returns400()
+    {
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var ctrl = CreateController(db, factory);
+            var body = new ValidateRoadRequest([
+                new CoordDto(36.0, 3.0),
+                new CoordDto(95.0, 3.0)
+            ]);
+            var result = await ctrl.ValidateRoad(body);
+            var bad = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(400, bad.StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task ValidateRoad_NoRoads_TurnsWithinLimit_ReturnsValid()
+    {
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var ctrl = CreateController(db, factory);
+            var body = new ValidateRoadRequest([
+                new CoordDto(36.0, 3.0),
+                new CoordDto(36.0, 3.01),
+                new CoordDto(36.0, 3.02),
+                new CoordDto(36.0, 3.03)
+            ]);
+            var result = await ctrl.ValidateRoad(body);
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<ValidateRoadResponse>(ok.Value);
+            Assert.True(resp.Valid);
+        }
+    }
+
+    [Fact]
+    public async Task ValidateRoad_Connected_ReturnsValid()
+    {
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var validationMock = new Mock<IValidationService>();
+            validationMock.Setup(v => v.CountUserRoadsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(1);
+            validationMock.Setup(v => v.CheckRoadConnectivityAsync(
+                    It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<double>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+
+            var ctrl = CreateController(db, factory, validationService: validationMock.Object);
+
+            var body = new ValidateRoadRequest([
+                new CoordDto(36.0, 3.0),
+                new CoordDto(36.1, 3.1)
+            ]);
+            var result = await ctrl.ValidateRoad(body);
+
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<ValidateRoadResponse>(ok.Value);
+            Assert.True(resp.Valid);
+        }
+    }
+
+    [Fact]
+    public async Task ValidateDistrict_OutOfRangeLatitude_Returns400()
+    {
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var ctrl = CreateController(db, factory);
+            var body = new ValidateDistrictRequest([
+                new CoordDto(36.0, 3.0),
+                new CoordDto(36.0, 3.1),
+                new CoordDto(100.0, 3.1)
+            ], "residential");
+            var result = await ctrl.ValidateDistrict(body);
+            var bad = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(400, bad.StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task ValidateDistrict_IndustryZone_SkipsAdjacency_ReturnsValid()
+    {
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var validationMock = new Mock<IValidationService>();
+            validationMock.Setup(v => v.CountUserDistrictsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(1);
+            validationMock.Setup(v => v.CheckDistrictOverlapAsync(
+                    It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(false);
+
+            var ctrl = CreateController(db, factory, validationService: validationMock.Object);
+
+            var body = new ValidateDistrictRequest([
+                new CoordDto(36.0, 3.0),
+                new CoordDto(36.0, 3.1),
+                new CoordDto(36.1, 3.1)
+            ], FeatureTypes.DistrictLayers.IndustryZone);
+            var result = await ctrl.ValidateDistrict(body);
+
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<ValidateDistrictResponse>(ok.Value);
+            Assert.True(resp.Valid);
+        }
+    }
+
+    [Fact]
+    public async Task ValidateDistrict_NoAdjacentSiblings_ReturnsValid()
+    {
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var validationMock = new Mock<IValidationService>();
+            validationMock.Setup(v => v.CountUserDistrictsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(1);
+            validationMock.Setup(v => v.CheckDistrictOverlapAsync(
+                    It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(false);
+            validationMock.Setup(v => v.CountSiblingsInSameAreaAsync(
+                    It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(0);
+
+            var ctrl = CreateController(db, factory, validationService: validationMock.Object);
+
+            var body = new ValidateDistrictRequest([
+                new CoordDto(36.0, 3.0),
+                new CoordDto(36.0, 3.1),
+                new CoordDto(36.1, 3.1)
+            ], "residential");
+            var result = await ctrl.ValidateDistrict(body);
+
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<ValidateDistrictResponse>(ok.Value);
+            Assert.True(resp.Valid);
+        }
+    }
+
+    [Fact]
+    public async Task ValidateDistrict_AdjacencyFails_ReturnsInvalid()
+    {
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var validationMock = new Mock<IValidationService>();
+            validationMock.Setup(v => v.CountUserDistrictsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(1);
+            validationMock.Setup(v => v.CheckDistrictOverlapAsync(
+                    It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(false);
+            validationMock.Setup(v => v.CountSiblingsInSameAreaAsync(
+                    It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(1);
+            validationMock.Setup(v => v.CheckDistrictAdjacencyAsync(
+                    It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(false);
+
+            var ctrl = CreateController(db, factory, validationService: validationMock.Object);
+
+            var body = new ValidateDistrictRequest([
+                new CoordDto(36.0, 3.0),
+                new CoordDto(36.0, 3.1),
+                new CoordDto(36.1, 3.1)
+            ], "residential");
+            var result = await ctrl.ValidateDistrict(body);
+
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<ValidateDistrictResponse>(ok.Value);
+            Assert.False(resp.Valid);
+            Assert.NotNull(resp.Error);
+            Assert.Contains("connect", resp.Error, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public async Task DistrictsCoverage_AnonymousUser_ReturnsCovered()
+    {
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var ctrl = new ValidationController(
+                Options.Create(new ValidationOptions()),
+                new ValidationService(new TestDbContextFactory(db)),
+                Mock.Of<ILogger<ValidationController>>(),
+                Mock.Of<IWebHostEnvironment>())
+            {
+                ControllerContext = new ControllerContext
+                {
+                    HttpContext = new DefaultHttpContext()
+                }
+            };
+
+            var result = await ctrl.DistrictsCoverage();
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<DistrictCoverageResponse>(ok.Value);
+            Assert.True(resp.Covered);
+        }
+    }
+
+    [Fact]
+    public async Task DistrictsCoverage_AllCovered_ReturnsCovered()
+    {
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var validationMock = new Mock<IValidationService>();
+            validationMock.Setup(v => v.CountUserUrbanAreasAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(1);
+            validationMock.Setup(v => v.CountUserDistrictsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(1);
+            validationMock.Setup(v => v.CheckDistrictCoverageAsync(
+                    It.IsAny<Guid>(), It.IsAny<double>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+
+            var ctrl = CreateController(db, factory, validationService: validationMock.Object);
+
+            var result = await ctrl.DistrictsCoverage();
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<DistrictCoverageResponse>(ok.Value);
+            Assert.True(resp.Covered);
+        }
+    }
+
+    [Fact]
+    public async Task DistrictsCoverage_GapsRemain_ReturnsNotCovered()
+    {
+        var (db, factory) = CreateDb();
+        await using (db)
+        {
+            var validationMock = new Mock<IValidationService>();
+            validationMock.Setup(v => v.CountUserUrbanAreasAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(1);
+            validationMock.Setup(v => v.CountUserDistrictsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(1);
+            validationMock.Setup(v => v.CheckDistrictCoverageAsync(
+                    It.IsAny<Guid>(), It.IsAny<double>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(false);
+
+            var ctrl = CreateController(db, factory, validationService: validationMock.Object);
+
+            var result = await ctrl.DistrictsCoverage();
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var resp = Assert.IsType<DistrictCoverageResponse>(ok.Value);
+            Assert.False(resp.Covered);
+            Assert.Contains("gaps", resp.Message, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
     public async Task DistrictsCoverage_NoDistricts_ReturnsNotCovered()
     {
         var (db, factory) = CreateDb();
@@ -312,3 +563,4 @@ public class ValidationControllerTests
         }
     }
 }
+

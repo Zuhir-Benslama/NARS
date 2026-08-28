@@ -13,9 +13,9 @@
       These are a REGRESSION FLOOR, not a target. CI enforces coverage on the
       UNIT-ONLY run (filter Category!=Service), so the floor must fit the
       lower of the two measured runs (excludes generated code — see the Exclude
-      property below). Last measured 2026-08-16:
-        - unit-only (what CI gates on): ~61.5% line / 53.6% branch
-        - full suite incl. service tests: ~77.3% line / 67.1% branch
+      property below). Last measured 2026-08-28:
+        - unit-only (what CI gates on): ~63.2% line / ~60.0% branch
+        - full suite incl. service tests: ~79.5% line / ~73.3% branch
       Raise as coverage improves — do not lower. The single Threshold value
       applies to both line and branch, so it is capped by the lower (branch)
       metric of the unit-only run.
