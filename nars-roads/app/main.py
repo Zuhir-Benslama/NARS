@@ -50,9 +50,9 @@ INFERENCE_TIMEOUT = env_int("NARS_ROADS_INFERENCE_TIMEOUT", 120)
 
 # Model registry: feature type -> how to build its model. Each entry is an
 # independent binary (foreground/background) checkpoint, so one task can be
-# updated or rolled back without touching the others. Roads stays commented
-# out until a road checkpoint exists; enabling it is this entry plus a
-# /segment/roads endpoint (postprocess: mask_to_linestrings).
+# updated or rolled back without touching the others. Roads is not yet
+# registered — no road checkpoint exists yet; adding it is a "roads" entry here
+# plus a /segment/roads endpoint (postprocess: mask_to_linestrings).
 MODEL_SPECS: dict[str, dict] = {
     "buildings": {
         "weights_path": os.environ.get(
@@ -60,10 +60,6 @@ MODEL_SPECS: dict[str, dict] = {
         ),
         "num_classes": 2,
     },
-    # "roads": {
-    #     "weights_path": os.environ.get("NARS_ROADS_ROADS_WEIGHTS_PATH"),
-    #     "num_classes": 2,
-    # },
 }
 
 # Built lazily in lifespan so importing this module (tests, tooling, --reload)
@@ -226,12 +222,12 @@ def _segment_task(
             )
             try:
                 fg_prob, transform = future.result(timeout=INFERENCE_TIMEOUT)
-            except concurrent.futures.TimeoutError:
+            except concurrent.futures.TimeoutError as exc:
                 future.cancel()
                 raise HTTPException(
                     status_code=504,
                     detail=(f"Inference did not complete within {INFERENCE_TIMEOUT}s"),
-                )
+                ) from exc
             # Only the buildings postprocessor exists today. A future task
             # (e.g. roads) would dispatch to mask_to_linestrings here, so the
             # branch is dropped rather than left unreachable.

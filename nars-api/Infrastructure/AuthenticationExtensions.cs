@@ -140,16 +140,12 @@ public static class AuthenticationExtensions
                 };
             });
 
-        services.AddAuthorization(options =>
-        {
-            // Backs [Authorize(Policy = "CanReviewFeatures")] on the
-            // AI draft-feature accept/reject endpoints.
-            options.AddPolicy("CanReviewFeatures", policy => policy.RequireAssertion(ctx =>
+        services.AddAuthorizationBuilder()
+            .AddPolicy("CanReviewFeatures", policy => policy.RequireAssertion(ctx =>
             {
                 var role = ctx.User.FindFirstValue(ClaimNames.Role);
                 return UserRoles.IsDraftReviewer(role);
             }));
-        });
 
         // Register JwtService with the same secret and options used for authentication
         services.AddScoped<IJwtService, JwtService>(sp =>

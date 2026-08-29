@@ -37,8 +37,5 @@ public sealed class SecurityStampCache(IMemoryCache cache) : ISecurityStampCache
         cache.Set(CacheKey(userId), stamp, opts);
     }
 
-    public void EvictStamp(Guid userId)
-    {
-        cache.Remove(CacheKey(userId));
-    }
+    public void EvictStamp(Guid userId) => cache.Remove(CacheKey(userId));
 }

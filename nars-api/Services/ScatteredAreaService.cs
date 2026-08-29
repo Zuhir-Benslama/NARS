@@ -137,16 +137,13 @@ public sealed class ScatteredAreaService(
         }
     }
 
-    private void RecordError(Guid userId, int communeId)
-    {
-        cache.Set(
+    private void RecordError(Guid userId, int communeId) => cache.Set(
             ErrorCacheKey(userId, communeId),
             new ErrorEntry(timeProvider.UtcNow, GenericErrorMessage),
             new MemoryCacheEntryOptions
             {
                 AbsoluteExpirationRelativeToNow = ErrorCacheDuration,
             });
-    }
 
     /// <summary>
     /// Extracts polygon coordinates from a GeoJSON geometry as a list of

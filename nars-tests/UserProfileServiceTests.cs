@@ -36,7 +36,7 @@ public sealed class UserProfileServiceTests
             Name = "Profile User",
             Email = email,
             Phone = DefaultPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
+            PasswordHash = DefaultPasswordHash,
             SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.FieldWorker,
         };

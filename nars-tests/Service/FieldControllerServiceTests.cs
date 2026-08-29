@@ -153,7 +153,7 @@ public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
             Email = $"other-{otherOwnerId:N}@test.com",
             Phone = DefaultPhone,
             Username = $"other_owner_{otherOwnerId:N}",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
+            PasswordHash = DefaultPasswordHash,
             SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.CommuneUser,
             CommuneId = 2,

@@ -26,10 +26,21 @@ helm-check: ## Check that helm is installed
 .PHONY: helm-repos
 helm-repos: ## Ensure required Helm chart repos are configured
 	@echo "→ Configuring Helm repositories..."
-	@helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update
-	@helm repo add grafana https://grafana.github.io/helm-charts --force-update
-	@helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts --force-update
-	@helm repo update
+	@added=0; \
+	for spec in "prometheus-community https://prometheus-community.github.io/helm-charts" \
+	            "grafana https://grafana.github.io/helm-charts" \
+	            "open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts"; do \
+		name=$${spec%% *}; \
+		if helm repo list 2>/dev/null | awk '{print $$1}' | grep -qx "$$name"; then \
+			echo "  ✓ repo already present: $$name"; \
+		else \
+			helm repo add "$$name" "$${spec#* }" >/dev/null; \
+			added=1; \
+		fi; \
+	done; \
+	if [ "$$added" -eq 1 ]; then \
+		helm repo update; \
+	fi
 	@echo "✓ Helm repositories ready"
 
 .PHONY: observability-namespace

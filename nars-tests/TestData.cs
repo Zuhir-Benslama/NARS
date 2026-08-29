@@ -17,6 +17,13 @@ public static class TestData
     public const string AltPassword = "StrongP@ss1";
     /// <summary>Placeholder hash for test users that never authenticate via password.</summary>
     public const string DummyPasswordHash = "hash";
+    /// <summary>
+    /// A valid bcrypt hash of <see cref="DefaultPassword"/>, computed once at
+    /// first access. Test users that only <em>store</em> a password hash (their
+    /// credentials are never verified) reuse this instead of re-hashing at every
+    /// case, which costs ~50-100ms per call at default cost 10.
+    /// </summary>
+    public static readonly string DefaultPasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword);
 
     // ── Auth tokens ────────────────────────────────────────────────────
     public const string AdminSignupToken = "nars-admin-signup-v1";

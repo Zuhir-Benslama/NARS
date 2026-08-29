@@ -25,11 +25,14 @@ public class PagesControllerTests
     private const string LoginTemplate = "<html><head><meta name=\"csrf-token\" content=\"\"></head><body><script>app();</script></body></html>";
     private const string IndexTemplate = "<html><head><meta name=\"csrf-token\" content=\"\"></head><body><script src=\"/app.js\"></script></body></html>";
 
-    // PagesController reads templates from Directory.GetCurrentDirectory()/wwwroot.
-    // The lock serializes template setup across test classes within this test
-    // host; it cannot synchronize separate processes, but combined with the
-    // create-if-missing write below (never clobber a pre-existing file) any
-    // interleaving converges on the same content.
+    // PagesController.LoadPageTemplateAsync reads templates from
+    // Directory.GetCurrentDirectory()/wwwroot unconditionally, so the templates
+    // must live there — the test cannot redirect the controller to a temp dir
+    // (it uses the process CWD internally). The static ctor writes the canonical
+    // fixtures every time (overwriting any stale file a previous run left behind,
+    // so the test never asserts against outdated template content). The lock
+    // serializes writes across test classes sharing this host; concurrent
+    // separate processes converge because every writer emits identical content.
     private static readonly object TemplateWriteLock = new();
 
     static PagesControllerTests()
@@ -38,18 +41,12 @@ public class PagesControllerTests
         {
             var wwwroot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
             Directory.CreateDirectory(wwwroot);
-            EnsureTemplate(Path.Combine(wwwroot, "login.html"), LoginTemplate);
-            EnsureTemplate(Path.Combine(wwwroot, "index.html"), IndexTemplate);
+            WriteTemplate(Path.Combine(wwwroot, "login.html"), LoginTemplate);
+            WriteTemplate(Path.Combine(wwwroot, "index.html"), IndexTemplate);
         }
     }
 
-    private static void EnsureTemplate(string path, string template)
-    {
-        if (!File.Exists(path))
-        {
-            File.WriteAllText(path, template);
-        }
-    }
+    private static void WriteTemplate(string path, string template) => File.WriteAllText(path, template);
 
     private sealed class ControllerHarness : IDisposable
     {

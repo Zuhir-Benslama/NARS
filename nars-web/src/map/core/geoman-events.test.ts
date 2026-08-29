@@ -127,12 +127,16 @@ describe("registerGeomanEvents", () => {
     expect(mapOn).toHaveBeenCalledWith("gm:remove", expect.any(Function))
   })
 
-  it("debugError when geoman is not initialized", () => {
-    _setCtx({ map: { on: vi.fn() } as any, geoman: undefined } as any)
+  it("still binds handlers when geoman is not yet initialized (lazy init)", () => {
+    _setCtx({ map: { on: mapOn } as any, geoman: undefined } as any)
 
     mod.registerGeomanEvents()
 
-    expect(mockDebugError).toHaveBeenCalledWith("Geoman not initialized")
+    expect(mapOn).toHaveBeenCalledWith("pm:markerdragstart", expect.any(Function))
+    expect(mapOn).toHaveBeenCalledWith("pm:markerdragend", expect.any(Function))
+    expect(mapOn).toHaveBeenCalledWith("dblclick", expect.any(Function))
+    expect(mapOn).toHaveBeenCalledWith("gm:editend", expect.any(Function))
+    expect(mapOn).toHaveBeenCalledWith("gm:remove", expect.any(Function))
   })
 })
 

@@ -50,16 +50,18 @@ export default defineConfig(({ command, mode }) => {
     build: {
       outDir: "dist",
       emptyOutDir: true,
+      // The Geoman editor is loaded lazily via a dynamic import in map-init.ts
+      // on the first draw/edit session. It must NOT be assigned to a manual
+      // chunk — doing so pulls it into the eager entry graph and forces the
+      // ~460KB bundle to be fetched (and executed) at page load. Leaving it on
+      // automatic code-splitting keeps it as a true lazy chunk that is fetched
+      // on demand only when the user first opens a draw or edit session.
       // Source maps only for non-production builds — shipping maps publicly
       // exposes the full original TS/Vue source. Keep them for dev/staging.
       sourcemap: mode !== "production",
-      // Maplibre GL JS is ~1MB and @geoman-io/maplibre-geoman-free (~0.7MB)
-      // bundles it via a default import, so the vendor-geoman chunk can reach
-      // ~1.7MB after minification. It is now loaded on demand (dynamic import
-      // in map-init.ts), fetched via modulepreload and only executed when the
-      // map initializes — so it does not block first paint. It is stable
-      // vendor code that changes rarely and is cached across deploys.
-      chunkSizeWarningLimit: 1700,
+      // Maplibre GL is ~1MB and is the always-needed baseline, so don't treat
+      // it (or the on-demand ~460KB geoman chunk) as an oversized-chunk error.
+      chunkSizeWarningLimit: 1100,
       rollupOptions: {
         output: {
           entryFileNames: "assets/[name]-[hash].js",
@@ -68,14 +70,8 @@ export default defineConfig(({ command, mode }) => {
           manualChunks(id: string) {
             if (!id.includes("node_modules")) return
 
-            // Maplibre GL JS - core library. Note: rolldown bundles maplibre-gl
-            // INTO the geoman chunk because @geoman-io/maplibre-geoman-free
-            // default-imports the whole library; the split is still honoured at
-            // the CSS level (vendor-maplibre.css stays separate).
+            // Maplibre GL JS - the core map library (always needed)
             if (id.includes("maplibre-gl")) return "vendor-maplibre"
-
-            // Maplibre Geoman - drawing/editing toolkit (large, changes rarely)
-            if (id.includes("@geoman-io/maplibre-geoman-free")) return "vendor-geoman"
 
             // Graphology - road network graph (changes rarely)
             if (id.includes("graphology")) return "vendor-graphology"

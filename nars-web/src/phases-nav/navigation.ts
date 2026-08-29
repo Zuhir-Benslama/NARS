@@ -2,11 +2,13 @@
 
 import { t } from "../i18n"
 import { PHASES } from "../phases"
+import { debugWarn } from "../utils/debug"
 import { useAppStore } from "../stores/appStore"
 import { useLayerStore } from "../stores/layerStore"
 import { showToast } from "../lib/toast"
 import { checkDistrictCoverage } from "../lib/validation"
 import { buildDrawControl } from "../map/draw/draw-control"
+import { ensureGeoman } from "../map/map-init"
 import { setDrawingPhase } from "../map/draw/draw-complete"
 import { refreshLayerVisibility } from "../map/rendering/labels"
 import { computeAndApplyRoadDirections } from "../map/roads/road-directions"
@@ -74,7 +76,11 @@ export function setPhase(index: number): void {
   const phase = PHASES[index]
   setDrawingPhase(phase ?? null)
   if (phase) {
-    buildDrawControl(phase)
+    // User-driven phase navigation: lazily initialize the geoman editor on
+    // first use, then arm that phase's draw mode.
+    void ensureGeoman()
+      .then(() => buildDrawControl(phase))
+      .catch((err) => debugWarn("[NAV] Unable to arm draw control:", err))
   }
   refreshLayerVisibility()
 }

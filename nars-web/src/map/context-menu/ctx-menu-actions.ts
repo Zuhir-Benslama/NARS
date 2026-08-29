@@ -6,7 +6,6 @@ import { useSelectionStore } from "../../stores/selectionStore"
 import { openEditModal } from "../../stores/modalStore"
 import { PHASES, CITY_CENTER_COLOR } from "../../phases"
 import { CITY_CENTER_CONFIG } from "../../config"
-import { getCtx } from "../core/state"
 import { useFeaturesStore } from "../../stores/featuresStore"
 import { useLayerStore, LAYER_KEYS } from "../../stores/layerStore"
 import { showToast, showConfirm } from "../../lib/toast"
@@ -51,12 +50,10 @@ export function enableEditGeometry(dbId: string): void {
     return
   }
 
-  if (!getCtx().geoman) {
+  enableEditMode(entry.id).catch((err) => {
+    debugError("[EDIT] enableEditMode:", err)
     showToast(t("map_edit_mode_unavailable"), "error")
-    return
-  }
-
-  void enableEditMode(entry.id)
+  })
   showToast(t("map_edit_mode_hint"), "info")
 }
 

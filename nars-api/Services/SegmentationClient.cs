@@ -24,16 +24,10 @@ public interface ISegmentationClient
 /// anything. Callers (e.g. a draft-features endpoint) are responsible for
 /// writing accepted results into ai_draft_features via EF Core.
 /// </summary>
-public sealed class SegmentationClient : ISegmentationClient
+public sealed class SegmentationClient(HttpClient httpClient, ILogger<SegmentationClient> logger) : ISegmentationClient
 {
-    private readonly HttpClient _httpClient;
-    private readonly ILogger<SegmentationClient> _logger;
-
-    public SegmentationClient(HttpClient httpClient, ILogger<SegmentationClient> logger)
-    {
-        _httpClient = httpClient;
-        _logger = logger;
-    }
+    private readonly HttpClient _httpClient = httpClient;
+    private readonly ILogger<SegmentationClient> _logger = logger;
 
     public async Task<SegmentationResult> SegmentTileAsync(
         Stream tileStream,

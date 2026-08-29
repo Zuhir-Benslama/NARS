@@ -45,33 +45,41 @@ classDiagram
     %% ===== NON-FEATURE MODELS =====
     class Inspection {
         +Guid Id
-        +Guid UserId
         +Guid FeatureId
-        +string FeatureType
+        +Guid UserId
+        +string Type
+        +string Data
         +string Status
-        +string? Notes
         +DateTime CreatedAt
+        +DateTime? UpdatedAt
     }
 
     class ErrorLog {
         +Guid Id
-        +Guid UserId
+        +Guid? UserId
         +string Level
+        +string Code
         +string Message
-        +string? Source
-        +string? StackTrace
+        +string? Context
+        +string? Url
+        +string? Method
+        +string? IpAddress
+        +string? UserAgent
         +DateTime CreatedAt
     }
 
     class AiDraftFeature {
         +Guid Id
         +string FeatureType
+        +string GeometryGeoJson
+        +string Source
+        +double Confidence
         +string Status
         +int CommuneId
-        +string? GeometryJson
-        +string? Label
-        +DateTime CreatedAt
-        +DateTime? UpdatedAt
+        +Guid? ReviewedBy
+        +DateTimeOffset? ReviewedAt
+        +DateTimeOffset CreatedAt
+        +string? SourceTileRef
     }
 
     %% ===== LOCATION MODELS =====
@@ -87,7 +95,7 @@ classDiagram
         +int? WilayaId
         +string Role
         +DateTime CreatedAt
-        +int? FailedLoginAttempts
+        +int FailedLoginAttempts
         +DateTime? LockedUntil
         +string SecurityStamp
     }
@@ -184,6 +192,7 @@ classDiagram
         +CreateToken(userId, username, name, email, communeId, securityStamp, role, dairaId, wilayaId) string
         +ValidateToken(string) ClaimsPrincipal?
         +CreateRefreshToken() (string raw, string hash)
+        +AccessTokenExpiresIn TimeSpan
     }
 
     class JwtService {
@@ -195,81 +204,100 @@ classDiagram
 
     class IRefreshTokenService {
         <<interface>>
-        +IssueRefreshTokenAsync(userId) RefreshTokenResult
+        +IssueRefreshTokenAsync(userId) (raw, hash, expiresAt)
         +RotateRefreshTokenAsync(rawToken) RefreshTokenResult
         +MintAccessTokenAsync(rawToken) RefreshTokenResult
-        +RecordFailedLoginAsync(userId) Task
+        +RevokeAllUserTokensAsync(userId) Task
+        +RecordFailedLoginAsync(user, maxFailedAttempts, lockoutMinutes, utcNow) Task
         +ResetFailedAttemptsIfNeededAsync(user) Task
-        +PruneExpiredTokensAsync() Task
     }
 
     class RefreshTokenService {
-        +IssueRefreshTokenAsync(userId) RefreshTokenResult
+        +IssueRefreshTokenAsync(userId) (raw, hash, expiresAt)
         +RotateRefreshTokenAsync(rawToken) RefreshTokenResult
         +MintAccessTokenAsync(rawToken) RefreshTokenResult
-        +RecordFailedLoginAsync(userId) Task
+        +RevokeAllUserTokensAsync(userId) Task
+        +RecordFailedLoginAsync(user, maxFailedAttempts, lockoutMinutes, utcNow) Task
         +ResetFailedAttemptsIfNeededAsync(user) Task
-        +PruneExpiredTokensAsync() Task
     }
     IRefreshTokenService <|.. RefreshTokenService
 
     class IFeatureService {
         <<interface>>
-        +SaveFeatureAsync(request, userId) CreateResponse
-        +UpdateFeatureAsync(id, request, userId) UpdateFeatureResponse
-        +DeleteFeatureAsync(id, userId) Task
-        +LoadFeaturesAsync(userId, skip, take) LoadFeaturesResponse
-        +LoadByLayerAsync(userId, layer, skip, take) LoadFeaturesResponse
-        +ClearFeaturesAsync(request, userId) Task
-        +GetStatsAsync(userId) FeatureStatsResponse
+        +RoadExistsAsync(roadId, userId, ct) Task~bool~
+        +SaveFeatureAsync(entity, featureType, ct) Task~Guid~
+        +GetFeatureTypeAsync(featureId, ct) Task~string?~
+        +OwnsFeatureAsync(featureId, featureType, userId, ct) Task~bool~
+        +UpdateFeatureAsync(command, ct) Task~bool~
+        +DeleteFeatureAsync(featureId, userId, featureType, ct) Task~bool~
+        +ClearAllFeaturesAsync(userId, ct) Task~int~
+        +QueueScatteredRefreshAsync(userId, communeId) ValueTask
     }
 
     class IFeatureStatsService {
         <<interface>>
-        +GetStatsAsync(userId) FeatureStatsResponse
+        +GetFeatureCountsAsync(userId, ct) Task~Dictionary~string, long~~
+        +GetUserFeatureCountsAsync(userIds, ct) Task~Dictionary~Guid, UserFeatureStats~~
+        +LoadAllFeaturesAsync(userId, skip, take, ct) (features, totalCount)
+        +LoadByLayerAsync(userId, layer, skip, take, ct) (features, totalCount)
     }
 
     class IFeatureCleanupService {
         <<interface>>
-        +DeleteAllUserFeaturesAsync(userId) Task
+        +DeleteAllFeaturesForUserAsync(db, userId, ct) Task~int~
     }
 
     class IUserAuthorizationService {
         <<interface>>
-        +VerifyCredentialsAsync(username, password, maxAttempts, lockoutMinutes) CredentialResult
-        +GetUserClaimsAsync(user) IEnumerable~Claim~
-        +CreateManagedUserAsync(request, creatorId) Task
-        +UpdateManagedUserAsync(userId, request, callerId) Task
-        +DeleteManagedUserAsync(userId, callerId) Task
-        +GetManageableUsersAsync(callerId) IEnumerable~UserInfo~
+        +CanCreateRole(callerRole, targetRole) bool
+        +ValidateCreateUserScopeAsync(callerRole, callerDaira?, callerWilaya?, targetRole, commune?, daira?, wilaya?) ScopeValidationResult
+        +ValidateManagedUserScopeAsync(callerRole, callerCommune?, callerDaira?, callerWilaya?, targetRole, commune?, daira?, wilaya?) ScopeValidationResult
+        +GetManageableUsersAsync(callerRole, commune?, daira?, wilaya?, skip, take) PagedResponse~AdminUserSummary~
+        +FindUserByIdAsync(userId, ct) Task~User?~
+        +FindUserByUsernameAsync(username, ct) Task~User?~
+        +VerifyCredentialsAsync(username, password, maxAttempts, lockoutMinutes) CredentialCheckResult
+        +UpdateManagedUserAsync(callerUserId, callerRole, targetUserId, body) UserUpdateResult
+        +DeleteUserAsync(userId, ct) Task~bool~
     }
 
     class IUserCreationService {
         <<interface>>
-        +CreateUserAsync(request, creatorId) Task~User~
-        +CreateAdminAsync(request) Task~User~
+        +CreateUserAsync(callerRole, name, email, phone, username, password, targetRole, commune?, daira?, wilaya?) ManagedUserCreationResult
+        +ValidateAndCreateUserAsync(name, email, phone, username, password, role, commune?, daira?, wilaya?) UserCreationResult
+        +SaveUserAsync(user, ct) Task
     }
 
     class IUserProfileService {
         <<interface>>
-        +UpdateProfileAsync(userId, request) UserInfo
-        +UpdateCredentialsAsync(userId, request) UpdateCredentialsResponse
+        +GetUserByIdAsync(userId, ct) Task~User?~
+        +IsUsernameTakenAsync(username, ct) Task~bool~
+        +IsEmailTakenAsync(email, ct) Task~bool~
+        +UpdateUserAsync(user, ct) Task
+        +UpdateCredentialsAsync(userId, request) UpdateCredentialsResult
     }
 
     class IValidationService {
         <<interface>>
-        +CheckMainUrbanExistsAsync(userId) MainUrbanExistsResponse
-        +CheckDistrictCoverageAsync(userId) DistrictCoverageResponse
-        +ValidateRoadAsync(request, userId) ValidateRoadResponse
-        +ValidateDistrictAsync(request, userId) ValidateDistrictResponse
+        +CheckRoadConnectivityAsync(userId, wkt, maxDistanceMeters, ct) Task~bool~
+        +CheckDistrictCoverageAsync(userId, toleranceMeters, ct) Task~bool~
+        +CheckDistrictOverlapAsync(userId, wkt, ct) Task~bool~
+        +CountSiblingsInSameAreaAsync(userId, wkt, ct) Task~long~
+        +CheckDistrictAdjacencyAsync(userId, wkt, ct) Task~bool~
+        +UserHasCentralUrbanAreaAsync(userId, ct) Task~bool~
+        +CountUserRoadsAsync(userId, ct) Task~int~
+        +CountUserDistrictsAsync(userId, ct) Task~int~
+        +CountUserUrbanAreasAsync(userId, ct) Task~int~
     }
 
     class IFieldService {
         <<interface>>
-        +GetFeaturesAsync(userId) IEnumerable~FieldFeatureResult~
-        +InspectAsync(request, userId) FieldInspectionResponse
-        +GetInspectionsAsync(featureId, userId) FieldInspectionsResponse
-        +CreateEntranceAsync(request, userId) FeatureResult
+        +QueryFeaturesAsync(descriptor, communeId, skip, take, ct) (items, total)
+        +GetFeatureOwnerAsync(featureType, featureId, ct) (userId, communeId)?
+        +GetInspectionsAsync(featureId, skip, take, ct) Task~List~FieldInspectionResponse~~
+        +GetRoadOwnerAsync(roadId, ct) (ownerUserId, communeId)?
+        +CreateEntranceAsync(roadId, ownerUserId, creatorUserId, label, data, ct) Task~Guid~
+        +GetFeatureRegistryTypeAsync(featureId, ct) Task~string?~
+        +SubmitInspectionAsync(featureId, userId, type, status, data, ct) Task~Guid~
     }
 
     class IScatteredAreaService {
@@ -286,53 +314,55 @@ classDiagram
 
     class IRoadQueryService {
         <<interface>>
-        +GetRoadSideAsync(request, userId) RoadSideResponse
+        +GetUserRoadByIdAsync(roadId, userId, ct) Task~Road?~
     }
 
     class IEntranceQueryService {
         <<interface>>
-        +SuggestEntranceNumberAsync(roadId, lat, lng) int
+        +GetUsedEntranceNumbersAsync(userId, roadId, side, ct) Task~HashSet~int~~
     }
 
     class IAdminOverviewService {
         <<interface>>
-        +GetOverviewAsync(skip, take) NationalOverviewResponse
-        +GetWilayaAsync(wilayaId) WilayaReport
-        +GetDairaAsync(dairaId) DairaReport
+        +GetNationalOverviewAsync(skip, take) (items, total)
+        +GetWilayaReportAsync(wilayaId) Task~WilayaReport?~
+        +GetDairaReportAsync(dairaId, expectedWilayaId?) Task~DairaReport?~
     }
 
     class IErrorLogService {
         <<interface>>
-        +SubmitLogsAsync(batch, userId) Task
+        +LogBatchAsync(entries, ct) Task
     }
 
     class ICommuneScopeService {
         <<interface>>
-        +GetCommuneIdAsync(userId) int?
+        +CanAccessCommuneAsync(callerRole, callerCommune?, callerDaira?, callerWilaya?, targetCommuneId, ct) Task~bool~
     }
 
     class IDraftFeaturesService {
         <<interface>>
-        +SegmentTileAsync(request, userId) SegmentSummaryResponse
-        +ListAsync(userId) IEnumerable~AiDraftFeatureDto~
-        +AcceptAsync(id, userId) Task
-        +RejectAsync(id, userId) Task
+        +SegmentTileAsync(callerRole, communeId, tileStream, fileName, contentType, bbox, ct) Task~SegmentSummaryResponse~
+        +ListDraftsAsync(callerRole, communeId, featureType?, status, skip, take) PagedResponse~AiDraftFeatureDto~
+        +AcceptDraftAsync(callerRole, userId, draftId, ct) DraftReviewResult
+        +RejectDraftAsync(callerRole, userId, draftId, ct) DraftReviewResult
     }
 
     class ISegmentationClient {
         <<interface>>
-        +SegmentAsync(tileData, ct) SegmentationResult
+        +SegmentTileAsync(tileStream, fileName, contentType, bbox, ct) Task~SegmentationResult~
     }
 
     class ISecurityStampCache {
         <<interface>>
-        +GetStampAsync(userId) Task~string?
-        +EvictStamp(userId) Task
+        +GetStampAsync(userId, ct) Task~string?~
+        +SetStamp(userId, stamp) void
+        +EvictStamp(userId) void
     }
 
     class IPageAuthService {
         <<interface>>
-        +TryAuthenticateAsync(HttpContext) Task~bool~
+        +TryAuthenticateAsync(ct) Task~bool~
+        +TryRefreshSessionAsync(ct) Task~bool~
     }
 
     class IBackgroundTaskQueue {
@@ -354,7 +384,7 @@ classDiagram
 
     class ILogSanitizer {
         <<interface>>
-        +Sanitize(message) string
+        +Sanitize(value, maxLen) string
     }
 
     class IDateTimeProvider {
@@ -402,28 +432,29 @@ classDiagram
     }
 
     class FeaturesController {
-        +Save(FeatureSaveRequest) Task
-        +Update(id, FeatureUpdateRequest) Task
-        +Delete(id) Task
-        +Load(skip, take) Task
-        +LoadByLayer(layerType, skip, take) Task
-        +Clear(ClearFeaturesRequest) Task
+        +SaveFeature(FeatureSaveRequest) Task
+        +UpdateFeature(id, FeatureUpdateRequest) Task
+        +DeleteFeature(id) Task
+        +LoadFeatures(skip, take) Task
+        +ClearFeatures(ClearFeaturesRequest) Task
         +GetStats() Task
     }
 
     class FeatureCatalogController {
         +GetFeatureTypes() Task
+        +LoadByLayer(layerType, skip, take) Task
     }
 
     class ValidationController {
-        +CheckMainUrbanExists() Task
-        +CheckDistrictCoverage() Task
+        +MainUrbanExists() Task
+        +DistrictsCoverage() Task
         +ValidateRoad(ValidateRoadRequest) Task
         +ValidateDistrict(ValidateDistrictRequest) Task
     }
 
     class SpatialController {
         +GetRoadSide(RoadSideRequest) Task
+        +GetScatteredStatus() Task
         +RefreshScattered() Task
     }
 
@@ -436,22 +467,21 @@ classDiagram
     }
 
     class UsersController {
-        +UpdateProfile(UpdateUserRequest) Task
-        +UpdateCredentials(UpdateCredentialsRequest) Task
+        +UpdateCredentials(UpdateUserRequest) Task
     }
 
     class FieldController {
         +GetFeatures() Task
-        +Inspect(FieldInspectRequest) Task
+        +SubmitInspection(FieldInspectRequest) Task
         +GetInspections(featureId) Task
-        +CreateEntrance(FieldEntranceCreateRequest) Task
+        +CreateEntranceFromInspection(FieldEntranceCreateRequest) Task
     }
 
     class DraftFeaturesController {
-        +Segment(SegmentTileRequest) Task
-        +List() Task
-        +Accept(id) Task
-        +Reject(id) Task
+        +SegmentTile(SegmentTileRequest) Task
+        +ListDrafts() Task
+        +AcceptDraft(id) Task
+        +RejectDraft(id) Task
     }
 
     class LogsController {

@@ -104,7 +104,7 @@ public class UserAuthorizationServiceTests
             Email = "caller@test.com",
             Name = "Caller",
             Phone = DefaultPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
+            PasswordHash = DefaultPasswordHash,
             SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.DairaAdmin,
             DairaId = 1,
@@ -369,6 +369,38 @@ public class UserAuthorizationServiceTests
         return CreateService(db);
     }
 
+    // Seeds the dominant UpdateManagedUserAsync scenario: a NationalAdmin caller
+    // editing a WilayaAdmin target (wilaya 1). Neither authenticates, so a
+    // store-only hash suffices. Returns fresh caller/target ids for the request.
+    private static async Task<(Guid CallerId, Guid TargetId)> SeedNationalAdminEditingWilayaAdminAsync(AppDbContext db)
+    {
+        var callerId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            Id = callerId,
+            Username = "caller",
+            Email = "caller@test.com",
+            Name = "Caller",
+            Phone = DefaultPhone,
+            PasswordHash = DefaultPasswordHash,
+            Role = UserRoles.NationalAdmin,
+        });
+        var targetId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            Id = targetId,
+            Username = "target",
+            Email = "target@test.com",
+            Name = "Target",
+            Phone = DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.WilayaAdmin,
+            WilayaId = 1,
+        });
+        await db.SaveChangesAsync();
+        return (callerId, targetId);
+    }
+
     [Fact]
     public async Task GetManageableUsersAsync_NationalAdmin_ReturnsOnlyWilayaAdmins()
     {
@@ -436,7 +468,7 @@ public class UserAuthorizationServiceTests
             Name = "Locked",
             Email = AltEmail,
             Phone = DefaultPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
+            PasswordHash = DefaultPasswordHash,
             Role = UserRoles.FieldWorker,
         });
         await db.SaveChangesAsync();
@@ -464,7 +496,7 @@ public class UserAuthorizationServiceTests
             Name = "Locked",
             Email = AltEmail,
             Phone = DefaultPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
+            PasswordHash = DefaultPasswordHash,
             Role = UserRoles.FieldWorker,
         });
         await db.SaveChangesAsync();
@@ -492,7 +524,7 @@ public class UserAuthorizationServiceTests
             Name = "Locked",
             Email = AltEmail,
             Phone = DefaultPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
+            PasswordHash = DefaultPasswordHash,
             Role = UserRoles.FieldWorker,
             LockedUntil = FixedUtcNow.AddMinutes(10),
         });
@@ -539,7 +571,7 @@ public class UserAuthorizationServiceTests
             Email = "caller@test.com",
             Name = "Caller",
             Phone = DefaultPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
+            PasswordHash = DefaultPasswordHash,
             Role = UserRoles.WilayaAdmin,
             WilayaId = 1,
         });
@@ -578,7 +610,7 @@ public class UserAuthorizationServiceTests
             Email = "caller@test.com",
             Name = "Caller",
             Phone = DefaultPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
+            PasswordHash = DefaultPasswordHash,
             Role = UserRoles.DairaAdmin,
             DairaId = 1,
         });
@@ -610,30 +642,7 @@ public class UserAuthorizationServiceTests
     public async Task UpdateManagedUserAsync_SensitiveChangeWithoutPassword_ReturnsPasswordRequired()
     {
         using var db = CreateInMemoryDb("UserAuthPasswordRequired");
-        var callerId = Guid.NewGuid();
-        db.Users.Add(new User
-        {
-            Id = callerId,
-            Username = "caller",
-            Email = "caller@test.com",
-            Name = "Caller",
-            Phone = DefaultPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
-            Role = UserRoles.NationalAdmin,
-        });
-        var targetId = Guid.NewGuid();
-        db.Users.Add(new User
-        {
-            Id = targetId,
-            Username = "target",
-            Email = "target@test.com",
-            Name = "Target",
-            Phone = DefaultPhone,
-            PasswordHash = "hash",
-            Role = UserRoles.WilayaAdmin,
-            WilayaId = 1,
-        });
-        await db.SaveChangesAsync();
+        var (callerId, targetId) = await SeedNationalAdminEditingWilayaAdminAsync(db);
         var svc = CreateService(db);
 
         var result = await svc.UpdateManagedUserAsync(
@@ -649,30 +658,7 @@ public class UserAuthorizationServiceTests
     public async Task UpdateManagedUserAsync_SensitiveChangeWrongPassword_ReturnsInvalidPassword()
     {
         using var db = CreateInMemoryDb("UserAuthInvalidPassword");
-        var callerId = Guid.NewGuid();
-        db.Users.Add(new User
-        {
-            Id = callerId,
-            Username = "caller",
-            Email = "caller@test.com",
-            Name = "Caller",
-            Phone = DefaultPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
-            Role = UserRoles.NationalAdmin,
-        });
-        var targetId = Guid.NewGuid();
-        db.Users.Add(new User
-        {
-            Id = targetId,
-            Username = "target",
-            Email = "target@test.com",
-            Name = "Target",
-            Phone = DefaultPhone,
-            PasswordHash = "hash",
-            Role = UserRoles.WilayaAdmin,
-            WilayaId = 1,
-        });
-        await db.SaveChangesAsync();
+        var (callerId, targetId) = await SeedNationalAdminEditingWilayaAdminAsync(db);
         var svc = CreateService(db);
 
         var result = await svc.UpdateManagedUserAsync(
@@ -688,30 +674,7 @@ public class UserAuthorizationServiceTests
     public async Task UpdateManagedUserAsync_NameTooLong_ReturnsInvalid()
     {
         using var db = CreateInMemoryDb("UserAuthInvalidName");
-        var callerId = Guid.NewGuid();
-        db.Users.Add(new User
-        {
-            Id = callerId,
-            Username = "caller",
-            Email = "caller@test.com",
-            Name = "Caller",
-            Phone = DefaultPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
-            Role = UserRoles.NationalAdmin,
-        });
-        var targetId = Guid.NewGuid();
-        db.Users.Add(new User
-        {
-            Id = targetId,
-            Username = "target",
-            Email = "target@test.com",
-            Name = "Target",
-            Phone = DefaultPhone,
-            PasswordHash = "hash",
-            Role = UserRoles.WilayaAdmin,
-            WilayaId = 1,
-        });
-        await db.SaveChangesAsync();
+        var (callerId, targetId) = await SeedNationalAdminEditingWilayaAdminAsync(db);
         var svc = CreateService(db);
 
         var result = await svc.UpdateManagedUserAsync(
@@ -729,30 +692,7 @@ public class UserAuthorizationServiceTests
     public async Task UpdateManagedUserAsync_InvalidEmail_ReturnsInvalid()
     {
         using var db = CreateInMemoryDb("UserAuthInvalidEmail");
-        var callerId = Guid.NewGuid();
-        db.Users.Add(new User
-        {
-            Id = callerId,
-            Username = "caller",
-            Email = "caller@test.com",
-            Name = "Caller",
-            Phone = DefaultPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
-            Role = UserRoles.NationalAdmin,
-        });
-        var targetId = Guid.NewGuid();
-        db.Users.Add(new User
-        {
-            Id = targetId,
-            Username = "target",
-            Email = "target@test.com",
-            Name = "Target",
-            Phone = DefaultPhone,
-            PasswordHash = "hash",
-            Role = UserRoles.WilayaAdmin,
-            WilayaId = 1,
-        });
-        await db.SaveChangesAsync();
+        var (callerId, targetId) = await SeedNationalAdminEditingWilayaAdminAsync(db);
         var svc = CreateService(db);
 
         var result = await svc.UpdateManagedUserAsync(
@@ -776,7 +716,7 @@ public class UserAuthorizationServiceTests
             Email = "caller@test.com",
             Name = "Caller",
             Phone = DefaultPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
+            PasswordHash = DefaultPasswordHash,
             Role = UserRoles.NationalAdmin,
         });
         var targetId = Guid.NewGuid();
@@ -826,7 +766,7 @@ public class UserAuthorizationServiceTests
             Email = "caller@test.com",
             Name = "Caller",
             Phone = DefaultPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
+            PasswordHash = DefaultPasswordHash,
             Role = UserRoles.NationalAdmin,
         });
         var targetId = Guid.NewGuid();
@@ -858,30 +798,7 @@ public class UserAuthorizationServiceTests
     public async Task UpdateManagedUserAsync_InvalidGeographyForRole_ReturnsInvalid()
     {
         using var db = CreateInMemoryDb("UserAuthInvalidGeo");
-        var callerId = Guid.NewGuid();
-        db.Users.Add(new User
-        {
-            Id = callerId,
-            Username = "caller",
-            Email = "caller@test.com",
-            Name = "Caller",
-            Phone = DefaultPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
-            Role = UserRoles.NationalAdmin,
-        });
-        var targetId = Guid.NewGuid();
-        db.Users.Add(new User
-        {
-            Id = targetId,
-            Username = "target",
-            Email = "target@test.com",
-            Name = "Target",
-            Phone = DefaultPhone,
-            PasswordHash = "hash",
-            Role = UserRoles.WilayaAdmin,
-            WilayaId = 1,
-        });
-        await db.SaveChangesAsync();
+        var (callerId, targetId) = await SeedNationalAdminEditingWilayaAdminAsync(db);
         var svc = CreateService(db);
 
         var result = await svc.UpdateManagedUserAsync(
@@ -906,7 +823,7 @@ public class UserAuthorizationServiceTests
             Email = "caller@test.com",
             Name = "Caller",
             Phone = DefaultPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
+            PasswordHash = DefaultPasswordHash,
             SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.NationalAdmin,
         });
@@ -959,7 +876,7 @@ public class UserAuthorizationServiceTests
             Email = "caller@test.com",
             Name = "Caller",
             Phone = DefaultPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
+            PasswordHash = DefaultPasswordHash,
             Role = UserRoles.WilayaAdmin,
             WilayaId = 1,
         });
@@ -1005,7 +922,7 @@ public class UserAuthorizationServiceTests
             Email = "caller@test.com",
             Name = "Caller",
             Phone = DefaultPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword),
+            PasswordHash = DefaultPasswordHash,
             SecurityStamp = User.GenerateSecurityStamp(),
             Role = UserRoles.NationalAdmin,
         });

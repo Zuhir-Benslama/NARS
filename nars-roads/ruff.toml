@@ -8,5 +8,16 @@
 # fixed message string would lose the tile pixel dimensions / decode reason);
 # enabling TRY makes those directives live instead of dead under ruff's
 # default rule set.
+#
+# flake8-bandit (S) is enabled so security-style checks run on the application
+# code (app/ is clean under the full S set). The two test-idiom rules are
+# scoped out for tests/: S101 `assert` is how pytest natively asserts (its
+# assertion-rewriting diagnostics depend on the `assert` statement), and S105
+# flags the shared test fixture token in helpers.py, which is an intentionally
+# hardcoded *test* credential, not a real secret.
 [lint]
-extend-select = ["TRY"]
+extend-select = ["TRY", "S"]
+
+[lint.per-file-ignores]
+# ruff distinguishes `tests/` from `app/` by path prefix.
+"tests/**" = ["S101", "S105"]

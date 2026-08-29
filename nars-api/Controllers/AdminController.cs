@@ -67,7 +67,7 @@ public class AdminController(
     {
         // Enforce the caller's wilaya scope inside the report query for wilaya
         // admins to avoid a separate round-trip for the daira entity.
-        int? expectedWilayaId = CurrentUserRole == UserRoles.WilayaAdmin ? CurrentWilayaId : null;
+        var expectedWilayaId = CurrentUserRole == UserRoles.WilayaAdmin ? CurrentWilayaId : null;
 
         var result = await overviewService.GetDairaReportAsync(dairaId, expectedWilayaId, cancellationToken);
         return result is null ? Problem(detail: "Daira not found.", statusCode: 404) : Ok(result);

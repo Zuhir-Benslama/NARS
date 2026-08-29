@@ -7,16 +7,18 @@ import { getCtx, _setCtx } from "./core/state"
 import { useFeaturesStore } from "../stores/featuresStore"
 import type { MapContext } from "./core/state"
 import { initSources } from "./map-layers"
-import { suppressGeomanFill, ensureGeomanDrawEdgesVisible } from "./edit/edit-mode"
 import { updateEndpointMarkers } from "./roads/road-directions"
 import { refreshLayerVisibility } from "./rendering/labels"
 import { MAP_CONFIG } from "../config"
-import { debugWarn } from "../utils/debug"
+import { debugLog, debugWarn } from "../utils/debug"
 
 let currentActiveStyle: maplibregl.StyleSpecification | undefined
 let _styleSwitchInFlight = false
 let _pendingStyleKey: string | null = null
 let _pendingWaiters: (() => void)[] = []
+
+let _geomanOptions: ReturnType<typeof buildGeomanOptions> | null = null
+let _geomanInitPromise: Promise<void> | null = null
 
 let _setBaseLayer: (key: string) => void | Promise<void> = () => {
   debugWarn("setBaseLayer called before map initialization")
@@ -52,6 +54,8 @@ export function resetMapInit(): void {
   _styleSwitchInFlight = false
   _pendingStyleKey = null
   _pendingWaiters = []
+  _geomanOptions = null
+  _geomanInitPromise = null
   _setBaseLayer = (_key: string) => {
     debugWarn("setBaseLayer called before map initialization")
   }
@@ -126,9 +130,9 @@ export async function initMap(): Promise<void> {
 
   currentActiveStyle = satelliteStyle
 
-  const geomanOptions = buildGeomanOptions()
+  _geomanOptions = buildGeomanOptions()
 
-  _setBaseLayer = (key: string) => switchBaseLayer(key, geomanOptions)
+  _setBaseLayer = (key: string) => switchBaseLayer(key, _geomanOptions!)
 
   let loadTimer: ReturnType<typeof setTimeout> | undefined
   await new Promise<void>((resolve) => {
@@ -144,7 +148,6 @@ export async function initMap(): Promise<void> {
     }, 15_000)
   })
 
-  await initGeoman(ctx.map, geomanOptions)
   initSources()
 }
 
@@ -174,11 +177,34 @@ async function initGeoman(
   map: maplibregl.Map,
   options: ReturnType<typeof buildGeomanOptions>,
 ): Promise<void> {
+  // Load the geoman stylesheet together with the library so the editing
+  // controls/vertex markers are styled the first time an edit session opens.
+  await import("@geoman-io/maplibre-geoman-free/dist/maplibre-geoman.css")
   const { createGeomanInstance } = await import("@geoman-io/maplibre-geoman-free")
   getCtx().geoman = await createGeomanInstance(map, options)
+  const { suppressGeomanFill, ensureGeomanDrawEdgesVisible } = await import("./edit/edit-mode")
   suppressGeomanFill()
   ensureGeomanDrawEdgesVisible()
   map.doubleClickZoom.disable()
+  debugLog("[MAP] Geoman initialized")
+}
+
+/**
+ * Lazily ensure the Geoman editor is initialized. The heavy geoman bundle is
+ * deferred until the user first enters a draw or edit session (see initMap),
+ * then this becomes the single choke point that creates the instance on
+ * demand. Concurrent callers share one in-flight initialization promise.
+ */
+export async function ensureGeoman(): Promise<void> {
+  const ctx = getCtx()
+  if (ctx.geoman && !ctx.geoman.destroyed) return
+  if (!_geomanOptions) throw new Error("[MAP] ensureGeoman called before initMap()")
+  if (!_geomanInitPromise) {
+    _geomanInitPromise = initGeoman(ctx.map, _geomanOptions).finally(() => {
+      _geomanInitPromise = null
+    })
+  }
+  await _geomanInitPromise
 }
 
 async function switchBaseLayer(
@@ -207,6 +233,11 @@ async function switchBaseLayer(
   }
   _styleSwitchInFlight = true
   const previous = currentActiveStyle
+  // Capture whether geoman was already initialized before setStyle wipes the
+  // map (and with it geoman's layers). With lazy geoman init, an editor that
+  // was never opened stays deferred across style switches. Only a session
+  // that already initialized geoman must be recreated on the new style.
+  const geomanWasPresent = !!getCtx().geoman
 
   try {
     const map = ctx.map
@@ -252,8 +283,10 @@ async function switchBaseLayer(
 
     updateEndpointMarkers()
 
-    await disposeGeoman()
-    await initGeoman(map, geomanOptions)
+    if (geomanWasPresent) {
+      await disposeGeoman()
+      await initGeoman(map, geomanOptions)
+    }
   } finally {
     _styleSwitchInFlight = false
     const waiters = _pendingWaiters

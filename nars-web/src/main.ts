@@ -1,5 +1,4 @@
 import "maplibre-gl/dist/maplibre-gl.css"
-import "@geoman-io/maplibre-geoman-free/dist/maplibre-geoman.css"
 import { createApp } from "vue"
 import { createPinia } from "pinia"
 import App from "./App.vue"

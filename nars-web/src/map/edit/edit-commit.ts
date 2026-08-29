@@ -166,7 +166,7 @@ export async function commitEditMode(): Promise<void> {
 
     const phase = PHASES.find((p) => p.key === entry.data.type)
     if (phase) {
-      buildDrawControl(phase)
+      void buildDrawControl(phase)
       repatchMarker()
     }
   } finally {
@@ -209,7 +209,7 @@ export async function cancelEditMode(): Promise<void> {
 
   const phase = PHASES.find((p) => p.key === entry.data.type)
   if (phase) {
-    buildDrawControl(phase)
+    void buildDrawControl(phase)
     repatchMarker()
   }
 }

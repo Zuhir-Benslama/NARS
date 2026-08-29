@@ -120,14 +120,14 @@ public sealed class FeatureStatsService(
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var conn = db.Database.GetDbConnection();
-        return await FeatureQueryHelper.LoadAllFeaturesAsync(conn, userId, skip, take, ct, logger);
+        return await FeatureQueryHelper.LoadAllFeaturesAsync(conn, userId, skip, take, logger, ct);
     }
 
     public async Task<(List<FeatureResult> features, int totalCount)> LoadByLayerAsync(Guid userId, string layer, int skip, int take, CancellationToken ct = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var conn = db.Database.GetDbConnection();
-        return await FeatureQueryHelper.LoadByLayerAsync(conn, userId, layer, skip, take, ct, logger);
+        return await FeatureQueryHelper.LoadByLayerAsync(conn, userId, layer, skip, take, logger, ct);
     }
 
     private static string BuildUnionAll(Func<int, string, string> branchBuilder)

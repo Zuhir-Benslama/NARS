@@ -3,7 +3,7 @@ name: "CodeQL"
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
     branches: [main]
   schedule:
@@ -38,6 +38,12 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
+
+      - name: Setup .NET
+        if: matrix.language == 'csharp'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
 
       - name: Autobuild (.NET)
         if: matrix.language == 'csharp'

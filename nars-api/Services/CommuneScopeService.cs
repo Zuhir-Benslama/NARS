@@ -49,7 +49,11 @@ public sealed class CommuneScopeService(IDbContextFactory<AppDbContext> dbFactor
 
             case UserRoles.DairaAdmin:
                 {
-                    if (!callerDairaId.HasValue) return false;
+                    if (!callerDairaId.HasValue)
+                    {
+                        return false;
+                    }
+
                     await using var db = await dbFactory.CreateDbContextAsync(ct);
                     return await db.Communes.AnyAsync(
                         c => c.CommuneId == targetCommuneId && c.DairaId == callerDairaId.Value, ct);
@@ -57,7 +61,11 @@ public sealed class CommuneScopeService(IDbContextFactory<AppDbContext> dbFactor
 
             case UserRoles.WilayaAdmin:
                 {
-                    if (!callerWilayaId.HasValue) return false;
+                    if (!callerWilayaId.HasValue)
+                    {
+                        return false;
+                    }
+
                     await using var db = await dbFactory.CreateDbContextAsync(ct);
                     return await db.Communes.AnyAsync(
                         c => c.CommuneId == targetCommuneId

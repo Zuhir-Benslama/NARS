@@ -31,7 +31,11 @@ public sealed class FeatureCleanupService : IFeatureCleanupService
         var sb = new StringBuilder("WITH feature_ids AS (");
         for (var i = 0; i < descriptors.Count; i++)
         {
-            if (i > 0) sb.Append(" UNION ALL ");
+            if (i > 0)
+            {
+                sb.Append(" UNION ALL ");
+            }
+
             var table = FeatureTypeRegistry.ValidateTableName(descriptors[i].TableName);
             sb.Append($"SELECT id FROM {table} WHERE user_id = @uid");
         }

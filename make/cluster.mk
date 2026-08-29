@@ -166,6 +166,7 @@ cluster-port-forward: ## Deprecated — use 'proxy-up' directly.
 .PHONY: cluster-stop
 cluster-stop: ## Scale all deployments to 0 (stop pods, keep cluster)
 	@echo "→ Stopping all pods..."
+	@mkdir -p "$(BACKUP_DIR)/replicas"
 	@for deploy in $(SCALABLE_DEPLOYS); do
 		if ! $(KUBECTL) get deployment "$$deploy" -n "$(NAMESPACE)" >/dev/null 2>&1; then
 			echo "  ⚠ $$deploy not found, skipping"
@@ -174,7 +175,6 @@ cluster-stop: ## Scale all deployments to 0 (stop pods, keep cluster)
 		saved="$(BACKUP_DIR)/replicas/$$deploy.txt"
 		replicas=$$($(KUBECTL) get deployment "$$deploy" -n "$(NAMESPACE)" \
 			-o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
-		mkdir -p "$(BACKUP_DIR)/replicas"
 		echo "$$replicas" > "$$saved"
 		$(KUBECTL) scale deployment "$$deploy" -n "$(NAMESPACE)" --replicas=0
 		echo "  ✓ $$deploy → 0 (was $$replicas)"

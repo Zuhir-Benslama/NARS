@@ -12,7 +12,7 @@ smoke-test: ## Post-deploy smoke test: verify /health, frontend, and API auth
 	@echo ""
 	@failed=0;
 	pass() { echo "  ✓ $$1"; };
-	fail() { echo "  ✖ $$1"; failed=$$((failed + 1)); };
+	fail() { echo "  ✖ $$1" >&2; failed=$$((failed + 1)); };
 	echo "  1. Health endpoint...";
 	health=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/health" 2>/dev/null || echo "000");
 	if [ "$$health" = "200" ]; then

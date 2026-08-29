@@ -173,7 +173,7 @@ public class RefreshTokenService(
             user.LockedUntil = null;
         }
 
-        user.FailedLoginAttempts = user.FailedLoginAttempts + 1;
+        user.FailedLoginAttempts++;
         if (user.FailedLoginAttempts >= maxFailedAttempts)
         {
             user.LockedUntil = now.AddMinutes(lockoutMinutes);

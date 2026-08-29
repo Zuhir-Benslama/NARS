@@ -8,6 +8,7 @@ sequenceDiagram
     actor User
     participant main.ts
     participant Browser
+    participant App.vue
     participant AppStore
     participant ApiModule
     participant MapInit

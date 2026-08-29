@@ -16,7 +16,6 @@ import { refreshLayerVisibility } from "../rendering/labels"
 import { getUserMessageKey } from "../../lib/errors"
 import { showToast } from "../../lib/toast"
 import { t } from "../../i18n"
-import { debugError } from "../../utils/debug"
 import { PHASES } from "../../phases"
 import { buildGeoJsonFeature } from "../features/loader-build"
 import type { FeatureTypeKey, LayerEntry, LatLng } from "../../types"
@@ -236,12 +235,11 @@ function restoreRemovedFeature(removed: LayerEntry, phaseKey: FeatureTypeKey): v
 }
 
 export function registerGeomanEvents(): void {
-  const { map, geoman } = getCtx()
-  if (!geoman) {
-    debugError("Geoman not initialized")
-    return
-  }
-
+  // Geoman is initialized lazily on first edit/draw, but geoman dispatches
+  // its events through the map object, so these listeners are registered up
+  // front (independent of whether the geoman bundle is loaded yet). Each
+  // handler guards on getCtx().geoman internally.
+  const { map } = getCtx()
   map.on("pm:markerdragstart", onVertexDragStart)
   map.on("pm:markerdragend", onVertexDragEnd)
   map.on("dblclick", onDblClick)

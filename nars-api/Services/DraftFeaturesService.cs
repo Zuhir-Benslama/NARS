@@ -78,12 +78,7 @@ public class DraftFeaturesService(
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
 
-        var commune = await db.Communes.FindAsync([communeId], ct);
-        if (commune is null)
-        {
-            throw new KeyNotFoundException($"Commune {communeId} not found");
-        }
-
+        _ = await db.Communes.FindAsync([communeId], ct) ?? throw new KeyNotFoundException($"Commune {communeId} not found");
         SegmentationResult result;
         result = await segmentationClient.SegmentTileAsync(
             tileStream, fileName, contentType, bbox, ct);
@@ -107,7 +102,7 @@ public class DraftFeaturesService(
 
         return new SegmentSummaryResponse(
             BuildingCount: result.Buildings.Count,
-            DraftIds: draftEntities.Select(d => d.Id).ToList());
+            DraftIds: [.. draftEntities.Select(d => d.Id)]);
     }
 
     public async Task<PagedResponse<AiDraftFeatureDto>> ListDraftsAsync(
@@ -207,15 +202,12 @@ public class DraftFeaturesService(
     /// which does not implement ExecuteUpdateAsync.
     /// </summary>
     protected virtual async Task<int> TryReviewDraftAsync(
-        AppDbContext db, Guid draftId, string newStatus, Guid reviewedBy, DateTimeOffset reviewedAt, CancellationToken ct)
-    {
-        return await db.AiDraftFeatures
+        AppDbContext db, Guid draftId, string newStatus, Guid reviewedBy, DateTimeOffset reviewedAt, CancellationToken ct) => await db.AiDraftFeatures
             .Where(f => f.Id == draftId && f.Status == AiDraftFeature.StatusPending)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(f => f.Status, newStatus)
                 .SetProperty(f => f.ReviewedBy, reviewedBy)
                 .SetProperty(f => f.ReviewedAt, reviewedAt), ct);
-    }
 
     private Task<bool> CanAccessCommuneAsync(
         string callerRole, int? callerCommuneId, int? callerDairaId, int? callerWilayaId,

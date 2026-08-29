@@ -32,7 +32,7 @@ public class LocationsController(
     /// <see cref="IActionResult"/> when the search is too long, or null on success
     /// with <paramref name="sanitized"/> holding the escaped search term.
     /// </summary>
-    private IActionResult? ValidateSearch(string? search, out string sanitized)
+    private ObjectResult? ValidateSearch(string? search, out string sanitized)
     {
         search ??= "";
         sanitized = SqlFragments.EscapeLikeWildcards(search);

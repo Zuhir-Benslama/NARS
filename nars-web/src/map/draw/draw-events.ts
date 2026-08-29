@@ -68,7 +68,7 @@ function watchDrawType() {
       const phase = PHASES[phaseIdx]
       if (phase) {
         setDrawingPhase(phase)
-        buildDrawControl(phase)
+        void buildDrawControl(phase)
 
         if (phase.key === "cityCenter") {
           requestAnimationFrame(() => {

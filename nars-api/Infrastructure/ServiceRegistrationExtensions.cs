@@ -147,10 +147,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IFeatureCleanupService, FeatureCleanupService>();
     }
 
-    private static void AddNarsHttpClients(this IServiceCollection services, IConfiguration config)
-    {
-        services.AddSegmentationClient(config);
-    }
+    private static void AddNarsHttpClients(this IServiceCollection services, IConfiguration config) => services.AddSegmentationClient(config);
 
     private static void AddNarsControllers(this IServiceCollection services)
     {

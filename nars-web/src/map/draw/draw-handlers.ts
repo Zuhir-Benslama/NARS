@@ -16,6 +16,7 @@ import { getCtx, updateSelectionHighlight } from "../core/state"
 import { useFeaturesStore } from "../../stores/featuresStore"
 import { showContextMenu, showMapContextMenu } from "../context-menu/context-menu"
 import { buildDrawControl, clearEdgeVisibilityPoll } from "./draw-control"
+import { ensureGeoman } from "../map-init"
 import {
   getDrawingPhase,
   completeDrawingWithGeometry,
@@ -188,7 +189,7 @@ function onContextMenu(e: MouseEvent): void {
         ?.disableDraw()
         .then(() => {
           if (phase && phase.key !== "namingPanels") {
-            buildDrawControl(phase)
+            void buildDrawControl(phase)
             repatchMarker()
           }
         })
@@ -263,7 +264,11 @@ function onClick(e: MapLibreMapMouseEvent & { point: { x: number; y: number } })
     updateSelectionHighlight(null)
     const currentPhase = PHASES[appStore.currentPhase]
     if (currentPhase && currentPhase.key !== "namingPanels") {
-      buildDrawControl(currentPhase)
+      // User clicked the empty map — treat it as intent to draw, loading the
+      // deferred geoman bundle on first use before re-arming the draw mode.
+      void ensureGeoman()
+        .then(() => buildDrawControl(currentPhase))
+        .catch((err) => debugError("[DRAW] Unable to arm draw control:", err))
     }
   }
 }
@@ -297,7 +302,7 @@ function onKeyDown(e: KeyboardEvent): void {
         ?.disableDraw()
         .then(() => {
           if (phase && phase.key !== "namingPanels") {
-            buildDrawControl(phase)
+            void buildDrawControl(phase)
             repatchMarker()
           }
         })

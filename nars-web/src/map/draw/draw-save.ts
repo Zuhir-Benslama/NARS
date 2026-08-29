@@ -293,7 +293,7 @@ export async function completeDrawingWithGeometry(
   const modalResult = await openModalForFeature(drawingPhase, featureId, geometry)
   if (!modalResult) {
     deleteGeomanFeature(geomanFeatureData)
-    buildDrawControl({
+    void buildDrawControl({
       key: drawingPhase.key,
       drawType: drawingPhase.drawType,
       color: drawingPhase.color,
@@ -378,7 +378,7 @@ async function resetDrawMode(): Promise<void> {
   } catch (err) {
     debugError("[DRAW-SAVE] reset disableDraw:", err)
   }
-  buildDrawControl({
+  void buildDrawControl({
     key: phase.key,
     drawType: phase.drawType,
     color: phase.color,

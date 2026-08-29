@@ -5,6 +5,7 @@
 import { getCtx } from "../core/state"
 import { debugLog, debugError } from "../../utils/debug"
 import { ensureGeomanDrawEdgesVisible } from "../edit/edit-state"
+import { patchGeomanMarkerPointerSnap } from "./draw-marker-patch"
 import { DRAW_CONFIG } from "../../config"
 import { useDrawStore } from "../../stores/drawStore"
 import type { DrawModeName } from "@geoman-io/maplibre-geoman-free"
@@ -40,7 +41,14 @@ export function clearEdgeVisibilityPoll(): void {
   }
 }
 
-export function buildDrawControl(phase: PhaseConfig): void {
+export async function buildDrawControl(phase: PhaseConfig): Promise<void> {
+  // Passive callers (startup watcher, phase restore) can reach this before the
+  // user has opened a draw/edit session — in that case geoman is still deferred
+  // and there is nothing to arm, so we no-op. Callers that represent genuine
+  // draw intent (phase navigation, empty-map click) call ensureGeoman() before
+  // invoking this, which lazily loads the bundle on first use.
+  patchGeomanMarkerPointerSnap()
+
   const gm = getCtx().geoman
   if (!gm) return
 

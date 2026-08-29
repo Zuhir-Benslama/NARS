@@ -35,7 +35,11 @@ def main() -> None:
         try:
             with Image.open(png) as img:
                 img.convert("RGB").save(pdf, "PDF", resolution=150)
-        except Exception as e:  # noqa: BLE001 - Pillow raises broad exceptions
+        # Catch the realistic Pillow failure types and keep converting the
+        # rest, failing at the end only if any file could not be converted.
+        # UnidentifiedImageError is an OSError subclass; ValueError covers
+        # content Pillow can open but not convert as requested.
+        except (OSError, ValueError) as e:
             print(f"Error: cannot open '{png.name}' — {e}", file=sys.stderr)
             failures += 1
 

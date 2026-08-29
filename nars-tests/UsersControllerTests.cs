@@ -66,9 +66,13 @@ public class UsersControllerTests
         var ctrl = CreateController(authenticated: false);
 
         // [Authorize] on NarsControllerBase returns 401 via middleware in production.
-        // Unit tests bypass the middleware pipeline, so RequiredCurrentUserId throws.
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        // Unit tests bypass the middleware pipeline, so the action reaches
+        // NarsControllerBase.RequiredCurrentUserId, whose job is to fail loudly if
+        // an unauthenticated code path ever slips through — assert that specific
+        // defense-in-depth guard (message match), not just any InvalidOperationException.
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             ctrl.UpdateCredentials(new UpdateUserRequest("newuser", null, null, null), default));
+        Assert.Contains("user_id claim missing", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -5,6 +5,7 @@
 import type { GeoJsonImportFeature } from "@geoman-io/maplibre-geoman-free"
 import type { LatLng } from "../../types"
 import { getCtx } from "../core/state"
+import { ensureGeoman } from "../map-init"
 import {
   disableCrosshair,
   disableSnapping,
@@ -34,6 +35,8 @@ export { commitEditMode, cancelEditMode } from "./edit-commit"
 // ─── ENABLE EDIT MODE ────────────────────────────────────────────────────────
 
 export async function enableEditMode(featureId?: string): Promise<void> {
+  // Load the geoman bundle on demand the first time the user edits a feature.
+  await ensureGeoman()
   const { geoman } = getCtx()
   if (!geoman) return
 

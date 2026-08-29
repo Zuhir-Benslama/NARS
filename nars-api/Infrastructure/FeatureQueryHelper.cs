@@ -76,8 +76,8 @@ public static class FeatureQueryHelper
         Guid userId,
         int skip,
         int take,
-        CancellationToken ct = default,
-        ILogger? logger = null) => await ExecuteQueryAsync(conn, _loadFeaturesSql, userId, layer: null, skip, take, ct, logger);
+        ILogger? logger = null,
+        CancellationToken ct = default) => await ExecuteQueryAsync(conn, _loadFeaturesSql, userId, layer: null, skip, take, logger, ct);
 
     /// <summary>
     /// Loads features for a specific layer with pagination.
@@ -89,8 +89,8 @@ public static class FeatureQueryHelper
         string layer,
         int skip,
         int take,
-        CancellationToken ct = default,
-        ILogger? logger = null) => await ExecuteQueryAsync(conn, _loadByLayerSql, userId, layer, skip, take, ct, logger);
+        ILogger? logger = null,
+        CancellationToken ct = default) => await ExecuteQueryAsync(conn, _loadByLayerSql, userId, layer, skip, take, logger, ct);
 
     private static async Task<(List<FeatureResult> features, int totalCount)> ExecuteQueryAsync(
         DbConnection conn,
@@ -99,8 +99,8 @@ public static class FeatureQueryHelper
         string? layer,
         int skip,
         int take,
-        CancellationToken ct,
-        ILogger? logger)
+        ILogger? logger,
+        CancellationToken ct)
     {
         await using var handle = await conn.EnsureOpenAsync(ct);
 

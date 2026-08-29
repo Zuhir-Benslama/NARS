@@ -26,11 +26,8 @@ namespace NarsApi.Migrations
         }
 
         /// <inheritdoc />
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.DropColumn(
+        protected override void Down(MigrationBuilder migrationBuilder) => migrationBuilder.DropColumn(
                 name: "security_stamp",
                 table: "users");
-        }
     }
 }

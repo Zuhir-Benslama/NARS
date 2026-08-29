@@ -236,7 +236,7 @@ public static class PipelineExtensions
 
         var cspOptions = app.Services.GetRequiredService<IOptions<CspOptions>>().Value;
 
-        app.Use(async (HttpContext ctx, RequestDelegate next) =>
+        app.Use(async (ctx, next) =>
             await ApplyCspMiddlewareAsync(ctx, next, cspOptions));
     }
 

@@ -18,7 +18,7 @@ const {
   mockShowConfirm: vi.fn(),
   mockGetUserMessageKey: vi.fn(() => "err_unknown"),
   mockRecordDelete: vi.fn(),
-  mockEnableEditMode: vi.fn(),
+  mockEnableEditMode: vi.fn(() => Promise.resolve()),
   mockComputeCircleRing: vi.fn(
     () =>
       [
@@ -147,16 +147,17 @@ describe("enableEditGeometry", () => {
     expect(mockShowToast).not.toHaveBeenCalledWith("map_edit_mode_unavailable", "error")
   })
 
-  it("shows error when geoman not available", () => {
+  it("shows error when enabling edit mode fails", async () => {
     addLayerEntry("areas", { dbId: "g1" })
+    mockEnableEditMode.mockRejectedValueOnce(new Error("init failed"))
 
     mod.enableEditGeometry("g1")
-
-    expect(mockShowToast).toHaveBeenCalledWith("map_edit_mode_unavailable", "error")
+    await vi.waitFor(() => {
+      expect(mockShowToast).toHaveBeenCalledWith("map_edit_mode_unavailable", "error")
+    })
   })
 
   it("enables edit mode when geoman is available", () => {
-    _setCtx({ geoman: {} as any, featuresSource: { setData: vi.fn() } } as any)
     addLayerEntry("areas", { dbId: "g1" })
 
     mod.enableEditGeometry("g1")
