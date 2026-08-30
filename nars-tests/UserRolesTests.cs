@@ -62,4 +62,21 @@ public class UserRolesTests
         Assert.Equal("wilaya_admin", UserRoles.WilayaAdmin);
         Assert.Equal("national_admin", UserRoles.NationalAdmin);
     }
+
+    [Theory]
+    [InlineData(UserRoles.FieldWorker)]
+    [InlineData(UserRoles.CommuneUser)]
+    [InlineData(UserRoles.DairaAdmin)]
+    [InlineData(UserRoles.WilayaAdmin)]
+    [InlineData(UserRoles.NationalAdmin)]
+    public void IsDraftReviewer_ReviewerRoles_ReturnsTrue(string role) =>
+        Assert.True(UserRoles.IsDraftReviewer(role));
+
+    [Fact]
+    public void IsDraftReviewer_Null_ReturnsFalse() =>
+        Assert.False(UserRoles.IsDraftReviewer(null));
+
+    [Fact]
+    public void IsDraftReviewer_UnknownRole_ReturnsFalse() =>
+        Assert.False(UserRoles.IsDraftReviewer("unknown_role"));
 }

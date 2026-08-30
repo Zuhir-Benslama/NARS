@@ -378,7 +378,10 @@ classDiagram
     IBackgroundTaskQueue <|.. BackgroundTaskQueue
 
     class BackgroundQueueProcessor {
-        +ExecuteAsync(ct) Task
+        <<IHostedService>>
+        +StartAsync(ct) Task
+        +StopAsync(ct) Task
+        +DisposeAsync() ValueTask
     }
     BackgroundQueueProcessor --> IBackgroundTaskQueue
 
@@ -415,7 +418,7 @@ classDiagram
     }
 
     class AdminSignupController {
-        +AdminSignup(AuthorizedAdminSignupRequest) Task
+        +AuthorizedAdminSignup(AuthorizedAdminSignupRequest) Task
     }
 
     class AdminController {
@@ -459,11 +462,10 @@ classDiagram
     }
 
     class LocationsController {
-        +GetWilayas() Task
-        +GetDairas(wilayaId?) Task
-        +GetCommunes(dairaId?) Task
+        +GetWilayas(search?) Task
+        +GetDairas(wilayaId?, search?) Task
+        +GetCommunes(dairaId?, search?) Task
         +GetCommuneBoundary(id) Task
-        +SearchLocations(query) Task
     }
 
     class UsersController {
@@ -489,9 +491,9 @@ classDiagram
     }
 
     class PagesController {
-        +Index() Task
-        +Login() Task
-        +Map() Task
+        +Root() Task
+        +LoginPage() Task
+        +MapPage() Task
     }
 
     ControllerBase <|-- NarsControllerBase
@@ -545,7 +547,7 @@ classDiagram
     }
 
     class FeatureTypeDescriptor {
-        +string FeatureType
+        +string Type
         +Type EntityType
         +string TableName
         +Func~DbSet~ DbSetAccessor

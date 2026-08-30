@@ -9,7 +9,7 @@ lint: ## Run cross-project linting (.NET format + infra linters)
 	$(SUBMAKE) infra-lint
 
 .PHONY: infra-lint
-infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, makefile, checkmake, tag guard)
+infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, makefile, checkmake, sql, nginx, tag guard)
 	$(SUBMAKE) infra-lint-shell
 	$(SUBMAKE) infra-lint-docker
 	$(SUBMAKE) infra-lint-yaml
@@ -17,6 +17,8 @@ infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, ma
 	$(SUBMAKE) infra-lint-node
 	$(SUBMAKE) infra-lint-makefile
 	$(SUBMAKE) infra-lint-checkmake
+	$(SUBMAKE) infra-lint-sql
+	$(SUBMAKE) infra-lint-nginx
 	$(SUBMAKE) infra-lint-tag-guard
 	$(SUBMAKE) infra-lint-local-ingress-guard
 
@@ -30,9 +32,14 @@ SHELL_SCRIPTS     := $(wildcard nars-infra/scripts/*.sh)
 DOCKERFILES       := $(wildcard nars-infra/docker/Dockerfile.*)
 YAML_FILES        := $(wildcard nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml nars-infra/roads/*.yaml)
 NODE_SCRIPTS      := $(wildcard nars-infra/scripts/*.mjs)
+MIGRATIONS_SQL    := $(wildcard nars-infra/migrations/*.sql nars-infra/scripts/postgis-migration-baseline.sql)
+# nginx.nars-vite.conf is not a wildcard target — it is the frontend server block
+NGINX_CONF        := nars-infra/docker/nginx.nars-vite.conf
+NGINX_SNIPPET     := nars-infra/docker/proxy-common-snippet.conf
 SHELL_SCRIPTS_MNT := $(patsubst %,/mnt/%,$(SHELL_SCRIPTS))
 DOCKERFILES_MNT   := $(patsubst %,/mnt/%,$(DOCKERFILES))
 YAML_FILES_MNT    := $(patsubst %,/mnt/%,$(YAML_FILES))
+MIGRATIONS_SQL_MNT := $(patsubst %,/mnt/%,$(MIGRATIONS_SQL))
 
 .PHONY: infra-lint-shell
 infra-lint-shell: ## Shell-check nars-infra/scripts/*.sh
@@ -45,7 +52,7 @@ infra-lint-shell: ## Shell-check nars-infra/scripts/*.sh
 .PHONY: infra-lint-docker
 infra-lint-docker: ## Lint Dockerfiles with hadolint
 	@if command -v hadolint >/dev/null 2>&1; then
-		hadolint --failure-threshold error $(DOCKERFILES)
+		hadolint --config nars-infra/.hadolint.yaml --failure-threshold error $(DOCKERFILES)
 	else
 		docker run --rm \
 			-v "$$(pwd):/mnt" \
@@ -104,6 +111,45 @@ infra-lint-checkmake: ## Lint the root Makefile with checkmake (config: checkmak
 		docker run --rm -v "$$(pwd):/mnt:ro" --entrypoint /checkmake \
 			$(CHECKMAKE_IMAGE) --config=/mnt/checkmake.ini /mnt/Makefile
 	fi
+
+.PHONY: infra-lint-sql
+infra-lint-sql: ## Syntax-check migration/baseline SQL with sqlfluff (postgres dialect)
+# Only files WITHOUT psql meta-commands (\c, \gexec, ...) belong in this list —
+# sqlfluff is a SQL parser, not a psql meta-command interpreter. That rules out
+# scripts/create_nars_db.sql, which relies on \gexec/\c.
+	@if [ -z "$(MIGRATIONS_SQL)" ]; then echo "✓ No SQL files to check"; exit 0; fi
+	@if command -v sqlfluff >/dev/null 2>&1; then \
+		for f in $(MIGRATIONS_SQL); do \
+			echo "→ sqlfluff parse $$f"; \
+			sqlfluff parse --dialect postgres "$$f" >/dev/null || exit 1; \
+		done \
+	else \
+		for f in $(MIGRATIONS_SQL_MNT); do \
+			echo "→ sqlfluff parse $$f"; \
+			docker run --rm -v "$$(pwd):/mnt" $(SQLFLUFF_IMAGE) \
+				parse --dialect postgres "$$f" >/dev/null || exit 1; \
+		done \
+	fi
+	@echo "✓ SQL syntax OK ($(MIGRATIONS_SQL))"
+
+.PHONY: infra-lint-nginx
+infra-lint-nginx: ## Validate nginx frontend config with `nginx -t`
+# The config points at cluster-internal DNS (resolver kube-dns..., upstream
+# nars-api.nars.svc.cluster.local). A bare `nginx -t` on a host cannot resolve
+# those, so this gate runs docker-only: `--add-host` sandbox mappings let the
+# cluster names resolve while still catching all real syntax/structure errors.
+	@command -v docker >/dev/null 2>&1 || { echo "✖ infra-lint-nginx needs docker"; exit 1; }
+	@if ! docker image inspect $(NGINX_IMAGE) >/dev/null 2>&1; then docker pull $(NGINX_IMAGE) >/dev/null; fi
+	@docker run --rm \
+		--add-host "kube-dns.kube-system.svc.cluster.local.:127.0.0.11" \
+		--add-host "nars-api.nars.svc.cluster.local:127.0.0.11" \
+		--add-host "otel-collector.observability.svc.cluster.local:11.1.1.1" \
+		-v "$$(pwd):/mnt" $(NGINX_IMAGE) sh -c \
+		'cp /mnt/$(NGINX_CONF) /etc/nginx/conf.d/default.conf && \
+		 mkdir -p /etc/nginx/snippets && \
+		 cp /mnt/$(NGINX_SNIPPET) /etc/nginx/snippets/proxy-common.conf && \
+		 nginx -t'
+	@echo "✓ nginx configuration valid"
 
 
 # Internal: warn when the mutable 'latest' tag is in use (build/push/load).

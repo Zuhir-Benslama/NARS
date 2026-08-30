@@ -102,7 +102,7 @@ Run `make help` for the full list. The most useful:
 | `test` | Run all backend tests |
 | `test-coverage` | Backend tests with coverage thresholds enforced |
 | `lint` | Cross-project linting (.NET format + infra linters) |
-| `infra-lint` | Lint nars-infra: shell, docker, yaml, python, node, makefile |
+| `infra-lint` | Lint nars-infra: shell, docker, yaml, python, node, makefile, sql, nginx, tag guard |
 | `images-build` / `images-push` | Build / push all Docker images |
 | `frontend-update` | Rebuild nars-vite, load into kind, rollout restart |
 | `observability-install` | Deploy LGTM stack + OTel Collector |

@@ -55,6 +55,11 @@ SOCAT_IMAGE         ?= alpine/socat:1.8.1.3@sha256:3d9e7966201dd3a065df591020a09
 # discontinued). The image bakes "/Makefile" into its ENTRYPOINT array, so the
 # target overrides --entrypoint; see infra-lint-checkmake.
 CHECKMAKE_IMAGE     ?= quay.io/checkmake/checkmake:v0.3.0@sha256:375280dd16214aefd5729b69a3ad8fc95c89c8d4b9cb8b1d1639e20c6ec910f9
+# nginx-version image matching the Dockerfile.nars-vite final stage — `nginx -t`
+# must run in a sandbox with cluster DNS names resolved (see infra-lint-nginx).
+NGINX_IMAGE          ?= nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+# sqlfluff v3.3.0 — syntax check for migration/baseline SQL (see infra-lint-sql).
+SQLFLUFF_IMAGE       ?= sqlfluff/sqlfluff:3.3.0@sha256:99c4be1cd1af25344154b8d349d3208573c5c106f2617544fe8c6f85f3a50ad2
 OBSERVABILITY_NAMESPACE ?= observability
 LOG_DIR             ?= /tmp/nars
 MIGRATIONS_DIR      ?= nars-infra/migrations

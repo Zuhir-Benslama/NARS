@@ -248,3 +248,23 @@ def test_polygons_disjoint_blobs_keep_absolute_coordinates():
         assert len(inside) == 1, f"polygon outside any expected window: {ring[:4]}"
         matched_windows.add(inside[0])
     assert matched_windows == {0, 1}
+
+
+def test_polygons_skips_degenerate_regions(monkeypatch):
+    # find_objects can emit a None bbox for a phantom label with no pixels;
+    # the guard must skip it instead of crashing on the None slice. label()
+    # produces contiguous labels, so this never occurs for in-process masks —
+    # the pathological library return is fabricated to pin the defensive path.
+    from scipy import ndimage
+
+    real_find_objects = ndimage.find_objects
+
+    def gapped_find_objects(labeled):
+        real = real_find_objects(labeled)
+        # Append a phantom (None, None) bbox row for a label with no pixels.
+        return (real[0], (None, None))
+
+    monkeypatch.setattr(ndimage, "find_objects", gapped_find_objects)
+    features = mask_to_polygons(_building_mask(), TRANSFORM)
+    assert len(features) == 1
+    assert features[0].geometry.type == "Polygon"

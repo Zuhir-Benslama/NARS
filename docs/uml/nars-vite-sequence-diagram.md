@@ -18,28 +18,28 @@ sequenceDiagram
     Browser->>main.ts: Load
     main.ts->>main.ts: Apply saved theme (prevent flash)
 
-    main.ts->>AppStore: checkAuth()
-    AppStore->>ApiModule: GET /api/current_user (credentials: include)
+    main.ts->>main.ts: checkAuth() (inline function in main.ts)
+    main.ts->>ApiModule: GET /api/current_user (credentials: include)
 
     alt 200 OK (access token valid)
-        ApiModule-->>AppStore: UserInfo
-        AppStore->>AppStore: setUser(UserInfo)
+        ApiModule-->>main.ts: UserInfo
     else 401 (token expired or missing)
-        ApiModule-->>AppStore: 401
-        AppStore->>ApiModule: POST /api/refresh (single-flight)
+        ApiModule-->>main.ts: 401
+        main.ts->>ApiModule: POST /api/refresh (single-flight)
         Note over ApiModule: refreshSession() deduplicates concurrent calls
 
         alt Refresh succeeds (200)
-            ApiModule-->>AppStore: new JWT in cookies
-            AppStore->>ApiModule: GET /api/current_user (retry with new token)
-            ApiModule-->>AppStore: UserInfo
-            AppStore->>AppStore: setUser(UserInfo)
+            ApiModule-->>main.ts: new JWT in cookies
+            main.ts->>ApiModule: GET /api/current_user (retry with new token)
+            ApiModule-->>main.ts: UserInfo
         else Refresh fails (401)
-            ApiModule-->>AppStore: 401
-            AppStore-->>User: Redirect to /login
+            ApiModule-->>main.ts: 401
+            main.ts-->>User: Redirect to /login
             Note over User: End of flow
         end
     end
+
+    main.ts->>AppStore: setUser(user) on successful auth
 
     main.ts->>main.ts: Create Vue app (Pinia + i18n)
     main.ts->>main.ts: Register v-click-outside directive
@@ -263,7 +263,7 @@ sequenceDiagram
 
     DrawSave->>UseFeatureValidation: getRoadSide(roadId, lat, lng)
     UseFeatureValidation->>ApiModule: POST /api/road-side {roadId, lat, lng}
-    ApiModule-->>UseFeatureValidation: {side: 'left'/'right', entranceNumber}
+    ApiModule-->>UseFeatureValidation: {side: 'left'/'right', suggestedNumber}
     UseFeatureValidation-->>DrawSave: {side, number}
 
     DrawSave->>DrawSave: Open modal with auto-filled side + number

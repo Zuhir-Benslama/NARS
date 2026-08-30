@@ -117,113 +117,23 @@ jobs:
         run: mypy app/ tests/
         working-directory: nars-roads
 
-  # ─── Infra lint (shell, docker, yaml, python, node, make) ──
+  # ─── Infra lint (delegates to `make infra-lint`) ─────────────
+  # The Makefile owns the gate list and the exact tool versions/digests
+  # (see make/quality.mk + the *_IMAGE vars). CI must not hand-roll a second
+  # copy of that logic — it drifted before (missed the sql/nginx gates, had
+  # stale hadolint/checkmake versions, and skipped the hadolint config).
+  # `make infra-lint` runs all 11 gates, using the digest-pinned tool images
+  # via the docker fallback branches (the runner has docker; only `node` is
+  # provided locally for the .mjs gate, matching NODE_IMAGE node:22-alpine).
   infra-lint:
     name: Infra lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
 
-      - name: Install lint tools
-        run: |
-          pip install yamllint ruff
-
-          # shellcheck — tarball checksum verified before extraction
-          SC_VERSION=v0.11.0
-          SC_SHA256=8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
-          curl -fsSL -o /tmp/shellcheck.tar.xz \
-            "https://github.com/koalaman/shellcheck/releases/download/${SC_VERSION}/shellcheck-${SC_VERSION}.linux.x86_64.tar.xz"
-          echo "${SC_SHA256}  /tmp/shellcheck.tar.xz" | sha256sum -c -
-          tar -xJ --strip-components=1 -C /usr/local/bin -f /tmp/shellcheck.tar.xz shellcheck-${SC_VERSION}/shellcheck
-          rm -f /tmp/shellcheck.tar.xz
-
-          # hadolint — binary checksum verified before install
-          HL_VERSION=v2.12.0
-          HL_SHA256=56de6d5e5ec427e17b74fa48d51271c7fc0d61244bf5c90e828aab8362d55010
-          curl -fsSL -o /tmp/hadolint \
-            "https://github.com/hadolint/hadolint/releases/download/${HL_VERSION}/hadolint-Linux-x86_64"
-          echo "${HL_SHA256}  /tmp/hadolint" | sha256sum -c -
-          sudo install -m 755 /tmp/hadolint /usr/local/bin/hadolint
-          rm -f /tmp/hadolint
-
-          # checkmake — binary checksum verified before install
-          CM_VERSION=v0.3.2
-          CM_SHA256=e2effb876913f3ee2caef0ba35f6202c5e8a3cd55a077d8d2b9ce2034257b6af
-          curl -fsSL -o /tmp/checkmake \
-            "https://github.com/checkmake/checkmake/releases/download/${CM_VERSION}/checkmake-${CM_VERSION}.linux.amd64"
-          echo "${CM_SHA256}  /tmp/checkmake" | sha256sum -c -
-          sudo install -m 755 /tmp/checkmake /usr/local/bin/checkmake
-          rm -f /tmp/checkmake
-
-      - name: Shellcheck
-        run: shellcheck nars-infra/scripts/*.sh
-
-      - name: Hadolint
-        run: hadolint --failure-threshold error nars-infra/docker/Dockerfile.*
-
-      - name: Yamllint
-        run: >
-          yamllint -c nars-infra/.yamllint.yaml
-          nars-infra/k8s/*.yaml
-          nars-infra/k8s/helm-values/*.yaml
-          nars-infra/roads/*.yaml
-
-      - name: Ruff
-        run: |
-          ruff check nars-infra/scripts/ nars-roads/app/ nars-roads/tests/
-          ruff format --check nars-infra/scripts/ nars-roads/app/ nars-roads/tests/
-
-      - name: Node syntax check
-        run: |
-          for f in nars-infra/scripts/*.mjs; do node --check "$f"; done
-
-      - name: Makefile syntax
-        run: |
-          make -n help > /dev/null 2>&1
-          echo "✓ Makefile syntax OK"
-
-      - name: Undefined variables
-        run: |
-          make -Rr --warn-undefined-variables -n help 2>&1 \
-            | grep -i 'warning.*undefined' | grep -v GNUMAKEFLAGS \
-            && { echo "✖ Undefined variable references found"; exit 1; } \
-            || echo "✓ No undefined variable references"
-
-      - name: Checkmake
-        run: checkmake --config=checkmake.ini Makefile
-
-      - name: Tag guard
-        run: |
-          DEPLOY_ENV=production IMAGE_TAG=latest ALLOW_LATEST= make _check-pinned-tag 2>/dev/null && {
-            echo "✖ _check-pinned-tag unexpectedly accepted latest in production"
-            exit 1
-          } || echo "✓ latest rejected in production"
-
-          DEPLOY_ENV=production IMAGE_TAG=abc123 ALLOW_LATEST= make _check-pinned-tag
-          echo "✓ pinned tag accepted in production"
-
-          DEPLOY_ENV=production IMAGE_TAG='a`rm`b' ALLOW_LATEST= make _check-pinned-tag 2>/dev/null && {
-            echo "✖ _check-pinned-tag unexpectedly accepted hostile tag"
-            exit 1
-          } || echo "✓ hostile tag rejected"
-
-          DEPLOY_ENV=production IMAGE_TAG=latest ALLOW_LATEST=1 make _check-pinned-tag
-          echo "✓ ALLOW_LATEST=1 override accepted"
-
-      - name: Local ingress guard
-        run: |
-          DEPLOY_ENV=production make _check-local-ingresses 2>/dev/null && {
-            echo "✖ _check-local-ingresses unexpectedly accepted local ingresses in production"
-            exit 1
-          } || echo "✓ local ingresses rejected in production"
-
-          DEPLOY_ENV=dev make _check-local-ingresses
-          echo "✓ local ingresses allowed in dev"
+      - name: Run make infra-lint (all 11 gates)
+        run: make infra-lint

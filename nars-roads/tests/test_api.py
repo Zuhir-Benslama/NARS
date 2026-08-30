@@ -212,6 +212,30 @@ def test_segment_returns_500_on_inference_failure(monkeypatch):
     assert resp.status_code == 500
 
 
+def test_segment_returns_504_when_inference_times_out(monkeypatch):
+    """A pathological tile that hangs the model must not hold a semaphore slot
+    forever: the endpoint enforces a wall-clock timeout and answers 504."""
+    import time
+
+    class _HangingModel:
+        is_loaded = True
+
+        def predict(self, raw: bytes, bbox: tuple[float, float, float, float]):
+            time.sleep(2)  # simulate a hang; short enough not to slow the suite
+            raise AssertionError("test bug: predict should time out before returning")  # noqa: TRY003 - test fixture message
+
+    monkeypatch.setattr(roads, "INFERENCE_TIMEOUT", 0.05)
+    monkeypatch.setattr(roads, "_models", {"buildings": _HangingModel()})
+
+    resp = _post(
+        headers=AUTH,
+        params=BBOX,
+        files={"tile": ("t.tif", make_tiff_bytes(), "image/tiff")},
+    )
+    assert resp.status_code == 504
+    assert "Inference did not complete within" in resp.json()["detail"]
+
+
 def test_segment_schema_rejects_malformed_feature():
     from pydantic import ValidationError
 

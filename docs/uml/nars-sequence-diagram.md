@@ -305,5 +305,5 @@ sequenceDiagram
     PostgreSQL-->>GeometryHelper: existing count
     GeometryHelper-->>SpatialController: next number
 
-    SpatialController-->>User: 200 OK {side, entranceNumber}
+    SpatialController-->>User: 200 OK {side, suggestedNumber}
 ```

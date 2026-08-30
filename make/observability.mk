@@ -56,6 +56,7 @@ observability-prometheus-stack: .env _check-secrets ## Install Prometheus + Graf
 	printf '%s' "$$GRAFANA_PASSWORD" > "$$tmpdir/grafana_password";
 	helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
 		--namespace "$(OBSERVABILITY_NAMESPACE)" \
+		--version "$(KUBE_PROMETHEUS_STACK_VERSION)" \
 		--values "$(K8S_DIR)/helm-values/kube-prometheus-stack.yaml" \
 		--set-file grafana.adminPassword="$$tmpdir/grafana_password" \
 		--timeout 10m
