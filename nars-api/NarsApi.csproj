@@ -49,7 +49,7 @@
     <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
 
     <!-- Roslyn analyzers for code quality -->
-    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.302">
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.400">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
