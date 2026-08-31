@@ -12,8 +12,10 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Controllers;
+using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
+using NarsApi.Models;
 using NarsApi.Services;
 using static NarsApi.Tests.TestData;
 using Xunit;
@@ -24,6 +26,9 @@ public class PagesControllerTests
 {
     private const string LoginTemplate = "<html><head><meta name=\"csrf-token\" content=\"\"></head><body><script>app();</script></body></html>";
     private const string IndexTemplate = "<html><head><meta name=\"csrf-token\" content=\"\"></head><body><script src=\"/app.js\"></script></body></html>";
+
+    // Security stamp embedded in test principals and seeded on the test user.
+    private const string TestSecurityStamp = "test-security-stamp";
 
     // PagesController.LoadPageTemplateAsync reads templates from
     // Directory.GetCurrentDirectory()/wwwroot unconditionally, so the templates
@@ -52,6 +57,8 @@ public class PagesControllerTests
     {
         private readonly ServiceProvider _requestServices;
         private readonly MemoryCache _cache;
+        private readonly Mock<ISecurityStampCache> _stampCache;
+        private readonly AppDbContext _db;
 
         public DefaultHttpContext HttpContext { get; }
         public Mock<IJwtService> Jwt { get; } = new();
@@ -97,10 +104,32 @@ public class PagesControllerTests
             var httpContextAccessor = new Mock<IHttpContextAccessor>();
             httpContextAccessor.Setup(x => x.HttpContext).Returns(HttpContext);
 
+            // Page sessions validate the token's security stamp, so wire up an
+            // in-memory DB containing the stamp the current user is seeded with.
+            _db = CreateInMemoryDb("PagesAuth_" + Guid.NewGuid().ToString("N"));
+            _db.Users.Add(new User
+            {
+                Id = UserId,
+                Username = "alice",
+                Name = "Alice",
+                Email = DefaultEmail,
+                Phone = DefaultPhone,
+                PasswordHash = "hash",
+                Role = UserRoles.FieldWorker,
+                SecurityStamp = TestSecurityStamp,
+            });
+            _db.SaveChanges();
+
+            _stampCache = new Mock<ISecurityStampCache>();
+            _stampCache.Setup(c => c.GetStampAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(TestSecurityStamp);
+
             var pageAuthService = new PageAuthService(
                 httpContextAccessor.Object,
                 Jwt.Object,
                 Refresh.Object,
+                _stampCache.Object,
+                _db,
                 webHost,
                 Mock.Of<ILogger<PageAuthService>>());
 
@@ -118,12 +147,18 @@ public class PagesControllerTests
             };
         }
 
+        /// <summary>A principal carrying the claims the real JwtService mints.</summary>
+        public ClaimsPrincipal CreatePrincipal(string username = "alice", string? stamp = TestSecurityStamp)
+            => new(new ClaimsIdentity(
+            [
+                new Claim(ClaimNames.Username, username),
+                new Claim(ClaimNames.UserId, UserId.ToString()),
+                new Claim(ClaimNames.SecurityStamp, stamp ?? TestSecurityStamp),
+            ], authenticationType: "jwt"));
+
         public ControllerHarness WithValidPrincipal(string token, string username = "alice")
         {
-            var principal = new ClaimsPrincipal(new ClaimsIdentity(
-                [new Claim(ClaimTypes.Name, username), new Claim("sub", Guid.NewGuid().ToString())],
-                authenticationType: "jwt"));
-            Jwt.Setup(j => j.ValidateToken(token)).Returns(principal);
+            Jwt.Setup(j => j.ValidateToken(token)).Returns(CreatePrincipal(username));
             return this;
         }
 
@@ -131,6 +166,7 @@ public class PagesControllerTests
         {
             _cache.Dispose();
             _requestServices.Dispose();
+            _db.Dispose();
         }
     }
 
@@ -293,5 +329,40 @@ public class PagesControllerTests
             r => r.MintAccessTokenAsync("refresh-token", It.IsAny<CancellationToken>()), Times.Once);
         var setCookie = string.Join(";", h.HttpContext.Response.Headers["Set-Cookie"].Where(v => v is not null));
         Assert.Contains($"{CookieNames.AccessToken}=new-access-token", setCookie);
+    }
+
+    [Fact]
+    public async Task MapPage_SignatureValidButStampRotated_FallsBackToRefresh()
+    {
+        // The cookie's JWT is still signature-valid, but its security stamp no
+        // longer matches (the account was locked or the password changed). The
+        // page must not treat it as authenticated — it falls back to silent
+        // refresh, which mints a fresh token from the DB's current stamp.
+        using var h = new ControllerHarness(accessCookie: "stale-token", refreshCookie: "refresh-token");
+        h.Jwt.Setup(j => j.ValidateToken("stale-token")).Returns(h.CreatePrincipal(stamp: "rotated-stamp"));
+        h.Jwt.Setup(j => j.ValidateToken("new-access-token")).Returns(h.CreatePrincipal());
+        h.Refresh
+            .Setup(r => r.MintAccessTokenAsync("refresh-token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RefreshTokenResult(true, null, "alice", null, "new-access-token", FixedUtcNow.AddDays(30)));
+
+        var result = await h.Controller.MapPage();
+
+        Assert.IsType<ContentResult>(result);
+        h.Refresh.Verify(
+            r => r.MintAccessTokenAsync("refresh-token", It.IsAny<CancellationToken>()), Times.Once);
+        var setCookie = string.Join(";", h.HttpContext.Response.Headers["Set-Cookie"].Where(v => v is not null));
+        Assert.Contains($"{CookieNames.AccessToken}=new-access-token", setCookie);
+    }
+
+    [Fact]
+    public async Task MapPage_SignatureValidButStampRotated_NoRefreshCookie_RedirectsToLogin()
+    {
+        using var h = new ControllerHarness(accessCookie: "stale-token");
+        h.Jwt.Setup(j => j.ValidateToken("stale-token")).Returns(h.CreatePrincipal(stamp: "rotated-stamp"));
+
+        var result = await h.Controller.MapPage();
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal(LoginPath, redirect.Url);
     }
 }

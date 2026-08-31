@@ -24,6 +24,7 @@ metadata:
     app.kubernetes.io/version: "latest"
 spec:
   replicas: 1
+  revisionHistoryLimit: 3
   strategy:
     type: Recreate
   selector:
@@ -142,10 +143,12 @@ spec:
             limits:
               cpu: 1
               memory: 1Gi
-          # The initContainer handles chown; the main container can now run as
-          # the postgres user (uid 999). CHOWN/DAC_OVERRIDE/SETUID/SETGID/FOWNER
-          # are only needed during init (handled above). allowPrivilegeEscalation
-          # remains true because postgres's postmaster forks child processes.
+          # The initContainer (root) handles chown; the main container runs as the
+          # postgres user (uid 999). Container-level runAsNonRoot: true overrides
+          # the pod-level runAsUser: 999 — the postgres user IS non-root.
+          # CHOWN/DAC_OVERRIDE/FOWNER are only needed during init (handled above).
+          # allowPrivilegeEscalation remains true because postgres's postmaster
+          # forks child processes that inherit file descriptors.
           securityContext:
             allowPrivilegeEscalation: true
             readOnlyRootFilesystem: false

@@ -21,6 +21,17 @@
       />
     </div>
     <div class="modal-field">
+      <label>{{ t("label_password_current") }}</label>
+      <input
+        v-model="form.currentPassword"
+        type="password"
+        class="modal-input"
+        :placeholder="t('placeholder_password_current')"
+        :required="!!form.password"
+        maxlength="72"
+      />
+    </div>
+    <div class="modal-field">
       <label>{{ t("label_password") }}</label>
       <input
         v-model="form.password"
@@ -49,7 +60,7 @@ const props = defineProps<{ visible: boolean }>()
 
 const appStore = useAppStore()
 
-const form = reactive({ username: "", email: "", password: "" })
+const form = reactive({ username: "", email: "", password: "", currentPassword: "" })
 const saving = ref(false)
 
 function syncFromStore() {
@@ -57,6 +68,7 @@ function syncFromStore() {
     form.username = appStore.user.username || ""
     form.email = appStore.user.email || ""
     form.password = ""
+    form.currentPassword = ""
   }
 }
 
@@ -80,6 +92,8 @@ function validateForm(): string | null {
 
   if (form.password && form.password.length < 8) return t("error_password_min_length")
 
+  if (form.password && !form.currentPassword) return t("error_password_current_required")
+
   return null
 }
 
@@ -96,9 +110,12 @@ async function save() {
     username: form.username.trim(),
     email: form.email.trim(),
   }
-  if (form.password) body.password = form.password
+  if (form.password) {
+    body.password = form.password
+    body.current_password = form.currentPassword
+  }
 
-  const res = await apiFetch("/api/user/update", {
+  const res = await apiFetch("/api/user/profile", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -113,10 +130,15 @@ async function save() {
   if (!res) return
   if (res.ok) {
     if (appStore.user) {
-      appStore.setUser({ ...appStore.user, ...body })
+      appStore.setUser({
+        ...appStore.user,
+        username: form.username.trim(),
+        email: form.email.trim(),
+      })
     }
     showToast(t("alert_account_updated"), "success")
     form.password = ""
+    form.currentPassword = ""
   }
 }
 </script>

@@ -38,12 +38,13 @@ public class RefreshTokenServiceTests
     /// <summary>
     /// A testable subclass that replaces PostgreSQL-specific queries (FOR UPDATE SKIP LOCKED,
     /// ExecuteUpdateAsync) with standard LINQ equivalents usable with the InMemory provider.
+    /// Test-shared: AuthTestHelper builds its AuthController stack on it too.
     ///
     /// This means unit tests exercise slightly different code paths than production.
     /// Integration tests (AuthControllerServiceTests, FeatureStatsServiceTests, etc.)
     /// cover the real PostgreSQL code paths via Testcontainers.
     /// </summary>
-    private sealed class TestableRefreshTokenService(
+    internal sealed class TestableRefreshTokenService(
         AppDbContext db,
         IJwtService jwt,
         IOptions<JwtOptions> jwtOptions,
@@ -67,6 +68,36 @@ public class RefreshTokenServiceTests
             }
 
             await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        protected override async Task<bool> RecordFailedLoginInStoreAsync(
+            User user, int maxFailedAttempts, int lockoutMinutes, DateTime now, CancellationToken cancellationToken)
+        {
+            // Mirrors the atomic production SQL on a tracked entity, since the
+            // InMemory provider cannot run ExecuteUpdateAsync.
+            if (user.LockedUntil.HasValue && user.LockedUntil.Value <= now)
+            {
+                user.FailedLoginAttempts = 0;
+                user.LockedUntil = null;
+            }
+
+            user.FailedLoginAttempts++;
+
+            if (user.FailedLoginAttempts < maxFailedAttempts)
+            {
+                // Persist the increment (the production SQL UPDATE is immediate).
+                await _db.SaveChangesAsync(cancellationToken);
+                return false;
+            }
+
+            // Threshold reached: lock the account, reset the counter so
+            // re-locking after expiry needs another full sequence, and rotate
+            // the security stamp.
+            user.LockedUntil = now.AddMinutes(lockoutMinutes);
+            user.FailedLoginAttempts = 0;
+            user.SecurityStamp = User.GenerateSecurityStamp();
+            await _db.SaveChangesAsync(cancellationToken);
+            return true;
         }
     }
 
@@ -368,7 +399,7 @@ public class RefreshTokenServiceTests
     }
 
     [Fact]
-    public async Task RotateRefreshTokenAsync_ReplayOfRevokedToken_RevokesAllTokensForUser()
+    public async Task RotateRefreshTokenAsync_ReplayOfRevokedToken_AfterGraceWindow_RevokesAllTokensForUser()
     {
         var (db, raw) = await SeedTokenAsync(FixedUtcNow.AddDays(30));
         using (db)
@@ -383,13 +414,43 @@ public class RefreshTokenServiceTests
             var active = await db.RefreshTokens.CountAsync(rt => !rt.Revoked);
             Assert.Equal(1, active);
 
-            // Replaying the old (now-revoked) token signals theft: every
-            // outstanding token for the user must be revoked.
+            // Age the successor beyond the replay-grace window so the rotation
+            // appears to have happened long before this replay.
+            var successor = await db.RefreshTokens.FirstAsync(rt => !rt.Revoked);
+            successor.CreatedAt = FixedUtcNow.AddMinutes(-1);
+
+            // Replaying the old (now-revoked) token after the grace window
+            // signals theft: every outstanding token for the user is revoked.
             var replay = await svc.RotateRefreshTokenAsync(raw);
 
             Assert.False(replay.Success);
             Assert.Equal("Invalid or expired refresh token.", replay.Detail);
             Assert.Equal(0, await db.RefreshTokens.CountAsync(rt => !rt.Revoked));
+        }
+    }
+
+    [Fact]
+    public async Task RotateRefreshTokenAsync_BenignRetryOfJustRotatedToken_DoesNotRevokeFamily()
+    {
+        var (db, raw) = await SeedTokenAsync(FixedUtcNow.AddDays(30));
+        using (db)
+        {
+            var svc = CreateService(db);
+
+            var first = await svc.RotateRefreshTokenAsync(raw);
+            Assert.True(first.Success);
+
+            // The successor was issued within the replay-grace window, so a
+            // retry of the old token is a benign double-submit (double-click,
+            // two tabs, UA retry), not theft: the successor must survive.
+            var successor = await db.RefreshTokens.FirstAsync(rt => !rt.Revoked);
+            successor.CreatedAt = FixedUtcNow;
+
+            var replay = await svc.RotateRefreshTokenAsync(raw);
+
+            Assert.False(replay.Success);
+            Assert.Equal("Invalid or expired refresh token.", replay.Detail);
+            Assert.Equal(1, await db.RefreshTokens.CountAsync(rt => !rt.Revoked));
         }
     }
 

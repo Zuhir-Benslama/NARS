@@ -227,7 +227,6 @@ classDiagram
         +RoadExistsAsync(roadId, userId, ct) Task~bool~
         +SaveFeatureAsync(entity, featureType, ct) Task~Guid~
         +GetFeatureTypeAsync(featureId, ct) Task~string?~
-        +OwnsFeatureAsync(featureId, featureType, userId, ct) Task~bool~
         +UpdateFeatureAsync(command, ct) Task~bool~
         +DeleteFeatureAsync(featureId, userId, featureType, ct) Task~bool~
         +ClearAllFeaturesAsync(userId, ct) Task~int~
@@ -269,10 +268,6 @@ classDiagram
 
     class IUserProfileService {
         <<interface>>
-        +GetUserByIdAsync(userId, ct) Task~User?~
-        +IsUsernameTakenAsync(username, ct) Task~bool~
-        +IsEmailTakenAsync(email, ct) Task~bool~
-        +UpdateUserAsync(user, ct) Task
         +UpdateCredentialsAsync(userId, request) UpdateCredentialsResult
     }
 

@@ -5,6 +5,9 @@ metadata:
   name: nars-config
   namespace: nars
 data:
+  # ⚠ Base config for local dev. Production overlay MUST override this to
+  # "Production" — leaving it as "Development" enables detailed error pages
+  # and disables HTTPS certificate validation in the API.
   ASPNETCORE_ENVIRONMENT: "Development"
   ASPNETCORE_URLS: "http://+:8080"
   # Production CORS origins only.

@@ -18,7 +18,7 @@ import os
 import secrets
 import threading
 from contextlib import asynccontextmanager
-from typing import Annotated
+from typing import Annotated, TypedDict
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, UploadFile
 
@@ -48,12 +48,20 @@ MAX_CONCURRENT_INFERENCES = max(1, env_int("NARS_ROADS_MAX_CONCURRENT_INFERENCES
 # MAX_CONCURRENT_INFERENCES=2 just two such tiles exhaust all capacity.
 INFERENCE_TIMEOUT = env_int("NARS_ROADS_INFERENCE_TIMEOUT", 120)
 
+
 # Model registry: feature type -> how to build its model. Each entry is an
 # independent binary (foreground/background) checkpoint, so one task can be
 # updated or rolled back without touching the others. Roads is not yet
 # registered — no road checkpoint exists yet; adding it is a "roads" entry here
 # plus a /segment/roads endpoint (postprocess: mask_to_linestrings).
-MODEL_SPECS: dict[str, dict] = {
+class ModelSpec(TypedDict):
+    """How to construct one task's SegmentationModel."""
+
+    weights_path: str
+    num_classes: int
+
+
+MODEL_SPECS: dict[str, ModelSpec] = {
     "buildings": {
         "weights_path": os.environ.get(
             "NARS_ROADS_WEIGHTS_PATH", "weights/unet_bldg_base.pth"

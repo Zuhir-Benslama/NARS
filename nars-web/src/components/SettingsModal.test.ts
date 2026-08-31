@@ -15,7 +15,6 @@ const globalOpts = {
     SettingsGeneral: { template: '<div class="mock-general">General</div>' },
     SettingsAccount: { template: '<div class="mock-account">Account</div>' },
     SettingsUsers: { template: '<div class="mock-users">Users</div>' },
-    SettingsFeatures: { template: '<div class="mock-features">Features</div>' },
     SettingsAbout: { template: '<div class="mock-about">About</div>' },
   },
 }
@@ -40,14 +39,13 @@ describe("SettingsModal", () => {
     expect(wrapper.text()).toContain("settings_title")
   })
 
-  it("shows default tabs (general, account, features, about)", () => {
+  it("shows default tabs (general, account, about)", () => {
     const wrapper = mount(SettingsModal, { props: { visible: true }, global: globalOpts })
     const tabs = wrapper.findAll(".sidebar-tab")
-    expect(tabs).toHaveLength(4)
+    expect(tabs).toHaveLength(3)
     expect(tabs[0].text()).toContain("tab_general")
     expect(tabs[1].text()).toContain("tab_account")
-    expect(tabs[2].text()).toContain("tab_features")
-    expect(tabs[3].text()).toContain("tab_about")
+    expect(tabs[2].text()).toContain("tab_about")
   })
 
   it("shows users tab for admin users", () => {
@@ -62,7 +60,7 @@ describe("SettingsModal", () => {
     }
     const wrapper = mount(SettingsModal, { props: { visible: true }, global: globalOpts })
     const tabs = wrapper.findAll(".sidebar-tab")
-    expect(tabs).toHaveLength(5)
+    expect(tabs).toHaveLength(4)
     expect(tabs[2].text()).toContain("tab_users")
   })
 

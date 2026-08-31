@@ -26,7 +26,7 @@ class FeatureGeometry(BaseModel):
     have [[lng, lat], ...], Polygons have [[[lng, lat], ...], ...]."""
 
     type: Literal["Point", "LineString", "Polygon"]
-    coordinates: list[list[float]] | list[list[list[float]]]
+    coordinates: list[float] | list[list[float]] | list[list[list[float]]]
 
 
 class Feature(BaseModel):

@@ -3,8 +3,26 @@
 
 # ─── Observability (Grafana LGTM + OTel) ─────────────────────
 
+.PHONY: _check-observability-security
+_check-observability-security: ## Fail if Helm values ship insecure defaults in production
+	@if [ "$(DEPLOY_ENV)" = "production" ] || [ "$(DEPLOY_ENV)" = "staging" ]; then \
+		if grep -q 'auth_enabled: false' "$(K8S_DIR)/helm-values/loki.yaml"; then \
+			echo "✖ loki.yaml has auth_enabled: false — unauthorized log access is not allowed in $(DEPLOY_ENV)"; \
+			echo "  Set loki.auth_enabled=true via Helm override or production overlay."; \
+			exit 1; \
+		fi; \
+		if grep -q 'insecure: true' "$(K8S_DIR)/helm-values/opentelemetry-collector.yaml"; then \
+			echo "✖ opentelemetry-collector.yaml has tls.insecure: true — unencrypted trace export is not allowed in $(DEPLOY_ENV)"; \
+			echo "  Set config.exporters.otlp.tls.insecure=false via Helm override or production overlay."; \
+			exit 1; \
+		fi; \
+		echo "✓ Observability security checks passed ($(DEPLOY_ENV))"; \
+	else \
+		echo "  ⚠ Skipping observability security checks (DEPLOY_ENV=$(DEPLOY_ENV))"; \
+	fi
+
 .PHONY: observability-install
-observability-install: .env _check-secrets helm-check helm-repos ## Install LGTM stack + OpenTelemetry Collector
+observability-install: .env _check-secrets _check-observability-security helm-check helm-repos ## Install LGTM stack + OpenTelemetry Collector
 	$(SUBMAKE) observability-namespace
 	$(SUBMAKE) observability-prometheus-stack
 	$(SUBMAKE) observability-loki

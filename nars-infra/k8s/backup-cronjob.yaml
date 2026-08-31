@@ -28,6 +28,25 @@ metadata:
     app.kubernetes.io/component: backup
 automountServiceAccountToken: false
 ---
+# PostGIS backup runs on a schedule; a PDB with maxUnavailable: 0 prevents
+# voluntary disruption (node drain, cluster upgrade) from evicting an in-flight
+# backup pod mid-dump, which would otherwise abort the backup and leave a
+# partial file.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: postgis-backup
+  namespace: nars
+  labels:
+    app.kubernetes.io/name: postgis-backup
+    app.kubernetes.io/component: backup
+spec:
+  maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgis-backup
+      app.kubernetes.io/component: backup
+---
 apiVersion: batch/v1
 kind: CronJob
 metadata:

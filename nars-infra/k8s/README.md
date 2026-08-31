@@ -10,7 +10,7 @@ that automates cluster creation, deployment, and teardown.
 make cluster-up
 
 # Port-forward ingress controller to localhost
-make cluster-port-forward
+make proxy-up
 
 # Add to /etc/hosts
 echo '127.0.0.1 nars.dz' | sudo tee -a /etc/hosts
@@ -44,7 +44,8 @@ echo '127.0.0.1 nars.dz' | sudo tee -a /etc/hosts
 
 | Command | Description |
 |---------|-------------|
-| `make cluster-port-forward` | Forward ingress controller to `localhost:8080` (background) |
+| `make proxy-up` | Forward ingress controller to `localhost:8080` (background) |
+| `make proxy-down` | Stop the port-forward and socat bridge |
 
 ### Database
 

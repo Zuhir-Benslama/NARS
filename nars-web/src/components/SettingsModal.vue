@@ -40,7 +40,6 @@
           <SettingsGeneral v-if="activeTab === 'general'" />
           <SettingsAccount v-if="activeTab === 'account'" :visible="visible" />
           <SettingsUsers v-if="activeTab === 'users'" />
-          <SettingsFeatures v-if="activeTab === 'features'" />
           <SettingsAbout v-if="activeTab === 'about'" />
         </div>
       </div>
@@ -62,7 +61,6 @@ import { useAppStore } from "../stores/appStore"
 import SettingsGeneral from "./settings/SettingsGeneral.vue"
 import SettingsAccount from "./settings/SettingsAccount.vue"
 import SettingsUsers from "./settings/SettingsUsers.vue"
-import SettingsFeatures from "./settings/SettingsFeatures.vue"
 import SettingsAbout from "./settings/SettingsAbout.vue"
 
 const props = defineProps<{ visible: boolean }>()
@@ -83,13 +81,12 @@ const canManageUsers = computed(() => appStore.canManageUsers)
 const baseTabs = [
   { id: "general", tKey: "tab_general", icon: "⚙️" },
   { id: "account", tKey: "tab_account", icon: "👤" },
-  { id: "features", tKey: "tab_features", icon: "⬟" },
   { id: "about", tKey: "tab_about", icon: "ℹ️" },
 ]
 const adminTab = { id: "users", tKey: "tab_users", icon: "👥" }
 
 const tabs = computed(() =>
-  canManageUsers.value ? [baseTabs[0], baseTabs[1], adminTab, baseTabs[2], baseTabs[3]] : baseTabs,
+  canManageUsers.value ? [baseTabs[0], baseTabs[1], adminTab, baseTabs[2]] : baseTabs,
 )
 
 function onTabKeydown(e: KeyboardEvent) {

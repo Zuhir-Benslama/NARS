@@ -10,6 +10,7 @@ metadata:
     app.kubernetes.io/version: "latest"
 spec:
   replicas: 2
+  revisionHistoryLimit: 5
   strategy:
     type: RollingUpdate
     rollingUpdate:

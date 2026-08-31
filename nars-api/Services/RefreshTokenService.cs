@@ -47,13 +47,28 @@ public class RefreshTokenService(
             return new RefreshTokenResult(false, "Invalid or expired refresh token.", null, null, null, null);
         }
 
-        // Replay of an already-rotated token signals theft (the legitimate
-        // holder only ever uses the newest token). Revoke every outstanding
-        // token so the attacker's session dies too, then reject the request
-        // with the same generic message to avoid revealing what happened.
+        // Replay of an already-rotated token can mean one of two things:
+        //   * a benign retry by the legitimate client that just rotated the
+        //     token moments ago (double-click, two tabs, UA retry), or
+        //   * a genuine replay of a stolen token much later by an attacker.
+        // Only the second signals theft: revoke every outstanding token so the
+        // attacker's session dies too, then reject the request with the same
+        // generic message to avoid revealing what happened. The grace window
+        // bounds how long a replayed old token is tolerated (Jwt:RefreshReplayGraceSeconds).
         if (stored.Revoked)
         {
-            await RevokeAllUserTokensAsync(stored.UserId, cancellationToken);
+            var successor = await db.RefreshTokens
+                .Where(rt => rt.UserId == stored.UserId && !rt.Revoked && rt.ExpiresAt > timeProvider.UtcNow)
+                .OrderByDescending(rt => rt.CreatedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            var reuseIsRecent = successor is not null
+                && timeProvider.UtcNow - successor.CreatedAt <= TimeSpan.FromSeconds(jwtOptions.Value.RefreshReplayGraceSeconds);
+            if (!reuseIsRecent)
+            {
+                await RevokeAllUserTokensAsync(stored.UserId, cancellationToken);
+            }
+
             await tx.CommitAsync(cancellationToken);
             return new RefreshTokenResult(false, "Invalid or expired refresh token.", null, null, null, null);
         }
@@ -167,24 +182,64 @@ public class RefreshTokenService(
 
         // A lockout that has already expired starts a fresh counting cycle,
         // so re-locking requires another full sequence of failed attempts.
-        if (user.LockedUntil.HasValue && user.LockedUntil.Value <= now)
+        if (await RecordFailedLoginInStoreAsync(user, maxFailedAttempts, lockoutMinutes, now, cancellationToken))
         {
-            user.FailedLoginAttempts = 0;
-            user.LockedUntil = null;
-        }
-
-        user.FailedLoginAttempts++;
-        if (user.FailedLoginAttempts >= maxFailedAttempts)
-        {
-            user.LockedUntil = now.AddMinutes(lockoutMinutes);
-            user.FailedLoginAttempts = 0;
             // Rotate the security stamp so any access tokens issued before the
             // lockout are rejected immediately (see AuthenticationExtensions
             // OnTokenValidated) instead of remaining valid until expiry.
-            user.SecurityStamp = User.GenerateSecurityStamp();
             stampCache.EvictStamp(user.Id);
         }
-        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Applies a failed login atomically in the database and reports whether a
+    /// fresh lockout was just applied.
+    ///
+    /// The failed-login counter is incremented with a row-level atomic UPDATE
+    /// (<c>failed_login_attempts = failed_login_attempts + 1</c>) instead of a
+    /// read-modify-write on a tracked entity, so two concurrent bad-password
+    /// attempts cannot both persist the same value and lose one increment
+    /// (which would delay or dodge the lockout threshold). Virtual so unit
+    /// tests can override it with a tracked-entity equivalent — the InMemory
+    /// provider cannot execute <c>ExecuteUpdateAsync</c>.
+    /// </summary>
+    protected virtual async Task<bool> RecordFailedLoginInStoreAsync(
+        User user, int maxFailedAttempts, int lockoutMinutes, DateTime now, CancellationToken cancellationToken)
+    {
+        // Clear an expired lockout so the fresh cycle starts counting from zero.
+        await db.Users
+            .Where(u => u.Id == user.Id && u.LockedUntil != null && u.LockedUntil <= now)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(u => u.LockedUntil, u => (DateTime?)null)
+                .SetProperty(u => u.FailedLoginAttempts, 0), cancellationToken);
+
+        // Atomic increment. Skipping rows that are currently locked keeps an
+        // active lockout immune to extension by further bad passwords.
+        await db.Users
+            .Where(u => u.Id == user.Id && u.LockedUntil == null)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(u => u.FailedLoginAttempts, u => u.FailedLoginAttempts + 1), cancellationToken);
+
+        var attempts = await db.Users.AsNoTracking()
+            .Where(u => u.Id == user.Id)
+            .Select(u => u.FailedLoginAttempts)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (attempts < maxFailedAttempts)
+        {
+            return false;
+        }
+
+        // Threshold reached: lock the account, reset the counter so re-locking
+        // after expiry needs another full sequence, and rotate the security stamp.
+        var newStamp = User.GenerateSecurityStamp();
+        await db.Users
+            .Where(u => u.Id == user.Id)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(u => u.LockedUntil, now.AddMinutes(lockoutMinutes))
+                .SetProperty(u => u.FailedLoginAttempts, 0)
+                .SetProperty(u => u.SecurityStamp, newStamp), cancellationToken);
+        return true;
     }
 
     public async Task ResetFailedAttemptsIfNeededAsync(User user, CancellationToken cancellationToken = default)

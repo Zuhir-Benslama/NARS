@@ -43,20 +43,18 @@ jobs:
       - name: Build
         run: dotnet build Workspace.sln --no-restore
 
-      - name: Unit tests + coverage
-        run: >
-          dotnet test nars-tests/NarsApi.Tests.csproj
-          --no-restore
-          --filter "Category!=Service"
-          /p:CollectCoverage=true
-          /p:CoverletOutputFormat=cobertura
-          /p:CoverletOutput=${{ github.workspace }}/coverage.cobertura.xml
+      # The Makefile owns the unit coverage gate (`make test-coverage`): it
+      # applies the `Category!=Service` filter and the coverlet Threshold from
+      # nars-tests/NarsApi.Tests.csproj. CI delegates rather than hand-rolling a
+      # second copy (same principle as the infra-lint and roads-test jobs).
+      - name: Unit tests + coverage (make test-coverage)
+        run: make test-coverage
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: dotnet-coverage
-          path: coverage.cobertura.xml
+          path: nars-tests/TestResults/coverage.cobertura.xml
           if-no-files-found: ignore
 
   # ─── Frontend (nars-web) ────────────────────────────────────
@@ -75,6 +73,15 @@ jobs:
       - run: npm ci
         working-directory: nars-web
 
+      # The API contract (`api-spec/openapi.json`) is committed so codegen is
+      # deterministic and diffable in PRs. Regenerate the client types from the
+      # committed spec and fail if the committed schema.d.ts has drifted —
+      # this is what catches "my changes moved an endpoint" without needing a
+      # live backend in CI.
+      - name: API types in sync with committed spec
+        run: npm run codegen:types && git diff --exit-code -- src/api/schema.d.ts
+        working-directory: nars-web
+
       - name: Type-check
         run: npm run typecheck
         working-directory: nars-web
@@ -91,38 +98,43 @@ jobs:
         run: npm run build
         working-directory: nars-web
 
-      - name: Unit tests
-        run: npm run test:run
+      - name: Unit tests + coverage (thresholds enforced)
+        run: npm run test:coverage
         working-directory: nars-web
 
       - name: Audit
         run: npm run audit
         working-directory: nars-web
 
-  # ─── Roads type-check (nars-roads) ────────────────────────
-  roads:
-    name: Roads
+  # ─── Roads test suite (nars-roads) ────────────────────────
+  # The gate intentionally lives in the Makefile (`make roads-test`): it builds
+  # the test image and runs the exact quality commands — mypy on app/ and
+  # tests/ against the real dependency stack, then pytest with a coverage
+  # floor. CI delegates to it instead of hand-rolling a second copy (same
+  # principle as the infra-lint job); a bare `mypy` install with no deps was
+  # near-vacuous because ignore_missing_imports typed the whole stack dynamic.
+  roads-test:
+    name: Roads test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install mypy
-        run: pip install mypy==2.1.0
-
-      - name: Mypy
-        run: mypy app/ tests/
-        working-directory: nars-roads
+      - name: Run make roads-test (mypy app/tests + pytest w/ coverage floor)
+        env:
+          # Warm the torch base layer across runs via the GitHub Actions cache.
+          # type=gha needs no registry login; mode=max exports every stage layer
+          # so the (multi-hundred-MB) pip-install-torch step is cached instead
+          # of rebuilt cold on every push. The flags flow into the make target
+          # unchanged, so the Makefile stays the single owner of the build.
+          ROADS_TEST_DOCKER_BUILD_ARGS: --cache-from=type=gha --cache-to=type=gha,mode=max
+        run: make roads-test
 
   # ─── Infra lint (delegates to `make infra-lint`) ─────────────
   # The Makefile owns the gate list and the exact tool versions/digests
   # (see make/quality.mk + the *_IMAGE vars). CI must not hand-roll a second
   # copy of that logic — it drifted before (missed the sql/nginx gates, had
   # stale hadolint/checkmake versions, and skipped the hadolint config).
-  # `make infra-lint` runs all 11 gates, using the digest-pinned tool images
+  # `make infra-lint` runs all 12 gates, using the digest-pinned tool images
   # via the docker fallback branches (the runner has docker; only `node` is
   # provided locally for the .mjs gate, matching NODE_IMAGE node:22-alpine).
   infra-lint:
@@ -135,5 +147,5 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Run make infra-lint (all 11 gates)
+      - name: Run make infra-lint (all 12 gates)
         run: make infra-lint

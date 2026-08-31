@@ -105,10 +105,11 @@ describe("SettingsAccount", () => {
     const inputs = wrapper.findAll("input")
     await inputs[0].setValue("newuser")
     await inputs[1].setValue("new@email.com")
-    await inputs[2].setValue("newpass123")
+    await inputs[2].setValue("currentpass")
+    await inputs[3].setValue("newpass123")
     await wrapper.find(".modal-btn-save").trigger("click")
     expect(mockApiFetch).toHaveBeenCalledWith(
-      "/api/user/update",
+      "/api/user/profile",
       expect.objectContaining({
         method: "PUT",
         body: expect.stringContaining("newuser"),
@@ -155,7 +156,7 @@ describe("SettingsAccount", () => {
     const inputs = wrapper.findAll("input")
     await inputs[0].setValue("validuser")
     await inputs[1].setValue("valid@email.com")
-    await inputs[2].setValue("short")
+    await inputs[3].setValue("short")
     await wrapper.find(".modal-btn-save").trigger("click")
     expect(mockShowToast).toHaveBeenCalledWith("error_password_min_length", "error")
   })

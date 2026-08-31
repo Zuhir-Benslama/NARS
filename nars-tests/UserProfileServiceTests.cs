@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Moq;
 using NarsApi.Data;
 using NarsApi.DTOs;
@@ -45,64 +46,6 @@ public sealed class UserProfileServiceTests
     }
 
     [Fact]
-    public async Task GetUserByIdAsync_ExistingUser_ReturnsUser()
-    {
-        var h = new Harness(db => SeedUser(db));
-        var user = await h.Service.GetUserByIdAsync(UserId);
-        Assert.NotNull(user);
-        Assert.Equal("profileuser", user.Username);
-    }
-
-    [Fact]
-    public async Task GetUserByIdAsync_UnknownUser_ReturnsNull()
-    {
-        var h = new Harness(db => SeedUser(db));
-        var user = await h.Service.GetUserByIdAsync(Guid.NewGuid());
-        Assert.Null(user);
-    }
-
-    [Fact]
-    public async Task IsUsernameTakenAsync_Taken_ReturnsTrue()
-    {
-        var h = new Harness(db => SeedUser(db));
-        Assert.True(await h.Service.IsUsernameTakenAsync("profileuser"));
-    }
-
-    [Fact]
-    public async Task IsUsernameTakenAsync_Free_ReturnsFalse()
-    {
-        var h = new Harness(db => SeedUser(db));
-        Assert.False(await h.Service.IsUsernameTakenAsync("otheruser"));
-    }
-
-    [Fact]
-    public async Task IsEmailTakenAsync_Taken_ReturnsTrue()
-    {
-        var h = new Harness(db => SeedUser(db));
-        Assert.True(await h.Service.IsEmailTakenAsync("profile@test.com"));
-    }
-
-    [Fact]
-    public async Task IsEmailTakenAsync_Free_ReturnsFalse()
-    {
-        var h = new Harness(db => SeedUser(db));
-        Assert.False(await h.Service.IsEmailTakenAsync("free@test.com"));
-    }
-
-    [Fact]
-    public async Task UpdateUserAsync_PersistsChanges()
-    {
-        var h = new Harness(db => SeedUser(db));
-        var user = await h.Service.GetUserByIdAsync(UserId);
-        Assert.NotNull(user);
-        user.Name = "Renamed";
-        await h.Service.UpdateUserAsync(user);
-        var updated = await h.Service.GetUserByIdAsync(UserId);
-        Assert.NotNull(updated);
-        Assert.Equal("Renamed", updated.Name);
-    }
-
-    [Fact]
     public async Task UpdateCredentialsAsync_UnknownUser_ReturnsUserNotFound()
     {
         var h = new Harness(db => SeedUser(db));
@@ -136,7 +79,7 @@ public sealed class UserProfileServiceTests
     public async Task UpdateCredentialsAsync_DuplicateUsername_ReturnsDuplicateUsername()
     {
         var h = new Harness(db => SeedUser(db));
-        db_AddOtherUser(h.Db);
+        AddOtherUser(h.Db);
         var result = await h.Service.UpdateCredentialsAsync(UserId,
             new UpdateUserRequest(Username: "otheruser", Email: null, CurrentPassword: null, Password: null));
         Assert.Equal(CredentialUpdateError.DuplicateUsername, result.Error);
@@ -165,7 +108,7 @@ public sealed class UserProfileServiceTests
     public async Task UpdateCredentialsAsync_DuplicateEmail_ReturnsDuplicateEmail()
     {
         var h = new Harness(db => SeedUser(db));
-        db_AddOtherUser(h.Db);
+        AddOtherUser(h.Db);
         var result = await h.Service.UpdateCredentialsAsync(UserId,
             new UpdateUserRequest(Username: null, Email: "OTHER@test.com", CurrentPassword: null, Password: null));
         Assert.Equal(CredentialUpdateError.DuplicateEmail, result.Error);
@@ -212,8 +155,7 @@ public sealed class UserProfileServiceTests
     public async Task UpdateCredentialsAsync_PasswordChange_RotatesStampAndEvicts()
     {
         var h = new Harness(db => SeedUser(db));
-        var before = await h.Service.GetUserByIdAsync(UserId);
-        Assert.NotNull(before);
+        var before = await h.Db.Users.SingleAsync(u => u.Id == UserId);
         var originalStamp = before.SecurityStamp;
 
         var result = await h.Service.UpdateCredentialsAsync(UserId,
@@ -227,7 +169,7 @@ public sealed class UserProfileServiceTests
         Assert.True(BCrypt.Net.BCrypt.Verify("NewStr0ng!Pass", result.User.PasswordHash));
     }
 
-    private static void db_AddOtherUser(AppDbContext db)
+    private static void AddOtherUser(AppDbContext db)
     {
         if (db.Users.Any(u => u.Username == "otheruser"))
         {

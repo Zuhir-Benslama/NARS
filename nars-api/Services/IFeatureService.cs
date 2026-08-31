@@ -12,8 +12,6 @@ public interface IFeatureService
     Task<Guid> SaveFeatureAsync(FeatureBase entity, string featureType, CancellationToken ct);
     /// <summary>Returns the feature type string (e.g. "road", "area") for a given feature ID.</summary>
     Task<string?> GetFeatureTypeAsync(Guid featureId, CancellationToken ct);
-    /// <summary>Verifies that the user owns the specified feature.</summary>
-    Task<bool> OwnsFeatureAsync(Guid featureId, string featureType, Guid userId, CancellationToken ct);
     /// <summary>Updates an existing feature's label and/or data.</summary>
     Task<bool> UpdateFeatureAsync(UpdateFeatureCommand command, CancellationToken ct);
     /// <summary>Deletes a single feature by ID, verifying ownership.</summary>

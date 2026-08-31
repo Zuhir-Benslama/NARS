@@ -169,7 +169,7 @@ describe("EntranceInspectionForm", () => {
       await new Promise((resolve) => setTimeout(resolve, 0))
 
       expect(mockApiFetch).toHaveBeenCalledWith(
-        "/api/field/entrance/create",
+        "/api/field/entrance",
         expect.objectContaining({
           method: "POST",
         }),

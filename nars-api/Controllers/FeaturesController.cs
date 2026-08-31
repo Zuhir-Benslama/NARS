@@ -154,9 +154,18 @@ public class FeaturesController(
             return Problem(detail: "Feature not found", statusCode: 404);
         }
 
-        if (!await featureService.OwnsFeatureAsync(featureId, featureType, RequiredCurrentUserId, cancellationToken))
+        // House-entrance updates can relink the entrance to a road via the
+        // roadDbId in the payload (post-update action in FeatureTypeRegistry).
+        // Validate the target road the same way the Save path does so users
+        // cannot point an entrance at a road they do not own or that does not
+        // exist. (Ownership/existence of the feature itself is enforced by
+        // UpdateFeatureAsync's WHERE user_id clause.)
+        if (featureType == FeatureTypes.HouseEntrance
+            && body.Data is JsonElement entranceData
+            && FeatureTypeRegistry.TryGetRoadDbId(entranceData, out var roadId)
+            && !await featureService.RoadExistsAsync(roadId, RequiredCurrentUserId, cancellationToken))
         {
-            return Problem(detail: "Feature not found", statusCode: 404);
+            return Problem(detail: "Referenced road not found.", statusCode: 400);
         }
 
         if (body.Data is JsonElement dataElement)

@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
+using NarsApi.Data;
 using NarsApi.Infrastructure;
 
 namespace NarsApi.Services;
@@ -14,6 +16,8 @@ public sealed class PageAuthService(
     IHttpContextAccessor httpContextAccessor,
     IJwtService jwt,
     IRefreshTokenService refreshService,
+    ISecurityStampCache stampCache,
+    AppDbContext db,
     IHostEnvironment env,
     ILogger<PageAuthService> logger) : IPageAuthService
 {
@@ -22,8 +26,8 @@ public sealed class PageAuthService(
 
     public async Task<bool> TryAuthenticateAsync(CancellationToken cancellationToken = default)
     {
-        var principal = ValidateAccessTokenFromCookie();
-        principal ??= ValidateAccessTokenFromBearerHeader();
+        var principal = await ValidateAccessTokenFromCookieAsync(cancellationToken);
+        principal ??= await ValidateAccessTokenFromBearerHeaderAsync(cancellationToken);
 
         if (principal is not null)
         {
@@ -49,6 +53,8 @@ public sealed class PageAuthService(
             // Read-only page loads mint an access token WITHOUT rotating the
             // one-time-use refresh token, so concurrent tabs (or double-fetch
             // from /) never revoke it for each other and bounce to /login.
+            // MintAccessTokenAsync reads the user's CURRENT security stamp and
+            // rejects locked accounts, so the minted token is always fresh.
             var result = await refreshService.MintAccessTokenAsync(refreshToken, cancellationToken);
             if (!result.Success)
             {
@@ -79,7 +85,7 @@ public sealed class PageAuthService(
         }
     }
 
-    private ClaimsPrincipal? ValidateAccessTokenFromCookie()
+    private async Task<ClaimsPrincipal?> ValidateAccessTokenFromCookieAsync(CancellationToken ct)
     {
         var accessToken = HttpContext.Request.Cookies[CookieNames.AccessToken];
         if (string.IsNullOrEmpty(accessToken))
@@ -87,20 +93,20 @@ public sealed class PageAuthService(
             return null;
         }
 
-        var principal = jwt.ValidateToken(accessToken);
+        var principal = await ValidateSecurityStampAsync(jwt.ValidateToken(accessToken), ct);
         if (principal is not null)
         {
             logger.LogDebug("[Pages] access_token cookie is valid.");
         }
         else
         {
-            logger.LogDebug("[Pages] access_token cookie is EXPIRED or INVALID.");
+            logger.LogDebug("[Pages] access_token cookie is EXPIRED, INVALID, or STAMPED OUT.");
         }
 
         return principal;
     }
 
-    private ClaimsPrincipal? ValidateAccessTokenFromBearerHeader()
+    private async Task<ClaimsPrincipal?> ValidateAccessTokenFromBearerHeaderAsync(CancellationToken ct)
     {
         var bearerHeader = HttpContext.Request.Headers.Authorization.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(bearerHeader)
@@ -115,20 +121,58 @@ public sealed class PageAuthService(
             return null;
         }
 
-        var principal = jwt.ValidateToken(bearerToken);
+        var principal = await ValidateSecurityStampAsync(jwt.ValidateToken(bearerToken), ct);
         if (principal is not null)
         {
             logger.LogDebug("[Pages] Valid bearer token header found.");
         }
         else
         {
-            logger.LogDebug("[Pages] Bearer token header is invalid or expired.");
+            logger.LogDebug("[Pages] Bearer token header is invalid, expired, or stamped out.");
         }
 
         // Never persist a header-supplied bearer token into the access_token
         // cookie: the client chose to send it via header (not as a cookie), and
         // writing it as a long-lived cookie would broaden the token's exposure.
         return principal;
+    }
+
+    /// <summary>
+    /// Re-checks the token's embedded security stamp against the current one,
+    /// mirroring the JwtBearer <c>OnTokenValidated</c> handler so page sessions
+    /// revoke immediately on lockout/password change instead of staying valid
+    /// until the token or cookie expires.
+    /// </summary>
+    private async Task<ClaimsPrincipal?> ValidateSecurityStampAsync(ClaimsPrincipal? principal, CancellationToken ct)
+    {
+        if (principal is null)
+        {
+            return null;
+        }
+
+        var userId = Guid.TryParse(principal.FindFirstValue(ClaimNames.UserId), out var id) ? id : (Guid?)null;
+        var stamp = principal.FindFirstValue(ClaimNames.SecurityStamp);
+        if (userId is null || string.IsNullOrEmpty(stamp))
+        {
+            return null;
+        }
+
+        var current = await stampCache.GetStampAsync(userId.Value, ct);
+        if (current is null)
+        {
+            // Cache miss — query DB and populate cache for next request.
+            current = await db.Users.AsNoTracking()
+                .Where(u => u.Id == userId.Value)
+                .Select(u => u.SecurityStamp)
+                .FirstOrDefaultAsync(ct);
+
+            if (current is not null)
+            {
+                stampCache.SetStamp(userId.Value, current);
+            }
+        }
+
+        return current == stamp ? principal : null;
     }
 
     private CookieOptions MakeCookieOptions(TimeSpan maxAge)

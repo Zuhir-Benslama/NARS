@@ -29,6 +29,14 @@ public class RateLimitOptions
     public int ApiWindowMinutes { get; set; } = 1;
     public int ApiSegmentsPerWindow { get; set; } = 6;
 
+    /// <summary>
+    /// How many excess requests may wait (OldestFirst) before being rejected.
+    /// Smooths bursty interactive data-entry traffic behind a shared client IP
+    /// (NAT) so a temporary spike degrades to a brief pause rather than a hard
+    /// 429 mid-work. 0 keeps the strict drop-on-overflow behaviour.
+    /// </summary>
+    public int ApiQueueLimit { get; set; } = 10;
+
     // Client-side log submission limits
     public int LogsPermitLimit { get; set; } = 30;
     public int LogsWindowMinutes { get; set; } = 1;
@@ -52,13 +60,28 @@ public static class RateLimitExtensions
             rateOptions.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
             rateOptions.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
-                RateLimitPartition.GetFixedWindowLimiter(
+            {
+                // kubelet liveness/readiness probes hit the /health* endpoints
+                // every few seconds from the same pod IP; throttling them can
+                // crash-loop the deployment and consumes the per-IP quota meant
+                // for real API traffic, so exempt them from the global limiter.
+                var path = httpContext.Request.Path;
+                if (path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase)
+                    || path.StartsWithSegments("/api/health", StringComparison.OrdinalIgnoreCase))
+                {
+                    return RateLimitPartition.GetNoLimiter("health");
+                }
+
+                return RateLimitPartition.GetFixedWindowLimiter(
                     partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                     factory: _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = options.ApiPermitLimit,
                         Window = TimeSpan.FromMinutes(options.ApiWindowMinutes),
-                    }));
+                        QueueLimit = options.ApiQueueLimit,
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                    });
+            });
 
             rateOptions.AddSlidingWindowLimiter("auth", limiter =>
             {

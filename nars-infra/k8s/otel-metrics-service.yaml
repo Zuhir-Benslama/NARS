@@ -18,11 +18,14 @@ spec:
   # Selector must match the pod labels emitted by the opentelemetry-collector
   # Helm chart (verified against the chart templates for OTEL_COLLECTOR_VERSION
   # in the Makefile — re-verify this selector whenever that version changes).
-  # The chart sets
-  # app.kubernetes.io/component: standalone-collector on its pods when
-  # mode: deployment — keep in sync with the Deployment's
+  # The chart sets app.kubernetes.io/component: standalone-collector on its pods
+  # when mode: deployment — keep in sync with the Deployment's
   # spec.selector.matchLabels, not just the Service metadata labels above
   # (which serve the ServiceMonitor matchLabels instead).
+  #
+  # ⚠ VERIFY after every deploy — label mismatches cause silent zero-metrics:
+  #   kubectl get pods -n observability \
+  #     -o jsonpath='{.items[*].metadata.labels.app\.kubernetes\.io/component}'
   selector:
     app.kubernetes.io/name: opentelemetry-collector
     app.kubernetes.io/instance: otel-collector

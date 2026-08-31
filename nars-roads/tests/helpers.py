@@ -43,7 +43,7 @@ def make_tiff_bytes(
     `crs` defaults to EPSG:4326 (geographic). Pass a projected CRS (e.g.
     "EPSG:32633") or None to build tiles that must NOT have their embedded
     transform trusted (see SegmentationModel._embedded_transform)."""
-    dt = np.dtype(dtype)
+    dt: np.dtype = np.dtype(dtype)
     data = np.zeros((3, height, width), dtype=dt)
     data[1, height // 4 : height // 2, width // 8 : 7 * width // 8] = (
         np.iinfo(dt).max if dt.kind == "u" else 200.0

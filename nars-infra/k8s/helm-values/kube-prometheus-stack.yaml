@@ -45,6 +45,7 @@ global:
 
 prometheus:
   prometheusSpec:
+    retention: 15d
     serviceMonitorSelectorNilUsesHelmValues: false
     serviceMonitorSelector:
       matchLabels:

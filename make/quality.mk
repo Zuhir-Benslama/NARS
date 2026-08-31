@@ -9,7 +9,7 @@ lint: ## Run cross-project linting (.NET format + infra linters)
 	$(SUBMAKE) infra-lint
 
 .PHONY: infra-lint
-infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, makefile, checkmake, sql, nginx, tag guard)
+infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, makefile, checkmake, sql, nginx, tag guard, observability security)
 	$(SUBMAKE) infra-lint-shell
 	$(SUBMAKE) infra-lint-docker
 	$(SUBMAKE) infra-lint-yaml
@@ -21,6 +21,7 @@ infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, ma
 	$(SUBMAKE) infra-lint-nginx
 	$(SUBMAKE) infra-lint-tag-guard
 	$(SUBMAKE) infra-lint-local-ingress-guard
+	$(SUBMAKE) infra-lint-observability-security
 
 # File lists resolved by make ($(wildcard)) at parse time and /mnt-prefixed
 # for container use. Shell globs like /mnt/**/*.yaml must NOT be used in
@@ -219,3 +220,15 @@ infra-lint-local-ingress-guard: ## Assert _check-local-ingresses rejects local i
 	@echo "→ Verifying _check-local-ingresses passes in dev..."
 	@DEPLOY_ENV=dev $(SUBMAKE) _check-local-ingresses
 	@echo "  ✓ local ingresses allowed in dev"
+
+.PHONY: infra-lint-observability-security
+infra-lint-observability-security: ## Assert _check-observability-security rejects insecure Helm values in production (self-test)
+	@echo "→ Verifying production observability security check rejects insecure Helm values..."
+	@if DEPLOY_ENV=production $(SUBMAKE) _check-observability-security >/dev/null 2>&1; then
+		echo "✖ _check-observability-security unexpectedly passed with insecure defaults in production";
+		exit 1;
+	fi
+	@echo "  ✓ insecure defaults rejected in production"
+	@echo "→ Verifying _check-observability-security warns (skips) in dev..."
+	@DEPLOY_ENV=dev $(SUBMAKE) _check-observability-security
+	@echo "  ✓ dev skips observability security check"

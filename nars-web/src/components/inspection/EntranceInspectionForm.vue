@@ -188,7 +188,7 @@ async function createEntrance() {
   if (!props.feature) return
   creating.value = true
   try {
-    const res = await apiFetch("/api/field/entrance/create", {
+    const res = await apiFetch("/api/field/entrance", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

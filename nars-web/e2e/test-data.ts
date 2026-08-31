@@ -136,7 +136,7 @@ export async function setupAuthMocks(page: Page, role = "commune_user") {
     }
   })
 
-  await page.route("**/api/user/update", async (route) => {
+  await page.route("**/api/user/profile", async (route) => {
     if (!isApiRequest(route.request().url())) {
       await route.continue()
       return

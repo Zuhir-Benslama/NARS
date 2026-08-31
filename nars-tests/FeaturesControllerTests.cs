@@ -260,25 +260,21 @@ public class FeaturesControllerTests
     [Fact]
     public async Task UpdateFeature_NotOwned_Returns404()
     {
+        // Ownership is enforced by UpdateFeatureAsync's WHERE user_id clause
+        // (there is no dedicated ownership check in the controller), so a
+        // feature belonging to another user is invisible: the update reports
+        // "not found". Mock the service to model that scoping.
+        var featureServiceMock = new Mock<IFeatureService>();
+        featureServiceMock.Setup(s => s.GetFeatureTypeAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(FeatureTypes.Road);
+        featureServiceMock.Setup(s => s.UpdateFeatureAsync(It.IsAny<UpdateFeatureCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
         var (db, factory) = CreateInMemoryDbPair("FeaturesTest");
         await using (db)
         {
-            var otherId = Guid.NewGuid();
-            db.Roads.Add(new Road
-            {
-                Id = otherId,
-                UserId = Guid.NewGuid(),
-                Layer = FeatureTypes.RoadLayers.Street,
-                Data = "{}",
-                Label = "other",
-                UpdatedAt = FixedUtcNow
-            });
-            db.FeatureRegistry.Add(new FeatureRegistry { Id = otherId, FeatureType = FeatureTypes.Road });
-            await db.SaveChangesAsync();
-
-            var ctrl = CreateController(db, factory: factory);
+            var ctrl = CreateController(db, featureService: featureServiceMock.Object, factory: factory);
             var body = new FeatureUpdateRequest(Label: "new_label", Data: null);
-            var result = await ctrl.UpdateFeature(otherId, body);
+            var result = await ctrl.UpdateFeature(Guid.NewGuid(), body);
             var objResult = Assert.IsType<ObjectResult>(result);
             Assert.Equal(404, objResult.StatusCode);
         }
@@ -309,6 +305,57 @@ public class FeaturesControllerTests
             var result = await ctrl.UpdateFeature(fid, body);
             var objResult = Assert.IsType<ObjectResult>(result);
             Assert.Equal(400, objResult.StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task UpdateFeature_HouseEntranceRoadRefNotFound_Returns400()
+    {
+        // House-entrance updates can relink via roadDbId in the payload; a road
+        // the user does not own (or that does not exist) must be rejected with
+        // 400, mirroring the Save path.
+        var featureServiceMock = new Mock<IFeatureService>();
+        featureServiceMock.Setup(s => s.GetFeatureTypeAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(FeatureTypes.HouseEntrance);
+        featureServiceMock.Setup(s => s.RoadExistsAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        var (db, factory) = CreateInMemoryDbPair("FeaturesTest");
+        await using (db)
+        {
+            var ctrl = CreateController(db, featureService: featureServiceMock.Object, factory: factory);
+            var data = Json($$"""{"coordinates":[{"lat":36.0,"lng":3.0}],"roadDbId":"{{Guid.NewGuid()}}"}""");
+            var body = new FeatureUpdateRequest(Label: "new_label", Data: data);
+            var result = await ctrl.UpdateFeature(Guid.NewGuid(), body);
+            var objResult = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(400, objResult.StatusCode);
+            featureServiceMock.Verify(
+                s => s.RoadExistsAsync(It.IsAny<Guid>(), UserId, It.IsAny<CancellationToken>()), Times.Once);
+        }
+    }
+
+    [Fact]
+    public async Task UpdateFeature_HouseEntranceRoadRefOk_ReachesService()
+    {
+        var featureServiceMock = new Mock<IFeatureService>();
+        featureServiceMock.Setup(s => s.GetFeatureTypeAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(FeatureTypes.HouseEntrance);
+        featureServiceMock.Setup(s => s.RoadExistsAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        featureServiceMock.Setup(s => s.UpdateFeatureAsync(It.IsAny<UpdateFeatureCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        var (db, factory) = CreateInMemoryDbPair("FeaturesTest");
+        await using (db)
+        {
+            var ctrl = CreateController(db, featureService: featureServiceMock.Object, factory: factory);
+            var roadId = Guid.NewGuid();
+            var data = Json($$"""{"coordinates":[{"lat":36.0,"lng":3.0}],"roadDbId":"{{roadId}}"}""");
+            var body = new FeatureUpdateRequest(Label: "new_label", Data: data);
+            var result = await ctrl.UpdateFeature(Guid.NewGuid(), body);
+            Assert.IsType<OkObjectResult>(result);
+            featureServiceMock.Verify(
+                s => s.RoadExistsAsync(roadId, UserId, It.IsAny<CancellationToken>()), Times.Once);
+            featureServiceMock.Verify(
+                s => s.UpdateFeatureAsync(It.IsAny<UpdateFeatureCommand>(), It.IsAny<CancellationToken>()), Times.Once);
         }
     }
 

@@ -21,6 +21,15 @@ public class JwtOptions
     [Range(1, 365)] public int RefreshExpiresInDays { get; set; } = 7;
 
     /// <summary>
+    /// How long a replayed (already-rotated) refresh token is tolerated before
+    /// the whole token family is revoked as theft. The legitimate client only
+    /// ever holds the newest token, so a retry of an old one within this window
+    /// is presumed to be a benign double-submit (double-click, two tabs, UA
+    /// retry) rather than an attacker's replay.
+    /// </summary>
+    [Range(0, 300)] public int RefreshReplayGraceSeconds { get; set; } = 10;
+
+    /// <summary>
     /// JWT signing algorithm. Allowlisted to the symmetric HS* family that the
     /// signing key (a raw secret) can support; a misconfiguration fails fast at
     /// startup via DataAnnotations validation instead of being silently ignored.

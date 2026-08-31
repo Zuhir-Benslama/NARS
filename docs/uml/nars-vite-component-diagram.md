@@ -462,10 +462,6 @@ classDiagram
         User CRUD + role admin
     }
 
-    class SettingsFeatures {
-        Feature type labels
-    }
-
     class SettingsAbout {
         Version info
     }
@@ -579,7 +575,6 @@ classDiagram
     SettingsModal --> SettingsGeneral
     SettingsModal --> SettingsAccount
     SettingsModal --> SettingsUsers
-    SettingsModal --> SettingsFeatures
     SettingsModal --> SettingsAbout
 
     SettingsGeneral --> UseTheme

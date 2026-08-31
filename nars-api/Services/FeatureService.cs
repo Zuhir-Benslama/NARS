@@ -39,14 +39,6 @@ public sealed class FeatureService(
         return reg?.FeatureType;
     }
 
-    public async Task<bool> OwnsFeatureAsync(Guid featureId, string featureType, Guid userId, CancellationToken ct)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var dbSet = FeatureTypeRegistry.GetDbSet(db, featureType);
-        return dbSet is not null
-            && await dbSet.AnyAsync(f => f.Id == featureId && f.UserId == userId, ct);
-    }
-
     public async Task<bool> UpdateFeatureAsync(UpdateFeatureCommand command, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -142,7 +134,7 @@ public sealed class FeatureService(
             return;
         }
 
-        await bgQueue.QueueBackgroundWorkItemAsync(async (sp, ct) =>
+        var enqueued = await bgQueue.QueueBackgroundWorkItemAsync(async (sp, ct) =>
         {
             try
             {
@@ -154,5 +146,16 @@ public sealed class FeatureService(
                 logger.LogError(ex, "Background refresh of scattered area failed");
             }
         });
+
+        if (!enqueued)
+        {
+            // The recompute was rejected because the bounded queue is full: the
+            // save/update/delete still succeeded, but the caller has no way to
+            // know the scattered layer is now stale. Surface it so the gap
+            // between the acknowledged write and the recompute is visible.
+            logger.LogWarning(
+                "Scattered-area recompute for user {UserId} commune {CommuneId} was dropped: background queue is full.",
+                userId, communeId.Value);
+        }
     }
 }

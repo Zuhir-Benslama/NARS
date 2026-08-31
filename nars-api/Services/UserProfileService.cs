@@ -8,31 +8,6 @@ namespace NarsApi.Services;
 
 public sealed class UserProfileService(IDbContextFactory<AppDbContext> dbFactory, ISecurityStampCache stampCache) : IUserProfileService
 {
-    public async Task<User?> GetUserByIdAsync(Guid userId, CancellationToken ct = default)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db.Users.FindAsync([userId], ct);
-    }
-
-    public async Task<bool> IsUsernameTakenAsync(string username, CancellationToken ct = default)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db.Users.AnyAsync(u => u.Username == username, ct);
-    }
-
-    public async Task<bool> IsEmailTakenAsync(string email, CancellationToken ct = default)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db.Users.AnyAsync(u => u.Email == email, ct);
-    }
-
-    public async Task UpdateUserAsync(User user, CancellationToken ct = default)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        db.Users.Update(user);
-        await db.SaveChangesAsync(ct);
-    }
-
     public async Task<UpdateCredentialsResult> UpdateCredentialsAsync(Guid userId, UpdateUserRequest request, CancellationToken ct = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);

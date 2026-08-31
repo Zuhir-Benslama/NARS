@@ -36,6 +36,18 @@ public static class AuthTestHelper
     }
 
     /// <summary>
+    /// Builds a RefreshTokenService for the given context. Unit tests run on the
+    /// InMemory provider, which cannot execute the PostgreSQL-only SQL
+    /// (FOR UPDATE SKIP LOCKED, ExecuteUpdateAsync), so they get the testable
+    /// subclass; integration tests run on real PostgreSQL and MUST exercise the
+    /// production SQL paths (covered by AuthControllerServiceTests).
+    /// </summary>
+    private static RefreshTokenService CreateRefreshTokenService(AppDbContext db, IJwtService jwtService, IDateTimeProvider timeProvider)
+        => db.Database.IsInMemory()
+            ? new RefreshTokenServiceTests.TestableRefreshTokenService(db, jwtService, DefaultJwtOptions, Mock.Of<ISecurityStampCache>(), timeProvider)
+            : new RefreshTokenService(db, jwtService, DefaultJwtOptions, Mock.Of<ISecurityStampCache>(), timeProvider);
+
+    /// <summary>
     /// AuthController over a real RefreshTokenService/UserAuthorizationService
     /// stack. No ControllerContext is attached; tests set their own HttpContext.
     /// </summary>
@@ -43,7 +55,7 @@ public static class AuthTestHelper
     {
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var jwtService = CreateJwtService(timeProvider);
-        var refreshService = new RefreshTokenService(db, jwtService, DefaultJwtOptions, Mock.Of<ISecurityStampCache>(), timeProvider);
+        var refreshService = CreateRefreshTokenService(db, jwtService, timeProvider);
         return new AuthController(
             refreshService,
             jwtService,
@@ -60,7 +72,7 @@ public static class AuthTestHelper
     {
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var jwtService = CreateJwtService(timeProvider);
-        var refreshService = new RefreshTokenService(db, jwtService, DefaultJwtOptions, Mock.Of<ISecurityStampCache>(), timeProvider);
+        var refreshService = CreateRefreshTokenService(db, jwtService, timeProvider);
         var authorizationService = new UserAuthorizationService(db, refreshService, Mock.Of<IFeatureCleanupService>(), timeProvider, Mock.Of<ISecurityStampCache>());
         return new AdminSignupController(
             refreshService,

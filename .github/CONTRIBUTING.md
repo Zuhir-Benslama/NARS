@@ -54,7 +54,7 @@ For local Kubernetes deployment with observability, monitoring, and all services
 make cluster-up
 ```
 
-See the [Makefile](Makefile) for available targets (`cluster-down`, `cluster-rebuild`, `cluster-port-forward`, `smoke-test`, etc.).
+See the [Makefile](Makefile) for available targets (`cluster-down`, `cluster-rebuild`, `proxy-up`, `smoke-test`, etc.).
 
 ---
 
