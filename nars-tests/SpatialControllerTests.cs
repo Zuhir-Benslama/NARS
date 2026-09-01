@@ -183,9 +183,10 @@ public class SpatialControllerTests
     public async Task RefreshScattered_Valid_Returns200()
     {
         var uid = Guid.NewGuid();
+        var geojson = "{\"type\":\"MultiPolygon\"}";
         var scatteredMock = new Mock<IScatteredAreaService>();
         scatteredMock.Setup(s => s.RefreshAsync(uid, 1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+            .ReturnsAsync(geojson);
         var (ctrl, db) = CreateController(userId: uid, scatteredService: scatteredMock.Object);
         using (db)
         {
@@ -194,8 +195,8 @@ public class SpatialControllerTests
             var ok = Assert.IsType<OkObjectResult>(result);
             var resp = Assert.IsType<ScatteredRefreshResponse>(ok.Value);
             Assert.True(resp.Success);
+            Assert.Equal(geojson, resp.GeoJson);
             Assert.Equal("Scattered area recomputed.", resp.Message);
-            Assert.Null(resp.GeoJson);
         }
     }
 
@@ -205,7 +206,8 @@ public class SpatialControllerTests
         var uid = Guid.NewGuid();
         var scatteredMock = new Mock<IScatteredAreaService>();
         scatteredMock.Setup(s => s.RefreshAsync(uid, 1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
+            .ReturnsAsync((string?)null);
+        scatteredMock.Setup(s => s.GetLastError(uid, 1)).Returns((FixedUtcNowOffset, "error"));
         var (ctrl, db) = CreateController(userId: uid, scatteredService: scatteredMock.Object);
         using (db)
         {

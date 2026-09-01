@@ -21,28 +21,19 @@ namespace NarsApi.Tests.Service;
 /// </summary>
 [Collection(PostgreSqlCollection.CollectionName)]
 [Trait("Category", "Service")]
-public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLifetime
+public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : ServiceTestBase(fixture)
 {
-    private readonly NarsDatabaseFixture _fixture = fixture;
-    private AppDbContext _db = null!;
 
-    public async Task InitializeAsync()
+    protected override async Task SeedAsync()
     {
-        _db = _fixture.CreateDbContext();
         await SeedReferenceDataAsync();
-    }
-
-    public async Task DisposeAsync()
-    {
-        try { await _db.DisposeAsync(); }
-        finally { await _fixture.CleanTablesAsync(); }
     }
 
     private ValidationController CreateController(Guid userId)
     {
         var ctrl = new ValidationController(
             Options.Create(new ValidationOptions()),
-            new ValidationService(_fixture.CreateDbContextFactory()),
+            new ValidationService(Fixture.CreateDbContextFactory()),
             Mock.Of<ILogger<ValidationController>>(),
             Mock.Of<IWebHostEnvironment>());
         AuthTestHelper.SetUser(ctrl, userId, UserRoles.CommuneUser, communeId: 1);
@@ -96,7 +87,7 @@ public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : IAs
             }
         });
 
-        await _db.Districts.AddAsync(new District
+        await Db.Districts.AddAsync(new District
         {
             Id = Guid.NewGuid(),
             UserId = userId,
@@ -104,7 +95,7 @@ public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : IAs
             Label = "Existing District",
             Data = existingData,
         });
-        await _db.SaveChangesAsync();
+        await Db.SaveChangesAsync();
 
         // Try to create a district that significantly overlaps the existing one
         var result = await controller.ValidateDistrict(new ValidateDistrictRequest(
@@ -132,7 +123,7 @@ public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : IAs
         // was `Touches OR (BoundaryIntersects AND EXISTS(urban area))`, so any
         // touching district short-circuited past the urban-area gate.
         var userId = await CreateTestUserAsync();
-        var service = new ValidationService(_fixture.CreateDbContextFactory());
+        var service = new ValidationService(Fixture.CreateDbContextFactory());
 
         var existingSquare = new[]
         {
@@ -142,7 +133,7 @@ public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : IAs
             new CoordDto(36.000, 2.920),
         };
 
-        await _db.Districts.AddAsync(new District
+        await Db.Districts.AddAsync(new District
         {
             Id = Guid.NewGuid(),
             UserId = userId,
@@ -150,7 +141,7 @@ public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : IAs
             Label = "Existing District",
             Data = System.Text.Json.JsonSerializer.Serialize(new { coordinates = existingSquare }),
         });
-        await _db.SaveChangesAsync();
+        await Db.SaveChangesAsync();
 
         // Shares an edge with the existing district (lat 36.020) but no urban
         // area intersects either polygon.
@@ -172,7 +163,7 @@ public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : IAs
     public async Task CheckDistrictAdjacency_TouchingWithinSharedUrbanArea_ReturnsTrue()
     {
         var userId = await CreateTestUserAsync();
-        var service = new ValidationService(_fixture.CreateDbContextFactory());
+        var service = new ValidationService(Fixture.CreateDbContextFactory());
 
         var urbanSquare = new[]
         {
@@ -190,7 +181,7 @@ public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : IAs
             new CoordDto(36.000, 2.920),
         };
 
-        await _db.Areas.AddAsync(new Area
+        await Db.Areas.AddAsync(new Area
         {
             Id = Guid.NewGuid(),
             UserId = userId,
@@ -198,7 +189,7 @@ public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : IAs
             Label = "Urban Area",
             Data = System.Text.Json.JsonSerializer.Serialize(new { coordinates = urbanSquare }),
         });
-        await _db.Districts.AddAsync(new District
+        await Db.Districts.AddAsync(new District
         {
             Id = Guid.NewGuid(),
             UserId = userId,
@@ -206,7 +197,7 @@ public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : IAs
             Label = "Existing District",
             Data = System.Text.Json.JsonSerializer.Serialize(new { coordinates = existingSquare }),
         });
-        await _db.SaveChangesAsync();
+        await Db.SaveChangesAsync();
 
         var touchingSquare = new[]
         {
@@ -224,8 +215,8 @@ public class ValidationControllerServiceTests(NarsDatabaseFixture fixture) : IAs
 
     private async Task<Guid> CreateTestUserAsync()
     {
-        var user = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: 1, name: "Validation Test User");
+        var user = await SeedData.CreateUserAsync(Db, UserRoles.CommuneUser, communeId: 1, name: "Validation Test User");
         return user.Id;
     }
-    private async Task SeedReferenceDataAsync() => await SeedData.SeedBasicLocationsAsync(_db);
+    private async Task SeedReferenceDataAsync() => await SeedData.SeedBasicLocationsAsync(Db);
 }

@@ -798,7 +798,35 @@ public class UserAuthorizationServiceTests
     public async Task UpdateManagedUserAsync_InvalidGeographyForRole_ReturnsInvalid()
     {
         using var db = CreateInMemoryDb("UserAuthInvalidGeo");
-        var (callerId, targetId) = await SeedNationalAdminEditingWilayaAdminAsync(db);
+        var callerId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            Id = callerId,
+            Username = "caller",
+            Email = "caller@test.com",
+            Name = "Caller",
+            Phone = DefaultPhone,
+            PasswordHash = DefaultPasswordHash,
+            SecurityStamp = User.GenerateSecurityStamp(),
+            Role = UserRoles.NationalAdmin,
+        });
+        // Target is a wilaya_admin with NO geographic anchor. Reassigning the
+        // same role without supplying a wilaya_id is therefore genuinely invalid:
+        // the effective geography (merged from the target and the request) still
+        // lacks the wilaya that wilaya_admin requires.
+        var targetId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            Id = targetId,
+            Username = "target",
+            Email = "target@test.com",
+            Name = "Target",
+            Phone = DefaultPhone,
+            PasswordHash = "hash",
+            Role = UserRoles.WilayaAdmin,
+            WilayaId = null,
+        });
+        await db.SaveChangesAsync();
         var svc = CreateService(db);
 
         var result = await svc.UpdateManagedUserAsync(

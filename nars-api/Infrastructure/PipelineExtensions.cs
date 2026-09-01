@@ -381,8 +381,31 @@ public static class PipelineExtensions
 
     private static bool MatchesOrigin(string origin, string expected)
     {
+        // Normalize through Uri so an explicitly-defaulted port ("https://host:443")
+        // compares equal to the implicit form ("https://host"), and scheme/host are
+        // case-insensitively lowercased. Falls back to a trim/compare on values that
+        // fail to parse as absolute URIs.
+        if (TryNormalizeOrigin(origin, out var a) && TryNormalizeOrigin(expected, out var b))
+        {
+            return a == b;
+        }
+
         static string Normalize(string value) => value.Trim().TrimEnd('/').ToLowerInvariant();
         return Normalize(origin) == Normalize(expected);
+    }
+
+    private static bool TryNormalizeOrigin(string value, out string normalized)
+    {
+        normalized = string.Empty;
+        if (Uri.TryCreate(value.Trim().TrimEnd('/'), UriKind.Absolute, out var uri)
+            && !string.IsNullOrEmpty(uri.Scheme))
+        {
+            var port = uri.IsDefaultPort ? string.Empty : $":{uri.Port}";
+            normalized = $"{uri.Scheme.ToLowerInvariant()}://{uri.Host}{port}".ToLowerInvariant();
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>

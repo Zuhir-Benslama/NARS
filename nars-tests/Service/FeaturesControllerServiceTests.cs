@@ -21,34 +21,26 @@ namespace NarsApi.Tests.Service;
 /// </summary>
 [Collection(PostgreSqlCollection.CollectionName)]
 [Trait("Category", "Service")]
-public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLifetime
+public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : ServiceTestBase(fixture)
 {
-    private readonly NarsDatabaseFixture _fixture = fixture;
-    private AppDbContext _db = null!;
     private Guid _userId;
 
-    public async Task InitializeAsync()
+    protected override async Task SeedAsync()
     {
-        _db = _fixture.CreateDbContext();
         _userId = await CreateUserAsync();
-    }
-
-    public async Task DisposeAsync()
-    {
-        try { await _db.DisposeAsync(); }
-        finally { await _fixture.CleanTablesAsync(); }
     }
 
     private FeaturesController CreateController()
     {
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var bgQueueMock = Mock.Of<IBackgroundTaskQueue>();
-        var factory = _fixture.CreateDbContextFactory();
+        var factory = Fixture.CreateDbContextFactory();
         var ctrl = new FeaturesController(
             new FeatureService(factory, bgQueueMock, new FeatureCleanupService(), Mock.Of<ILogger<FeatureService>>()),
             Options.Create(new FeatureDefaultsOptions()),
             timeProvider,
-            new FeatureStatsService(_fixture.CreateDbContextFactory()),
+            new FeatureStatsService(Fixture.CreateDbContextFactory()),
+            new NumberEntrancesService(Fixture.CreateDbContextFactory()),
             Mock.Of<ILogger<FeaturesController>>(),
             Mock.Of<IWebHostEnvironment>());
         AuthTestHelper.SetUser(ctrl, _userId, UserRoles.CommuneUser, communeId: 1);
@@ -80,7 +72,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         Assert.Equal(201, statusResult.StatusCode);
 
         // Verify in database
-        var area = await _db.Areas.FirstOrDefaultAsync(a => a.UserId == _userId && a.Label == "Test Central Urban");
+        var area = await Db.Areas.FirstOrDefaultAsync(a => a.UserId == _userId && a.Label == "Test Central Urban");
         Assert.NotNull(area);
         Assert.Equal(FeatureTypes.AreaLayers.CentralUrban, area.Layer);
     }
@@ -107,7 +99,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         var statusResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, statusResult.StatusCode);
 
-        var road = await _db.Roads.FirstOrDefaultAsync(r => r.UserId == _userId && r.Label == "Test Road");
+        var road = await Db.Roads.FirstOrDefaultAsync(r => r.UserId == _userId && r.Label == "Test Road");
         Assert.NotNull(road);
     }
 
@@ -193,11 +185,11 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         Assert.IsType<NoContentResult>(deleteResult);
 
         // Verify it's gone (use AsNoTracking to avoid change tracker caching)
-        var area = await _db.Areas.AsNoTracking().FirstOrDefaultAsync(a => a.Id == featureId);
+        var area = await Db.Areas.AsNoTracking().FirstOrDefaultAsync(a => a.Id == featureId);
         Assert.Null(area);
 
         // Verify registry is also cleaned up
-        var reg = await _db.FeatureRegistry.AsNoTracking().FirstOrDefaultAsync(r => r.Id == featureId);
+        var reg = await Db.FeatureRegistry.AsNoTracking().FirstOrDefaultAsync(r => r.Id == featureId);
         Assert.Null(reg);
     }
 
@@ -227,7 +219,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
 
         // Attach a house entrance owned by that road.
         var fieldService = new FieldService(
-            _fixture.CreateDbContextFactory(),
+            Fixture.CreateDbContextFactory(),
             Mock.Of<IFeatureService>(),
             Mock.Of<ILogger<FieldService>>());
         var entranceId = await fieldService.CreateEntranceAsync(roadId, _userId, _userId, "Entrance A", "{}");
@@ -236,9 +228,9 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         var deleteResult = await controller.DeleteFeature(roadId);
         Assert.IsType<NoContentResult>(deleteResult);
 
-        var entrance = await _db.HouseEntrances.AsNoTracking().FirstOrDefaultAsync(e => e.Id == entranceId);
+        var entrance = await Db.HouseEntrances.AsNoTracking().FirstOrDefaultAsync(e => e.Id == entranceId);
         Assert.Null(entrance);
-        var reg = await _db.FeatureRegistry.AsNoTracking().FirstOrDefaultAsync(r => r.Id == entranceId);
+        var reg = await Db.FeatureRegistry.AsNoTracking().FirstOrDefaultAsync(r => r.Id == entranceId);
         Assert.Null(reg);
     }
 
@@ -260,9 +252,9 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         Assert.Equal(200, okResult.StatusCode);
 
         // Verify all features are gone
-        var areaCount = await _db.Areas.CountAsync(a => a.UserId == _userId);
+        var areaCount = await Db.Areas.CountAsync(a => a.UserId == _userId);
         Assert.Equal(0, areaCount);
-        var regCount = await _db.FeatureRegistry.CountAsync();
+        var regCount = await Db.FeatureRegistry.CountAsync();
         Assert.Equal(0, regCount);
     }
 
@@ -291,7 +283,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         Assert.Equal(200, updateOk.StatusCode);
 
         // Verify the update persisted
-        var area = await _db.Areas.AsNoTracking().FirstOrDefaultAsync(a => a.Id == featureId);
+        var area = await Db.Areas.AsNoTracking().FirstOrDefaultAsync(a => a.Id == featureId);
         Assert.NotNull(area);
         Assert.Equal("Updated Label", area.Label);
         using var persistedData = System.Text.Json.JsonDocument.Parse(area.Data);
@@ -327,14 +319,14 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : IAsyn
         var updateOk = Assert.IsType<OkObjectResult>(updateResult);
         Assert.Equal(200, updateOk.StatusCode);
 
-        var road = await _db.Roads.AsNoTracking().FirstOrDefaultAsync(r => r.Id == featureId);
+        var road = await Db.Roads.AsNoTracking().FirstOrDefaultAsync(r => r.Id == featureId);
         Assert.Equal("Road After", road!.Label);
     }
 
     private async Task<Guid> CreateUserAsync()
     {
-        await SeedData.SeedBasicLocationsAsync(_db);
-        var user = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: 1, name: "Features Test User");
+        await SeedData.SeedBasicLocationsAsync(Db);
+        var user = await SeedData.CreateUserAsync(Db, UserRoles.CommuneUser, communeId: 1, name: "Features Test User");
         return user.Id;
     }
 

@@ -14,26 +14,17 @@ namespace NarsApi.Tests.Service;
 
 [Collection(PostgreSqlCollection.CollectionName)]
 [Trait("Category", "Service")]
-public class LocationsControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLifetime
+public class LocationsControllerServiceTests(NarsDatabaseFixture fixture) : ServiceTestBase(fixture)
 {
-    private readonly NarsDatabaseFixture _fixture = fixture;
-    private AppDbContext _db = null!;
 
-    public async Task InitializeAsync()
+    protected override async Task SeedAsync()
     {
-        _db = _fixture.CreateDbContext();
-        await SeedData.SeedAdminLocationsAsync(_db);
-    }
-
-    public async Task DisposeAsync()
-    {
-        try { await _db.DisposeAsync(); }
-        finally { await _fixture.CleanTablesAsync(); }
+        await SeedData.SeedAdminLocationsAsync(Db);
     }
 
     private LocationsController CreateController()
     {
-        var factory = _fixture.CreateDbContextFactory();
+        var factory = Fixture.CreateDbContextFactory();
         var searchService = new LocationSearchService(factory);
         return new LocationsController(
             Options.Create(new LocationsOptions()),

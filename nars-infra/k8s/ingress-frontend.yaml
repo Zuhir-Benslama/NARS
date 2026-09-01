@@ -53,9 +53,11 @@ spec:
 # Serves localhost without TLS for local development access.
 # No host restriction — catches any host (192.168.x.x, etc.) so
 # LAN devices and ADB-reversed ports reach the SPA.
-# /health is not routed here (see nars-frontend above) — local health
-# checks go through the host-less nars-api-local ingress instead,
-# which `make smoke-test` relies on.
+# Only this ingress owns the SPA catch-all (/.*). For the explicit
+# `localhost` host it also routes /login and /api to the API service.
+# Hostless /api, /login and /health requests are served by nars-api-local
+# (the single source of truth for API routing) — /health is not routed
+# here, which `make smoke-test` relies on.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -94,20 +96,6 @@ spec:
                   number: 80
     - http:
         paths:
-          - path: /login
-            pathType: Exact
-            backend:
-              service:
-                name: nars-api
-                port:
-                  number: 8080
-          - path: /api(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: nars-api
-                port:
-                  number: 8080
           - path: /(.*)
             pathType: ImplementationSpecific
             backend:

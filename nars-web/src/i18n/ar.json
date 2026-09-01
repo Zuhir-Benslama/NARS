@@ -334,6 +334,7 @@
   "map_restore_refs_warning": "تمت استعادة الخاصية، لكن تعذر حفظ بعض المراجع المتبادلة.",
   "map_assigned_numbers": "Assigned numbers to {count} entrances.",
   "map_assigned_numbers_partial": "تم تخصيص أرقام لـ {assigned} مداخل؛ فشل حفظ {failed}.",
+  "map_assigned_numbers_error": "تعذّر تخصيص أرقام المنازل. يرجى المحاولة مرة أخرى.",
   "map_enable_snapping": "Enable Snapping",
   "map_disable_snapping": "Disable Snapping",
   "map_snapping_enabled": "Snapping enabled",

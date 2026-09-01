@@ -71,7 +71,7 @@ public static class FeatureQueryHelper
     /// Loads features across all tables for a given user with pagination.
     /// Returns the feature rows and the total count (for pagination UI).
     /// </summary>
-    public static async Task<(List<FeatureResult> features, int totalCount)> LoadAllFeaturesAsync(
+    public static async Task<(List<FeatureResult> features, long totalCount)> LoadAllFeaturesAsync(
         DbConnection conn,
         Guid userId,
         int skip,
@@ -83,7 +83,7 @@ public static class FeatureQueryHelper
     /// Loads features for a specific layer with pagination.
     /// Returns the feature rows and the total count (for pagination UI).
     /// </summary>
-    public static async Task<(List<FeatureResult> features, int totalCount)> LoadByLayerAsync(
+    public static async Task<(List<FeatureResult> features, long totalCount)> LoadByLayerAsync(
         DbConnection conn,
         Guid userId,
         string layer,
@@ -92,7 +92,7 @@ public static class FeatureQueryHelper
         ILogger? logger = null,
         CancellationToken ct = default) => await ExecuteQueryAsync(conn, _loadByLayerSql, userId, layer, skip, take, logger, ct);
 
-    private static async Task<(List<FeatureResult> features, int totalCount)> ExecuteQueryAsync(
+    private static async Task<(List<FeatureResult> features, long totalCount)> ExecuteQueryAsync(
         DbConnection conn,
         string sql,
         Guid userId,
@@ -124,7 +124,7 @@ public static class FeatureQueryHelper
         // First result set: the total matching row count (independent of paging).
         await reader.ReadAsync(ct);
         var totalOrdinal = reader.GetOrdinal("total_count");
-        var totalCount = Convert.ToInt32(reader.GetInt64(totalOrdinal));
+        var totalCount = reader.IsDBNull(totalOrdinal) ? 0L : reader.GetInt64(totalOrdinal);
 
         // Second result set: the paged feature rows.
         await reader.NextResultAsync(ct);

@@ -17,6 +17,7 @@ public class FeaturesController(
     IOptions<FeatureDefaultsOptions> featureDefaults,
     IDateTimeProvider timeProvider,
     IFeatureStatsService featureStatsService,
+    INumberEntrancesService numberEntrancesService,
     ILogger<FeaturesController> logger,
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
@@ -139,6 +140,38 @@ public class FeaturesController(
             NamingPanel: GetCount(FeatureTypes.NamingPanel),
             Total: total
         ));
+    }
+
+    /// <summary>Atomically assigns entrance numbers to an ordered batch of house entrances on a road.</summary>
+    [HttpPost("number-entrances")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> NumberEntrances([FromBody] NumberEntrancesRequest body, CancellationToken cancellationToken = default)
+    {
+        if (body.EntranceIds.Count == 0)
+        {
+            return Problem(detail: "At least one entrance is required.", statusCode: 400);
+        }
+
+        try
+        {
+            var numbered = await numberEntrancesService.NumberAsync(
+                RequiredCurrentUserId, body.RoadId, body.EntranceIds, cancellationToken);
+
+            if (numbered is null)
+            {
+                return Problem(detail: "Road or entrance not found.", statusCode: 404);
+            }
+
+            return Ok(new NumberEntrancesResponse(Success: true, Entrances: numbered));
+        }
+        catch (NumberSeriesExhaustedException ex)
+        {
+            logger.LogWarning(ex, "Entrance-number series exhausted for user {UserId}: {Reason}", CurrentUserId, ex.Message);
+            return Problem(detail: ex.Message, statusCode: 409);
+        }
     }
 
     /// <summary>Updates an existing feature's label and/or data payload.</summary>

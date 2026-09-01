@@ -1525,7 +1525,7 @@ network round-trip. Server-side PostGIS checks enforce spatial correctness.}
 
 \subsection{Relation Definitions}
 
-The database comprises 15 tables. \Cref{tab:schema} summarises the
+The database comprises 18 tables. \Cref{tab:schema} summarises the
 primary keys, foreign keys, and key index definitions as derived from
 \texttt{AppDbContext.cs} and the EF Core model configuration.
 
@@ -1551,12 +1551,12 @@ primary keys, foreign keys, and key index definitions as derived from
   & Static reference table \\
 \texttt{dairas}
   & \texttt{daira\_id} (int)
-  & \texttt{wilaya\_id}
-  & \\
+  & \texttt{wilaya\_id} $\to$ \texttt{wilayas}
+  & \texttt{ix\_dairas\_wilaya\_id} \\
 \texttt{communes}
   & \texttt{commune\_id} (int)
-  & \texttt{daira\_id}
-  & \\
+  & \texttt{daira\_id} $\to$ \texttt{dairas}
+  & \texttt{ix\_communes\_daira\_id} \\
 \texttt{communes\_boundaries}
   & \texttt{commune\_id} (int)
   &
@@ -1597,6 +1597,18 @@ primary keys, foreign keys, and key index definitions as derived from
   & \texttt{id} (UUID v7)
   &
   & \texttt{ix\_naming\_panels\_user\_id} \\
+\texttt{error\_logs}
+  & \texttt{id} (UUID v7)
+  & \texttt{user\_id} $\to$ \texttt{users} (nullable)
+  & \texttt{ix\_error\_logs\_user\_id}, \texttt{ix\_error\_logs\_level}, \texttt{ix\_error\_logs\_created\_at} \\
+\texttt{inspections}
+  & \texttt{id} (UUID v7)
+  & \texttt{user\_id} $\to$ \texttt{users}
+  & \texttt{ix\_inspections\_user\_id}, \texttt{ix\_inspections\_feature\_created} \\
+\texttt{ai\_draft\_features}
+  & \texttt{id} (UUID v7)
+  & \texttt{commune\_id} $\to$ \texttt{communes}, \texttt{reviewed\_by} $\to$ \texttt{users} (nullable)
+  & \texttt{ix\_ai\_draft\_status}, \texttt{ix\_ai\_draft\_created\_at} \\
 \bottomrule
 \end{tabularx}
 \end{table}

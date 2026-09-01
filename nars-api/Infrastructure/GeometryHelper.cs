@@ -19,6 +19,11 @@ public static class GeometryHelper
     public static int FindNearestSegmentIndex(
         double markerLat, double markerLng, IReadOnlyList<(double Lat, double Lng)> roadCoords)
     {
+        if (roadCoords.Count < 2)
+        {
+            throw new ArgumentException("Road must have at least 2 coordinates to find a segment.", nameof(roadCoords));
+        }
+
         var cosLat = Math.Cos(markerLat * DegToRad);
         var minDist = double.MaxValue;
         var nearestIdx = 0;
@@ -89,15 +94,23 @@ public static class GeometryHelper
     /// Suggests the next available entrance number (odd for left, even for right).
     /// Parity is preserved even past 10,000 so an exhausted series never collides
     /// with the opposite parity (e.g. 10000 must not be reused by the odd series).
+    /// Returns -1 when the entire parity series up to <see cref="MaxEntranceNumber"/>
+    /// is exhausted, signalling the caller that no collision-free number exists.
     /// </summary>
     public static int SuggestEntranceNumber(string side, HashSet<int> usedNumbers)
     {
-        var suggested = side == "left" ? 1 : 2;
-        while (usedNumbers.Contains(suggested) && suggested < MaxEntranceNumber)
+        var start = side == "left" ? 1 : 2;
+        var suggested = start;
+        while (suggested <= MaxEntranceNumber && usedNumbers.Contains(suggested))
         {
             suggested += 2;
         }
-        return suggested;
+
+        // The loop above stops at the first free number, or once suggested exceeds
+        // the cap (meaning the parity series is exhausted). In that case return -1
+        // instead of a value past the cap or one whose parity collides with the
+        // opposite series.
+        return suggested > MaxEntranceNumber ? -1 : suggested;
     }
 
     public static string FormatDoubleInvariant(double v) => v.ToString(CultureInfo.InvariantCulture);

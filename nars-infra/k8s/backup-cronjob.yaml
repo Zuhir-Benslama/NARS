@@ -13,6 +13,10 @@ spec:
   # ⚠ local-path is the kind/local-dev default. Override for production
   # (e.g., ebs-gp3, managed-premium, etc.) via a kustomize patch or
   # by editing this value before applying.
+  # NOTE: local-path volumes live inside the kind node container and are
+  # destroyed when the cluster is deleted, unlike the postgis-data hostPath
+  # PV which survives on the host filesystem. Backups here are best-effort
+  # local snapshots in dev only — production must use durable storage.
   storageClassName: local-path
   resources:
     requests:

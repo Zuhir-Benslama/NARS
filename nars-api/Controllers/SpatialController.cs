@@ -79,6 +79,12 @@ public class SpatialController(
             RequiredCurrentUserId, body.RoadId, side, cancellationToken);
 
         var suggested = GeometryHelper.SuggestEntranceNumber(side, usedNumbers);
+        if (suggested < 0)
+        {
+            return Problem(
+                detail: "The entrance-number series for this side is exhausted; no collision-free number is available.",
+                statusCode: 409);
+        }
 
         return Ok(new RoadSideResponse(side, suggested));
     }
@@ -122,14 +128,18 @@ public class SpatialController(
             return Problem(detail: "This endpoint requires a commune-level account.", statusCode: 400);
         }
 
-        var succeeded = await scatteredService.RefreshAsync(RequiredCurrentUserId, communeId.Value, cancellationToken);
-        if (!succeeded)
+        var geojson = await scatteredService.RefreshAsync(RequiredCurrentUserId, communeId.Value, cancellationToken);
+
+        // A null result is ambiguous between "no scattered geometry existed" and
+        // a real failure; failures always populate the error cache, so use it to
+        // tell the two apart.
+        if (geojson is null && scatteredService.GetLastError(RequiredCurrentUserId, communeId.Value) is not null)
         {
             return Problem(
                 detail: "Scattered area recomputation failed.",
                 statusCode: StatusCodes.Status500InternalServerError);
         }
 
-        return Ok(new ScatteredRefreshResponse(true, null, "Scattered area recomputed."));
+        return Ok(new ScatteredRefreshResponse(true, geojson, "Scattered area recomputed."));
     }
 }

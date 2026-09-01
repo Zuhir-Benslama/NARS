@@ -58,10 +58,20 @@ public sealed class FeatureStatsService(
             .Select(u => new { u.Id, u.Username, u.Name, u.Email, u.Role })
             .ToListAsync(ct);
 
+        // If none of the requested user IDs matched a real user, there is nothing
+        // to count — skip the UNION ALL round-trip entirely.
+        if (users.Count == 0)
+        {
+            return [];
+        }
+
         var conn = (NpgsqlConnection)db.Database.GetDbConnection();
         await using var connHandle = await conn.EnsureOpenAsync(ct);
 
         // Build a single UNION ALL query across all tables, grouped by user_id.
+        // Uses the matched user IDs (not the full request array) so IDs that
+        // resolved to no user are never scanned.
+        var matchedIds = users.Select(u => u.Id).ToArray();
         var sql = BuildUnionAll((i, table) =>
             $"SELECT user_id, @tp{i} AS Type, COUNT(*)::bigint AS Count FROM {table} WHERE user_id = ANY(@u{i}) GROUP BY user_id");
 
@@ -70,7 +80,7 @@ public sealed class FeatureStatsService(
         foreach (var type in _featureTypes)
         {
             cmd.Parameters.Add(new NpgsqlParameter<string>($"tp{paramIndex}", type));
-            cmd.Parameters.Add(new NpgsqlParameter<Guid[]>($"u{paramIndex}", userIds));
+            cmd.Parameters.Add(new NpgsqlParameter<Guid[]>($"u{paramIndex}", matchedIds));
             paramIndex++;
         }
 
@@ -116,14 +126,14 @@ public sealed class FeatureStatsService(
         return resultList;
     }
 
-    public async Task<(List<FeatureResult> features, int totalCount)> LoadAllFeaturesAsync(Guid userId, int skip, int take, CancellationToken ct = default)
+    public async Task<(List<FeatureResult> features, long totalCount)> LoadAllFeaturesAsync(Guid userId, int skip, int take, CancellationToken ct = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var conn = db.Database.GetDbConnection();
         return await FeatureQueryHelper.LoadAllFeaturesAsync(conn, userId, skip, take, logger, ct);
     }
 
-    public async Task<(List<FeatureResult> features, int totalCount)> LoadByLayerAsync(Guid userId, string layer, int skip, int take, CancellationToken ct = default)
+    public async Task<(List<FeatureResult> features, long totalCount)> LoadByLayerAsync(Guid userId, string layer, int skip, int take, CancellationToken ct = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var conn = db.Database.GetDbConnection();

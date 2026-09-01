@@ -55,7 +55,9 @@ FLOAT_BYTE_SCALE_THRESHOLD = 2.0
 # gigabytes, so we also bound the decoded footprint before allocating the
 # output arrays. 25M pixels keeps the working set well under the pod's 4Gi
 # limit while still accommodating far larger tiles than the service sees.
-MAX_DECODED_PIXELS = env_int("NARS_ROADS_MAX_DECODED_PIXELS", 25_000_000)
+MAX_DECODED_PIXELS = env_int(
+    "NARS_ROADS_MAX_DECODED_PIXELS", 25_000_000, minimum=1_000, maximum=1_000_000_000
+)
 
 
 class TileTooLargeError(ValueError):

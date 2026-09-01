@@ -5,7 +5,9 @@ namespace NarsApi.Infrastructure;
 
 /// <summary>
 /// Configuration model for rate limiting policies.
-/// Move values to appsettings.json for easy tuning without recompilation.
+/// Values are bound from the "RateLimit" section of appsettings.json by
+/// <see cref="RateLimitExtensions.AddNarsRateLimiting"/>; the property
+/// defaults below act only as a fallback when that config section is absent.
 /// </summary>
 public class RateLimitOptions
 {

@@ -321,6 +321,12 @@ spec:
 # NARS_ROADS_WEIGHTS_URL (arbitrary host, secret-supplied). default-deny-egress
 # would block it on NetworkPolicy-enforcing CNIs (Calico/Cilium) — allow plain
 # HTTP(S) egress only. kindnet does not enforce this; it matters for production.
+#
+# ⚠ CIDR 0.0.0.0/0 is deliberately open here because the weights host is an
+# arbitrary secret-supplied URL that this file cannot know. For production,
+# restrict this policy to the actual weights host's resolved IPs (e.g. via a
+# kustomize overlay patch replacing 0.0.0.0/0 with the CDN ranges of the real
+# endpoint), and drop the :80 rule if the URL is known to be HTTPS-only.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

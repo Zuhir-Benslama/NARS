@@ -11,6 +11,7 @@ import { updateEndpointMarkers } from "./roads/road-directions"
 import { refreshLayerVisibility } from "./rendering/labels"
 import { MAP_CONFIG } from "../config"
 import { debugLog, debugWarn } from "../utils/debug"
+import { suppressGeomanFill, ensureGeomanDrawEdgesVisible } from "./edit/edit-mode"
 
 let currentActiveStyle: maplibregl.StyleSpecification | undefined
 let _styleSwitchInFlight = false
@@ -182,7 +183,6 @@ async function initGeoman(
   await import("@geoman-io/maplibre-geoman-free/dist/maplibre-geoman.css")
   const { createGeomanInstance } = await import("@geoman-io/maplibre-geoman-free")
   getCtx().geoman = await createGeomanInstance(map, options)
-  const { suppressGeomanFill, ensureGeomanDrawEdgesVisible } = await import("./edit/edit-mode")
   suppressGeomanFill()
   ensureGeomanDrawEdgesVisible()
   map.doubleClickZoom.disable()

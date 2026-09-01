@@ -139,7 +139,9 @@ public sealed class FeatureService(
             try
             {
                 var svc = sp.GetRequiredService<IScatteredAreaService>();
-                await svc.RefreshAsync(userId, communeId.Value, ct);
+                // Background path: the recomputed GeoJSON is not streamed to any
+                // caller, so it is intentionally discarded here.
+                _ = await svc.RefreshAsync(userId, communeId.Value, ct);
             }
             catch (Exception ex)
             {

@@ -15,23 +15,14 @@ namespace NarsApi.Tests.Service;
 /// </summary>
 [Collection(PostgreSqlCollection.CollectionName)]
 [Trait("Category", "Service")]
-public class UserProfileServiceTests(NarsDatabaseFixture fixture) : IAsyncLifetime
+public class UserProfileServiceTests(NarsDatabaseFixture fixture) : ServiceTestBase(fixture)
 {
-    private readonly NarsDatabaseFixture _fixture = fixture;
-    private AppDbContext _db = null!;
     private UserProfileService _service = null!;
 
-    public async Task InitializeAsync()
+    protected override async Task SeedAsync()
     {
-        _db = _fixture.CreateDbContext();
-        await SeedData.SeedBasicLocationsAsync(_db);
-        _service = new UserProfileService(_fixture.CreateDbContextFactory(), Mock.Of<ISecurityStampCache>());
-    }
-
-    public async Task DisposeAsync()
-    {
-        try { await _db.DisposeAsync(); }
-        finally { await _fixture.CleanTablesAsync(); }
+        await SeedData.SeedBasicLocationsAsync(Db);
+        _service = new UserProfileService(Fixture.CreateDbContextFactory(), Mock.Of<ISecurityStampCache>());
     }
 
     [Fact]
@@ -47,7 +38,7 @@ public class UserProfileServiceTests(NarsDatabaseFixture fixture) : IAsyncLifeti
     [Fact]
     public async Task UpdateCredentials_ValidUpdate_NormalizesAndPersists()
     {
-        var user = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: 1);
+        var user = await SeedData.CreateUserAsync(Db, UserRoles.CommuneUser, communeId: 1);
 
         var result = await _service.UpdateCredentialsAsync(
             user.Id, new UpdateUserRequest("  NewUser  ", "  MiXeD@Example.COM ", null, null));
@@ -56,7 +47,7 @@ public class UserProfileServiceTests(NarsDatabaseFixture fixture) : IAsyncLifeti
         Assert.Equal("newuser", result.User!.Username);
         Assert.Equal("mixed@example.com", result.User.Email);
 
-        var reloaded = await _db.Users.AsNoTracking().SingleAsync(u => u.Id == user.Id);
+        var reloaded = await Db.Users.AsNoTracking().SingleAsync(u => u.Id == user.Id);
         Assert.Equal("newuser", reloaded.Username);
         Assert.Equal("mixed@example.com", reloaded.Email);
     }
@@ -64,8 +55,8 @@ public class UserProfileServiceTests(NarsDatabaseFixture fixture) : IAsyncLifeti
     [Fact]
     public async Task UpdateCredentials_DuplicateUsername_ReturnsDuplicate()
     {
-        var user = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: 1);
-        var other = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: 1);
+        var user = await SeedData.CreateUserAsync(Db, UserRoles.CommuneUser, communeId: 1);
+        var other = await SeedData.CreateUserAsync(Db, UserRoles.CommuneUser, communeId: 1);
 
         var result = await _service.UpdateCredentialsAsync(
             user.Id, new UpdateUserRequest(other.Username, null, null, null));
@@ -77,8 +68,8 @@ public class UserProfileServiceTests(NarsDatabaseFixture fixture) : IAsyncLifeti
     [Fact]
     public async Task UpdateCredentials_DuplicateEmail_ReturnsDuplicate()
     {
-        var user = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: 1);
-        var other = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: 1);
+        var user = await SeedData.CreateUserAsync(Db, UserRoles.CommuneUser, communeId: 1);
+        var other = await SeedData.CreateUserAsync(Db, UserRoles.CommuneUser, communeId: 1);
 
         var result = await _service.UpdateCredentialsAsync(
             user.Id, new UpdateUserRequest(null, other.Email, null, null));
@@ -90,7 +81,7 @@ public class UserProfileServiceTests(NarsDatabaseFixture fixture) : IAsyncLifeti
     [Fact]
     public async Task UpdateCredentials_InvalidEmail_ReturnsInvalidEmail()
     {
-        var user = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: 1);
+        var user = await SeedData.CreateUserAsync(Db, UserRoles.CommuneUser, communeId: 1);
 
         var result = await _service.UpdateCredentialsAsync(
             user.Id, new UpdateUserRequest(null, "not-an-email", null, null));
@@ -102,7 +93,7 @@ public class UserProfileServiceTests(NarsDatabaseFixture fixture) : IAsyncLifeti
     [Fact]
     public async Task UpdateCredentials_OversizeUsername_ReturnsInvalidUsername()
     {
-        var user = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: 1);
+        var user = await SeedData.CreateUserAsync(Db, UserRoles.CommuneUser, communeId: 1);
 
         var result = await _service.UpdateCredentialsAsync(
             user.Id, new UpdateUserRequest(new string('u', UserFieldValidator.MaxUsernameLength + 1), null, null, null));
@@ -114,7 +105,7 @@ public class UserProfileServiceTests(NarsDatabaseFixture fixture) : IAsyncLifeti
     [Fact]
     public async Task UpdateCredentials_WrongCurrentPassword_ReturnsWrongCurrentPassword()
     {
-        var user = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: 1);
+        var user = await SeedData.CreateUserAsync(Db, UserRoles.CommuneUser, communeId: 1);
 
         var result = await _service.UpdateCredentialsAsync(
             user.Id, new UpdateUserRequest(null, null, "WrongP@ss", "NewP@ss123"));
@@ -126,7 +117,7 @@ public class UserProfileServiceTests(NarsDatabaseFixture fixture) : IAsyncLifeti
     [Fact]
     public async Task UpdateCredentials_WeakNewPassword_ReturnsWeakPassword()
     {
-        var user = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: 1);
+        var user = await SeedData.CreateUserAsync(Db, UserRoles.CommuneUser, communeId: 1);
 
         var result = await _service.UpdateCredentialsAsync(
             user.Id, new UpdateUserRequest(null, null, DefaultPassword, "short"));
@@ -138,7 +129,7 @@ public class UserProfileServiceTests(NarsDatabaseFixture fixture) : IAsyncLifeti
     [Fact]
     public async Task UpdateCredentials_ValidPasswordChange_HashesAndFlags()
     {
-        var user = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: 1);
+        var user = await SeedData.CreateUserAsync(Db, UserRoles.CommuneUser, communeId: 1);
 
         var result = await _service.UpdateCredentialsAsync(
             user.Id, new UpdateUserRequest(null, null, DefaultPassword, "NewP@ss123"));
@@ -147,14 +138,14 @@ public class UserProfileServiceTests(NarsDatabaseFixture fixture) : IAsyncLifeti
         Assert.True(result.PasswordChanged);
         Assert.True(BCrypt.Net.BCrypt.Verify("NewP@ss123", result.User!.PasswordHash));
 
-        var reloaded = await _db.Users.AsNoTracking().SingleAsync(u => u.Id == user.Id);
+        var reloaded = await Db.Users.AsNoTracking().SingleAsync(u => u.Id == user.Id);
         Assert.True(BCrypt.Net.BCrypt.Verify("NewP@ss123", reloaded.PasswordHash));
     }
 
     [Fact]
     public async Task UpdateCredentials_SameUsernameAndEmail_NoConflict_NoChange()
     {
-        var user = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: 1);
+        var user = await SeedData.CreateUserAsync(Db, UserRoles.CommuneUser, communeId: 1);
         var username = user.Username;
         var email = user.Email;
 

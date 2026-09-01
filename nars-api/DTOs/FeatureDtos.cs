@@ -71,7 +71,7 @@ public record CreateResponse(
 
 public record LoadFeaturesResponse<T>(
     IReadOnlyList<T> Features,
-    int Count,
+    long Count,
     int Skip,
     int Take
 );

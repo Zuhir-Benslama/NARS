@@ -178,7 +178,16 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
         // The migrations history table must survive: it records which EF
         // migrations the fixture already applied, and wiping it would make any
         // future MigrateAsync re-run the whole chain against existing tables.
-        var userTables = tables.Where(t => t != "__EFMigrationsHistory").ToList();
+        // The PostGIS metadata tables (spatial_ref_sys and friends) also live in
+        // the public schema and belong to the installed extension, not to test
+        // data — never truncate them (spatial_ref_sys holds the ~8000 SRID defs
+        // used for SRID lookups; wiping them would silently break SRID-based queries).
+        var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "__EFMigrationsHistory",
+            "spatial_ref_sys",
+        };
+        var userTables = tables.Where(t => !excluded.Contains(t)).ToList();
         if (userTables.Count == 0)
         {
             return;

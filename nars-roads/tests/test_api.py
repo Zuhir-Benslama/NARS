@@ -58,6 +58,31 @@ def test_ready_200_and_health_when_model_loaded(monkeypatch):
     assert client.get("/health").json() == {"status": "ok", "model_loaded": True}
 
 
+def _ok_spec() -> roads.ModelSpec:
+    return {"weights_path": "nope.pth", "num_classes": 2}
+
+
+def test_load_model_constructs_healthy_model(monkeypatch):
+    # The healthy path: a valid checkpoint constructs and returns a loaded model.
+    monkeypatch.setattr(
+        roads, "SegmentationModel", lambda *a, **k: _StubModel(is_loaded=True)
+    )
+    loaded = roads._load_model("buildings", _ok_spec())
+    assert loaded is not None and loaded.is_loaded
+
+
+def test_load_model_isolates_a_failed_task(monkeypatch):
+    # Per-model fault isolation (fix #1): a checkpoint that fails to load must
+    # not abort the whole service. `_load_model` logs and returns None so the
+    # startup loop can skip that task while the others keep serving.
+    monkeypatch.setattr(
+        roads,
+        "SegmentationModel",
+        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("corrupt")),
+    )
+    assert roads._load_model("buildings", _ok_spec()) is None
+
+
 def test_segment_rejects_missing_token():
     assert _post().status_code == 401
 
@@ -127,6 +152,38 @@ def test_segment_rejects_out_of_range_longitude():
         files={"tile": ("t.tif", b"x", "image/tiff")},
     )
     assert resp.status_code == 422
+
+
+def test_segment_rejects_out_of_range_max_lon():
+    # Per-axis validation (fix #5): the message names the offending axis and
+    # bound instead of a merged "bbox is invalid".
+    resp = _post(
+        headers=AUTH,
+        params={"min_lon": 0.0, "min_lat": 0.0, "max_lon": 181.0, "max_lat": 1.0},
+        files={"tile": ("t.tif", b"x", "image/tiff")},
+    )
+    assert resp.status_code == 422
+    assert "max_lon" in resp.json()["detail"]
+
+
+def test_segment_rejects_out_of_range_max_lat():
+    resp = _post(
+        headers=AUTH,
+        params={"min_lon": 0.0, "min_lat": 0.0, "max_lon": 1.0, "max_lat": 91.0},
+        files={"tile": ("t.tif", b"x", "image/tiff")},
+    )
+    assert resp.status_code == 422
+    assert "max_lat" in resp.json()["detail"]
+
+
+def test_segment_rejects_out_of_range_min_lon():
+    resp = _post(
+        headers=AUTH,
+        params={"min_lon": -181.0, "min_lat": 0.0, "max_lon": 1.0, "max_lat": 1.0},
+        files={"tile": ("t.tif", b"x", "image/tiff")},
+    )
+    assert resp.status_code == 422
+    assert "min_lon" in resp.json()["detail"]
 
 
 def test_segment_rejects_degenerate_bbox():

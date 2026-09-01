@@ -131,6 +131,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IFeatureService, FeatureService>();
         services.AddScoped<IBoundaryService, BoundaryService>();
         services.AddScoped<IEntranceQueryService, EntranceQueryService>();
+        services.AddScoped<INumberEntrancesService, NumberEntrancesService>();
         services.AddScoped<IAdminOverviewService, AdminOverviewService>();
         services.AddScoped<IUserAuthorizationService, UserAuthorizationService>();
         services.AddScoped<IErrorLogService, ErrorLogService>();

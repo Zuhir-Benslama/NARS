@@ -33,9 +33,9 @@ public class ScatteredAreaServiceTests
         var service = CreateService(dbFactory: factory.Object);
         var userId = Guid.NewGuid();
 
-        var success = await service.RefreshAsync(userId, 1);
+        var geojson = await service.RefreshAsync(userId, 1);
 
-        Assert.False(success);
+        Assert.Null(geojson);
         var error = service.GetLastError(userId, 1);
         Assert.NotNull(error);
         Assert.Equal(FixedUtcNowOffset, error!.Value.Timestamp);
@@ -119,7 +119,7 @@ public class ScatteredAreaServiceTests
         await Task.WhenAll(reads);
 
         Assert.Empty(readErrors);
-        Assert.All(writeResults, Assert.False);
+        Assert.All(writeResults, Assert.Null);
         Assert.All(userIds, uid => Assert.NotNull(service.GetLastError(uid, 1)));
         // Another user's error must not appear under a different user's key.
         Assert.Null(service.GetLastError(Guid.NewGuid(), 1));

@@ -17,39 +17,30 @@ namespace NarsApi.Tests.Service;
 
 [Collection(PostgreSqlCollection.CollectionName)]
 [Trait("Category", "Service")]
-public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLifetime
+public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : ServiceTestBase(fixture)
 {
-    private readonly NarsDatabaseFixture _fixture = fixture;
-    private AppDbContext _db = null!;
 
-    public async Task InitializeAsync()
+    protected override async Task SeedAsync()
     {
-        _db = _fixture.CreateDbContext();
-        await SeedData.SeedAdminLocationsAsync(_db);
-    }
-
-    public async Task DisposeAsync()
-    {
-        try { await _db.DisposeAsync(); }
-        finally { await _fixture.CleanTablesAsync(); }
+        await SeedData.SeedAdminLocationsAsync(Db);
     }
 
     private AdminController CreateOverviewController()
     {
-        var featureStats = new FeatureStatsService(_fixture.CreateDbContextFactory());
-        return new AdminController(new AdminOverviewService(_db, featureStats), Mock.Of<ILogger<AdminController>>(), Mock.Of<IWebHostEnvironment>());
+        var featureStats = new FeatureStatsService(Fixture.CreateDbContextFactory());
+        return new AdminController(new AdminOverviewService(Db, featureStats), Mock.Of<ILogger<AdminController>>(), Mock.Of<IWebHostEnvironment>());
     }
 
     private static IDateTimeProvider FixedTimeProvider() =>
         Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
 
     private UserAuthorizationService CreateUserAuthorizationService() =>
-        new(_db, Mock.Of<IRefreshTokenService>(), Mock.Of<IFeatureCleanupService>(), FixedTimeProvider(), Mock.Of<ISecurityStampCache>());
+        new(Db, Mock.Of<IRefreshTokenService>(), Mock.Of<IFeatureCleanupService>(), FixedTimeProvider(), Mock.Of<ISecurityStampCache>());
 
     private AdminUserController CreateUserManagementController() => new(
             Mock.Of<Microsoft.Extensions.Logging.ILogger<AdminUserController>>(),
             CreateUserAuthorizationService(),
-            new UserCreationService(_fixture.CreateDbContextFactory(), CreateUserAuthorizationService(),
+            new UserCreationService(Fixture.CreateDbContextFactory(), CreateUserAuthorizationService(),
                 Mock.Of<Microsoft.Extensions.Logging.ILogger<UserCreationService>>()),
             Mock.Of<IWebHostEnvironment>());
 
@@ -68,7 +59,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         var created = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, created.StatusCode);
 
-        var createdUser = await _db.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
+        var createdUser = await Db.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
         Assert.NotNull(createdUser);
         Assert.Equal(UserRoles.CommuneUser, createdUser.Role);
         Assert.Equal(CommuneId100, createdUser.CommuneId);
@@ -87,7 +78,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         var created = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, created.StatusCode);
 
-        var createdUser = await _db.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
+        var createdUser = await Db.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
         Assert.NotNull(createdUser);
         Assert.Equal(UserRoles.DairaAdmin, createdUser.Role);
         Assert.Equal(DairaId10, createdUser.DairaId);
@@ -106,7 +97,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         var created = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, created.StatusCode);
 
-        var createdUser = await _db.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
+        var createdUser = await Db.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
         Assert.NotNull(createdUser);
         Assert.Equal(UserRoles.WilayaAdmin, createdUser.Role);
         Assert.Equal(WilayaId2, createdUser.WilayaId);
@@ -188,7 +179,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         var created = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, created.StatusCode);
 
-        var createdUser = await _db.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
+        var createdUser = await Db.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
         Assert.NotNull(createdUser);
         Assert.Equal(UserRoles.FieldWorker, createdUser.Role);
         Assert.Equal(CommuneId100, createdUser.CommuneId);
@@ -210,7 +201,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         var result = await controller.DeleteManagedUser(target.Id, default);
 
         Assert.IsType<NoContentResult>(result);
-        Assert.Null(await _db.Users.FindAsync(target.Id));
+        Assert.Null(await Db.Users.FindAsync(target.Id));
     }
 
     [Fact]
@@ -224,7 +215,7 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         var result = await controller.DeleteManagedUser(target.Id, default);
 
         Assert.IsType<NoContentResult>(result);
-        Assert.Null(await _db.Users.FindAsync(target.Id));
+        Assert.Null(await Db.Users.FindAsync(target.Id));
     }
 
     // ── Overview ───────────────────────────────────────────────────────────────
@@ -277,8 +268,8 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
             WilayaId = WilayaId1,
             CreatedAt = FixedUtcNow.AddHours(1),
         };
-        _db.Users.AddRange(early, late);
-        await _db.SaveChangesAsync();
+        Db.Users.AddRange(early, late);
+        await Db.SaveChangesAsync();
 
         var caller = await CreateUserAsync(UserRoles.NationalAdmin);
         var controller = CreateOverviewController();
@@ -467,5 +458,5 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         string role,
         int? communeId = null,
         int? dairaId = null,
-        int? wilayaId = null) => await SeedData.CreateUserAsync(_db, role, communeId, dairaId, wilayaId, name: $"Creator {Guid.NewGuid().ToString("N")[..8]}");
+        int? wilayaId = null) => await SeedData.CreateUserAsync(Db, role, communeId, dairaId, wilayaId, name: $"Creator {Guid.NewGuid().ToString("N")[..8]}");
 }

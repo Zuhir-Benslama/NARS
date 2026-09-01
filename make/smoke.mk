@@ -14,9 +14,12 @@ smoke-test: ## Post-deploy smoke test: verify /health, frontend, and API auth
 	pass() { echo "  ✓ $$1"; };
 	fail() { echo "  ✖ $$1" >&2; failed=$$((failed + 1)); };
 	echo "  1. Health endpoint...";
-	health=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/health" 2>/dev/null || echo "000");
+	# One request: write the body to a temp file while capturing the HTTP code,
+	# so we don't curl /health twice (status probe + body probe).
+	_tmp=$$(mktemp);
+	health=$$(curl -s -o "$$_tmp" -w "%{http_code}" --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/health" 2>/dev/null || echo "000");
 	if [ "$$health" = "200" ]; then
-		body=$$(curl -s --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/health" 2>/dev/null || echo "");
+		body=$$(cat "$$_tmp" 2>/dev/null || echo "");
 		if echo "$$body" | grep -qE '"status"[[:space:]]*:[[:space:]]*"Healthy"'; then
 			pass "/health → 200 Healthy";
 		else
@@ -25,6 +28,7 @@ smoke-test: ## Post-deploy smoke test: verify /health, frontend, and API auth
 	else
 		fail "/health → $$health (expected 200)";
 	fi;
+	rm -f "$$_tmp";
 	echo "  2. Frontend reachability...";
 	frontend=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/" 2>/dev/null || echo "000");
 	if [ "$$frontend" = "200" ]; then

@@ -19,21 +19,12 @@ namespace NarsApi.Tests.Service;
 
 [Collection(PostgreSqlCollection.CollectionName)]
 [Trait("Category", "Service")]
-public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLifetime
+public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : ServiceTestBase(fixture)
 {
-    private readonly NarsDatabaseFixture _fixture = fixture;
-    private AppDbContext _db = null!;
 
-    public async Task InitializeAsync()
+    protected override async Task SeedAsync()
     {
-        _db = _fixture.CreateDbContext();
         await SeedReferenceDataAsync();
-    }
-
-    public async Task DisposeAsync()
-    {
-        try { await _db.DisposeAsync(); }
-        finally { await _fixture.CleanTablesAsync(); }
     }
 
     [Fact]
@@ -64,7 +55,7 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
         var statusResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, statusResult.StatusCode);
 
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == "integration_user");
+        var user = await Db.Users.FirstOrDefaultAsync(u => u.Username == "integration_user");
         Assert.NotNull(user);
         Assert.Equal("integration@test.com", user.Email);
         Assert.Equal(1, user.CommuneId);
@@ -126,13 +117,13 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
             dairaId: 1);
 
         // Two independent contexts + controllers simulating concurrent requests
-        await using var db1 = _fixture.CreateDbContext();
-        var factory1 = _fixture.CreateDbContextFactory();
+        await using var db1 = Fixture.CreateDbContext();
+        var factory1 = Fixture.CreateDbContextFactory();
         var ctrl1 = AuthTestHelper.CreateAdminSignupController(db1, factory1);
         ctrl1.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         ctrl1.ControllerContext.HttpContext.Request.Headers["X-Admin-Signup"] = TestData.AdminSignupToken;
-        await using var db2 = _fixture.CreateDbContext();
-        var factory2 = _fixture.CreateDbContextFactory();
+        await using var db2 = Fixture.CreateDbContext();
+        var factory2 = Fixture.CreateDbContextFactory();
         var ctrl2 = AuthTestHelper.CreateAdminSignupController(db2, factory2);
         ctrl2.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         ctrl2.ControllerContext.HttpContext.Request.Headers["X-Admin-Signup"] = TestData.AdminSignupToken;
@@ -172,7 +163,7 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
         Assert.Contains(409, statusCodes);
 
         // Exactly one user persisted
-        await using var verifyDb = _fixture.CreateDbContext();
+        await using var verifyDb = Fixture.CreateDbContext();
         var userCount = await verifyDb.Users.CountAsync(u => u.Username == "race_user");
         Assert.Equal(1, userCount);
     }
@@ -202,7 +193,7 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
         Assert.Contains("refresh_token=", setCookie, StringComparison.Ordinal);
 
         // The refresh token must be persisted (and usable for rotation).
-        await using var verifyDb = _fixture.CreateDbContext();
+        await using var verifyDb = Fixture.CreateDbContext();
         var stored = await verifyDb.RefreshTokens.AsNoTracking()
             .FirstOrDefaultAsync(rt => rt.UserId == user.Id);
         Assert.NotNull(stored);
@@ -240,7 +231,7 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
             Password: DefaultPassword
         ));
 
-        await using var db = _fixture.CreateDbContext();
+        await using var db = Fixture.CreateDbContext();
         var tokenCount = await db.RefreshTokens.AsNoTracking().CountAsync(rt => rt.UserId == user.Id && !rt.Revoked);
         Assert.Equal(1, tokenCount);
 
@@ -282,11 +273,11 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
         Assert.Equal("current_user@test.com", payload.Email);
     }
 
-    private AuthController CreateController() => AuthTestHelper.CreateAuthController(_db);
+    private AuthController CreateController() => AuthTestHelper.CreateAuthController(Db);
 
-    private AdminSignupController CreateSignupController() => AuthTestHelper.CreateAdminSignupController(_db, _fixture.CreateDbContextFactory());
+    private AdminSignupController CreateSignupController() => AuthTestHelper.CreateAdminSignupController(Db, Fixture.CreateDbContextFactory());
 
-    private async Task SeedReferenceDataAsync() => await SeedData.SeedBasicLocationsAsync(_db);
+    private async Task SeedReferenceDataAsync() => await SeedData.SeedBasicLocationsAsync(Db);
 
     private async Task<User> CreateAdminAsync(
         string username,
@@ -294,20 +285,20 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
         int? dairaId = null,
         int? wilayaId = null)
     {
-        var user = await SeedData.CreateUserAsync(_db, role, dairaId: dairaId, wilayaId: wilayaId, name: $"Admin {username}");
+        var user = await SeedData.CreateUserAsync(Db, role, dairaId: dairaId, wilayaId: wilayaId, name: $"Admin {username}");
         // Override username since CreateUserAsync generates one
         user.Username = username;
         user.Email = $"{username}@test.com";
-        await _db.SaveChangesAsync();
+        await Db.SaveChangesAsync();
         return user;
     }
 
     private async Task<User> CreateCommuneUserAsync(string username, int communeId)
     {
-        var user = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: communeId, name: $"User {username}");
+        var user = await SeedData.CreateUserAsync(Db, UserRoles.CommuneUser, communeId: communeId, name: $"User {username}");
         user.Username = username;
         user.Email = $"{username}@test.com";
-        await _db.SaveChangesAsync();
+        await Db.SaveChangesAsync();
         return user;
     }
 
@@ -323,7 +314,7 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLif
 
     private AuthController CreateSignInController()
     {
-        var ctrl = AuthTestHelper.CreateAuthController(_db);
+        var ctrl = AuthTestHelper.CreateAuthController(Db);
         ctrl.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext(),

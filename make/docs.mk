@@ -1,21 +1,21 @@
-# Included by the top-level Makefile (GNU make: single instance, shared vars). Target grouping: regeneration of generated docs artifacts (mermaid UML -> PDF).
-
-# The UML diagrams are authored as ```mermaid blocks in docs/uml/*.md and
-# shipped as docs/pdf/nars-uml-diagrams.pdf. That PDF is BUILT ARTIFACT and
-# drifts whenever a diagram source is edited but not re-rendered (this bit the
-# repo once: the class diagram was edited to drop OwnsFeatureAsync/dead
-# UserProfileService methods, but the committed PDF was 10 days stale).
+# Included by the top-level Makefile (GNU make: single instance, shared vars). Target grouping: regeneration of generated docs artifacts (mermaid UML -> PDF, LaTeX -> PDF).
 #
+# Both PDFs under docs/pdf/ are gitignored build artifacts. Regenerate
+# locally before sharing.
+#
+# UML diagrams are authored as ```mermaid blocks in docs/uml/*.md.
 # The pipeline is manual-only upstream (render-mermaid-playwright.mjs +
-# png-to-pdf.py). This target wraps it so regeneration is one repeatable,
-# documented command instead of an undocumented chore.
+# png-to-pdf.py). docs-uml-pdf wraps it so regeneration is one repeatable,
+# documented command (previously the committed PDF drifted 10 days behind a
+# class-diagram edit that removed OwnsFeatureAsync / dead UserProfileService
+# methods).
 #
-# Dependencies (checked by the target):
-#   - node + Playwright (Firefox) resolvable from nars-web/package.json
-#     (the render script imports playwright; install via `npm ci` in nars-web)
-#   - network access to a mermaid@11 CDN (jsdelivr, else unpkg)
-#   - Pillow (png-to-pdf.py) and pdfunite (PDF merge) — both present here
-#   - a writable build dir (default /tmp/nars/uml-build)
+# The technical report is authored in docs/nars_documentation.tex.
+# docs-tex-pdf runs two pdflatex passes (for TOC/cref resolution).
+#
+# Dependencies (checked by each target):
+#   docs-uml-pdf: node + Playwright (Firefox) from nars-web/ + mermaid@11 CDN
+#   docs-tex-pdf: pdflatex (texlive)
 
 UML_SRC_DIR      ?= docs/uml
 UML_BUILD_DIR    ?= $(LOG_DIR)/uml-build
@@ -38,3 +38,20 @@ docs-uml-pdf: ## Regenerate docs/pdf/nars-uml-diagrams.pdf from docs/uml/*.md (m
 	@echo "→ Merging diagrams into $(UML_PDF_OUT)..."
 	@pdfunite "$(UML_BUILD_DIR)"/*.pdf "$(UML_PDF_OUT)"
 	@echo "✓ $(UML_PDF_OUT) regenerated from $(UML_SRC_DIR)"
+
+TEX_BUILD_DIR    ?= $(LOG_DIR)/tex-build
+
+.PHONY: docs-tex-pdf
+docs-tex-pdf: ## Regenerate docs/pdf/nars_documentation.pdf from docs/nars_documentation.tex (pdflatex, two passes)
+	@echo "→ Building nars_documentation.tex (needs pdflatex)..."
+	@command -v pdflatex >/dev/null 2>&1 || { echo "✖ pdflatex is not installed (install texlive)"; exit 1; }
+	@rm -rf "$(TEX_BUILD_DIR)"; mkdir -p "$(TEX_BUILD_DIR)"
+	@pdflatex -interaction=nonstopmode -halt-on-error -output-directory "$(TEX_BUILD_DIR)" \
+		nars_documentation.tex >/dev/null 2>&1 \
+		|| { echo "✖ First pdflatex pass failed:"; tail -30 "$(TEX_BUILD_DIR)/nars_documentation.log"; exit 1; }
+	@pdflatex -interaction=nonstopmode -output-directory "$(TEX_BUILD_DIR)" \
+		nars_documentation.tex >/dev/null 2>&1 \
+		|| { echo "✖ Second pdflatex pass failed:"; tail -30 "$(TEX_BUILD_DIR)/nars_documentation.log"; exit 1; }
+	@mkdir -p docs/pdf
+	@cp "$(TEX_BUILD_DIR)/nars_documentation.pdf" docs/pdf/nars_documentation.pdf
+	@echo "✓ docs/pdf/nars_documentation.pdf regenerated from docs/nars_documentation.tex"

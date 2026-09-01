@@ -61,74 +61,65 @@ export async function setHouseNumbers(): Promise<void> {
     })
   withDist.sort((a, b) => a.dist - b.dist)
 
-  let oddNext = 1,
-    evenNext = 2
-  ;(state.houseEntrances || [])
-    .filter(
-      (e) =>
-        e.data.entranceTypeKey === "main_entrance" &&
-        e.data.roadDbId === appStore.referenceRoadDbId &&
-        e.data.label !== "?" &&
-        e.data.entranceNumber != null,
-    )
-    .forEach((e) => {
-      const n = e.data.entranceNumber!
-      if (n % 2 !== 0 && n >= oddNext) oddNext = n + 2
-      if (n % 2 === 0 && n >= evenNext) evenNext = n + 2
+  // Send the batch (ordered by arc length along the road) to a single atomic
+  // server-side endpoint. The server locks the road, computes a dense,
+  // collision-free odd/even sequence in batch order, persists it, and returns
+  // the authoritative numbers. Only those are applied to the store — the UI
+  // must not show numbers the server never stored.
+  const orderedIds = withDist.map(({ entry }) => entry.dbId)
+
+  try {
+    const res = await apiFetch("/api/features/number-entrances", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roadId: appStore.referenceRoadDbId, entranceIds: orderedIds }),
     })
+    if (!res.ok) throw new Error(`House numbering failed (${res.status})`)
 
-  let assignedCount = 0
-  let failureCount = 0
-  const updates: Promise<void>[] = []
-  const mapPatches: Array<{
-    id: string
-    properties: MaplibreFeature["properties"]
-  }> = []
+    const body = (await res.json()) as {
+      success: boolean
+      entrances: Array<{ id: string; side: string; entranceNumber: number; label: string }>
+    }
+    if (!body.success) throw new Error("House numbering failed")
 
-  for (const { entry } of withDist) {
-    const isLeft = entry.data.side === "left"
-    const number = isLeft ? oddNext : evenNext
-    if (isLeft) oddNext += 2
-    else evenNext += 2
+    const byDbId = new Map(body.entrances.map((n) => [n.id, n]))
+    let assignedCount = 0
+    let failureCount = 0
+    const mapPatches: Array<{
+      id: string
+      properties: MaplibreFeature["properties"]
+    }> = []
 
-    const newData = { ...entry.data, entranceNumber: number, label: String(number) }
-
-    updates.push(
-      apiFetch(`/api/features/${entry.dbId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: newData }),
+    for (const { entry } of withDist) {
+      const numbered = byDbId.get(entry.dbId)
+      if (!numbered) {
+        failureCount++
+        continue
+      }
+      useLayerStore().updateFeature("houseEntrances", entry.dbId, {
+        entranceNumber: numbered.entranceNumber,
+        label: numbered.label,
       })
-        .then(() => {
-          // Apply the local mutation only after the server confirms — the UI
-          // must not show numbers the server never stored.
-          useLayerStore().updateFeature("houseEntrances", entry.dbId, {
-            entranceNumber: number,
-            label: String(number),
-          })
-          mapPatches.push({
-            id: entry.id,
-            properties: { phaseKey: entry.data.type, label: String(number) },
-          })
-          assignedCount++
-        })
-        .catch((err) => {
-          debugError(`setHouseNumbers save error (id=${entry.dbId}):`, err)
-          failureCount++
-        }),
-    )
-  }
+      mapPatches.push({
+        id: entry.id,
+        properties: { phaseKey: entry.data.type, label: numbered.label },
+      })
+      assignedCount++
+    }
 
-  await Promise.all(updates)
-  featuresStore.batchUpdate(mapPatches)
+    featuresStore.batchUpdate(mapPatches)
 
-  if (failureCount > 0) {
-    showToast(
-      t("map_assigned_numbers_partial", { assigned: assignedCount, failed: failureCount }),
-      "error",
-    )
-  } else {
-    showToast(t("map_assigned_numbers", { count: assignedCount }), "success")
+    if (failureCount > 0) {
+      showToast(
+        t("map_assigned_numbers_partial", { assigned: assignedCount, failed: failureCount }),
+        "error",
+      )
+    } else {
+      showToast(t("map_assigned_numbers", { count: assignedCount }), "success")
+    }
+  } catch (err) {
+    debugError("setHouseNumbers error:", err)
+    showToast(t("map_assigned_numbers_error"), "error")
   }
 }
 

@@ -16,30 +16,21 @@ namespace NarsApi.Tests.Service;
 
 [Collection(PostgreSqlCollection.CollectionName)]
 [Trait("Category", "Service")]
-public class SpatialControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLifetime
+public class SpatialControllerServiceTests(NarsDatabaseFixture fixture) : ServiceTestBase(fixture)
 {
-    private readonly NarsDatabaseFixture _fixture = fixture;
-    private AppDbContext _db = null!;
     private Guid _userId;
 
-    public async Task InitializeAsync()
+    protected override async Task SeedAsync()
     {
-        _db = _fixture.CreateDbContext();
         _userId = await CreateUserAsync();
-    }
-
-    public async Task DisposeAsync()
-    {
-        try { await _db.DisposeAsync(); }
-        finally { await _fixture.CleanTablesAsync(); }
     }
 
     private SpatialController CreateController(IScatteredAreaService? scatteredService = null)
     {
         var ctrl = new SpatialController(
-            new RoadQueryService(_db),
+            new RoadQueryService(Db),
             scatteredService ?? Mock.Of<IScatteredAreaService>(),
-            new EntranceQueryService(_fixture.CreateDbContextFactory()),
+            new EntranceQueryService(Fixture.CreateDbContextFactory()),
             Mock.Of<IWebHostEnvironment>(),
             Mock.Of<ILogger<SpatialController>>());
         AuthTestHelper.SetUser(ctrl, _userId, UserRoles.FieldWorker, communeId: 1);
@@ -48,8 +39,8 @@ public class SpatialControllerServiceTests(NarsDatabaseFixture fixture) : IAsync
 
     private async Task<Guid> CreateUserAsync()
     {
-        await SeedData.SeedBasicLocationsAsync(_db);
-        var user = await SeedData.CreateUserAsync(_db, UserRoles.FieldWorker, communeId: 1, name: "Spatial Test User");
+        await SeedData.SeedBasicLocationsAsync(Db);
+        var user = await SeedData.CreateUserAsync(Db, UserRoles.FieldWorker, communeId: 1, name: "Spatial Test User");
         return user.Id;
     }
 
@@ -58,7 +49,7 @@ public class SpatialControllerServiceTests(NarsDatabaseFixture fixture) : IAsync
     {
         var controller = CreateController();
         var coords = """{"coordinates":[{"lat":36.4,"lng":2.9},{"lat":36.4,"lng":3.1}]}""";
-        var roadId = await TestData.AddRoadAsync(_db, _userId, coords, registerInFeatureRegistry: true);
+        var roadId = await TestData.AddRoadAsync(Db, _userId, coords, registerInFeatureRegistry: true);
 
         var result = await controller.GetRoadSide(new RoadSideRequest(
             RoadId: roadId, Lat: 36.5, Lng: 3.0));
@@ -123,27 +114,28 @@ public class SpatialControllerServiceTests(NarsDatabaseFixture fixture) : IAsync
     [Fact]
     public async Task RefreshScattered_ValidRequest_Returns200()
     {
-        var scatteredMock = new Mock<IScatteredAreaService>(MockBehavior.Strict);
-        scatteredMock.Setup(s => s.RefreshAsync(_userId, 1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+        var unit = Mock.Of<IScatteredAreaService>(s =>
+            s.RefreshAsync(_userId, 1, It.IsAny<CancellationToken>()) == Task.FromResult<string?>("{}"));
 
-        var controller = CreateController(scatteredMock.Object);
+        var controller = CreateController(unit);
 
         var result = await controller.RefreshScattered();
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var resp = Assert.IsType<ScatteredRefreshResponse>(ok.Value);
         Assert.True(resp.Success);
+        Assert.Equal("{}", resp.GeoJson);
     }
 
     [Fact]
     public async Task RefreshScattered_FailedRefresh_Returns500()
     {
-        var scatteredMock = new Mock<IScatteredAreaService>(MockBehavior.Strict);
-        scatteredMock.Setup(s => s.RefreshAsync(_userId, 1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
+        var unit = new Mock<IScatteredAreaService>(MockBehavior.Strict);
+        unit.Setup(s => s.RefreshAsync(_userId, 1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
+        unit.Setup(s => s.GetLastError(_userId, 1)).Returns((FixedUtcNowOffset, "error"));
 
-        var controller = CreateController(scatteredMock.Object);
+        var controller = CreateController(unit.Object);
 
         var result = await controller.RefreshScattered();
 
@@ -157,9 +149,9 @@ public class SpatialControllerServiceTests(NarsDatabaseFixture fixture) : IAsync
         // Intentionally bypasses CreateController() — this test requires
         // NationalAdmin with no communeId, whereas the helper sets FieldWorker+communeId:1.
         var controller = new SpatialController(
-            new RoadQueryService(_db),
+            new RoadQueryService(Db),
             Mock.Of<IScatteredAreaService>(),
-            new EntranceQueryService(_fixture.CreateDbContextFactory()),
+            new EntranceQueryService(Fixture.CreateDbContextFactory()),
             Mock.Of<IWebHostEnvironment>(),
             Mock.Of<ILogger<SpatialController>>());
         AuthTestHelper.SetUser(controller, _userId, UserRoles.NationalAdmin);

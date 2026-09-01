@@ -14,6 +14,18 @@ public sealed class DraftFeaturesController(
     ILogger<DraftFeaturesController> logger,
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
+    // Accepted image mime types for geo-referenced tiles submitted to segmentation.
+    private static readonly HashSet<string> AllowedTileContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image/tiff", "image/tif", "image/jpeg", "image/jpg", "image/png", "image/webp",
+    };
+
+    // File extensions mapped from the accepted mime types above.
+    private static readonly HashSet<string> AllowedTileExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".tif", ".tiff", ".jpeg", ".jpg", ".png", ".webp",
+    };
+
     /// <summary>
     /// Submits an imagery tile for the given commune, runs building
     /// segmentation, and stores the results as pending draft features.
@@ -23,7 +35,9 @@ public sealed class DraftFeaturesController(
     [HttpPost("segment")]
     // 50MB cap: a 1024x1024 georeferenced tile is typically a few MB, so this
     // allows headroom without disabling limits. Above Sonar's 8MB default
-    // threshold by design (see FeatureDefaults:MultipartBodyLengthLimit).
+    // threshold by design (see FeatureDefaults:MultipartBodyLengthLimit). The
+    // uploaded file's content type and extension are validated below so the
+    // large bound is not an arbitrary-upload vector.
 #pragma warning disable S5693 // RequestSizeLimit(50MB) is an intentional, bounded upload cap for imagery tiles
     [RequestSizeLimit(50_000_000)]
     [RequestFormLimits(MultipartBodyLengthLimit = 50_000_000)]
@@ -40,6 +54,24 @@ public sealed class DraftFeaturesController(
         if (request.Tile.Length == 0)
         {
             return Problem(detail: "Uploaded tile is empty.", statusCode: 400);
+        }
+
+        var contentType = request.Tile.ContentType;
+        var extension = Path.GetExtension(request.Tile.FileName);
+        if (!AllowedTileContentTypes.Contains(contentType))
+        {
+            logger.LogWarning("Rejected tile upload with disallowed content type '{ContentType}'", contentType);
+            return Problem(
+                detail: "Uploaded tile must be a recognized image type (TIFF, JPEG, PNG or WebP).",
+                statusCode: 400);
+        }
+
+        if (string.IsNullOrEmpty(extension) || !AllowedTileExtensions.Contains(extension))
+        {
+            logger.LogWarning("Rejected tile upload with no/unsupported file extension '{FileName}'", request.Tile.FileName);
+            return Problem(
+                detail: "Uploaded tile must have a recognized image file extension (.tif, .tiff, .jpg, .jpeg, .png or .webp).",
+                statusCode: 400);
         }
 
         if (request.MinLon is null || request.MinLat is null || request.MaxLon is null || request.MaxLat is null)

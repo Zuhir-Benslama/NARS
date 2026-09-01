@@ -36,7 +36,11 @@ public sealed class ScatteredAreaService(
         return null;
     }
 
-    public async Task<bool> RefreshAsync(Guid userId, int communeId, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Recomputes scattered areas for the given user and commune.
+    /// Returns the recomputed scattered-area GeoJSON, or <c>null</c> on failure.
+    /// </summary>
+    public async Task<string?> RefreshAsync(Guid userId, int communeId, CancellationToken cancellationToken = default)
     {
         cache.Remove(ErrorCacheKey(userId, communeId));
 
@@ -88,7 +92,10 @@ public sealed class ScatteredAreaService(
 
             if (scatteredGeoJson is null)
             {
-                return true;
+                // Boundary exists but produced no scattered geometry: recomputation
+                // succeeded with an empty result. A null fallback also lets a
+                // boundary-less commune return in a catch as a failure below.
+                return scatteredGeoJson;
             }
 
             await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
@@ -125,7 +132,7 @@ public sealed class ScatteredAreaService(
             });
             await db.SaveChangesAsync(cancellationToken);
             await tx.CommitAsync(cancellationToken);
-            return true;
+            return scatteredGeoJson;
         }
         catch (Exception ex) when (ex is not OperationCanceledException
             and not OutOfMemoryException and not StackOverflowException)
@@ -133,7 +140,7 @@ public sealed class ScatteredAreaService(
             RecordError(userId, communeId);
 
             logger.LogError(ex, "ScatteredAreaService refresh failed for user {UserId}, commune {CommuneId}", userId, communeId);
-            return false;
+            return null;
         }
     }
 

@@ -47,7 +47,10 @@ function entrance(id: string, dbId: string, side: "left" | "right"): LayerEntry 
 beforeEach(async () => {
   vi.clearAllMocks()
   setActivePinia(createPinia())
-  mockApiFetch.mockResolvedValue({ ok: true })
+  mockApiFetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({ success: true, entrances: [] }),
+  })
 
   const as = await import("../stores/appStore")
   useAppStore = as.useAppStore
@@ -90,18 +93,40 @@ describe("setHouseNumbers", () => {
     expect(mockShowToast).toHaveBeenCalledWith("alert_no_unassigned_entrances", "info")
   })
 
-  it("mutates entrances only after the PUT succeeds", async () => {
+  it("sends the ordered batch and applies the authoritative numbers returned by the server", async () => {
     useAppStore().referenceRoadDbId = "road-1"
     await seedRoad()
     const store = useLayerStore()
-    const left = entrance("e1", "e-db-1", "left")
     const right = entrance("e2", "e-db-2", "right")
+    const left = entrance("e1", "e-db-1", "left")
     store.addFeature("houseEntrances", left)
     store.addFeature("houseEntrances", right)
 
+    // Note: e1 is placed closer to the road start (lng 127.0) than e2
+    // (lng 127.001), so the batch order is [left, right] regardless of the
+    // order they were added to the store.
+    mockApiFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        entrances: [
+          { id: "e-db-1", side: "left", entranceNumber: 1, label: "1" },
+          { id: "e-db-2", side: "right", entranceNumber: 2, label: "2" },
+        ],
+      }),
+    })
+
     await setHouseNumbers()
 
-    expect(mockApiFetch).toHaveBeenCalledTimes(2)
+    expect(mockApiFetch).toHaveBeenCalledTimes(1)
+    const [url, init] = mockApiFetch.mock.calls[0]
+    expect(url).toBe("/api/features/number-entrances")
+    expect(init.method).toBe("POST")
+    expect(JSON.parse(init.body)).toEqual({
+      roadId: "road-1",
+      entranceIds: ["e-db-1", "e-db-2"],
+    })
+    // Applied numbers come from the server response, not computed client-side.
     expect((left.data as { entranceNumber: number }).entranceNumber).toBe(1)
     expect((left.data as { label: string }).label).toBe("1")
     expect((right.data as { entranceNumber: number }).entranceNumber).toBe(2)
@@ -114,7 +139,7 @@ describe("setHouseNumbers", () => {
     expect(mockShowToast).toHaveBeenCalledWith("map_assigned_numbers", "success")
   })
 
-  it("does not mutate entrances whose PUT fails and shows a partial error toast", async () => {
+  it("does not mutate entrances and shows an error toast when the batch request fails", async () => {
     useAppStore().referenceRoadDbId = "road-1"
     await seedRoad()
     const store = useLayerStore()
@@ -123,15 +148,15 @@ describe("setHouseNumbers", () => {
     store.addFeature("houseEntrances", left)
     store.addFeature("houseEntrances", right)
 
-    mockApiFetch
-      .mockResolvedValueOnce({ ok: true })
-      .mockRejectedValueOnce(new Error("Network failure"))
+    mockApiFetch.mockRejectedValue(new Error("Network failure"))
 
     await setHouseNumbers()
 
-    expect((left.data as { entranceNumber: number }).entranceNumber).toBe(1)
+    expect(mockApiFetch).toHaveBeenCalledTimes(1)
+    expect((left.data as { entranceNumber: number }).entranceNumber).toBeUndefined()
     expect((right.data as { entranceNumber: number }).entranceNumber).toBeUndefined()
     expect((right.data as { label: string }).label).toBe("?")
-    expect(mockShowToast).toHaveBeenCalledWith("map_assigned_numbers_partial", "error")
+    expect(mockFeaturesStoreBatchUpdate).not.toHaveBeenCalled()
+    expect(mockShowToast).toHaveBeenCalledWith("map_assigned_numbers_error", "error")
   })
 })

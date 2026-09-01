@@ -77,6 +77,13 @@ spec:
           volumeMounts:
             - name: postgis-data
               mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
       containers:
         - name: postgis
           image: zuhirbenslama/nars-postgis:latest

@@ -300,7 +300,10 @@ public sealed class UserAuthorizationService(
 
         if (body.Role is not null)
         {
-            var geoCheck = GeographicValidator.Validate(body.Role, body.CommuneId, body.DairaId, body.WilayaId);
+            // Validate against the merged effective values (not the raw body), so
+            // the check reflects the full post-update geography and agrees with the
+            // effective-scope validation performed above.
+            var geoCheck = GeographicValidator.Validate(body.Role, effectiveCommuneId, effectiveDairaId, effectiveWilayaId);
             if (geoCheck is not null)
             {
                 return UserUpdateResult.Failure(UserUpdateErrorCode.Invalid, geoCheck);

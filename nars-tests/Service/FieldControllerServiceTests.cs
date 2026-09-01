@@ -18,27 +18,18 @@ namespace NarsApi.Tests.Service;
 
 [Collection(PostgreSqlCollection.CollectionName)]
 [Trait("Category", "Service")]
-public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLifetime
+public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : ServiceTestBase(fixture)
 {
-    private readonly NarsDatabaseFixture _fixture = fixture;
-    private AppDbContext _db = null!;
     private Guid _workerId;
 
-    public async Task InitializeAsync()
+    protected override async Task SeedAsync()
     {
-        _db = _fixture.CreateDbContext();
         _workerId = await CreateWorkerAsync();
-    }
-
-    public async Task DisposeAsync()
-    {
-        try { await _db.DisposeAsync(); }
-        finally { await _fixture.CleanTablesAsync(); }
     }
 
     private FieldController CreateController()
     {
-        var factory = _fixture.CreateDbContextFactory();
+        var factory = Fixture.CreateDbContextFactory();
         var featureSvc = new FeatureService(factory, Mock.Of<IBackgroundTaskQueue>(), Mock.Of<IFeatureCleanupService>(), Mock.Of<ILogger<FeatureService>>());
         var fieldSvc = new FieldService(factory, featureSvc, Mock.Of<ILogger<FieldService>>());
         var ctrl = new FieldController(Mock.Of<ILogger<FieldController>>(), Options.Create(new FeatureDefaultsOptions()), fieldSvc, Mock.Of<IWebHostEnvironment>());
@@ -48,16 +39,16 @@ public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
 
     private async Task<Guid> CreateWorkerAsync()
     {
-        await SeedData.SeedBasicLocationsAsync(_db);
-        var user = await SeedData.CreateUserAsync(_db, UserRoles.FieldWorker, communeId: 1, name: "Field Worker Integration");
+        await SeedData.SeedBasicLocationsAsync(Db);
+        var user = await SeedData.CreateUserAsync(Db, UserRoles.FieldWorker, communeId: 1, name: "Field Worker Integration");
         return user.Id;
     }
 
     private async Task<Guid> CreateRoadWithOwnerAsync()
     {
-        var owner = await SeedData.CreateUserAsync(_db, UserRoles.CommuneUser, communeId: 1, name: "Road Owner");
+        var owner = await SeedData.CreateUserAsync(Db, UserRoles.CommuneUser, communeId: 1, name: "Road Owner");
         var roadId = Guid.NewGuid();
-        _db.Roads.Add(new Road
+        Db.Roads.Add(new Road
         {
             Id = roadId,
             UserId = owner.Id,
@@ -66,9 +57,9 @@ public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
             Layer = FeatureTypes.RoadLayers.Street,
             UpdatedAt = FixedUtcNow,
         });
-        _db.FeatureRegistry.Add(new FeatureRegistry { Id = roadId, FeatureType = FeatureTypes.Road });
+        Db.FeatureRegistry.Add(new FeatureRegistry { Id = roadId, FeatureType = FeatureTypes.Road });
 
-        await _db.SaveChangesAsync();
+        await Db.SaveChangesAsync();
         return roadId;
     }
 
@@ -137,16 +128,16 @@ public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         var controller = CreateController();
 
         // Seed a second commune so the road owner can be in a different one
-        if (!await _db.Communes.AnyAsync(c => c.CommuneId == 2))
+        if (!await Db.Communes.AnyAsync(c => c.CommuneId == 2))
         {
-            _db.Dairas.Add(new Daira { DairaId = 2, WilayaId = 1, DairaFr = "Bir Mourad Raïs", DairaAr = "بئر مراد رايس", DairaLatitude = 36.74, DairaLongitude = 3.05 });
-            _db.Communes.Add(new Commune { CommuneId = 2, DairaId = 2, CommuneCode = 1002, CommuneFr = "Bir Mourad Raïs Centre", CommuneAr = "بئر مراد رايس الوسطى", CommuneLatitude = 36.74, CommuneLongitude = 3.05 });
-            await _db.SaveChangesAsync();
+            Db.Dairas.Add(new Daira { DairaId = 2, WilayaId = 1, DairaFr = "Bir Mourad Raïs", DairaAr = "بئر مراد رايس", DairaLatitude = 36.74, DairaLongitude = 3.05 });
+            Db.Communes.Add(new Commune { CommuneId = 2, DairaId = 2, CommuneCode = 1002, CommuneFr = "Bir Mourad Raïs Centre", CommuneAr = "بئر مراد رايس الوسطى", CommuneLatitude = 36.74, CommuneLongitude = 3.05 });
+            await Db.SaveChangesAsync();
         }
 
         // Create a user in a different commune
         var otherOwnerId = Guid.NewGuid();
-        await _db.Users.AddAsync(new User
+        await Db.Users.AddAsync(new User
         {
             Id = otherOwnerId,
             Name = "Other Commune Owner",
@@ -160,7 +151,7 @@ public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         });
 
         var roadId = Guid.NewGuid();
-        _db.Roads.Add(new Road
+        Db.Roads.Add(new Road
         {
             Id = roadId,
             UserId = otherOwnerId,
@@ -169,8 +160,8 @@ public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
             Layer = FeatureTypes.RoadLayers.Street,
             UpdatedAt = FixedUtcNow,
         });
-        _db.FeatureRegistry.Add(new FeatureRegistry { Id = roadId, FeatureType = FeatureTypes.Road });
-        await _db.SaveChangesAsync();
+        Db.FeatureRegistry.Add(new FeatureRegistry { Id = roadId, FeatureType = FeatureTypes.Road });
+        await Db.SaveChangesAsync();
 
         var result = await controller.SubmitInspection(new FieldInspectRequest(
             FeatureId: roadId.ToString(),
@@ -223,7 +214,7 @@ public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : IAsyncLi
         Assert.True(resp.Success);
 
         // Verify in DB
-        var entrance = await _db.HouseEntrances.FirstOrDefaultAsync(e => e.Id == Guid.Parse(resp.Id));
+        var entrance = await Db.HouseEntrances.FirstOrDefaultAsync(e => e.Id == Guid.Parse(resp.Id));
         Assert.NotNull(entrance);
         Assert.Equal("Integration Entrance", entrance.Label);
     }

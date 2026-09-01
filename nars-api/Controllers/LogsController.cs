@@ -31,7 +31,18 @@ public class LogsController(
     private const int MaxUserAgentLength = 500;
     private const int MaxCodeLength = 50; // must match ErrorLog.Code [MaxLength(50)]
 
-    /// <summary>Accepts client-side error logs for server-side storage and analysis.</summary>
+    /// <summary>
+    /// Accepts client-side error logs for server-side storage and analysis.
+    /// <para>
+    /// CSRF note: this endpoint is exempted from antiforgery-token validation
+    /// (see <c>PipelineExtensions.ShouldValidateCsrf</c>) because the SPA flushes
+    /// logs at page unload via <c>sendBeacon()</c>, which cannot set headers.
+    /// Its CSRF control rests on the SameSite=Lax session cookie plus the
+    /// Origin check enforced for authenticated cross-origin writes in production:
+    /// a cross-site POST that does not carry the auth cookie is rejected, and the
+    /// endpoint requires the cookie to <see cref="AuthorizeAttribute"/>.
+    /// </para>
+    /// </summary>
     [HttpPost("logs")]
     [Authorize]
     [Consumes("application/json")]
