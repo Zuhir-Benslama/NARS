@@ -40,6 +40,11 @@ docs-uml-pdf: ## Regenerate docs/pdf/nars-uml-diagrams.pdf from docs/uml/*.md (m
 	@echo "✓ $(UML_PDF_OUT) regenerated from $(UML_SRC_DIR)"
 
 TEX_BUILD_DIR    ?= $(LOG_DIR)/tex-build
+# Source is under docs/; the recipe runs from the repo root, so a bare
+# filename would make pdflatex abort with a file error (and write no log,
+# masking the cause). Keep the full path in one place.
+TEX_SRC          := docs/nars_documentation.tex
+TEX_PDF_LOG      := $(TEX_BUILD_DIR)/nars_documentation.log
 
 .PHONY: docs-tex-pdf
 docs-tex-pdf: ## Regenerate docs/pdf/nars_documentation.pdf from docs/nars_documentation.tex (pdflatex, two passes)
@@ -47,11 +52,11 @@ docs-tex-pdf: ## Regenerate docs/pdf/nars_documentation.pdf from docs/nars_docum
 	@command -v pdflatex >/dev/null 2>&1 || { echo "✖ pdflatex is not installed (install texlive)"; exit 1; }
 	@rm -rf "$(TEX_BUILD_DIR)"; mkdir -p "$(TEX_BUILD_DIR)"
 	@pdflatex -interaction=nonstopmode -halt-on-error -output-directory "$(TEX_BUILD_DIR)" \
-		nars_documentation.tex >/dev/null 2>&1 \
-		|| { echo "✖ First pdflatex pass failed:"; tail -30 "$(TEX_BUILD_DIR)/nars_documentation.log"; exit 1; }
+		"$(TEX_SRC)" >/dev/null 2>&1 \
+		|| { echo "✖ First pdflatex pass failed:"; tail -30 "$(TEX_PDF_LOG)"; exit 1; }
 	@pdflatex -interaction=nonstopmode -output-directory "$(TEX_BUILD_DIR)" \
-		nars_documentation.tex >/dev/null 2>&1 \
-		|| { echo "✖ Second pdflatex pass failed:"; tail -30 "$(TEX_BUILD_DIR)/nars_documentation.log"; exit 1; }
+		"$(TEX_SRC)" >/dev/null 2>&1 \
+		|| { echo "✖ Second pdflatex pass failed:"; tail -30 "$(TEX_PDF_LOG)"; exit 1; }
 	@mkdir -p docs/pdf
 	@cp "$(TEX_BUILD_DIR)/nars_documentation.pdf" docs/pdf/nars_documentation.pdf
 	@echo "✓ docs/pdf/nars_documentation.pdf regenerated from docs/nars_documentation.tex"

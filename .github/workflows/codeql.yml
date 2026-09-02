@@ -12,7 +12,8 @@ on:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    runs-on: ubuntu-latest
+    # Pinned for reproducible autobuild + .NET/JS analysis matrix.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       security-events: write

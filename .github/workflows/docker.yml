@@ -23,7 +23,9 @@ env:
 jobs:
   build-and-push:
     name: "${{ matrix.image }}"
-    runs-on: ubuntu-latest
+    # Pinned runner for the image-push path: reproducible base OS/toolchain
+    # for Dockerfile builds. Bump deliberately when a newer LTS is needed.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false

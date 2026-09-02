@@ -21,7 +21,11 @@ jobs:
   # ─── .NET (nars-api + nars-tests) ──────────────────────────
   dotnet:
     name: .NET
-    runs-on: ubuntu-latest
+    # Pinned (not ubuntu-latest, which is a moving label). Infra-lint and the
+    # tag/local-ingress/observability guards rely on the runner's preinstalled
+    # kubectl + kustomize; pinning keeps their versions (and everything else)
+    # reproducible across the matrix.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -60,7 +64,7 @@ jobs:
   # ─── Frontend (nars-web) ────────────────────────────────────
   web:
     name: Frontend
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -115,7 +119,7 @@ jobs:
   # near-vacuous because ignore_missing_imports typed the whole stack dynamic.
   roads-test:
     name: Roads test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -137,15 +141,23 @@ jobs:
   # `make infra-lint` runs all 12 gates, using the digest-pinned tool images
   # via the docker fallback branches (the runner has docker; only `node` is
   # provided locally for the .mjs gate, matching NODE_IMAGE node:22-alpine).
+  # kubectl is set up explicitly (not the runner's preinstalled copy): the
+  # local-ingress-guard self-test shells out to `kubectl kustomize`, so the
+  # version must not silently drift with the runner image.
   infra-lint:
     name: Infra lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.36.4"
 
       - name: Run make infra-lint (all 12 gates)
         run: make infra-lint
