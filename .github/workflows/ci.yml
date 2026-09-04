@@ -65,6 +65,10 @@ jobs:
   web:
     name: Frontend
     runs-on: ubuntu-24.04
+    # Hard cap for the whole job so a stalled npm registry lookup can't hang
+    # CI indefinitely (npm ci / npm audit hit registry.npmjs.org, which is
+    # occasionally slow on hosted runners).
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -74,8 +78,10 @@ jobs:
           cache: npm
           cache-dependency-path: nars-web/package-lock.json
 
-      - run: npm ci
+      - name: Install dependencies (npm ci)
+        run: npm ci
         working-directory: nars-web
+        timeout-minutes: 15
 
       # The API contract (`api-spec/openapi.json`) is committed so codegen is
       # deterministic and diffable in PRs. Regenerate the client types from the
@@ -109,6 +115,10 @@ jobs:
       - name: Audit
         run: npm run audit
         working-directory: nars-web
+        # npm audit does a live registry lookup which can stall on flaky
+        # runner networking; fail fast with a clear error instead of hanging
+        # the whole job until the run-level concurrency cancel kills it.
+        timeout-minutes: 3
 
   # ─── Roads test suite (nars-roads) ────────────────────────
   # The gate intentionally lives in the Makefile (`make roads-test`): it builds
@@ -142,6 +152,7 @@ jobs:
   docs:
     name: Docs (UML render)
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -155,12 +166,15 @@ jobs:
       # createRequire(anchor nars-web/package.json). Install it, then fetch the
       # Firefox browser binary the renderer drives (npm ci installs the npm
       # package, not the browsers).
-      - run: npm ci
+      - name: Install dependencies (npm ci)
+        run: npm ci
         working-directory: nars-web
+        timeout-minutes: 15
 
       - name: Install Playwright Firefox browser
         run: npx playwright install firefox
         working-directory: nars-web
+        timeout-minutes: 10
 
       - name: Validate UML diagrams render (make docs-lint-uml)
         run: make docs-lint-uml
