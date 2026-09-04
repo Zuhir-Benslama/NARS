@@ -252,7 +252,7 @@ public class FeaturesController(
             return Problem(detail: "Feature not found", statusCode: 404);
         }
 
-        logger.LogInformation("[Features] User {UserId} deleted {Type} {Id}", CurrentUserId, featureType, featureId);
+        logger.LogInformation("[Features] User {UserId} deleted {Type} {Id}", CurrentUserId, featureType.ReplaceLineEndings(" "), featureId);
 
         await MaybeQueueScatteredRefreshAsync(featureType);
 

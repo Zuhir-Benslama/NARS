@@ -1,0 +1,15 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nars-config
+  namespace: nars
+data:
+  # Production: disable detailed error pages + HTTPS cert validation.
+  # The base ships Development for local dev; production MUST override.
+  ASPNETCORE_ENVIRONMENT: "Production"
+  # localhost is removed — the dev-only local ingresses are excluded from this
+  # overlay, so an authoritative production API should not accept localhost
+  # Host headers.
+  AllowedHosts: "nars.dz;api.nars.dz"
+  # Keep CORS as-is (base already lists production origins only).

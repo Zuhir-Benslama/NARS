@@ -137,18 +137,9 @@ public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : ServiceT
 
         // Create a user in a different commune
         var otherOwnerId = Guid.NewGuid();
-        await Db.Users.AddAsync(new User
-        {
-            Id = otherOwnerId,
-            Name = "Other Commune Owner",
-            Email = $"other-{otherOwnerId:N}@test.com",
-            Phone = DefaultPhone,
-            Username = $"other_owner_{otherOwnerId:N}",
-            PasswordHash = DefaultPasswordHash,
-            SecurityStamp = User.GenerateSecurityStamp(),
-            Role = UserRoles.CommuneUser,
-            CommuneId = 2,
-        });
+        await SeedData.CreateUserAsync(Db, UserRoles.CommuneUser,
+            communeId: 2, id: otherOwnerId, name: "Other Commune Owner",
+            username: $"other_owner_{otherOwnerId:N}", email: $"other-{otherOwnerId:N}@test.com");
 
         var roadId = Guid.NewGuid();
         Db.Roads.Add(new Road

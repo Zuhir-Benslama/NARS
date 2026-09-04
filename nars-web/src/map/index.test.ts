@@ -76,7 +76,7 @@ describe("destroyMap", () => {
     expect(mockRemoveBoundaryClickEvents).toHaveBeenCalledTimes(1)
   })
 
-  it("disposes Geoman before removing the map", async () => {
+  it("removes the map before disposing Geoman (sync beforeunload safety)", async () => {
     const order: string[] = []
     mockDisposeGeoman.mockImplementation(() => {
       order.push("dispose")
@@ -88,7 +88,7 @@ describe("destroyMap", () => {
 
     await destroyMap()
 
-    expect(order).toEqual(["dispose", "remove"])
+    expect(order).toEqual(["remove", "dispose"])
   })
 
   it("is a no-op when the map was never initialized", async () => {

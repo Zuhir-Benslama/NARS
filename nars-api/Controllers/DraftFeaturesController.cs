@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
+using NarsApi.Models;
 using NarsApi.Services;
 
 namespace NarsApi.Controllers;
@@ -115,6 +116,19 @@ public sealed class DraftFeaturesController(
     /// Lists draft features for a commune, for the review queue UI.
     /// The caller must have access to the commune.
     /// </summary>
+    // Allowlist for draft filter values — rejects unknown values early instead
+    // of silently returning empty results.
+    private static readonly HashSet<string> AllowedDraftStatuses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        AiDraftFeature.StatusPending, AiDraftFeature.StatusAccepted,
+        AiDraftFeature.StatusRejected, AiDraftFeature.StatusEdited,
+    };
+
+    private static readonly HashSet<string> AllowedDraftFeatureTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        AiDraftFeature.TypeRoad, AiDraftFeature.TypeBuilding,
+    };
+
     [HttpGet]
     public async Task<ActionResult<PagedResponse<AiDraftFeatureDto>>> ListDrafts(
         [FromQuery] int communeId,
@@ -125,6 +139,18 @@ public sealed class DraftFeaturesController(
         CancellationToken cancellationToken = default)
     {
         (skip, take) = Pagination.Clamp(skip, take);
+
+        if (!AllowedDraftStatuses.Contains(status))
+        {
+            var allowed = string.Join(", ", AllowedDraftStatuses.Select(s => $"'{s}'"));
+            return Problem(detail: $"status must be one of: {allowed}.", statusCode: 400);
+        }
+
+        if (featureType is not null && !AllowedDraftFeatureTypes.Contains(featureType))
+        {
+            var allowed = string.Join(", ", AllowedDraftFeatureTypes.Select(t => $"'{t}'"));
+            return Problem(detail: $"featureType must be one of: {allowed}.", statusCode: 400);
+        }
 
         try
         {

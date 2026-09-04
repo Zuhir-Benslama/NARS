@@ -37,12 +37,20 @@ public class AdminControllerServiceTests(NarsDatabaseFixture fixture) : ServiceT
     private UserAuthorizationService CreateUserAuthorizationService() =>
         new(Db, Mock.Of<IRefreshTokenService>(), Mock.Of<IFeatureCleanupService>(), FixedTimeProvider(), Mock.Of<ISecurityStampCache>());
 
-    private AdminUserController CreateUserManagementController() => new(
+    private AdminUserController CreateUserManagementController()
+    {
+        var factory = Fixture.CreateDbContextFactory();
+        // Share a single UserAuthorizationService between the controller and
+        // UserCreationService, matching production DI (AddScoped) where both
+        // resolve the same instance within a request scope.
+        var authorizationService = CreateUserAuthorizationService();
+        return new AdminUserController(
             Mock.Of<Microsoft.Extensions.Logging.ILogger<AdminUserController>>(),
-            CreateUserAuthorizationService(),
-            new UserCreationService(Fixture.CreateDbContextFactory(), CreateUserAuthorizationService(),
+            authorizationService,
+            new UserCreationService(factory, authorizationService,
                 Mock.Of<Microsoft.Extensions.Logging.ILogger<UserCreationService>>()),
             Mock.Of<IWebHostEnvironment>());
+    }
 
     // ── CreateAdmin ─────────────────────────────────────────────────────
 

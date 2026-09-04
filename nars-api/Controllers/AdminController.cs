@@ -29,7 +29,7 @@ public class AdminController(
     {
         var role = CurrentUserRole;
         var dairaId = CurrentDairaId;
-        logger.LogInformation("[Admin] User {UserId} ({Role}) accessed admin overview", CurrentUserId, role);
+        logger.LogInformation("[Admin] User {UserId} ({Role}) accessed admin overview", CurrentUserId, role?.ReplaceLineEndings(" "));
         return role switch
         {
             UserRoles.DairaAdmin when dairaId is null =>

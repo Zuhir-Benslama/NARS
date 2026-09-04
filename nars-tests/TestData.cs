@@ -62,6 +62,12 @@ public static class TestData
     public static readonly Guid UserId = new("11111111-1111-1111-1111-111111111111");
 
     // ── Location IDs ───────────────────────────────────────────────────
+    // NOTE: the unit (InMemory) and integration (PostgreSQL) suites deliberately
+    // use DIFFERENT ID namespaces. InMemory suites use CommuneId1/2 (with
+    // SeedData.SeedBasicLocationsAsync), while the integration suites use the
+    // 100/101 namespace (with SeedData.SeedAdminLocationsAsync). This prevents
+    // accidental cross-talk if a test ever mixes the two contexts. Keep them
+    // distinct on purpose rather than "fixing" them to be equal.
     public const int CommuneId1 = 1;
     public const int CommuneId2 = 2;
 

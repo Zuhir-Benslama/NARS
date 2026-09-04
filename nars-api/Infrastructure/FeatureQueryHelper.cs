@@ -18,6 +18,10 @@ public static class FeatureQueryHelper
     // JsonSerializer.Deserialize<JsonElement> returns an unowned element backed
     // by the serializer's own buffer — unlike JsonDocument.Parse(...).RootElement,
     // it requires no disposal and cannot leak the pooled document.
+    //
+    // IMPORTANT: Do NOT change this to JsonDocument.Parse("...").RootElement —
+    // that would hold a JsonDocument (backed by pooled buffers) for the process
+    // lifetime without disposal.
     private static readonly JsonElement EmptyJsonObject = JsonSerializer.Deserialize<JsonElement>("{}");
     private static readonly string _loadFeaturesSql = BuildSql(withLayer: false);
     private static readonly string _loadByLayerSql = BuildSql(withLayer: true);

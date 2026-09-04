@@ -38,9 +38,10 @@ classDiagram
 
     class MaplibreFeature {
         +string id
-        +FeatureData data
-        +string type
+        +GeoJSON.Geometry geometry
+        +object properties
     }
+    note for MaplibreFeature "properties: { dbId?, phaseKey, label,\ngeomType?, fillColor?,\nlineColor?, lineWidth?, ... }"
 
     class DeletedFeature {
         +LayerEntry entry
@@ -86,7 +87,7 @@ classDiagram
         +remove(dbId)
         +update(dbId, data)
         +batchUpdate(features)
-        +getAll(phase)
+        +getAll()
         +updateSource()
     }
 
@@ -130,12 +131,13 @@ classDiagram
         +secondaryEntrances
         +areaCount, districtCount, roadCount...
         Actions
-        +addFeature(LayerEntry)
-        +removeFeature(dbId)
-        +updateFeature(dbId, data)
+        +addFeature(layer, entry)
+        +removeFeature(layer, dbId)
+        +updateFeature(layer, dbId, data)
         +updateFeatureData(dbId, data)
-        +clearLayer(phase)
+        +clearLayer(layer)
         +getFeature(dbId)
+        +reset()
     }
 
     class DrawStore {
@@ -252,9 +254,8 @@ classDiagram
         +apiFetch(path, options)
         +refreshSession()
         +apiUrl(path)
-        -applyCSRF(options)
-        -classifyError(response)
     }
+    note for ApiModule "CSRF header injected inline via getCsrfToken();\nerrors classified inline in handleResponse()"
 
     %% ===== MAP MODULES =====
     class MapContext {

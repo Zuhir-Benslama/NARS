@@ -99,10 +99,17 @@ infra-lint-makefile: ## Validate Makefile syntax with dry-run
 	@echo "→ Checking undefined variable references..."
 	# GNUMAKEFLAGS is a GNU Make internal variable spuriously flagged by
 	# --warn-undefined-variables -Rr (make 4.4+); filter it out.
-	# Fails when references are found — `|| true` only handles the clean case.
-	@make -Rr --warn-undefined-variables -n help 2>&1 | grep -i 'warning.*undefined' | grep -v GNUMAKEFLAGS \
-		&& { echo "✖ Undefined variable references found (see above)"; exit 1; } \
-		|| echo "✓ No undefined variable references"
+	# Capture into a variable and test on it, rather than on the pipeline exit
+	# code: a pipeline ends with `grep -v`'s status, so if the only warnings were
+	# GNUMAKEFLAGS (filtered out entirely) the old form falsely reported success.
+	@undef=$$(make -Rr --warn-undefined-variables -n help 2>&1 | grep -i 'warning.*undefined' | grep -v GNUMAKEFLAGS || true); \
+	if [ -n "$$undef" ]; then \
+		echo "✖ Undefined variable references found (see above)"; \
+		echo "$$undef"; \
+		exit 1; \
+	else \
+		echo "✓ No undefined variable references"; \
+	fi
 
 .PHONY: infra-lint-checkmake
 infra-lint-checkmake: ## Lint the root Makefile with checkmake (config: checkmake.ini)
@@ -179,11 +186,11 @@ _check-pinned-tag: ## Fail if deploying with the mutable 'latest' tag outside lo
 .PHONY: _check-local-ingresses
 _check-local-ingresses: ## Fail if dev-only local ingresses would be deployed outside local dev
 	@if [ "$(DEPLOY_ENV)" != "dev" ]; then
-		output=$$($(KUBECTL) kustomize "$(K8S_DIR)" 2>&1) || { echo "✖ kubectl kustomize failed — cannot verify local ingresses are absent"; exit 1; };
+		output=$$($(KUBECTL) kustomize "$(K8S_OVERLAY_DIR)" 2>&1) || { echo "✖ kubectl kustomize failed — cannot verify local ingresses are absent"; exit 1; };
 		if echo "$$output" | grep -qE "name: nars-(api|frontend)-local"; then
 			echo "✖ Refusing to deploy dev-only local ingresses (nars-api-local / nars-frontend-local) in $(DEPLOY_ENV).";
 			echo "  They expose /api and /login WITHOUT mTLS and match any Host.";
-			echo "  Exclude them via a production overlay, or set DEPLOY_ENV=dev.";
+			echo "  Ensure the overlay used ($(K8S_OVERLAY_DIR)) does not include ingress-local, or set DEPLOY_ENV=dev.";
 			exit 1;
 		fi
 	fi
@@ -210,13 +217,16 @@ infra-lint-tag-guard: ## Assert _check-pinned-tag rejects 'latest' outside dev (
 	@echo "  ✓ ALLOW_LATEST=1 override accepted"
 
 .PHONY: infra-lint-local-ingress-guard
-infra-lint-local-ingress-guard: ## Assert _check-local-ingresses rejects local ingresses outside dev (self-test)
-	@echo "→ Verifying _check-local-ingresses rejects the base kustomization in production (it ships nars-api-local)..."
-	@if DEPLOY_ENV=production $(SUBMAKE) _check-local-ingresses >/dev/null 2>&1; then
-		echo "✖ _check-local-ingresses unexpectedly accepted dev local ingresses in production";
+infra-lint-local-ingress-guard: ## Assert local ingresses are excluded from non-dev overlays (self-test)
+	@echo "→ Verifying dev overlay actually ships the local ingresses (nars-api-local)..."
+	@if ! $(KUBECTL) kustomize "$(K8S_OVERLAY_DIR)" 2>/dev/null | grep -qE "name: nars-(api|frontend)-local"; then
+		echo "✖ dev overlay is missing dev local ingresses — 'make cluster-up' would lose localhost access";
 		exit 1;
 	fi
-	@echo "  ✓ local ingresses rejected in production"
+	@echo "  ✓ dev overlay includes local ingresses"
+	@echo "→ Verifying _check-local-ingresses passes in production (prod overlay has no local ingresses)..."
+	@DEPLOY_ENV=production $(SUBMAKE) _check-local-ingresses
+	@echo "  ✓ production overlay rejects/times-out all local ingress output"
 	@echo "→ Verifying _check-local-ingresses passes in dev..."
 	@DEPLOY_ENV=dev $(SUBMAKE) _check-local-ingresses
 	@echo "  ✓ local ingresses allowed in dev"

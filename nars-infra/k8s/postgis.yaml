@@ -154,10 +154,12 @@ spec:
           # postgres user (uid 999). Container-level runAsNonRoot: true overrides
           # the pod-level runAsUser: 999 — the postgres user IS non-root.
           # CHOWN/DAC_OVERRIDE/FOWNER are only needed during init (handled above).
-          # allowPrivilegeEscalation remains true because postgres's postmaster
-          # forks child processes that inherit file descriptors.
+          # allowPrivilegeEscalation: false is safe — the postmaster forks worker
+          # processes that share its own uid; forking does not require gaining
+          # privileges (setuid/setgid). The postgres docs' official secure
+          # recommendations run with privilege escalation disabled.
           securityContext:
-            allowPrivilegeEscalation: true
+            allowPrivilegeEscalation: false
             readOnlyRootFilesystem: false
             runAsNonRoot: true
             seccompProfile:

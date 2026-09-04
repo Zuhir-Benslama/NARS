@@ -40,6 +40,7 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
         .Build();
 
     private bool _initialized;
+    private bool _disposed;
     private IDbContextFactory<AppDbContext>? _sharedFactory;
 
     public string ConnectionString => _container.GetConnectionString();
@@ -92,6 +93,11 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
+        if (_disposed)
+        {
+            return;
+        }
+        _disposed = true;
         try
         {
             (_sharedFactory as IDisposable)?.Dispose();
@@ -124,6 +130,11 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
     /// </summary>
     public IDbContextFactory<AppDbContext> CreateDbContextFactory()
     {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(NarsDatabaseFixture));
+        }
+
         if (!_initialized)
         {
             throw new InvalidOperationException("Database not initialized");

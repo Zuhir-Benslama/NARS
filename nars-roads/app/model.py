@@ -191,7 +191,7 @@ class SegmentationModel:
         return probs.squeeze(0).permute(1, 2, 0).cpu().numpy()
 
     @staticmethod
-    def _embedded_transform(src) -> rasterio.Affine | None:
+    def _embedded_transform(src: rasterio.DatasetReader) -> rasterio.Affine | None:
         """The tile's own georeferencing, but only when it can be trusted to
         describe geographic (degree-unit) coordinates.
 

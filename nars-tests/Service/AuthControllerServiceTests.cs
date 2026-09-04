@@ -285,20 +285,15 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : ServiceTe
         int? dairaId = null,
         int? wilayaId = null)
     {
-        var user = await SeedData.CreateUserAsync(Db, role, dairaId: dairaId, wilayaId: wilayaId, name: $"Admin {username}");
-        // Override username since CreateUserAsync generates one
-        user.Username = username;
-        user.Email = $"{username}@test.com";
-        await Db.SaveChangesAsync();
+        var user = await SeedData.CreateUserAsync(Db, role, dairaId: dairaId, wilayaId: wilayaId,
+            name: $"Admin {username}", username: username, email: $"{username}@test.com");
         return user;
     }
 
     private async Task<User> CreateCommuneUserAsync(string username, int communeId)
     {
-        var user = await SeedData.CreateUserAsync(Db, UserRoles.CommuneUser, communeId: communeId, name: $"User {username}");
-        user.Username = username;
-        user.Email = $"{username}@test.com";
-        await Db.SaveChangesAsync();
+        var user = await SeedData.CreateUserAsync(Db, UserRoles.CommuneUser, communeId: communeId,
+            name: $"User {username}", username: username, email: $"{username}@test.com");
         return user;
     }
 

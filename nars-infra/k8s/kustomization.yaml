@@ -19,8 +19,10 @@ resources:
   - frontend-service.yaml
   - ingress-api.yaml
   - ingress-frontend.yaml
-  # nars-api-local and nars-frontend-local are created by
-  # the same files (multi-doc YAML)
+  # nars-api-local and nars-frontend-local live in ingress-local.yaml but are
+  # NOT listed here — they are dev-only and added by the development overlay
+  # (nars-infra/overlays/dev). Keeping them out of the base keeps the base
+  # safe to deploy to any environment.
   - network-policy.yaml
   - resource-quota.yaml
   - hpa.yaml
@@ -32,23 +34,23 @@ resources:
   # after the observability stack is installed (their CRDs are only available then):
   #   make observability-servicemonitor
 # ─── Environment Overlays ──────────────────────────────────────────────
-# This directory is the base. To add environment-specific overlays:
+# Overlays live OUTSIDE this directory (nars-infra/overlays/) because a
+# kustomize base cannot contain its own overlays (it rejects the cycle).
 #
-#   k8s/overlays/
-#   ├── development/  # (default — this base)
-#   ├── staging/
-#   │   ├── kustomization.yaml   # resources: [../../base]
-#   │   └── patches/             # replica count, resource limits, etc.
-#   └── production/
-#       ├── kustomization.yaml
+#   nars-infra/overlays/
+#   ├── dev/          # base + local dev ingresses (nars-infra/k8s/ingress-local/)
+#   │   └── kustomization.yaml   # resources: [../../k8s, ../../k8s/ingress-local]
+#   └── production/   # base + Production env + production health CIDRs
+#       ├── kustomization.yaml   # resources: [../../k8s]
 #       └── patches/
-#           ├── replica-count.yaml
-#           ├── resource-limits.yaml
-#           ├── ingress-tls.yaml
-#           └── storage-class.yaml
+#           ├── configmap.yaml        # ASPNETCORE_ENVIRONMENT=Production
+#           └── health-ingress.yaml   # ⚠ replace REPLACE_ME_* CIDRs
 #
-# Apply with:
-#   kustomize build k8s/overlays/production | kubectl apply -f -
+# The Makefile selects the overlay from $(DEPLOY_ENV) for `make kustomize-apply`
+# (default/dev -> dev overlay; production -> production overlay).
+#
+# Apply manually with:
+#   kubectl kustomize nars-infra/overlays/production | kubectl apply -f -
 images:
   # ⚠ `latest` tags are for local dev only — they produce non-reproducible
   # deployments. CI/CD pipelines MUST override with a pinned SHA:

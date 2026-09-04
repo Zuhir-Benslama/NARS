@@ -8,6 +8,31 @@ import { t } from "../i18n"
 const STEP = 5
 
 let rotationControlEl: HTMLElement | null = null
+let rotationStyleInjected = false
+
+const ROTATION_STYLE = `
+  .nars-rotation-control {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    display: flex;
+    gap: 4px;
+    z-index: 1000;
+  }
+  .nars-rotation-btn {
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+  }
+`
+
+function injectRotationStyle(): void {
+  if (rotationStyleInjected) return
+  const style = document.createElement("style")
+  style.textContent = ROTATION_STYLE
+  document.head.appendChild(style)
+  rotationStyleInjected = true
+}
 
 export function resetRotation(): void {
   useRotationStore().resetRotation()
@@ -20,26 +45,24 @@ export function setBearing(deg: number): void {
 }
 
 export function initRotationControls(): void {
+  injectRotationStyle()
   const container = getCtx().map.getContainer()
 
   const wrap = document.createElement("div")
-  wrap.className = "nars-rotation-control leaflet-bar"
-  wrap.style.cssText = "position:absolute;bottom:10px;right:10px;display:flex;gap:4px;z-index:1000;"
+  wrap.className = "nars-rotation-control"
 
   const ccw = document.createElement("button")
   ccw.textContent = "↺"
   ccw.title = t("rotate_ccw")
   ccw.setAttribute("aria-label", t("rotate_ccw"))
-  ccw.className = "nars-map-btn"
-  ccw.style.cssText = "width:30px;height:30px;cursor:pointer;"
+  ccw.className = "nars-map-btn nars-rotation-btn"
   ccw.onclick = () => setBearing(useRotationStore().currentBearing - STEP)
 
   const cw = document.createElement("button")
   cw.textContent = "↻"
   cw.title = t("rotate_cw")
   cw.setAttribute("aria-label", t("rotate_cw"))
-  cw.className = "nars-map-btn"
-  cw.style.cssText = "width:30px;height:30px;cursor:pointer;"
+  cw.className = "nars-map-btn nars-rotation-btn"
   cw.onclick = () => setBearing(useRotationStore().currentBearing + STEP)
 
   wrap.appendChild(ccw)

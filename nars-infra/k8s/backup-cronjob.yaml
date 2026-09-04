@@ -86,9 +86,12 @@ spec:
           serviceAccountName: postgis-backup
           securityContext:
             runAsNonRoot: true
-            runAsUser: 999
-            runAsGroup: 999
-            fsGroup: 999
+            # The nars-backup image is built on postgres:17-alpine, whose
+            # postgres user is uid 70 (not 999). pg_dump/gzip/gpg run fine as
+            # uid 70, and this matches the HOME comment below.
+            runAsUser: 70
+            runAsGroup: 70
+            fsGroup: 70
           containers:
             - name: pg-dump
               image: zuhirbenslama/nars-backup:latest

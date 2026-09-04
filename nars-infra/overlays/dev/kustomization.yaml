@@ -1,0 +1,14 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Development overlay — base plus the dev-only local ingresses.
+# The base itself carries ASPNETCORE_ENVIRONMENT=Development and no TLS
+# mTLS requirement semantics for local ports; this overlay adds the
+# hostless /api, /login, /health (API) and SPA catch-all (frontend)
+# ingresses used when port-forwarding ingress-nginx to localhost.
+#
+#   kubectl kustomize nars-infra/overlays/dev | kubectl apply -f -
+#   make kustomize-apply             # DEPLOY_ENV=dev (default) uses this
+resources:
+  - ../../k8s
+  - ../../k8s/ingress-local

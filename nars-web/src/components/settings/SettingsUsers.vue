@@ -435,6 +435,10 @@ async function submit() {
         showToast(successMsg.value, "success")
         cancelEdit()
         await fetchUsers()
+      } else {
+        const data = (await res.json().catch(() => null)) as { detail?: string } | null
+        errorMsg.value = data?.detail ?? t("su_err_network")
+        showToast(errorMsg.value, "error")
       }
     } else {
       const body: Record<string, unknown> = {
@@ -461,6 +465,10 @@ async function submit() {
         selectedDairaId.value = null
         selectedCommuneId.value = null
         await fetchUsers()
+      } else {
+        const data = (await res.json().catch(() => null)) as { detail?: string } | null
+        errorMsg.value = data?.detail ?? t("su_err_network")
+        showToast(errorMsg.value, "error")
       }
     }
   } catch (err) {

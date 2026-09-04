@@ -255,13 +255,13 @@ classDiagram
         +FindUserByIdAsync(userId, ct) Task~User?~
         +FindUserByUsernameAsync(username, ct) Task~User?~
         +VerifyCredentialsAsync(username, password, maxAttempts, lockoutMinutes) CredentialCheckResult
-        +UpdateManagedUserAsync(callerUserId, callerRole, targetUserId, body) UserUpdateResult
+        +UpdateManagedUserAsync(callerUserId, callerRole, callerCommune?, callerDaira?, callerWilaya?, targetUserId, body) UserUpdateResult
         +DeleteUserAsync(userId, ct) Task~bool~
     }
 
     class IUserCreationService {
         <<interface>>
-        +CreateUserAsync(callerRole, name, email, phone, username, password, targetRole, commune?, daira?, wilaya?) ManagedUserCreationResult
+        +CreateUserAsync(callerRole, callerCommune?, callerDaira?, callerWilaya?, name, email, phone, username, password, targetRole, commune?, daira?, wilaya?) ManagedUserCreationResult
         +ValidateAndCreateUserAsync(name, email, phone, username, password, role, commune?, daira?, wilaya?) UserCreationResult
         +SaveUserAsync(user, ct) Task
     }
@@ -297,7 +297,7 @@ classDiagram
 
     class IScatteredAreaService {
         <<interface>>
-        +RefreshAsync(userId, communeId, ct) Task~bool~
+        +RefreshAsync(userId, communeId, ct) Task~string?~
         +GetLastError(userId, communeId) (DateTimeOffset, string)?
     }
 
@@ -336,10 +336,10 @@ classDiagram
 
     class IDraftFeaturesService {
         <<interface>>
-        +SegmentTileAsync(callerRole, communeId, tileStream, fileName, contentType, bbox, ct) Task~SegmentSummaryResponse~
-        +ListDraftsAsync(callerRole, communeId, featureType?, status, skip, take) PagedResponse~AiDraftFeatureDto~
-        +AcceptDraftAsync(callerRole, userId, draftId, ct) DraftReviewResult
-        +RejectDraftAsync(callerRole, userId, draftId, ct) DraftReviewResult
+        +SegmentTileAsync(callerRole, callerCommune?, callerDaira?, callerWilaya?, communeId, tileStream, fileName, contentType, bbox, ct) Task~SegmentSummaryResponse~
+        +ListDraftsAsync(callerRole, callerCommune?, callerDaira?, callerWilaya?, communeId, featureType?, status, skip, take, ct) PagedResponse~AiDraftFeatureDto~
+        +AcceptDraftAsync(callerRole, callerCommune?, callerDaira?, callerWilaya?, userId, draftId, ct) DraftReviewResult
+        +RejectDraftAsync(callerRole, callerCommune?, callerDaira?, callerWilaya?, userId, draftId, ct) DraftReviewResult
     }
 
     class ISegmentationClient {
@@ -390,6 +390,33 @@ classDiagram
         +UtcNow DateTime
     }
 
+    class ILocationQueryService {
+        <<interface>>
+        +GetCommuneByIdAsync(communeId, ct) Task~Commune?~
+        +GetCommuneBoundaryAsync(communeId, ct) Task~CommuneBoundary?~
+        +GetCommuneWithDairaAsync(communeId, ct) (Commune?, Daira?)
+        +GetLocationChainAsync(communeId, ct) (Commune?, Daira?, Wilaya?)
+        +GetDairaWithWilayaAsync(dairaId, ct) (Daira?, Wilaya?)
+        +GetWilayaAsync(wilayaId, ct) Task~Wilaya?~
+    }
+
+    class IBoundaryService {
+        <<interface>>
+        +GetBoundaryGeoJsonAsync(communeId, ct) Task~string?~
+    }
+
+    class ILocationSearchService {
+        <<interface>>
+        +SearchWilayasAsync(search, skip, take, ct) Task~PagedResponse~WilayaItem~~
+        +SearchDairasAsync(wilayaId, search, skip, take, ct) Task~PagedResponse~DairaItem?~~
+        +SearchCommunesAsync(dairaId, search, skip, take, ct) Task~PagedResponse~CommuneItem?~~
+    }
+
+    class INumberEntrancesService {
+        <<interface>>
+        +NumberAsync(userId, roadId, entranceIds, ct) Task~IReadOnlyList~NumberedEntrance?~~
+    }
+
     %% ===== CONTROLLERS =====
     class ControllerBase {
         <<abstract>>
@@ -436,6 +463,7 @@ classDiagram
         +LoadFeatures(skip, take) Task
         +ClearFeatures(ClearFeaturesRequest) Task
         +GetStats() Task
+        +NumberEntrances(NumberEntrancesRequest) Task
     }
 
     class FeatureCatalogController {
@@ -529,6 +557,7 @@ classDiagram
     LocationsController --> ILocationSearchService
     UsersController --> IUserProfileService
     UsersController --> IRefreshTokenService
+    FeaturesController --> INumberEntrancesService
     DraftFeaturesController --> IDraftFeaturesService
     PagesController --> IPageAuthService
     LogsController --> IErrorLogService
@@ -536,7 +565,7 @@ classDiagram
     %% ===== INFRASTRUCTURE =====
     class FeatureTypeRegistry {
         <<static>>
-        +GetDescriptor(string) FeatureTypeDescriptor
+        +GetDescriptor(string) FeatureTypeDescriptor?
         +GetAllDescriptors() FeatureTypeDescriptor[]
         +IsValidTableName(string) bool
     }

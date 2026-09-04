@@ -250,29 +250,30 @@ sequenceDiagram
     Admin->>AdminUserController: POST /api/admin/users CreateAdminRequest
     Note over AdminUserController: Requires JWT + UserManagementRoles
 
-    AdminUserController->>IUserAuthorizationService: CreateManagedUserAsync(request, creatorId)
-    IUserAuthorizationService->>IUserAuthorizationService: Validate hierarchy
-    Note over IUserAuthorizationService: national_admin -> wilaya_admin<br/>wilaya_admin -> daira_admin<br/>daira_admin -> commune_user
+    AdminUserController->>IUserCreationService: CreateUserAsync(callerRole, callerCommuneId, callerDairaId, callerWilayaId, name, email, phone, username, password, targetRole, communeId, dairaId, wilayaId)
 
+    IUserCreationService->>IUserAuthorizationService: CanCreateRole(callerRole, targetRole)
     alt Invalid hierarchy
-        IUserAuthorizationService-->>AdminUserController: 403 Forbidden
-    else Email already exists
-        IUserAuthorizationService-->>AdminUserController: 409 Conflict
-    else Scope mismatch
-        IUserAuthorizationService-->>AdminUserController: 403 Forbidden
-    else Valid
-        IUserAuthorizationService->>IUserCreationService: CreateUserAsync(request, creatorId)
-        IUserCreationService->>PasswordValidator: Validate(password)
-        alt Weak password
-            IUserCreationService-->>IUserAuthorizationService: 400 Bad Request
-        else Strong password
-            IUserCreationService->>PostgreSQL: Hash password with BCrypt
-            IUserCreationService->>PostgreSQL: INSERT INTO users
-            IUserCreationService-->>IUserAuthorizationService: User
+        IUserAuthorizationService-->>IUserCreationService: false
+        IUserCreationService-->>AdminUserController: 403 Forbidden
+    else Valid hierarchy
+        IUserCreationService->>IUserAuthorizationService: ValidateCreateUserScopeAsync(callerRole, callerDaira?, callerWilaya?, targetRole, commune?, daira?, wilaya?)
+        alt Scope mismatch
+            IUserAuthorizationService-->>IUserCreationService: error
+            IUserCreationService-->>AdminUserController: 403 Forbidden
+        else Scope valid
+            IUserCreationService->>PasswordValidator: Validate(password)
+            alt Weak password
+                IUserCreationService-->>AdminUserController: 400 Bad Request
+            else Strong password
+                IUserCreationService->>PostgreSQL: Hash password with BCrypt
+                IUserCreationService->>PostgreSQL: INSERT INTO users
+                IUserCreationService-->>AdminUserController: User
+            end
         end
-        IUserAuthorizationService-->>AdminUserController: UserInfo
-        AdminUserController-->>Admin: 200 OK {user}
     end
+
+    AdminUserController-->>Admin: 201 Created {user}
 ```
 
 ## 7. Road-Side Determination Flow
@@ -282,27 +283,33 @@ sequenceDiagram
     autonumber
     actor User
     participant SpatialController
-    participant FeatureQueryHelper
-    participant PostgreSQL
+    participant IRoadQueryService
+    participant IEntranceQueryService
     participant GeometryHelper
+    participant PostgreSQL
 
     User->>SpatialController: POST /api/road-side RoadSideRequest
     Note over SpatialController: {roadId, lat, lng}
 
-    SpatialController->>FeatureQueryHelper: Get road geometry by ID
-    FeatureQueryHelper->>PostgreSQL: SELECT geometry FROM roads WHERE id = ?
-    PostgreSQL-->>FeatureQueryHelper: LineString geometry
+    SpatialController->>IRoadQueryService: GetUserRoadByIdAsync(roadId, userId)
+    IRoadQueryService->>PostgreSQL: SELECT geometry FROM roads WHERE id = ? AND user_id = ?
+    PostgreSQL-->>IRoadQueryService: Road with WKT geometry
 
-    SpatialController->>GeometryHelper: FindNearestSegmentIndex(lat, lng, coords)
+    SpatialController->>GeometryHelper: ParseRoadCoordinates(coordsJson)
+    GeometryHelper-->>SpatialController: List<(lat, lng)>
+
+    SpatialController->>GeometryHelper: FindNearestSegmentIndex(lat, lng, roadCoords)
     GeometryHelper-->>SpatialController: nearest index
 
     SpatialController->>GeometryHelper: DetermineSide(lat, lng, segStart, segEnd)
     Note over GeometryHelper: Cross product determines<br/>left or right side of road
     GeometryHelper-->>SpatialController: side (left/right)
 
-    SpatialController->>GeometryHelper: SuggestEntranceNumber(roadId, side)
-    GeometryHelper->>PostgreSQL: SELECT COUNT FROM house_entrances WHERE road_id = ? AND side = ?
-    PostgreSQL-->>GeometryHelper: existing count
+    SpatialController->>IEntranceQueryService: GetUsedEntranceNumbersAsync(userId, roadId, side)
+    IEntranceQueryService->>PostgreSQL: SELECT COUNT FROM house_entrances WHERE road_id = ? AND side = ?
+    PostgreSQL-->>IEntranceQueryService: used numbers
+
+    SpatialController->>GeometryHelper: SuggestEntranceNumber(side, usedNumbers)
     GeometryHelper-->>SpatialController: next number
 
     SpatialController-->>User: 200 OK {side, suggestedNumber}

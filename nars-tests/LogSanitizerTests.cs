@@ -69,9 +69,8 @@ public class LogSanitizerTests
     }
 
     [Fact]
-    public void Sanitize_PreservesNewlineAllowedCharactersOnlyAfterEncoding()
+    public void Sanitize_TruncatesShortPlainStringToMaxLength()
     {
-        // Newlines are stripped before HTML encoding; truncation applies after.
         var result = _sanitizer.Sanitize(new string('z', 50), 10);
         Assert.Equal(10, result.Length);
         Assert.Equal(new string('z', 10), result);

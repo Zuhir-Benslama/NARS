@@ -3,6 +3,7 @@ using NarsApi.Data;
 using NarsApi.Models;
 using NetTopologySuite.Geometries;
 using NetTopologySuite;
+using static NarsApi.Tests.TestData;
 
 namespace NarsApi.Tests;
 
@@ -92,17 +93,36 @@ public static class SeedData
         await db.SaveChangesAsync();
     }
 
+    /// <summary>
+    /// Creates a single pending road draft for <paramref name="communeId"/>.
+    /// Shared by the InMemory unit suite and the PostgreSQL integration suite so
+    /// the two stay in sync. Returns the draft's id.
+    /// </summary>
+    public static async Task<Guid> AddDraftAsync(AppDbContext db, int communeId)
+    {
+        var draft = AiDraftFeature.Create(
+            featureType: AiDraftFeature.TypeRoad,
+            geometryGeoJson: """{"type":"LineString","coordinates":[[36.72,2.96],[36.73,2.97]]}""",
+            confidence: 0.9,
+            communeId: communeId,
+            sourceTileRef: "tile.png",
+            createdAt: FixedUtcNowOffset);
+        db.AiDraftFeatures.Add(draft);
+        await db.SaveChangesAsync();
+        return draft.Id;
+    }
+
     public static async Task<User> CreateUserAsync(AppDbContext db, string role,
         int? communeId = null, int? dairaId = null, int? wilayaId = null,
         string? name = null, Guid? id = null, string? username = null,
-        string? securityStamp = null)
+        string? securityStamp = null, string? email = null)
     {
         var suffix = Guid.NewGuid().ToString("N");
         var user = new User
         {
             Id = id ?? Guid.NewGuid(),
             Name = name ?? $"User {suffix[..8]}",
-            Email = $"{suffix[..12]}@test.com",
+            Email = email ?? $"{suffix[..12]}@test.com",
             Phone = TestData.DefaultPhone,
             Username = username ?? $"user_{suffix[..12]}",
             PasswordHash = DefaultPasswordHash,

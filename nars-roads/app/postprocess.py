@@ -64,7 +64,7 @@ def mask_to_linestrings(
             geometry = mapping(line)
             confidence = float(prob_mask[pts[:, 0], pts[:, 1]].mean())
         except (GEOSException, ValueError, TypeError):
-            logger.debug("Skipping degenerate road edge", exc_info=True)
+            logger.info("Skipping degenerate road edge", exc_info=True)
             continue
         features.append(
             Feature(
@@ -134,7 +134,7 @@ def mask_to_polygons(
         try:
             poly = Polygon(coords).simplify(SIMPLIFY_TOLERANCE, preserve_topology=True)
         except (GEOSException, ValueError, TypeError):
-            logger.debug("Skipping malformed building polygon", exc_info=True)
+            logger.info("Skipping malformed building polygon", exc_info=True)
             continue
 
         if not poly.is_valid or poly.area == 0 or poly.geom_type != "Polygon":

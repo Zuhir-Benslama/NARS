@@ -1,0 +1,19 @@
+---
+# ⚠ REQUIRED EDIT BEFORE PRODUCTION APPLY.
+# The base ships kind cluster defaults (10.244.0.0/16 pod, 10.96.0.0/12 svc).
+# For a real cluster you MUST replace REPLACE_ME_* with that cluster's actual
+# pod/service CIDRs (and optionally restrict /health to monitoring egress
+# IPs instead). Detect them with:
+#   kubectl cluster-info dump | grep -m1 -oP 'cluster-cidr=\K[^ ]+'
+#   kubectl cluster-info dump | grep -m1 -oP 'service-cluster-ip-range=\K[^ ]+'
+#
+# Fails closed: `make secrets-validate` (a prerequisite of kustomize-apply)
+# aborts if the rendered overlay still contains "REPLACE_ME", so applying
+# this unedited is blocked on the deploy path.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nars-api-health
+  namespace: nars
+  annotations:
+    nginx.ingress.kubernetes.io/whitelist-source-range: "REPLACE_ME_POD_CIDR,REPLACE_ME_SVC_CIDR"

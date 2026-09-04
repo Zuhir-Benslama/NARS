@@ -157,10 +157,10 @@ public sealed class ScatteredAreaService(
     /// {lat, lng} ring arrays — the format expected by
     /// <see cref="SqlFragments.PolygonFromData"/>.
     ///
-    /// For Polygon: returns the outer ring.
-    /// For MultiPolygon: returns the outer rings of ALL constituent polygons
-    /// so that spatial queries see the complete scattered geometry, not just
-    /// the first disconnected piece (which is the common case for Algerian communes).
+    /// For Polygon: returns all rings (outer + interior holes).
+    /// For MultiPolygon: returns all rings from ALL constituent polygons
+    /// (outer + interior holes for each), so that spatial queries see the
+    /// complete scattered geometry including holes, not just the outer shells.
     /// </summary>
     private static List<List<object>> ExtractAllRings(JsonElement geo)
     {
@@ -174,13 +174,19 @@ public sealed class ScatteredAreaService(
 
         if (geomType == "Polygon" && geo.TryGetProperty("coordinates", out var coords))
         {
-            result.Add(RingToLatLngList(coords.EnumerateArray().FirstOrDefault()));
+            foreach (var ring in coords.EnumerateArray())
+            {
+                result.Add(RingToLatLngList(ring));
+            }
         }
         else if (geomType == "MultiPolygon" && geo.TryGetProperty("coordinates", out var multiCoords))
         {
             foreach (var polygon in multiCoords.EnumerateArray())
             {
-                result.Add(RingToLatLngList(polygon.EnumerateArray().FirstOrDefault()));
+                foreach (var ring in polygon.EnumerateArray())
+                {
+                    result.Add(RingToLatLngList(ring));
+                }
             }
         }
 

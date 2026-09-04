@@ -41,6 +41,9 @@ export async function destroyMap(): Promise<void> {
   unregisterGeomanEvents()
   unregisterFieldWorkerClick()
   removeBoundaryClickEvents()
-  await disposeGeoman()
+  // map.remove() must run before the async geoman disposal so that
+  // beforeunload (which calls this function synchronously up to the first
+  // await) still removes the WebGL canvas and releases GPU resources.
   ctx.map.remove()
+  await disposeGeoman()
 }

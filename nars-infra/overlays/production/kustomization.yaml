@@ -1,0 +1,21 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Production overlay — hardens the base (nars-infra/k8s) for a real cluster.
+# Lives OUTSIDE k8s/ so it is not part of the base build context (a base
+# cannot contain its own overlays — kustomize rejects that cycle).
+#
+# Dev-only local ingresses are already excluded because the base does not
+# include ingress-local.yaml (that file is added only by the dev overlay),
+# so no delete patches are needed here.
+#
+#   kubectl kustomize nars-infra/overlays/production | kubectl apply -f -
+#   make kustomize-apply IMAGE_TAG=<commit-sha> DEPLOY_ENV=production
+#
+# ⚠ Before applying, replace the REPLACE_ME_* CIDRs in
+# patches/health-ingress.yaml (see that file).
+resources:
+  - ../../k8s
+patches:
+  - path: patches/configmap.yaml
+  - path: patches/health-ingress.yaml

@@ -133,6 +133,38 @@ jobs:
           ROADS_TEST_DOCKER_BUILD_ARGS: --cache-from=type=gha --cache-to=type=gha,mode=max
         run: make roads-test
 
+  # ─── Docs (UML diagram render gate) ────────────────────────
+  # Renders every ```mermaid block under docs/uml/*.md with the same
+  # Playwright-based renderer the Makefile pipeline uses (docs-lint-uml →
+  # render-mermaid-playwright.mjs, mermaid pinned to 11.17.2). A mermaid
+  # syntax error or a moved/renamed diagrams dir fails CI instead of surfacing
+  # only when someone manually regenerates the (gitignored) PDFs.
+  docs:
+    name: Docs (UML render)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: nars-web/package-lock.json
+
+      # playwright is a nars-web devDependency that the renderer resolves via
+      # createRequire(anchor nars-web/package.json). Install it, then fetch the
+      # Firefox browser binary the renderer drives (npm ci installs the npm
+      # package, not the browsers).
+      - run: npm ci
+        working-directory: nars-web
+
+      - name: Install Playwright Firefox browser
+        run: npx playwright install firefox
+        working-directory: nars-web
+
+      - name: Validate UML diagrams render (make docs-lint-uml)
+        run: make docs-lint-uml
+
   # ─── Infra lint (delegates to `make infra-lint`) ─────────────
   # The Makefile owns the gate list and the exact tool versions/digests
   # (see make/quality.mk + the *_IMAGE vars). CI must not hand-roll a second

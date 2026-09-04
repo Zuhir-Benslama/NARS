@@ -91,9 +91,11 @@ async function main() {
 
           console.log(`  Rendering diagram ${i + 1}/${codeBlocks.length}...`);
 
-          // Try jsdelivr first, fall back to unpkg if unavailable
-          const mermaidUrl = `https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs`;
-          const fallbackUrl = `https://unpkg.com/mermaid@11/dist/mermaid.esm.min.mjs`;
+          // Try jsdelivr first, fall back to unpkg if unavailable.
+          // Pinned to 11.17.2 (not the mutable @11 major tag) so a breaking or
+          // vulnerable 11.x release cannot silently change rendered output.
+          const mermaidUrl = `https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.esm.min.mjs`;
+          const fallbackUrl = `https://unpkg.com/mermaid@11.17.2/dist/mermaid.esm.min.mjs`;
 
           const html = `<!DOCTYPE html>
 <html>

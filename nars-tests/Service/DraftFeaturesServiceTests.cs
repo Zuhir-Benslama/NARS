@@ -18,17 +18,8 @@ namespace NarsApi.Tests.Service;
 /// </summary>
 [Collection(PostgreSqlCollection.CollectionName)]
 [Trait("Category", "Service")]
-public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : IAsyncLifetime
+public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : ServiceTestBase(fixture)
 {
-    private readonly NarsDatabaseFixture _fixture = fixture;
-
-    public Task InitializeAsync() => Task.CompletedTask;
-
-    public async Task DisposeAsync()
-    {
-        await _fixture.CleanTablesAsync();
-    }
-
     private static DraftFeaturesService CreateService(IDbContextFactory<AppDbContext> factory) =>
         new(factory,
             Mock.Of<ISegmentationClient>(),
@@ -38,21 +29,7 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : IAsyncLife
     /// <summary>Own context per service: mirrors production (context per request).</summary>
     private DraftFeaturesService CreateIsolatedService()
     {
-        return CreateService(_fixture.CreateDbContextFactory());
-    }
-
-    private static async Task<Guid> AddPendingDraftAsync(AppDbContext db, int communeId)
-    {
-        var draft = AiDraftFeature.Create(
-            featureType: AiDraftFeature.TypeRoad,
-            geometryGeoJson: """{"type":"LineString","coordinates":[[36.72,2.96],[36.73,2.97]]}""",
-            confidence: 0.9,
-            communeId: communeId,
-            sourceTileRef: "tile.png",
-            createdAt: FixedUtcNowOffset);
-        db.AiDraftFeatures.Add(draft);
-        await db.SaveChangesAsync();
-        return draft.Id;
+        return CreateService(Fixture.CreateDbContextFactory());
     }
 
     /// <summary>
@@ -70,18 +47,18 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : IAsyncLife
     [Fact]
     public async Task AcceptDraft_RealConditionalUpdate_TransitionsAndStampsReviewer()
     {
-        await using var seedDb = _fixture.CreateDbContext();
+        await using var seedDb = Fixture.CreateDbContext();
         var (reviewerId, _) = await SeedReviewerAndCommuneAsync(seedDb, CommuneId100);
-        var draftId = await AddPendingDraftAsync(seedDb, CommuneId100);
+        var draftId = await SeedData.AddDraftAsync(seedDb, CommuneId100);
 
-        var svc = CreateService(_fixture.CreateDbContextFactory());
+        var svc = CreateService(Fixture.CreateDbContextFactory());
 
         var result = await svc.AcceptDraftAsync(
             UserRoles.NationalAdmin, null, null, null, reviewerId, draftId, default);
 
         Assert.Equal(DraftReviewStatus.Success, result.Status);
 
-        await using var verifyDb = _fixture.CreateDbContext();
+        await using var verifyDb = Fixture.CreateDbContext();
         var draft = await verifyDb.AiDraftFeatures.AsNoTracking()
             .SingleAsync(f => f.Id == draftId);
         Assert.Equal(AiDraftFeature.StatusAccepted, draft.Status);
@@ -92,18 +69,18 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : IAsyncLife
     [Fact]
     public async Task RejectDraft_RealConditionalUpdate_TransitionsToRejected()
     {
-        await using var seedDb = _fixture.CreateDbContext();
+        await using var seedDb = Fixture.CreateDbContext();
         var (reviewerId, _) = await SeedReviewerAndCommuneAsync(seedDb, CommuneId100);
-        var draftId = await AddPendingDraftAsync(seedDb, CommuneId100);
+        var draftId = await SeedData.AddDraftAsync(seedDb, CommuneId100);
 
-        var svc = CreateService(_fixture.CreateDbContextFactory());
+        var svc = CreateService(Fixture.CreateDbContextFactory());
 
         var result = await svc.RejectDraftAsync(
             UserRoles.WilayaAdmin, null, null, WilayaId1, reviewerId, draftId, default);
 
         Assert.Equal(DraftReviewStatus.Success, result.Status);
 
-        await using var verifyDb = _fixture.CreateDbContext();
+        await using var verifyDb = Fixture.CreateDbContext();
         var draft = await verifyDb.AiDraftFeatures.AsNoTracking()
             .SingleAsync(f => f.Id == draftId);
         Assert.Equal(AiDraftFeature.StatusRejected, draft.Status);
@@ -113,13 +90,13 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : IAsyncLife
     [Fact]
     public async Task AcceptDraft_SecondReview_ReturnsAlreadyReviewedAndKeepsFirstDecision()
     {
-        await using var seedDb = _fixture.CreateDbContext();
+        await using var seedDb = Fixture.CreateDbContext();
         var (firstReviewerId, _) = await SeedReviewerAndCommuneAsync(seedDb, CommuneId100);
         var secondReviewer = await SeedData.CreateUserAsync(seedDb, UserRoles.CommuneUser);
-        var draftId = await AddPendingDraftAsync(seedDb, CommuneId100);
+        var draftId = await SeedData.AddDraftAsync(seedDb, CommuneId100);
 
-        var factory1 = _fixture.CreateDbContextFactory();
-        var factory2 = _fixture.CreateDbContextFactory();
+        var factory1 = Fixture.CreateDbContextFactory();
+        var factory2 = Fixture.CreateDbContextFactory();
 
         var first = await CreateService(factory1).AcceptDraftAsync(
             UserRoles.NationalAdmin, null, null, null, firstReviewerId, draftId, default);
@@ -130,7 +107,7 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : IAsyncLife
         Assert.Equal(DraftReviewStatus.AlreadyReviewed, second.Status);
 
         // The loser must not overwrite the winner's decision.
-        await using var verifyDb = _fixture.CreateDbContext();
+        await using var verifyDb = Fixture.CreateDbContext();
         var draft = await verifyDb.AiDraftFeatures.AsNoTracking()
             .SingleAsync(f => f.Id == draftId);
         Assert.Equal(AiDraftFeature.StatusAccepted, draft.Status);
@@ -140,14 +117,14 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : IAsyncLife
     [Fact]
     public async Task AcceptDraft_ConcurrentReviewers_ExactlyOneWins()
     {
-        await using var seedDb = _fixture.CreateDbContext();
+        await using var seedDb = Fixture.CreateDbContext();
         var (reviewer1Seed, _) = await SeedReviewerAndCommuneAsync(seedDb, CommuneId100);
         var reviewer2 = await SeedData.CreateUserAsync(seedDb, UserRoles.CommuneUser);
         var reviewer2Id = reviewer2.Id;
-        var draftId = await AddPendingDraftAsync(seedDb, CommuneId100);
+        var draftId = await SeedData.AddDraftAsync(seedDb, CommuneId100);
 
-        var factory1 = _fixture.CreateDbContextFactory();
-        var factory2 = _fixture.CreateDbContextFactory();
+        var factory1 = Fixture.CreateDbContextFactory();
+        var factory2 = Fixture.CreateDbContextFactory();
         var svc1 = CreateService(factory1);
         var svc2 = CreateService(factory2);
 
@@ -158,7 +135,7 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : IAsyncLife
         Assert.Single(results, r => r.Status == DraftReviewStatus.Success);
         Assert.Single(results, r => r.Status == DraftReviewStatus.AlreadyReviewed);
 
-        await using var verifyDb = _fixture.CreateDbContext();
+        await using var verifyDb = Fixture.CreateDbContext();
         var draft = await verifyDb.AiDraftFeatures.AsNoTracking()
             .SingleAsync(f => f.Id == draftId);
         Assert.Equal(AiDraftFeature.StatusAccepted, draft.Status);
@@ -169,7 +146,7 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : IAsyncLife
     [Fact]
     public async Task ReviewDraft_UnknownDraft_ReturnsNotFound()
     {
-        var svc = CreateService(_fixture.CreateDbContextFactory());
+        var svc = CreateService(Fixture.CreateDbContextFactory());
 
         var result = await svc.AcceptDraftAsync(
             UserRoles.NationalAdmin, null, null, null, UserId, Guid.NewGuid(), default);

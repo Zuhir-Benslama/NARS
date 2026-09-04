@@ -18,8 +18,10 @@ import os
 import secrets
 import threading
 from contextlib import asynccontextmanager
-from typing import Annotated, Any, TypedDict
+from typing import Annotated, TypedDict
 
+import numpy as np
+import rasterio
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, UploadFile
 
 from app.config import env_int
@@ -84,8 +86,11 @@ MODEL_SPECS: dict[str, ModelSpec] = {
 }
 
 # Built lazily in lifespan so importing this module (tests, tooling, --reload)
-# never forces a multi-hundred-MB weight load.
+# never forces a multi-hundred-MB weight load. Protected by _models_lock for
+# safe concurrent reads during request handling and writes during lifecycle
+# transitions.
 _models: dict[str, SegmentationModel] = {}
+_models_lock = threading.Lock()
 
 # Each inference can peak at ~500MB (25M-px prob maps + windows), so unbounded
 # threadpool concurrency on a 4Gi pod is an OOM risk. A small semaphore caps
@@ -125,13 +130,15 @@ def _load_model(task: str, spec: ModelSpec) -> SegmentationModel | None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    global _models
-    for task, spec in MODEL_SPECS.items():
-        model = _load_model(task, spec)
-        if model is not None:
-            _models[task] = model
+    with _models_lock:
+        for task, spec in MODEL_SPECS.items():
+            model = _load_model(task, spec)
+            if model is not None:
+                _models[task] = model
     yield
-    _models = {}
+    _TIMEOUT_POOL.shutdown(wait=False, cancel_futures=True)
+    with _models_lock:
+        _models.clear()
 
 
 app = FastAPI(
@@ -147,7 +154,8 @@ def _any_task_loaded() -> bool:
     reports unready and fails closed (never serves random predictions), but a
     service with any healthy task can still serve. Returns False only when no
     registered task is usable — the pod must not receive traffic then."""
-    return any(model is not None and model.is_loaded for model in _models.values())
+    with _models_lock:
+        return any(model is not None and model.is_loaded for model in _models.values())
 
 
 def verify_internal_token(
@@ -190,14 +198,16 @@ def _validate_bbox(
 
     An unvalidated box (e.g. min_lon > max_lon, lat > 90) would produce an
     inverted transform in model.predict and silently garbage GeoJSON."""
-    if not (-180.0 <= min_lon <= 180.0):
-        raise HTTPException(status_code=422, detail="min_lon must be in [-180, 180]")
-    if not (-180.0 <= max_lon <= 180.0):
-        raise HTTPException(status_code=422, detail="max_lon must be in [-180, 180]")
-    if not (-90.0 <= min_lat <= 90.0):
-        raise HTTPException(status_code=422, detail="min_lat must be in [-90, 90]")
-    if not (-90.0 <= max_lat <= 90.0):
-        raise HTTPException(status_code=422, detail="max_lat must be in [-90, 90]")
+    for name, value, low, high in [
+        ("min_lon", min_lon, -180.0, 180.0),
+        ("max_lon", max_lon, -180.0, 180.0),
+        ("min_lat", min_lat, -90.0, 90.0),
+        ("max_lat", max_lat, -90.0, 90.0),
+    ]:
+        if not (low <= value <= high):
+            raise HTTPException(
+                status_code=422, detail=f"{name} must be in [{low}, {high}]"
+            )
     if min_lon >= max_lon:
         raise HTTPException(
             status_code=422,
@@ -212,7 +222,7 @@ def _validate_bbox(
 
 def _run_inference(
     model: SegmentationModel, raw: bytes, bbox: tuple[float, float, float, float]
-) -> tuple[Any, Any]:
+) -> tuple[np.ndarray, rasterio.Affine]:
     """Run one inference under the concurrency cap and a wall-clock timeout.
 
     The semaphore caps concurrent inferences so a burst of large tiles can't
@@ -259,14 +269,19 @@ def _segment_task(
     to vector features. Shared by every /segment/<task> endpoint."""
     _validate_bbox(min_lon, min_lat, max_lon, max_lat)
 
-    if tile.content_type not in ("image/tiff", "image/png", "image/jpeg"):
+    if tile.content_type is None or tile.content_type not in (
+        "image/tiff",
+        "image/png",
+        "image/jpeg",
+    ):
         raise HTTPException(
             status_code=415, detail=f"Unsupported content type: {tile.content_type}"
         )
 
     # Cheap readiness gate before buffering the upload: an unready task should
     # reject with 503 without reading (and discarding) up to MAX_TILE_BYTES.
-    model = _models.get(task)
+    with _models_lock:
+        model = _models.get(task)
     if model is None or not model.is_loaded:
         raise HTTPException(status_code=503, detail=f"{task} model not ready")
 

@@ -54,20 +54,6 @@ public class DraftFeaturesUnitTests
         await SeedData.SeedAdminLocationsAsync(db);
     }
 
-    private static async Task<Guid> AddDraftAsync(AppDbContext db, int communeId)
-    {
-        var draft = AiDraftFeature.Create(
-            featureType: AiDraftFeature.TypeRoad,
-            geometryGeoJson: """{"type":"LineString","coordinates":[[36.72,2.96],[36.73,2.97]]}""",
-            confidence: 0.9,
-            communeId: communeId,
-            sourceTileRef: "tile.png",
-            createdAt: FixedUtcNowOffset);
-        db.AiDraftFeatures.Add(draft);
-        await db.SaveChangesAsync();
-        return draft.Id;
-    }
-
     [Fact]
     public async Task ListDrafts_OutOfScopeCommune_ThrowsUnauthorized()
     {
@@ -89,7 +75,7 @@ public class DraftFeaturesUnitTests
         await using (db)
         {
             await SeedAsync(db);
-            var draftId = await AddDraftAsync(db, CommuneId100);
+            var draftId = await SeedData.AddDraftAsync(db, CommuneId100);
             var svc = CreateService(db, factory: factory);
 
             var drafts = await svc.ListDraftsAsync(UserRoles.FieldWorker, CommuneId100, null, null, CommuneId100, null, AiDraftFeature.StatusPending, default);
@@ -163,7 +149,7 @@ public class DraftFeaturesUnitTests
         await using (db)
         {
             await SeedAsync(db);
-            var draftId = await AddDraftAsync(db, CommuneId101);
+            var draftId = await SeedData.AddDraftAsync(db, CommuneId101);
             var svc = CreateService(db, factory: factory);
 
             var result = await svc.AcceptDraftAsync(UserRoles.FieldWorker, CommuneId100, null, null, UserId, draftId, default);
@@ -179,7 +165,7 @@ public class DraftFeaturesUnitTests
         await using (db)
         {
             await SeedAsync(db);
-            var draftId = await AddDraftAsync(db, CommuneId100);
+            var draftId = await SeedData.AddDraftAsync(db, CommuneId100);
             var svc = CreateService(db, factory: factory);
 
             var result = await svc.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, UserId, draftId, default);
@@ -199,7 +185,7 @@ public class DraftFeaturesUnitTests
         await using (db)
         {
             await SeedAsync(db);
-            var draftId = await AddDraftAsync(db, CommuneId100);
+            var draftId = await SeedData.AddDraftAsync(db, CommuneId100);
             var svc = CreateService(db, factory: factory);
 
             var result = await svc.RejectDraftAsync(UserRoles.WilayaAdmin, null, null, WilayaId1, UserId, draftId, default);
@@ -233,7 +219,7 @@ public class DraftFeaturesUnitTests
         await using (db)
         {
             await SeedAsync(db);
-            var draftId = await AddDraftAsync(db, CommuneId100);
+            var draftId = await SeedData.AddDraftAsync(db, CommuneId100);
             var svc = CreateService(db, factory: factory);
 
             await svc.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, UserId, draftId, default);

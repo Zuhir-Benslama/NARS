@@ -46,28 +46,29 @@ sequenceDiagram
     main.ts->>Browser: mount(App)
     Browser->>App.vue: Render
 
-    alt User is commune_user or field_worker
+    alt User is commune_user
         App.vue->>App.vue: Render map UI
         main.ts->>FeatureLoader: loadUserAndCommune()
         FeatureLoader->>ApiModule: GET /api/current_user
         ApiModule-->>FeatureLoader: UserInfo
         FeatureLoader->>AppStore: setUser(UserInfo)
 
-        main.ts->>FeatureLoader: loadFromDatabase()
-        FeatureLoader->>ApiModule: GET /api/features
-        ApiModule-->>FeatureLoader: FeatureResult[]
-        FeatureLoader->>FeatureLoader: Build GeoJSON + populate stores
-
         main.ts->>MapInit: initMap()
         MapInit->>MapInit: Create MapLibre (center Algeria, zoom 5)
         MapInit->>MapInit: Initialize Geoman
         MapInit->>MapInit: Create GeoJSON sources + render layers
         MapInit->>MapInit: Register draw events, geoman events
+        MapInit->>MapInit: refreshLayerVisibility()
+
+        main.ts->>FeatureLoader: loadFromDatabase()
+        FeatureLoader->>ApiModule: GET /api/features
+        ApiModule-->>FeatureLoader: FeatureResult[]
+        FeatureLoader->>FeatureLoader: Build GeoJSON + populate stores
+        FeatureLoader->>FeatureLoader: refreshLayerVisibility()
 
         main.ts->>main.ts: Restore phase from localStorage
-        main.ts->>MapInit: refreshLayerVisibility()
-    else Admin user
-        App.vue->>App.vue: Render AdminDashboard
+    else Admin/other role
+        App.vue->>App.vue: Render AdminDashboard (admin) or FieldPanel (field_worker)
         Note over App.vue: No map initialization
     end
 ```
@@ -131,9 +132,9 @@ sequenceDiagram
             ApiModule-->>DrawSave: 200 OK {id}
 
             DrawSave->>FeaturesStore: add(MaplibreFeature)
-            DrawSave->>LayerStore: addFeature(LayerEntry)
-            DrawSave->>LayerStore: updateSource()
-            LayerStore-->>User: Feature rendered on map
+            DrawSave->>FeaturesStore: updateSource()
+            DrawSave->>LayerStore: addFeature(layer, LayerEntry)
+            FeaturesStore-->>User: Feature rendered on map
         end
     end
 ```
@@ -170,7 +171,7 @@ sequenceDiagram
 
         User->>Geoman: Right-click (commit)
         Geoman->>EditMode: commitEditMode()
-        EditMode->>LayerStore: updateFeature(dbId, newGeometry)
+        EditMode->>LayerStore: updateFeature(layer, dbId, data)
         EditMode->>ApiModule: PUT /api/features/{id}
         ApiModule-->>EditMode: 200 OK
         EditMode->>Geoman: Disable edit mode
@@ -196,7 +197,8 @@ sequenceDiagram
     actor User
     participant PhaseBar
     participant PhaseNav
-    participant UseFeatureValidation
+    participant LayerStore
+    participant useFeatureValidation
     participant ApiModule
     participant AppStore
     participant LocalStorage
@@ -209,28 +211,27 @@ sequenceDiagram
     PhaseNav->>PhaseNav: Check prerequisites
 
     alt Advancing from areas (0->1)
-        PhaseNav->>UseFeatureValidation: isMainUrban
-        UseFeatureValidation->>ApiModule: GET /api/validate/area/main-urban-exists
-        ApiModule-->>UseFeatureValidation: {hasCentralUrban: bool}
-        alt No central urban area
-            UseFeatureValidation-->>PhaseNav: false
+        PhaseNav->>LayerStore: Check $state.areas.length
+        alt No urban area created
             PhaseNav-->>User: Show warning toast
         end
     else Advancing from districts (1->2)
-        PhaseNav->>UseFeatureValidation: checkDistrictCoverage()
-        UseFeatureValidation->>ApiModule: GET /api/validate/districts/coverage
-        ApiModule-->>UseFeatureValidation: {covered: bool}
+        PhaseNav->>useFeatureValidation: checkDistrictCoverage()
+        useFeatureValidation->>ApiModule: GET /api/validate/districts/coverage
+        ApiModule-->>useFeatureValidation: {covered: bool}
         alt Incomplete coverage
-            UseFeatureValidation-->>PhaseNav: false
+            useFeatureValidation-->>PhaseNav: false
             PhaseNav-->>User: Show warning toast
         end
     else Advancing from roads (3->4)
-        PhaseNav->>AppStore: Check counts.roads
+        PhaseNav->>LayerStore: Check $state.roads.length
         alt No roads created
             PhaseNav-->>User: Show warning toast
+        else Roads exist
+            PhaseNav->>PhaseNav: computeAndApplyRoadDirections()
         end
     else Advancing from entrances (4->5)
-        PhaseNav->>AppStore: Check counts.entrances
+        PhaseNav->>LayerStore: Check $state.houseEntrances.length
         alt No entrances created
             PhaseNav-->>User: Show warning toast
         end
@@ -253,18 +254,22 @@ sequenceDiagram
     actor User
     participant Geoman
     participant DrawSave
-    participant UseFeatureValidation
+    participant DrawModal
+    participant ValidationLib
     participant ApiModule
     participant HouseNumbering
     participant LayerStore
+    participant Turf
 
     User->>Geoman: Draw entrance marker near road
     Geoman->>DrawSave: gm:create event
 
-    DrawSave->>UseFeatureValidation: getRoadSide(roadId, lat, lng)
-    UseFeatureValidation->>ApiModule: POST /api/road-side {roadId, lat, lng}
-    ApiModule-->>UseFeatureValidation: {side: 'left'/'right', suggestedNumber}
-    UseFeatureValidation-->>DrawSave: {side, number}
+    DrawSave->>DrawModal: Prepare modal for house_entrance
+    DrawModal->>ValidationLib: getRoadSide(roadDbId, lat, lng)
+    ValidationLib->>ApiModule: POST /api/road-side {roadId, lat, lng}
+    ApiModule-->>ValidationLib: {side: 'left'/'right', suggestedNumber}
+    ValidationLib-->>DrawModal: {side, number}
+    DrawModal-->>DrawSave: Modal result
 
     DrawSave->>DrawSave: Open modal with auto-filled side + number
     DrawSave->>User: Show modal
@@ -272,15 +277,17 @@ sequenceDiagram
     User->>DrawSave: Confirm save
     DrawSave->>ApiModule: POST /api/features {type: 'house_entrance', ...}
     ApiModule-->>DrawSave: 200 OK {id}
-    DrawSave->>LayerStore: addFeature(entrance)
+    DrawSave->>LayerStore: addFeature(layer, entrance)
 
     Note over User: For bulk numbering:
     User->>HouseNumbering: Trigger setHouseNumbers()
-    HouseNumbering->>LayerStore: Get unassigned entrances
-    HouseNumbering->>UseFeatureValidation: Project onto reference road
+    HouseNumbering->>LayerStore: Get entrances for reference road
+    HouseNumbering->>Turf: nearestPointOnLine (project onto road)
+    Turf-->>HouseNumbering: arc-length position
     HouseNumbering->>HouseNumbering: Sort by arc-length, assign odd/even
+    HouseNumbering->>ApiModule: POST /api/features/number-entrances {roadId, entranceIds}
+    ApiModule-->>HouseNumbering: Ordered entrance numbers
     HouseNumbering->>LayerStore: Update each entrance
-    HouseNumbering->>ApiModule: PUT /api/features/{id} for each
 ```
 
 ## 6. Session Refresh Flow (Single-Flight)

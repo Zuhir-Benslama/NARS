@@ -1,5 +1,11 @@
 # Included by the top-level Makefile (GNU make: single instance, shared vars). Target grouping: k8s manifests, TLS, secrets, kustomize deploy.
 
+# Kustomize build root, selected by DEPLOY_ENV (recursive = expanded at use time,
+# after DEPLOY_ENV is set in make/images.mk).
+#   dev (default) → development overlay (base + local dev ingresses)
+#   anything else  → production overlay (Production env, no local ingresses) — fail-closed
+K8S_OVERLAY_DIR = $(if $(filter dev,$(DEPLOY_ENV)),nars-infra/overlays/dev,nars-infra/overlays/production)
+
 
 .PHONY: _check-secrets
 _check-secrets: ## Fail fast if critical secrets are empty (prevents deploying with insecure defaults)
@@ -147,9 +153,9 @@ ca-secret: ca-generate namespace-ensure ## Create mTLS CA secret from k8s/certs/
 
 .PHONY: secrets-validate
 secrets-validate: ## Fail if kustomize output contains placeholder values (REPLACE_ME)
-	@echo "→ Validating kustomize output for placeholder values..."
-	@exit_code=0;
-	output=$$($(KUBECTL) kustomize "$(K8S_DIR)" 2>&1) || exit_code=$$?;
+	@echo "→ Validating kustomize overlay (${K8S_OVERLAY_DIR}) for placeholder values..."
+	exit_code=0;
+	output=$$($(KUBECTL) kustomize "$(K8S_OVERLAY_DIR)" 2>&1) || exit_code=$$?;
 	if [ "$$exit_code" -ne 0 ]; then
 		echo "✖ ERROR: kustomize failed (exit $$exit_code):";
 		echo "$$output" | head -5;
@@ -161,8 +167,9 @@ secrets-validate: ## Fail if kustomize output contains placeholder values (REPLA
 	fi;
 	if echo "$$output" | grep -q "REPLACE_ME"; then
 		echo "✖ ERROR: kustomize output contains REPLACE_ME placeholder values!";
-		echo "  Run 'make secrets-apply' to generate real secrets from .env.";
-		echo "  Or edit the file directly to replace placeholders.";
+		echo "  Hint: for production, edit nars-infra/overlays/production/patches/health-ingress.yaml";
+		echo "  and replace REPLACE_ME_POD_CIDR/REPLACE_ME_SVC_CIDR with your cluster's real CIDRs,";
+		echo "  then run 'make secrets-apply' again.";
 		echo "";
 		echo "$$output" | grep -n "REPLACE_ME";
 		exit 1;
@@ -251,7 +258,7 @@ kustomize-apply: secrets-validate _check-pinned-tag _check-local-ingresses ## Ap
 	@echo "→ Applying kustomization (images: $(DOCKER_ORG)/*:"$(IMAGE_TAG_Q)")..."
 	# Tag rewriting lives in nars-infra/scripts/kustomize-tag-rewrite.awk
 	# (documented + diff-tested against the former inline awk program).
-	@$(KUBECTL) kustomize "$(K8S_DIR)" \
+	@$(KUBECTL) kustomize "$(K8S_OVERLAY_DIR)" \
 		| awk -v org="$(DOCKER_ORG)" -v tag=$(IMAGE_TAG_Q) -v images="$(REGISTRY_IMAGES)" \
 			-f "$(SCRIPTS_DIR)/kustomize-tag-rewrite.awk" \
 		| $(KUBECTL) apply -f -
