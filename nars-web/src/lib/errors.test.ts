@@ -43,8 +43,9 @@ describe("withRetry", () => {
       throw createNetworkError("boom")
     })
     const promise = withRetry(fn, { maxRetries: 3, baseDelay: 1, maxDelay: 10 })
+    const assertion = expect(promise).rejects.toMatchObject({ code: "NETWORK_ERROR" })
     await vi.advanceTimersByTimeAsync(1000)
-    await expect(promise).rejects.toMatchObject({ code: "NETWORK_ERROR" })
+    await assertion
     expect(fn).toHaveBeenCalledTimes(4)
   })
 
