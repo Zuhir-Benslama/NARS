@@ -15,10 +15,12 @@ is only reachable from inside the cluster network.
 import concurrent.futures
 import logging
 import os
+import queue
 import secrets
 import threading
+from collections.abc import Callable
 from contextlib import asynccontextmanager
-from typing import Annotated, TypedDict
+from typing import Annotated, Any, TypedDict, TypeVar
 
 import numpy as np
 import rasterio
@@ -62,6 +64,10 @@ MAX_CONCURRENT_INFERENCES = env_int(
 INFERENCE_TIMEOUT = env_int(
     "NARS_ROADS_INFERENCE_TIMEOUT", 120, minimum=1, maximum=3600
 )
+# How long a request waits for an inference slot before failing with 503.
+# Requests park on this (their upload stays spooled on disk), not on a per-
+# request inference buffer.
+QUEUE_TIMEOUT = env_int("NARS_ROADS_QUEUE_TIMEOUT", 30, minimum=0, maximum=300)
 
 
 # Model registry: feature type -> how to build its model. Each entry is an
@@ -94,13 +100,72 @@ _models_lock = threading.Lock()
 
 # Each inference can peak at ~500MB (25M-px prob maps + windows), so unbounded
 # threadpool concurrency on a 4Gi pod is an OOM risk. A small semaphore caps
-# how many inferences run in parallel; the rest queue in the threadpool.
+# how many inferences run in parallel; the rest wait for a permit (see
+# _segment_task) before their upload is even buffered, so they park disk, not RAM.
 INFERENCE_SEMAPHORE = threading.BoundedSemaphore(MAX_CONCURRENT_INFERENCES)
+
+
+T = TypeVar("T")
+
+
+class _InferenceExecutor:
+    """Bounded pool of daemon worker threads, one slot per worker.
+
+    ThreadPoolExecutor's workers are non-daemon AND joined at interpreter exit
+    by its atexit handler, so a predict abandoned by the 504 timeout path — a
+    running Python thread cannot be interrupted — would stall pod termination
+    for the whole k8s grace period. Daemon threads are not joined on exit:
+    SIGTERM then tears the pod down immediately while the abandoned inference
+    is still running. The executor shuts down with the process instead of
+    having a shutdown step of its own.
+    """
+
+    def __init__(self, max_workers: int, thread_name_prefix: str):
+        self._work: queue.Queue[
+            tuple[concurrent.futures.Future[Any], Callable[[], Any]]
+        ] = queue.Queue()
+        self._threads = [
+            threading.Thread(
+                target=self._run,
+                name=f"{thread_name_prefix}-{i}",
+                daemon=True,
+            )
+            for i in range(max_workers)
+        ]
+        self._started = False
+        self._start_lock = threading.Lock()
+
+    def _run(self) -> None:
+        while True:
+            future, fn = self._work.get()
+            if not future.set_running_or_notify_cancel():
+                continue
+            try:
+                future.set_result(fn())
+            # Any failure of a user-supplied callable must land in the Future
+            # so the awaiting request sees it; the broad catch is deliberate.
+            except Exception as exc:  # noqa: BLE001 - propagate to the future
+                future.set_exception(exc)
+
+    def submit(self, fn: Callable[[], T]) -> concurrent.futures.Future[T]:
+        """Run `fn` on an available worker. Workers are started lazily on
+        first use, so importing this module (tests, tooling, --reload) never
+        spawns threads."""
+        if not self._started:
+            with self._start_lock:
+                if not self._started:
+                    for thread in self._threads:
+                        thread.start()
+                    self._started = True
+        future: concurrent.futures.Future[Any] = concurrent.futures.Future()
+        self._work.put((future, fn))
+        return future
+
 
 # Dedicated executor for wrapping predict() with a wall-clock timeout.
 # max_workers matches the semaphore so at most MAX_CONCURRENT_INFERENCES
-# timeout-watchdog threads exist at any time.
-_TIMEOUT_POOL = concurrent.futures.ThreadPoolExecutor(
+# timeout-watchdog workers exist at any time.
+_TIMEOUT_POOL = _InferenceExecutor(
     max_workers=MAX_CONCURRENT_INFERENCES,
     thread_name_prefix="infer-timeout",
 )
@@ -136,7 +201,6 @@ async def lifespan(_app: FastAPI):
             if model is not None:
                 _models[task] = model
     yield
-    _TIMEOUT_POOL.shutdown(wait=False, cancel_futures=True)
     with _models_lock:
         _models.clear()
 
@@ -223,37 +287,49 @@ def _validate_bbox(
 def _run_inference(
     model: SegmentationModel, raw: bytes, bbox: tuple[float, float, float, float]
 ) -> tuple[np.ndarray, rasterio.Affine]:
-    """Run one inference under the concurrency cap and a wall-clock timeout.
+    """Run one predict on the bounded daemon pool under a wall-clock timeout.
 
-    The semaphore caps concurrent inferences so a burst of large tiles can't
-    OOM the pod; extra requests wait up to 30s here instead of stacking
-    ~500MB each. The submitted predict() runs on the bounded executor so a
-    pathological tile that hangs the model cannot hold a semaphore slot
-    forever — the client gets a 504 on timeout.
+    The submitted predict() runs on a worker the timeout can abandon (see
+    _InferenceExecutor): a pathological tile that hangs the model cannot hold
+    an inference slot forever — the client gets a 504 on timeout and the
+    abandoned thread keeps working until it finishes, then is reaped at
+    process exit along with its daemon owner.
     """
-    acquired = INFERENCE_SEMAPHORE.acquire(timeout=30)
-    if not acquired:
-        raise HTTPException(
-            status_code=503,
-            detail="Server is at capacity; retry after a short delay",
-        )
+    future = _TIMEOUT_POOL.submit(lambda: model.predict(raw, bbox=bbox))
     try:
-        future = _TIMEOUT_POOL.submit(model.predict, raw, bbox=bbox)
-        try:
-            return future.result(timeout=INFERENCE_TIMEOUT)
-        except concurrent.futures.TimeoutError as exc:
-            # cancel() is a no-op once the predict is running (the worker is
-            # already mid-inference), so the abandoned thread keeps working and
-            # the executor reclaims the worker when it finishes. The semaphore
-            # permit is still released by the finally below, so a single stuck
-            # tile degrades to a 504 rather than permanently exhausting a slot.
-            future.cancel()
+        return future.result(timeout=INFERENCE_TIMEOUT)
+    except concurrent.futures.TimeoutError as exc:
+        # cancel() is a no-op once the predict is running (the worker is
+        # already mid-inference), so the abandoned thread keeps working and
+        # frees its stack when it finishes. The inference permit is released
+        # by the caller's finally, so a single stuck tile degrades to a 504
+        # rather than permanently exhausting a slot.
+        future.cancel()
+        raise HTTPException(
+            status_code=504,
+            detail=f"Inference did not complete within {INFERENCE_TIMEOUT}s",
+        ) from exc
+
+
+def _read_upload(tile: UploadFile) -> bytes:
+    """Read the upload under the authoritative size cap.
+
+    Reads at most MAX_TILE_BYTES, so we never buffer an unbounded tile into
+    memory. A file that is empty, or strictly larger than the cap, is
+    rejected before any inference work happens."""
+    raw = tile.file.read(MAX_TILE_BYTES)
+    if not raw:
+        raise HTTPException(status_code=400, detail="Empty file upload")
+    if len(raw) >= MAX_TILE_BYTES:
+        # The upload may be exactly at the limit or larger. Check one more
+        # byte to distinguish the two cases.
+        extra = tile.file.read(1)
+        if extra:
             raise HTTPException(
-                status_code=504,
-                detail=f"Inference did not complete within {INFERENCE_TIMEOUT}s",
-            ) from exc
-    finally:
-        INFERENCE_SEMAPHORE.release()
+                status_code=413,
+                detail=f"Tile exceeds the {MAX_TILE_BYTES} byte limit",
+            )
+    return raw
 
 
 def _segment_task(
@@ -285,25 +361,29 @@ def _segment_task(
     if model is None or not model.is_loaded:
         raise HTTPException(status_code=503, detail=f"{task} model not ready")
 
-    # Authoritative size cap: read up to the limit and reject if the upload
-    # is bigger, so we never buffer an unbounded tile into memory.
-    raw = tile.file.read(MAX_TILE_BYTES)
-    if not raw:
-        raise HTTPException(status_code=400, detail="Empty file upload")
-    if len(raw) >= MAX_TILE_BYTES:
-        # The upload may be exactly at the limit or larger. Check one more
-        # byte to distinguish the two cases.
-        extra = tile.file.read(1)
-        if extra:
-            raise HTTPException(
-                status_code=413,
-                detail=f"Tile exceeds the {MAX_TILE_BYTES} byte limit",
-            )
-
-    try:
-        fg_prob, transform = _run_inference(
-            model, raw, bbox=(min_lon, min_lat, max_lon, max_lat)
+    # Capacity gate before buffering the upload or allocating the prob maps:
+    # at most MAX_CONCURRENT_INFERENCES requests hold a raw buffer + prob maps
+    # at once. Extra requests wait up to QUEUE_TIMEOUT seconds here; their
+    # uploads stay spooled on disk (Starlette), so a flood of large tiles
+    # parks disk, not RAM.
+    if not INFERENCE_SEMAPHORE.acquire(timeout=QUEUE_TIMEOUT):
+        raise HTTPException(
+            status_code=503,
+            detail="Server is at capacity; retry after a short delay",
         )
+    try:
+        # The permit is held across the read as well, so a rejection below
+        # (empty/oversized upload) still releases it in the finally.
+        try:
+            raw = _read_upload(tile)
+            fg_prob, transform = _run_inference(
+                model, raw, bbox=(min_lon, min_lat, max_lon, max_lat)
+            )
+        finally:
+            # Release before postprocessing: the permit covers the buffered
+            # upload + inference, not the vectorization that follows it.
+            INFERENCE_SEMAPHORE.release()
+
         # Only the buildings postprocessor exists today. A future task
         # (e.g. roads) would dispatch to mask_to_linestrings here, so the
         # branch is dropped rather than left unreachable.

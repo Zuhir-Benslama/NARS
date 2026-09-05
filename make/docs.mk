@@ -21,32 +21,32 @@ UML_SRC_DIR      ?= docs/uml
 UML_BUILD_DIR    ?= $(LOG_DIR)/uml-build
 UML_PDF_OUT      ?= docs/pdf/nars-uml-diagrams.pdf
 
-# CI gate: render every ```mermaid block under docs/uml and fail if any diagram
-# does not render (or if the renderer finds no src / no diagrams). Shared with
-# the docs-uml-pdf preflight so a broken diagram breaks the pipeline before it
-# reaches the hand-off PDF regeneration path.
-.PHONY: docs-lint-uml
-docs-lint-uml: ## CI gate: validate all docs/uml/*.md mermaid diagrams render
+# Internal: node must exist and Playwright (Firefox) must be resolvable from
+# nars-web/ (indirectly, since it is a dependency there), else both grooming
+# targets fail fast with a clear message. Also run 'npm ci' in nars-web first.
+.PHONY: _check-playwright
+_check-playwright:
 	@command -v node >/dev/null 2>&1 || { echo "✖ node is not installed"; exit 1; }
 	@if ! node -e "require('playwright')" >/dev/null 2>&1 && \
 	    ! node -e "const {createRequire}=require('node:module');createRequire(require('path').resolve('nars-web/package.json'))('playwright')" >/dev/null 2>&1; then \
 		echo "✖ Playwright (Firefox) is not resolvable from nars-web/ — run 'npm ci' in nars-web first."; \
 		exit 1; \
 	fi
+
+# CI gate: render every ```mermaid block under docs/uml and fail if any diagram
+# does not render (or if the renderer finds no src / no diagrams). Shared with
+# the docs-uml-pdf preflight so a broken diagram breaks the pipeline before it
+# reaches the hand-off PDF regeneration path.
+.PHONY: docs-lint-uml
+docs-lint-uml: _check-playwright ## CI gate: validate all docs/uml/*.md mermaid diagrams render
 	@rm -rf "$(UML_BUILD_DIR)"; mkdir -p "$(UML_BUILD_DIR)"
 	@node nars-infra/scripts/render-mermaid-playwright.mjs \
 		"$(UML_SRC_DIR)" "$(UML_BUILD_DIR)"
 	@echo "✓ All UML diagrams under $(UML_SRC_DIR) rendered successfully"
 
 .PHONY: docs-uml-pdf
-docs-uml-pdf: ## Regenerate docs/pdf/nars-uml-diagrams.pdf from docs/uml/*.md (mermaid -> PNG -> PDF)
+docs-uml-pdf: _check-playwright ## Regenerate docs/pdf/nars-uml-diagrams.pdf from docs/uml/*.md (mermaid -> PNG -> PDF)
 	@echo "→ Rendering UML diagrams to PNG (needs node + Playwright Firefox + mermaid CDN)..."
-	@command -v node >/dev/null 2>&1 || { echo "✖ node is not installed"; exit 1; }
-	@if ! node -e "require('playwright')" >/dev/null 2>&1 && \
-	    ! node -e "const {createRequire}=require('node:module');createRequire(require('path').resolve('nars-web/package.json'))('playwright')" >/dev/null 2>&1; then \
-		echo "✖ Playwright (Firefox) is not resolvable from nars-web/ — run 'npm ci' in nars-web first."; \
-		exit 1; \
-	fi
 	@rm -rf "$(UML_BUILD_DIR)"; mkdir -p "$(UML_BUILD_DIR)"
 	@node nars-infra/scripts/render-mermaid-playwright.mjs \
 		"$(UML_SRC_DIR)" "$(UML_BUILD_DIR)"

@@ -26,6 +26,7 @@ jobs:
     # kubectl + kustomize; pinning keeps their versions (and everything else)
     # reproducible across the matrix.
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -130,6 +131,7 @@ jobs:
   roads-test:
     name: Roads test
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -193,6 +195,7 @@ jobs:
   infra-lint:
     name: Infra lint
     runs-on: ubuntu-24.04
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 

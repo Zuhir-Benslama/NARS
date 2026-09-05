@@ -162,7 +162,7 @@ public class FieldControllerTests
         fieldService.Setup(s => s.GetFeatureOwnerAsync(FeatureTypes.Road, roadId, default))
             .ReturnsAsync((OtherUserId, (int?)1));
         fieldService.Setup(s => s.SubmitInspectionAsync(roadId, It.IsAny<Guid>(), FeatureTypes.Road, "good", It.IsAny<string>(), default))
-            .ReturnsAsync(Guid.NewGuid());
+            .ReturnsAsync(SubmitInspectionResult.Success(Guid.NewGuid()));
         var ctrl = CreateController(fieldService: fieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
@@ -183,6 +183,8 @@ public class FieldControllerTests
             .ReturnsAsync(FeatureTypes.Road);
         fieldService.Setup(s => s.GetFeatureOwnerAsync(FeatureTypes.Road, roadId, default))
             .ReturnsAsync((OtherUserId, (int?)1));
+        fieldService.Setup(s => s.SubmitInspectionAsync(roadId, It.IsAny<Guid>(), FeatureTypes.Road, "invalid_status", It.IsAny<string>(), default))
+            .ReturnsAsync(SubmitInspectionResult.Failure(InspectionMalformedField.Status));
         var ctrl = CreateController(fieldService: fieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 
@@ -221,7 +223,7 @@ public class FieldControllerTests
         fieldService.Setup(s => s.GetFeatureOwnerAsync(FeatureTypes.Road, roadId, default))
             .ReturnsAsync((OtherUserId, (int?)1));
         fieldService.Setup(s => s.SubmitInspectionAsync(roadId, It.IsAny<Guid>(), FeatureTypes.Road, "good", It.IsAny<string>(), default))
-            .ReturnsAsync(Guid.NewGuid());
+            .ReturnsAsync(SubmitInspectionResult.Success(Guid.NewGuid()));
         var ctrl = CreateController(fieldService: fieldService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
 

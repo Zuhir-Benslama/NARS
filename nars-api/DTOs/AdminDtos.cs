@@ -50,15 +50,12 @@ public record UpdateAdminRequest(
 
 public record AdminUserSummary(
     [property: JsonPropertyName("user_id")] string UserId,
-    [property: JsonPropertyName("username")] string Username,
-    [property: JsonPropertyName("name")] string Name,
-    [property: JsonPropertyName("email")] string Email,
-    [property: JsonPropertyName("role")] string Role,
+    string Username, string Name, string Email, string Role,
     [property: JsonPropertyName("phone")] string Phone,
     [property: JsonPropertyName("commune_id")] int? CommuneId,
     [property: JsonPropertyName("daira_id")] int? DairaId,
     [property: JsonPropertyName("wilaya_id")] int? WilayaId
-);
+) : UserCoreInfo(Username, Name, Email, Role);
 
 // ─── MONITORING HIERARCHY ─────────────────────────────────────────────────────
 

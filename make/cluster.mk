@@ -91,8 +91,7 @@ _pre-cluster-down-backup:
 		exit 0;
 	fi;
 	echo "→ Auto-backing up database before cluster teardown...";
-	PASS=$$($(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
-		-o jsonpath='{.data.postgres_password}' 2>/dev/null | base64 -d 2>/dev/null || true);
+	PASS=$$($(_get_db_password_cmd));
 	if [ -z "$$PASS" ]; then
 		echo "  ⚠ Could not read DB password — skipping backup";
 		exit 0;

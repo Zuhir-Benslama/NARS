@@ -81,21 +81,27 @@ public class FieldController(
             return Problem(detail: $"Inspection data is too large (max {_maxFeatureDataSize / 1024} KB).", statusCode: 400);
         }
 
-        var statusError = ValidateInspectionStatus(body.Status);
-        if (statusError is not null)
-        {
-            return statusError;
-        }
-
-        var inspectionId = await fieldService.SubmitInspectionAsync(
+        var inspectionResult = await fieldService.SubmitInspectionAsync(
             featureId, RequiredCurrentUserId, normalizedType, body.Status, rawData, cancellationToken);
+        if (inspectionResult is not { IsSuccess: true })
+        {
+            var message = inspectionResult?.Malformed switch
+            {
+                InspectionMalformedField.Type =>
+                    $"Invalid inspection type. Must be one of: {string.Join(", ", FieldService.ValidInspectionTypes)}",
+                InspectionMalformedField.Status =>
+                    $"Status must be one of: {string.Join(", ", FieldService.ValidInspectionStatuses.Select(s => $"'{s}'"))}.",
+                _ => "Invalid inspection parameters.",
+            };
+            return Problem(detail: message, statusCode: 400);
+        }
 
         logger.LogInformation("[Field] Worker {WorkerId} inspected {Type} {FeatureId} — status: {Status}",
             CurrentUserId, body.Type.ReplaceLineEndings(" "), featureId, body.Status.ReplaceLineEndings(" "));
 
         return StatusCode(201, new CreateResponse(
             Success: true,
-            Id: inspectionId.ToString(),
+            Id: inspectionResult.InspectionId!.Value.ToString(),
             Message: "Inspection saved."
         ));
     }
@@ -221,15 +227,4 @@ public class FieldController(
     private static string ExtractJsonData(JsonNode data) => data is JsonValue value && value.TryGetValue<string>(out var str)
             ? str
             : data.ToJsonString();
-
-    private ObjectResult? ValidateInspectionStatus(string status)
-    {
-        if (!FieldService.ValidInspectionStatuses.Contains(status))
-        {
-            var allowed = string.Join(", ", FieldService.ValidInspectionStatuses.Select(s => $"'{s}'"));
-            return Problem(detail: $"Status must be one of: {allowed}.", statusCode: 400);
-        }
-
-        return null;
-    }
 }

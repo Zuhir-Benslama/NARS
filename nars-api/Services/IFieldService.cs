@@ -18,6 +18,9 @@ public interface IFieldService
     Task<Guid> CreateEntranceAsync(Guid roadId, Guid ownerUserId, Guid creatorUserId, string label, string data, CancellationToken ct = default);
     /// <summary>Looks up a feature registry entry.</summary>
     Task<string?> GetFeatureRegistryTypeAsync(Guid featureId, CancellationToken ct = default);
-    /// <summary>Inspects a feature and persists the inspection record.</summary>
-    Task<Guid> SubmitInspectionAsync(Guid featureId, Guid userId, string type, string status, string data, CancellationToken ct = default);
+    /// <summary>
+    /// Inspects a feature and persists the inspection record. Returns a
+    /// <see cref="SubmitInspectionResult"/> rather than throwing for invalid input.
+    /// </summary>
+    Task<SubmitInspectionResult> SubmitInspectionAsync(Guid featureId, Guid userId, string type, string status, string data, CancellationToken ct = default);
 }

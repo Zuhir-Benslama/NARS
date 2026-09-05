@@ -126,12 +126,12 @@ public class LocationsController(
     // ── GET /api/commune/{id}/boundary ────────────────────────
 
     /// <summary>Returns the GeoJSON boundary geometry for a commune.</summary>
-    [HttpGet("commune/{communeId:int}/boundary")]
+    [HttpGet("commune/{commune_id:int}/boundary")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetCommuneBoundary(int communeId, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetCommuneBoundary(int commune_id, CancellationToken cancellationToken = default)
     {
-        var commune = await locationQuery.GetCommuneByIdAsync(communeId, cancellationToken);
+        var commune = await locationQuery.GetCommuneByIdAsync(commune_id, cancellationToken);
         if (commune is null)
         {
             return Problem(detail: "Commune not found.", statusCode: 404);
@@ -139,7 +139,7 @@ public class LocationsController(
 
         // Raw ADO.NET required — ST_AsGeoJSON returns a text result that
         // EF Core's Npgsql mapper mis-handles under UseSnakeCaseNamingConvention().
-        var geoJson = await boundaryService.GetBoundaryGeoJsonAsync(communeId, cancellationToken);
+        var geoJson = await boundaryService.GetBoundaryGeoJsonAsync(commune_id, cancellationToken);
 
         if (geoJson is null)
         {
@@ -157,7 +157,7 @@ public class LocationsController(
             }
         }
 
-        return Ok(new CommuneBoundaryResponse(communeId, commune.CommuneFr, geoJson));
+        return Ok(new CommuneBoundaryResponse(commune_id, commune.CommuneFr, geoJson));
     }
 
     // ── GET /api/commune/{id}/boundary-debug ──────────────────
@@ -165,17 +165,17 @@ public class LocationsController(
 
     /// <summary>Development-only endpoint for inspecting commune boundary geometry details.</summary>
     [Authorize]
-    [HttpGet("commune/{communeId:int}/boundary-debug")]
+    [HttpGet("commune/{commune_id:int}/boundary-debug")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DebugCommuneBoundary(int communeId, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> DebugCommuneBoundary(int commune_id, CancellationToken cancellationToken = default)
     {
         if (!environment.IsDevelopment())
         {
             return NotFound();
         }
 
-        var boundary = await locationQuery.GetCommuneBoundaryAsync(communeId, cancellationToken);
+        var boundary = await locationQuery.GetCommuneBoundaryAsync(commune_id, cancellationToken);
         if (boundary is null)
         {
             return Problem(detail: "Boundary not found", statusCode: 404);
@@ -183,7 +183,7 @@ public class LocationsController(
 
         return Ok(new
         {
-            communeId,
+            commune_id,
             geometryType = boundary.Geometry.GeometryType,
             numPoints = boundary.Geometry.NumPoints,
             isValid = boundary.Geometry.IsValid,

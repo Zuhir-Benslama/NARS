@@ -13,6 +13,7 @@ sequenceDiagram
     participant ApiModule
     participant MapInit
     participant FeatureLoader
+    participant Geometry
 
     User->>Browser: Navigate to URL
     Browser->>main.ts: Load
@@ -58,15 +59,17 @@ sequenceDiagram
         MapInit->>MapInit: Initialize Geoman
         MapInit->>MapInit: Create GeoJSON sources + render layers
         MapInit->>MapInit: Register draw events, geoman events
-        MapInit->>MapInit: refreshLayerVisibility()
 
         main.ts->>FeatureLoader: loadFromDatabase()
         FeatureLoader->>ApiModule: GET /api/features
         ApiModule-->>FeatureLoader: FeatureResult[]
         FeatureLoader->>FeatureLoader: Build GeoJSON + populate stores
+        FeatureLoader->>FeatureLoader: Restore phase from localStorage
         FeatureLoader->>FeatureLoader: refreshLayerVisibility()
 
-        main.ts->>main.ts: Restore phase from localStorage
+        main.ts->>Geometry: displayCommuneBoundary(communeId)
+        Geometry->>ApiModule: GET /api/commune/{id}/boundary
+        ApiModule-->>Geometry: Boundary GeoJSON (cached for style switches)
     else Admin/other role
         App.vue->>App.vue: Render AdminDashboard (admin) or FieldPanel (field_worker)
         Note over App.vue: No map initialization
@@ -116,8 +119,7 @@ sequenceDiagram
         User->>FeatureModal: Click Save
 
         FeatureModal->>UseFeatureValidation: validate()
-        UseFeatureValidation->>ApiModule: POST /api/validate/...
-        ApiModule-->>UseFeatureValidation: Valid/Invalid
+        Note over UseFeatureValidation: Client-side only — no API call.\nPer-type geometry/structure checks + modal errors.
 
         alt Invalid
             UseFeatureValidation-->>FeatureModal: Show errors
@@ -150,6 +152,7 @@ sequenceDiagram
     participant Geoman
     participant Snapping
     participant LayerStore
+    participant FeaturesStore
     participant ApiModule
     participant Undo
 
@@ -183,9 +186,10 @@ sequenceDiagram
         ContextMenu->>ApiModule: DELETE /api/features/{id}
         ApiModule-->>ContextMenu: 200 OK
         ContextMenu->>Undo: recordDelete(entry, phaseKey)
-        ContextMenu->>LayerStore: removeFeature(dbId)
-        LayerStore->>LayerStore: updateSource()
-        LayerStore-->>User: Feature removed
+        ContextMenu->>FeaturesStore: remove(id)
+        FeaturesStore->>FeaturesStore: updateSource()
+        ContextMenu->>LayerStore: removeFeature(layer, dbId)
+        FeaturesStore-->>User: Feature removed
     end
 ```
 
@@ -198,7 +202,7 @@ sequenceDiagram
     participant PhaseBar
     participant PhaseNav
     participant LayerStore
-    participant useFeatureValidation
+    participant ValidationLib
     participant ApiModule
     participant AppStore
     participant LocalStorage
@@ -216,11 +220,11 @@ sequenceDiagram
             PhaseNav-->>User: Show warning toast
         end
     else Advancing from districts (1->2)
-        PhaseNav->>useFeatureValidation: checkDistrictCoverage()
-        useFeatureValidation->>ApiModule: GET /api/validate/districts/coverage
-        ApiModule-->>useFeatureValidation: {covered: bool}
+        PhaseNav->>ValidationLib: checkDistrictCoverage()
+        ValidationLib->>ApiModule: GET /api/validate/districts/coverage
+        ApiModule-->>ValidationLib: {covered: bool}
         alt Incomplete coverage
-            useFeatureValidation-->>PhaseNav: false
+            ValidationLib-->>PhaseNav: false
             PhaseNav-->>User: Show warning toast
         end
     else Advancing from roads (3->4)

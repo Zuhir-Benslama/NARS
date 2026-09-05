@@ -93,19 +93,8 @@ public class AuthControllerTests
         {
             await SeedLocationDataAsync(db);
             await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
-            await db.Users.AddAsync(new User
-            {
-                Id = Guid.NewGuid(),
-                Name = "Existing",
-                Email = "existing@example.com",
-                Phone = TestData.DefaultPhone,
-                Username = "existinguser",
-                PasswordHash = DefaultPasswordHash,
-                SecurityStamp = User.GenerateSecurityStamp(),
-                Role = UserRoles.CommuneUser,
-                CommuneId = CommuneId1,
-            });
-            await db.SaveChangesAsync();
+            await SeedData.CreateUserAsync(db, UserRoles.CommuneUser,
+                communeId: CommuneId1, name: "Existing", username: "existinguser", email: "existing@example.com");
 
             var controller = CreateSignupController(db, factory);
 
@@ -126,19 +115,8 @@ public class AuthControllerTests
         {
             await SeedLocationDataAsync(db);
             await SeedAdminAsync(db, username: "admin", role: UserRoles.DairaAdmin, dairaId: 1);
-            await db.Users.AddAsync(new User
-            {
-                Id = Guid.NewGuid(),
-                Name = "Existing",
-                Email = "dupe@example.com",
-                Phone = TestData.DefaultPhone,
-                Username = "existinguser",
-                PasswordHash = DefaultPasswordHash,
-                SecurityStamp = User.GenerateSecurityStamp(),
-                Role = UserRoles.CommuneUser,
-                CommuneId = CommuneId1,
-            });
-            await db.SaveChangesAsync();
+            await SeedData.CreateUserAsync(db, UserRoles.CommuneUser,
+                communeId: CommuneId1, name: "Existing", username: "existinguser", email: "dupe@example.com");
 
             var controller = CreateSignupController(db, factory);
 

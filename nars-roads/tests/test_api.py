@@ -18,6 +18,28 @@ AUTH = {"X-Internal-Token": AUTH_TOKEN}
 BBOX = {"min_lon": 0.0, "min_lat": 0.0, "max_lon": 1.0, "max_lat": 1.0}
 
 
+@pytest.fixture(autouse=True)
+def _restore_module_globals():
+    """Snapshot app.main's mutable, process-wide state and restore it after
+    every test. A test that assigns roads._models / INFERENCE_SEMAPHORE / ...
+    directly (instead of via monkeypatch) must not leak its mutation into the
+    next test regardless of execution order."""
+    snapshot = {
+        name: getattr(roads, name)
+        for name in (
+            "_models",
+            "INTERNAL_TOKEN",
+            "MAX_TILE_BYTES",
+            "INFERENCE_TIMEOUT",
+            "QUEUE_TIMEOUT",
+            "INFERENCE_SEMAPHORE",
+        )
+    }
+    yield
+    for name, value in snapshot.items():
+        setattr(roads, name, value)
+
+
 class _StubModel:
     """Minimal stand-in for SegmentationModel: satisfies the readiness gate
     (is_loaded) and lets the endpoint error paths be exercised without torch
@@ -350,6 +372,37 @@ def test_inference_concurrency_is_bounded():
     finally:
         for _ in range(sum(acquired)):
             roads.INFERENCE_SEMAPHORE.release()
+
+
+def test_inference_pool_workers_are_daemon():
+    """Regression for the shutdown-hang finding: workers must be daemon so a
+    predict abandoned by the 504 timeout path never blocks interpreter exit
+    (ThreadPoolExecutor's are non-daemon and joined at process shutdown)."""
+    import threading
+    import time
+
+    from app.main import _InferenceExecutor
+
+    executor = _InferenceExecutor(
+        max_workers=1, thread_name_prefix="infer-daemon-regression"
+    )
+    future = executor.submit(lambda: time.sleep(0.05) or "ran")
+    assert future.result(timeout=5) == "ran"
+
+    workers = [
+        t
+        for t in threading.enumerate()
+        if t.name.startswith("infer-daemon-regression") and t.is_alive()
+    ]
+    assert workers
+    assert all(worker.daemon for worker in workers)
+
+
+def test_queue_timeout_is_configured():
+    # The capacity-gate wait is env-tunable like the other knobs; it must
+    # parse to a sane integer so requests fail fast at capacity, not hang.
+    assert isinstance(roads.QUEUE_TIMEOUT, int)
+    assert 0 <= roads.QUEUE_TIMEOUT < 300
 
 
 def test_segment_returns_503_when_semaphore_exhausted(monkeypatch):

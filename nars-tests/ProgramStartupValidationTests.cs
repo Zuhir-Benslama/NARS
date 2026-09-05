@@ -79,7 +79,8 @@ public class ProgramStartupValidationTests : IDisposable
 
         var factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(b => b.UseSetting("Jwt:SecretKey", string.Empty));
-        ExpectStartupFailure(factory, "Jwt:SecretKey is not configured");
+        var ex = ExpectStartupFailure(factory, "Jwt:SecretKey is not configured");
+        Assert.Contains("NARS_JWT_SECRET", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -142,6 +143,7 @@ public class ProgramStartupValidationTests : IDisposable
                 b.UseSetting("AdminSignup:SignupToken", "test-signup-token");
             });
 
-        ExpectStartupFailure(factory, "Unable to connect to the database");
+        var ex = ExpectStartupFailure(factory, "Unable to connect to the database");
+        Assert.Contains("Verify the connection string", ex.Message, StringComparison.Ordinal);
     }
 }

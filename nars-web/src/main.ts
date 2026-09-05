@@ -162,7 +162,7 @@ void (async () => {
         layerStore: useLayerStore(),
       } satisfies TestStores,
       writable: false,
-      configurable: import.meta.env.DEV,
+      configurable: true,
     })
   }
 

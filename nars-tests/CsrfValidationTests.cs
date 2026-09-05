@@ -11,36 +11,75 @@ public class CsrfValidationTests
     [InlineData("HEAD")]
     [InlineData("OPTIONS")]
     [InlineData("TRACE")]
-    public void ShouldValidateCsrf_SafeMethods_ReturnsFalse(string method) =>
-        Assert.False(PipelineExtensions.ShouldValidateCsrf(method, true, true, false, ApiFeaturesPath));
+    public void ShouldValidateCsrfRequest_SafeMethods_ReturnsFalse(string method) =>
+        Assert.False(PipelineExtensions.ShouldValidateCsrfRequest(method, true, true, false, ApiFeaturesPath, out _));
 
     [Fact]
-    public void ShouldValidateCsrf_AnonymousPost_ReturnsFalse() =>
-        Assert.False(PipelineExtensions.ShouldValidateCsrf("POST", false, true, false, ApiFeaturesPath));
+    public void ShouldValidateCsrfRequest_AuthenticatedApiPostInProduction_ReturnsTrue() =>
+        Assert.True(PipelineExtensions.ShouldValidateCsrfRequest("POST", true, true, false, ApiFeaturesPath, out _));
 
     [Fact]
-    public void ShouldValidateCsrf_ApiPostInProduction_ReturnsTrue() =>
-        Assert.True(PipelineExtensions.ShouldValidateCsrf("POST", true, true, false, ApiFeaturesPath));
+    public void ShouldValidateCsrfRequest_AuthenticatedApiDeleteInProduction_ReturnsTrue() =>
+        Assert.True(PipelineExtensions.ShouldValidateCsrfRequest("DELETE", true, true, false, "/api/features/{id}", out _));
 
     [Fact]
-    public void ShouldValidateCsrf_ApiDeleteInProduction_ReturnsTrue() =>
-        Assert.True(PipelineExtensions.ShouldValidateCsrf("DELETE", true, true, false, "/api/features/{id}"));
+    public void ShouldValidateCsrfRequest_AuthenticatedApiPutInProduction_ReturnsTrue() =>
+        Assert.True(PipelineExtensions.ShouldValidateCsrfRequest("PUT", true, true, false, "/api/admin/users/{id}", out _));
 
     [Fact]
-    public void ShouldValidateCsrf_ApiPutInProduction_ReturnsTrue() =>
-        Assert.True(PipelineExtensions.ShouldValidateCsrf("PUT", true, true, false, "/api/admin/users/{id}"));
+    public void ShouldValidateCsrfRequest_AuthenticatedApiPostInDevelopment_ReturnsFalse() =>
+        Assert.False(PipelineExtensions.ShouldValidateCsrfRequest("POST", true, true, true, ApiFeaturesPath, out _));
 
     [Fact]
-    public void ShouldValidateCsrf_ApiPostInDevelopment_ReturnsFalse() =>
-        Assert.False(PipelineExtensions.ShouldValidateCsrf("POST", true, true, true, ApiFeaturesPath));
+    public void ShouldValidateCsrfRequest_AuthenticatedLogsEndpoint_ReturnsFalse() =>
+        Assert.False(PipelineExtensions.ShouldValidateCsrfRequest("POST", true, true, false, ApiLogsPath, out _));
 
     [Fact]
-    public void ShouldValidateCsrf_LogsEndpoint_ReturnsFalse() =>
-        Assert.False(PipelineExtensions.ShouldValidateCsrf("POST", true, true, false, ApiLogsPath));
+    public void ShouldValidateCsrfRequest_PagePostInDevelopment_ReturnsTrue() =>
+        Assert.True(PipelineExtensions.ShouldValidateCsrfRequest("POST", true, false, true, "/some-page", out _));
+
+    // ── Anonymous state-changing API requests (defense-in-depth guard) ───
+
+    [Theory]
+    [InlineData("/api/signin")]
+    [InlineData("/api/refresh")]
+    [InlineData("/api/admin/authorized-signup")]
+    [InlineData("/api/signup")]
+    public void ShouldValidateCsrfRequest_AnonymousAllowedPath_NotRejected(string path)
+    {
+        Assert.False(PipelineExtensions.ShouldValidateCsrfRequest("POST", false, true, false, path, out var rejected));
+        Assert.False(rejected);
+    }
 
     [Fact]
-    public void ShouldValidateCsrf_PagePostInDevelopment_ReturnsTrue() =>
-        Assert.True(PipelineExtensions.ShouldValidateCsrf("POST", true, false, true, "/some-page"));
+    public void ShouldValidateCsrfRequest_AnonymousApiPost_FlaggedForRejection()
+    {
+        Assert.False(PipelineExtensions.ShouldValidateCsrfRequest("POST", false, true, false, ApiFeaturesPath, out var rejected));
+        Assert.True(rejected);
+    }
+
+    [Fact]
+    public void ShouldValidateCsrfRequest_AnonymousNonApiPost_NotFlaggedForRejection()
+    {
+        Assert.False(PipelineExtensions.ShouldValidateCsrfRequest("POST", false, false, true, "/some-page", out var rejected));
+        Assert.False(rejected);
+    }
+
+    [Fact]
+    public void ShouldValidateCsrfRequest_AnonymousApiGet_NotFlaggedForRejection()
+    {
+        Assert.False(PipelineExtensions.ShouldValidateCsrfRequest("GET", false, true, false, ApiFeaturesPath, out var rejected));
+        Assert.False(rejected);
+    }
+
+    [Fact]
+    public void IsAnonymousMutatingApiPath_AllowlistedPaths()
+    {
+        Assert.True(PipelineExtensions.IsAnonymousMutatingApiPath("/api/signin"));
+        Assert.True(PipelineExtensions.IsAnonymousMutatingApiPath("/api/admin/authorized-signup"));
+        Assert.False(PipelineExtensions.IsAnonymousMutatingApiPath("/api/features"));
+        Assert.False(PipelineExtensions.IsAnonymousMutatingApiPath("/api/features/123"));
+    }
 
     // ── Origin validation (login CSRF defense) ──────────────────────────
 

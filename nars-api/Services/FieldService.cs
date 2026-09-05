@@ -8,6 +8,29 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
+/// <summary>
+/// Outcome of <see cref="IFieldService.SubmitInspectionAsync"/>. Follows the
+/// result-object pattern used by the other services (FieldService was the only
+/// one that still threw <see cref="ArgumentException"/> for invalid client
+/// input, which the global exception handler had to translate into a 400).
+/// </summary>
+public enum InspectionMalformedField
+{
+    Type,
+    Status,
+}
+
+/// <summary>Structured result so controllers map malformed input to a 400.</summary>
+public sealed record SubmitInspectionResult(Guid? InspectionId, InspectionMalformedField? Malformed)
+{
+    public bool IsSuccess => InspectionId.HasValue;
+
+    public static SubmitInspectionResult Success(Guid inspectionId) => new(inspectionId, null);
+
+    public static SubmitInspectionResult Failure(InspectionMalformedField malformed)
+        => new(null, malformed);
+}
+
 public sealed class FieldService(
     IDbContextFactory<AppDbContext> dbFactory,
     IFeatureService featureService,
@@ -182,16 +205,16 @@ public sealed class FieldService(
     public async Task<string?> GetFeatureRegistryTypeAsync(Guid featureId, CancellationToken ct = default)
         => await featureService.GetFeatureTypeAsync(featureId, ct);
 
-    public async Task<Guid> SubmitInspectionAsync(Guid featureId, Guid userId, string type, string status, string data, CancellationToken ct = default)
+    public async Task<SubmitInspectionResult> SubmitInspectionAsync(Guid featureId, Guid userId, string type, string status, string data, CancellationToken ct = default)
     {
         if (!ValidInspectionTypes.Contains(type))
         {
-            throw new ArgumentException($"Invalid inspection type. Must be one of: {string.Join(", ", ValidInspectionTypes)}", nameof(type));
+            return SubmitInspectionResult.Failure(InspectionMalformedField.Type);
         }
 
         if (!ValidInspectionStatuses.Contains(status))
         {
-            throw new ArgumentException($"Invalid inspection status. Must be one of: {string.Join(", ", ValidInspectionStatuses)}", nameof(status));
+            return SubmitInspectionResult.Failure(InspectionMalformedField.Status);
         }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -208,6 +231,6 @@ public sealed class FieldService(
 
         db.Add(inspection);
         await db.SaveChangesAsync(ct);
-        return inspection.Id;
+        return SubmitInspectionResult.Success(inspection.Id);
     }
 }

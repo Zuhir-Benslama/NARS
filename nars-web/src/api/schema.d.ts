@@ -1711,7 +1711,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  "/api/commune/{communeId}/boundary": {
+  "/api/commune/{commune_id}/boundary": {
     parameters: {
       query?: never
       header?: never
@@ -1723,7 +1723,7 @@ export interface paths {
         query?: never
         header?: never
         path: {
-          communeId: number
+          commune_id: number
         }
         cookie?: never
       }
@@ -1757,7 +1757,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  "/api/commune/{communeId}/boundary-debug": {
+  "/api/commune/{commune_id}/boundary-debug": {
     parameters: {
       query?: never
       header?: never
@@ -1769,7 +1769,7 @@ export interface paths {
         query?: never
         header?: never
         path: {
-          communeId: number
+          commune_id: number
         }
         cookie?: never
       }

@@ -62,12 +62,14 @@ public static class TestData
     public static readonly Guid UserId = new("11111111-1111-1111-1111-111111111111");
 
     // ── Location IDs ───────────────────────────────────────────────────
-    // NOTE: the unit (InMemory) and integration (PostgreSQL) suites deliberately
-    // use DIFFERENT ID namespaces. InMemory suites use CommuneId1/2 (with
-    // SeedData.SeedBasicLocationsAsync), while the integration suites use the
-    // 100/101 namespace (with SeedData.SeedAdminLocationsAsync). This prevents
-    // accidental cross-talk if a test ever mixes the two contexts. Keep them
-    // distinct on purpose rather than "fixing" them to be equal.
+    // NOTE: suites deliberately use DIFFERENT ID namespaces and must not mix
+    // them. The bulk of unit AND integration suites (controller auth flows,
+    // features, field, stats, validation, spatial, user profile) seed via
+    // SeedData.SeedBasicLocationsAsync and use CommuneId1/2. Admin-scoped
+    // suites (draft features, commune scope, admin controllers/services,
+    // locations) seed via SeedData.SeedAdminLocationsAsync and use the 100/101
+    // namespace. Keep the two namespaces distinct on purpose so a test that
+    // mixes them fails loudly instead of silently sharing rows.
     public const int CommuneId1 = 1;
     public const int CommuneId2 = 2;
 
@@ -109,6 +111,7 @@ public static class TestData
         string? password = null,
         string? email = null,
         string? name = null,
+        string? phone = null,
         int? communeId = null,
         string role = UserRoles.CommuneUser,
         string adminUsername = "admin")
@@ -117,7 +120,7 @@ public static class TestData
             AdminPassword: DefaultPassword,
             Name: name ?? "Test User",
             Email: email ?? DefaultEmail,
-            Phone: AltPhone,
+            Phone: phone ?? AltPhone,
             Username: username ?? "testuser",
             Password: password ?? AltPassword,
             Role: role,

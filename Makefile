@@ -65,6 +65,13 @@ LOG_DIR             ?= /tmp/nars
 MIGRATIONS_DIR      ?= nars-infra/migrations
 SCRIPTS_DIR         ?= nars-infra/scripts
 POSTGIS_GET_POD_CMD = $(KUBECTL) get pod -n "$(NAMESPACE)" -l app.kubernetes.io/name=postgis -o jsonpath='{.items[0].metadata.name}' 2>/dev/null
+# Read the postgres superuser password from the deployed 'nars-secrets' k8s
+# secret. Expands to the bare pipeline (no assignment); callers bind it with
+# PASS=$$(…) / pass=$$(…) so each site picks its own variable name. Same
+# stdin-privacy convention as _pg_dump_cmd: the value never appears in
+# kubectl's arguments or the process table.
+_get_db_password_cmd = $(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
+	-o jsonpath='{.data.postgres_password}' 2>/dev/null | base64 -d 2>/dev/null || true
 
 # ─── Secrets ──────────────────────────────────────────────────
 # Auto-generate .env with stable secrets if missing.

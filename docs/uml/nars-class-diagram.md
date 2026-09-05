@@ -292,7 +292,7 @@ classDiagram
         +GetRoadOwnerAsync(roadId, ct) (ownerUserId, communeId)?
         +CreateEntranceAsync(roadId, ownerUserId, creatorUserId, label, data, ct) Task~Guid~
         +GetFeatureRegistryTypeAsync(featureId, ct) Task~string?~
-        +SubmitInspectionAsync(featureId, userId, type, status, data, ct) Task~Guid~
+        +SubmitInspectionAsync(featureId, userId, type, status, data, ct) Task~SubmitInspectionResult~
     }
 
     class IScatteredAreaService {
@@ -302,7 +302,7 @@ classDiagram
     }
 
     class ScatteredAreaService {
-        +RefreshAsync(userId, communeId, ct) Task~bool~
+        +RefreshAsync(userId, communeId, ct) Task~string?~
         +GetLastError(userId, communeId) (DateTimeOffset, string)?
     }
     IScatteredAreaService <|.. ScatteredAreaService
@@ -434,10 +434,12 @@ classDiagram
 
     class AuthController {
         +SignIn(SignInRequest) Task
+        +SignUp() Task
         +Logout() Task
         +Refresh() Task
         +CurrentUser() Task
     }
+    note for AuthController "SignUp is a disabled self-registration\nstub that always returns 410 Gone."
 
     class AdminSignupController {
         +AuthorizedAdminSignup(AuthorizedAdminSignupRequest) Task

@@ -31,7 +31,7 @@ infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, ma
 # shellcheck/hadolint/yamllint docker fallbacks before.
 SHELL_SCRIPTS     := $(wildcard nars-infra/scripts/*.sh)
 DOCKERFILES       := $(wildcard nars-infra/docker/Dockerfile.*)
-YAML_FILES        := $(wildcard nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml nars-infra/roads/*.yaml)
+YAML_FILES        := $(wildcard nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml nars-infra/roads/*.yaml .github/workflows/*.yml)
 NODE_SCRIPTS      := $(wildcard nars-infra/scripts/*.mjs)
 MIGRATIONS_SQL    := $(wildcard nars-infra/migrations/*.sql nars-infra/scripts/postgis-migration-baseline.sql)
 # nginx.nars-vite.conf is not a wildcard target — it is the frontend server block
@@ -63,7 +63,7 @@ infra-lint-docker: ## Lint Dockerfiles with hadolint
 	fi
 
 .PHONY: infra-lint-yaml
-infra-lint-yaml: ## Lint k8s YAML with yamllint (uses .yamllint.yaml config)
+infra-lint-yaml: ## Lint k8s + GitHub Actions YAML with yamllint (uses .yamllint.yaml config)
 	@if command -v yamllint >/dev/null 2>&1; then
 		yamllint -c nars-infra/.yamllint.yaml $(YAML_FILES)
 	else
@@ -161,22 +161,24 @@ infra-lint-nginx: ## Validate nginx frontend config with `nginx -t`
 
 
 # Internal: warn when the mutable 'latest' tag is in use (build/push/load).
-.PHONY: _warn-latest-tag
-_warn-latest-tag:
+# Internal: reject IMAGE_TAG containing characters outside the whitelist
+# (alphanumeric, dots, hyphens, underscores) before it is interpolated into a
+# shell command. Shared by the build/push/apply tag gates below.
+.PHONY: _check-tag-syntax
+_check-tag-syntax:
 	@if $(_check_tag_cmd); then \
 		echo '✖ IMAGE_TAG='$(IMAGE_TAG_Q)' contains invalid characters (only alphanumeric, dots, hyphens, underscores allowed)'; \
 		exit 1; \
 	fi
+
+.PHONY: _warn-latest-tag
+_warn-latest-tag: _check-tag-syntax
 	@if echo $(IMAGE_TAG_Q) | grep -qi "^latest$$"; then \
 		echo "  ⚠ IMAGE_TAG=latest — set IMAGE_TAG=<commit-sha> for CI/CD builds"; \
 	fi
 
 .PHONY: _check-pinned-tag
-_check-pinned-tag: ## Fail if deploying with the mutable 'latest' tag outside local dev
-	@if $(_check_tag_cmd); then \
-		echo '✖ IMAGE_TAG='$(IMAGE_TAG_Q)' contains invalid characters (only alphanumeric, dots, hyphens, underscores allowed)'; \
-		exit 1; \
-	fi
+_check-pinned-tag: _check-tag-syntax ## Fail if deploying with the mutable 'latest' tag outside local dev
 	@if [ "$(ALLOW_LATEST)" != "1" ] && [ "$(DEPLOY_ENV)" != "dev" ] && echo $(IMAGE_TAG_Q) | grep -qi "^latest$$"; then
 		echo "✖ Refusing to deploy IMAGE_TAG=latest in $(DEPLOY_ENV) — mutable tags break reproducible deployments.";
 		echo "  Set IMAGE_TAG=<commit-sha>, or DEPLOY_ENV=dev, or ALLOW_LATEST=1 to override.";
@@ -184,10 +186,9 @@ _check-pinned-tag: ## Fail if deploying with the mutable 'latest' tag outside lo
 	fi
 
 .PHONY: _check-local-ingresses
-_check-local-ingresses: ## Fail if dev-only local ingresses would be deployed outside local dev
+_check-local-ingresses: $(if $(filter-out dev,$(DEPLOY_ENV)),$(KUSTOMIZE_MANIFEST)) ## Fail if dev-only local ingresses would be deployed outside local dev
 	@if [ "$(DEPLOY_ENV)" != "dev" ]; then
-		output=$$($(KUBECTL) kustomize "$(K8S_OVERLAY_DIR)" 2>&1) || { echo "✖ kubectl kustomize failed — cannot verify local ingresses are absent"; exit 1; };
-		if echo "$$output" | grep -qE "name: nars-(api|frontend)-local"; then
+		if grep -qE "name: nars-(api|frontend)-local" "$(KUSTOMIZE_MANIFEST)"; then
 			echo "✖ Refusing to deploy dev-only local ingresses (nars-api-local / nars-frontend-local) in $(DEPLOY_ENV).";
 			echo "  They expose /api and /login WITHOUT mTLS and match any Host.";
 			echo "  Ensure the overlay used ($(K8S_OVERLAY_DIR)) does not include ingress-local, or set DEPLOY_ENV=dev.";

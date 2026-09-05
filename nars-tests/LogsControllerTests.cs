@@ -63,6 +63,22 @@ public class LogsControllerTests
         return ctrl;
     }
 
+    // Mutable mailbox the capture lambda writes into; tests read the
+    // sanitized/persisted payload from here after SubmitLogs completes.
+    private sealed class ErrorLogCapture
+    {
+        public List<ErrorLog>? Entries { get; set; }
+    }
+
+    private static Mock<IErrorLogService> CreateCapturingLogService(ErrorLogCapture capture)
+    {
+        var mock = new Mock<IErrorLogService>();
+        mock.Setup(s => s.LogBatchAsync(It.IsAny<List<ErrorLog>>(), It.IsAny<CancellationToken>()))
+            .Callback<List<ErrorLog>, CancellationToken>((entries, _) => capture.Entries = entries)
+            .Returns(Task.CompletedTask);
+        return mock;
+    }
+
     // ── SubmitLogs ──────────────────────────────────────────────────────
 
     [Fact]
@@ -154,13 +170,8 @@ public class LogsControllerTests
     [Fact]
     public async Task SubmitLogs_SanitizesFields()
     {
-        List<ErrorLog>? captured = null;
-        var mock = new Mock<IErrorLogService>();
-        mock.Setup(s => s.LogBatchAsync(It.IsAny<List<ErrorLog>>(), It.IsAny<CancellationToken>()))
-            .Callback<List<ErrorLog>, CancellationToken>((entries, _) => captured = entries)
-            .Returns(Task.CompletedTask);
-
-        var ctrl = CreateController(errorLogService: mock.Object, authenticated: false);
+        var capture = new ErrorLogCapture();
+        var ctrl = CreateController(errorLogService: CreateCapturingLogService(capture).Object, authenticated: false);
         var body = new LogBatch(
         [
             new("error", "code\x00with\u0007control", "msg", "ctx\u0001value", "http://test.com/p\u0002q", "PO\u0003ST"),
@@ -168,8 +179,8 @@ public class LogsControllerTests
 
         await ctrl.SubmitLogs(body);
 
-        Assert.NotNull(captured);
-        var entry = Assert.Single(captured!);
+        Assert.NotNull(capture.Entries);
+        var entry = Assert.Single(capture.Entries!);
         Assert.Equal("codewithcontrol", entry.Code);
         Assert.Equal("ctxvalue", entry.Context);
         Assert.Equal("http://test.com/pq", entry.Url);
@@ -194,13 +205,8 @@ public class LogsControllerTests
     [Fact]
     public async Task SubmitLogs_EncodesHtmlInMessageAndContext()
     {
-        List<ErrorLog>? captured = null;
-        var mock = new Mock<IErrorLogService>();
-        mock.Setup(s => s.LogBatchAsync(It.IsAny<List<ErrorLog>>(), It.IsAny<CancellationToken>()))
-            .Callback<List<ErrorLog>, CancellationToken>((entries, _) => captured = entries)
-            .Returns(Task.CompletedTask);
-
-        var ctrl = CreateController(errorLogService: mock.Object);
+        var capture = new ErrorLogCapture();
+        var ctrl = CreateController(errorLogService: CreateCapturingLogService(capture).Object);
         var body = new LogBatch(
         [
             new("error", null, "<script>alert(1)</script>", "<img onerror=alert(1)>", null, null),
@@ -208,8 +214,8 @@ public class LogsControllerTests
 
         await ctrl.SubmitLogs(body);
 
-        Assert.NotNull(captured);
-        var entry = Assert.Single(captured!);
+        Assert.NotNull(capture.Entries);
+        var entry = Assert.Single(capture.Entries!);
         Assert.Equal("&lt;script&gt;alert(1)&lt;/script&gt;", entry.Message);
         Assert.Equal("&lt;img onerror=alert(1)&gt;", entry.Context);
     }
@@ -217,13 +223,8 @@ public class LogsControllerTests
     [Fact]
     public async Task SubmitLogs_EncodesHtmlAfterControlCharStrip()
     {
-        List<ErrorLog>? captured = null;
-        var mock = new Mock<IErrorLogService>();
-        mock.Setup(s => s.LogBatchAsync(It.IsAny<List<ErrorLog>>(), It.IsAny<CancellationToken>()))
-            .Callback<List<ErrorLog>, CancellationToken>((entries, _) => captured = entries)
-            .Returns(Task.CompletedTask);
-
-        var ctrl = CreateController(errorLogService: mock.Object);
+        var capture = new ErrorLogCapture();
+        var ctrl = CreateController(errorLogService: CreateCapturingLogService(capture).Object);
         var body = new LogBatch(
         [
             new("error", null, "msg\u0000<script>", "ctx\u0007<script>", null, null),
@@ -231,8 +232,8 @@ public class LogsControllerTests
 
         await ctrl.SubmitLogs(body);
 
-        Assert.NotNull(captured);
-        var entry = Assert.Single(captured!);
+        Assert.NotNull(capture.Entries);
+        var entry = Assert.Single(capture.Entries!);
         Assert.Equal("msg&lt;script&gt;", entry.Message);
         Assert.Equal("ctx&lt;script&gt;", entry.Context);
     }
@@ -240,13 +241,8 @@ public class LogsControllerTests
     [Fact]
     public async Task SubmitLogs_DefaultLevelIsError()
     {
-        List<ErrorLog>? captured = null;
-        var mock = new Mock<IErrorLogService>();
-        mock.Setup(s => s.LogBatchAsync(It.IsAny<List<ErrorLog>>(), It.IsAny<CancellationToken>()))
-            .Callback<List<ErrorLog>, CancellationToken>((entries, _) => captured = entries)
-            .Returns(Task.CompletedTask);
-
-        var ctrl = CreateController(errorLogService: mock.Object);
+        var capture = new ErrorLogCapture();
+        var ctrl = CreateController(errorLogService: CreateCapturingLogService(capture).Object);
         var body = new LogBatch(
         [
             new(null, null, "no level specified", null, null, null),
@@ -254,20 +250,15 @@ public class LogsControllerTests
 
         await ctrl.SubmitLogs(body);
 
-        Assert.NotNull(captured);
-        Assert.Equal("error", captured![0].Level);
+        Assert.NotNull(capture.Entries);
+        Assert.Equal("error", capture.Entries![0].Level);
     }
 
     [Fact]
     public async Task SubmitLogs_PreservesOriginalLevelCasing()
     {
-        List<ErrorLog>? captured = null;
-        var mock = new Mock<IErrorLogService>();
-        mock.Setup(s => s.LogBatchAsync(It.IsAny<List<ErrorLog>>(), It.IsAny<CancellationToken>()))
-            .Callback<List<ErrorLog>, CancellationToken>((entries, _) => captured = entries)
-            .Returns(Task.CompletedTask);
-
-        var ctrl = CreateController(errorLogService: mock.Object);
+        var capture = new ErrorLogCapture();
+        var ctrl = CreateController(errorLogService: CreateCapturingLogService(capture).Object);
         var body = new LogBatch(
         [
             new("ERROR", null, "upper case level", null, null, null),
@@ -275,7 +266,7 @@ public class LogsControllerTests
 
         await ctrl.SubmitLogs(body);
 
-        Assert.NotNull(captured);
-        Assert.Equal("ERROR", captured![0].Level);
+        Assert.NotNull(capture.Entries);
+        Assert.Equal("ERROR", capture.Entries![0].Level);
     }
 }

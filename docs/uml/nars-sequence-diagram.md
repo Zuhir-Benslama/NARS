@@ -209,15 +209,17 @@ sequenceDiagram
     autonumber
     actor User
     participant FeaturesController
+    participant IFeatureStatsService
     participant FeatureQueryHelper
     participant FeatureTypeRegistry
     participant PostgreSQL
     participant SqlFragments
 
-    User->>FeaturesController: GET /api/features
-    FeaturesController->>FeaturesController: Get CurrentUserId
+    User->>FeaturesController: GET /api/features?skip=&take=
+    FeaturesController->>FeaturesController: Get CurrentUserId + clamp pagination
 
-    FeaturesController->>FeatureQueryHelper: LoadFeaturesAsync(userId)
+    FeaturesController->>IFeatureStatsService: LoadAllFeaturesAsync(userId, skip, take, ct)
+    IFeatureStatsService->>FeatureQueryHelper: LoadAllFeaturesAsync(conn, userId, skip, take, ct)
 
     FeatureQueryHelper->>FeatureTypeRegistry: GetAllDescriptors()
     FeatureTypeRegistry-->>FeatureQueryHelper: List~FeatureTypeDescriptor~
@@ -229,10 +231,11 @@ sequenceDiagram
     FeatureQueryHelper->>PostgreSQL: Execute UNION ALL query
     PostgreSQL-->>FeatureQueryHelper: Raw feature rows
 
-    FeatureQueryHelper->>FeatureQueryHelper: Map rows to DTOs
-    FeatureQueryHelper-->>FeaturesController: List~FeatureDto~
+    FeatureQueryHelper->>FeatureQueryHelper: Map rows to FeatureResult DTOs
+    FeatureQueryHelper-->>IFeatureStatsService: (features, totalCount)
+    IFeatureStatsService-->>FeaturesController: (features, totalCount)
 
-    FeaturesController-->>User: 200 OK {features: [...]}
+    FeaturesController-->>User: 200 OK {features: [...], count}
 ```
 
 ## 6. Admin User Creation Flow

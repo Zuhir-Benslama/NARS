@@ -7,8 +7,7 @@ db-get-pod: ## Get the postgis pod name
 
 .PHONY: db-get-password
 db-get-password: ## Get the postgis password from k8s secret (stderr only, non-CI safe)
-	@pass=$$($(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
-		-o jsonpath='{.data.postgres_password}' 2>/dev/null | base64 -d 2>/dev/null || true)
+	@pass=$$($(_get_db_password_cmd))
 	@if [ -z "$$pass" ]; then
 		echo "⚠ No postgis password found in secret 'nars-secrets'" >&2
 	elif [ -t 2 ]; then
@@ -22,8 +21,7 @@ db-get-password: ## Get the postgis password from k8s secret (stderr only, non-C
 db-backup: ## Dump the PostGIS database to a local file
 	@POD=$$($(POSTGIS_GET_POD_CMD) || true)
 	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found in namespace '$(NAMESPACE)'"; exit 1; fi
-	@PASS=$$($(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
-		-o jsonpath='{.data.postgres_password}' 2>/dev/null | base64 -d 2>/dev/null || true)
+	@PASS=$($(_get_db_password_cmd))
 	@if [ -z "$$PASS" ]; then echo "✖ Could not read DB password — is nars-secrets deployed?"; exit 1; fi
 	@echo "→ Backing up database '$(DB_NAME)' from pod $$POD..."
 	@PREFIX=manual
@@ -47,8 +45,7 @@ db-restore: ## Restore a backup. Usage: make db-restore FILE=backup/manual_nars_
 		echo "✖ FILE='$(FILE)' contains unexpected characters";
 		exit 1;
 	fi
-	@PASS=$$($(KUBECTL) get secret nars-secrets -n "$(NAMESPACE)" \
-		-o jsonpath='{.data.postgres_password}' 2>/dev/null | base64 -d 2>/dev/null || true)
+	@PASS=$($(_get_db_password_cmd))
 	@if [ -z "$$PASS" ]; then echo "✖ Could not read DB password — is nars-secrets deployed?"; exit 1; fi
 	@echo "→ Restoring '$(FILE)' into $(DB_NAME)..."
 	@echo "  ⚠ This will OVERWRITE the current database."

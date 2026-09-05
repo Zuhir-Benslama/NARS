@@ -9,6 +9,7 @@ import {
   createTimeoutError,
   createNotFoundError,
   createConflictError,
+  createValidationError,
   withRetry,
   logError,
 } from "../lib/errors"
@@ -127,7 +128,7 @@ async function handleResponse(
       })
       break
     case 422:
-      error = createServerError(`Validation failed: ${message}`, {
+      error = createValidationError(message, {
         ...context,
         status: response.status,
         code,

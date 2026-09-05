@@ -67,7 +67,7 @@ classDiagram
         +canManageUsers
         +communeName
         +cityCenterLatLng
-        +counts (from featuresStore)
+        +counts (from layerStore)
         Actions
         +setUser(UserInfo)
         +setLoading(bool)
@@ -272,6 +272,7 @@ classDiagram
         +destroyMap()
         +setBaseLayer(key)
     }
+    note for MapInit "destroyMap is defined in the map module\nindex (map/index.ts), not in map-init.ts."
 
     class DrawEvents {
         +registerDrawEvents()

@@ -55,42 +55,6 @@ export class NarsError extends Error {
       Error.captureStackTrace(this, NarsError)
     }
   }
-
-  // Get a user-friendly message
-  getUserMessage(): string {
-    switch (this.code) {
-      case ErrorCode.NETWORK:
-        return "Network error. Please check your connection and try again."
-      case ErrorCode.VALIDATION:
-        return "Please check your input and try again."
-      case ErrorCode.AUTH:
-        return "Authentication required. Please log in again."
-      case ErrorCode.NOT_FOUND:
-        return "Feature not found. It may have been deleted."
-      case ErrorCode.SERVER:
-        return "Server error. Please try again later."
-      case ErrorCode.TIMEOUT:
-        return "Request timed out. Please try again."
-      case ErrorCode.PERMISSION:
-        return "You do not have permission to perform this action."
-      case ErrorCode.CONFLICT:
-        return "This resource has been modified by another user. Please refresh."
-      default:
-        return "An unexpected error occurred. Please try again."
-    }
-  }
-
-  // Get technical details for logging
-  getTechnicalDetails(): string {
-    const parts = [`[${this.code}]`, this.message]
-    if (Object.keys(this.context).length > 0) {
-      parts.push(`Context: ${JSON.stringify(this.context)}`)
-    }
-    if (this.cause) {
-      parts.push(`Cause: ${this.cause instanceof Error ? this.cause.message : String(this.cause)}`)
-    }
-    return parts.join(" | ")
-  }
 }
 
 // ─── ERROR FACTORY FUNCTIONS ──────────────────────────────────────────────────
@@ -141,6 +105,14 @@ export function createConflictError(
   cause?: unknown,
 ): NarsError {
   return new NarsError(ErrorCode.CONFLICT, message, context, cause)
+}
+
+export function createValidationError(
+  message: string,
+  context: ErrorContext = {},
+  cause?: unknown,
+): NarsError {
+  return new NarsError(ErrorCode.VALIDATION, message, context, cause)
 }
 
 // ─── RETRY LOGIC ──────────────────────────────────────────────────────────────
@@ -225,7 +197,16 @@ export async function withRetry<T>(
     }
   }
 
-  throw lastError
+  // Defensive: every iteration above returns or throws, so this is only
+  // reachable for pathological RetryOptions (e.g. a negative maxRetries that
+  // skips the loop entirely). Guarantee a typed NarsError rather than the
+  // null-initialized lastError.
+  throw new NarsError(
+    ErrorCode.UNKNOWN,
+    "Retry loop exhausted without producing a result",
+    {},
+    lastError ?? undefined,
+  )
 }
 
 // ─── ERROR LOGGING ────────────────────────────────────────────────────────────
@@ -275,7 +256,7 @@ const USER_MESSAGE_KEYS: Record<ErrorCode, string> = {
 /**
  * Resolve a user-facing i18n key for any thrown value. Returns a generic key for
  * non-NarsError values. Callers translate it via `t()`. Raw server bodies must
- * never be shown to end users — use `getErrorMessage`/`getTechnicalDetails` only
+ * never be shown to end users — use `getErrorMessage` only
  * for logging.
  */
 export function getUserMessageKey(err: unknown): string {

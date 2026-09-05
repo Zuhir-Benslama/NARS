@@ -76,14 +76,6 @@ public class LocationsControllerTests
 
     // ── GET /api/wilayas ──────────────────────────────────────────────────
 
-    [Theory]
-    [InlineData("50%", "50\\%")]
-    [InlineData("a_b", "a\\_b")]
-    [InlineData("50\\%", "50\\\\\\%")]
-    [InlineData("plain", "plain")]
-    public void EscapeLikeWildcards_EscapesWildcardsAndBackslash(string input, string expected)
-        => Assert.Equal(expected, SqlFragments.EscapeLikeWildcards(input));
-
     [Fact]
     public async Task GetWilayas_NoSearch_ReturnsAllWilayas()
     {

@@ -16,6 +16,17 @@ public sealed class UserAuthorizationService(
 {
     // Stable dummy hash so BCrypt always does the full work, even for unknown users.
     // Prevents username enumeration via response-time side-channel.
+    //
+    // DELIBERATE TRADE-OFF (kept): running the full BCrypt cost for unknown
+    // usernames costs ~300ms CPU per attempt, which is a DoS surface for any
+    // request reaching VerifyCredentialsAsync. Making the dummy path cheap (e.g. a
+    // CryptographicOperations.FixedTimeEquals against a constant) would re-open a
+    // ~300ms timing side channel that enumerates registered usernames — the exact
+    // weakness the dummy hash exists to close. The CPU burn is bounded instead by
+    // RateLimitPolicies.Auth (sliding window, default 5 requests / 30s, zero queue)
+    // on the only two anonymous entry points (signin + authorized-signup), and the
+    // signup path requires the X-Admin-Signup header. Do not replace this dummy
+    // verify with a cheap comparison without also rate-limiting the caller harder.
     private const string DummyHash = "$2a$11$BCfJgwy.hTY703/9RBjPo.8UjBrTHh/95zFznkYLiapLvWdf5ISbO";
 
     public bool CanCreateRole(string callerRole, string targetRole) => (callerRole, targetRole) switch

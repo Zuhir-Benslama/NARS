@@ -38,19 +38,16 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : ServiceTe
         var controller = CreateSignupController();
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         controller.ControllerContext.HttpContext.Request.Headers["X-Admin-Signup"] = AdminSignupToken;
-        var result = await controller.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
-            AdminUsername: "daira_admin_1",
-            AdminPassword: DefaultPassword,
-            Name: "Integration Test User",
-            Email: "integration@test.com",
-            Phone: DefaultPhone,
-            Username: "integration_user",
-            Password: DefaultPassword,
-            Role: UserRoles.CommuneUser,
-            CommuneId: 1,
-            DairaId: null,
-            WilayaId: null
-        ), AdminSignupToken);
+        var result = await controller.AuthorizedAdminSignup(
+            ValidAdminSignup(
+                adminUsername: "daira_admin_1",
+                name: "Integration Test User",
+                email: "integration@test.com",
+                phone: DefaultPhone,
+                username: "integration_user",
+                password: DefaultPassword,
+                communeId: 1),
+            AdminSignupToken);
 
         var statusResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, statusResult.StatusCode);
@@ -72,36 +69,30 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : ServiceTe
         var first = CreateSignupController();
         first.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         first.ControllerContext.HttpContext.Request.Headers["X-Admin-Signup"] = AdminSignupToken;
-        await first.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
-            AdminUsername: "daira_admin_1",
-            AdminPassword: DefaultPassword,
-            Name: "User One",
-            Email: "one@test.com",
-            Phone: DefaultPhone,
-            Username: "duplicate_user",
-            Password: DefaultPassword,
-            Role: UserRoles.CommuneUser,
-            CommuneId: 1,
-            DairaId: null,
-            WilayaId: null
-        ), AdminSignupToken);
+        await first.AuthorizedAdminSignup(
+            ValidAdminSignup(
+                adminUsername: "daira_admin_1",
+                name: "User One",
+                email: "one@test.com",
+                phone: DefaultPhone,
+                username: "duplicate_user",
+                password: DefaultPassword,
+                communeId: 1),
+            AdminSignupToken);
 
         var second = CreateSignupController();
         second.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         second.ControllerContext.HttpContext.Request.Headers["X-Admin-Signup"] = AdminSignupToken;
-        var result = await second.AuthorizedAdminSignup(new AuthorizedAdminSignupRequest(
-            AdminUsername: "daira_admin_1",
-            AdminPassword: DefaultPassword,
-            Name: "User Two",
-            Email: "two@test.com",
-            Phone: DefaultPhone,
-            Username: "duplicate_user",
-            Password: DefaultPassword,
-            Role: UserRoles.CommuneUser,
-            CommuneId: 1,
-            DairaId: null,
-            WilayaId: null
-        ), AdminSignupToken);
+        var result = await second.AuthorizedAdminSignup(
+            ValidAdminSignup(
+                adminUsername: "daira_admin_1",
+                name: "User Two",
+                email: "two@test.com",
+                phone: DefaultPhone,
+                username: "duplicate_user",
+                password: DefaultPassword,
+                communeId: 1),
+            AdminSignupToken);
 
         var conflict = Assert.IsType<ObjectResult>(result);
         Assert.Equal(409, conflict.StatusCode);
@@ -128,19 +119,14 @@ public class AuthControllerServiceTests(NarsDatabaseFixture fixture) : ServiceTe
         ctrl2.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         ctrl2.ControllerContext.HttpContext.Request.Headers["X-Admin-Signup"] = TestData.AdminSignupToken;
 
-        var request = new AuthorizedAdminSignupRequest(
-            AdminUsername: "race_admin",
-            AdminPassword: DefaultPassword,
-            Name: "Race User",
-            Email: "race@test.com",
-            Phone: DefaultPhone,
-            Username: "race_user",
-            Password: DefaultPassword,
-            Role: UserRoles.CommuneUser,
-            CommuneId: 1,
-            DairaId: null,
-            WilayaId: null
-        );
+        var request = ValidAdminSignup(
+            adminUsername: "race_admin",
+            name: "Race User",
+            email: "race@test.com",
+            phone: DefaultPhone,
+            username: "race_user",
+            password: DefaultPassword,
+            communeId: 1);
 
         // Fire both concurrently — both pass the SELECT uniqueness check,
         // then one INSERT succeeds while the other hits the unique constraint.

@@ -2043,12 +2043,12 @@
         }
       }
     },
-    "/api/commune/{communeId}/boundary": {
+    "/api/commune/{commune_id}/boundary": {
       "get": {
         "tags": ["Locations"],
         "parameters": [
           {
-            "name": "communeId",
+            "name": "commune_id",
             "in": "path",
             "required": true,
             "schema": {
@@ -2085,12 +2085,12 @@
         }
       }
     },
-    "/api/commune/{communeId}/boundary-debug": {
+    "/api/commune/{commune_id}/boundary-debug": {
       "get": {
         "tags": ["Locations"],
         "parameters": [
           {
-            "name": "communeId",
+            "name": "commune_id",
             "in": "path",
             "required": true,
             "schema": {

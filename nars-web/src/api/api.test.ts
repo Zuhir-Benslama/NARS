@@ -246,7 +246,7 @@ describe("apiFetch", () => {
     [403, "AUTH_ERROR"],
     [404, "NOT_FOUND"],
     [409, "CONFLICT_ERROR"],
-    [422, "SERVER_ERROR"],
+    [422, "VALIDATION_ERROR"],
     [500, "SERVER_ERROR"],
     [503, "SERVER_ERROR"],
   ])("maps HTTP %i to %s", async (status, code) => {

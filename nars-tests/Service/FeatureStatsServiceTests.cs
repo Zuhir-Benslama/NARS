@@ -24,9 +24,9 @@ public class FeatureStatsServiceTests(NarsDatabaseFixture fixture) : ServiceTest
         _userId1 = Guid.NewGuid();
         _userId2 = Guid.NewGuid();
 
-        Db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = _userId1, Layer = FeatureTypes.AreaLayers.CentralUrban, Label = "A1", Data = "{}", CreatedAt = FixedUtcNow });
-        Db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = _userId1, Layer = FeatureTypes.AreaLayers.SecondaryUrban, Label = "A2", Data = "{}", CreatedAt = FixedUtcNow });
-        Db.Roads.Add(new Road { Id = Guid.CreateVersion7(), UserId = _userId1, Layer = FeatureTypes.RoadLayers.Street, Label = "R1", Data = "{}", CreatedAt = FixedUtcNow });
+        Db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = _userId1, Layer = FeatureTypes.AreaLayers.CentralUrban, Label = "A1", Data = """{"label":"A1"}""", CreatedAt = FixedUtcNow });
+        Db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = _userId1, Layer = FeatureTypes.AreaLayers.SecondaryUrban, Label = "A2", Data = """{"label":"A2"}""", CreatedAt = FixedUtcNow });
+        Db.Roads.Add(new Road { Id = Guid.CreateVersion7(), UserId = _userId1, Layer = FeatureTypes.RoadLayers.Street, Label = "R1", Data = """{"label":"R1"}""", CreatedAt = FixedUtcNow });
         Db.Areas.Add(new Area { Id = Guid.CreateVersion7(), UserId = _userId2, Layer = FeatureTypes.AreaLayers.CentralUrban, Label = "A3", Data = "{}", CreatedAt = FixedUtcNow });
         Db.Districts.Add(new District { Id = Guid.CreateVersion7(), UserId = _userId2, Layer = FeatureTypes.DistrictLayers.HousingEstate, Label = "D1", Data = "{}", CreatedAt = FixedUtcNow });
         Db.Districts.Add(new District { Id = Guid.CreateVersion7(), UserId = _userId2, Layer = FeatureTypes.DistrictLayers.DistrictLayer, Label = "D2", Data = "{}", CreatedAt = FixedUtcNow });
@@ -140,7 +140,9 @@ public class FeatureStatsServiceTests(NarsDatabaseFixture fixture) : ServiceTest
 
         foreach (var healthy in features.Where(f => f.Id != corruptId.ToString()))
         {
-            Assert.True(healthy.Data.EnumerateObject().Any() || healthy.Data.ValueKind == JsonValueKind.Object);
+            // Healthy rows must arrive intact (still non-empty data), unlike the
+            // degraded corrupt row asserted above.
+            Assert.NotEmpty(healthy.Data.EnumerateObject());
         }
 
         loggerMock.Verify(

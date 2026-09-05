@@ -151,30 +151,46 @@ ca-secret: ca-generate namespace-ensure ## Create mTLS CA secret from k8s/certs/
 		echo "✓ CA secret created"
 	fi
 
+# Materialized `kubectl kustomize` output shared by the apply gates below.
+# Rendering it once here — instead of in each of secrets-validate,
+# _check-local-ingresses, and the kustomize-apply recipe — cuts kustomize
+# evaluation from up to 3 runs per apply to exactly 1. FORCE regenerates the
+# file on every invocation (the overlay depends on live vars + on-disk
+# kustomization.yaml, so a stale render must never be consumed). The file lives
+# under LOG_DIR so it never pollutes the repo.
+KUSTOMIZE_MANIFEST := $(LOG_DIR)/kustomize-output.yaml
+
+.PHONY: FORCE
+FORCE:
+
+$(KUSTOMIZE_MANIFEST): FORCE
+	@mkdir -p "$(@D)"
+	@output=$$($(KUBECTL) kustomize "$(K8S_OVERLAY_DIR)" 2>&1) || exit_code=$$?
+	@if [ "$${exit_code:-0}" -ne 0 ]; then
+		echo "✖ ERROR: kustomize failed:"
+		echo "$$output" | head -5
+		exit 1
+	fi
+	@if [ -z "$$output" ]; then
+		echo "✖ ERROR: kustomize produced empty output"
+		exit 1
+	fi
+	@printf '%s\n' "$$output" > "$@"
+	@chmod 600 "$@"
+
 .PHONY: secrets-validate
-secrets-validate: ## Fail if kustomize output contains placeholder values (REPLACE_ME)
+secrets-validate: $(KUSTOMIZE_MANIFEST) ## Fail if kustomize output contains placeholder values (REPLACE_ME)
 	@echo "→ Validating kustomize overlay (${K8S_OVERLAY_DIR}) for placeholder values..."
-	exit_code=0;
-	output=$$($(KUBECTL) kustomize "$(K8S_OVERLAY_DIR)" 2>&1) || exit_code=$$?;
-	if [ "$$exit_code" -ne 0 ]; then
-		echo "✖ ERROR: kustomize failed (exit $$exit_code):";
-		echo "$$output" | head -5;
-		exit 1;
-	fi;
-	if [ -z "$$output" ]; then
-		echo "✖ ERROR: kustomize produced empty output";
-		exit 1;
-	fi;
-	if echo "$$output" | grep -q "REPLACE_ME"; then
-		echo "✖ ERROR: kustomize output contains REPLACE_ME placeholder values!";
-		echo "  Hint: for production, edit nars-infra/overlays/production/patches/health-ingress.yaml";
-		echo "  and replace REPLACE_ME_POD_CIDR/REPLACE_ME_SVC_CIDR with your cluster's real CIDRs,";
-		echo "  then run 'make secrets-apply' again.";
-		echo "";
-		echo "$$output" | grep -n "REPLACE_ME";
-		exit 1;
-	fi;
-	echo "✓ No placeholder values found"
+	@if grep -q "REPLACE_ME" "$(KUSTOMIZE_MANIFEST)"; then
+		echo "✖ ERROR: kustomize output contains REPLACE_ME placeholder values!"
+		echo "  Hint: for production, edit $(K8S_OVERLAY_DIR)/patches/health-ingress.yaml"
+		echo "  and replace REPLACE_ME_POD_CIDR/REPLACE_ME_SVC_CIDR with your cluster's real CIDRs,"
+		echo "  then run 'make secrets-apply' again."
+		echo ""
+		grep -n "REPLACE_ME" "$(KUSTOMIZE_MANIFEST)"
+		exit 1
+	fi
+	@echo "✓ No placeholder values found"
 
 .PHONY: secrets-apply
 secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and regcred with generated/variable values
@@ -227,13 +243,9 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 	fi
 
 .PHONY: kustomize-set-image-tag
-kustomize-set-image-tag: ## Persistently pin image tags in kustomization.yaml (manual; kustomize-apply rewrites tags per-run)
+kustomize-set-image-tag: _check-tag-syntax ## Persistently pin image tags in kustomization.yaml (manual; kustomize-apply rewrites tags per-run)
 	@if [ -z "$(IMAGE_TAG)" ]; then
 		echo "✖ IMAGE_TAG is empty — specify a tag (e.g. IMAGE_TAG=abc1234)";
-		exit 1;
-	fi
-	@if $(_check_tag_cmd); then
-		echo '✖ IMAGE_TAG='$(IMAGE_TAG_Q)' contains invalid characters (only alphanumeric, dots, hyphens, underscores allowed)';
 		exit 1;
 	fi
 	@if echo $(IMAGE_TAG_Q) | grep -qi "^latest$$"; then
@@ -258,10 +270,11 @@ kustomize-apply: secrets-validate _check-pinned-tag _check-local-ingresses ## Ap
 	@echo "→ Applying kustomization (images: $(DOCKER_ORG)/*:"$(IMAGE_TAG_Q)")..."
 	# Tag rewriting lives in nars-infra/scripts/kustomize-tag-rewrite.awk
 	# (documented + diff-tested against the former inline awk program).
-	@$(KUBECTL) kustomize "$(K8S_OVERLAY_DIR)" \
-		| awk -v org="$(DOCKER_ORG)" -v tag=$(IMAGE_TAG_Q) -v images="$(REGISTRY_IMAGES)" \
-			-f "$(SCRIPTS_DIR)/kustomize-tag-rewrite.awk" \
-		| $(KUBECTL) apply -f -
+	# Reads the shared render (see $(KUSTOMIZE_MANIFEST) above) instead of
+	# re-running `kubectl kustomize`, which already ran in the gates above.
+	@awk -v org="$(DOCKER_ORG)" -v tag=$(IMAGE_TAG_Q) -v images="$(REGISTRY_IMAGES)" \
+		-f "$(SCRIPTS_DIR)/kustomize-tag-rewrite.awk" < "$(KUSTOMIZE_MANIFEST)" \
+	| $(KUBECTL) apply -f -
 	@echo "✓ Kustomization applied"
 
 	@echo "→ Waiting for postgis..."

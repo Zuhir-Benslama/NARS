@@ -21,7 +21,7 @@ public class JsonHelperTests
     {
         var node = JsonHelper.DeserializeSafe("[1,2,3]");
         Assert.NotNull(node);
-        Assert.True(node!.AsArray().Count == 3);
+        Assert.Equal(3, node!.AsArray().Count);
     }
 
     [Fact]
@@ -44,10 +44,28 @@ public class JsonHelperTests
 
     [Theory]
     [InlineData("")]
+    [InlineData("not json")]
     [InlineData("null")]
     [InlineData("true")]
-    public void DeserializeSafe_EdgeValues_NoThrow(string json)
+    public void DeserializeSafe_EdgeValues_ReturnsExpectedNode(string json)
     {
-        _ = JsonHelper.DeserializeSafe(json);
+        var node = JsonHelper.DeserializeSafe(json);
+
+        if (json == "null")
+        {
+            // JSON null deserializes to a null JsonNode reference, not a node.
+            Assert.Null(node);
+        }
+        else if (json == "true")
+        {
+            Assert.NotNull(node);
+            Assert.Equal(JsonValueKind.True, node!.GetValueKind());
+        }
+        else
+        {
+            // Invalid input degrades to an empty object (documented fallback).
+            Assert.NotNull(node);
+            Assert.Equal(JsonValueKind.Object, node!.GetValueKind());
+        }
     }
 }

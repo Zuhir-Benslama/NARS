@@ -15,7 +15,7 @@
 
 - [x] **N+1 admin overview query** — Replaced 6 sequential DB round-trips in `AdminOverviewService.GetNationalOverviewAsync` with a single CTE query (2 queries total: count + CTE)
 - [x] **Security stamp DB query per request** — Cache the security stamp in distributed cache with short TTL instead of querying DB on every authenticated request (`AuthenticationExtensions.cs:94-103`)
-- [ ] **Dummy BCrypt on every invalid login** — Consider a faster constant-time hash comparison for the dummy path to reduce DoS surface (~300ms CPU per unknown username) (deferred)
+- [x] **Dummy BCrypt on every invalid login** — Deliberately kept: the dummy hash keeps timing uniform for unknown usernames (prevents enumeration via response-time). DoS surface is bounded by the auth rate limiter (5 req / 30s). Trade-off documented in `UserAuthorizationService.cs`
 - [x] **Unbounded IN clauses** — All `Contains` calls are in EF Core LINQ queries; Npgsql already translates to `= ANY(@array)` automatically
 
 ## MEDIUM — Code Duplication
@@ -36,13 +36,13 @@
 
 ## LOW — Inconsistencies
 
-- [ ] **Route param casing** — Normalize `communeId` vs `wilaya_id` to one convention (breaking API change, deferred)
+- [x] **Route param casing** — Normalized to snake_case for path route params (`commune_id`); HTTP-invisible so no breaking change. Updated `openapi.json` + `schema.d.ts`. Note: the `communeId` *query* param on `/api/draft-features` kept camelCase (different convention, frontend-owned)
 - [x] **CSP nonce injection** — Unify `<script>` vs `<script ` replacement patterns in `PagesController.cs` (lines 62, 90)
-- [ ] **Error handling in FieldService** — `SubmitInspectionAsync` throws exceptions while all other services return result objects (already handled by global exception handler, low impact)
-- [ ] **Consolidate commune DTOs** — Merge `CommuneItem`, `CommuneInfo`, `CommuneBoundaryResponse` into a shared base with optional fields (different contexts, not worth merging)
-- [ ] **CSRF for anonymous endpoints** — Add guard that rejects anonymous POST mutations in `PipelineExtensions.cs` instead of silently skipping CSRF (intentional: login/admin-signup need anonymous POST)
+- [x] **Error handling in FieldService** — `SubmitInspectionAsync` now returns `SubmitInspectionResult` (Success/Failure) instead of throwing; `FieldController` maps malformed input to 400 Problem details, removing the last throw-based service
+- [x] **Consolidate commune DTOs** — Extracted shared `GeoItem` base (`id`/`name_fr`/`name_ar`/`latitude`/`longitude`); `WilayaItem`/`DairaItem`/`CommuneItem` derive from it with identical JSON keys. `CommuneInfo` and `CommuneBoundaryResponse` kept as distinct contracts (nullable fields / boundary-specific shape)
+- [x] **CSRF for anonymous endpoints** — Added allowlist guard in `PipelineExtensions.cs`: anonymous state-changing requests to non-allowlisted `/api` paths are rejected with 403 before the anonymous POST can run. Allowlist: `/api/signin`, `/api/refresh`, `/api/admin/authorized-signup`, `/api/signup`
 - [x] **CORS localhost default** — Add startup validation that `Cors:AllowedOrigins` is set in non-development environments
-- [ ] **Duplicate user summary DTOs** — Consolidate `UserInfo` and `AdminUserSummary` into a shared type (different contexts, not worth merging)
+- [x] **Duplicate user summary DTOs** — Extracted shared `UserCoreInfo` (`username`/`name`/`email`/`role`); `UserInfo`, `UserInfoWithLocation`, and `AdminUserSummary` derive from it with identical JSON keys
 - [x] **Refresh token pruner dispose** — Scope disposal already handles DbContext; verified correct
 - [x] **EntranceQueryService side validation** — Validate `side` parameter is "left" or "right" instead of silently defaulting to "right"
 - [x] **Log level fallback** — Log null level as "unknown" instead of silently defaulting to "error" in `LogsController.cs:83`

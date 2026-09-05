@@ -93,25 +93,32 @@ public record CommuneInfo(
     [property: JsonPropertyName("longitude")] double? Longitude
 );
 
-public record UserInfo(
-    [property: JsonPropertyName("id")] string Id,
+/// <summary>
+/// Shared core fields of the user summary DTOs. Declares the JSON key names
+/// once; <see cref="UserInfo"/> and <see cref="AdminUserSummary"/> inherit them
+/// so both serialize the username/name/email/role block identically while each
+/// keeps its own id and context-specific fields.
+/// </summary>
+public record UserCoreInfo(
     [property: JsonPropertyName("username")] string Username,
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("email")] string Email,
-    [property: JsonPropertyName("role")] string Role,
-    [property: JsonPropertyName("commune")] CommuneInfo? Commune = null
+    [property: JsonPropertyName("role")] string Role
 );
+
+public record UserInfo(
+    [property: JsonPropertyName("id")] string Id,
+    string Username, string Name, string Email, string Role,
+    [property: JsonPropertyName("commune")] CommuneInfo? Commune = null
+) : UserCoreInfo(Username, Name, Email, Role);
 
 public record UserInfoWithLocation(
     [property: JsonPropertyName("id")] string Id,
-    [property: JsonPropertyName("username")] string Username,
-    [property: JsonPropertyName("name")] string Name,
-    [property: JsonPropertyName("email")] string Email,
-    [property: JsonPropertyName("role")] string Role,
+    string Username, string Name, string Email, string Role,
     [property: JsonPropertyName("wilaya")] CommuneInfo? Wilaya = null,
     [property: JsonPropertyName("daira")] CommuneInfo? Daira = null,
     [property: JsonPropertyName("commune")] CommuneInfo? Commune = null
-);
+) : UserCoreInfo(Username, Name, Email, Role);
 
 public record SignInResponse(
     [property: JsonPropertyName("success")] bool Success,

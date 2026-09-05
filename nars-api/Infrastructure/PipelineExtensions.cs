@@ -334,12 +334,13 @@ public static class PipelineExtensions
                 }
             }
 
-            if (ShouldValidateCsrf(
+            if (ShouldValidateCsrfRequest(
                     method,
                     isAuthenticated,
                     isApiPath,
                     app.Environment.IsDevelopment(),
-                    ctx.Request.Path))
+                    ctx.Request.Path,
+                    out var rejectedBecauseAnonymousApi))
             {
                 var antiforgery = ctx.RequestServices.GetRequiredService<IAntiforgery>();
                 try { await antiforgery.ValidateRequestAsync(ctx); }
@@ -356,6 +357,24 @@ public static class PipelineExtensions
                     await ctx.Response.WriteAsJsonAsync(problem, JsonOptions);
                     return;
                 }
+            }
+            else if (rejectedBecauseAnonymousApi)
+            {
+                // An unauthenticated state-changing request hit an API route
+                // that is not on the anonymous-mutation allowlist. There is no
+                // antiforgery token to validate (the request carries no auth),
+                // so reject it outright rather than silently letting it through
+                // and relying on the controller to refuse.
+                ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+                var problem = new Microsoft.AspNetCore.Mvc.ProblemDetails
+                {
+                    Detail = "Unauthenticated state-changing request rejected.",
+                    Status = 403,
+                    Title = "Forbidden",
+                    Type = "https://tools.ietf.org/html/rfc7231#section-6.5.3",
+                };
+                await ctx.Response.WriteAsJsonAsync(problem, JsonOptions);
+                return;
             }
             await next();
         });
@@ -409,6 +428,28 @@ public static class PipelineExtensions
     }
 
     /// <summary>
+    /// Anonymous state-changing API endpoints. An unauthenticated request that
+    /// reaches the CSRF middleware has already passed <c>UseAuthorization</c>,
+    /// so it can only target an <c>[AllowAnonymous]</c> controller action. Those
+    /// actions are enumerated here so every other anonymous mutation to /api is
+    /// rejected instead of silently skipping antiforgery validation.
+    /// </summary>
+    internal static readonly string[] AnonymousMutatingApiPaths =
+    [
+        "/api/signin",
+        "/api/refresh",
+        // Authorized admin sign-up carries its own CSRF control (the
+        // X-Admin-Signup custom header, which cross-site forms cannot set).
+        "/api/admin/authorized-signup",
+        // Deprecated self-registration — allowlisted so it still returns the
+        // intentional 410 Gone instead of a misleading 403.
+        "/api/signup",
+    ];
+
+    internal static bool IsAnonymousMutatingApiPath(string path)
+        => AnonymousMutatingApiPaths.Any(p => path.Equals(p, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
     /// Decides whether the CSRF middleware must validate the request's
     /// <c>X-CSRF-Token</c> header. Non-GET requests are only validated when they
     /// are authenticated. API requests are enforced outside Development: in Vite
@@ -417,20 +458,34 @@ public static class PipelineExtensions
     /// would break every state-changing request. <c>/api/logs</c> is exempt
     /// because the SPA flushes logs at unload via <c>sendBeacon()</c>, which
     /// cannot set headers — its CSRF control is the SameSite=Lax session cookie.
+    /// Anonymous state-changing API mutations are never antiforgery-validated
+    /// (there is no token), but any such request whose path is not on
+    /// <see cref="AnonymousMutatingApiPaths"/> is flagged via
+    /// <paramref name="rejectedBecauseAnonymousApi"/> so the middleware rejects it.
     /// </summary>
-    internal static bool ShouldValidateCsrf(
+    internal static bool ShouldValidateCsrfRequest(
         string method,
         bool isAuthenticated,
         bool isApiPath,
         bool isDevelopment,
-        string path)
+        string path,
+        out bool rejectedBecauseAnonymousApi)
     {
+        rejectedBecauseAnonymousApi = false;
         if (method is "GET" or "HEAD" or "OPTIONS" or "TRACE")
         {
             return false;
         }
         if (!isAuthenticated)
         {
+            // Auth/authorization already run before this middleware: an
+            // otherwise-protected endpoint would have returned 401/403 before
+            // reaching here, so an anonymous unsafe /api request can only target
+            // an [AllowAnonymous] action. Reject any that is not allowlisted.
+            if (isApiPath && !IsAnonymousMutatingApiPath(path))
+            {
+                rejectedBecauseAnonymousApi = true;
+            }
             return false;
         }
         if (path.Equals("/api/logs", StringComparison.OrdinalIgnoreCase))

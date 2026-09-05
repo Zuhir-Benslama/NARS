@@ -309,7 +309,8 @@ public class PagesControllerTests
 
         var result = await h.Controller.MapPage();
 
-        Assert.IsType<RedirectResult>(result);
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal(LoginPath, redirect.Url);
     }
 
     [Fact]

@@ -811,6 +811,15 @@ exempt because all auth cookies carry \texttt{SameSite=Lax}, which
 prevents cross-origin \texttt{POST}/\texttt{PUT}/\texttt{DELETE} requests
 from attaching session cookies.
 
+The \texttt{SameSite=Lax} rule alone does not stop unauthenticated
+state-changing requests, whose cookies antiforgery tokens do not cover.
+An origin-checking middleware therefore additionally rejects any
+unsafe-method request under \texttt{/api/} whose \texttt{Origin} header is
+present but matches neither an explicitly allowed origin nor the
+deployment's own origin, returning \texttt{403}; non-browser clients send
+no \texttt{Origin} and are unaffected. Like antiforgery, the check is
+bypassed in the Development environment.
+
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Rate Limiting}
 \label{sec:ratelimit}
@@ -832,7 +841,7 @@ limiters (equivalent to a single segment, $S = 1$).
 \toprule
 \textbf{Policy} & $P$ (permits) & $W$ (window) & $S$ (segments) & \textbf{Scope} \\
 \midrule
-\texttt{auth}      & 5  & 30 s  & 3 & \texttt{POST /api/signin}, \texttt{/signup}, \texttt{/refresh} \\
+\texttt{auth}      & 5  & 30 s  & 3 & \texttt{POST /api/signin}, \texttt{/refresh}, \texttt{/admin/authorized-signup} \\
 \texttt{clear}     & 3  & 10 min & 1 & \texttt{POST /api/features/clear} \\
 \texttt{api}       & 60 & 1 min & 6 & All other authenticated endpoints \\
 \texttt{scattered} & 5  & 5 min & 1 & \texttt{POST /api\allowbreak/areas\allowbreak/refresh\-scattered} \\
@@ -878,7 +887,9 @@ providing a secondary defence layer.
 \Cref{tab:api_endpoints} enumerates the complete REST surface. All
 endpoints under \texttt{/api/} require HTTP cookie authentication (the
 \texttt{access\_token} cookie) except \texttt{/api/signin},
-\texttt{/api/signup}, \texttt{/api/refresh}, and \texttt{/health}.
+\texttt{/api/signup}, \texttt{/api/refresh}, and the anonymous health
+probes \texttt{/api/health} and \texttt{/health} (including their
+\texttt{live}/\texttt{ready} variants).
 
 \begin{table}[H]
 \centering
@@ -889,7 +900,7 @@ endpoints under \texttt{/api/} require HTTP cookie authentication (the
 \textbf{Method} & \textbf{Path} & \textbf{Description} & \textbf{Rate policy} \\
 \midrule
 \multicolumn{4}{l}{\textit{Authentication}} \\
-POST & \texttt{/api/signup}        & Register new user            & \texttt{auth} \\
+POST & \texttt{/api/signup}        & Disabled self-registration stub (always returns 410 Gone) & --- \\
 POST & \texttt{/api/signin}        & Authenticate, issue tokens   & \texttt{auth} \\
 POST & \texttt{/api/logout}        & Revoke refresh token         & \texttt{api}  \\
 POST & \texttt{/api/refresh}       & Rotate refresh token         & \texttt{auth} \\
@@ -945,7 +956,10 @@ POST & \texttt{/api/draft-features/\{id\}/reject} & Reject a draft feature      
 GET  & \texttt{/api/areas/scattered-status}    & Background task error status   & \texttt{api} \\
 POST & \texttt{/api/areas/refresh-scattered}   & Recompute scattered areas      & \texttt{scattered} \\
 POST & \texttt{/api/logs}                      & Client-side error log          & \texttt{logs} \\
-GET  & \texttt{/health}                       & Database connectivity probe   & --- \\
+GET  & \texttt{/health/live}                   & Liveness probe — dependency-free & --- \\
+GET  & \texttt{/health/ready}                  & Readiness probe — DB-aware     & --- \\
+GET  & \texttt{/health}                        & Aggregate up/down (k8s startup probe, external monitoring)  & --- \\
+GET  & \texttt{/api/health}                    & Same aggregate probe under \texttt{/api} & --- \\
 \bottomrule
 \end{tabularx}
 \end{table}
