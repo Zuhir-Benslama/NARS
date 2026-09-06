@@ -12,7 +12,7 @@ test-unit: ## Run only unit tests (no Postgres container)
 .PHONY: test-service
 test-service: ## Run only Postgres-backed service tests (requires Docker for Testcontainers)
 	@docker info >/dev/null 2>&1 || { echo "✖ Docker daemon is not running (required by Testcontainers)"; exit 1; }
-	dotnet test nars-tests/NarsApi.Tests.csproj --filter "Category=Service"
+	dotnet test nars-tests/NarsApi.Tests.csproj --no-restore --filter "Category=Service"
 
 .PHONY: test-coverage
 test-coverage: ## Run unit tests with coverage and enforce thresholds (coverlet.msbuild; no Postgres container)
@@ -35,3 +35,15 @@ roads-test: ## Run the segmentation service's Python test suite in a container
 		--target test \
 		-t "$(DOCKER_ORG)/nars-roads:test" nars-roads/
 	docker run --rm "$(DOCKER_ORG)/nars-roads:test"
+
+# png-to-pdf.py is a host/dev utility: it needs Pillow at runtime anyway, so
+# its tests run against the host interpreter rather than a dedicated image
+# (unlike roads-test, which needs the full model/ML dependency stack).
+# CI supplies the runner deps and calls this target (see ci.yml).
+.PHONY: infra-test-python
+infra-test-python: ## Run nars-infra Python utility tests with pytest (host; requires Pillow + pytest)
+	@if ! python3 -c "import PIL, pytest" >/dev/null 2>&1; then \
+		echo "✖ infra-test-python needs Pillow and pytest (pip install pillow pytest)"; \
+		exit 1; \
+	fi
+	python3 -m pytest nars-infra/scripts/test_png_to_pdf.py

@@ -90,7 +90,7 @@ sequenceDiagram
     RefreshTokenService->>RefreshTokenService: SHA-256 hash the raw token
 
     RefreshTokenService->>PostgreSQL: BEGIN READ COMMITTED
-    RefreshTokenService->>PostgreSQL: SELECT * FROM refresh_tokens WHERE token_hash = ? AND expires_at > now() FOR UPDATE SKIP LOCKED
+    RefreshTokenService->>PostgreSQL: SELECT id FROM refresh_tokens WHERE token_hash=? AND expires_at>now() FOR UPDATE
 
     alt Token not found
         RefreshTokenService-->>AuthController: Invalid or expired
@@ -225,7 +225,7 @@ sequenceDiagram
     FeatureTypeRegistry-->>FeatureQueryHelper: List~FeatureTypeDescriptor~
 
     FeatureQueryHelper->>FeatureQueryHelper: Build UNION ALL query
-    Note over FeatureQueryHelper: SELECT id, layer, label, data, ST_AsText(geometry)<br/>FROM areas WHERE user_id = ?<br/>UNION ALL<br/>FROM roads WHERE user_id = ?<br/>UNION ALL ...
+    Note over FeatureQueryHelper: SELECT id, layer, ... ST_AsText(geometry)<br/>FROM areas, roads WHERE user_id = ?
 
     FeatureQueryHelper->>SqlFragments: ST_AsText(geometry)
     FeatureQueryHelper->>PostgreSQL: Execute UNION ALL query
@@ -253,14 +253,14 @@ sequenceDiagram
     Admin->>AdminUserController: POST /api/admin/users CreateAdminRequest
     Note over AdminUserController: Requires JWT + UserManagementRoles
 
-    AdminUserController->>IUserCreationService: CreateUserAsync(callerRole, callerCommuneId, callerDairaId, callerWilayaId, name, email, phone, username, password, targetRole, communeId, dairaId, wilayaId)
+    AdminUserController->>IUserCreationService: CreateUserAsync(callerRole, ..., wilayaId)
 
     IUserCreationService->>IUserAuthorizationService: CanCreateRole(callerRole, targetRole)
     alt Invalid hierarchy
         IUserAuthorizationService-->>IUserCreationService: false
         IUserCreationService-->>AdminUserController: 403 Forbidden
     else Valid hierarchy
-        IUserCreationService->>IUserAuthorizationService: ValidateCreateUserScopeAsync(callerRole, callerDaira?, callerWilaya?, targetRole, commune?, daira?, wilaya?)
+        IUserCreationService->>IUserAuthorizationService: ValidateCreateUserScopeAsync(callerRole, ..., wilaya?)
         alt Scope mismatch
             IUserAuthorizationService-->>IUserCreationService: error
             IUserCreationService-->>AdminUserController: 403 Forbidden

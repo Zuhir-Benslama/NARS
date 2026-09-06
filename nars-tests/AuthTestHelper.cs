@@ -44,8 +44,19 @@ public static class AuthTestHelper
     /// </summary>
     private static RefreshTokenService CreateRefreshTokenService(AppDbContext db, IJwtService jwtService, IDateTimeProvider timeProvider)
         => db.Database.IsInMemory()
-            ? new RefreshTokenServiceTests.TestableRefreshTokenService(db, jwtService, DefaultJwtOptions, Mock.Of<ISecurityStampCache>(), timeProvider)
-            : new RefreshTokenService(db, jwtService, DefaultJwtOptions, Mock.Of<ISecurityStampCache>(), timeProvider);
+            ? new RefreshTokenServiceTests.TestableRefreshTokenService(db, jwtService, DefaultJwtOptions, timeProvider)
+            : new RefreshTokenService(db, jwtService, DefaultJwtOptions, timeProvider);
+
+    /// <summary>
+    /// Builds an AccountLockoutService for the given context. Unit tests run on
+    /// the InMemory provider, which cannot execute ExecuteUpdateAsync, so they
+    /// get the testable subclass; integration tests run on real PostgreSQL and
+    /// MUST exercise the production SQL paths (covered by AuthControllerServiceTests).
+    /// </summary>
+    private static AccountLockoutService CreateAccountLockoutService(AppDbContext db)
+        => db.Database.IsInMemory()
+            ? new AccountLockoutServiceTests.TestableAccountLockoutService(db, Mock.Of<ISecurityStampCache>())
+            : new AccountLockoutService(db, Mock.Of<ISecurityStampCache>());
 
     /// <summary>
     /// AuthController over a real RefreshTokenService/UserAuthorizationService
@@ -56,13 +67,15 @@ public static class AuthTestHelper
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var jwtService = CreateJwtService(timeProvider);
         var refreshService = CreateRefreshTokenService(db, jwtService, timeProvider);
+        var accountLockout = CreateAccountLockoutService(db);
         return new AuthController(
             refreshService,
+            accountLockout,
             jwtService,
             Options.Create(new AccountLockoutOptions()),
             Mock.Of<ILogger<AuthController>>(),
             timeProvider,
-            new UserAuthorizationService(db, refreshService, Mock.Of<IFeatureCleanupService>(), timeProvider, Mock.Of<ISecurityStampCache>()),
+            new UserAuthorizationService(db, refreshService, accountLockout, Mock.Of<IFeatureCleanupService>(), timeProvider, Mock.Of<ISecurityStampCache>()),
             Mock.Of<ILocationQueryService>(),
             Mock.Of<IWebHostEnvironment>());
     }
@@ -73,9 +86,11 @@ public static class AuthTestHelper
         var timeProvider = Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow);
         var jwtService = CreateJwtService(timeProvider);
         var refreshService = CreateRefreshTokenService(db, jwtService, timeProvider);
-        var authorizationService = new UserAuthorizationService(db, refreshService, Mock.Of<IFeatureCleanupService>(), timeProvider, Mock.Of<ISecurityStampCache>());
+        var accountLockout = CreateAccountLockoutService(db);
+        var authorizationService = new UserAuthorizationService(
+            db, refreshService, accountLockout, Mock.Of<IFeatureCleanupService>(), timeProvider, Mock.Of<ISecurityStampCache>());
         return new AdminSignupController(
-            refreshService,
+            accountLockout,
             Options.Create(new AccountLockoutOptions()),
             Options.Create(new AdminSignupOptions { SignupToken = TestData.AdminSignupToken }),
             Mock.Of<ILogger<AdminSignupController>>(),

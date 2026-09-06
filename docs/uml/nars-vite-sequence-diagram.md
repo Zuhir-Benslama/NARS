@@ -119,7 +119,7 @@ sequenceDiagram
         User->>FeatureModal: Click Save
 
         FeatureModal->>UseFeatureValidation: validate()
-        Note over UseFeatureValidation: Client-side only — no API call.\nPer-type geometry/structure checks + modal errors.
+        Note over UseFeatureValidation: Client-side only — no API call.\nPer-type geometry/structure checks
 
         alt Invalid
             UseFeatureValidation-->>FeatureModal: Show errors
@@ -310,7 +310,7 @@ sequenceDiagram
     Tab1->>refreshPromise: apiFetch() fails -> POST /api/refresh
     Tab2->>refreshPromise: apiFetch() fails -> POST /api/refresh
 
-    Note over refreshPromise: Single-flight dedup:<br/>first caller starts request,<br/>second caller waits on same Promise
+    Note over refreshPromise: Single-flight dedup:<br/>first caller starts request,<br/>others wait on same Promise
 
     refreshPromise->>ApiModule: POST /api/refresh (only once)
     ApiModule->>Server: Cookie: refresh_token=...

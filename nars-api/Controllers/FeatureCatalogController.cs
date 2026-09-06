@@ -20,7 +20,11 @@ public class FeatureCatalogController(
     /// <summary>Loads features filtered by layer type with pagination.</summary>
     [HttpGet("features/by-layer/{layerType}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> LoadByLayer(string layerType, [FromQuery] int skip = 0, [FromQuery] int take = 100, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> LoadByLayer(
+        string layerType,
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 100,
+        CancellationToken cancellationToken = default)
     {
         (skip, take) = Pagination.Clamp(skip, take);
 

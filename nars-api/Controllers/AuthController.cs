@@ -14,6 +14,7 @@ namespace NarsApi.Controllers;
 [Tags("Auth")]
 public class AuthController(
     IRefreshTokenService refreshService,
+    IAccountLockoutService accountLockout,
     IJwtService jwt,
     IOptions<AccountLockoutOptions> lockoutOptions,
     ILogger<AuthController> logger,
@@ -66,7 +67,7 @@ public class AuthController(
 
         var user = credentialResult.User!;
 
-        await refreshService.ResetFailedAttemptsIfNeededAsync(user, cancellationToken);
+        await accountLockout.ResetFailedAttemptsIfNeededAsync(user, cancellationToken);
 
         return await BuildSignInResponseAsync(user, cancellationToken);
     }

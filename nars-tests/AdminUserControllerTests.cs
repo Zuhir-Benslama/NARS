@@ -21,7 +21,7 @@ public class AdminUserControllerTests
 
     private static AdminUserController CreateController(AppDbContext db, IDbContextFactory<AppDbContext>? factory = null)
     {
-        var authSvc = new UserAuthorizationService(db, Mock.Of<IRefreshTokenService>(), Mock.Of<IFeatureCleanupService>(), Mock.Of<IDateTimeProvider>(), Mock.Of<ISecurityStampCache>());
+        var authSvc = new UserAuthorizationService(db, Mock.Of<IRefreshTokenService>(), Mock.Of<IAccountLockoutService>(), Mock.Of<IFeatureCleanupService>(), Mock.Of<IDateTimeProvider>(), Mock.Of<ISecurityStampCache>());
         return new(Mock.Of<ILogger<AdminUserController>>(),
             authSvc,
             new UserCreationService(factory ?? new TestDbContextFactory(db), authSvc, Mock.Of<ILogger<UserCreationService>>()),

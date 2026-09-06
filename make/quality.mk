@@ -44,6 +44,7 @@ MIGRATIONS_SQL_MNT := $(patsubst %,/mnt/%,$(MIGRATIONS_SQL))
 
 .PHONY: infra-lint-shell
 infra-lint-shell: ## Shell-check nars-infra/scripts/*.sh
+	@if [ -z "$(SHELL_SCRIPTS)" ]; then echo "✓ No shell scripts to check"; exit 0; fi
 	@if command -v shellcheck >/dev/null 2>&1; then
 		shellcheck $(SHELL_SCRIPTS)
 	else
@@ -52,6 +53,7 @@ infra-lint-shell: ## Shell-check nars-infra/scripts/*.sh
 
 .PHONY: infra-lint-docker
 infra-lint-docker: ## Lint Dockerfiles with hadolint
+	@if [ -z "$(DOCKERFILES)" ]; then echo "✓ No Dockerfiles to check"; exit 0; fi
 	@if command -v hadolint >/dev/null 2>&1; then
 		hadolint --config nars-infra/.hadolint.yaml --failure-threshold error $(DOCKERFILES)
 	else
@@ -64,6 +66,7 @@ infra-lint-docker: ## Lint Dockerfiles with hadolint
 
 .PHONY: infra-lint-yaml
 infra-lint-yaml: ## Lint k8s + GitHub Actions YAML with yamllint (uses .yamllint.yaml config)
+	@if [ -z "$(YAML_FILES)" ]; then echo "✓ No YAML files to check"; exit 0; fi
 	@if command -v yamllint >/dev/null 2>&1; then
 		yamllint -c nars-infra/.yamllint.yaml $(YAML_FILES)
 	else

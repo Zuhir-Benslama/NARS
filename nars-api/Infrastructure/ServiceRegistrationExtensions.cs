@@ -125,8 +125,11 @@ public static class ServiceRegistrationExtensions
         services.AddHostedService<RefreshTokenPruner>();
         services.AddSingleton<IScatteredAreaService, ScatteredAreaService>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
+        services.AddScoped<IAccountLockoutService, AccountLockoutService>();
         services.AddScoped<IValidationService, ValidationService>();
         services.AddScoped<IFieldService, FieldService>();
+        services.AddScoped<IInspectionService, InspectionService>();
+        services.AddScoped<IEntranceService, EntranceService>();
         services.AddScoped<IFeatureStatsService, FeatureStatsService>();
         services.AddScoped<IFeatureService, FeatureService>();
         services.AddScoped<IBoundaryService, BoundaryService>();

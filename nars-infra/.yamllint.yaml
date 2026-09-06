@@ -20,3 +20,9 @@ rules:
   document-start:
     present: true
     level: warning
+
+  truthy:
+    # GitHub Actions workflows use `on:` as the event trigger key, which the
+    # YAML 1.1 spec parses as a boolean scalar. That is not a lintable truthy
+    # value, so stop flagging mapping keys (values are still checked).
+    check-keys: false

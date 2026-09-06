@@ -17,6 +17,8 @@ public class FieldController(
     ILogger<FieldController> logger,
     IOptions<FeatureDefaultsOptions> featureDefaults,
     IFieldService fieldService,
+    IInspectionService inspectionService,
+    IEntranceService entranceService,
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     private readonly int _maxFeatureDataSize = featureDefaults.Value.MaxFeatureDataSize;
@@ -81,16 +83,16 @@ public class FieldController(
             return Problem(detail: $"Inspection data is too large (max {_maxFeatureDataSize / 1024} KB).", statusCode: 400);
         }
 
-        var inspectionResult = await fieldService.SubmitInspectionAsync(
+        var inspectionResult = await inspectionService.SubmitInspectionAsync(
             featureId, RequiredCurrentUserId, normalizedType, body.Status, rawData, cancellationToken);
         if (inspectionResult is not { IsSuccess: true })
         {
             var message = inspectionResult?.Malformed switch
             {
                 InspectionMalformedField.Type =>
-                    $"Invalid inspection type. Must be one of: {string.Join(", ", FieldService.ValidInspectionTypes)}",
+                    $"Invalid inspection type. Must be one of: {string.Join(", ", InspectionService.ValidInspectionTypes)}",
                 InspectionMalformedField.Status =>
-                    $"Status must be one of: {string.Join(", ", FieldService.ValidInspectionStatuses.Select(s => $"'{s}'"))}.",
+                    $"Status must be one of: {string.Join(", ", InspectionService.ValidInspectionStatuses.Select(s => $"'{s}'"))}.",
                 _ => "Invalid inspection parameters.",
             };
             return Problem(detail: message, statusCode: 400);
@@ -136,7 +138,7 @@ public class FieldController(
             return Forbid();
         }
 
-        var inspections = await fieldService.GetInspectionsAsync(featureId, skip, take, cancellationToken);
+        var inspections = await inspectionService.GetInspectionsAsync(featureId, skip, take, cancellationToken);
         return Ok(new FieldInspectionsResponse(inspections));
     }
 
@@ -157,7 +159,7 @@ public class FieldController(
             return Problem(detail: "Invalid road_id.", statusCode: 400);
         }
 
-        var roadOwner = await fieldService.GetRoadOwnerAsync(roadId, cancellationToken);
+        var roadOwner = await entranceService.GetRoadOwnerAsync(roadId, cancellationToken);
         if (roadOwner is null)
         {
             return Problem(detail: "Road not found.", statusCode: 400);
@@ -176,7 +178,7 @@ public class FieldController(
         }
 
         var label = body.Label ?? DefaultEntranceLabel;
-        var newId = await fieldService.CreateEntranceAsync(
+        var newId = await entranceService.CreateEntranceAsync(
             roadId, roadOwner.Value.OwnerUserId, RequiredCurrentUserId, label, rawData, cancellationToken);
 
         logger.LogInformation(
@@ -192,7 +194,7 @@ public class FieldController(
 
     private async Task<IActionResult?> ValidateInspectionTargetAsync(Guid featureId, string type, CancellationToken ct)
     {
-        var validTypes = FieldService.ValidInspectionTypes;
+        var validTypes = InspectionService.ValidInspectionTypes;
         if (!validTypes.Contains(type))
         {
             return Problem(detail: $"Invalid inspection type. Must be one of: {string.Join(", ", validTypes)}", statusCode: 400);

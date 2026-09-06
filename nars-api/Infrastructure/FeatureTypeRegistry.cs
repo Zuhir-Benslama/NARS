@@ -93,7 +93,13 @@ public sealed class FeatureTypeDescriptor
 /// </summary>
 public static class FeatureTypeRegistry
 {
-    private static FeatureTypeDescriptor Descriptor<T>(string type, string tableName, Func<AppDbContext, Microsoft.EntityFrameworkCore.DbSet<T>> dbSet, Func<AppDbContext, Guid, Guid, System.Text.Json.JsonElement?, CancellationToken, Task>? postUpdateAction = null, IReadOnlyList<IndexDefinition>? indexes = null, IReadOnlyList<CompositeIndexDefinition>? compositeIndexes = null) where T : FeatureBase, new() =>
+    private static FeatureTypeDescriptor Descriptor<T>(
+        string type,
+        string tableName,
+        Func<AppDbContext, Microsoft.EntityFrameworkCore.DbSet<T>> dbSet,
+        Func<AppDbContext, Guid, Guid, System.Text.Json.JsonElement?, CancellationToken, Task>? postUpdateAction = null,
+        IReadOnlyList<IndexDefinition>? indexes = null,
+        IReadOnlyList<CompositeIndexDefinition>? compositeIndexes = null) where T : FeatureBase, new() =>
         new()
         {
             Type = type,

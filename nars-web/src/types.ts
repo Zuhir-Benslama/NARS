@@ -41,6 +41,7 @@ export type { UserRole, CommuneInfo, DairaInfo, WilayaInfo, UserInfo } from "./t
 export type {
   UserFeatureStats,
   AdminInfo,
+  ManageableUser,
   CommuneReport,
   DairaReport,
   WilayaReport,

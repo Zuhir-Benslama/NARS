@@ -32,7 +32,15 @@ public class FieldControllerServiceTests(NarsDatabaseFixture fixture) : ServiceT
         var factory = Fixture.CreateDbContextFactory();
         var featureSvc = new FeatureService(factory, Mock.Of<IBackgroundTaskQueue>(), Mock.Of<IFeatureCleanupService>(), Mock.Of<ILogger<FeatureService>>());
         var fieldSvc = new FieldService(factory, featureSvc, Mock.Of<ILogger<FieldService>>());
-        var ctrl = new FieldController(Mock.Of<ILogger<FieldController>>(), Options.Create(new FeatureDefaultsOptions()), fieldSvc, Mock.Of<IWebHostEnvironment>());
+        var inspectionSvc = new InspectionService(factory);
+        var entranceSvc = new EntranceService(factory);
+        var ctrl = new FieldController(
+            Mock.Of<ILogger<FieldController>>(),
+            Options.Create(new FeatureDefaultsOptions()),
+            fieldSvc,
+            inspectionSvc,
+            entranceSvc,
+            Mock.Of<IWebHostEnvironment>());
         AuthTestHelper.SetUser(ctrl, _workerId, UserRoles.FieldWorker, communeId: 1);
         return ctrl;
     }

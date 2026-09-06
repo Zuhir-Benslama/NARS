@@ -1,3 +1,4 @@
+---
 name: CI
 
 on:
@@ -210,3 +211,21 @@ jobs:
 
       - name: Run make infra-lint (all 12 gates)
         run: make infra-lint
+
+  # ─── Infra utility tests (delegates to `make infra-test-python`) ────────
+  # png-to-pdf.py is a host/dev utility whose tests need Pillow + pytest; CI
+  # supplies those runner deps (pinned to the local dev versions) and lets the
+  # Makefile own the actual test invocation.
+  infra-test-python:
+    name: Infra utility test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run make infra-test-python
+        run: pip install --quiet pillow==12.3.0 pytest==9.0.3 && make infra-test-python

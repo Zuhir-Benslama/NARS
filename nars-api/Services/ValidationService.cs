@@ -189,6 +189,8 @@ public sealed class ValidationService(IDbContextFactory<AppDbContext> dbFactory)
     public async Task<int> CountUserUrbanAreasAsync(Guid userId, CancellationToken ct = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db.Set<Area>().CountAsync(a => a.UserId == userId && (a.Layer == FeatureTypes.AreaLayers.CentralUrban || a.Layer == FeatureTypes.AreaLayers.SecondaryUrban), ct);
+        return await db.Set<Area>().CountAsync(
+            a => a.UserId == userId
+                && (a.Layer == FeatureTypes.AreaLayers.CentralUrban || a.Layer == FeatureTypes.AreaLayers.SecondaryUrban), ct);
     }
 }

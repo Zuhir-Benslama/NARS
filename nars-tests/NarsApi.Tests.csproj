@@ -13,16 +13,20 @@
       These are a REGRESSION FLOOR, not a target. CI enforces coverage on the
       UNIT-ONLY run (filter Category!=Service), so the floor must fit the
       lower of the two measured runs (excludes generated code — see the Exclude
-      property below). Last measured 2026-08-30:
-        - unit-only (what CI gates on): ~63.6% line / ~61.8% branch
-        - full suite incl. service tests: ~79.9% line / ~75.0% branch
+      property below). Last measured 2026-09-06:
+        - unit-only (what CI gates on): ~62.3% line / ~59.5% branch
+        - full suite incl. service tests: ~78.8% line / ~73.4% branch
+      The service split moved inspection/entrance logic into new classes;
+      InspectionService and EntranceService.GetRoadOwnerAsync are covered by
+      direct InMemory unit tests, while EntranceService.CreateEntranceAsync
+      (real transaction) and the SQL helpers stay in the Postgres suites.
       Raise as coverage improves — do not lower. The single Threshold value
       applies to both line and branch, so it is capped by the lower (branch)
       metric of the unit-only run.
       Defined here (not on the CLI) because the vstest command-line parser
       splits comma-separated /p: values (e.g. ThresholdType=line,branch).
     -->
-    <Threshold Condition="'$(CollectCoverage)' == 'true'">50</Threshold>
+    <Threshold Condition="'$(CollectCoverage)' == 'true'">55</Threshold>
     <ThresholdType Condition="'$(CollectCoverage)' == 'true'">line,branch</ThresholdType>
     <ThresholdStat Condition="'$(CollectCoverage)' == 'true'">total</ThresholdStat>
   </PropertyGroup>

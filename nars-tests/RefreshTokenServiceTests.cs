@@ -14,8 +14,6 @@ namespace NarsApi.Tests;
 
 public class RefreshTokenServiceTests
 {
-    private const string OriginalStamp = "original-stamp";
-
     private static AppDbContext CreateDb() => CreateInMemoryDb("RefreshTokenTest");
 
     private static string HashRefreshToken(string raw) =>
@@ -48,8 +46,7 @@ public class RefreshTokenServiceTests
         AppDbContext db,
         IJwtService jwt,
         IOptions<JwtOptions> jwtOptions,
-        ISecurityStampCache stampCache,
-        IDateTimeProvider timeProvider) : RefreshTokenService(db, jwt, jwtOptions, stampCache, timeProvider)
+        IDateTimeProvider timeProvider) : RefreshTokenService(db, jwt, jwtOptions, timeProvider)
     {
         private readonly AppDbContext _db = db;
 
@@ -69,36 +66,6 @@ public class RefreshTokenServiceTests
 
             await _db.SaveChangesAsync(cancellationToken);
         }
-
-        protected override async Task<bool> RecordFailedLoginInStoreAsync(
-            User user, int maxFailedAttempts, int lockoutMinutes, DateTime now, CancellationToken cancellationToken)
-        {
-            // Mirrors the atomic production SQL on a tracked entity, since the
-            // InMemory provider cannot run ExecuteUpdateAsync.
-            if (user.LockedUntil.HasValue && user.LockedUntil.Value <= now)
-            {
-                user.FailedLoginAttempts = 0;
-                user.LockedUntil = null;
-            }
-
-            user.FailedLoginAttempts++;
-
-            if (user.FailedLoginAttempts < maxFailedAttempts)
-            {
-                // Persist the increment (the production SQL UPDATE is immediate).
-                await _db.SaveChangesAsync(cancellationToken);
-                return false;
-            }
-
-            // Threshold reached: lock the account, reset the counter so
-            // re-locking after expiry needs another full sequence, and rotate
-            // the security stamp.
-            user.LockedUntil = now.AddMinutes(lockoutMinutes);
-            user.FailedLoginAttempts = 0;
-            user.SecurityStamp = User.GenerateSecurityStamp();
-            await _db.SaveChangesAsync(cancellationToken);
-            return true;
-        }
     }
 
     private static TestableRefreshTokenService CreateService(AppDbContext db, IJwtService? jwt = null, IDateTimeProvider? timeProvider = null)
@@ -108,7 +75,6 @@ public class RefreshTokenServiceTests
             db,
             jwt ?? CreateJwtMock().Object,
             jwtOptions,
-            Mock.Of<ISecurityStampCache>(),
             timeProvider ?? CreateTimeProvider());
     }
 
@@ -651,96 +617,5 @@ public class RefreshTokenServiceTests
             Assert.Equal("newuser", stored.Username);
             Assert.Equal(DefaultEmail, stored.Email);
         }
-    }
-
-    // ── RecordFailedLoginAsync ──────────────────────────────────────────
-
-    [Fact]
-    public async Task RecordFailedLoginAsync_IncrementsAttempts()
-    {
-        using var db = CreateDb();
-        var user = await SeedUserAsync(db, failedLoginAttempts: 0);
-        var svc = CreateService(db);
-
-        await svc.RecordFailedLoginAsync(user, maxFailedAttempts: 5, lockoutMinutes: 15, FixedUtcNowOffset);
-
-        Assert.Equal(1, user.FailedLoginAttempts);
-        Assert.Null(user.LockedUntil);
-    }
-
-    [Fact]
-    public async Task RecordFailedLoginAsync_AtThreshold_LocksUserAndResetsCounter()
-    {
-        using var db = CreateDb();
-        var user = await SeedUserAsync(db, securityStamp: OriginalStamp, failedLoginAttempts: 4);
-        var svc = CreateService(db);
-
-        await svc.RecordFailedLoginAsync(user, maxFailedAttempts: 5, lockoutMinutes: 15, FixedUtcNowOffset);
-
-        // Counter resets so re-locking after expiry requires a full new sequence.
-        Assert.Equal(0, user.FailedLoginAttempts);
-        Assert.Equal(FixedUtcNowOffset.DateTime.AddMinutes(15), user.LockedUntil);
-        Assert.NotEqual(OriginalStamp, user.SecurityStamp);
-    }
-
-    [Fact]
-    public async Task RecordFailedLoginAsync_WhileLocked_IgnoresFailure()
-    {
-        using var db = CreateDb();
-        var lockedUntil = FixedUtcNow.AddMinutes(10);
-        var user = await SeedUserAsync(db, securityStamp: OriginalStamp, failedLoginAttempts: 0, lockedUntil: lockedUntil);
-        var svc = CreateService(db);
-
-        await svc.RecordFailedLoginAsync(user, maxFailedAttempts: 5, lockoutMinutes: 15, FixedUtcNowOffset);
-
-        // An active lockout must not be extendable by further bad passwords.
-        Assert.Equal(0, user.FailedLoginAttempts);
-        Assert.Equal(lockedUntil, user.LockedUntil);
-        Assert.Equal(OriginalStamp, user.SecurityStamp);
-    }
-
-    [Fact]
-    public async Task RecordFailedLoginAsync_ExpiredLockout_StartsFreshCycle()
-    {
-        using var db = CreateDb();
-        var user = await SeedUserAsync(db, securityStamp: OriginalStamp,
-            failedLoginAttempts: 5, lockedUntil: FixedUtcNow.AddMinutes(-1));
-        var svc = CreateService(db);
-
-        await svc.RecordFailedLoginAsync(user, maxFailedAttempts: 5, lockoutMinutes: 15, FixedUtcNowOffset);
-
-        // After the previous lockout expired, one failure must not immediately
-        // re-lock; a fresh sequence of failures is required.
-        Assert.Equal(1, user.FailedLoginAttempts);
-        Assert.Null(user.LockedUntil);
-        Assert.Equal(OriginalStamp, user.SecurityStamp);
-    }
-
-    // ── ResetFailedAttemptsIfNeededAsync ────────────────────────────────
-
-    [Fact]
-    public async Task ResetFailedAttemptsIfNeededAsync_ClearsState()
-    {
-        using var db = CreateDb();
-        var user = await SeedUserAsync(db, failedLoginAttempts: 3, lockedUntil: FixedUtcNow.AddMinutes(30));
-        var svc = CreateService(db);
-
-        await svc.ResetFailedAttemptsIfNeededAsync(user);
-
-        Assert.Equal(0, user.FailedLoginAttempts);
-        Assert.Null(user.LockedUntil);
-    }
-
-    [Fact]
-    public async Task ResetFailedAttemptsIfNeededAsync_AlreadyClean_NoSave()
-    {
-        using var db = CreateDb();
-        var user = await SeedUserAsync(db, failedLoginAttempts: 0);
-        var svc = CreateService(db);
-
-        await svc.ResetFailedAttemptsIfNeededAsync(user);
-
-        Assert.Equal(0, user.FailedLoginAttempts);
-        Assert.Null(user.LockedUntil);
     }
 }

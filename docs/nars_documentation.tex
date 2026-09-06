@@ -235,7 +235,7 @@ where
 with $\Delta\varphi = \varphi_2 - \varphi_1$ and
 $\Delta\lambda = \lambda_2 - \lambda_1$ in radians, and the mean Earth
 radius $R = 6{,}371{,}000\ \mathrm{m}$ (the value used throughout the
-codebase; see \texttt{GEOMETRY\_CONFIG.earthRadiusMeters} in
+codebase; see \texttt{GEOMETRY\_CONFIG.\allowbreak earthRadiusMeters} in
 \texttt{src/config.ts}).
 
 \begin{remark}
@@ -646,7 +646,7 @@ the closure variable \texttt{\_origSetLngLat}.
 \section{Scattered Area Computation}
 \label{sec:scattered}
 
-Urban areas may be of three subtypes: \texttt{central\_urban},
+Urban areas have three subtypes: \texttt{central\_urban},
 \texttt{secondary\_urban}, and \texttt{scattered}. The third subtype is
 never drawn manually; it is auto-computed as the set-theoretic complement
 of the explicit urban areas within the commune boundary.
@@ -672,8 +672,9 @@ disconnected. Each connected component is stored as a separate
 
 The scattered-area computation is triggered by any mutation to the
 \texttt{areas} table: save, update, or delete. It is dispatched to an
-\texttt{IBackgroundTaskQueue} (a \texttt{Channel<Func<IServiceProvider,
-CancellationToken, ValueTask>>}) so it does not block the HTTP response.
+\texttt{IBackgroundTaskQueue} (a \texttt{Channel<Func<}\allowbreak{}
+\texttt{IServiceProvider,}\allowbreak{} \texttt{CancellationToken,}\allowbreak{}
+\texttt{ValueTask>>}) so it does not block the HTTP response.
 The queue is bounded and processes work items sequentially:
 
 \begin{equation}
@@ -797,17 +798,20 @@ The \texttt{ASP.NET Core IAntiforgery} service uses the \emph{double-submit
 cookie} pattern:
 
 \begin{equation}
-  \text{Valid} \iff
-    \texttt{cookie}[\texttt{X-CSRF-TOKEN-COOKIE}] \neq \varnothing
-    \;\land\;
-    \texttt{header}[\texttt{X-CSRF-Token}]
-    = \mathcal{F}\!\left(\texttt{cookie}[\texttt{X-CSRF-TOKEN-COOKIE}]\right)
+  \begin{aligned}
+    \text{Valid} &\iff
+      \texttt{cookie}[\texttt{X-CSRF-TOKEN-COOKIE}] \neq \varnothing \\
+    &\quad\land\;
+      \texttt{header}[\texttt{X-CSRF-Token}]
+      = \mathcal{F}\!\left(\texttt{cookie}[\texttt{X-CSRF-TOKEN-COOKIE}]\right)
+  \end{aligned}
   \label{eq:csrf}
 \end{equation}
 
 where $\mathcal{F}$ is the ASP.NET Core antiforgery token derivation
 function (internally HMAC-based). API endpoints (\texttt{/api/\ldots}) are
-exempt because all auth cookies carry \texttt{SameSite=Lax}, which
+exempt because all their auth cookies carry the \texttt{SameSite=Lax} attribute,
+which
 prevents cross-origin \texttt{POST}/\texttt{PUT}/\texttt{DELETE} requests
 from attaching session cookies.
 
@@ -1172,8 +1176,12 @@ For every ordered pair $(R_i, R_j)$ with $i \neq j$, two junction types are dete
 
 \paragraph{T-junction.}
 An endpoint $p \in \{p_0^{(j)}, p_{m_j-1}^{(j)}\}$ that satisfies
-$d_{\text{geo}}(p, p_0^{(i)}) > \delta_J$ and
-$d_{\text{geo}}(p, p_{m_i-1}^{(i)}) > \delta_J$, yet whose nearest point
+\[
+  d_{\text{geo}}(p, p_0^{(i)}) > \delta_J
+  \quad\text{and}\quad
+  d_{\text{geo}}(p, p_{m_i-1}^{(i)}) > \delta_J
+\]
+yet whose nearest point
 on the body of $R_i$ is within $\delta_J$:
 \begin{equation}
   q^* = \proj_{R_i}(p), \quad d_{\text{geo}}(p, q^*) \leq \delta_J
@@ -1192,7 +1200,9 @@ shared at all junction points (merged within $\delta_J$).
 
 \begin{definition}[Topology graph]
 $G = (V, E)$ where
-$V = \{v \in \mathcal{G} \mid v \text{ is an endpoint or junction point}\}$
+\begin{equation*}
+  V = \{v \in \mathcal{G} \mid v \text{ is an endpoint or junction point}\}
+\end{equation*}
 and $e = (v_a, v_b, s) \in E$ iff sub-segment $s$ connects $v_a$ to $v_b$.
 Nodes within $\delta_J$ of each other are unified.
 \end{definition}
@@ -1441,10 +1451,12 @@ ID via \texttt{mainEntranceDbId} must be updated. The restore procedure
 performs this repair in-memory:
 
 \begin{equation}
-  \forall e' \in \texttt{houseEntrances}:\;
-  e'.\texttt{mainEntranceDbId} = \text{id}_{\text{old}}
-  \;\implies\;
-  e'.\texttt{mainEntranceDbId} \leftarrow \text{id}_{\text{new}}
+  \begin{aligned}
+    \forall e' \in \texttt{houseEntrances}:&\;
+    e'.\texttt{mainEntranceDbId} = \text{id}_{\text{old}} \\
+    &\quad\implies\;
+    e'.\texttt{mainEntranceDbId} \leftarrow \text{id}_{\text{new}}
+  \end{aligned}
   \label{eq:undo_ref_repair}
 \end{equation}
 
@@ -1547,7 +1559,7 @@ primary keys, foreign keys, and key index definitions as derived from
 \centering
 \caption{Database schema summary}
 \label{tab:schema}
-\begin{tabularx}{\textwidth}{lllX}
+\begin{tabularx}{\textwidth}{llXX}
 \toprule
 \textbf{Table} & \textbf{PK} & \textbf{FK} & \textbf{Notable indices / constraints} \\
 \midrule
@@ -1555,74 +1567,74 @@ primary keys, foreign keys, and key index definitions as derived from
   & \texttt{id} (UUID v7)
   &
   & UNIQUE(\texttt{email}), UNIQUE(\texttt{username}) \\
-\texttt{refresh\_tokens}
+\texttt{refresh\_\allowbreak{}tokens}
   & \texttt{id} (UUID)
-  & \texttt{user\_id} $\to$ \texttt{users}
-  & \texttt{ix\_refresh\_tokens\_token\_hash} \\
+  & \texttt{user\_\allowbreak{}id} $\to$ \texttt{users}
+  & \texttt{ix\_\allowbreak{}refresh\_\allowbreak{}tokens\_\allowbreak{}token\_\allowbreak{}hash} \\
 \texttt{wilayas}
-  & \texttt{wilaya\_id} (int)
+  & \texttt{wilaya\_\allowbreak{}id} (int)
   &
   & Static reference table \\
 \texttt{dairas}
-  & \texttt{daira\_id} (int)
-  & \texttt{wilaya\_id} $\to$ \texttt{wilayas}
-  & \texttt{ix\_dairas\_wilaya\_id} \\
+  & \texttt{daira\_\allowbreak{}id} (int)
+  & \texttt{wilaya\_\allowbreak{}id} $\to$ \texttt{wilayas}
+  & \texttt{ix\_\allowbreak{}dairas\_\allowbreak{}wilaya\_\allowbreak{}id} \\
 \texttt{communes}
-  & \texttt{commune\_id} (int)
-  & \texttt{daira\_id} $\to$ \texttt{dairas}
-  & \texttt{ix\_communes\_daira\_id} \\
-\texttt{communes\_boundaries}
-  & \texttt{commune\_id} (int)
+  & \texttt{commune\_\allowbreak{}id} (int)
+  & \texttt{daira\_\allowbreak{}id} $\to$ \texttt{dairas}
+  & \texttt{ix\_\allowbreak{}communes\_\allowbreak{}daira\_\allowbreak{}id} \\
+\texttt{communes\_\allowbreak{}boundaries}
+  & \texttt{commune\_\allowbreak{}id} (int)
   &
   & GIST index on \texttt{geometry} \\
-\texttt{feature\_registry}
+\texttt{feature\_\allowbreak{}registry}
   & \texttt{id} (UUID v7)
   &
-  & \texttt{feature\_type} string \\
+  & \texttt{feature\_\allowbreak{}type} string \\
 \texttt{areas}
   & \texttt{id} (UUID v7)
   &
-  & \texttt{ix\_areas\_user\_id}, \texttt{ix\_areas\_user\_layer} \\
+  & \texttt{ix\_\allowbreak{}areas\_\allowbreak{}user\_\allowbreak{}id}, \texttt{ix\_\allowbreak{}areas\_\allowbreak{}user\_\allowbreak{}layer} \\
 \texttt{districts}
   & \texttt{id} (UUID v7)
   &
-  & \texttt{ix\_districts\_user\_id} \\
-\texttt{city\_centers}
+  & \texttt{ix\_\allowbreak{}districts\_\allowbreak{}user\_\allowbreak{}id} \\
+\texttt{city\_\allowbreak{}centers}
   & \texttt{id} (UUID v7)
   &
-  & \texttt{ix\_city\_centers\_user\_id} \\
+  & \texttt{ix\_\allowbreak{}city\_\allowbreak{}centers\_\allowbreak{}user\_\allowbreak{}id} \\
 \texttt{roads}
   & \texttt{id} (UUID v7)
   &
-  & \texttt{ix\_roads\_user\_id}, \texttt{ix\_roads\_user\_layer} \\
-\texttt{house\_entrances}
+  & \texttt{ix\_\allowbreak{}roads\_\allowbreak{}user\_\allowbreak{}id}, \texttt{ix\_\allowbreak{}roads\_\allowbreak{}user\_\allowbreak{}layer} \\
+\texttt{house\_\allowbreak{}entrances}
   & \texttt{id} (UUID v7)
-  & \texttt{road\_id} $\to$ \texttt{roads} (nullable)
-  & \texttt{ix\_house\_entrances\_road\_id} (partial, \texttt{road\_id IS NOT NULL}) \\
-\texttt{public\_buildings}
-  & \texttt{id} (UUID v7)
-  &
-  & \texttt{ix\_public\_buildings\_user\_id} \\
-\texttt{public\_spaces}
+  & \texttt{road\_\allowbreak{}id} $\to$ \texttt{roads} (nullable)
+  & \texttt{ix\_\allowbreak{}house\_\allowbreak{}entrances\_\allowbreak{}road\_\allowbreak{}id} (partial, \texttt{road\_\allowbreak{}id IS NOT NULL}) \\
+\texttt{public\_\allowbreak{}buildings}
   & \texttt{id} (UUID v7)
   &
-  & \texttt{ix\_public\_spaces\_user\_id} \\
-\texttt{naming\_panels}
+  & \texttt{ix\_\allowbreak{}public\_\allowbreak{}buildings\_\allowbreak{}user\_\allowbreak{}id} \\
+\texttt{public\_\allowbreak{}spaces}
   & \texttt{id} (UUID v7)
   &
-  & \texttt{ix\_naming\_panels\_user\_id} \\
-\texttt{error\_logs}
+  & \texttt{ix\_\allowbreak{}public\_\allowbreak{}spaces\_\allowbreak{}user\_\allowbreak{}id} \\
+\texttt{naming\_\allowbreak{}panels}
   & \texttt{id} (UUID v7)
-  & \texttt{user\_id} $\to$ \texttt{users} (nullable)
-  & \texttt{ix\_error\_logs\_user\_id}, \texttt{ix\_error\_logs\_level}, \texttt{ix\_error\_logs\_created\_at} \\
+  &
+  & \texttt{ix\_\allowbreak{}naming\_\allowbreak{}panels\_\allowbreak{}user\_\allowbreak{}id} \\
+\texttt{error\_\allowbreak{}logs}
+  & \texttt{id} (UUID v7)
+  & \texttt{user\_\allowbreak{}id} $\to$ \texttt{users} (nullable)
+  & \texttt{ix\_\allowbreak{}error\_\allowbreak{}logs\_\allowbreak{}user\_\allowbreak{}id}, \texttt{ix\_\allowbreak{}error\_\allowbreak{}logs\_\allowbreak{}level}, \texttt{ix\_\allowbreak{}error\_\allowbreak{}logs\_\allowbreak{}created\_\allowbreak{}at} \\
 \texttt{inspections}
   & \texttt{id} (UUID v7)
-  & \texttt{user\_id} $\to$ \texttt{users}
-  & \texttt{ix\_inspections\_user\_id}, \texttt{ix\_inspections\_feature\_created} \\
-\texttt{ai\_draft\_features}
+  & \texttt{user\_\allowbreak{}id} $\to$ \texttt{users}
+  & \texttt{ix\_\allowbreak{}inspections\_\allowbreak{}user\_\allowbreak{}id}, \texttt{ix\_\allowbreak{}inspections\_\allowbreak{}feature\_\allowbreak{}created} \\
+\texttt{ai\_\allowbreak{}draft\_\allowbreak{}features}
   & \texttt{id} (UUID v7)
-  & \texttt{commune\_id} $\to$ \texttt{communes}, \texttt{reviewed\_by} $\to$ \texttt{users} (nullable)
-  & \texttt{ix\_ai\_draft\_status}, \texttt{ix\_ai\_draft\_created\_at} \\
+  & \texttt{commune\_\allowbreak{}id} $\to$ \texttt{communes}, \texttt{reviewed\_\allowbreak{}by} $\to$ \texttt{users} (nullable)
+  & \texttt{ix\_\allowbreak{}ai\_\allowbreak{}draft\_\allowbreak{}status}, \texttt{ix\_\allowbreak{}ai\_\allowbreak{}draft\_\allowbreak{}created\_\allowbreak{}at} \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -1652,16 +1664,18 @@ Primary keys are generated client-side using \texttt{Guid.CreateVersion7()},
 which encodes a Unix millisecond timestamp in the high 48 bits of the UUID:
 
 \begin{equation}
-  \text{UUID v7} =
-  \underbrace{\text{48 bits: ms timestamp}}_{\text{monotonic}}
-  \;\|\;
-  \underbrace{\text{4 bits: version = 7}}_{}
-  \;\|\;
-  \underbrace{\text{12 bits: seq counter}}_{\text{sub-ms ordering}}
-  \;\|\;
-  \underbrace{\text{2 bits: variant}}_{}
-  \;\|\;
-  \underbrace{\text{62 bits: random}}_{\text{uniqueness}}
+  \begin{aligned}
+    \text{UUID v7} &=
+      \underbrace{\text{48 bits: ms timestamp}}_{\text{monotonic}}
+      \;\|\;
+      \underbrace{\text{4 bits: version = 7}}_{} \\
+    &\quad\|\;
+      \underbrace{\text{12 bits: seq counter}}_{\text{sub-ms ordering}}
+      \;\|\;
+      \underbrace{\text{2 bits: variant}}_{} \\
+    &\quad\|\;
+      \underbrace{\text{62 bits: random}}_{\text{uniqueness}}
+  \end{aligned}
   \label{eq:uuid_v7}
 \end{equation}
 

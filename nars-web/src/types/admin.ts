@@ -25,6 +25,18 @@ export interface AdminInfo {
   role: UserRole
 }
 
+export interface ManageableUser {
+  user_id: string
+  username: string
+  name: string
+  email: string
+  role: string
+  phone: string
+  commune_id: number | null
+  daira_id: number | null
+  wilaya_id: number | null
+}
+
 export interface CommuneReport {
   commune_id: number
   commune_name_fr: string

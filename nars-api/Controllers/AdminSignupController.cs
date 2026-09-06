@@ -26,7 +26,7 @@ namespace NarsApi.Controllers;
 [Route("/api")]
 [Tags("Auth")]
 public class AdminSignupController(
-    IRefreshTokenService refreshService,
+    IAccountLockoutService accountLockout,
     IOptions<AccountLockoutOptions> lockoutOptions,
     IOptions<AdminSignupOptions> adminSignupOptions,
     ILogger<AdminSignupController> logger,
@@ -99,7 +99,7 @@ public class AdminSignupController(
 
         var newUser = creationResult.User!;
 
-        await refreshService.ResetFailedAttemptsIfNeededAsync(admin, cancellationToken);
+        await accountLockout.ResetFailedAttemptsIfNeededAsync(admin, cancellationToken);
 
         logger.LogInformation(
             "[Auth] {AdminUser} ({AdminRole}) created {NewRole} account {NewUser} via login page",

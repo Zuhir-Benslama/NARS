@@ -41,7 +41,7 @@ classDiagram
         +GeoJSON.Geometry geometry
         +object properties
     }
-    note for MaplibreFeature "properties: { dbId?, phaseKey, label,\ngeomType?, fillColor?,\nlineColor?, lineWidth?, ... }"
+    note for MaplibreFeature "properties: dbId?, phaseKey, label,\ngeomType?, fillColor?,\nlineColor?, lineWidth?, ..."
 
     class DeletedFeature {
         +LayerEntry entry

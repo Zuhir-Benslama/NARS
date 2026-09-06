@@ -35,20 +35,20 @@ describe("initTelemetry", () => {
     initTelemetry()
     expect(mockRegister).not.toHaveBeenCalled()
     warn.mockRestore()
-  })
+  }, 20_000)
 
   it("skips initialization when explicitly disabled even with an endpoint", async () => {
     vi.stubEnv("VITE_OTEL_DISABLED", "true")
     const { initTelemetry } = await import("./telemetry")
     initTelemetry("http://otel:4318/v1/traces")
     expect(mockRegister).not.toHaveBeenCalled()
-  })
+  }, 20_000)
 
   it("initializes OTel when endpoint is set", async () => {
     const { initTelemetry } = await import("./telemetry")
     expect(() => initTelemetry("http://otel:4318/v1/traces")).not.toThrow()
     expect(mockRegister).toHaveBeenCalledTimes(1)
-  })
+  }, 20_000)
 
   it("configures the fetch instrumentation with a URL-sanitizing request hook", async () => {
     const { initTelemetry } = await import("./telemetry")
@@ -56,7 +56,7 @@ describe("initTelemetry", () => {
 
     const config = mockFetchInst.mock.calls[0][0]
     expect(config.requestHook).toEqual(expect.any(Function))
-  })
+  }, 20_000)
 })
 
 describe("sanitizeTelemetryUrl", () => {

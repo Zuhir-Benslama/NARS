@@ -10,6 +10,7 @@ namespace NarsApi.Services;
 public sealed class UserAuthorizationService(
     AppDbContext db,
     IRefreshTokenService refreshService,
+    IAccountLockoutService accountLockout,
     IFeatureCleanupService cleanupService,
     IDateTimeProvider timeProvider,
     ISecurityStampCache stampCache) : IUserAuthorizationService
@@ -188,7 +189,7 @@ public sealed class UserAuthorizationService(
         // non-locked accounts (see above).
         if (user is not null && !passwordValid)
         {
-            await refreshService.RecordFailedLoginAsync(user, maxFailedAttempts, lockoutMinutes, timeProvider.UtcNow, ct);
+            await accountLockout.RecordFailedLoginAsync(user, maxFailedAttempts, lockoutMinutes, timeProvider.UtcNow, ct);
         }
 
         if (user is null || !passwordValid)

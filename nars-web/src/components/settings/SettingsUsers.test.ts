@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { mount } from "@vue/test-utils"
 import { mockApiFetch, createMockSuccessResponse } from "../../test/setup"
 import SettingsUsers from "./SettingsUsers.vue"
+import SettingsUsersForm from "./SettingsUsersForm.vue"
 
 const mockAppStore = vi.fn()
 vi.mock("../../stores/appStore", () => ({
@@ -196,7 +197,7 @@ describe("SettingsUsers", () => {
       await inputs[4].setValue("password123")
 
       // Select a daira by directly setting state
-      ;(wrapper.vm as any).selectedDairaId = 1
+      ;(wrapper.getComponent(SettingsUsersForm).vm as any).selectedDairaId = 1
 
       await wrapper.find(".modal-btn-save").trigger("click")
       await new Promise((resolve) => setTimeout(resolve, 0))
@@ -270,7 +271,7 @@ describe("SettingsUsers", () => {
     it("defaults target to wilaya_admin (single target)", () => {
       mockAppStore.mockReturnValue({ user: { role: "national_admin" } })
       const wrapper = mount(SettingsUsers)
-      expect((wrapper.vm as any).targetRole).toBe("wilaya_admin")
+      expect((wrapper.getComponent(SettingsUsersForm).vm as any).targetRole).toBe("wilaya_admin")
     })
   })
 
@@ -278,20 +279,20 @@ describe("SettingsUsers", () => {
     it("sets selectedDairaId on v-model change", async () => {
       mockAppStore.mockReturnValue({ user: { role: "wilaya_admin" } })
       const wrapper = mount(SettingsUsers)
-      ;(wrapper.vm as any).selectedDairaId = 5
+      ;(wrapper.getComponent(SettingsUsersForm).vm as any).selectedDairaId = 5
       await new Promise((resolve) => setTimeout(resolve, 0))
 
-      expect((wrapper.vm as any).selectedDairaId).toBe(5)
+      expect((wrapper.getComponent(SettingsUsersForm).vm as any).selectedDairaId).toBe(5)
     })
 
     it("cascades daira change to reset commune", async () => {
       mockAppStore.mockReturnValue({ user: { role: "wilaya_admin" } })
       const wrapper = mount(SettingsUsers)
-      ;(wrapper.vm as any).selectedDairaId = 5
-      ;(wrapper.vm as any).selectedCommuneId = 10
+      ;(wrapper.getComponent(SettingsUsersForm).vm as any).selectedDairaId = 5
+      ;(wrapper.getComponent(SettingsUsersForm).vm as any).selectedCommuneId = 10
       await new Promise((resolve) => setTimeout(resolve, 0))
 
-      expect((wrapper.vm as any).selectedCommuneId).toBeNull()
+      expect((wrapper.getComponent(SettingsUsersForm).vm as any).selectedCommuneId).toBeNull()
     })
   })
 
@@ -304,7 +305,8 @@ describe("SettingsUsers", () => {
         },
       })
       const wrapper = mount(SettingsUsers)
-      const dairaEndpoint = (wrapper.vm as any).dairaEndpoint as (q: string) => string
+      const form = wrapper.getComponent(SettingsUsersForm).vm as any
+      const dairaEndpoint = form.dairaEndpoint as (q: string) => string
       expect(dairaEndpoint("")).toBe("/api/dairas?search=&wilaya_id=9")
     })
 
@@ -316,8 +318,9 @@ describe("SettingsUsers", () => {
         },
       })
       const wrapper = mount(SettingsUsers)
-      ;(wrapper.vm as any).selectedWilayaId = 3
-      const dairaEndpoint = (wrapper.vm as any).dairaEndpoint as (q: string) => string
+      const form = wrapper.getComponent(SettingsUsersForm).vm as any
+      form.selectedWilayaId = 3
+      const dairaEndpoint = form.dairaEndpoint as (q: string) => string
       expect(dairaEndpoint("")).toBe("/api/dairas?search=&wilaya_id=3")
     })
 
@@ -329,7 +332,8 @@ describe("SettingsUsers", () => {
         },
       })
       const wrapper = mount(SettingsUsers)
-      const communeEndpoint = (wrapper.vm as any).communeEndpoint as (q: string) => string
+      const form = wrapper.getComponent(SettingsUsersForm).vm as any
+      const communeEndpoint = form.communeEndpoint as (q: string) => string
       expect(communeEndpoint("")).toBe("/api/communes?search=&daira_id=12")
     })
 
@@ -341,8 +345,9 @@ describe("SettingsUsers", () => {
         },
       })
       const wrapper = mount(SettingsUsers)
-      ;(wrapper.vm as any).selectedDairaId = 7
-      const communeEndpoint = (wrapper.vm as any).communeEndpoint as (q: string) => string
+      const form = wrapper.getComponent(SettingsUsersForm).vm as any
+      form.selectedDairaId = 7
+      const communeEndpoint = form.communeEndpoint as (q: string) => string
       expect(communeEndpoint("")).toBe("/api/communes?search=&daira_id=7")
     })
   })

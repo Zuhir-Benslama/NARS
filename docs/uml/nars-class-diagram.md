@@ -249,20 +249,20 @@ classDiagram
     class IUserAuthorizationService {
         <<interface>>
         +CanCreateRole(callerRole, targetRole) bool
-        +ValidateCreateUserScopeAsync(callerRole, callerDaira?, callerWilaya?, targetRole, commune?, daira?, wilaya?) ScopeValidationResult
-        +ValidateManagedUserScopeAsync(callerRole, callerCommune?, callerDaira?, callerWilaya?, targetRole, commune?, daira?, wilaya?) ScopeValidationResult
+        +ValidateCreateUserScopeAsync(callerRole, ..., wilaya?) ScopeValidationResult
+        +ValidateManagedUserScopeAsync(callerRole, ..., wilaya?) ScopeValidationResult
         +GetManageableUsersAsync(callerRole, commune?, daira?, wilaya?, skip, take) PagedResponse~AdminUserSummary~
         +FindUserByIdAsync(userId, ct) Task~User?~
         +FindUserByUsernameAsync(username, ct) Task~User?~
         +VerifyCredentialsAsync(username, password, maxAttempts, lockoutMinutes) CredentialCheckResult
-        +UpdateManagedUserAsync(callerUserId, callerRole, callerCommune?, callerDaira?, callerWilaya?, targetUserId, body) UserUpdateResult
+        +UpdateManagedUserAsync(callerUserId, ..., body) UserUpdateResult
         +DeleteUserAsync(userId, ct) Task~bool~
     }
 
     class IUserCreationService {
         <<interface>>
-        +CreateUserAsync(callerRole, callerCommune?, callerDaira?, callerWilaya?, name, email, phone, username, password, targetRole, commune?, daira?, wilaya?) ManagedUserCreationResult
-        +ValidateAndCreateUserAsync(name, email, phone, username, password, role, commune?, daira?, wilaya?) UserCreationResult
+        +CreateUserAsync(callerRole, ..., wilaya?) ManagedUserCreationResult
+        +ValidateAndCreateUserAsync(name, ..., wilaya?) UserCreationResult
         +SaveUserAsync(user, ct) Task
     }
 
@@ -336,10 +336,10 @@ classDiagram
 
     class IDraftFeaturesService {
         <<interface>>
-        +SegmentTileAsync(callerRole, callerCommune?, callerDaira?, callerWilaya?, communeId, tileStream, fileName, contentType, bbox, ct) Task~SegmentSummaryResponse~
-        +ListDraftsAsync(callerRole, callerCommune?, callerDaira?, callerWilaya?, communeId, featureType?, status, skip, take, ct) PagedResponse~AiDraftFeatureDto~
-        +AcceptDraftAsync(callerRole, callerCommune?, callerDaira?, callerWilaya?, userId, draftId, ct) DraftReviewResult
-        +RejectDraftAsync(callerRole, callerCommune?, callerDaira?, callerWilaya?, userId, draftId, ct) DraftReviewResult
+        +SegmentTileAsync(callerRole, ..., bbox, ct) Task~SegmentSummaryResponse~
+        +ListDraftsAsync(callerRole, ..., status, skip, take, ct) PagedResponse~AiDraftFeatureDto~
+        +AcceptDraftAsync(callerRole, ..., userId, draftId, ct) DraftReviewResult
+        +RejectDraftAsync(callerRole, ..., userId, draftId, ct) DraftReviewResult
     }
 
     class ISegmentationClient {

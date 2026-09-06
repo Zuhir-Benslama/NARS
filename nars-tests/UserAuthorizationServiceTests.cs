@@ -12,7 +12,13 @@ namespace NarsApi.Tests;
 public class UserAuthorizationServiceTests
 {
     private static UserAuthorizationService CreateService(AppDbContext db) =>
-        new(db, Mock.Of<IRefreshTokenService>(), Mock.Of<IFeatureCleanupService>(), Mock.Of<IDateTimeProvider>(), Mock.Of<ISecurityStampCache>());
+        new(
+            db,
+            Mock.Of<IRefreshTokenService>(),
+            Mock.Of<IAccountLockoutService>(),
+            Mock.Of<IFeatureCleanupService>(),
+            Mock.Of<IDateTimeProvider>(),
+            Mock.Of<ISecurityStampCache>());
 
     [Fact]
     public async Task FindUserByIdAsync_ExistingUser_ReturnsUser()
@@ -129,7 +135,7 @@ public class UserAuthorizationServiceTests
         var stampCacheMock = new Mock<ISecurityStampCache>();
         var timeProvider = Mock.Of<IDateTimeProvider>();
         var svc = new UserAuthorizationService(db, refreshMock.Object,
-            Mock.Of<IFeatureCleanupService>(), timeProvider, stampCacheMock.Object);
+            Mock.Of<IAccountLockoutService>(), Mock.Of<IFeatureCleanupService>(), timeProvider, stampCacheMock.Object);
 
         var result = await svc.UpdateManagedUserAsync(
             callerId, UserRoles.DairaAdmin, callerCommuneId: null, callerDairaId: 1, callerWilayaId: null,
@@ -474,8 +480,8 @@ public class UserAuthorizationServiceTests
         await db.SaveChangesAsync();
         var timeProvider = new Mock<IDateTimeProvider>();
         timeProvider.Setup(t => t.UtcNow).Returns(FixedUtcNow);
-        var refreshMock = new Mock<IRefreshTokenService>();
-        var svc = new UserAuthorizationService(db, refreshMock.Object,
+        var accountLockoutMock = new Mock<IAccountLockoutService>();
+        var svc = new UserAuthorizationService(db, Mock.Of<IRefreshTokenService>(), accountLockoutMock.Object,
             Mock.Of<IFeatureCleanupService>(), timeProvider.Object, Mock.Of<ISecurityStampCache>());
 
         var result = await svc.VerifyCredentialsAsync("locked", DefaultPassword, 5, 30);
@@ -502,15 +508,15 @@ public class UserAuthorizationServiceTests
         await db.SaveChangesAsync();
         var timeProvider = new Mock<IDateTimeProvider>();
         timeProvider.Setup(t => t.UtcNow).Returns(FixedUtcNow);
-        var refreshMock = new Mock<IRefreshTokenService>();
-        var svc = new UserAuthorizationService(db, refreshMock.Object,
+        var accountLockoutMock = new Mock<IAccountLockoutService>();
+        var svc = new UserAuthorizationService(db, Mock.Of<IRefreshTokenService>(), accountLockoutMock.Object,
             Mock.Of<IFeatureCleanupService>(), timeProvider.Object, Mock.Of<ISecurityStampCache>());
 
         var result = await svc.VerifyCredentialsAsync("locked", "wrong-password", 5, 30);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(CredentialCheckStatus.InvalidCredentials, result.Status);
-        refreshMock.Verify(r => r.RecordFailedLoginAsync(It.IsAny<User>(), 5, 30, FixedUtcNow, It.IsAny<CancellationToken>()), Times.Once);
+        accountLockoutMock.Verify(a => a.RecordFailedLoginAsync(It.IsAny<User>(), 5, 30, FixedUtcNow, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -531,15 +537,17 @@ public class UserAuthorizationServiceTests
         await db.SaveChangesAsync();
         var timeProvider = new Mock<IDateTimeProvider>();
         timeProvider.Setup(t => t.UtcNow).Returns(FixedUtcNow);
-        var refreshMock = new Mock<IRefreshTokenService>();
-        var svc = new UserAuthorizationService(db, refreshMock.Object,
+        var accountLockoutMock = new Mock<IAccountLockoutService>();
+        var svc = new UserAuthorizationService(db, Mock.Of<IRefreshTokenService>(), accountLockoutMock.Object,
             Mock.Of<IFeatureCleanupService>(), timeProvider.Object, Mock.Of<ISecurityStampCache>());
 
         var result = await svc.VerifyCredentialsAsync("locked", DefaultPassword, 5, 30);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(CredentialCheckStatus.Locked, result.Status);
-        refreshMock.Verify(r => r.RecordFailedLoginAsync(It.IsAny<User>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()), Times.Never);
+        accountLockoutMock.Verify(
+            a => a.RecordFailedLoginAsync(It.IsAny<User>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -548,15 +556,17 @@ public class UserAuthorizationServiceTests
         using var db = CreateInMemoryDb("VerifyUnknown");
         var timeProvider = new Mock<IDateTimeProvider>();
         timeProvider.Setup(t => t.UtcNow).Returns(FixedUtcNow);
-        var refreshMock = new Mock<IRefreshTokenService>();
-        var svc = new UserAuthorizationService(db, refreshMock.Object,
+        var accountLockoutMock = new Mock<IAccountLockoutService>();
+        var svc = new UserAuthorizationService(db, Mock.Of<IRefreshTokenService>(), accountLockoutMock.Object,
             Mock.Of<IFeatureCleanupService>(), timeProvider.Object, Mock.Of<ISecurityStampCache>());
 
         var result = await svc.VerifyCredentialsAsync("no-such-user", DefaultPassword, 5, 30);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(CredentialCheckStatus.InvalidCredentials, result.Status);
-        refreshMock.Verify(r => r.RecordFailedLoginAsync(It.IsAny<User>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()), Times.Never);
+        accountLockoutMock.Verify(
+            a => a.RecordFailedLoginAsync(It.IsAny<User>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -874,7 +884,7 @@ public class UserAuthorizationServiceTests
         var refreshMock = new Mock<IRefreshTokenService>();
         var stampCacheMock = new Mock<ISecurityStampCache>();
         var svc = new UserAuthorizationService(db, refreshMock.Object,
-            Mock.Of<IFeatureCleanupService>(), Mock.Of<IDateTimeProvider>(), stampCacheMock.Object);
+            Mock.Of<IAccountLockoutService>(), Mock.Of<IFeatureCleanupService>(), Mock.Of<IDateTimeProvider>(), stampCacheMock.Object);
 
         var result = await svc.UpdateManagedUserAsync(
             callerId, UserRoles.NationalAdmin, callerCommuneId: null, callerDairaId: null, callerWilayaId: null,
@@ -974,7 +984,7 @@ public class UserAuthorizationServiceTests
         var stampCacheMock = new Mock<ISecurityStampCache>();
         var timeProvider = Mock.Of<IDateTimeProvider>();
         var svc = new UserAuthorizationService(db, refreshMock.Object,
-            Mock.Of<IFeatureCleanupService>(), timeProvider, stampCacheMock.Object);
+            Mock.Of<IAccountLockoutService>(), Mock.Of<IFeatureCleanupService>(), timeProvider, stampCacheMock.Object);
 
         var result = await svc.UpdateManagedUserAsync(
             callerId, UserRoles.NationalAdmin, callerCommuneId: null, callerDairaId: null, callerWilayaId: null,

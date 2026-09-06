@@ -1,7 +1,5 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using Moq;
 using NarsApi.Data;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
@@ -28,21 +26,18 @@ public class NumberEntrancesServiceTests(NarsDatabaseFixture fixture) : ServiceT
     private NumberEntrancesService CreateService() =>
         new(Fixture.CreateDbContextFactory());
 
-    private async Task<(Guid RoadId, FieldService FieldService)> CreateRoadWithFieldServiceAsync()
+    private async Task<(Guid RoadId, EntranceService EntranceService)> CreateRoadWithEntranceServiceAsync()
     {
         var coords = """{"coordinates":[{"lat":36.4,"lng":2.9},{"lat":36.4,"lng":3.1}]}""";
         var roadId = await TestData.AddRoadAsync(Db, _userId, coords, registerInFeatureRegistry: true);
-        var fieldService = new FieldService(
-            Fixture.CreateDbContextFactory(),
-            Mock.Of<IFeatureService>(),
-            Mock.Of<ILogger<FieldService>>());
-        return (roadId, fieldService);
+        var entranceService = new EntranceService(Fixture.CreateDbContextFactory());
+        return (roadId, entranceService);
     }
 
-    private async Task<Guid> CreateEntranceAsync(FieldService fieldService, Guid roadId, string side)
+    private async Task<Guid> CreateEntranceAsync(EntranceService entranceService, Guid roadId, string side)
     {
         var data = JsonSerializer.Serialize(new { side });
-        return await fieldService.CreateEntranceAsync(roadId, _userId, _userId, "Entrance", data);
+        return await entranceService.CreateEntranceAsync(roadId, _userId, _userId, "Entrance", data);
     }
 
     private async Task<string?> GetEntranceDataJsonAsync(Guid entranceId)
@@ -68,11 +63,11 @@ public class NumberEntrancesServiceTests(NarsDatabaseFixture fixture) : ServiceT
     [Fact]
     public async Task NumberAsync_DenseSequenceInRequestOrder_AssignsOddLeftEvenRight()
     {
-        var (roadId, fieldService) = await CreateRoadWithFieldServiceAsync();
-        var left1 = await CreateEntranceAsync(fieldService, roadId, "left");
-        var left2 = await CreateEntranceAsync(fieldService, roadId, "left");
-        var right1 = await CreateEntranceAsync(fieldService, roadId, "right");
-        var right2 = await CreateEntranceAsync(fieldService, roadId, "right");
+        var (roadId, entranceService) = await CreateRoadWithEntranceServiceAsync();
+        var left1 = await CreateEntranceAsync(entranceService, roadId, "left");
+        var left2 = await CreateEntranceAsync(entranceService, roadId, "left");
+        var right1 = await CreateEntranceAsync(entranceService, roadId, "right");
+        var right2 = await CreateEntranceAsync(entranceService, roadId, "right");
 
         var numbered = await CreateService().NumberAsync(
             _userId, roadId, [left1, left2, right1, right2], CancellationToken.None);
@@ -107,14 +102,14 @@ public class NumberEntrancesServiceTests(NarsDatabaseFixture fixture) : ServiceT
     [Fact]
     public async Task NumberAsync_ExistingNumberedEntrances_SeedsUsedSet()
     {
-        var (roadId, fieldService) = await CreateRoadWithFieldServiceAsync();
+        var (roadId, entranceService) = await CreateRoadWithEntranceServiceAsync();
 
         // An already-numbered left entrance at 1 (dense start).
-        await fieldService.CreateEntranceAsync(
+        await entranceService.CreateEntranceAsync(
             roadId, _userId, _userId, "Existing",
             JsonSerializer.Serialize(new { side = "left", entranceNumber = 1 }));
 
-        var newLeft = await CreateEntranceAsync(fieldService, roadId, "left");
+        var newLeft = await CreateEntranceAsync(entranceService, roadId, "left");
 
         var numbered = await CreateService().NumberAsync(
             _userId, roadId, [newLeft], CancellationToken.None);
@@ -128,9 +123,9 @@ public class NumberEntrancesServiceTests(NarsDatabaseFixture fixture) : ServiceT
     [Fact]
     public async Task NumberAsync_ConcurrentBatchesOnSameRoad_ProduceDisjointNumbers()
     {
-        var (roadId, fieldService) = await CreateRoadWithFieldServiceAsync();
-        var left1 = await CreateEntranceAsync(fieldService, roadId, "left");
-        var left2 = await CreateEntranceAsync(fieldService, roadId, "left");
+        var (roadId, entranceService) = await CreateRoadWithEntranceServiceAsync();
+        var left1 = await CreateEntranceAsync(entranceService, roadId, "left");
+        var left2 = await CreateEntranceAsync(entranceService, roadId, "left");
         var service = CreateService();
 
         var t1 = service.NumberAsync(_userId, roadId, [left1], CancellationToken.None);

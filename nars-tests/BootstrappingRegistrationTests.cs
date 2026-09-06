@@ -109,9 +109,12 @@ public class BootstrappingRegistrationTests : IDisposable
         Assert.IsType<BackgroundTaskQueue>(sp.GetRequiredService<IBackgroundTaskQueue>());
         Assert.IsType<FeatureService>(sp.GetRequiredService<IFeatureService>());
         Assert.IsType<FieldService>(sp.GetRequiredService<IFieldService>());
+        Assert.IsType<InspectionService>(sp.GetRequiredService<IInspectionService>());
+        Assert.IsType<EntranceService>(sp.GetRequiredService<IEntranceService>());
         Assert.IsType<ValidationService>(sp.GetRequiredService<IValidationService>());
         Assert.IsType<JwtService>(sp.GetRequiredService<IJwtService>());
         Assert.IsType<RefreshTokenService>(sp.GetRequiredService<IRefreshTokenService>());
+        Assert.IsType<AccountLockoutService>(sp.GetRequiredService<IAccountLockoutService>());
         Assert.IsType<ScatteredAreaService>(sp.GetRequiredService<IScatteredAreaService>());
         Assert.IsType<UserAuthorizationService>(sp.GetRequiredService<IUserAuthorizationService>());
         Assert.IsType<BoundaryService>(sp.GetRequiredService<IBoundaryService>());

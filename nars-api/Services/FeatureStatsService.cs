@@ -133,7 +133,8 @@ public sealed class FeatureStatsService(
         return await FeatureQueryHelper.LoadAllFeaturesAsync(conn, userId, skip, take, logger, ct);
     }
 
-    public async Task<(List<FeatureResult> features, long totalCount)> LoadByLayerAsync(Guid userId, string layer, int skip, int take, CancellationToken ct = default)
+    public async Task<(List<FeatureResult> features, long totalCount)> LoadByLayerAsync(
+        Guid userId, string layer, int skip, int take, CancellationToken ct = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var conn = db.Database.GetDbConnection();

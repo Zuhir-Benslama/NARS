@@ -14,7 +14,13 @@ namespace NarsApi.Services;
 /// The configuration (secret, issuer, audience) is injected via the constructor
 /// to ensure consistency with the Authentication middleware.
 /// </summary>
-public sealed class JwtService(string secret, string? issuer, string? audience, IOptions<JwtOptions> jwtOptions, ILogger<JwtService> logger, IDateTimeProvider timeProvider) : IJwtService
+public sealed class JwtService(
+    string secret,
+    string? issuer,
+    string? audience,
+    IOptions<JwtOptions> jwtOptions,
+    ILogger<JwtService> logger,
+    IDateTimeProvider timeProvider) : IJwtService
 {
     // Thread-safe: JwtSecurityTokenHandler is safe for concurrent reads after initialization.
     // MapInboundClaims=false keeps claim types verbatim ("role", "email", ...) instead of

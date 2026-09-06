@@ -62,7 +62,14 @@ public sealed class LocationSearchService(IDbContextFactory<AppDbContext> dbFact
 
         var total = await q.CountAsync(ct);
         var items = await q.OrderBy(c => c.CommuneFr).ThenBy(c => c.CommuneId).Skip(skip).Take(take)
-            .Select(c => new CommuneItem(c.CommuneId, c.CommuneFr, c.CommuneAr, c.CommuneCode == null ? null : c.CommuneCode.ToString(), c.CommuneLatitude, c.CommuneLongitude, c.CommuneName ?? ""))
+            .Select(c => new CommuneItem(
+                c.CommuneId,
+                c.CommuneFr,
+                c.CommuneAr,
+                c.CommuneCode == null ? null : c.CommuneCode.ToString(),
+                c.CommuneLatitude,
+                c.CommuneLongitude,
+                c.CommuneName ?? ""))
             .ToListAsync(ct);
 
         return new PagedResponse<CommuneItem>(items, total, skip, take);
