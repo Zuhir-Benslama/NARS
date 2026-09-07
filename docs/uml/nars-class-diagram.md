@@ -204,21 +204,29 @@ classDiagram
 
     class IRefreshTokenService {
         <<interface>>
-        +IssueRefreshTokenAsync(userId) (raw, hash, expiresAt)
-        +RotateRefreshTokenAsync(rawToken) RefreshTokenResult
-        +MintAccessTokenAsync(rawToken) RefreshTokenResult
-        +RevokeAllUserTokensAsync(userId) Task
-        +RecordFailedLoginAsync(user, maxFailedAttempts, lockoutMinutes, utcNow) Task
-        +ResetFailedAttemptsIfNeededAsync(user) Task
+        +IssueRefreshTokenAsync(userId, cancellationToken) (raw, hash, expiresAt)
+        +RotateRefreshTokenAsync(rawRefreshToken, cancellationToken) RefreshTokenResult
+        +MintAccessTokenAsync(rawRefreshToken, cancellationToken) RefreshTokenResult
+        +RevokeAllUserTokensAsync(userId, cancellationToken) Task
     }
 
+    class IAccountLockoutService {
+        <<interface>>
+        +RecordFailedLoginAsync(user, maxFailedAttempts, lockoutMinutes, utcNow, cancellationToken) Task
+        +ResetFailedAttemptsIfNeededAsync(user, cancellationToken) Task
+    }
+
+    class AccountLockoutService {
+        +RecordFailedLoginAsync(user, maxFailedAttempts, lockoutMinutes, utcNow, cancellationToken) Task
+        +ResetFailedAttemptsIfNeededAsync(user, cancellationToken) Task
+    }
+    IAccountLockoutService <|.. AccountLockoutService
+
     class RefreshTokenService {
-        +IssueRefreshTokenAsync(userId) (raw, hash, expiresAt)
-        +RotateRefreshTokenAsync(rawToken) RefreshTokenResult
-        +MintAccessTokenAsync(rawToken) RefreshTokenResult
-        +RevokeAllUserTokensAsync(userId) Task
-        +RecordFailedLoginAsync(user, maxFailedAttempts, lockoutMinutes, utcNow) Task
-        +ResetFailedAttemptsIfNeededAsync(user) Task
+        +IssueRefreshTokenAsync(userId, cancellationToken) (raw, hash, expiresAt)
+        +RotateRefreshTokenAsync(rawRefreshToken, cancellationToken) RefreshTokenResult
+        +MintAccessTokenAsync(rawRefreshToken, cancellationToken) RefreshTokenResult
+        +RevokeAllUserTokensAsync(userId, cancellationToken) Task
     }
     IRefreshTokenService <|.. RefreshTokenService
 
@@ -288,12 +296,32 @@ classDiagram
         <<interface>>
         +QueryFeaturesAsync(descriptor, communeId, skip, take, ct) (items, total)
         +GetFeatureOwnerAsync(featureType, featureId, ct) (userId, communeId)?
-        +GetInspectionsAsync(featureId, skip, take, ct) Task~List~FieldInspectionResponse~~
-        +GetRoadOwnerAsync(roadId, ct) (ownerUserId, communeId)?
-        +CreateEntranceAsync(roadId, ownerUserId, creatorUserId, label, data, ct) Task~Guid~
         +GetFeatureRegistryTypeAsync(featureId, ct) Task~string?~
+    }
+
+    class IInspectionService {
+        <<interface>>
+        +GetInspectionsAsync(featureId, skip, take, ct) Task~List~FieldInspectionResponse~~
         +SubmitInspectionAsync(featureId, userId, type, status, data, ct) Task~SubmitInspectionResult~
     }
+
+    class InspectionService {
+        +GetInspectionsAsync(featureId, skip, take, ct) Task~List~FieldInspectionResponse~~
+        +SubmitInspectionAsync(featureId, userId, type, status, data, ct) Task~SubmitInspectionResult~
+    }
+    IInspectionService <|.. InspectionService
+
+    class IEntranceService {
+        <<interface>>
+        +GetRoadOwnerAsync(roadId, ct) (ownerUserId, communeId)?
+        +CreateEntranceAsync(roadId, ownerUserId, creatorUserId, label, data, ct) Task~Guid~
+    }
+
+    class EntranceService {
+        +GetRoadOwnerAsync(roadId, ct) (ownerUserId, communeId)?
+        +CreateEntranceAsync(roadId, ownerUserId, creatorUserId, label, data, ct) Task~Guid~
+    }
+    IEntranceService <|.. EntranceService
 
     class IScatteredAreaService {
         <<interface>>
@@ -554,6 +582,10 @@ classDiagram
     SpatialController --> IScatteredAreaService
     SpatialController --> IEntranceQueryService
     FieldController --> IFieldService
+    FieldController --> IInspectionService
+    FieldController --> IEntranceService
+    AuthController --> IAccountLockoutService
+    AdminSignupController --> IAccountLockoutService
     LocationsController --> IBoundaryService
     LocationsController --> ILocationQueryService
     LocationsController --> ILocationSearchService

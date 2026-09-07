@@ -73,7 +73,7 @@ dotnet build --configuration Release
 dotnet run
 
 # Run tests
-dotnet test ../nars-tests
+dotnet test NarsApi.Tests
 
 # New migration
 dotnet ef migrations add <Name>
@@ -86,7 +86,7 @@ dotnet ef migrations add <Name>
 - 10 test files (2,249 lines), 4 integration + 6 unit
 
 ```bash
-dotnet test ../nars-tests
+dotnet test NarsApi.Tests
 ```
 
 ## Security

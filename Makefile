@@ -60,6 +60,11 @@ CHECKMAKE_IMAGE     ?= quay.io/checkmake/checkmake:v0.3.0@sha256:375280dd16214ae
 NGINX_IMAGE          ?= nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
 # sqlfluff v3.3.0 — syntax check for migration/baseline SQL (see infra-lint-sql).
 SQLFLUFF_IMAGE       ?= sqlfluff/sqlfluff:3.3.0@sha256:99c4be1cd1af25344154b8d349d3208573c5c106f2617544fe8c6f85f3a50ad2
+# markdownlint v0.18.1 (mdl) — lint docs markdown (see infra-lint-markdown).
+# Numeric tags are markdownlint-cli0.x versions; the Ruby CLI entrypoint takes
+# the explicit file list (no shell globbing), so the Makefile expands the list.
+# The gate drives it with the Ruby style DSL at nars-infra/.markdownlint.rb.
+MARKDOWNLINT_IMAGE   ?= markdownlint/markdownlint:0.18.1@sha256:76308d71bcc351d1f995bc1ca09f6c8014047f7018d6d87415e99bd04afc9c35
 OBSERVABILITY_NAMESPACE ?= observability
 LOG_DIR             ?= /tmp/nars
 MIGRATIONS_DIR      ?= nars-infra/migrations

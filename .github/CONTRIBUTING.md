@@ -6,7 +6,7 @@ NARS (National Addressing Reference System) is a full-stack geospatial applicati
 
 - **nars-api/** — ASP.NET Core 10 backend API (C#, EF Core + PostGIS)
 - **nars-web/** — Vue 3 + TypeScript frontend SPA (Maplibre GL JS + Geoman)
-- **nars-tests/** — xUnit unit tests + Testcontainers-based integration tests
+- **nars-api/NarsApi.Tests/** — xUnit unit tests + Testcontainers-based integration tests
 
 ---
 
@@ -69,7 +69,7 @@ nars-infra/                 — Infrastructure configs
 └── scripts/                — DB creation scripts, admin bootstrap, mermaid tooling
 nars-api/                   — ASP.NET Core 10 backend
 nars-web/                   — Vue 3 + TypeScript frontend
-nars-tests/                 — Backend unit + integration tests (xUnit)
+nars-api/NarsApi.Tests/       — Backend unit + integration tests (xUnit)
 Makefile                    — Cluster management entry point
 ```
 
@@ -98,8 +98,8 @@ dotnet restore
 dotnet build --configuration Release
 dotnet run                              # starts on http://localhost:5000
 dotnet watch run                        # hot reload
-dotnet test ../nars-tests               # run all tests (unit + integration)
-dotnet test ../nars-tests --filter "FullyQualifiedName!~Integration"  # unit only
+dotnet test NarsApi.Tests                   # run all tests (unit + integration)
+dotnet test NarsApi.Tests --filter "FullyQualifiedName!~Integration"  # unit only
 dotnet ef migrations add <Name>         # add a new migration
 dotnet ef database update               # apply migrations
 ```
@@ -159,19 +159,19 @@ nars-web/src/
 
 ## Testing
 
-### Backend Tests (nars-tests/)
+### Backend Tests (nars-api/NarsApi.Tests/)
 
 xUnit with Moq for unit tests and Testcontainers.PostgreSql for integration tests.
 
 ```bash
 # Unit tests only (fast, no database needed)
-dotnet test nars-tests --filter "FullyQualifiedName!~Integration"
+dotnet test nars-api/NarsApi.Tests --filter "FullyQualifiedName!~Integration"
 
 # Integration tests (requires Docker for Testcontainers)
-dotnet test nars-tests --filter "FullyQualifiedName~Integration"
+dotnet test nars-api/NarsApi.Tests --filter "FullyQualifiedName~Integration"
 
 # All tests
-dotnet test nars-tests
+dotnet test nars-api/NarsApi.Tests
 ```
 
 Integration tests spin up a real PostGIS container via Testcontainers. Docker must be running.

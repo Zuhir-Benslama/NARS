@@ -8,7 +8,11 @@
 # png-to-pdf.py). docs-uml-pdf wraps it so regeneration is one repeatable,
 # documented command (previously the committed PDF drifted 10 days behind a
 # class-diagram edit that removed OwnsFeatureAsync / dead UserProfileService
-# methods).
+# methods). `make docs-lint` is the CI gate for docs/: it renders every
+# mermaid block (docs-lint-uml), lints the markdown (infra-lint-markdown), and
+# checks the backend class diagram against nars-api source, so a deleted or
+# renamed type/member fails CI instead of silently rotting
+# (infra-lint-uml-drift).
 #
 # The technical report is authored in docs/nars_documentation.tex.
 # docs-tex-pdf runs two pdflatex passes (for TOC/cref resolution).
@@ -32,6 +36,11 @@ _check-playwright:
 		echo "✖ Playwright (Firefox) is not resolvable from nars-web/ — run 'npm ci' in nars-web first."; \
 		exit 1; \
 	fi
+
+.PHONY: docs-lint
+docs-lint: docs-lint-uml ## CI gate: render UML diagrams, lint docs markdown, check class-diagram drift
+	$(SUBMAKE) infra-lint-markdown
+	$(SUBMAKE) infra-lint-uml-drift
 
 # CI gate: render every ```mermaid block under docs/uml and fail if any diagram
 # does not render (or if the renderer finds no src / no diagrams). Shared with

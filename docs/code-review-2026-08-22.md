@@ -35,7 +35,7 @@ mypy + pytest green in the rebuilt `nars-roads:test` image · 72/72 tests,
 | L10 | Security-stamp cache invalidation is per-node; other replicas served stale stamps up to TTL after rotation | Postgres trigger (`migration AddStampEvictionNotifyTrigger`) fires `pg_notify('nars_stamp_evict', userId)` on `security_stamp` change; `StampEvictionListener` (BackgroundService) LISTENs and evicts locally, with reconnect loop; no external dependency added |
 | L11 | Login CSRF: unauthenticated POSTs bypassed antiforgery, so a cross-site form could log a victim into an attacker's account | Origin validation for unsafe methods on `/api`: present `Origin` must match an allowed origin or the request origin, else 403 (absent Origin = non-browser client = allowed); skipped in Development like antiforgery; pure decision function unit-tested |
 
-## Deliberately kept
+## Deliberately kept (nars-api)
 
 - `AiDraftFeature.TypeRoad` / `StatusEdited` constants referenced by frontend.
 - Anonymous `/health` endpoints — aggregate status string only; monitoring
@@ -76,7 +76,7 @@ test suites, plus new regression coverage listed below).
 | L6 | Logger shipped full URLs including query strings (`?search=…` user input) to the error-log pipeline | `stripUrlQuery` on the url field AND url/method removed from the free-form context blob so the query can't leak via JSON.stringify |
 | L7 | Minors | edit-commit: readGeomanGeometry failure now aborts the commit with an error toast instead of silently PUTting stale pre-edit data; map-init: concurrent base-layer switch queued latest-wins (awaitable) instead of dropped, keeping UI active-style state honest; ProfileMenu logout guarded against double-submit |
 
-### Deliberately kept
+### Deliberately kept (nars-web)
 
 - `pointInMunicipalLimit` / `pointInScatteredArea` have no production caller
   today, but they are the only readers of hit-test state that live loaders

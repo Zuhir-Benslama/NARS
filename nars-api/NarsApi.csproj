@@ -7,6 +7,14 @@
     <RootNamespace>NarsApi</RootNamespace>
   </PropertyGroup>
 
+  <!-- NarsApi.Tests is a sibling test project nested under this directory; the SDK
+       default globs would otherwise compile its sources into the web assembly. -->
+  <ItemGroup>
+    <Compile Remove="NarsApi.Tests\**" />
+    <EmbeddedResource Remove="NarsApi.Tests\**" />
+    <None Remove="NarsApi.Tests\**" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="NarsApi.Tests" />
   </ItemGroup>

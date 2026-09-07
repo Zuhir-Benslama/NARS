@@ -65,7 +65,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\nars-api\NarsApi.csproj" />
+    <ProjectReference Include="..\NarsApi.csproj" />
   </ItemGroup>
 
   <ItemGroup>

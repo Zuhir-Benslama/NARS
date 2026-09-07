@@ -40,7 +40,7 @@ A full-stack geographic data management application for urban addressing across 
 | `nars-web/` | Vue 3 + TypeScript web frontend | [`nars-web/README.md`](nars-web/README.md) | [`nars-web/TODO.md`](nars-web/TODO.md) |
 | `nars-roads/` | FastAPI segmentation service — aerial tile in, GeoJSON draft features out | — | [`nars-roads/TODO.md`](nars-roads/TODO.md) |
 | `nars-infra/` | k8s manifests, init/migration scripts, Dockerfiles | — | — |
-| `nars-tests/` | Backend unit & integration tests (Testcontainers) | — | — |
+| `nars-api/NarsApi.Tests/` | Backend unit & integration tests (Testcontainers) | — | — |
 
 ## Quick Start
 

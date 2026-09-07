@@ -1,22 +1,22 @@
-# Included by the top-level Makefile (GNU make: single instance, shared vars). Target grouping: backend (nars-tests) + roads test suites.
+# Included by the top-level Makefile (GNU make: single instance, shared vars). Target grouping: backend (nars-api/NarsApi.Tests) + roads test suites.
 
 
 .PHONY: test
 test: ## Run all tests
-	dotnet test nars-tests/NarsApi.Tests.csproj --no-restore
+	dotnet test nars-api/NarsApi.Tests/NarsApi.Tests.csproj --no-restore
 
 .PHONY: test-unit
 test-unit: ## Run only unit tests (no Postgres container)
-	dotnet test nars-tests/NarsApi.Tests.csproj --no-restore --filter "Category!=Service"
+	dotnet test nars-api/NarsApi.Tests/NarsApi.Tests.csproj --no-restore --filter "Category!=Service"
 
 .PHONY: test-service
 test-service: ## Run only Postgres-backed service tests (requires Docker for Testcontainers)
 	@docker info >/dev/null 2>&1 || { echo "✖ Docker daemon is not running (required by Testcontainers)"; exit 1; }
-	dotnet test nars-tests/NarsApi.Tests.csproj --no-restore --filter "Category=Service"
+	dotnet test nars-api/NarsApi.Tests/NarsApi.Tests.csproj --no-restore --filter "Category=Service"
 
 .PHONY: test-coverage
 test-coverage: ## Run unit tests with coverage and enforce thresholds (coverlet.msbuild; no Postgres container)
-	dotnet test nars-tests/NarsApi.Tests.csproj --no-restore \
+	dotnet test nars-api/NarsApi.Tests/NarsApi.Tests.csproj --no-restore \
 		--filter "Category!=Service" \
 		/p:CollectCoverage=true \
 		/p:CoverletOutputFormat=cobertura \

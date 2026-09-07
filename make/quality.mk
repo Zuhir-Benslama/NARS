@@ -9,7 +9,7 @@ lint: ## Run cross-project linting (.NET format + infra linters)
 	$(SUBMAKE) infra-lint
 
 .PHONY: infra-lint
-infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, makefile, checkmake, sql, nginx, tag guard, observability security)
+infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, makefile, checkmake, sql, nginx, tag guard, observability security, markdown, uml drift)
 	$(SUBMAKE) infra-lint-shell
 	$(SUBMAKE) infra-lint-docker
 	$(SUBMAKE) infra-lint-yaml
@@ -22,6 +22,8 @@ infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, ma
 	$(SUBMAKE) infra-lint-tag-guard
 	$(SUBMAKE) infra-lint-local-ingress-guard
 	$(SUBMAKE) infra-lint-observability-security
+	$(SUBMAKE) infra-lint-markdown
+	$(SUBMAKE) infra-lint-uml-drift
 
 # File lists resolved by make ($(wildcard)) at parse time and /mnt-prefixed
 # for container use. Shell globs like /mnt/**/*.yaml must NOT be used in
@@ -34,6 +36,10 @@ DOCKERFILES       := $(wildcard nars-infra/docker/Dockerfile.*)
 YAML_FILES        := $(wildcard nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml nars-infra/roads/*.yaml .github/workflows/*.yml)
 NODE_SCRIPTS      := $(wildcard nars-infra/scripts/*.mjs)
 MIGRATIONS_SQL    := $(wildcard nars-infra/migrations/*.sql nars-infra/scripts/postgis-migration-baseline.sql)
+# docs/**/*.md — markdown lint gate (infra-lint-markdown). UML diagrams are
+# additionally gated by docs-lint-uml (render) and infra-lint-uml-drift
+# (nars-class-diagram.md vs nars-api source).
+DOCS_MD           := $(wildcard docs/*.md docs/uml/*.md)
 # nginx.nars-vite.conf is not a wildcard target — it is the frontend server block
 NGINX_CONF        := nars-infra/docker/nginx.nars-vite.conf
 NGINX_SNIPPET     := nars-infra/docker/proxy-common-snippet.conf
@@ -41,6 +47,7 @@ SHELL_SCRIPTS_MNT := $(patsubst %,/mnt/%,$(SHELL_SCRIPTS))
 DOCKERFILES_MNT   := $(patsubst %,/mnt/%,$(DOCKERFILES))
 YAML_FILES_MNT    := $(patsubst %,/mnt/%,$(YAML_FILES))
 MIGRATIONS_SQL_MNT := $(patsubst %,/mnt/%,$(MIGRATIONS_SQL))
+DOCS_MD_MNT       := $(patsubst %,/mnt/%,$(DOCS_MD))
 
 .PHONY: infra-lint-shell
 infra-lint-shell: ## Shell-check nars-infra/scripts/*.sh
@@ -124,7 +131,7 @@ infra-lint-checkmake: ## Lint the root Makefile with checkmake (config: checkmak
 	fi
 
 .PHONY: infra-lint-sql
-infra-lint-sql: ## Syntax-check migration/baseline SQL with sqlfluff (postgres dialect)
+infra-lint-sql: ## Syntax-check migration/baseline/seed SQL with sqlfluff (postgres dialect)
 # Only files WITHOUT psql meta-commands (\c, \gexec, ...) belong in this list —
 # sqlfluff is a SQL parser, not a psql meta-command interpreter. That rules out
 # scripts/create_nars_db.sql, which relies on \gexec/\c.
@@ -141,7 +148,21 @@ infra-lint-sql: ## Syntax-check migration/baseline SQL with sqlfluff (postgres d
 				parse --dialect postgres "$$f" >/dev/null || exit 1; \
 		done \
 	fi
-	@echo "✓ SQL syntax OK ($(MIGRATIONS_SQL))"
+	@echo "→ sqlfluff parse docs/seed_reference_data.sql (statements only)..."
+	# The seed file is a psql COPY data dump: each block is
+	# "COPY ... FROM stdin;" followed by tab-separated data rows until a
+	# lone "\." terminator. The data rows are NOT SQL, so strip every data
+	# block and parse the remaining statements (transaction, guards, TRUNCATE,
+	# VACUUM ANALYZE) with the postgres dialect.
+	@_tmp=$$(mktemp); trap 'rm -f "$$_tmp"' EXIT; \
+	awk 'BEGIN{skip=0} /^COPY /{skip=1} skip{ if (/^\\\.$$/) skip=0; next } {print}' docs/seed_reference_data.sql > "$$_tmp"; \
+	if command -v sqlfluff >/dev/null 2>&1; then \
+		sqlfluff parse --dialect postgres "$$_tmp" >/dev/null; \
+	else \
+		docker run --rm -i -v "$$(pwd):/mnt:ro" $(SQLFLUFF_IMAGE) parse --dialect postgres - < "$$_tmp" >/dev/null; \
+	fi \
+	|| { echo "✖ docs/seed_reference_data.sql failed to parse (statements only)"; exit 1; }
+	@echo "✓ SQL syntax OK ($(MIGRATIONS_SQL) docs/seed_reference_data.sql)"
 
 .PHONY: infra-lint-nginx
 infra-lint-nginx: ## Validate nginx frontend config with `nginx -t`
@@ -246,3 +267,23 @@ infra-lint-observability-security: ## Assert _check-observability-security rejec
 	@echo "→ Verifying _check-observability-security warns (skips) in dev..."
 	@DEPLOY_ENV=dev $(SUBMAKE) _check-observability-security
 	@echo "  ✓ dev skips observability security check"
+
+.PHONY: infra-lint-markdown
+infra-lint-markdown: ## Lint docs markdown with markdownlint (style: nars-infra/.markdownlint.rb)
+	@if [ -z "$(DOCS_MD)" ]; then echo "✓ No markdown files to check"; exit 0; fi
+	@if command -v mdl >/dev/null 2>&1; then
+		mdl -s nars-infra/.markdownlint.rb $(DOCS_MD)
+	else
+		docker run --rm -v "$$(pwd):/mnt:ro" $(MARKDOWNLINT_IMAGE) \
+			-s /mnt/nars-infra/.markdownlint.rb $(DOCS_MD_MNT)
+	fi
+
+# Internal: assert docs/uml/nars-class-diagram.md is in sync with nars-api.
+# docs-lint-uml proves only that the mermaid parses; this gate proves every
+# type and member listed in the backend class diagram exists in the source
+# (it previously missed a refactor that moved lockout out of RefreshTokenService
+# and inspection/entrance out of FieldService).
+.PHONY: infra-lint-uml-drift
+infra-lint-uml-drift: ## Assert nars-class-diagram.md types/members exist in nars-api (drift guard)
+	@command -v python3 >/dev/null 2>&1 || { echo "✖ python3 is not installed (required for infra-lint-uml-drift)"; exit 1; }
+	@python3 nars-infra/scripts/check_uml_class_diagram.py
