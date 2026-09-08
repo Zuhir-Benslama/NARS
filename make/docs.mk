@@ -20,6 +20,7 @@
 # Dependencies (checked by each target):
 #   docs-uml-pdf: node + Playwright (Firefox) from nars-web/ + mermaid@11 CDN
 #   docs-tex-pdf: pdflatex (texlive)
+#   docs-tex-lint: docker (digest-pinned texlive image)
 
 UML_SRC_DIR      ?= docs/uml
 UML_BUILD_DIR    ?= $(LOG_DIR)/uml-build
@@ -86,3 +87,31 @@ docs-tex-pdf: ## Regenerate docs/pdf/nars_documentation.pdf from docs/nars_docum
 	@mkdir -p docs/pdf
 	@cp "$(TEX_BUILD_DIR)/nars_documentation.pdf" docs/pdf/nars_documentation.pdf
 	@echo "✓ docs/pdf/nars_documentation.pdf regenerated from docs/nars_documentation.tex"
+
+# CI gate: prove the committed .tex compiles (2 passes). The tex source is
+# committed but docs/pdf/*.pdf are gitignored build artifacts, so without a
+# gate a LaTeX error or a source edit that breaks the build ships silently and
+# the shipped PDF goes stale (see docs/code-review D4). Docs-lint-uml is the
+# renderer gate for docs/uml/*.md; this is the equivalent for the report —
+# compilation is proven in the pinned texlive image, while the actual PDF
+# regen stays manual (docs-tex-pdf). Mounts the repo read-only at /mnt and
+# runs from /mnt/docs so relative \includegraphics/\input keep their paths;
+# build artifacts land in a host temp dir (kept on failure for the log).
+.PHONY: docs-tex-lint
+docs-tex-lint: ## CI gate: prove docs/nars_documentation.tex compiles (2 passes, pinned texlive image)
+	@command -v docker >/dev/null 2>&1 || { echo "✖ docs-tex-lint needs docker"; exit 1; }
+	@if ! docker image inspect $(TEX_IMAGE) >/dev/null 2>&1; then docker pull $(TEX_IMAGE) >/dev/null; fi
+	@tmpdir=$$(mktemp -d); trap 'rm -rf "$$tmpdir"' EXIT; \
+	if docker run --rm \
+		-v "$$(pwd):/mnt:ro" \
+		-v "$$tmpdir":/out -w /mnt/docs \
+		--entrypoint sh \
+		$(TEX_IMAGE) -c \
+		'pdflatex -interaction=nonstopmode -halt-on-error -output-directory=/out nars_documentation.tex >/dev/null 2>&1 && \
+		 pdflatex -interaction=nonstopmode -halt-on-error -output-directory=/out nars_documentation.tex >/dev/null 2>&1'; then \
+		echo "✓ docs/nars_documentation.tex compiles (2 passes)"; \
+	else \
+		echo "✖ docs/nars_documentation.tex failed to compile — log:"; \
+		tail -30 "$$tmpdir/nars_documentation.log" 2>/dev/null || true; \
+		exit 1; \
+	fi

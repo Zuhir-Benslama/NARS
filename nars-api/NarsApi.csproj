@@ -8,11 +8,14 @@
   </PropertyGroup>
 
   <!-- NarsApi.Tests is a sibling test project nested under this directory; the SDK
-       default globs would otherwise compile its sources into the web assembly. -->
+       default globs would otherwise compile its sources into the web assembly and
+       (as Content) copy the test project's bin/obj outputs into the web output,
+       which recursively re-copies itself on every build. -->
   <ItemGroup>
     <Compile Remove="NarsApi.Tests\**" />
     <EmbeddedResource Remove="NarsApi.Tests\**" />
     <None Remove="NarsApi.Tests\**" />
+    <Content Remove="NarsApi.Tests\**" />
   </ItemGroup>
 
   <ItemGroup>

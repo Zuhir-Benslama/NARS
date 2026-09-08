@@ -83,7 +83,7 @@ images-load: _warn-latest-tag ## Load locally built Docker images into the kind 
 		full="$(DOCKER_ORG)/$$img:"$(IMAGE_TAG_Q)
 		if docker image inspect "$$full" >/dev/null 2>&1; then
 			echo "→ Loading $$full into cluster..."
-			kind load docker-image "$$full" --name "$(CLUSTER_NAME)"
+			$(KIND) load docker-image "$$full" --name "$(CLUSTER_NAME)"
 		else
 			echo "  ⚠ $$full not found locally — pods will fail to start unless regcred is configured"
 		fi
@@ -93,7 +93,7 @@ images-load: _warn-latest-tag ## Load locally built Docker images into the kind 
 .PHONY: frontend-update
 frontend-update: _warn-latest-tag ## Rebuild nars-vite, load into kind, and rollout restart
 	$(SUBMAKE) _build-nars-vite
-	@kind load docker-image "$(DOCKER_ORG)/nars-vite:"$(IMAGE_TAG_Q)" --name "$(CLUSTER_NAME)"
+	@$(KIND) load docker-image "$(DOCKER_ORG)/nars-vite:"$(IMAGE_TAG_Q)" --name "$(CLUSTER_NAME)"
 	@$(KUBECTL) rollout restart deployment nars-frontend -n "$(NAMESPACE)"
 	@$(KUBECTL) rollout status deployment nars-frontend -n "$(NAMESPACE)" --timeout=120s
 	@echo "✓ nars-vite rebuilt and deployed"

@@ -20,6 +20,7 @@ DOCKER_DIR         ?= nars-infra/docker
 DOCKER_ORG         ?= zuhirbenslama
 DOCKER_USERNAME    ?= zuhirbenslama
 KUBECTL            ?= kubectl
+KIND               ?= kind
 DOCKER_TOKEN       ?=
 BACKUP_DIR         ?= backup
 DB_NAME            ?= nars_db
@@ -65,6 +66,11 @@ SQLFLUFF_IMAGE       ?= sqlfluff/sqlfluff:3.3.0@sha256:99c4be1cd1af25344154b8d34
 # the explicit file list (no shell globbing), so the Makefile expands the list.
 # The gate drives it with the Ruby style DSL at nars-infra/.markdownlint.rb.
 MARKDOWNLINT_IMAGE   ?= markdownlint/markdownlint:0.18.1@sha256:76308d71bcc351d1f995bc1ca09f6c8014047f7018d6d87415e99bd04afc9c35
+# texlive (full scheme) — compiles docs/nars_documentation.tex in CI (see
+# docs-tex-lint in make/docs.mk). Upstream publishes only rolling `latest-*`
+# tags (no version tags), so the full-scheme tag is pinned by digest; the
+# digest is immutable and keeps resolving even if the tag later moves.
+TEX_IMAGE            ?= texlive/texlive:latest@sha256:66446fb092ef02d6dc31bba079d9bdc83e8a6af00562c6062bb97ae8e91814ea
 OBSERVABILITY_NAMESPACE ?= observability
 LOG_DIR             ?= /tmp/nars
 MIGRATIONS_DIR      ?= nars-infra/migrations

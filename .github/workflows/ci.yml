@@ -185,6 +185,24 @@ jobs:
       - name: Validate docs (render UML, lint markdown, check drift)
         run: make docs-lint
 
+  # ─── Docs report (LaTeX) ─────────────────────────────────
+  # `make docs-tex-lint` compiles docs/nars_documentation.tex (two passes, for
+  # TOC/cref) inside the digest-pinned texlive/texlive image, so a LaTeX error
+  # or a source edit that breaks the build fails CI instead of shipping a
+  # stale nars_documentation.pdf. The PDF itself is a gitignored artifact
+  # regenerated manually (`make docs-tex-pdf`, see make/docs.mk) — this gate
+  # proves the committed .tex still compiles, the same principle as
+  # docs-lint-uml vs the manual docs-uml-pdf regen.
+  docs-tex:
+    name: Docs (LaTeX report)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile technical report (make docs-tex-lint)
+        run: make docs-tex-lint
+
   # ─── Infra lint (delegates to `make infra-lint`) ─────────────
   # The Makefile owns the gate list and the exact tool versions/digests
   # (see make/quality.mk + the *_IMAGE vars). CI must not hand-roll a second

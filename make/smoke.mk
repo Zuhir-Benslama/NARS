@@ -16,7 +16,7 @@ smoke-test: ## Post-deploy smoke test: verify /health, frontend, and API auth
 	echo "  1. Health endpoint...";
 	# One request: write the body to a temp file while capturing the HTTP code,
 	# so we don't curl /health twice (status probe + body probe).
-	_tmp=$$(mktemp);
+	@_tmp=$$(mktemp);
 	health=$$(curl -s -o "$$_tmp" -w "%{http_code}" --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/health" 2>/dev/null || echo "000");
 	if [ "$$health" = "200" ]; then
 		body=$$(cat "$$_tmp" 2>/dev/null || echo "");

@@ -6,7 +6,7 @@
 .PHONY: prerequisites
 prerequisites: ## Check that all required tools are installed
 	@echo "→ Checking prerequisites..."
-	@command -v kind >/dev/null 2>&1 || { echo "✖ kind is not installed → https://kind.sigs.k8s.io/docs/user/quick-start/"; exit 1; }
+	@command -v $(KIND) >/dev/null 2>&1 || { echo "✖ $(KIND) is not installed → https://kind.sigs.k8s.io/docs/user/quick-start/"; exit 1; }
 	@command -v kubectl >/dev/null 2>&1 || { echo "✖ kubectl is not installed"; exit 1; }
 	@command -v mkcert >/dev/null 2>&1 || { echo "✖ mkcert is not installed → https://github.com/FiloSottile/mkcert"; exit 1; }
 	@command -v docker >/dev/null 2>&1 || { echo "✖ docker is not installed"; exit 1; }
@@ -59,7 +59,7 @@ namespace-ensure: ## Ensure $(NAMESPACE) namespace exists (idempotent)
 .PHONY: cluster-down
 cluster-down: proxy-down _pre-cluster-down-backup ## Delete the kind cluster (auto-backs up data first)
 	@echo "→ Deleting cluster '$(CLUSTER_NAME)'..."
-	@kind delete cluster --name "$(CLUSTER_NAME)" 2>/dev/null || true
+	@$(KIND) delete cluster --name "$(CLUSTER_NAME)" 2>/dev/null || true
 	@docker rm -f kube-proxy 2>/dev/null || true
 	@echo "✓ Cluster deleted (postgis data preserved at $(POSTGRES_DATA_DIR))"
 
@@ -206,7 +206,7 @@ cluster-restart: cluster-stop cluster-start ## Stop all pods, then start them ag
 
 .PHONY: cluster-create
 cluster-create: ## Create the kind cluster with host-mounted postgis data (idempotent)
-	@if kind get clusters 2>/dev/null | grep -q "^$(CLUSTER_NAME)$$"; then
+	@if $(KIND) get clusters 2>/dev/null | grep -q "^$(CLUSTER_NAME)$$"; then
 		echo "→ Cluster '$(CLUSTER_NAME)' already exists"
 	else
 		echo "→ Creating postgis data directory at $(POSTGRES_DATA_DIR)..."
@@ -238,7 +238,7 @@ cluster-create: ## Create the kind cluster with host-mounted postgis data (idemp
 			echo '        containerPath: /mnt/nars/postgis';
 		} > "$$KIND_CFG"
 		echo "→ Creating kind cluster '$(CLUSTER_NAME)'..."
-		kind create cluster --name "$(CLUSTER_NAME)" --config "$$KIND_CFG"
+		$(KIND) create cluster --name "$(CLUSTER_NAME)" --config "$$KIND_CFG"
 		echo "✓ Cluster created"
 	fi
 	$(SUBMAKE) cluster-wait
@@ -277,7 +277,7 @@ kubeconfig-fix: ## Patch kubeconfig for rootless Docker (port 16443 via kube-pro
 		fi;
 		KUBECONFIG=$$(mktemp);
 		trap 'rm -f "$$KUBECONFIG"' EXIT;
-		kind get kubeconfig --name "$(CLUSTER_NAME)" > "$$KUBECONFIG";
+		$(KIND) get kubeconfig --name "$(CLUSTER_NAME)" > "$$KUBECONFIG";
 		sed -i 's/127.0.0.1:[0-9]*/127.0.0.1:16443/' "$$KUBECONFIG";
 		mkdir -p "$$HOME/.kube";
 		if [ -f "$$HOME/.kube/config" ] && ! cmp -s "$$HOME/.kube/config" "$$KUBECONFIG"; then

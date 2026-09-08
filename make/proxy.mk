@@ -10,7 +10,7 @@ port-forward-start: ## Start kubectl port-forward inside the kind container (bac
 	@sleep 0.5
 	@docker exec -d "$(CLUSTER_NAME)-control-plane" kubectl port-forward --address 0.0.0.0 \
 		-n ingress-nginx service/ingress-nginx-controller $(APP_PORT):80 > /dev/null 2>&1
-	@docker exec -d $(CLUSTER_NAME)-control-plane kubectl port-forward --address 0.0.0.0 \
+	@docker exec -d "$(CLUSTER_NAME)-control-plane" kubectl port-forward --address 0.0.0.0 \
 		-n ingress-nginx service/ingress-nginx-controller $(APP_TLS_PORT):443 > /dev/null 2>&1
 	@sleep 2
 	@echo "✓ Port-forward started inside kind container"
@@ -73,7 +73,7 @@ adb-reverse: ## Forward phone:$(APP_PORT) → host:$(APP_PORT) via USB (for mobi
 .PHONY: proxy-status
 proxy-status: ## Show proxy status
 	@echo "=== Port-forward (kind container) ==="
-	@docker exec $(CLUSTER_NAME)-control-plane ss -tlnp 2>/dev/null | grep -E '$(APP_PORT)|$(APP_TLS_PORT)' || echo "  NOT RUNNING"
+	@docker exec "$(CLUSTER_NAME)-control-plane" ss -tlnp 2>/dev/null | grep -E '$(APP_PORT)|$(APP_TLS_PORT)' || echo "  NOT RUNNING"
 	@echo ""
 	@echo "=== socat bridge container ==="
 	@docker ps --filter name=$(PROXY_CONTAINER) --format '  {{.ID}} {{.Status}} {{.Image}}' 2>/dev/null || echo "  NOT RUNNING"
