@@ -1,0 +1,65 @@
+# docs-tex compile image for the NARS technical report (docs/nars_documentation.tex).
+# Authoritative build: `make docs-tex-image` (see make/docs.mk); pushed to
+# $(DOCKER_ORG)/nars-docs-tex and pinned by digest in TEX_IMAGE (Makefile).
+#
+# Upstream texlive/texlive publishes only rolling `latest-*` tags (no version
+# tags), so the small-scheme base is pinned by its manifest-list digest. The
+# report uses a small, stable package set (article + amsmath/tikz/pgfplots/
+# listings/...), which is far smaller than the 2.7 GB full scheme needed to
+# compile it — see docs/code-review (gates at completion) and make/docs.mk.
+
+FROM texlive/texlive:latest-small@sha256:ed19d0b6014018f182949fe1239829ad3efb91eab91ea0fe696fbaca27a31631
+
+# Install exactly the packages docs/nars_documentation.tex requires on top of
+# the small scheme. `tlmgr install` is a no-op for anything already present.
+# Run against an HTTPS mirror that verifies in CI (the default CTAN redirect
+# chain served a mirror whose signed texlive.tlpdb failed gpg verification
+# during image builds; tuna's copy verified clean).
+# NOTE: `subcaption.sty` ships inside the `caption` package and `tabularx.sty`
+# inside `tools` — they are not standalone tlpdb names in TeX Live 2026; both
+# bundles are already present in latest-small. algpseudocode ships in
+# `algorithmicx`; `algorithms` provides `algorithm`.
+RUN tlmgr option repository https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet \
+    && tlmgr install \
+	babel \
+	geometry \
+	amsfonts \
+	mathtools \
+	algorithmicx \
+	algorithms \
+	booktabs \
+	multirow \
+	graphics \
+	float \
+	xcolor \
+	listings \
+	enumitem \
+	caption \
+	hyperref \
+	cleveref \
+	pgf \
+	pgfplots \
+    && tlmgr path add
+
+# Build-time self-test: fail the build if a fresh image cannot typeset the
+# exact package soup the report pulls in (catches a missing/renamed package
+# before the image ships).
+RUN printf '\\documentclass[12pt,a4paper]{article}\n\
+\\usepackage[T1]{fontenc}\n\\usepackage[english]{babel}\n\\usepackage{geometry}\n\
+\\usepackage{amsmath,amssymb,amsthm}\n\\usepackage{mathtools}\n\
+\\usepackage{algorithm}\n\\usepackage{algpseudocode}\n\\usepackage{booktabs}\n\
+\\usepackage{array}\n\\usepackage{tabularx}\n\\usepackage{multirow}\n\
+\\usepackage{graphicx}\n\\usepackage{float}\n\\usepackage{xcolor}\n\
+\\usepackage{listings}\n\\usepackage{enumitem}\n\\usepackage{caption}\n\
+\\usepackage{subcaption}\n\\usepackage{hyperref}\n\\usepackage{cleveref}\n\
+\\usepackage{tikz}\n\\usepackage{pgfplots}\n\\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, patterns}\n\
+\\begin{document}\nSelf-test: $\\mathbb{R}^2$, \\lstinline{sql}, \\tikz\\draw (0,0) -- (1,1);\n\\end{document}\n' \
+	> /tmp/dt_self_test.tex \
+    && pdflatex -interaction=nonstopmode -halt-on-error -output-directory=/tmp /tmp/dt_self_test.tex > /dev/null \
+    && rm -f /tmp/dt_self_test.*
+
+# Version marker (docs.mk / TEX_IMAGE pin by semver tag + digest; bump the
+# tag on any base or package change so the pinned digest stays truthful).
+LABEL org.opencontainers.image.title="nars-docs-tex" \
+      org.opencontainers.image.description="Minimal TeX Live image for compiling docs/nars_documentation.tex" \
+      org.opencontainers.image.source="https://github.com/Zuhir-Benslama/NARS"

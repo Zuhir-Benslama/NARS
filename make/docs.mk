@@ -73,6 +73,16 @@ TEX_BUILD_DIR    ?= $(LOG_DIR)/tex-build
 TEX_SRC          := docs/nars_documentation.tex
 TEX_PDF_LOG      := $(TEX_BUILD_DIR)/nars_documentation.log
 
+# Tag for the docs-tex compile image (pushed to $(DOCKER_ORG)/nars-docs-tex).
+# Bump on any base/package change; TEX_IMAGE (root Makefile) pins the released
+# image by digest, so old digests keep resolving after a re-push.
+DOCS_TEX_IMAGE_TAG ?= 0.1.0
+
+.PHONY: docs-tex-image
+docs-tex-image: ## Build $(DOCKER_ORG)/nars-docs-tex:$(DOCS_TEX_IMAGE_TAG) (see nars-infra/docker/Dockerfile.nars-docs-tex)
+	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-docs-tex" \
+		-t "$(DOCKER_ORG)/nars-docs-tex:$(DOCS_TEX_IMAGE_TAG)" .
+
 .PHONY: docs-tex-pdf
 docs-tex-pdf: ## Regenerate docs/pdf/nars_documentation.pdf from docs/nars_documentation.tex (pdflatex, two passes)
 	@echo "→ Building nars_documentation.tex (needs pdflatex)..."
