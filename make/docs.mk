@@ -78,9 +78,16 @@ TEX_PDF_LOG      := $(TEX_BUILD_DIR)/nars_documentation.log
 # image by digest, so old digests keep resolving after a re-push.
 DOCS_TEX_IMAGE_TAG ?= 0.1.0
 
+# Extra `docker build` args for the docs-tex image. Empty for local one-shot
+# builds; CI supplies BuildKit gha cache flags (via env) so the base pull and
+# tlmgr-install layer are warmed across runs. Keeps the Makefile as the single
+# owner of the build command while letting CI tune caching.
+DOCS_TEX_DOCKER_BUILD_ARGS ?=
+
 .PHONY: docs-tex-image
 docs-tex-image: ## Build $(DOCKER_ORG)/nars-docs-tex:$(DOCS_TEX_IMAGE_TAG) (see nars-infra/docker/Dockerfile.nars-docs-tex)
-	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-docs-tex" \
+	@docker build $(DOCS_TEX_DOCKER_BUILD_ARGS) \
+		-f "$(DOCKER_DIR)/Dockerfile.nars-docs-tex" \
 		-t "$(DOCKER_ORG)/nars-docs-tex:$(DOCS_TEX_IMAGE_TAG)" .
 
 .PHONY: docs-tex-pdf

@@ -196,9 +196,21 @@ jobs:
   docs-tex:
     name: Docs (LaTeX report)
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+
+      # Build the nars-docs-tex image so a Dockerfile/base drift that breaks
+      # the rebuild (e.g. a package renamed or removed from tlnet — subcaption
+      # and tabularx are not standalone tlpdb names in TL2026) fails here
+      # instead of silently shipping a stale pinned image. `make docs-tex-image`
+      # runs the Dockerfile's own tlmgr-install + pdflatex self-test; type=gha
+      # warms the base/tlmgr layers across runs so this stays cheap on repeat
+      # pushes (same pattern as the roads-test job).
+      - name: Build docs-tex image (make docs-tex-image)
+        env:
+          DOCS_TEX_DOCKER_BUILD_ARGS: --cache-from=type=gha --cache-to=type=gha,mode=max
+        run: make docs-tex-image
 
       - name: Compile technical report (make docs-tex-lint)
         run: make docs-tex-lint
