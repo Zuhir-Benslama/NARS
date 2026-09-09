@@ -28,7 +28,7 @@ const MockPopup = vi.fn(function (this: any) {
   this.remove = vi.fn()
 })
 
-vi.mock("maplibre-gl", () => ({ default: { Popup: MockPopup } }))
+vi.mock("maplibre-gl", () => ({ Popup: MockPopup }))
 vi.mock("../lib/toast", () => ({ showToast: mockShowToast }))
 
 let mapMock: MapMock

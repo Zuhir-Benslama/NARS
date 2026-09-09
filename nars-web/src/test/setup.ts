@@ -109,14 +109,11 @@ vi.mock("maplibre-gl", () => {
     getElement = vi.fn(() => document.createElement("div"))
   }
 
-  // Real maplibre-gl exposes Map/Marker/Popup/LngLatBounds on the default
-  // namespace export, so code can call `new maplibregl.Marker(...)`.
-  ;(MockMap as any).Marker = MockMarker
-  ;(MockMap as any).Popup = MockPopup
-  ;(MockMap as any).LngLatBounds = MockLngLatBounds
-
+  // Real maplibre-gl exposes Map/Marker/Popup/LngLatBounds as named module
+  // exports (v6 is ESM-only, no default export), so code using a namespace
+  // import can call `new maplibregl.Marker(...)`.
   return {
-    default: MockMap,
+    Map: MockMap,
     Popup: MockPopup,
     Marker: MockMarker,
     LngLatBounds: MockLngLatBounds,

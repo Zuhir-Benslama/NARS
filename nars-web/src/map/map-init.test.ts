@@ -30,14 +30,12 @@ mockOnce.mockImplementation((event: string, cb: () => void) => {
 })
 
 vi.mock("maplibre-gl", () => ({
-  default: {
-    Map: class {
-      setStyle = mockSetStyle
-      once = mockOnce
-      doubleClickZoom = { disable: vi.fn() }
-      on = vi.fn()
-      off = vi.fn()
-    },
+  Map: class {
+    setStyle = mockSetStyle
+    once = mockOnce
+    doubleClickZoom = { disable: vi.fn() }
+    on = vi.fn()
+    off = vi.fn()
   },
 }))
 

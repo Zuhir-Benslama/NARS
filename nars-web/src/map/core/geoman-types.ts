@@ -5,6 +5,8 @@
 // These are intentionally conservative — they describe only the properties
 // actually used by NARS, not the full Geoman API surface.
 
+import type * as maplibregl from "maplibre-gl"
+
 export interface GeomanPointGeometry {
   type: "Point"
   coordinates: [number, number]

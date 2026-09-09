@@ -2,7 +2,7 @@
 
 import { PHASES } from "../../phases"
 import { useAppStore } from "../../stores/appStore"
-import maplibregl from "maplibre-gl"
+import type * as maplibregl from "maplibre-gl"
 import { getCtx } from "../core/state"
 import { debugLog } from "../../utils/debug"
 

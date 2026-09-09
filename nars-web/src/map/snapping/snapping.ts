@@ -1,4 +1,4 @@
-import maplibregl from "maplibre-gl"
+import * as maplibregl from "maplibre-gl"
 import { getCtx } from "../core/state"
 import { useAppStore } from "../../stores/appStore"
 import { useLayerStore } from "../../stores/layerStore"
@@ -297,7 +297,7 @@ export function snapPointForEdit(
   return result ? { lat: result.lat, lng: result.lng } : null
 }
 
-function snapLngLat(e: Record<string, unknown>): void {
+function snapLngLat(e: maplibregl.MapMouseEvent): void {
   const store = useSnapStore()
   if (!store.snapActive || !store.snapLatLng) return
   const { lng, lat } = store.snapLatLng
@@ -314,7 +314,7 @@ function snapLngLat(e: Record<string, unknown>): void {
 
 /** Early-exit wrapper: avoids reading the Pinia store on every click
  *  when snapping is not active (the common case). */
-function onSnapEvent(e: Record<string, unknown>): void {
+function onSnapEvent(e: maplibregl.MapMouseEvent): void {
   if (!useSnapStore().snapActive) return
   snapLngLat(e)
 }

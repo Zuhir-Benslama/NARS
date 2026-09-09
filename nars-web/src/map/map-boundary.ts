@@ -1,7 +1,7 @@
 // ─── BOUNDARY INTERACTION ─────────────────────────────────────────────────────
 // Click/hover handlers and context menu for commune boundary features.
 
-import maplibregl from "maplibre-gl"
+import * as maplibregl from "maplibre-gl"
 import { showToast } from "../lib/toast"
 import { escapeHtml } from "../utils/sanitize"
 import { useAppStore } from "../stores/appStore"

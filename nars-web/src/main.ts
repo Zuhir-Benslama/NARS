@@ -1,5 +1,10 @@
+import { setWorkerUrl } from "maplibre-gl"
 import "maplibre-gl/dist/maplibre-gl.css"
 import { createApp } from "vue"
+
+// MapLibre GL v6 is ESM-only; under a bundler the worker URL must be set
+// explicitly (it cannot be derived from import.meta.url at module scope).
+setWorkerUrl(new URL("maplibre-gl/dist/maplibre-gl-worker.mjs", import.meta.url).toString())
 import { createPinia } from "pinia"
 import App from "./App.vue"
 import "./app.css"

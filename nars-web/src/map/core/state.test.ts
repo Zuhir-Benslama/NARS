@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { setActivePinia, createPinia } from "pinia"
-import type maplibregl from "maplibre-gl"
+import type * as maplibregl from "maplibre-gl"
 
 const mockGetSource = vi.fn()
 const mockMap = {

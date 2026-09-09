@@ -27,6 +27,7 @@ import type {
   GeomanFeatures,
   GeomanFeatureStoreEntry,
 } from "./geoman-types"
+import type * as maplibregl from "maplibre-gl"
 import type { MapMouseEvent as MapLibreMapMouseEvent } from "maplibre-gl"
 
 // ─── REGISTRATION ─────────────────────────────────────────────────────────────
@@ -240,18 +241,20 @@ export function registerGeomanEvents(): void {
   // front (independent of whether the geoman bundle is loaded yet). Each
   // handler guards on getCtx().geoman internally.
   const { map } = getCtx()
-  map.on("pm:markerdragstart", onVertexDragStart)
-  map.on("pm:markerdragend", onVertexDragEnd)
+  const ev = map as unknown as maplibregl.Evented
+  ev.on("pm:markerdragstart", onVertexDragStart as unknown as maplibregl.Listener)
+  ev.on("pm:markerdragend", onVertexDragEnd as unknown as maplibregl.Listener)
   map.on("dblclick", onDblClick)
-  map.on("gm:editend", onEditEnd)
-  map.on("gm:remove", onRemove)
+  ev.on("gm:editend", onEditEnd as unknown as maplibregl.Listener)
+  ev.on("gm:remove", onRemove as unknown as maplibregl.Listener)
 }
 
 export function unregisterGeomanEvents(): void {
   const { map } = getCtx()
-  map.off("pm:markerdragstart", onVertexDragStart)
-  map.off("pm:markerdragend", onVertexDragEnd)
+  const ev = map as unknown as maplibregl.Evented
+  ev.off("pm:markerdragstart", onVertexDragStart as unknown as maplibregl.Listener)
+  ev.off("pm:markerdragend", onVertexDragEnd as unknown as maplibregl.Listener)
   map.off("dblclick", onDblClick)
-  map.off("gm:editend", onEditEnd)
-  map.off("gm:remove", onRemove)
+  ev.off("gm:editend", onEditEnd as unknown as maplibregl.Listener)
+  ev.off("gm:remove", onRemove as unknown as maplibregl.Listener)
 }

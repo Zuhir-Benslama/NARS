@@ -3,7 +3,7 @@
 // No access to module state, featureLayers, or ctx — only math.
 // Extracted from snapping.ts to keep that file focused on the state machine.
 
-import type maplibregl from "maplibre-gl"
+import type * as maplibregl from "maplibre-gl"
 
 // ─── PRIMITIVES ───────────────────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 // ─── SHARED MAP STATE ─────────────────────────────────────────────────────────
 
-import type maplibregl from "maplibre-gl"
+import type * as maplibregl from "maplibre-gl"
 import type { Geoman } from "@geoman-io/maplibre-geoman-free"
 import { useFeaturesStore } from "../../stores/featuresStore"
 

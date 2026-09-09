@@ -1,4 +1,4 @@
-import maplibregl from "maplibre-gl"
+import type * as maplibregl from "maplibre-gl"
 import { getCtx } from "./core/state"
 import { debugLog } from "../utils/debug"
 import { addBoundaryClickEvents } from "./map-boundary"

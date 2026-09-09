@@ -2,7 +2,7 @@
 // Creates the MapLibre map instance, initializes tile styles, sets up Geoman,
 // and exposes the setBaseLayer public API.
 
-import maplibregl from "maplibre-gl"
+import * as maplibregl from "maplibre-gl"
 import { getCtx, _setCtx } from "./core/state"
 import { useFeaturesStore } from "../stores/featuresStore"
 import type { MapContext } from "./core/state"

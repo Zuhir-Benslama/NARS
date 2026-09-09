@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import type maplibregl from "maplibre-gl"
+import type * as maplibregl from "maplibre-gl"
 import { closestOnCirclePerimeter, pixelDist, closestOnSegmentProjected } from "./snap-geometry"
 
 const project = (ll: [number, number]) => ({ x: ll[0], y: -ll[1] })

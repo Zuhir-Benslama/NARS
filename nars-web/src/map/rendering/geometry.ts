@@ -7,7 +7,7 @@ import { apiFetch } from "../../api"
 import { GEOMETRY_CONFIG } from "../../config"
 import { debugError } from "../../utils/debug"
 import { useAppStore } from "../../stores/appStore"
-import maplibregl from "maplibre-gl"
+import * as maplibregl from "maplibre-gl"
 
 // ─── MUNICIPALITY BOUNDARY ────────────────────────────────────────────────────
 // Module-level state mutated by loadMunicipalLimit() / loadScatteredPolygons().

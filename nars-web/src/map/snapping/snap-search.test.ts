@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import type maplibregl from "maplibre-gl"
+import type * as maplibregl from "maplibre-gl"
 
 const mockGetBounds = vi.fn()
 const mockProjectFn = vi.fn()

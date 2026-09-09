@@ -10,6 +10,7 @@ import { repatchMarker } from "./draw-state"
 import type { GeomanCreateEvent, ActionInstances } from "../core/geoman-types"
 
 const POINT_SNAP_THRESHOLD_PX = 20
+import type * as maplibregl from "maplibre-gl"
 import type { MapMouseEvent as MapLibreMapMouseEvent } from "maplibre-gl"
 
 import { getCtx, updateSelectionHighlight } from "../core/state"
@@ -331,9 +332,10 @@ let mapClickCleanup: (() => void) | null = null
 
 export function registerDrawHandlers(): void {
   const map = getCtx().map
+  const ev = map as unknown as maplibregl.Evented
 
-  map.on("gm:create", onFeatureCreated)
-  mapGmCreateCleanup = () => map.off("gm:create", onFeatureCreated)
+  ev.on("gm:create", onFeatureCreated as unknown as maplibregl.Listener)
+  mapGmCreateCleanup = () => ev.off("gm:create", onFeatureCreated as unknown as maplibregl.Listener)
 
   window.addEventListener("contextmenu", onContextMenu, true)
   contextMenuCleanup = () => window.removeEventListener("contextmenu", onContextMenu, true)
