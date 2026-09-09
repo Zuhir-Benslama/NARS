@@ -20,7 +20,7 @@
 # Dependencies (checked by each target):
 #   docs-uml-pdf: node + Playwright (Firefox) from nars-web/ + mermaid@11 CDN
 #   docs-tex-pdf: pdflatex (texlive)
-#   docs-tex-lint: docker (digest-pinned texlive image)
+#   docs-tex-lint: docker (texlive image, rebuilt from the current Dockerfile)
 
 UML_SRC_DIR      ?= docs/uml
 UML_BUILD_DIR    ?= $(LOG_DIR)/uml-build
@@ -40,7 +40,7 @@ _check-playwright:
 
 .PHONY: docs-lint
 docs-lint: docs-lint-uml ## CI gate: render UML diagrams, lint docs markdown, check class-diagram drift
-	$(SUBMAKE) infra-lint-markdown
+	@$(SUBMAKE) infra-lint-markdown
 	$(SUBMAKE) infra-lint-uml-drift
 
 # CI gate: render every ```mermaid block under docs/uml and fail if any diagram
@@ -110,20 +110,30 @@ docs-tex-pdf: ## Regenerate docs/pdf/nars_documentation.pdf from docs/nars_docum
 # gate a LaTeX error or a source edit that breaks the build ships silently and
 # the shipped PDF goes stale (see docs/code-review D4). Docs-lint-uml is the
 # renderer gate for docs/uml/*.md; this is the equivalent for the report —
-# compilation is proven in the pinned texlive image, while the actual PDF
-# regen stays manual (docs-tex-pdf). Mounts the repo read-only at /mnt and
-# runs from /mnt/docs so relative \includegraphics/\input keep their paths;
-# build artifacts land in a host temp dir (kept on failure for the log).
+# compilation is proven, while the actual PDF regen stays manual
+# (docs-tex-pdf). Mounts the repo read-only at /mnt and runs from /mnt/docs so
+# relative \includegraphics/\input keep their paths; build artifacts land in a
+# host temp dir (kept on failure for the log).
+#
+# The compile image is a PREREQUISITE (docs-tex-image): CI and local lint both
+# compile the report inside the image built from the CURRENT Dockerfile, so a
+# base/tlmgr change (tlnet rolls forward between releases) is exercised against
+# the real report instead of a stale pushed pin. TEX_IMAGE (root Makefile)
+# remains the released image for consumers and is used here only as a safety
+# net if the fresh build somehow isn't present.
 .PHONY: docs-tex-lint
-docs-tex-lint: ## CI gate: prove docs/nars_documentation.tex compiles (2 passes, pinned texlive image)
+docs-tex-lint: docs-tex-image ## CI gate: prove docs/nars_documentation.tex compiles (2 passes, freshly built texlive image)
 	@command -v docker >/dev/null 2>&1 || { echo "✖ docs-tex-lint needs docker"; exit 1; }
-	@if ! docker image inspect $(TEX_IMAGE) >/dev/null 2>&1; then docker pull $(TEX_IMAGE) >/dev/null; fi
+	@TEX_RUN_IMAGE="$(DOCKER_ORG)/nars-docs-tex:$(DOCS_TEX_IMAGE_TAG)";
+	if ! docker image inspect "$$TEX_RUN_IMAGE" >/dev/null 2>&1; then
+		TEX_RUN_IMAGE="$(TEX_IMAGE)";
+	fi
 	@tmpdir=$$(mktemp -d); trap 'rm -rf "$$tmpdir"' EXIT; \
 	if docker run --rm \
 		-v "$$(pwd):/mnt:ro" \
 		-v "$$tmpdir":/out -w /mnt/docs \
 		--entrypoint sh \
-		$(TEX_IMAGE) -c \
+		"$$TEX_RUN_IMAGE" -c \
 		'pdflatex -interaction=nonstopmode -halt-on-error -output-directory=/out nars_documentation.tex >/dev/null 2>&1 && \
 		 pdflatex -interaction=nonstopmode -halt-on-error -output-directory=/out nars_documentation.tex >/dev/null 2>&1'; then \
 		echo "✓ docs/nars_documentation.tex compiles (2 passes)"; \

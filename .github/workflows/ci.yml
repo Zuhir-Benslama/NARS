@@ -186,13 +186,16 @@ jobs:
         run: make docs-lint
 
   # ─── Docs report (LaTeX) ─────────────────────────────────
-  # `make docs-tex-lint` compiles docs/nars_documentation.tex (two passes, for
-  # TOC/cref) inside the digest-pinned texlive/texlive image, so a LaTeX error
-  # or a source edit that breaks the build fails CI instead of shipping a
-  # stale nars_documentation.pdf. The PDF itself is a gitignored artifact
-  # regenerated manually (`make docs-tex-pdf`, see make/docs.mk) — this gate
-  # proves the committed .tex still compiles, the same principle as
-  # docs-lint-uml vs the manual docs-uml-pdf regen.
+  # `make docs-tex-lint` depends on docs-tex-image, so one invocation both
+  # builds the compile image and compiles docs/nars_documentation.tex (two
+  # passes, for TOC/cref) INSIDE that freshly built image. Building first means
+  # a Dockerfile/base drift that breaks the rebuild (e.g. a package renamed or
+  # removed from tlnet — subcaption and tabularx are not standalone tlpdb names
+  # in TL2026) fails CI instead of silently shipping a stale pinned image; and
+  # compiling inside the fresh image (not a stale pushed pin) exercises rolling
+  # tlmgr package updates against the actual report. The PDF itself is a
+  # gitignored artifact regenerated manually (`make docs-tex-pdf`, see
+  # make/docs.mk).
   docs-tex:
     name: Docs (LaTeX report)
     runs-on: ubuntu-24.04
@@ -200,19 +203,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Build the nars-docs-tex image so a Dockerfile/base drift that breaks
-      # the rebuild (e.g. a package renamed or removed from tlnet — subcaption
-      # and tabularx are not standalone tlpdb names in TL2026) fails here
-      # instead of silently shipping a stale pinned image. `make docs-tex-image`
-      # runs the Dockerfile's own tlmgr-install + pdflatex self-test; type=gha
-      # warms the base/tlmgr layers across runs so this stays cheap on repeat
-      # pushes (same pattern as the roads-test job).
-      - name: Build docs-tex image (make docs-tex-image)
+      - name: Build image + compile report (make docs-tex-lint)
         env:
+          # type=gha warms the base/tlmgr layers across runs so the rebuild
+          # stays cheap on repeat pushes (same pattern as the roads-test job).
           DOCS_TEX_DOCKER_BUILD_ARGS: --cache-from=type=gha --cache-to=type=gha,mode=max
-        run: make docs-tex-image
-
-      - name: Compile technical report (make docs-tex-lint)
         run: make docs-tex-lint
 
   # ─── Infra lint (delegates to `make infra-lint`) ─────────────

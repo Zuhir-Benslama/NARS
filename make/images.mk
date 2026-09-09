@@ -92,7 +92,7 @@ images-load: _warn-latest-tag ## Load locally built Docker images into the kind 
 
 .PHONY: frontend-update
 frontend-update: _warn-latest-tag ## Rebuild nars-vite, load into kind, and rollout restart
-	$(SUBMAKE) _build-nars-vite
+	@$(SUBMAKE) _build-nars-vite
 	@$(KIND) load docker-image "$(DOCKER_ORG)/nars-vite:"$(IMAGE_TAG_Q)" --name "$(CLUSTER_NAME)"
 	@$(KUBECTL) rollout restart deployment nars-frontend -n "$(NAMESPACE)"
 	@$(KUBECTL) rollout status deployment nars-frontend -n "$(NAMESPACE)" --timeout=120s

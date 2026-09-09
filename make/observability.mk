@@ -23,7 +23,7 @@ _check-observability-security: ## Fail if Helm values ship insecure defaults in 
 
 .PHONY: observability-install
 observability-install: .env _check-secrets _check-observability-security helm-check helm-repos ## Install LGTM stack + OpenTelemetry Collector
-	$(SUBMAKE) observability-namespace
+	@$(SUBMAKE) observability-namespace
 	$(SUBMAKE) observability-prometheus-stack
 	$(SUBMAKE) observability-loki
 	$(SUBMAKE) observability-tempo

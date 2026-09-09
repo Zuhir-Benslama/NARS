@@ -3,11 +3,11 @@
 
 .PHONY: test
 test: ## Run all tests
-	dotnet test nars-api/NarsApi.Tests/NarsApi.Tests.csproj --no-restore
+	@dotnet test nars-api/NarsApi.Tests/NarsApi.Tests.csproj --no-restore
 
 .PHONY: test-unit
 test-unit: ## Run only unit tests (no Postgres container)
-	dotnet test nars-api/NarsApi.Tests/NarsApi.Tests.csproj --no-restore --filter "Category!=Service"
+	@dotnet test nars-api/NarsApi.Tests/NarsApi.Tests.csproj --no-restore --filter "Category!=Service"
 
 .PHONY: test-service
 test-service: ## Run only Postgres-backed service tests (requires Docker for Testcontainers)
@@ -16,7 +16,7 @@ test-service: ## Run only Postgres-backed service tests (requires Docker for Tes
 
 .PHONY: test-coverage
 test-coverage: ## Run unit tests with coverage and enforce thresholds (coverlet.msbuild; no Postgres container)
-	dotnet test nars-api/NarsApi.Tests/NarsApi.Tests.csproj --no-restore \
+	@dotnet test nars-api/NarsApi.Tests/NarsApi.Tests.csproj --no-restore \
 		--filter "Category!=Service" \
 		/p:CollectCoverage=true \
 		/p:CoverletOutputFormat=cobertura \
@@ -30,7 +30,7 @@ ROADS_TEST_DOCKER_BUILD_ARGS ?=
 
 .PHONY: roads-test
 roads-test: ## Run the segmentation service's Python test suite in a container
-	docker build $(ROADS_TEST_DOCKER_BUILD_ARGS) \
+	@docker build $(ROADS_TEST_DOCKER_BUILD_ARGS) \
 		-f "$(DOCKER_DIR)/Dockerfile.nars-roads" \
 		--target test \
 		-t "$(DOCKER_ORG)/nars-roads:test" nars-roads/

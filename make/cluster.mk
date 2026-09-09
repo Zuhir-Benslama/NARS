@@ -17,7 +17,7 @@ prerequisites: ## Check that all required tools are installed
 
 .PHONY: cluster-up
 cluster-up: prerequisites _check-secrets ## Full bootstrap: create cluster, build images, deploy everything
-	$(SUBMAKE) cluster-create
+	@$(SUBMAKE) cluster-create
 	$(SUBMAKE) kubeconfig-fix
 	$(SUBMAKE) ingress-install
 	$(SUBMAKE) ingress-wait
@@ -45,7 +45,7 @@ cluster-up: prerequisites _check-secrets ## Full bootstrap: create cluster, buil
 
 .PHONY: cluster-up-full
 cluster-up-full: ## Full bootstrap including observability stack
-	$(SUBMAKE) cluster-up
+	@$(SUBMAKE) cluster-up
 	$(SUBMAKE) observability-install
 	@echo ""
 	@echo "✓ Cluster '$(CLUSTER_NAME)' with observability is ready!"

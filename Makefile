@@ -129,11 +129,15 @@ NARS_ROADS_INTERNAL_TOKEN ?=
 NARS_ROADS_WEIGHTS_URL ?=
 export POSTGRES_PASSWORD JWT_SECRET GPG_PASSPHRASE GRAFANA_PASSWORD NARS_ADMIN_SIGNUP_TOKEN NARS_ROADS_INTERNAL_TOKEN NARS_ROADS_WEIGHTS_URL
 
+# Piping the target's output to a consumer that closes early (e.g.
+# `make help | head`) kills the last pipeline command with SIGPIPE (141).
+# Under -o pipefail that would surface as "Error 141" to make — the recipe
+# accepts only 141, still failing on any real error.
 .PHONY: help
 help: ## Show available targets
 	@grep -hE '^[a-zA-Z][a-zA-Z_-]*:.*?## .*$$' $(MAKEFILE_LIST) \
 		| sort \
-		| awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-28s\033[0m %s\n", $$1, $$2}'
+		| awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-28s\033[0m %s\n", $$1, $$2}' || test $$? -eq 141
 
 
 # ─── Modular Sections ───────────────────────────────────────

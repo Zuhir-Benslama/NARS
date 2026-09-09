@@ -5,12 +5,12 @@
 
 .PHONY: lint
 lint: ## Run cross-project linting (.NET format + infra linters)
-	dotnet format Workspace.sln --verify-no-changes --no-restore
+	@dotnet format Workspace.sln --verify-no-changes --no-restore
 	$(SUBMAKE) infra-lint
 
 .PHONY: infra-lint
 infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, makefile, checkmake, sql, nginx, tag guard, observability security, markdown, uml drift)
-	$(SUBMAKE) infra-lint-shell
+	@$(SUBMAKE) infra-lint-shell
 	$(SUBMAKE) infra-lint-docker
 	$(SUBMAKE) infra-lint-yaml
 	$(SUBMAKE) infra-lint-python
