@@ -30,6 +30,11 @@ _check-secrets: ## Fail fast if critical secrets are empty (prevents deploying w
 		echo "  Add it to .env (see .env.example for the default URL)";
 		exit 1;
 	fi
+	@if [ -z "$(NARS_ROADS_ROAD_WEIGHTS_URL)" ]; then
+		echo "✖ NARS_ROADS_ROAD_WEIGHTS_URL not set — the roads pod's fetch-road-weights initContainer would never become ready";
+		echo "  Add it to .env (see .env.example for the default SpaceNet weights URL)";
+		exit 1;
+	fi
 
 
 # ─── Individual Deployment Steps ────────────────────────────
@@ -39,7 +44,12 @@ ingress-install: ## Install NGINX Ingress Controller (idempotent)
 	@echo "→ Installing NGINX Ingress Controller..."
 	@$(KUBECTL) apply -f \
 		https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-$(INGRESS_NGINX_VERSION)/deploy/static/provider/kind/deploy.yaml
-	@$(KUBECTL) label node --overwrite $(CLUSTER_NAME)-control-plane ingress-ready=true 2>/dev/null || true
+	@$(KUBECTL) label --overwrite node $(CLUSTER_NAME)-control-plane ingress-ready=true 2>/dev/null || true
+	@# Align controller labels with nars-infra/k8s/network-policy.yaml selectors
+	@$(KUBECTL) -n ingress-nginx patch deployment ingress-nginx-controller \
+		--type merge -p \
+		'{"spec":{"template":{"metadata":{"labels":{"app.kubernetes.io/part-of":"nars","app.kubernetes.io/managed-by":"kustomize"}}}}}' \
+		>/dev/null 2>&1 || true
 	@echo "✓ Ingress controller installed"
 
 .PHONY: ingress-wait
@@ -216,12 +226,14 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 	| $(KUBECTL) apply -f -
 	@echo "✓ nars-secrets created"
 
-	@echo "→ Creating 'nars-roads-secrets' (shared internal token + weights URL)..."
+	@echo "→ Creating 'nars-roads-secrets' (shared internal token + weights URLs)..."
 	printf '%s' "$$NARS_ROADS_INTERNAL_TOKEN" > "$$tmpdir/internal-token";
 	printf '%s' "$$NARS_ROADS_WEIGHTS_URL" > "$$tmpdir/weights-url";
+	printf '%s' "$$NARS_ROADS_ROAD_WEIGHTS_URL" > "$$tmpdir/road-weights-url";
 	$(KUBECTL) create secret generic nars-roads-secrets -n "$(NAMESPACE)" \
 		--from-file=internal-token="$$tmpdir/internal-token" \
 		--from-file=weights-url="$$tmpdir/weights-url" \
+		--from-file=road-weights-url="$$tmpdir/road-weights-url" \
 		--dry-run=client -o yaml \
 	| $(KUBECTL) apply -f -
 	@echo "✓ nars-roads-secrets created"
@@ -275,6 +287,13 @@ kustomize-apply: secrets-validate _check-pinned-tag _check-local-ingresses ## Ap
 	@awk -v org="$(DOCKER_ORG)" -v tag=$(IMAGE_TAG_Q) -v images="$(REGISTRY_IMAGES)" \
 		-f "$(SCRIPTS_DIR)/kustomize-tag-rewrite.awk" < "$(KUSTOMIZE_MANIFEST)" \
 	| $(KUBECTL) apply -f -
+	@# The base/dev overlay ships the CPU roads deployment; re-apply the GPU
+	@# overlay so `make kustomize-apply` never reverts roads to CPU when
+	@# NARS_GPU=1 (matches what gpu-install does on first bootstrap).
+	@if [ "$(NARS_GPU)" = "1" ]; then
+		echo "→ Re-applying roads GPU overlay (NARS_GPU=1)...";
+		$(KUBECTL) apply -k "$(GPU_OVERLAY_DIR)";
+	fi
 	@echo "✓ Kustomization applied"
 
 	@echo "→ Waiting for postgis..."
@@ -284,6 +303,7 @@ kustomize-apply: secrets-validate _check-pinned-tag _check-local-ingresses ## Ap
 		$(SUBMAKE) postgis-password-sync
 		$(SUBMAKE) postgis-migration-baseline
 		$(SUBMAKE) db-migrate-nars
+		$(SUBMAKE) db-ef-migrate
 	else
 		echo "  ⚠ postgis deployment not found — skipping password sync, baseline, and migrations";
 	fi

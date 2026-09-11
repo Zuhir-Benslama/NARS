@@ -219,7 +219,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : Servi
 
         // Attach a house entrance owned by that road.
         var entranceService = new EntranceService(Fixture.CreateDbContextFactory());
-        var entranceId = await entranceService.CreateEntranceAsync(roadId, _userId, _userId, "Entrance A", "{}");
+        var entranceId = await entranceService.CreateEntranceAsync(roadId, _userId, "Entrance A", "{}");
 
         // Delete the road — the orphaned entrance must go with it.
         var deleteResult = await controller.DeleteFeature(roadId);

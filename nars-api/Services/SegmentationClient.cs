@@ -1,16 +1,22 @@
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using NarsApi.Models;
 
 namespace NarsApi.Services;
 
 public record SegmentedFeature(string GeometryGeoJson, double Confidence, string FeatureType);
 
-public record SegmentationResult(IReadOnlyList<SegmentedFeature> Buildings);
+public record SegmentationResult
+{
+    public IReadOnlyList<SegmentedFeature> Buildings { get; init; } = [];
+    public IReadOnlyList<SegmentedFeature> Roads { get; init; } = [];
+}
 
 public interface ISegmentationClient
 {
     Task<SegmentationResult> SegmentTileAsync(
+        string featureType,
         Stream tileStream,
         string fileName,
         string contentType,
@@ -30,12 +36,17 @@ public sealed class SegmentationClient(HttpClient httpClient, ILogger<Segmentati
     private readonly ILogger<SegmentationClient> _logger = logger;
 
     public async Task<SegmentationResult> SegmentTileAsync(
+        string featureType,
         Stream tileStream,
         string fileName,
         string contentType,
         (double MinLon, double MinLat, double MaxLon, double MaxLat) bbox,
         CancellationToken cancellationToken = default)
     {
+        var endpoint = featureType.Equals(AiDraftFeature.TypeRoad, StringComparison.OrdinalIgnoreCase)
+            ? "roads"
+            : "buildings";
+
         using var content = new MultipartFormDataContent();
         using var streamContent = new StreamContent(tileStream);
         streamContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
@@ -47,7 +58,7 @@ public sealed class SegmentationClient(HttpClient httpClient, ILogger<Segmentati
             CultureInfo.InvariantCulture,
             $"?min_lon={bbox.MinLon}&min_lat={bbox.MinLat}&max_lon={bbox.MaxLon}&max_lat={bbox.MaxLat}");
 
-        using var response = await _httpClient.PostAsync($"/segment/buildings{query}", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"/segment/{endpoint}{query}", content, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -82,8 +93,11 @@ public sealed class SegmentationClient(HttpClient httpClient, ILogger<Segmentati
         {
             try
             {
-                var buildings = ExtractFeatures(doc.RootElement.GetProperty("buildings").GetProperty("features"), "building");
-                return new SegmentationResult(buildings);
+                var featureTypeKey = endpoint == "roads" ? AiDraftFeature.TypeRoad : AiDraftFeature.TypeBuilding;
+                var features = ExtractFeatures(doc.RootElement.GetProperty(endpoint).GetProperty("features"), featureTypeKey);
+                return endpoint == "roads"
+                    ? new SegmentationResult { Roads = features }
+                    : new SegmentationResult { Buildings = features };
             }
             catch (KeyNotFoundException ex)
             {

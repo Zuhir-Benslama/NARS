@@ -3,7 +3,10 @@ uvicorn[standard]==0.30.6
 python-multipart==0.0.32
 torch==2.13.0
 segmentation-models-pytorch==0.3.4
-rasterio==1.3.10
+# 1.3.10's sdist build-system pins numpy==2.0.0rc1 (uninstallable), so any
+# Python bump that loses the published cp311 wheel silently breaks the image
+# build. 1.3.11+ requires an installable numpy range and keeps cp311 wheels.
+rasterio==1.3.11
 scikit-image==0.26.0
 # Direct import in app/postprocess.py — declared explicitly so removal from
 # scikit-image's transitive deps can't break the runtime.

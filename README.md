@@ -116,6 +116,28 @@ Run `make help` for the full list. The most useful:
 - `zuhirbenslama/nars-backup:latest` — Scheduled database backup job
 - `zuhirbenslama/nars-roads:latest` — FastAPI segmentation service (runs standalone)
 
+## Segmentation Models
+
+The `nars-roads` service runs independent checkpoints per feature type (a model
+registry — see `nars-roads/app/main.py`), so each model can be swapped and
+released separately.
+
+| Task | Endpoint | Architecture | Checkpoint | License |
+|------|----------|--------------|------------|---------|
+| Buildings (polygons) | `/segment/buildings` | `smp.Unet` (ResNet34) | HOT fAIr building baseline `unet_bldg_base.pth` | MIT (weights), CC-BY-4.0 dataset |
+| Roads (linestrings) | `/segment/roads` | `Resnet34Upsample` (SpaceNet 3 champion) | SpaceNet 3 `01-Albu` fold0 `fold0_best.pth` → converted `roads_best.pth` | CC-BY-SA 4.0 (weights), Apache-2.0 (code) |
+
+Road weights are the SpaceNet 3 Road Challenge champion solution by Alexander
+Buslaev, downloaded as-published from the SpaceNet model weights bucket and
+re-packed into a plain `state_dict` by `app/scripts/convert_roads.py` so the
+serving container never unpickles untrusted bytes. The vendored architecture
+(`app/road_model.py`, `resnet34-upsample` builder) is ported from the
+Apache-2.0 `albu-solution` (Copyright 2018 CosmiQ Works, an In-Q-Tel Lab).
+
+Each `/segment/<task>` response carries exactly one feature type
+(`featureType: "building" | "road"` selects the task on `nars-api`), so a
+response never mixes buildings and roads.
+
 ## Features
 
 - **Hierarchical Admin Roles**: National > Wilaya > Daira > Commune > Field Worker

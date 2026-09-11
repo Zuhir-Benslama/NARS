@@ -20,9 +20,17 @@ public record NumberEntrancesRequest(
     [property: JsonPropertyName("entranceIds")]
     [property: JsonRequired]
     [property: MinLength(1)]
-    [property: MaxLength(1000)]
+    [property: MaxLength(NumberEntrancesRequest.MaxBatchSize)]
     List<Guid> EntranceIds
-);
+)
+{
+    /// <summary>
+    /// Upper bound on one numbering batch. The service runs one UPDATE per
+    /// entrance inside a single locked transaction, so a large batch holds the
+    /// road lock (and its serialization anchor) for too long.
+    /// </summary>
+    public const int MaxBatchSize = 200;
+}
 
 /// <summary>The authoritative number assigned to one entrance.</summary>
 public record NumberedEntrance(

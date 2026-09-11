@@ -137,8 +137,8 @@ public class LocationsController(
             return Problem(detail: "Commune not found.", statusCode: 404);
         }
 
-        // Raw ADO.NET required — ST_AsGeoJSON returns a text result that
-        // EF Core's Npgsql mapper mis-handles under UseSnakeCaseNamingConvention().
+        // Raw ADO.NET required — ST_AsGeoJSON returns a text result that the
+        // EF Core/Npgsql mapper cannot materialize as spatial geometry directly.
         var geoJson = await boundaryService.GetBoundaryGeoJsonAsync(commune_id, cancellationToken);
 
         if (geoJson is null)

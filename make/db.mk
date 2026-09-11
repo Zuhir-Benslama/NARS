@@ -1,5 +1,9 @@
 # Included by the top-level Makefile (GNU make: single instance, shared vars). Target grouping: PostGIS backup/restore/admin + migrations.
 
+# Local port used by db-ef-migrate's temporary port-forward to PostGIS.
+EF_PG_PORT ?= 15433
+# Directory containing the nars-api EF Core project (Migrations/ + dotnet ef).
+EF_API_DIR ?= nars-api
 
 .PHONY: db-get-pod
 db-get-pod: ## Get the postgis pod name
@@ -21,7 +25,7 @@ db-get-password: ## Get the postgis password from k8s secret (stderr only, non-C
 db-backup: ## Dump the PostGIS database to a local file
 	@POD=$$($(POSTGIS_GET_POD_CMD) || true)
 	@if [ -z "$$POD" ]; then echo "✖ No postgis pod found in namespace '$(NAMESPACE)'"; exit 1; fi
-	@PASS=$($(_get_db_password_cmd))
+	@PASS=$$($(_get_db_password_cmd))
 	@if [ -z "$$PASS" ]; then echo "✖ Could not read DB password — is nars-secrets deployed?"; exit 1; fi
 	@echo "→ Backing up database '$(DB_NAME)' from pod $$POD..."
 	@PREFIX=manual
@@ -45,7 +49,7 @@ db-restore: ## Restore a backup. Usage: make db-restore FILE=backup/manual_nars_
 		echo "✖ FILE='$(FILE)' contains unexpected characters";
 		exit 1;
 	fi
-	@PASS=$($(_get_db_password_cmd))
+	@PASS=$$($(_get_db_password_cmd))
 	@if [ -z "$$PASS" ]; then echo "✖ Could not read DB password — is nars-secrets deployed?"; exit 1; fi
 	@echo "→ Restoring '$(FILE)' into $(DB_NAME)..."
 	@echo "  ⚠ This will OVERWRITE the current database."
@@ -95,13 +99,16 @@ db-admin: .env prerequisites ## Create national admin with one-time generated cr
 
 .PHONY: postgis-password-sync
 postgis-password-sync: ## Align postgres user password with POSTGRES_PASSWORD (for persisted volumes)
-# Password piped via stdin to avoid exposure in kubectl's remote command arguments.
+# Password never appears in kubectl args — the SQL is piped to psql via stdin.
+# (The previous remote `bash -c '...\'...'` quoting was unparseable — bash
+# treats `\'` inside single quotes literally, leaving an unterminated `"`.)
 # Uses $$POSTGRES_PASSWORD (shell env var) instead of $(POSTGRES_PASSWORD) (Make expansion)
 # to avoid breakage if the value contains shell metacharacters like single quotes.
 	@echo "→ Syncing postgres password..."
-	@printf '%s\n' "$$POSTGRES_PASSWORD" | \
+	@ESCAPED=$$(printf '%s' "$$POSTGRES_PASSWORD" | sed "s/'/''/g"); \
+	printf "ALTER USER postgres WITH PASSWORD '%s';\n" "$$ESCAPED" | \
 		$(KUBECTL) exec -i -n "$(NAMESPACE)" deployment/postgis -- \
-		bash -c 'read -r _pgpw; _escaped="$${_pgpw//\'/\'\'}"; printf "ALTER USER postgres WITH PASSWORD '\''%s'\'';\n" "$$_escaped" | psql -U postgres -d postgres -v ON_ERROR_STOP=1' >/dev/null
+		psql -U postgres -d postgres -v ON_ERROR_STOP=1 >/dev/null
 	@echo "✓ Postgres password synced"
 
 .PHONY: postgis-migration-baseline
@@ -128,3 +135,31 @@ db-migrate-nars: ## Apply NARS SQL migrations (nars-infra/migrations/*.sql) to t
 		exit 1; \
 	fi
 	@echo "✓ NARS SQL migrations applied ($$count file(s))"
+
+.PHONY: db-ef-migrate
+db-ef-migrate: ## Apply pending EF Core migrations (nars-api/Migrations) to the deployed DB (idempotent)
+	@if ! command -v dotnet >/dev/null 2>&1 || ! dotnet ef --version >/dev/null 2>&1; then
+		echo "  ⚠ dotnet EF tooling not installed — skipping EF migrations (schema may drift)";
+		exit 0;
+	fi
+	@if ! $(KUBECTL) get deployment postgis -n "$(NAMESPACE)" >/dev/null 2>&1; then
+		echo "  ⚠ postgis deployment not found — skipping EF migrations";
+		exit 0;
+	fi
+	@PASS=$$($(_get_db_password_cmd))
+	@if [ -z "$$PASS" ]; then echo "✖ Could not read DB password — is nars-secrets deployed?"; exit 1; fi
+	@echo "→ Applying pending EF Core migrations ($(EF_API_DIR)/Migrations) to '$(DB_NAME)'..."
+	@$(KUBECTL) port-forward -n "$(NAMESPACE)" svc/postgis "$(EF_PG_PORT):5432" >/dev/null 2>&1 & \
+	PF_PID=$$!; \
+	trap 'kill "$$PF_PID" 2>/dev/null || true' EXIT INT TERM; \
+	ready=0; \
+	for i in $$(seq 1 30); do \
+		if (exec 3<>/dev/tcp/127.0.0.1/$(EF_PG_PORT)) 2>/dev/null; then exec 3>&- 3<&-; ready=1; break; fi; \
+		sleep 1; \
+	done; \
+	if [ "$$ready" -ne 1 ]; then echo "✖ DB port-forward did not become ready"; exit 1; fi; \
+	(cd "$(EF_API_DIR)" && \
+	 PGPASSWORD="$$PASS" timeout 600 dotnet ef database update \
+		--connection "Host=127.0.0.1;Port=$(EF_PG_PORT);Database=$(DB_NAME);Username=postgres" \
+		--project . --startup-project .) || exit 1
+	@echo "✓ EF Core migrations applied"

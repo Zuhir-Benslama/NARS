@@ -97,7 +97,7 @@ public class DraftFeaturesUnitTests
 
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
                 svc.SegmentTileAsync(UserRoles.CommuneUser, CommuneId100, null, null, CommuneId101,
-                    stream, "tile.png", "image/png", (1, 1, 2, 2), default));
+                    AiDraftFeature.TypeBuilding, stream, "tile.png", "image/png", (1, 1, 2, 2), default));
         }
     }
 
@@ -113,32 +113,69 @@ public class DraftFeaturesUnitTests
 
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
                 svc.SegmentTileAsync(UserRoles.NationalAdmin, null, null, null, NonExistentId,
-                    stream, "tile.png", "image/png", (1, 1, 2, 2), default));
+                    AiDraftFeature.TypeBuilding, stream, "tile.png", "image/png", (1, 1, 2, 2), default));
         }
     }
 
     [Fact]
-    public async Task SegmentTile_InScopeCommune_PersistsDrafts()
+    public async Task SegmentTile_Buildings_InScopeCommune_PersistsDrafts()
     {
         var (db, factory) = CreateInMemoryDbPair("DraftsSegmentInScope");
         await using (db)
         {
             await SeedAsync(db);
             var segmentation = new Mock<ISegmentationClient>();
-            segmentation.Setup(s => s.SegmentTileAsync(It.IsAny<Stream>(), "tile.png", "image/png", It.IsAny<(double, double, double, double)>(), default))
-                .ReturnsAsync(new SegmentationResult(
-                    Buildings: [new SegmentedFeature("""{"type":"Polygon"}""", 0.8, AiDraftFeature.TypeBuilding)]));
+            segmentation.Setup(s => s.SegmentTileAsync(
+                    It.IsAny<string>(), It.IsAny<Stream>(), "tile.png", "image/png",
+                    It.IsAny<(double, double, double, double)>(), default))
+                .ReturnsAsync(new SegmentationResult
+                {
+                    Buildings = [new SegmentedFeature("""{"type":"Polygon"}""", 0.8, AiDraftFeature.TypeBuilding)],
+                });
             var svc = CreateService(db, segmentation.Object, factory);
             using var stream = new MemoryStream([1, 2, 3]);
 
             var summary = await svc.SegmentTileAsync(UserRoles.NationalAdmin, null, null, null, CommuneId100,
-                stream, "tile.png", "image/png", (1.0, 1.0, 2.0, 2.0), default);
+                AiDraftFeature.TypeBuilding, stream, "tile.png", "image/png", (1.0, 1.0, 2.0, 2.0), default);
 
             Assert.Equal(1, summary.BuildingCount);
+            Assert.Equal(0, summary.RoadCount);
             Assert.Single(summary.DraftIds);
             var saved = await db.AiDraftFeatures.ToListAsync();
             Assert.Single(saved);
             Assert.Equal(CommuneId100, saved[0].CommuneId);
+            Assert.Equal(AiDraftFeature.TypeBuilding, saved[0].FeatureType);
+        }
+    }
+
+    [Fact]
+    public async Task SegmentTile_Roads_InScopeCommune_PersistsDraftsAsRoads()
+    {
+        var (db, factory) = CreateInMemoryDbPair("DraftsSegmentRoads");
+        await using (db)
+        {
+            await SeedAsync(db);
+            var segmentation = new Mock<ISegmentationClient>();
+            segmentation.Setup(s => s.SegmentTileAsync(
+                    It.IsAny<string>(), It.IsAny<Stream>(), "tile.png", "image/png",
+                    It.IsAny<(double, double, double, double)>(), default))
+                .ReturnsAsync(new SegmentationResult
+                {
+                    Roads = [new SegmentedFeature("""{"type":"LineString"}""", 0.9, AiDraftFeature.TypeRoad)],
+                });
+            var svc = CreateService(db, segmentation.Object, factory);
+            using var stream = new MemoryStream([1, 2, 3]);
+
+            var summary = await svc.SegmentTileAsync(UserRoles.NationalAdmin, null, null, null, CommuneId100,
+                AiDraftFeature.TypeRoad, stream, "tile.png", "image/png", (1.0, 1.0, 2.0, 2.0), default);
+
+            Assert.Equal(0, summary.BuildingCount);
+            Assert.Equal(1, summary.RoadCount);
+            Assert.Single(summary.DraftIds);
+            var saved = await db.AiDraftFeatures.ToListAsync();
+            Assert.Single(saved);
+            Assert.Equal(CommuneId100, saved[0].CommuneId);
+            Assert.Equal(AiDraftFeature.TypeRoad, saved[0].FeatureType);
         }
     }
 

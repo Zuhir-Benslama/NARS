@@ -10,7 +10,7 @@ public interface ILocationSearchService
     /// <summary>Searches wilayas with pagination.</summary>
     Task<PagedResponse<WilayaItem>> SearchWilayasAsync(string search, int skip, int take, CancellationToken ct = default);
     /// <summary>Searches dairas within a wilaya with pagination.</summary>
-    Task<PagedResponse<DairaItem>?> SearchDairasAsync(int wilayaId, string search, int skip, int take, CancellationToken ct = default);
+    Task<PagedResponse<DairaItem>> SearchDairasAsync(int wilayaId, string search, int skip, int take, CancellationToken ct = default);
     /// <summary>Searches communes within a daira with pagination.</summary>
-    Task<PagedResponse<CommuneItem>?> SearchCommunesAsync(int dairaId, string search, int skip, int take, CancellationToken ct = default);
+    Task<PagedResponse<CommuneItem>> SearchCommunesAsync(int dairaId, string search, int skip, int take, CancellationToken ct = default);
 }

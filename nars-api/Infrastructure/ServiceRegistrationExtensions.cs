@@ -40,8 +40,7 @@ public static class ServiceRegistrationExtensions
             connectionString,
             sp.GetRequiredService<ISecurityStampCache>(),
             sp.GetRequiredService<ILogger<StampEvictionListener>>()));
-        var jwtAlgorithm = config.GetSection("Jwt").Get<JwtOptions>()?.Algorithm ?? "HS256";
-        services.AddNarsJwtAuthentication(jwtSecret, issuer: jwtIssuer, audience: jwtAudience, algorithm: jwtAlgorithm);
+        services.AddNarsJwtAuthentication(jwtSecret, issuer: jwtIssuer, audience: jwtAudience);
         services.AddNarsDomainServices();
         services.AddNarsHttpClients(config);
         services.AddNarsControllers();

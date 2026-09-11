@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using NarsApi.Data;
@@ -16,24 +15,28 @@ public static class AuthenticationExtensions
 {
     /// <summary>
     /// Adds JWT Bearer authentication reading tokens from HttpOnly cookies.
+    /// The signing algorithm is taken from the already-bound, DataAnnotations-
+    /// validated <see cref="JwtOptions"/> — the same source the
+    /// <c>JwtService</c> factory reads — so there is a single source of truth.
     /// </summary>
-    /// <param name="algorithm">
-    /// The configured signing algorithm (Jwt:Algorithm). Validation accepts ONLY
-    /// this algorithm — the same one JwtService signs with — so both validation
-    /// paths stay consistent and cross-algorithm tokens are rejected everywhere.
-    /// </param>
     public static IServiceCollection AddNarsJwtAuthentication(
         this IServiceCollection services,
         string jwtSecret,
         string? issuer = null,
-        string? audience = null,
-        string algorithm = "HS256")
+        string? audience = null)
     {
-        var signingAlgorithm = MapSigningAlgorithm(algorithm);
-
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(options =>
+            .AddJwtBearer();
+
+        // Dependency-injected options configuration: resolves the validated
+        // JwtOptions when the JwtBearerOptions are first built (runtime, after
+        // the container is complete), so the algorithm never has to be re-read
+        // from raw config at registration time.
+        services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+            .Configure<IOptions<JwtOptions>>((options, jwtOptions) =>
             {
+                var signingAlgorithm = MapSigningAlgorithm(jwtOptions.Value.Algorithm);
+
                 // Per-instance (not global) opt-out of claim renaming.
                 // MapInboundClaims=false keeps "role" as "role" instead of
                 // remapping to the long URI claim type, which would break
@@ -100,22 +103,8 @@ public static class AuthenticationExtensions
                         }
 
                         var stampCache = ctx.HttpContext.RequestServices.GetRequiredService<ISecurityStampCache>();
-                        var current = await stampCache.GetStampAsync(userId.Value, ctx.HttpContext.RequestAborted);
-
-                        if (current is null)
-                        {
-                            // Cache miss — query DB and populate cache for next request.
-                            var db = ctx.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
-                            current = await db.Users.AsNoTracking()
-                                .Where(u => u.Id == userId.Value)
-                                .Select(u => u.SecurityStamp)
-                                .FirstOrDefaultAsync(ctx.HttpContext.RequestAborted);
-
-                            if (current is not null)
-                            {
-                                stampCache.SetStamp(userId.Value, current);
-                            }
-                        }
+                        var db = ctx.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                        var current = await stampCache.GetStampWithDbFallbackAsync(db, userId.Value, ctx.HttpContext.RequestAborted);
 
                         if (current != stamp)
                         {
@@ -147,7 +136,8 @@ public static class AuthenticationExtensions
                 return UserRoles.IsDraftReviewer(role);
             }));
 
-        // Register JwtService with the same secret and options used for authentication
+        // Register JwtService so its factory resolves JwtOptions through the
+        // container, sharing the same validated instance used for authentication.
         services.AddScoped<IJwtService, JwtService>(sp =>
         {
             var jwtOptions = sp.GetRequiredService<IOptions<JwtOptions>>();

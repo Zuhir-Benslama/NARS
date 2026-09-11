@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../roads
+# Match the selector that the parent kustomization (nars-infra/k8s) deploys:
+# its `labels[].includeSelectors: true` injects part-of/managed-by into the
+# Deployment selector on every apply. The overlay must emit the SAME selector,
+# or `kubectl apply` fails with "spec.selector: field is immutable".
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/part-of: nars
+      app.kubernetes.io/managed-by: kustomize
+patches:
+  - path: patch.yaml

@@ -79,6 +79,92 @@ spec:
             limits:
               cpu: "250m"
               memory: "256Mi"
+        - name: fetch-road-weights
+          # Pulls the raw SpaceNet 3 champion roads checkpoint (a pickled
+          # model, not a state_dict) into /srv/weights for the conversion
+          # initContainer. Fail-safe like fetch-weights.
+          image: curlimages/curl:8.10.1@sha256:d9b4541e214bcd85196d6e92e2753ac6d0ea699f0af5741f8c6cccbfcf00ef4b
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              if [ -z "$NARS_ROADS_ROAD_WEIGHTS_URL" ]; then
+                echo "NARS_ROADS_ROAD_WEIGHTS_URL is not set; cannot fetch road weights" >&2
+                exit 1
+              fi
+              curl --fail --silent --show-error --location \
+                "$NARS_ROADS_ROAD_WEIGHTS_URL" -o /srv/weights/fold0_best.pth
+              ls -lh /srv/weights
+          env:
+            - name: NARS_ROADS_ROAD_WEIGHTS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: nars-roads-secrets
+                  key: road-weights-url
+                  optional: true
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: weights
+              mountPath: /srv/weights
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+        - name: convert-roads-weights
+          # The SpaceNet roads checkpoint is a legacy pickled model object; the
+          # serving image only loads plain state_dicts (weights_only=True,
+          # ref app/scripts/convert_roads.py). Convert once here so the main
+          # container never touches untrusted pickle bytes. Runs in the app
+          # image (has torch) after fetch-road-weights completes. This script
+          # runs offline, so a malicious pickle has no network or secrets.
+          image: zuhirbenslama/nars-roads:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "app.scripts.convert_roads"]
+          args:
+            - --input
+            - /srv/weights/fold0_best.pth
+            - --output
+            - /srv/weights/roads_best.pth
+          env:
+            - name: TMPDIR
+              value: /tmp
+            - name: HOME
+              value: /tmp
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: weights
+              mountPath: /srv/weights
+            - name: temp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
       containers:
         - name: nars-roads
           # ⚠ Dev default only — override via kustomize in CI/CD (e.g.
@@ -95,6 +181,8 @@ spec:
                   key: internal-token
             - name: NARS_ROADS_WEIGHTS_PATH
               value: /srv/weights/unet_bldg_base.pth
+            - name: NARS_ROADS_ROAD_WEIGHTS_PATH
+              value: /srv/weights/roads_best.pth
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://otel-collector.observability:4317"
             - name: OTEL_SERVICE_NAME

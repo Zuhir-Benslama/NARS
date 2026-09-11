@@ -55,8 +55,11 @@ spec:
 # Only this ingress owns the SPA catch-all (/.*). For the explicit
 # `localhost` host it also routes /login and /api to the API service.
 # Hostless /api, /login and /health requests are served by nars-api-local
-# (the single source of truth for API routing) — /health is not routed
-# here, which `make smoke-test` relies on.
+# (the single source of truth for API routing). Under the explicit
+# `localhost` host the API-serving paths (/login, /api, /health) are
+# mirrored here so `make smoke-test` (SMOKE_BASE_URL=localhost) reaches
+# the API — nginx prefers the exact host match over the hostless rule, so
+# /health must be listed on this rule or the SPA catch-all would win.
 #
 # ⚠ DEV ONLY — see above. Not in the base kustomization.
 apiVersion: networking.k8s.io/v1
@@ -83,6 +86,13 @@ spec:
                   number: 8080
           - path: /api(/|$)(.*)
             pathType: ImplementationSpecific
+            backend:
+              service:
+                name: nars-api
+                port:
+                  number: 8080
+          - path: /health
+            pathType: Exact
             backend:
               service:
                 name: nars-api

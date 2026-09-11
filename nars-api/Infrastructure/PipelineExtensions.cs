@@ -57,9 +57,24 @@ public static class PipelineExtensions
 
         // Bound the startup connectivity probe: if the database host is
         // unreachable (packets dropped), Npgsql's connect timeout alone can
-        // leave startup hanging for minutes. Fail fast instead.
-        using var connectTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var canConnect = await dbCtx.Database.CanConnectAsync(connectTimeout.Token);
+        // leave startup hanging for minutes. Fail fast instead — but only
+        // after a bounded retry window, so pods scaling out in parallel with
+        // postgis warm-up (cold starts, `make cluster-start`) do not crash.
+        const int maxAttempts = 20;
+        var canConnect = false;
+        for (var attempt = 1; attempt <= maxAttempts && !canConnect; attempt++)
+        {
+            using var probeCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            canConnect = await dbCtx.Database.CanConnectAsync(probeCts.Token);
+            if (!canConnect && attempt < maxAttempts)
+            {
+                logger.LogWarning(
+                    "Database not yet reachable (attempt {Attempt}/{MaxAttempts}); retrying in {Delay}s.",
+                    attempt, maxAttempts, 4);
+                await Task.Delay(TimeSpan.FromSeconds(4));
+            }
+        }
+
         if (!canConnect)
         {
             throw new InvalidOperationException(

@@ -31,6 +31,9 @@ cluster-up: prerequisites _check-secrets ## Full bootstrap: create cluster, buil
 	$(SUBMAKE) secrets-apply
 	$(SUBMAKE) images-load
 	$(SUBMAKE) kustomize-apply
+	@if [ "$(NARS_GPU)" = "1" ]; then
+		$(SUBMAKE) gpu-install;
+	fi
 	@echo ""
 	@echo "✓ Cluster '$(CLUSTER_NAME)' is ready!"
 	@echo ""
@@ -209,6 +212,11 @@ cluster-create: ## Create the kind cluster with host-mounted postgis data (idemp
 	@if $(KIND) get clusters 2>/dev/null | grep -q "^$(CLUSTER_NAME)$$"; then
 		echo "→ Cluster '$(CLUSTER_NAME)' already exists"
 	else
+		@if [ "$(NARS_GPU)" = "1" ]; then
+			$(SUBMAKE) _gpu-preflight;
+			$(SUBMAKE) gpu-node-image;
+			$(SUBMAKE) gpu-driver-bundle;
+		fi
 		echo "→ Creating postgis data directory at $(POSTGRES_DATA_DIR)..."
 		mkdir -p "$(POSTGRES_DATA_DIR)"
 		chmod 750 "$(POSTGRES_DATA_DIR)" 2>/dev/null || true
@@ -216,6 +224,10 @@ cluster-create: ## Create the kind cluster with host-mounted postgis data (idemp
 		DATA_DIR="$(POSTGRES_DATA_DIR)"
 		if echo "$$DATA_DIR" | grep -qv '^/'; then
 			DATA_DIR="$$(cd "$$DATA_DIR" && pwd)"
+		fi
+		GPU_DIR="$(GPU_DRIVER_DIR)"
+		if [ "$(NARS_GPU)" = "1" ] && echo "$$GPU_DIR" | grep -qv '^/'; then
+			GPU_DIR="$$(cd "$$GPU_DIR" && pwd)"
 		fi
 		KIND_CFG=$$(mktemp /tmp/kind-$(CLUSTER_NAME)-XXXXXX.yaml);
 		trap 'rm -f "$$KIND_CFG"' EXIT;
@@ -233,9 +245,25 @@ cluster-create: ## Create the kind cluster with host-mounted postgis data (idemp
 			echo '        - 0.0.0.0';
 			echo 'nodes:';
 			echo '  - role: control-plane';
+			if [ "$(NARS_GPU)" = "1" ]; then
+				echo "    image: $(GPU_NODE_IMAGE)";
+			fi
 			echo '    extraMounts:';
 			echo "      - hostPath: $$DATA_DIR";
 			echo '        containerPath: /mnt/nars/postgis';
+			if [ "$(NARS_GPU)" = "1" ]; then
+				# GPU mounts — the bare device nodes the CDI spec needs. NOTE:
+				# /dev/nvidia-caps (a DIRECTORY of device nodes) is deliberately
+				# excluded: under rootless Docker, Docker tries to mknod() the
+				# directory's devices into the node and fails. nvidia-caps only
+				# serves NVDEC/NV-CONTROL — irrelevant for torch inference.
+				echo "      - hostPath: $$GPU_DIR";
+				echo '        containerPath: /opt/nvidia/driver';
+				for dev in nvidiactl nvidia-modeset nvidia-uvm nvidia-uvm-tools nvidia0; do
+					echo "      - hostPath: /dev/$$dev";
+					echo "        containerPath: /dev/$$dev";
+				done
+			fi
 		} > "$$KIND_CFG"
 		echo "→ Creating kind cluster '$(CLUSTER_NAME)'..."
 		$(KIND) create cluster --name "$(CLUSTER_NAME)" --config "$$KIND_CFG"

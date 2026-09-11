@@ -303,7 +303,7 @@ public class FieldControllerTests
         var entranceService = new Mock<IEntranceService>();
         entranceService.Setup(s => s.GetRoadOwnerAsync(roadId, default))
             .ReturnsAsync((userId, (int?)1));
-        entranceService.Setup(s => s.CreateEntranceAsync(roadId, userId, It.IsAny<Guid>(), "Entrance Label", It.IsAny<string>(), default))
+        entranceService.Setup(s => s.CreateEntranceAsync(roadId, userId, "Entrance Label", It.IsAny<string>(), default))
             .ReturnsAsync(Guid.NewGuid());
         var ctrl = CreateController(entranceService: entranceService.Object);
         SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);

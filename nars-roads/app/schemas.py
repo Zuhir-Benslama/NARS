@@ -45,7 +45,8 @@ class FeatureCollection(BaseModel):
 
 
 class SegmentResponse(BaseModel):
-    """Segmentation result keyed by feature type. Buildings only today; roads
-    will be added here when a road checkpoint exists in the model registry."""
+    """Segmentation result keyed by feature type. Each /segment/<task> response
+    carries exactly one field, so a response never mixes feature types."""
 
     buildings: FeatureCollection | None = None
+    roads: FeatureCollection | None = None

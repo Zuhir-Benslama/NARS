@@ -9,10 +9,11 @@ registry in main.py), so checkpoints can be swapped and released
 independently. The buildings checkpoint (`unet_bldg_base.pth`) is the HOT
 fAIr building baseline from
 https://huggingface.co/nilsho01/unet-resnet34-vhr-buildings, a drop-in
-smp.Unet(resnet34, classes=2) state_dict. Training the weights is out of
-scope for this file - this only covers loading a checkpoint and running
-inference. Swap `_build_model` for D-LinkNet or another architecture
-without touching main.py or postprocess.py.
+smp.Unet(resnet34, classes=2) state_dict. The roads checkpoint is the
+SpaceNet 3 champion (Resnet34Upsample from app/road_model.py, a single-logit
+sigmoid model). Training the weights is out of scope for this file - this
+only covers loading a checkpoint and running inference. Swap `builder` for
+D-LinkNet or another architecture without touching main.py or postprocess.py.
 """
 
 from __future__ import annotations
@@ -84,10 +85,17 @@ class SegmentationModel:
         tile_size: int = 1024,
         num_classes: int = 2,
         device: str | None = None,
+        builder: str = "smp-unet",
     ):
         torch = _import_torch()
         self.tile_size = tile_size
         self.num_classes = num_classes
+        self.builder = builder
+        # Multi-class models (buildings) emit per-class logits - softmax over
+        # the classes. Single-class models (roads) emit one foreground logit
+        # that is passed through sigmoid instead (softmax of a single value is
+        # a constant 1.0, so it would destroy the probability estimate).
+        self.activation = "softmax" if num_classes > 1 else "sigmoid"
         self.device = torch.device(
             device or ("cuda" if torch.cuda.is_available() else "cpu")
         )
@@ -116,6 +124,11 @@ class SegmentationModel:
         self.net.eval()
 
     def _build_model(self) -> torch.nn.Module:
+        if self.builder == "resnet34-upsample":
+            from app.road_model import Resnet34Upsample
+
+            return Resnet34Upsample(num_classes=self.num_classes, num_channels=3)
+
         import segmentation_models_pytorch as smp
 
         return smp.Unet(
@@ -126,14 +139,14 @@ class SegmentationModel:
         )
 
     @staticmethod
-    def _normalize_window(arr: np.ndarray) -> np.ndarray:
+    def _normalize_window(arr: np.ndarray, scale: float | None = None) -> np.ndarray:
         """Normalize one decoded window: (bands, H, W) -> (H, W, 3) float32
         in [0, 1]. Selects the first 3 bands (repeating band 0 for
-        single-band rasters) and scales by the source bit depth so a 16-bit
-        GeoTIFF lands in the same range as a uint8 one. The scale is derived
-        from the array's own dtype — rasterio decodes every band into the
-        dataset's band-0 dtype, so that is the only scale the values actually
-        carry."""
+        single-band rasters). Integer pixels are divided by `scale` when the
+        caller derived one from the raster's actual data range (see
+        `_integer_scale`); otherwise by the array's own bit depth — rasterio
+        decodes every band into the dataset's band-0 dtype, so that is the
+        only scale the values carry by default."""
         arr = arr[:3] if arr.shape[0] >= 3 else np.repeat(arr[:1], 3, axis=0)
 
         img = np.transpose(arr, (1, 2, 0))
@@ -143,18 +156,54 @@ class SegmentationModel:
             # clearly byte-scaled (max well above 1): a value like 1.02 is
             # sensor noise on a [0,1] raster and must not be divided by 255
             # (which would black it). Non-finite values are neutralized so a
-            # single NaN/Inf can't poison normalization downstream.
+            # single NaN/Inf can't poison normalization downstream. Clipping
+            # always runs so negative pixels (float rasters are not required
+            # to be padded to zero) can't reach the net's ImageNet-based
+            # normalization with unclipped values.
             img = img.astype(np.float32)
             img = np.nan_to_num(img, nan=0.0, posinf=1.0, neginf=0.0)
-            mx = float(img.max())
-            if mx > 1.0:
-                if mx > FLOAT_BYTE_SCALE_THRESHOLD:
-                    img = img / 255.0
-                img = np.clip(img, 0.0, 1.0)
+            if float(img.max()) > FLOAT_BYTE_SCALE_THRESHOLD:
+                img = img / 255.0
+            img = np.clip(img, 0.0, 1.0)
         else:
-            # Scale by the integer bit depth: uint8 -> 255, uint16 -> 65535.
-            img = img.astype(np.float32) / float(np.iinfo(arr.dtype).max)
+            # Integer pixels: scale by the caller-derived raster range when
+            # given (see _integer_scale), else by the bit depth: uint8 -> 255,
+            # uint16 -> 65535. The dtype-max fallback is only correct when the
+            # data spans the full depth; a low-range 16-bit product (e.g. DNs
+            # in 10-1500) would collapse to ~0 and come out black, which is
+            # what the probe in _integer_scale guards against.
+            if scale is None:
+                scale = float(np.iinfo(arr.dtype).max)
+            img = img.astype(np.float32) / scale
         return img
+
+    @staticmethod
+    def _integer_scale(src: rasterio.DatasetReader) -> float:
+        """Integer normalization denominator for one raster.
+
+        Scaling by the dtype's full depth (255/65535) is only meaningful when
+        the data actually spans it; a low-range 16-bit tile (e.g. DNs in
+        10-1500) would be divided by 65535, collapse to ~0 and come out black.
+        Probe a decimated read for the real span once per raster: near the
+        full depth, keep the dtype max (preserves absolute radiometric range
+        across differently-deep datasets); otherwise min-max scale by the
+        observed max so low-range data is actually visible. Float tiles
+        self-normalize in `_normalize_window`, so they get an identity scale."""
+        dtype = np.dtype(src.dtypes[0])
+        if not np.issubdtype(dtype, np.integer):
+            return 1.0
+        dtype_max = float(np.iinfo(dtype).max)
+        sampled = src.read(
+            out_shape=(
+                src.count,
+                max(src.height // 16, 1),
+                max(src.width // 16, 1),
+            )
+        )
+        observed_max = float(sampled.max())
+        if observed_max >= 0.5 * dtype_max:
+            return dtype_max
+        return max(observed_max, 1.0)
 
     def _preprocess(self, img: np.ndarray) -> torch.Tensor:
         torch = _import_torch()
@@ -181,7 +230,10 @@ class SegmentationModel:
 
         with torch.no_grad():
             logits = self.net(x)
-            probs = F.softmax(logits, dim=1)
+            if self.activation == "sigmoid":
+                probs = torch.sigmoid(logits)
+            else:
+                probs = F.softmax(logits, dim=1)
 
         if (h, w) != (self.tile_size, self.tile_size):
             probs = F.interpolate(
@@ -245,7 +297,12 @@ class SegmentationModel:
                         )
 
                     probs = np.zeros((h, w, self.num_classes), dtype=np.float32)
-                    counts = np.zeros((h, w, 1), dtype=np.float32)
+
+                    # Compute the integer normalization denominator once per
+                    # raster so every window shares one scale (see
+                    # _integer_scale): a per-window min-max would make scaling
+                    # drift between tiles and create brightness seams.
+                    scale = self._integer_scale(src)
 
                     step = self.tile_size
                     for y in range(0, h, step):
@@ -253,10 +310,15 @@ class SegmentationModel:
                             y_end = min(y + step, h)
                             x_end = min(x0 + step, w)
                             window = Window.from_slices((y, y_end), (x0, x_end))
-                            chip = self._normalize_window(src.read(window=window))
+                            chip = self._normalize_window(
+                                src.read(window=window), scale=scale
+                            )
                             chip_probs = self._predict_tile(chip)
-                            probs[y:y_end, x0:x_end] += chip_probs
-                            counts[y:y_end, x0:x_end] += 1.0
+                            # The grid is strictly non-overlapping, so each
+                            # pixel is written exactly once; `=` (not `+=`)
+                            # keeps the map exact if overlap-and-blend is
+                            # added later.
+                            probs[y:y_end, x0:x_end] = chip_probs
             except RasterioIOError as exc:
                 # Decoding a garbage/truncated upload raises here; surface it
                 # as a 4xx client error instead of a 500.
@@ -264,6 +326,5 @@ class SegmentationModel:
                     f"Tile could not be decoded: {exc}"
                 ) from exc
 
-        probs = probs / np.clip(counts, 1.0, None)
-        fg_prob = probs[:, :, 1]
+        fg_prob = probs[:, :, self.num_classes - 1]
         return fg_prob, transform

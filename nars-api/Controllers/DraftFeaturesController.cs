@@ -28,10 +28,12 @@ public sealed class DraftFeaturesController(
     };
 
     /// <summary>
-    /// Submits an imagery tile for the given commune, runs building
+    /// Submits an imagery tile for the given commune, runs AI
     /// segmentation, and stores the results as pending draft features.
-    /// The caller must have access to the commune. Does not touch production
-    /// feature tables.
+    /// The `featureType` form field ("building" or "road") selects which
+    /// model/endpoint to call (per-request separation — each response
+    /// carries only one feature type). The caller must have access to the
+    /// commune. Does not touch production feature tables.
     /// </summary>
     [HttpPost("segment")]
     // 50MB cap: a 1024x1024 georeferenced tile is typically a few MB, so this
@@ -55,6 +57,16 @@ public sealed class DraftFeaturesController(
         if (request.Tile.Length == 0)
         {
             return Problem(detail: "Uploaded tile is empty.", statusCode: 400);
+        }
+
+        // Normalize and validate the requested feature type. Default to
+        // "building" so existing clients (which omit the field) keep working.
+        var featureType = string.IsNullOrWhiteSpace(request.FeatureType)
+            ? AiDraftFeature.TypeBuilding
+            : request.FeatureType.Trim().ToLowerInvariant();
+        if (featureType is not (AiDraftFeature.TypeBuilding or AiDraftFeature.TypeRoad))
+        {
+            return Problem(detail: "featureType must be 'building' or 'road'.", statusCode: 400);
         }
 
         var contentType = request.Tile.ContentType;
@@ -89,6 +101,7 @@ public sealed class DraftFeaturesController(
                 CurrentDairaId,
                 CurrentWilayaId,
                 request.CommuneId.Value,
+                featureType,
                 stream,
                 request.Tile.FileName,
                 request.Tile.ContentType,

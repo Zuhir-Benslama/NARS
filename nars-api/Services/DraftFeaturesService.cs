@@ -16,14 +16,16 @@ namespace NarsApi.Services;
 public interface IDraftFeaturesService
 {
     /// <summary>
-    /// Runs building segmentation on the uploaded tile and persists the
-    /// results as pending draft features for the commune. Returns an empty
-    /// list of ids when no features were detected. Throws when the caller has
-    /// no access to the commune or the commune does not exist.
+    /// Runs segmentation on the uploaded tile and persists the results as
+    /// pending draft features for the commune. `featureType` selects the
+    /// model/endpoint ("building" or "road"); each request targets exactly
+    /// one feature type. Returns counts for both feature types (one will be
+    /// zero). Throws when the caller has no access to the commune or the
+    /// commune does not exist.
     /// </summary>
     Task<SegmentSummaryResponse> SegmentTileAsync(
         string callerRole, int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
-        int communeId, Stream tileStream, string fileName, string contentType,
+        int communeId, string featureType, Stream tileStream, string fileName, string contentType,
         (double MinLon, double MinLat, double MaxLon, double MaxLat) bbox,
         CancellationToken ct);
 
@@ -67,7 +69,7 @@ public class DraftFeaturesService(
 
     public async Task<SegmentSummaryResponse> SegmentTileAsync(
         string callerRole, int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
-        int communeId, Stream tileStream, string fileName, string contentType,
+        int communeId, string featureType, Stream tileStream, string fileName, string contentType,
         (double MinLon, double MinLat, double MaxLon, double MaxLat) bbox,
         CancellationToken ct)
     {
@@ -81,17 +83,21 @@ public class DraftFeaturesService(
         _ = await db.Communes.FindAsync([communeId], ct) ?? throw new KeyNotFoundException($"Commune {communeId} not found");
         SegmentationResult result;
         result = await segmentationClient.SegmentTileAsync(
-            tileStream, fileName, contentType, bbox, ct);
+            featureType, tileStream, fileName, contentType, bbox, ct);
 
         var now = timeProvider.UtcNow;
         var draftEntities = new List<AiDraftFeature>();
 
-        foreach (var building in result.Buildings)
+        var features = featureType.Equals(AiDraftFeature.TypeRoad, StringComparison.OrdinalIgnoreCase)
+            ? result.Roads
+            : result.Buildings;
+
+        foreach (var feature in features)
         {
             draftEntities.Add(AiDraftFeature.Create(
-                featureType: "building",
-                geometryGeoJson: building.GeometryGeoJson,
-                confidence: building.Confidence,
+                featureType: feature.FeatureType,
+                geometryGeoJson: feature.GeometryGeoJson,
+                confidence: feature.Confidence,
                 communeId: communeId,
                 sourceTileRef: fileName,
                 createdAt: now));
@@ -100,9 +106,12 @@ public class DraftFeaturesService(
         db.AiDraftFeatures.AddRange(draftEntities);
         await db.SaveChangesAsync(ct);
 
-        return new SegmentSummaryResponse(
-            BuildingCount: result.Buildings.Count,
-            DraftIds: [.. draftEntities.Select(d => d.Id)]);
+        return new SegmentSummaryResponse
+        {
+            BuildingCount = result.Buildings.Count,
+            RoadCount = result.Roads.Count,
+            DraftIds = [.. draftEntities.Select(d => d.Id)],
+        };
     }
 
     public async Task<PagedResponse<AiDraftFeatureDto>> ListDraftsAsync(

@@ -4,7 +4,10 @@ The model is only built inside the lifespan context manager, so every test
 here runs against the app with _model == None. That is enough to exercise
 auth, validation, upload caps and the health/ready contract end to end."""
 
+from typing import Any
+
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from helpers import AUTH_TOKEN, make_tiff_bytes, requires_torch
 
@@ -59,6 +62,10 @@ def _post(**kwargs):
     return client.post("/segment/buildings", **kwargs)
 
 
+def _post_roads(**kwargs):
+    return client.post("/segment/roads", **kwargs)
+
+
 def test_health_reports_model_not_loaded():
     resp = client.get("/health")
     assert resp.status_code == 200
@@ -81,7 +88,12 @@ def test_ready_200_and_health_when_model_loaded(monkeypatch):
 
 
 def _ok_spec() -> roads.ModelSpec:
-    return {"weights_path": "nope.pth", "num_classes": 2}
+    return {
+        "weights_path": "nope.pth",
+        "num_classes": 2,
+        "builder": "smp-unet",
+        "postprocess": "polygons",
+    }
 
 
 def test_load_model_constructs_healthy_model(monkeypatch):
@@ -375,7 +387,7 @@ def test_inference_concurrency_is_bounded():
 
 
 def test_inference_pool_workers_are_daemon():
-    """Regression for the shutdown-hang finding: workers must be daemon so a
+    """Regression for the shutdown-hang finding: threads must be daemon so a
     predict abandoned by the 504 timeout path never blocks interpreter exit
     (ThreadPoolExecutor's are non-daemon and joined at process shutdown)."""
     import threading
@@ -383,26 +395,92 @@ def test_inference_pool_workers_are_daemon():
 
     from app.main import _InferenceExecutor
 
-    executor = _InferenceExecutor(
-        max_workers=1, thread_name_prefix="infer-daemon-regression"
-    )
-    future = executor.submit(lambda: time.sleep(0.05) or "ran")
+    seen: list[threading.Thread] = []
+
+    def record_and_sleep() -> str:
+        seen.append(threading.current_thread())
+        time.sleep(0.05)
+        return "ran"
+
+    executor = _InferenceExecutor(thread_name_prefix="infer-daemon-regression")
+    future = executor.submit(record_and_sleep)
     assert future.result(timeout=5) == "ran"
-
-    workers = [
-        t
-        for t in threading.enumerate()
-        if t.name.startswith("infer-daemon-regression") and t.is_alive()
-    ]
-    assert workers
-    assert all(worker.daemon for worker in workers)
+    assert seen
+    assert all(thread.daemon for thread in seen)
 
 
-def test_queue_timeout_is_configured():
-    # The capacity-gate wait is env-tunable like the other knobs; it must
-    # parse to a sane integer so requests fail fast at capacity, not hang.
-    assert isinstance(roads.QUEUE_TIMEOUT, int)
-    assert 0 <= roads.QUEUE_TIMEOUT < 300
+def test_executor_cancelled_submission_never_runs():
+    """A Future cancelled before its worker thread could start must never run
+    the callable (covers the set_running_or_notify_cancel guard, the only
+    code path 504-timeout cancellation can't reach in production)."""
+    import concurrent.futures
+
+    from app.main import _InferenceExecutor
+
+    future: concurrent.futures.Future[Any] = concurrent.futures.Future()
+    future.cancel()
+    calls: list[int] = []
+    _InferenceExecutor._run(future, lambda: calls.append(1))
+    assert future.cancelled()
+    assert calls == []
+
+
+def test_semaphore_permit_returned_after_upload_error(monkeypatch):
+    """The inference permit must be returned on failure paths after it was
+    acquired — and never double-released. A real BoundedSemaphore raises
+    ValueError on release-overflow, so this catches both a leak (an acquire
+    would hang/fail below) and a double release, which the MagicMock in the
+    503 test cannot."""
+    import threading
+
+    permits = threading.BoundedSemaphore(1)
+    monkeypatch.setattr(roads, "INFERENCE_SEMAPHORE", permits)
+    monkeypatch.setattr(roads, "_models", {"buildings": _StubModel()})
+
+    resp = _post(
+        headers=AUTH,
+        params=BBOX,
+        files={"tile": ("t.tif", b"", "image/tiff")},
+    )
+    assert resp.status_code == 400  # rejected after the permit was acquired
+
+    # All permits are back: exactly one acquire succeeds, a second fails.
+    assert permits.acquire(timeout=1.0) is True
+    assert permits.acquire(blocking=False) is False
+    permits.release()
+
+
+def test_declared_oversized_upload_rejected_before_buffering():
+    """A client declaring a part larger than MAX_TILE_BYTES in Content-Length
+    must be rejected by the dependency before any body is buffered (the
+    read-side cap in _read_upload can only fire after transport buffering).
+    Missing or non-numeric Content-Length (chunked) passes through — the
+    read-side cap still protects that case."""
+    from starlette.requests import Request
+
+    def make_request(content_length: str) -> Request:
+        return Request(
+            {
+                "type": "http",
+                "method": "POST",
+                "path": "/segment/buildings",
+                "raw_path": b"/segment/buildings",
+                "query_string": b"",
+                "headers": [(b"content-length", content_length.encode())],
+                "client": ("127.0.0.1", 1234),
+                "server": ("testserver", 80),
+                "scheme": "http",
+                "root_path": "",
+            }
+        )
+
+    oversized = roads.MAX_TILE_BYTES + 1
+    with pytest.raises(HTTPException) as err:
+        roads.reject_oversized_request(make_request(str(oversized)))
+    assert err.value.status_code == 413
+
+    assert roads.reject_oversized_request(make_request(str(1024))) is None
+    assert roads.reject_oversized_request(make_request("")) is None
 
 
 def test_segment_returns_503_when_semaphore_exhausted(monkeypatch):
@@ -445,6 +523,9 @@ def test_non_ascii_token_rejected_not_500():
 
 
 def test_segment_rejects_oversized_upload(monkeypatch):
+    """An oversize body is rejected 413. With a normal request the new
+    Content-Length dependency fires first (before buffering); the read-side
+    cap that backs it is exercised directly in the test below."""
     monkeypatch.setattr(roads, "MAX_TILE_BYTES", 1024)
     monkeypatch.setattr(
         roads, "_models", {"buildings": _StubModel()}
@@ -455,6 +536,29 @@ def test_segment_rejects_oversized_upload(monkeypatch):
         files={"tile": ("t.tif", b"x" * 2048, "image/tiff")},
     )
     assert resp.status_code == 413
+
+
+def test_read_upload_cap_fires_without_content_length(monkeypatch):
+    """The read-side cap in _read_upload is the authoritative guard: it must
+    still reject an oversized part when there is no déclarable Content-Length
+    (chunked encoding) or the declared size lies. Lines 329-331."""
+    import io
+
+    from app.main import _read_upload
+
+    class _FakeUpload:
+        def __init__(self, data: bytes):
+            self.file = io.BytesIO(data)
+
+    monkeypatch.setattr(roads, "MAX_TILE_BYTES", 1024)
+
+    with pytest.raises(HTTPException) as err:
+        _read_upload(_FakeUpload(b"x" * 2048))
+    assert err.value.status_code == 413
+
+    # Exactly at the cap (no extra byte beyond it) is accepted.
+    raw = _read_upload(_FakeUpload(b"x" * 1024))
+    assert len(raw) == 1024
 
 
 @requires_torch
@@ -488,6 +592,130 @@ def test_segment_end_to_end_returns_geojson(monkeypatch: pytest.MonkeyPatch):
                 assert "coordinates" in feature["geometry"]
                 assert feature["properties"]["confidence"] >= 0.0
                 assert feature["properties"]["confidence"] <= 1.0
+
+
+@requires_torch
+def test_segment_roads_end_to_end_returns_linestrings(monkeypatch: pytest.MonkeyPatch):
+    """Roads mirror of the buildings e2e: same request contract, but the
+    response is roads-only and carries LineString centerlines (Polygon for
+    buildings). With random init the mask may be empty, so the feature list
+    may be [] — the geometry assertion only applies to emitted features."""
+    from app.main import app as live_app
+
+    with TestClient(live_app) as live:
+        assert roads._models["roads"] is not None
+        monkeypatch.setattr(roads._models["roads"], "is_loaded", True)
+        resp = live.post(
+            "/segment/roads",
+            params={**BBOX, "threshold": 0.5},
+            headers=AUTH,
+            files={"tile": ("t.tif", make_tiff_bytes(), "image/tiff")},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert set(data) == {"roads"}
+        for fc in data.values():
+            assert fc["type"] == "FeatureCollection"
+            assert isinstance(fc["features"], list)
+            for feature in fc["features"]:
+                assert feature["type"] == "Feature"
+                assert feature["geometry"]["type"] == "LineString"
+                assert "coordinates" in feature["geometry"]
+                assert feature["properties"]["confidence"] >= 0.0
+                assert feature["properties"]["confidence"] <= 1.0
+
+
+# ── Roads: registry + endpoint contract ───────────────────────────────────
+
+
+def test_roads_registered_with_expected_config():
+    """The registry is the single source of truth for how the roads task is
+    wired: a single-class sigmoid Resnet34Upsample checkpoint whose mask is
+    converted to centerline linestrings, distinct from the buildings entry."""
+    assert "buildings" in roads.MODEL_SPECS
+    assert "roads" in roads.MODEL_SPECS
+    assert roads.MODEL_SPECS["roads"]["num_classes"] == 1
+    assert roads.MODEL_SPECS["roads"]["builder"] == "resnet34-upsample"
+    assert roads.MODEL_SPECS["roads"]["postprocess"] == "linestrings"
+    assert roads.MODEL_SPECS["buildings"]["postprocess"] == "polygons"
+    assert roads.POSTPROCESSORS["polygons"] is roads.mask_to_polygons
+    assert roads.POSTPROCESSORS["linestrings"] is roads.mask_to_linestrings
+
+
+def test_segment_roads_rejects_missing_token():
+    assert _post_roads().status_code == 401
+
+
+def test_segment_roads_rejects_wrong_token():
+    assert _post_roads(headers={"X-Internal-Token": "nope"}).status_code == 401
+
+
+def test_segment_roads_missing_bbox_params():
+    resp = _post_roads(
+        headers=AUTH, files={"tile": ("t.tif", make_tiff_bytes(), "image/tiff")}
+    )
+    assert resp.status_code == 422
+
+
+def test_segment_roads_rejects_unsupported_content_type():
+    resp = _post_roads(
+        headers=AUTH,
+        params=BBOX,
+        files={"tile": ("t.txt", b"not an image", "text/plain")},
+    )
+    assert resp.status_code == 415
+
+
+def test_segment_roads_503_when_not_loaded():
+    resp = _post_roads(
+        headers=AUTH,
+        params={**BBOX, "threshold": 0.5},
+        files={"tile": ("t.tif", b"x", "image/tiff")},
+    )
+    assert resp.status_code == 503
+
+
+def test_segment_roads_rejects_unready_model(monkeypatch):
+    # Fail-closed for the roads task too: a constructed-but-not-loaded roads
+    # model must 503 (mirrors the buildings case) rather than serving random
+    # predictions.
+    monkeypatch.setattr(roads, "_models", {"roads": _StubModel(is_loaded=False)})
+    assert (
+        _post_roads(
+            headers=AUTH,
+            params=BBOX,
+            files={"tile": ("t.tif", b"x", "image/tiff")},
+        ).status_code
+        == 503
+    )
+
+
+def test_segment_roads_rejects_empty_file(monkeypatch):
+    # With the roads model loaded, the empty-upload check fires first.
+    monkeypatch.setattr(roads, "_models", {"roads": _StubModel(is_loaded=True)})
+    resp = _post_roads(
+        headers=AUTH,
+        params=BBOX,
+        files={"tile": ("t.tif", b"", "image/tiff")},
+    )
+    assert resp.status_code == 400
+
+
+def test_segment_roads_rejects_out_of_range_threshold():
+    resp = _post_roads(
+        headers=AUTH,
+        params={**BBOX, "threshold": 1.5},
+        files={"tile": ("t.tif", b"x", "image/tiff")},
+    )
+    assert resp.status_code == 422
+
+
+def test_ready_200_when_only_roads_loaded(monkeypatch):
+    # Each task has its own readiness flag; a loaded roads model must make the
+    # pod ready even if buildings failed to load (independent release/rollback).
+    monkeypatch.setattr(roads, "_models", {"roads": _StubModel(is_loaded=True)})
+    assert client.get("/ready").status_code == 200
+    assert client.get("/health").json() == {"status": "ok", "model_loaded": True}
 
 
 # ── Boundary-value tests for validation helpers ────────────────────────────

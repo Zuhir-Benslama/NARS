@@ -1,0 +1,18 @@
+# GPU opt-in overlay (applied by `make gpu-install`, or `make cluster-up NARS_GPU=1`).
+# Requests one nvidia.com/gpu so the pod is scheduled with the device plugin's
+# CDI-allocated GPU. Model code already selects cuda automatically
+# (app/model.py SegmentationModel).
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nars-roads
+  namespace: nars
+spec:
+  template:
+    spec:
+      containers:
+        - name: nars-roads
+          resources:
+            limits:
+              nvidia.com/gpu: "1"

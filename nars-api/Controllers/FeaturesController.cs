@@ -155,6 +155,16 @@ public class FeaturesController(
             return Problem(detail: "At least one entrance is required.", statusCode: 400);
         }
 
+        if (body.EntranceIds.Count > NumberEntrancesRequest.MaxBatchSize)
+        {
+            return Problem(detail: $"At most {NumberEntrancesRequest.MaxBatchSize} entrances can be numbered per request.", statusCode: 400);
+        }
+
+        if (body.EntranceIds.Count != body.EntranceIds.Distinct().Count())
+        {
+            return Problem(detail: "Duplicate entrance IDs are not allowed.", statusCode: 400);
+        }
+
         try
         {
             var numbered = await numberEntrancesService.NumberAsync(

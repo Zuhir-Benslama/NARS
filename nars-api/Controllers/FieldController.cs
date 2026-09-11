@@ -179,7 +179,7 @@ public class FieldController(
 
         var label = body.Label ?? DefaultEntranceLabel;
         var newId = await entranceService.CreateEntranceAsync(
-            roadId, roadOwner.Value.OwnerUserId, RequiredCurrentUserId, label, rawData, cancellationToken);
+            roadId, roadOwner.Value.OwnerUserId, label, rawData, cancellationToken);
 
         logger.LogInformation(
             "[Field] Worker {WorkerId} created entrance {EntranceId} for road {RoadId} (owner: {OwnerId})",

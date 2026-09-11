@@ -20,7 +20,7 @@ smoke-test: ## Post-deploy smoke test: verify /health, frontend, and API auth
 	health=$$(curl -s -o "$$_tmp" -w "%{http_code}" --connect-timeout 5 --max-time 10 "$(SMOKE_BASE_URL)/health" 2>/dev/null || echo "000");
 	if [ "$$health" = "200" ]; then
 		body=$$(cat "$$_tmp" 2>/dev/null || echo "");
-		if echo "$$body" | grep -qE '"status"[[:space:]]*:[[:space:]]*"Healthy"'; then
+		if echo "$$body" | grep -qE '"status"[[:space:]]*:[[:space:]]*"Healthy"|^Healthy$$'; then
 			pass "/health → 200 Healthy";
 		else
 			fail "/health → 200 but body unexpected: $$body";

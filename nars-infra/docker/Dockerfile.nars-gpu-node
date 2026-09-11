@@ -1,0 +1,47 @@
+# ─── Kind GPU control-plane node (NARS) ──────────────────────────────────────
+# The only change vs stock kind nodes: nvidia-container-toolkit + a boot hook
+# that writes /etc/cdi/nvidia.yaml for the host GPU.
+#
+# The HOST needs nothing installed (no sudo): rootless Docker donates
+#   /dev/nvidia*            (device nodes, world-open 0666)
+#   /opt/nvidia/driver      (curated driver bundle — host data/nvidia/driver)
+# via extraMounts wired in make/cluster.mk when NARS_GPU=1. The node boot hook
+# turns that into CDI specs (/etc/cdi/nvidia.yaml + the k8s-device-plugin-vendor
+# spec in /var/run/cdi) before containerd/kubelet start.
+#
+# Base = default kind v0.27.0 node image. Debian bookworm with containerd
+# v2.0.2, which enables CRI CDI injection by default (verified via
+# `containerd config dump` → enable_cdi = true).
+FROM kindest/node:v1.32.2@sha256:f226345927d7e348497136874b6d207e0b32cc52154ad8323129352923a3142f
+
+# nvidia-container-toolkit (provides nvidia-ctk, used for CDI spec generation
+# and by the k8s-device-plugin). Installed INSIDE the node container so no
+# host-side toolkit or runtime is required.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+# Versions pinned for reproducibility (DL3008); bump deliberately on rebuild.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl=7.88.1-10+deb12u15 ca-certificates=20250419~deb12u1 gpg=2.2.40-1.1+deb12u2 \
+    && curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
+        | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
+    && curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
+        | sed 's#^deb #deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] #' \
+        > /etc/apt/sources.list.d/nvidia-container-toolkit.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends nvidia-container-toolkit=1.20.0-1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# The k8s-device-plugin container expects the toolkit under the NVIDIA
+# "container toolkit root" /usr/local/nvidia/toolkit/. Mirror the Debian
+# package layout there.
+RUN mkdir -p /usr/local/nvidia/toolkit/bin /usr/local/nvidia/toolkit/lib \
+    && ln -s /usr/bin/nvidia-ctk /usr/local/nvidia/toolkit/bin/nvidia-ctk \
+    && for lib in /usr/lib/x86_64-linux-gnu/libnvidia-container.so*; do \
+        ln -s "$lib" /usr/local/nvidia/toolkit/lib/; \
+    done
+
+# Boot hook: generate the CDI spec from the bind-mounted host GPU before
+# containerd/kubelet start (kind nodes run systemd as PID 1).
+COPY scripts/nvidia-cdi-init.sh /usr/local/sbin/nvidia-cdi-init.sh
+COPY systemd/nvidia-cdi-init.service /etc/systemd/system/nvidia-cdi-init.service
+RUN chmod 0755 /usr/local/sbin/nvidia-cdi-init.sh \
+    && systemctl enable nvidia-cdi-init.service

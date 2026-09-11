@@ -121,7 +121,7 @@ public class PagesControllerTests
             _db.SaveChanges();
 
             _stampCache = new Mock<ISecurityStampCache>();
-            _stampCache.Setup(c => c.GetStampAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            _stampCache.Setup(c => c.GetStampWithDbFallbackAsync(It.IsAny<AppDbContext>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(TestSecurityStamp);
 
             var pageAuthService = new PageAuthService(

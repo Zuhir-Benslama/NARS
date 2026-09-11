@@ -157,24 +157,11 @@ public sealed class PageAuthService(
             return null;
         }
 
-        var current = await stampCache.GetStampAsync(userId.Value, ct);
-        if (current is null)
-        {
-            // Cache miss — query DB and populate cache for next request.
-            current = await db.Users.AsNoTracking()
-                .Where(u => u.Id == userId.Value)
-                .Select(u => u.SecurityStamp)
-                .FirstOrDefaultAsync(ct);
-
-            if (current is not null)
-            {
-                stampCache.SetStamp(userId.Value, current);
-            }
-        }
+        var current = await stampCache.GetStampWithDbFallbackAsync(db, userId.Value, ct);
 
         return current == stamp ? principal : null;
     }
 
     private CookieOptions MakeCookieOptions(TimeSpan maxAge)
-        => CookieHelper.MakeCookieOptions(maxAge, env.IsProduction() || HttpContext.Request.IsHttps);
+        => CookieHelper.MakeCookieOptions(maxAge, CookieHelper.ShouldSetSecureCookie(env, HttpContext.Request));
 }

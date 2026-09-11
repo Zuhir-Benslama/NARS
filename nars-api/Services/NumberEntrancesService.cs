@@ -107,9 +107,12 @@ public sealed class NumberEntrancesService(IDbContextFactory<AppDbContext> dbFac
             }
         }
 
-        // Every requested entrance must exist, belong to the user, be on the
-        // road, and carry a valid side; otherwise the batch is inconsistent.
-        if (targets.Count != entranceIds.Distinct().Count())
+        // Reject duplicate IDs: the loop below iterates entranceIds in order
+        // and would number the same entrance twice, overwriting the first
+        // assignment. Every requested entrance must also exist, belong to the
+        // user, be on the road, and carry a valid side.
+        if (entranceIds.Count != entranceIds.Distinct().Count()
+            || targets.Count != entranceIds.Distinct().Count())
         {
             return null;
         }

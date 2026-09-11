@@ -37,6 +37,10 @@ _check-playwright:
 		echo "✖ Playwright (Firefox) is not resolvable from nars-web/ — run 'npm ci' in nars-web first."; \
 		exit 1; \
 	fi
+	@if ! node -e "const fs=require('fs');const {createRequire}=require('node:module');let m;try{m=require('playwright')}catch{const r=createRequire(require('path').resolve('nars-web/package.json'));m=r('playwright')}const p=m.firefox.executablePath();if(!fs.existsSync(p)){process.exit(1)}"; then \
+		echo "✖ Playwright Firefox browser binary not installed — run 'cd nars-web && npx playwright install firefox'."; \
+		exit 1; \
+	fi
 
 .PHONY: docs-lint
 docs-lint: docs-lint-uml ## CI gate: render UML diagrams, lint docs markdown, check class-diagram drift

@@ -37,7 +37,7 @@ public class NumberEntrancesServiceTests(NarsDatabaseFixture fixture) : ServiceT
     private async Task<Guid> CreateEntranceAsync(EntranceService entranceService, Guid roadId, string side)
     {
         var data = JsonSerializer.Serialize(new { side });
-        return await entranceService.CreateEntranceAsync(roadId, _userId, _userId, "Entrance", data);
+        return await entranceService.CreateEntranceAsync(roadId, _userId, "Entrance", data);
     }
 
     private async Task<string?> GetEntranceDataJsonAsync(Guid entranceId)
@@ -106,7 +106,7 @@ public class NumberEntrancesServiceTests(NarsDatabaseFixture fixture) : ServiceT
 
         // An already-numbered left entrance at 1 (dense start).
         await entranceService.CreateEntranceAsync(
-            roadId, _userId, _userId, "Existing",
+            roadId, _userId, "Existing",
             JsonSerializer.Serialize(new { side = "left", entranceNumber = 1 }));
 
         var newLeft = await CreateEntranceAsync(entranceService, roadId, "left");

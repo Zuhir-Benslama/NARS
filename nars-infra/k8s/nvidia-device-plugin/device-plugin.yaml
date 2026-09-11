@@ -1,0 +1,104 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-device-plugin
+  namespace: kube-system
+  labels:
+    k8s-app: nvidia-device-plugin
+    app.kubernetes.io/part-of: nars
+spec:
+  selector:
+    matchLabels:
+      k8s-app: nvidia-device-plugin
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        k8s-app: nvidia-device-plugin
+    spec:
+      priorityClassName: system-node-critical
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: nvidia-device-plugin
+          image: nvcr.io/nvidia/k8s-device-plugin:v0.17.0
+          imagePullPolicy: IfNotPresent
+          # CDI flow on a rootless-Docker node:
+          #   - device discovery = NVML. Needs the driver libs + /dev/nvidia*
+          #     device nodes in THIS container. The node's /opt/nvidia/driver
+          #     (driver bundle, incl. nvidia-ctk + libnvidia-container) is
+          #     mounted at /driver-root; LD_LIBRARY_PATH resolves the libs.
+          #     open() on the 0666 devices works unprivileged.
+#   - allocation = cdi-annotations. The node boot hook pre-generates BOTH CDI
+#     specs: /etc/cdi/nvidia.yaml (vendor nvidia.com) plus
+#     /var/run/cdi/k8s.device-plugin.nvidia.com-gpu.yaml (plugin vendor). The
+#     plugin only registers devices and emits annotations of the form
+#     k8s.device-plugin.nvidia.com/gpu=GPU-<uuid> that containerd resolves
+#     against the pre-generated spec. The plugin is NOT given a /var/run/cdi
+#     mount: its own spec generator would write either a writable JSON (with
+#     wrong dev-node paths and no symlinks) or crash on a read-only dir, so it
+#     instead writes harmlessly into the pod's tmpfs.
+#     --driver-root / --driver-root-ctr-path / --nvidia-ctk-path keep the
+#     in-container driver layout consistent with the hostPath volume.
+          args:
+            - --device-list-strategy=cdi-annotations
+            - --driver-root=/opt/nvidia/driver
+            - --driver-root-ctr-path=/driver-root
+            - --nvidia-ctk-path=/driver-root/bin/nvidia-ctk
+          env:
+            - name: LD_LIBRARY_PATH
+              value: /driver-root/lib64
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: compute,utility
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: device-plugin
+              mountPath: /var/lib/kubelet/device-plugins
+            - name: driver-root
+              mountPath: /driver-root
+              readOnly: true
+            - name: nvidiactl
+              mountPath: /dev/nvidiactl
+              readOnly: true
+            - name: nvidiamodeset
+              mountPath: /dev/nvidia-modeset
+              readOnly: true
+            - name: nvidiauvm
+              mountPath: /dev/nvidia-uvm
+              readOnly: true
+            - name: nvidiauvmtools
+              mountPath: /dev/nvidia-uvm-tools
+              readOnly: true
+            - name: nvidia0
+              mountPath: /dev/nvidia0
+              readOnly: true
+      volumes:
+        - name: device-plugin
+          hostPath:
+            path: /var/lib/kubelet/device-plugins
+        - name: driver-root
+          hostPath:
+            path: /opt/nvidia/driver
+        - name: nvidiactl
+          hostPath:
+            path: /dev/nvidiactl
+        - name: nvidiamodeset
+          hostPath:
+            path: /dev/nvidia-modeset
+        - name: nvidiauvm
+          hostPath:
+            path: /dev/nvidia-uvm
+        - name: nvidiauvmtools
+          hostPath:
+            path: /dev/nvidia-uvm-tools
+        - name: nvidia0
+          hostPath:
+            path: /dev/nvidia0

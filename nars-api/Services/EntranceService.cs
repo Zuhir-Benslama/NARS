@@ -9,7 +9,7 @@ namespace NarsApi.Services;
 public interface IEntranceService
 {
     Task<(Guid OwnerUserId, int? CommuneId)?> GetRoadOwnerAsync(Guid roadId, CancellationToken ct = default);
-    Task<Guid> CreateEntranceAsync(Guid roadId, Guid ownerUserId, Guid creatorUserId, string label, string data, CancellationToken ct = default);
+    Task<Guid> CreateEntranceAsync(Guid roadId, Guid ownerUserId, string label, string data, CancellationToken ct = default);
 }
 
 public sealed class EntranceService(IDbContextFactory<AppDbContext> dbFactory) : IEntranceService
@@ -27,7 +27,7 @@ public sealed class EntranceService(IDbContextFactory<AppDbContext> dbFactory) :
         return result is null ? null : (result.UserId, result.CommuneId);
     }
 
-    public async Task<Guid> CreateEntranceAsync(Guid roadId, Guid ownerUserId, Guid creatorUserId, string label, string data, CancellationToken ct = default)
+    public async Task<Guid> CreateEntranceAsync(Guid roadId, Guid ownerUserId, string label, string data, CancellationToken ct = default)
     {
         var newId = Guid.CreateVersion7();
 

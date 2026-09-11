@@ -28,7 +28,7 @@ public sealed class LocationSearchService(IDbContextFactory<AppDbContext> dbFact
         return new PagedResponse<WilayaItem>(items, total, skip, take);
     }
 
-    public async Task<PagedResponse<DairaItem>?> SearchDairasAsync(int wilayaId, string search, int skip, int take, CancellationToken ct = default)
+    public async Task<PagedResponse<DairaItem>> SearchDairasAsync(int wilayaId, string search, int skip, int take, CancellationToken ct = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var q = db.Dairas.Where(d => d.WilayaId == wilayaId).AsQueryable();
@@ -48,7 +48,7 @@ public sealed class LocationSearchService(IDbContextFactory<AppDbContext> dbFact
         return new PagedResponse<DairaItem>(items, total, skip, take);
     }
 
-    public async Task<PagedResponse<CommuneItem>?> SearchCommunesAsync(int dairaId, string search, int skip, int take, CancellationToken ct = default)
+    public async Task<PagedResponse<CommuneItem>> SearchCommunesAsync(int dairaId, string search, int skip, int take, CancellationToken ct = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var q = db.Communes.Where(c => c.DairaId == dairaId).AsQueryable();

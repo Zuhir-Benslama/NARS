@@ -8,13 +8,14 @@ stays runnable on machines without the ML stack.
 import numpy as np
 import pytest
 from helpers import DEFAULT_TRANSFORM, make_tiff_bytes, requires_torch
+from rasterio.io import MemoryFile
 from rasterio.transform import Affine, from_bounds
 
 from app.model import InvalidTileError, SegmentationModel, TileTooLargeError
 
 
-def _normalize(arr):
-    return SegmentationModel._normalize_window(arr)
+def _normalize(arr, **kwargs):
+    return SegmentationModel._normalize_window(arr, **kwargs)
 
 
 def test_normalize_window_uint8_scales_to_unit():
@@ -35,6 +36,80 @@ def test_normalize_window_uint16_scales_by_bit_depth():
     arr[:, 0, 0] = 65535
     out = _normalize(arr)
     assert out[0, 0, 0] == pytest.approx(1.0)
+
+
+def test_normalize_window_uint16_low_range_uses_raster_scale():
+    # A low-range 16-bit product (DNs ~1500) must be scaled by its actual
+    # range, not 65535, or it collapses to ~0 and comes out black.
+    arr = np.zeros((3, 1, 1), dtype=np.uint16)
+    arr[:, 0, 0] = 1500
+    out = _normalize(arr, scale=1500.0)
+    assert out[0, 0, 0] == pytest.approx(1.0)
+
+
+def test_normalize_window_float_negatives_clipped():
+    # Float rasters are not guaranteed padded to zero; negative pixels must
+    # be clipped (was: only clipping when max > 1.0). (3,1,3) -> transpose
+    # gives (H=1, W=3, bands=3): pixel columns are the middle dimension.
+    arr = np.array([[[-0.5, 0.3, 0.8]]], dtype=np.float32)
+    arr = np.repeat(arr, 3, axis=0)
+    out = _normalize(arr)
+    assert out[0, 0, 0] == 0.0
+    assert out[0, 1, 0] == pytest.approx(0.3)
+    assert out[0, 2, 0] == pytest.approx(0.8)
+
+
+def test_integer_scale_probes_low_range_uint16():
+    # _integer_scale derives the denominator from the raster's real data
+    # range, so low-range 16-bit tiles normalize to something visible.
+    data = np.zeros((3, 32, 32), dtype=np.uint16)
+    data[1, 4:28, 4:28] = 1500
+    with MemoryFile() as memfile:
+        with memfile.open(
+            driver="GTiff",
+            width=32,
+            height=32,
+            count=3,
+            dtype="uint16",
+        ) as dst:
+            dst.write(data)
+        with memfile.open() as src:
+            assert SegmentationModel._integer_scale(src) == pytest.approx(1500.0)
+
+
+def test_integer_scale_full_depth_uses_dtype_max():
+    # Data that actually spans the full 16-bit depth keeps the dtype max so
+    # absolute radiometric range is preserved across differently-deep rasters.
+    data = np.zeros((3, 32, 32), dtype=np.uint16)
+    data[1, 4:28, 4:28] = 65535
+    with MemoryFile() as memfile:
+        with memfile.open(
+            driver="GTiff",
+            width=32,
+            height=32,
+            count=3,
+            dtype="uint16",
+        ) as dst:
+            dst.write(data)
+        with memfile.open() as src:
+            assert SegmentationModel._integer_scale(src) == 65535.0
+
+
+def test_integer_scale_float_raster_is_identity():
+    # Float tiles self-normalize in _normalize_window; the scale must be a
+    # harmless identity so predict() can always pass one denominator through.
+    data = np.full((3, 16, 16), 0.5, dtype=np.float32)
+    with MemoryFile() as memfile:
+        with memfile.open(
+            driver="GTiff",
+            width=16,
+            height=16,
+            count=3,
+            dtype="float32",
+        ) as dst:
+            dst.write(data)
+        with memfile.open() as src:
+            assert SegmentationModel._integer_scale(src) == 1.0
 
 
 def test_normalize_window_float_normalized_unchanged():
@@ -89,6 +164,16 @@ def test_normalize_window_trims_extra_bands():
 @pytest.fixture(scope="module")
 def model():
     return SegmentationModel(weights_path="/nonexistent/weights.pth", tile_size=32)
+
+
+@pytest.fixture(scope="module")
+def road_model():
+    return SegmentationModel(
+        weights_path="/nonexistent/roads.pth",
+        tile_size=32,
+        num_classes=1,
+        builder="resnet34-upsample",
+    )
 
 
 @requires_torch
@@ -179,3 +264,56 @@ def test_weights_load_sets_is_loaded(tmp_path, model):
     loaded = SegmentationModel(weights_path=str(checkpoint), tile_size=32)
     assert loaded.is_loaded
     assert loaded.net is not model.net
+
+
+# ── Roads builder: single-class sigmoid Resnet34Upsample ───────────────────
+
+
+@requires_torch
+def test_road_model_uses_resnet34_upsample_builder(road_model):
+    # The roads spec maps to the vendored SpaceNet champion architecture, not
+    # smp.Unet. The vendored class is transportable and its attribute names
+    # match the converted checkpoint (convert_roads.py).
+    from app.road_model import Resnet34Upsample
+
+    assert road_model.builder == "resnet34-upsample"
+    assert isinstance(road_model.net, Resnet34Upsample)
+    # Single foreground logit shared by all roads pixels.
+    assert road_model.net.final[0].out_channels == 1
+
+
+@requires_torch
+def test_road_model_uses_sigmoid_not_softmax(road_model):
+    # Softmax over one logit is identically 1.0, which would fake total
+    # certainty; the roads head must use sigmoid so probabilities stay in
+    # (0, 1).
+    assert road_model.activation == "sigmoid"
+
+
+@requires_torch
+def test_road_predict_shapes_and_probability_range(road_model):
+    raw = make_tiff_bytes(width=64, height=48)
+    road, transform = road_model.predict(raw, bbox=(0.0, 0.0, 1.0, 1.0))
+    assert road.shape == (48, 64)
+    assert road.dtype == np.float32
+    assert road.min() >= 0.0
+    assert road.max() <= 1.0
+    assert transform == DEFAULT_TRANSFORM
+
+
+@requires_torch
+def test_road_weights_load_sets_is_loaded(tmp_path, road_model):
+    # Roads checkpoints produced by convert_roads.py load strict=True through
+    # the same SegmentationModel code path as buildings checkpoints.
+    import torch
+
+    checkpoint = tmp_path / "roads_best.pth"
+    torch.save(road_model.net.state_dict(), checkpoint)
+    loaded = SegmentationModel(
+        weights_path=str(checkpoint),
+        tile_size=32,
+        num_classes=1,
+        builder="resnet34-upsample",
+    )
+    assert loaded.is_loaded
+    assert loaded.net is not road_model.net

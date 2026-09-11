@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -239,10 +240,16 @@ public class AuthenticationExtensionsTests
     private static async Task<TokenValidatedContext> RunOnTokenValidatedAsync(
         JwtBearerOptions options, AppDbContext db, ClaimsPrincipal principal, string? cachedStamp = null)
     {
+        var cache = new SecurityStampCache(new MemoryCache(new MemoryCacheOptions()));
+        if (cachedStamp is not null)
+        {
+            var stampedUserId = Guid.Parse(principal.FindFirstValue(ClaimNames.UserId)!);
+            cache.SetStamp(stampedUserId, cachedStamp);
+        }
+
         var services = new ServiceCollection();
         services.AddSingleton(db);
-        services.AddSingleton<ISecurityStampCache>(Mock.Of<ISecurityStampCache>(
-            c => c.GetStampAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()) == Task.FromResult(cachedStamp)));
+        services.AddSingleton<ISecurityStampCache>(cache);
         await using var sp = services.BuildServiceProvider();
         var httpContext = new DefaultHttpContext { RequestServices = sp };
         var context = new TokenValidatedContext(httpContext, Scheme, options) { Principal = principal };

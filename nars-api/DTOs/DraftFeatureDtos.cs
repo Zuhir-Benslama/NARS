@@ -15,6 +15,13 @@ public sealed class SegmentTileRequest
     [Required]
     public IFormFile Tile { get; set; } = null!;
 
+    /// <summary>
+    /// Selects which segmentation model/endpoint to call: "building" (default)
+    /// or "road". Each request targets exactly one feature type (per-request
+    /// separation), so a response carries only buildings or roads, never both.
+    /// </summary>
+    public string? FeatureType { get; set; }
+
     [Required]
     public double? MinLon { get; set; }
 
@@ -28,7 +35,12 @@ public sealed class SegmentTileRequest
     public double? MaxLat { get; set; }
 }
 
-public sealed record SegmentSummaryResponse(int BuildingCount, List<Guid> DraftIds);
+public sealed record SegmentSummaryResponse
+{
+    public int BuildingCount { get; init; }
+    public int RoadCount { get; init; }
+    public List<Guid> DraftIds { get; init; } = [];
+}
 
 public sealed record AiDraftFeatureDto(
     Guid Id,

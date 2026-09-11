@@ -60,7 +60,7 @@ public abstract class NarsControllerBase(
 
     /// <summary>Creates a consistent CookieOptions with secure defaults for auth cookies.</summary>
     protected CookieOptions MakeCookieOptions(TimeSpan maxAge)
-        => CookieHelper.MakeCookieOptions(maxAge, environment.IsProduction() || Request.IsHttps);
+        => CookieHelper.MakeCookieOptions(maxAge, CookieHelper.ShouldSetSecureCookie(environment, Request));
 
     /// <summary>Writes the access + refresh auth cookies with consistent secure options.</summary>
     protected void AppendAuthCookies(string accessToken, string refreshToken, TimeSpan accessMaxAge, TimeSpan refreshMaxAge)

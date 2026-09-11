@@ -3,9 +3,9 @@ NARS Segmentation Service
 Stateless inference microservice: satellite/aerial tile in -> GeoJSON draft
 features out. One model instance per feature type (a model registry) rather
 than a shared multiclass network, so each checkpoint can be swapped and
-released independently. Today only `buildings` has a checkpoint; `roads` is
-documented in the registry so adding a road model is a config entry plus a
-/segment/roads endpoint.
+released independently. The registry currently has `buildings` (polygons) and
+`roads` (linestrings), each with its own endpoint (/segment/buildings and
+/segment/roads) so a response never mixes feature types.
 
 This service owns no data. nars-api (.NET) is responsible for persisting
 results into ai_draft_features and for auth/business rules. This service
@@ -13,9 +13,9 @@ is only reachable from inside the cluster network.
 """
 
 import concurrent.futures
+import itertools
 import logging
 import os
-import queue
 import secrets
 import threading
 from collections.abc import Callable
@@ -24,7 +24,15 @@ from typing import Annotated, Any, TypedDict, TypeVar
 
 import numpy as np
 import rasterio
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, UploadFile
+from fastapi import (
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
 
 from app.config import env_int
 from app.model import (
@@ -32,8 +40,8 @@ from app.model import (
     SegmentationModel,
     TileTooLargeError,
 )
-from app.postprocess import mask_to_polygons
-from app.schemas import FeatureCollection, SegmentResponse
+from app.postprocess import mask_to_linestrings, mask_to_polygons
+from app.schemas import Feature, FeatureCollection, SegmentResponse
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("nars-roads")
@@ -72,14 +80,18 @@ QUEUE_TIMEOUT = env_int("NARS_ROADS_QUEUE_TIMEOUT", 30, minimum=0, maximum=300)
 
 # Model registry: feature type -> how to build its model. Each entry is an
 # independent binary (foreground/background) checkpoint, so one task can be
-# updated or rolled back without touching the others. Roads is not yet
-# registered — no road checkpoint exists yet; adding it is a "roads" entry here
-# plus a /segment/roads endpoint (postprocess: mask_to_linestrings).
+# updated or rolled back without touching the others. `builder` picks the
+# network architect (smp-unet for the smp.ResNet34 U-Net buildings baseline,
+# resnet34-upsample for the SpaceNet 3 champion roads architecture in
+# app/road_model.py); `postprocess` picks how the foreground mask becomes
+# features (polygons for buildings, linestrings/centerlines for roads).
 class ModelSpec(TypedDict):
     """How to construct one task's SegmentationModel."""
 
     weights_path: str
     num_classes: int
+    builder: str
+    postprocess: str
 
 
 MODEL_SPECS: dict[str, ModelSpec] = {
@@ -88,7 +100,25 @@ MODEL_SPECS: dict[str, ModelSpec] = {
             "NARS_ROADS_WEIGHTS_PATH", "weights/unet_bldg_base.pth"
         ),
         "num_classes": 2,
+        "builder": "smp-unet",
+        "postprocess": "polygons",
     },
+    "roads": {
+        "weights_path": os.environ.get(
+            "NARS_ROADS_ROAD_WEIGHTS_PATH", "weights/roads_best.pth"
+        ),
+        "num_classes": 1,
+        "builder": "resnet34-upsample",
+        "postprocess": "linestrings",
+    },
+}
+
+# Foreground mask -> vector conversion per registered task. Kept separate
+# from MODEL_SPECS so the two concerns (model choice vs output geometry) can
+# evolve independently.
+POSTPROCESSORS: dict[str, Callable[..., list[Feature]]] = {
+    "polygons": mask_to_polygons,
+    "linestrings": mask_to_linestrings,
 }
 
 # Built lazily in lifespan so importing this module (tests, tooling, --reload)
@@ -109,66 +139,61 @@ T = TypeVar("T")
 
 
 class _InferenceExecutor:
-    """Bounded pool of daemon worker threads, one slot per worker.
+    """A fresh daemon thread per submitted callable.
 
     ThreadPoolExecutor's workers are non-daemon AND joined at interpreter exit
     by its atexit handler, so a predict abandoned by the 504 timeout path — a
     running Python thread cannot be interrupted — would stall pod termination
     for the whole k8s grace period. Daemon threads are not joined on exit:
     SIGTERM then tears the pod down immediately while the abandoned inference
-    is still running. The executor shuts down with the process instead of
-    having a shutdown step of its own.
+    is still running.
+
+    A fixed pool has a second, worse failure mode: the worker running the
+    abandoned predict is gone forever, so sustained pathological tiles
+    exhaust the pool and later requests 504 even though the model would have
+    finished quickly. A fresh thread per submit means an abandoned inference
+    costs only the one thread (it drains and exits on its own) and the next
+    request is never starved. Running-predict concurrency is still bounded —
+    not by this executor but by INFERENCE_SEMAPHORE, which caps acquisition
+    to MAX_CONCURRENT_INFERENCES regardless of how many threads were spawned.
     """
 
-    def __init__(self, max_workers: int, thread_name_prefix: str):
-        self._work: queue.Queue[
-            tuple[concurrent.futures.Future[Any], Callable[[], Any]]
-        ] = queue.Queue()
-        self._threads = [
-            threading.Thread(
-                target=self._run,
-                name=f"{thread_name_prefix}-{i}",
-                daemon=True,
-            )
-            for i in range(max_workers)
-        ]
-        self._started = False
-        self._start_lock = threading.Lock()
+    _serial = itertools.count(1)
 
-    def _run(self) -> None:
-        while True:
-            future, fn = self._work.get()
-            if not future.set_running_or_notify_cancel():
-                continue
-            try:
-                future.set_result(fn())
-            # Any failure of a user-supplied callable must land in the Future
-            # so the awaiting request sees it; the broad catch is deliberate.
-            except Exception as exc:  # noqa: BLE001 - propagate to the future
-                future.set_exception(exc)
+    def __init__(self, thread_name_prefix: str = "infer-timeout"):
+        self._thread_name_prefix = thread_name_prefix
 
     def submit(self, fn: Callable[[], T]) -> concurrent.futures.Future[T]:
-        """Run `fn` on an available worker. Workers are started lazily on
-        first use, so importing this module (tests, tooling, --reload) never
-        spawns threads."""
-        if not self._started:
-            with self._start_lock:
-                if not self._started:
-                    for thread in self._threads:
-                        thread.start()
-                    self._started = True
+        """Run `fn` on a fresh daemon thread and return its Future. The
+        thread is created on demand, so importing this module (tests, tooling,
+        --reload) never spawns threads."""
         future: concurrent.futures.Future[Any] = concurrent.futures.Future()
-        self._work.put((future, fn))
+        thread = threading.Thread(
+            target=self._run,
+            args=(future, fn),
+            name=f"{self._thread_name_prefix}-{next(self._serial)}",
+            daemon=True,
+        )
+        thread.start()
         return future
 
+    @staticmethod
+    def _run(future: concurrent.futures.Future[Any], fn: Callable[[], Any]) -> None:
+        if not future.set_running_or_notify_cancel():
+            return
+        try:
+            future.set_result(fn())
+        # Any failure of a user-supplied callable must land in the Future
+        # so the awaiting request sees it; the broad catch is deliberate.
+        except Exception as exc:  # noqa: BLE001 - propagate to the future
+            future.set_exception(exc)
 
-# Dedicated executor for wrapping predict() with a wall-clock timeout.
-# max_workers matches the semaphore so at most MAX_CONCURRENT_INFERENCES
-# timeout-watchdog workers exist at any time.
-_TIMEOUT_POOL = _InferenceExecutor(
-    max_workers=MAX_CONCURRENT_INFERENCES,
-    thread_name_prefix="infer-timeout",
-)
+
+# Runs each predict() on a fresh daemon thread so the 504 timeout can abandon
+# a hung inference without ever permanently losing a worker (see
+# _InferenceExecutor). Concurrency is bounded by INFERENCE_SEMAPHORE, not by
+# this pool.
+_TIMEOUT_POOL = _InferenceExecutor()
 
 
 def _load_model(task: str, spec: ModelSpec) -> SegmentationModel | None:
@@ -185,6 +210,7 @@ def _load_model(task: str, spec: ModelSpec) -> SegmentationModel | None:
             weights_path=spec["weights_path"],
             num_classes=spec["num_classes"],
             tile_size=TILE_SIZE,
+            builder=spec["builder"],
         )
     except Exception:  # a load failure must never abort startup
         logger.exception(
@@ -287,23 +313,23 @@ def _validate_bbox(
 def _run_inference(
     model: SegmentationModel, raw: bytes, bbox: tuple[float, float, float, float]
 ) -> tuple[np.ndarray, rasterio.Affine]:
-    """Run one predict on the bounded daemon pool under a wall-clock timeout.
+    """Run one predict on a fresh daemon thread under a wall-clock timeout.
 
-    The submitted predict() runs on a worker the timeout can abandon (see
+    The submitted predict() runs on a thread the timeout can abandon (see
     _InferenceExecutor): a pathological tile that hangs the model cannot hold
-    an inference slot forever — the client gets a 504 on timeout and the
-    abandoned thread keeps working until it finishes, then is reaped at
-    process exit along with its daemon owner.
+    an inference slot forever — the client gets a 504 on timeout, the
+    abandoned thread keeps working until it finishes and then exits, and the
+    next request gets a fresh thread instead of a permanently lost worker.
     """
     future = _TIMEOUT_POOL.submit(lambda: model.predict(raw, bbox=bbox))
     try:
         return future.result(timeout=INFERENCE_TIMEOUT)
     except concurrent.futures.TimeoutError as exc:
-        # cancel() is a no-op once the predict is running (the worker is
+        # cancel() is a no-op once the predict is running (the thread is
         # already mid-inference), so the abandoned thread keeps working and
-        # frees its stack when it finishes. The inference permit is released
-        # by the caller's finally, so a single stuck tile degrades to a 504
-        # rather than permanently exhausting a slot.
+        # exits when it finishes. The inference permit is released by the
+        # caller's finally, so a single stuck tile degrades to a 504 rather
+        # than permanently exhausting a slot.
         future.cancel()
         raise HTTPException(
             status_code=504,
@@ -330,6 +356,25 @@ def _read_upload(tile: UploadFile) -> bytes:
                 detail=f"Tile exceeds the {MAX_TILE_BYTES} byte limit",
             )
     return raw
+
+
+def reject_oversized_request(request: Request) -> None:
+    """Fast-fail on a declared multi-GB part before the body is buffered.
+
+    _read_upload caps the bytes actually consumed, but by the time the
+    endpoint runs Starlette has already buffered the whole multipart body
+    (past ~1MB it spills from memory to the temp dir), so a client streaming
+    a multi-GB part would fill the 2Gi emptyDir before the 413 fired. Running
+    as a dependency, this rejects on the declared Content-Length before the
+    UploadFile is parsed. The header is advisory (chunked or absent values
+    bypass it), which is why the authoritative read-side cap in _read_upload
+    stays."""
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > MAX_TILE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Tile exceeds the {MAX_TILE_BYTES} byte limit",
+        )
 
 
 def _segment_task(
@@ -372,34 +417,37 @@ def _segment_task(
             detail="Server is at capacity; retry after a short delay",
         )
     try:
-        # The permit is held across the read as well, so a rejection below
-        # (empty/oversized upload) still releases it in the finally.
+        # The permit is held across the read, the inference AND the
+        # postprocessing: mask_to_polygons allocates its own multi-hundred-MB
+        # working sets (label/close/contours), so bounding vectorization under
+        # the same permit keeps peak pod memory flat regardless of request
+        # fan-out. A rejection below (empty/oversized upload) still releases
+        # it in the finally.
         try:
             raw = _read_upload(tile)
             fg_prob, transform = _run_inference(
                 model, raw, bbox=(min_lon, min_lat, max_lon, max_lat)
             )
-        finally:
-            # Release before postprocessing: the permit covers the buffered
-            # upload + inference, not the vectorization that follows it.
-            INFERENCE_SEMAPHORE.release()
 
-        # Only the buildings postprocessor exists today. A future task
-        # (e.g. roads) would dispatch to mask_to_linestrings here, so the
-        # branch is dropped rather than left unreachable.
-        features = mask_to_polygons(fg_prob, transform, threshold=threshold)
-    except TileTooLargeError as exc:
-        raise HTTPException(
-            status_code=413,
-            detail="Tile decodes to more pixels than the service accepts",
-        ) from exc
-    except InvalidTileError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.exception("Inference failed")
-        raise HTTPException(status_code=500, detail="Inference failed") from exc
+            # Per-task postprocessing: polygons for buildings, centerline
+            # linestrings for roads. Dispatch is driven by the registry so a
+            # new task needs no code change here.
+            postprocess = POSTPROCESSORS[MODEL_SPECS[task]["postprocess"]]
+            features = postprocess(fg_prob, transform, threshold=threshold)
+        except TileTooLargeError as exc:
+            raise HTTPException(
+                status_code=413,
+                detail="Tile decodes to more pixels than the service accepts",
+            ) from exc
+        except InvalidTileError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.exception("Inference failed")
+            raise HTTPException(status_code=500, detail="Inference failed") from exc
+    finally:
+        INFERENCE_SEMAPHORE.release()
 
     return FeatureCollection(features=features)
 
@@ -407,7 +455,11 @@ def _segment_task(
 @app.post(
     "/segment/buildings",
     response_model=SegmentResponse,
-    dependencies=[Depends(verify_internal_token)],
+    response_model_exclude_none=True,
+    dependencies=[
+        Depends(verify_internal_token),
+        Depends(reject_oversized_request),
+    ],
 )
 def segment_buildings(
     tile: UploadFile,
@@ -431,6 +483,45 @@ def segment_buildings(
     return SegmentResponse(
         buildings=_segment_task(
             "buildings",
+            tile,
+            min_lon,
+            min_lat,
+            max_lon,
+            max_lat,
+            threshold,
+        )
+    )
+
+
+@app.post(
+    "/segment/roads",
+    response_model=SegmentResponse,
+    response_model_exclude_none=True,
+    dependencies=[
+        Depends(verify_internal_token),
+        Depends(reject_oversized_request),
+    ],
+)
+def segment_roads(
+    tile: UploadFile,
+    min_lon: float,
+    min_lat: float,
+    max_lon: float,
+    max_lat: float,
+    threshold: Annotated[float, Query(ge=0.0, le=1.0)] = 0.5,
+) -> SegmentResponse:
+    """
+    Run road inference on a single georeferenced tile.
+
+    Uses the same contract as /segment/buildings (bbox as four separate query
+    params) and returns road centerlines (LineString features) rather than
+    building footprints (Polygons). A response contains roads only — feature
+    types are never mixed. See the buildings docstring for the threading
+    rationale (CPU-bound inference on a plain `def`).
+    """
+    return SegmentResponse(
+        roads=_segment_task(
+            "roads",
             tile,
             min_lon,
             min_lat,

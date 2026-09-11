@@ -169,9 +169,9 @@ observability-stop: ## Stop observability port-forwards
 .PHONY: grafana-password
 grafana-password: ## Show the generated Grafana admin password (stderr only, non-CI safe)
 	@if [ -t 2 ]; then
-		# Shell env var ($${...}) not Make expansion ($(...)) so a password
-		# containing shell metacharacters cannot break the quoting — same rule
-		# documented at postgis-password-sync.
+		# Shell env var ($${"GRAFANA_PASSWORD"}) rather than Make expansion, so
+		# a password containing shell metacharacters cannot break the quoting —
+		# same rule documented at postgis-password-sync.
 		echo "$${GRAFANA_PASSWORD}" >&2;
 	else
 		echo "⚠ Refusing to print password to non-tty stderr (use 'make grafana-password' interactively)" >&2;

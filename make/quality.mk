@@ -106,13 +106,16 @@ infra-lint-makefile: ## Validate Makefile syntax with dry-run
 	@echo "→ Checking Makefile syntax..."
 	@make -n help > /dev/null 2>&1 && echo "✓ Makefile syntax OK" \
 		|| { echo "✖ Makefile syntax error"; exit 1; }
-	@echo "→ Checking undefined variable references..."
+	@echo "→ Checking undefined variable references (all targets)..."
 	# GNUMAKEFLAGS is a GNU Make internal variable spuriously flagged by
-	# --warn-undefined-variables -Rr (make 4.4+); filter it out.
+	# --warn-undefined-variables -Rr (make 4.4+); FILE is the documented
+	# make-argument of db-backup/db-restore (Usage: make db-restore FILE=...).
 	# Capture into a variable and test on it, rather than on the pipeline exit
 	# code: a pipeline ends with `grep -v`'s status, so if the only warnings were
-	# GNUMAKEFLAGS (filtered out entirely) the old form falsely reported success.
-	@undef=$$(make -Rr --warn-undefined-variables -n help 2>&1 | grep -i 'warning.*undefined' | grep -v GNUMAKEFLAGS || true); \
+	# filtered out entirely the old form falsely reported success.
+	@undef=$$(for t in $$(make -qp 2>/dev/null | awk -F: '/^[a-zA-Z0-9_.%-]+:([^=]|$$)/ {print $$1}' | sort -u); do \
+		make -Rr --warn-undefined-variables -n "$$t" 2>&1; \
+	done | grep -i 'warning.*undefined' | grep -v GNUMAKEFLAGS | grep -v "'FILE'" || true); \
 	if [ -n "$$undef" ]; then \
 		echo "✖ Undefined variable references found (see above)"; \
 		echo "$$undef"; \
