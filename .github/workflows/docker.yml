@@ -34,6 +34,8 @@ jobs:
         include:
           - image: nars-api
             context: "."
+          - image: nars-docs-tex
+            context: "."
           - image: nars-postgis
             context: "."
           - image: nars-vite
