@@ -167,7 +167,7 @@ jobs:
           path: nars-web/playwright-report/
           if-no-files-found: ignore
 
-  # ─── Roads test suite (nars-segma) ────────────────────────
+  # ─── Segma test suite (nars-segma) ────────────────────────
   # The gate intentionally lives in the Makefile (`make segma-test`): it builds
   # the test image and runs the exact quality commands — mypy on app/ and
   # tests/ against the real dependency stack, then pytest with a coverage
@@ -175,7 +175,7 @@ jobs:
   # principle as the infra-lint job); a bare `mypy` install with no deps was
   # near-vacuous because ignore_missing_imports typed the whole stack dynamic.
   segma-test:
-    name: Roads test
+    name: Segma test
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
