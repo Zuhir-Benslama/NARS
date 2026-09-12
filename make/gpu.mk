@@ -74,13 +74,29 @@ gpu-smoke-test: ## Run a one-shot torch CUDA smoke Job on the GPU
 	@echo "→ Running torch CUDA smoke job (nars-roads image, 1 GPU)..."
 	@# Single shared GPU: scale roads down so the smoke job can schedule (the
 	@# image is preloaded into the node, so IfNotPresent — not Always).
-	@$(KUBECTL) scale deployment/nars-roads -n "$(NAMESPACE)" --replicas=0 >/dev/null 2>&1 || true
+	@# .ONESHELL runs this whole recipe in ONE shell, so an EXIT trap restores
+	@# roads even if a step below fails (set -e) — same pattern as db-ef-migrate's
+	@# port-forward cleanup. Restore first, then trap armed for the last step.
+	@restore_roads() { \
+		$(KUBECTL) scale deployment/nars-roads -n "$(NAMESPACE)" --replicas=1 >/dev/null 2>&1 || true; \
+		$(KUBECTL) rollout status deployment/nars-roads -n "$(NAMESPACE)" --timeout=240s >/dev/null 2>&1 || true; \
+	}; \
+	trap restore_roads EXIT; \
+	$(KUBECTL) scale deployment/nars-roads -n "$(NAMESPACE)" --replicas=0 >/dev/null 2>&1 || true
 	@# A Job is deterministic (catches the fast-exiting torch one-liner), unlike
 	@# kubectl run --rm -i --attach which races pod lifecycle / keep-alives.
 	@$(KUBECTL) apply -k nars-infra/k8s/gpu-smoke
-	@$(KUBECTL) wait --for=condition=Complete job/nars-gpu-smoke -n "$(NAMESPACE)" --timeout=120s >/dev/null 2>&1 || true
-	@$(KUBECTL) logs job/nars-gpu-smoke -n "$(NAMESPACE)" 2>&1 || true
-	@$(KUBECTL) delete job nars-gpu-smoke -n "$(NAMESPACE)" --wait=false >/dev/null 2>&1 || true
-	@# Always restore roads (each make line runs in its own shell, so no trap).
-	@$(KUBECTL) scale deployment/nars-roads -n "$(NAMESPACE)" --replicas=1 >/dev/null 2>&1 || true
-	@$(KUBECTL) rollout status deployment/nars-roads -n "$(NAMESPACE)" --timeout=240s >/dev/null 2>&1 || true
+	@# Gate the target on the job reaching Complete: a broken GPU (torch exit
+	@# code + Failed job) then fails this target instead of a silent no-op. The
+	@# EXIT trap restores roads regardless; logs still dump either way. Note a
+	@# quickly-failing job waits out the full timeout below — wait only polls
+	@# for the Complete condition, and a Failed condition stops it at timeout.
+	@wait_rc=0; \
+	$(KUBECTL) wait --for=condition=Complete job/nars-gpu-smoke -n "$(NAMESPACE)" --timeout=120s >/dev/null 2>&1 || wait_rc=$$?; \
+	$(KUBECTL) logs job/nars-gpu-smoke -n "$(NAMESPACE)" 2>&1 || true; \
+	$(KUBECTL) delete job nars-gpu-smoke -n "$(NAMESPACE)" --wait=false >/dev/null 2>&1 || true; \
+	if [ "$$wait_rc" -ne 0 ]; then \
+		echo "✖ gpu smoke job did not complete (kubectl wait exit $$wait_rc) — see logs above"; \
+		exit 1; \
+	fi
+	@echo "✓ GPU smoke test passed (job nars-gpu-smoke completed)"

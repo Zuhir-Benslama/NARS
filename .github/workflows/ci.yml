@@ -122,6 +122,51 @@ jobs:
         # the whole job until the run-level concurrency cancel kills it.
         timeout-minutes: 3
 
+  # ─── Frontend e2e (nars-web) ─────────────────────────────────
+  # Playwright browser tests (e2e/*.spec.ts) run against the mocked API
+  # contract (e2e/test-data.ts). Every /api/* call is intercepted via
+  # page.route, so the suite needs only the Vite dev server Playwright
+  # starts (webServer in e2e/playwright.config.ts) plus the Chromium
+  # binary — no live backend or database. GitHub sets CI=true, which makes
+  # the config boot a fresh dev server and retry each test once. The HTML
+  # report is uploaded on failure for trace/screenshot debugging.
+  web-e2e:
+    name: Frontend e2e
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: nars-web/package-lock.json
+
+      - name: Install dependencies (npm ci)
+        run: npm ci
+        working-directory: nars-web
+        timeout-minutes: 15
+
+      # Hosted runners preinstall every Playwright browser system dependency;
+      # only the browser binary itself is missing, so a plain install suffices
+      # (no --with-deps) — same convention as the docs job's firefox install.
+      - name: Install Playwright Chromium browser
+        run: npx playwright install chromium
+        working-directory: nars-web
+        timeout-minutes: 10
+
+      - name: Run Playwright e2e tests
+        run: npm run test:e2e
+        working-directory: nars-web
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: web-e2e-report
+          path: nars-web/playwright-report/
+          if-no-files-found: ignore
+
   # ─── Roads test suite (nars-roads) ────────────────────────
   # The gate intentionally lives in the Makefile (`make roads-test`): it builds
   # the test image and runs the exact quality commands — mypy on app/ and

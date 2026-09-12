@@ -203,7 +203,7 @@ rate-limiting model. \Cref{sec:api} summarises the REST API surface.
 
 All coordinates in NARS are stored and transmitted in geographic
 coordinates (longitude $\lambda$, latitude $\varphi$) referenced to the
-World Geodetic System 1984 (WGS84), corresponding to EPSG:4326. PostGIS
+World Geodetic System 1984 (WGS84)\cite{wgs84}, corresponding to EPSG:4326. PostGIS
 geometry columns use SRID 4326; geography columns use the same datum and
 enable spheroidal distance computations.
 
@@ -216,7 +216,7 @@ $\varphi \in [-90^\circ, 90^\circ]$ is the latitude.
 \subsection{Haversine Distance}
 
 Client-side distance computations (circle radius estimation, road length
-checks) use the Haversine formula. Given two geographic coordinates
+checks) use the Haversine formula \cite{haversine}. Given two geographic coordinates
 $p_1 = \coord{\lambda_1}{\varphi_1}$ and $p_2 = \coord{\lambda_2}{\varphi_2}$,
 the great-circle distance is:
 
@@ -241,7 +241,7 @@ codebase; see \texttt{GEOMETRY\_CONFIG.\allowbreak earthRadiusMeters} in
 \begin{remark}
 The Haversine formula is numerically stable for all distances, including
 antipodal points, unlike the simpler spherical law of cosines. PostGIS
-server-side geography distances use the WGS84 spheroid, which introduces
+server-side geography distances use the WGS84 spheroid \cite{postgis}, which introduces
 a relative error below $0.3\,\%$ compared to Haversine; this discrepancy
 is acceptable for all NARS use cases.
 \end{remark}
@@ -268,7 +268,7 @@ $n = 64$ for rendering (smooth appearance) and $n = 16$ for edit mode
 
 Features are persisted as JSON objects in a PostgreSQL \texttt{text} column.
 The coordinates array uses the convention $\{$\texttt{lat}, \texttt{lng}$\}$
-(latitude-first), while GeoJSON and PostGIS use longitude-first
+(latitude-first), while GeoJSON\cite{geojson_rfc} and PostGIS use longitude-first
 $[\lambda, \varphi]$. All SQL fragments in \texttt{SqlFragments.cs} perform
 the swap explicitly:
 
@@ -293,7 +293,7 @@ eight top-level classes) and a \emph{layer} (a subtype within that class).
 \centering
 \caption{Feature type and layer taxonomy}
 \label{tab:feature_types}
-\begin{tabularx}{\textwidth}{llXl}
+\begin{tabularx}{\textwidth}{ll>{\raggedright\arraybackslash}Xl}
 \toprule
 \textbf{Type key} & \textbf{Table} & \textbf{Layer keys} & \textbf{Geometry} \\
 \midrule
@@ -543,7 +543,7 @@ NARS uses two coordinate spaces simultaneously during drawing:
     to the MapLibre canvas origin, with $y$-axis pointing downward.
 \end{itemize}
 
-The MapLibre \texttt{map.project(lngLat)} function provides the continuous
+The MapLibre\cite{maplibre} \texttt{map.project(lngLat)} function provides the continuous
 bijection $\Pi: \mathcal{G} \to \mathcal{S}$ (zoom-level dependent). Snap
 distances are measured in screen space because a fixed pixel threshold
 corresponds to a consistent physical pointing precision regardless of
@@ -693,7 +693,7 @@ $\lesssim 500$), $\tau_{\text{PostGIS}} < 50\ \mathrm{ms}$.
 
 \subsection{Password Storage: BCrypt}
 
-User passwords are stored as BCrypt digests. For a password $\pi$ and
+User passwords are stored as BCrypt digests \cite{bcrypt}. For a password $\pi$ and
 salt $s$ of length 128 bits (16 bytes), BCrypt computes:
 
 \begin{equation}
@@ -709,7 +709,7 @@ the hash from the embedded salt and compares in constant time.
 
 \subsection{JWT Access Token}
 
-JSON Web Tokens are signed with HMAC-SHA256. For header $h$, claims
+JSON Web Tokens are signed with HMAC-SHA256 \cite{jwt_rfc,hmac_rfc}. For header $h$, claims
 payload $c$, and secret key $k$ (a UTF-8 string of at least 32 characters):
 
 \begin{equation}
@@ -793,7 +793,7 @@ $F \leftarrow 0$, $\texttt{LockedUntil} \leftarrow \texttt{null}$.
 
 \subsection{CSRF Protection}
 
-CSRF protection covers server-rendered form submissions (the login page).
+CSRF protection covers server-rendered form submissions (the login page)\cite{owasp_csrf}.
 The \texttt{ASP.NET Core IAntiforgery} service uses the \emph{double-submit
 cookie} pattern:
 
@@ -833,7 +833,7 @@ NARS uses ASP.NET Core's rate limiter with five named policies
 \texttt{logs}); \cref{tab:rate_limits} gives the default configuration
 values from \texttt{appsettings.json} (falling back to the
 \texttt{RateLimitOptions.cs} defaults for policies not present there).
-The \texttt{auth} and \texttt{api} policies are sliding-window limiters;
+The \texttt{auth} and \texttt{api} policies are sliding-window limiters \cite{sliding_window};
 \texttt{clear}, \texttt{scattered}, and \texttt{logs} are fixed-window
 limiters (equivalent to a single segment, $S = 1$).
 
@@ -841,7 +841,7 @@ limiters (equivalent to a single segment, $S = 1$).
 \centering
 \caption{Rate-limiting policy parameters}
 \label{tab:rate_limits}
-\begin{tabularx}{\textwidth}{lrrrX}
+\begin{tabularx}{\textwidth}{lrrr>{\raggedright\arraybackslash}X}
 \toprule
 \textbf{Policy} & $P$ (permits) & $W$ (window) & $S$ (segments) & \textbf{Scope} \\
 \midrule
@@ -897,9 +897,9 @@ probes \texttt{/api/health} and \texttt{/health} (including their
 
 \begin{table}[H]
 \centering
-\caption{REST API endpoints}
+\caption{REST API endpoints (authentication, features)}
 \label{tab:api_endpoints}
-\begin{tabularx}{\textwidth}{llXl}
+\begin{tabularx}{\textwidth}{ll>{\raggedright\arraybackslash}Xl}
 \toprule
 \textbf{Method} & \textbf{Path} & \textbf{Description} & \textbf{Rate policy} \\
 \midrule
@@ -909,7 +909,7 @@ POST & \texttt{/api/signin}        & Authenticate, issue tokens   & \texttt{auth
 POST & \texttt{/api/logout}        & Revoke refresh token         & \texttt{api}  \\
 POST & \texttt{/api/refresh}       & Rotate refresh token         & \texttt{auth} \\
 GET  & \texttt{/api/current\_user} & Return authenticated profile & \texttt{api}  \\
-PUT  & \texttt{/api/user/profile}  & Update own username/email/password & \texttt{api}  \\
+PUT  & \texttt{/api/user/profile}  & Update own username/\allowbreak{}email/\allowbreak{}password & \texttt{api}  \\
 POST & \texttt{/api/admin/authorized-signup} & Create admin/manager user & \texttt{api} \\
 \midrule
 \multicolumn{4}{l}{\textit{Features}} \\
@@ -921,6 +921,16 @@ POST   & \texttt{/api/features/clear}      & Delete all features          & \tex
 GET    & \texttt{/api/features/stats}      & Per-type feature counts      & \texttt{api} \\
 GET    & \texttt{/api/features/by-layer/\{layer\}} & Paginated features filtered by layer & \texttt{api} \\
 GET    & \texttt{/api/feature-types}       & Available feature types      & \texttt{api} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{REST API endpoints (reference data and administration)}
+\begin{tabularx}{\textwidth}{ll>{\raggedright\arraybackslash}Xl}
+\toprule
+\textbf{Method} & \textbf{Path} & \textbf{Description} & \textbf{Rate policy} \\
 \midrule
 \multicolumn{4}{l}{\textit{Validation and Spatial}} \\
 GET  & \texttt{/api/validate/area/main-urban-exists} & Urban area existence check & \texttt{api} \\
@@ -943,6 +953,16 @@ GET  & \texttt{/api/admin/users}               & List managed users             
 POST & \texttt{/api/admin/users}               & Create managed user             & \texttt{api} \\
 PUT  & \texttt{/api/admin/users/\{id\}}        & Update managed user             & \texttt{api} \\
 DELETE & \texttt{/api/admin/users/\{id\}}       & Delete managed user             & \texttt{api} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{REST API endpoints (field, AI draft, auxiliary)}
+\begin{tabularx}{\textwidth}{ll>{\raggedright\arraybackslash}Xl}
+\toprule
+\textbf{Method} & \textbf{Path} & \textbf{Description} & \textbf{Rate policy} \\
 \midrule
 \multicolumn{4}{l}{\textit{Field inspection}} \\
 GET  & \texttt{/api/field/features}           & Field-worker feature feed       & \texttt{api} \\
@@ -1107,7 +1127,7 @@ maintain the registry invariant (\cref{eq:registry_invariant}).
 \end{algorithmic}
 \end{algorithm}
 
-The use of UUID v7 (time-ordered) as the primary key ensures that
+The use of UUID v7 (time-ordered)\cite{uuid7} as the primary key ensures that
 the default \texttt{ORDER BY created\_at} in the load query is equivalent
 to \texttt{ORDER BY id}, allowing future index optimisation.
 
@@ -1557,9 +1577,9 @@ primary keys, foreign keys, and key index definitions as derived from
 
 \begin{table}[H]
 \centering
-\caption{Database schema summary}
+\caption{Database schema summary (reference data and sessions)}
 \label{tab:schema}
-\begin{tabularx}{\textwidth}{llXX}
+\begin{tabularx}{\textwidth}{ll>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X}
 \toprule
 \textbf{Table} & \textbf{PK} & \textbf{FK} & \textbf{Notable indices / constraints} \\
 \midrule
@@ -1587,6 +1607,17 @@ primary keys, foreign keys, and key index definitions as derived from
   & \texttt{commune\_\allowbreak{}id} (int)
   &
   & GIST index on \texttt{geometry} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Database schema summary (feature tables)}
+\begin{tabularx}{\textwidth}{ll>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Table} & \textbf{PK} & \textbf{FK} & \textbf{Notable indices / constraints} \\
+\midrule
 \texttt{feature\_\allowbreak{}registry}
   & \texttt{id} (UUID v7)
   &
@@ -1623,6 +1654,17 @@ primary keys, foreign keys, and key index definitions as derived from
   & \texttt{id} (UUID v7)
   &
   & \texttt{ix\_\allowbreak{}naming\_\allowbreak{}panels\_\allowbreak{}user\_\allowbreak{}id} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Database schema summary (ledger and draft features)}
+\begin{tabularx}{\textwidth}{ll>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Table} & \textbf{PK} & \textbf{FK} & \textbf{Notable indices / constraints} \\
+\midrule
 \texttt{error\_\allowbreak{}logs}
   & \texttt{id} (UUID v7)
   & \texttt{user\_\allowbreak{}id} $\to$ \texttt{users} (nullable)
