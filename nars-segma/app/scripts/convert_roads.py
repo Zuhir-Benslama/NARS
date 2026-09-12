@@ -24,7 +24,7 @@ import logging
 
 from app.road_model import Resnet34Upsample, register_pytorch_zoo_aliases
 
-logger = logging.getLogger("nars-roads.convert_roads")
+logger = logging.getLogger("nars-segma.convert_roads")
 
 
 class ArchitectureMismatchError(RuntimeError):

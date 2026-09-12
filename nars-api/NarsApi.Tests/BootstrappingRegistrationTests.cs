@@ -248,7 +248,7 @@ public class BootstrappingRegistrationTests : IDisposable
     {
         using var sp = BuildProvider();
 
-        // Only the typed nars-roads client is registered; the former named
+        // Only the typed nars-segma client is registered; the former named
         // "tile-proxy"/"satellite" clients had no consumers and were removed.
         Assert.NotNull(sp.GetRequiredService<ISegmentationClient>());
     }

@@ -44,19 +44,19 @@ from app.postprocess import mask_to_linestrings, mask_to_polygons
 from app.schemas import Feature, FeatureCollection, SegmentResponse
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("nars-roads")
+logger = logging.getLogger("nars-segma")
 
 
 # Shared-secret for cluster-internal requests. Read once at import time: a
 # runtime rotation of the env var (e.g. via a pod restart with a new mounted
 # secret) is applied on the next process start, not on the fly. This is the
 # intended model for a static, cluster-internal service.
-INTERNAL_TOKEN = os.environ.get("NARS_ROADS_INTERNAL_TOKEN")
-TILE_SIZE = env_int("NARS_ROADS_TILE_SIZE", 1024, minimum=16, maximum=8192)
+INTERNAL_TOKEN = os.environ.get("NARS_SEGMA_INTERNAL_TOKEN")
+TILE_SIZE = env_int("NARS_SEGMA_TILE_SIZE", 1024, minimum=16, maximum=8192)
 # Upper bound on a single tile upload. Inference reads the whole tile into
 # memory, so an oversized upload is a pod-level memory-exhaustion risk.
 MAX_TILE_BYTES = env_int(
-    "NARS_ROADS_MAX_TILE_BYTES",
+    "NARS_SEGMA_MAX_TILE_BYTES",
     50 * 1024 * 1024,
     minimum=1024,
     maximum=1024 * 1024 * 1024,
@@ -64,18 +64,18 @@ MAX_TILE_BYTES = env_int(
 # How many inferences may run concurrently before requests queue in the
 # threadpool. Sized for the pod memory limit; raise/lower per deployment.
 MAX_CONCURRENT_INFERENCES = env_int(
-    "NARS_ROADS_MAX_CONCURRENT_INFERENCES", 2, minimum=1, maximum=64
+    "NARS_SEGMA_MAX_CONCURRENT_INFERENCES", 2, minimum=1, maximum=64
 )
 # Wall-clock ceiling on a single predict() call.  A pathological tile that
 # hangs the model would otherwise hold a semaphore slot indefinitely; with
 # MAX_CONCURRENT_INFERENCES=2 just two such tiles exhaust all capacity.
 INFERENCE_TIMEOUT = env_int(
-    "NARS_ROADS_INFERENCE_TIMEOUT", 120, minimum=1, maximum=3600
+    "NARS_SEGMA_INFERENCE_TIMEOUT", 120, minimum=1, maximum=3600
 )
 # How long a request waits for an inference slot before failing with 503.
 # Requests park on this (their upload stays spooled on disk), not on a per-
 # request inference buffer.
-QUEUE_TIMEOUT = env_int("NARS_ROADS_QUEUE_TIMEOUT", 30, minimum=0, maximum=300)
+QUEUE_TIMEOUT = env_int("NARS_SEGMA_QUEUE_TIMEOUT", 30, minimum=0, maximum=300)
 
 
 # Model registry: feature type -> how to build its model. Each entry is an
@@ -97,7 +97,7 @@ class ModelSpec(TypedDict):
 MODEL_SPECS: dict[str, ModelSpec] = {
     "buildings": {
         "weights_path": os.environ.get(
-            "NARS_ROADS_WEIGHTS_PATH", "weights/unet_bldg_base.pth"
+            "NARS_SEGMA_WEIGHTS_PATH", "weights/unet_bldg_base.pth"
         ),
         "num_classes": 2,
         "builder": "smp-unet",
@@ -105,7 +105,7 @@ MODEL_SPECS: dict[str, ModelSpec] = {
     },
     "roads": {
         "weights_path": os.environ.get(
-            "NARS_ROADS_ROAD_WEIGHTS_PATH", "weights/roads_best.pth"
+            "NARS_SEGMA_ROAD_WEIGHTS_PATH", "weights/roads_best.pth"
         ),
         "num_classes": 1,
         "builder": "resnet34-upsample",

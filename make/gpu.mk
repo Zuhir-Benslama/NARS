@@ -3,7 +3,7 @@
 
 GPU_NODE_DIR    ?= nars-infra/docker
 GPU_DEVICE_DIR  ?= nars-infra/k8s/nvidia-device-plugin
-GPU_OVERLAY_DIR ?= nars-infra/roads-gpu
+GPU_OVERLAY_DIR ?= nars-infra/segma-gpu
 
 # ─── Preflight ──────────────────────────────────────────────────
 
@@ -52,11 +52,11 @@ gpu-install: _gpu-preflight ## Install CDI device plugin + apply the roads GPU o
 	@$(KUBECTL) apply -k "$(GPU_DEVICE_DIR)"
 	@echo "→ Applying roads GPU overlay (nvidia.com/gpu: 1)..."
 	@$(KUBECTL) apply -k "$(GPU_OVERLAY_DIR)"
-	@echo "→ Rolling nars-roads..."
-	@$(KUBECTL) rollout restart deployment/nars-roads -n "$(NAMESPACE)"
+	@echo "→ Rolling nars-segma..."
+	@$(KUBECTL) rollout restart deployment/nars-segma -n "$(NAMESPACE)"
 	@echo "→ Waiting for plugin + roads..."
 	@$(KUBECTL) -n kube-system rollout status daemonset/nvidia-device-plugin --timeout=120s >/dev/null || true
-	@$(KUBECTL) -n "$(NAMESPACE)" rollout status deployment/nars-roads --timeout=180s || true
+	@$(KUBECTL) -n "$(NAMESPACE)" rollout status deployment/nars-segma --timeout=180s || true
 	@echo "✓ GPU plumbing installed"
 
 .PHONY: gpu-status
@@ -66,23 +66,23 @@ gpu-status: ## Show GPU availability (plugin pod, node allocatable, roads device
 	@echo "=== Node GPU allocatable ==="
 	@$(KUBECTL) get nodes -o jsonpath='{.items[*].status.allocatable.nvidia\.com/gpu}{"\n"}'
 	@echo "=== roads pod ==="
-	@$(KUBECTL) -n "$(NAMESPACE)" get pod -l app.kubernetes.io/name=nars-roads \
+	@$(KUBECTL) -n "$(NAMESPACE)" get pod -l app.kubernetes.io/name=nars-segma \
 		-o jsonpath='{.items[*].status.containerStatuses[0].name}{": "}{.items[*].status.containerStatuses[0].state}' 2>/dev/null; echo ""
 
 .PHONY: gpu-smoke-test
 gpu-smoke-test: ## Run a one-shot torch CUDA smoke Job on the GPU
-	@echo "→ Running torch CUDA smoke job (nars-roads image, 1 GPU)..."
+	@echo "→ Running torch CUDA smoke job (nars-segma image, 1 GPU)..."
 	@# Single shared GPU: scale roads down so the smoke job can schedule (the
 	@# image is preloaded into the node, so IfNotPresent — not Always).
 	@# .ONESHELL runs this whole recipe in ONE shell, so an EXIT trap restores
 	@# roads even if a step below fails (set -e) — same pattern as db-ef-migrate's
 	@# port-forward cleanup. Restore first, then trap armed for the last step.
 	@restore_roads() { \
-		$(KUBECTL) scale deployment/nars-roads -n "$(NAMESPACE)" --replicas=1 >/dev/null 2>&1 || true; \
-		$(KUBECTL) rollout status deployment/nars-roads -n "$(NAMESPACE)" --timeout=240s >/dev/null 2>&1 || true; \
+		$(KUBECTL) scale deployment/nars-segma -n "$(NAMESPACE)" --replicas=1 >/dev/null 2>&1 || true; \
+		$(KUBECTL) rollout status deployment/nars-segma -n "$(NAMESPACE)" --timeout=240s >/dev/null 2>&1 || true; \
 	}; \
 	trap restore_roads EXIT; \
-	$(KUBECTL) scale deployment/nars-roads -n "$(NAMESPACE)" --replicas=0 >/dev/null 2>&1 || true
+	$(KUBECTL) scale deployment/nars-segma -n "$(NAMESPACE)" --replicas=0 >/dev/null 2>&1 || true
 	@# A Job is deterministic (catches the fast-exiting torch one-liner), unlike
 	@# kubectl run --rm -i --attach which races pod lifecycle / keep-alives.
 	@$(KUBECTL) apply -k nars-infra/k8s/gpu-smoke

@@ -21,17 +21,17 @@ _check-secrets: ## Fail fast if critical secrets are empty (prevents deploying w
 		echo "✖ NARS_ADMIN_SIGNUP_TOKEN not set — run 'make .env' to generate it";
 		exit 1;
 	fi
-	@if [ -z "$(NARS_ROADS_INTERNAL_TOKEN)" ]; then
-		echo "✖ NARS_ROADS_INTERNAL_TOKEN not set — run 'make .env' to generate it";
+	@if [ -z "$(NARS_SEGMA_INTERNAL_TOKEN)" ]; then
+		echo "✖ NARS_SEGMA_INTERNAL_TOKEN not set — run 'make .env' to generate it";
 		exit 1;
 	fi
-	@if [ -z "$(NARS_ROADS_WEIGHTS_URL)" ]; then
-		echo "✖ NARS_ROADS_WEIGHTS_URL not set — the roads pod's fetch-weights initContainer would never become ready";
+	@if [ -z "$(NARS_SEGMA_WEIGHTS_URL)" ]; then
+		echo "✖ NARS_SEGMA_WEIGHTS_URL not set — the roads pod's fetch-weights initContainer would never become ready";
 		echo "  Add it to .env (see .env.example for the default URL)";
 		exit 1;
 	fi
-	@if [ -z "$(NARS_ROADS_ROAD_WEIGHTS_URL)" ]; then
-		echo "✖ NARS_ROADS_ROAD_WEIGHTS_URL not set — the roads pod's fetch-road-weights initContainer would never become ready";
+	@if [ -z "$(NARS_SEGMA_ROAD_WEIGHTS_URL)" ]; then
+		echo "✖ NARS_SEGMA_ROAD_WEIGHTS_URL not set — the roads pod's fetch-road-weights initContainer would never become ready";
 		echo "  Add it to .env (see .env.example for the default SpaceNet weights URL)";
 		exit 1;
 	fi
@@ -214,7 +214,7 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 	printf '%s' "$$JWT_SECRET" > "$$tmpdir/Jwt__SecretKey";
 	printf '%s' "$$GPG_PASSPHRASE" > "$$tmpdir/gpg-passphrase";
 	printf '%s' "$$NARS_ADMIN_SIGNUP_TOKEN" > "$$tmpdir/AdminSignup__SignupToken";
-	printf '%s' "$$NARS_ROADS_INTERNAL_TOKEN" > "$$tmpdir/Segmentation__InternalToken";
+	printf '%s' "$$NARS_SEGMA_INTERNAL_TOKEN" > "$$tmpdir/Segmentation__InternalToken";
 	$(KUBECTL) create secret generic nars-secrets -n "$(NAMESPACE)" \
 		--from-file=postgres_password="$$tmpdir/postgres_password" \
 		--from-file=ConnectionStrings__DefaultConnection="$$tmpdir/ConnectionStrings__DefaultConnection" \
@@ -226,17 +226,17 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 	| $(KUBECTL) apply -f -
 	@echo "✓ nars-secrets created"
 
-	@echo "→ Creating 'nars-roads-secrets' (shared internal token + weights URLs)..."
-	printf '%s' "$$NARS_ROADS_INTERNAL_TOKEN" > "$$tmpdir/internal-token";
-	printf '%s' "$$NARS_ROADS_WEIGHTS_URL" > "$$tmpdir/weights-url";
-	printf '%s' "$$NARS_ROADS_ROAD_WEIGHTS_URL" > "$$tmpdir/road-weights-url";
-	$(KUBECTL) create secret generic nars-roads-secrets -n "$(NAMESPACE)" \
+	@echo "→ Creating 'nars-segma-secrets' (shared internal token + weights URLs)..."
+	printf '%s' "$$NARS_SEGMA_INTERNAL_TOKEN" > "$$tmpdir/internal-token";
+	printf '%s' "$$NARS_SEGMA_WEIGHTS_URL" > "$$tmpdir/weights-url";
+	printf '%s' "$$NARS_SEGMA_ROAD_WEIGHTS_URL" > "$$tmpdir/road-weights-url";
+	$(KUBECTL) create secret generic nars-segma-secrets -n "$(NAMESPACE)" \
 		--from-file=internal-token="$$tmpdir/internal-token" \
 		--from-file=weights-url="$$tmpdir/weights-url" \
 		--from-file=road-weights-url="$$tmpdir/road-weights-url" \
 		--dry-run=client -o yaml \
 	| $(KUBECTL) apply -f -
-	@echo "✓ nars-roads-secrets created"
+	@echo "✓ nars-segma-secrets created"
 
 	@if [ -n "$(DOCKER_TOKEN)" ]; then
 		echo "→ Creating 'regcred'...";

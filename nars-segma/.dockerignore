@@ -11,7 +11,7 @@ __pycache__/
 # tests/ is NOT excluded — needed by the test stage (--target test)
 # weights/ is a dev fallback (empty dir with .gitkeep). The initContainer
 # fetches real weights at runtime into an emptyDir, but the COPY in
-# Dockerfile.nars-roads needs the directory present in the build context.
+# Dockerfile.nars-segma needs the directory present in the build context.
 # weights/*.pth
 docs/
 *.md

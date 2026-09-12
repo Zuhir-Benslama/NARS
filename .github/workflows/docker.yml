@@ -42,8 +42,8 @@ jobs:
             context: "."
           - image: nars-backup
             context: "."
-          - image: nars-roads
-            context: "nars-roads/"
+          - image: nars-segma
+            context: "nars-segma/"
 
     steps:
       - uses: actions/checkout@v4

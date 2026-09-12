@@ -26,19 +26,19 @@ test-coverage: ## Run unit tests with coverage and enforce thresholds (coverlet.
 # one-shot builds; CI supplies BuildKit gha cache flags (via env) so the heavy
 # torch base layer is warmed across runs. Keeps the Makefile as the single
 # owner of the build command while letting CI tune caching.
-ROADS_TEST_DOCKER_BUILD_ARGS ?=
+SEGMA_TEST_DOCKER_BUILD_ARGS ?=
 
-.PHONY: roads-test
-roads-test: ## Run the segmentation service's Python test suite in a container
-	@docker build $(ROADS_TEST_DOCKER_BUILD_ARGS) \
-		-f "$(DOCKER_DIR)/Dockerfile.nars-roads" \
+.PHONY: segma-test
+segma-test: ## Run the segmentation service's Python test suite in a container
+	@docker build $(SEGMA_TEST_DOCKER_BUILD_ARGS) \
+		-f "$(DOCKER_DIR)/Dockerfile.nars-segma" \
 		--target test \
-		-t "$(DOCKER_ORG)/nars-roads:test" nars-roads/
-	docker run --rm "$(DOCKER_ORG)/nars-roads:test"
+		-t "$(DOCKER_ORG)/nars-segma:test" nars-segma/
+	docker run --rm "$(DOCKER_ORG)/nars-segma:test"
 
 # png-to-pdf.py is a host/dev utility: it needs Pillow at runtime anyway, so
 # its tests run against the host interpreter rather than a dedicated image
-# (unlike roads-test, which needs the full model/ML dependency stack).
+# (unlike segma-test, which needs the full model/ML dependency stack).
 # CI supplies the runner deps and calls this target (see ci.yml).
 .PHONY: infra-test-python
 infra-test-python: ## Run nars-infra Python utility tests with pytest (host; requires Pillow + pytest)

@@ -33,7 +33,7 @@ infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, ma
 # shellcheck/hadolint/yamllint docker fallbacks before.
 SHELL_SCRIPTS     := $(wildcard nars-infra/scripts/*.sh)
 DOCKERFILES       := $(wildcard nars-infra/docker/Dockerfile.*)
-YAML_FILES        := $(wildcard nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml nars-infra/roads/*.yaml .github/workflows/*.yml)
+YAML_FILES        := $(wildcard nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml nars-infra/segma/*.yaml nars-infra/segma-gpu/*.yaml .github/workflows/*.yml)
 NODE_SCRIPTS      := $(wildcard nars-infra/scripts/*.mjs)
 MIGRATIONS_SQL    := $(wildcard nars-infra/migrations/*.sql nars-infra/scripts/postgis-migration-baseline.sql)
 # docs/**/*.md — markdown lint gate (infra-lint-markdown). UML diagrams are
@@ -84,11 +84,11 @@ infra-lint-yaml: ## Lint k8s + GitHub Actions YAML with yamllint (uses .yamllint
 .PHONY: infra-lint-python
 infra-lint-python: ## Lint Python scripts with ruff (check + format)
 	@if command -v ruff >/dev/null 2>&1; then
-		ruff check nars-infra/scripts/ nars-roads/app/ nars-roads/tests/
-		ruff format --check nars-infra/scripts/ nars-roads/app/ nars-roads/tests/
+		ruff check nars-infra/scripts/ nars-segma/app/ nars-segma/tests/
+		ruff format --check nars-infra/scripts/ nars-segma/app/ nars-segma/tests/
 	else
-		docker run --rm -v "$$(pwd):/mnt" $(RUFF_IMAGE) check /mnt/nars-infra/scripts/ /mnt/nars-roads/app/ /mnt/nars-roads/tests/
-		docker run --rm -v "$$(pwd):/mnt" $(RUFF_IMAGE) format --check /mnt/nars-infra/scripts/ /mnt/nars-roads/app/ /mnt/nars-roads/tests/
+		docker run --rm -v "$$(pwd):/mnt" $(RUFF_IMAGE) check /mnt/nars-infra/scripts/ /mnt/nars-segma/app/ /mnt/nars-segma/tests/
+		docker run --rm -v "$$(pwd):/mnt" $(RUFF_IMAGE) format --check /mnt/nars-infra/scripts/ /mnt/nars-segma/app/ /mnt/nars-segma/tests/
 	fi
 
 .PHONY: infra-lint-node

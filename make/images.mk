@@ -36,7 +36,7 @@ images-build: _warn-latest-tag ## Build all Docker images
 	$(SUBMAKE) _build-nars-postgis
 	$(SUBMAKE) _build-nars-vite
 	$(SUBMAKE) _build-nars-backup
-	$(SUBMAKE) _build-nars-roads
+	$(SUBMAKE) _build-nars-segma
 	@echo "✓ All images built"
 
 .PHONY: _build-nars-api
@@ -63,11 +63,11 @@ _build-nars-backup: _warn-latest-tag
 	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-backup" \
 		-t "$(DOCKER_ORG)/nars-backup:"$(IMAGE_TAG_Q) .
 
-.PHONY: _build-nars-roads
-_build-nars-roads: _warn-latest-tag
-	@echo "  → $(DOCKER_ORG)/nars-roads:"$(IMAGE_TAG_Q)
-	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-roads" \
-		-t "$(DOCKER_ORG)/nars-roads:"$(IMAGE_TAG_Q) nars-roads/
+.PHONY: _build-nars-segma
+_build-nars-segma: _warn-latest-tag
+	@echo "  → $(DOCKER_ORG)/nars-segma:"$(IMAGE_TAG_Q)
+	@docker build -f "$(DOCKER_DIR)/Dockerfile.nars-segma" \
+		-t "$(DOCKER_ORG)/nars-segma:"$(IMAGE_TAG_Q) nars-segma/
 
 .PHONY: images-push
 images-push: _check-pinned-tag _warn-latest-tag ## Push all Docker images to registry

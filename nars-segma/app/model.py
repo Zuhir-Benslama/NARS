@@ -40,7 +40,7 @@ __all__ = [
     "TileTooLargeError",
 ]
 
-logger = logging.getLogger("nars-roads.model")
+logger = logging.getLogger("nars-segma.model")
 
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
@@ -57,7 +57,7 @@ FLOAT_BYTE_SCALE_THRESHOLD = 2.0
 # output arrays. 25M pixels keeps the working set well under the pod's 4Gi
 # limit while still accommodating far larger tiles than the service sees.
 MAX_DECODED_PIXELS = env_int(
-    "NARS_ROADS_MAX_DECODED_PIXELS", 25_000_000, minimum=1_000, maximum=1_000_000_000
+    "NARS_SEGMA_MAX_DECODED_PIXELS", 25_000_000, minimum=1_000, maximum=1_000_000_000
 )
 
 

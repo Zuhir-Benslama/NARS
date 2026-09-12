@@ -1,7 +1,8 @@
+---
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - ../roads
+  - ../segma
 # Match the selector that the parent kustomization (nars-infra/k8s) deploys:
 # its `labels[].includeSelectors: true` injects part-of/managed-by into the
 # Deployment selector on every apply. The overlay must emit the SAME selector,

@@ -422,7 +422,7 @@ CREATE INDEX IF NOT EXISTS ix_error_logs_level      ON public.error_logs (level)
 -- 10.  AI draft features (segmentation suggestions awaiting human review)
 -- ══════════════════════════════════════════════════════════════════════════════
 -- Mirrors nars-infra/migrations/0001_create_ai_draft_features.sql. Draft rows
--- written by the nars-roads segmentation service are never promoted to the
+-- written by the nars-segma segmentation service are never promoted to the
 -- production feature tables until a field worker / commune admin accepts them.
 --
 -- ⚠ NAMES MUST STAY IN SYNC with that migration file: both are applied to the

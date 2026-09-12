@@ -1,4 +1,4 @@
-"""Shared test helpers for the nars-roads test suite.
+"""Shared test helpers for the nars-segma test suite.
 
 Kept out of conftest.py so tests can import them without relying on pytest's
 implicit conftest import machinery (which only works when the tests dir is on
@@ -20,7 +20,7 @@ except ImportError:
 requires_torch = pytest.mark.skipif(not _TORCH_AVAILABLE, reason="torch not installed")
 
 # Single source of truth for the internal auth token. conftest.py sets it as
-# NARS_ROADS_INTERNAL_TOKEN (before any app import) and test_api.py uses it in
+# NARS_SEGMA_INTERNAL_TOKEN (before any app import) and test_api.py uses it in
 # request headers, so the two can never drift apart.
 AUTH_TOKEN = "test-token"
 

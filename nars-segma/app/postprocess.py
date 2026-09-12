@@ -18,7 +18,7 @@ from app.schemas import Feature
 
 __all__ = ["mask_to_linestrings", "mask_to_polygons"]
 
-logger = logging.getLogger("nars-roads.postprocess")
+logger = logging.getLogger("nars-segma.postprocess")
 
 # Simplification tolerance in degrees. ~0.00002 deg is roughly 2m at the
 # equator - tune per your imagery resolution.

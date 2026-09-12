@@ -1,9 +1,9 @@
-# ─── Segmentation Service (nars-roads, FastAPI + PyTorch) ─────────────────────
+# ─── Segmentation Service (nars-segma, FastAPI + PyTorch) ─────────────────────
 # Build from repo root:
-#   docker build -f nars-infra/docker/Dockerfile.nars-roads -t nars-roads:latest nars-roads/
+#   docker build -f nars-infra/docker/Dockerfile.nars-segma -t nars-segma:latest nars-segma/
 # Run the test suite:
-#   docker build -f nars-infra/docker/Dockerfile.nars-roads --target test -t nars-roads:test nars-roads/
-#   docker run --rm nars-roads:test
+#   docker build -f nars-infra/docker/Dockerfile.nars-segma --target test -t nars-segma:test nars-segma/
+#   docker run --rm nars-segma:test
 FROM python:3.11-slim@sha256:78b39ef14d8e2b4d71f8dc304f1328c37df95fe0ef99477c2ae6bd3d03784553 AS base
 
 # rasterio needs GDAL at the OS level
@@ -32,7 +32,7 @@ COPY tests ./tests
 
 # Quality gate on the CI path: the test image runs mypy (type-check the app
 # and its tests against the real dependency stack) then pytest with a coverage
-# floor, so a regression in types or coverage fails `make roads-test` (CI)
+# floor, so a regression in types or coverage fails `make segma-test` (CI)
 # instead of silently eroding. Local runs without pytest-cov stay unaffected
 # (args live here, not in pytest.ini addopts).
 CMD ["sh", "-c", "mypy app/ tests/ && pytest -q tests/ --cov=app --cov-report=term-missing --cov-fail-under=85"]
@@ -40,25 +40,25 @@ CMD ["sh", "-c", "mypy app/ tests/ && pytest -q tests/ --cov=app --cov-report=te
 FROM base
 
 # Run as a non-root user. The deployment enforces runAsNonRoot/runAsUser 10001
-# (see nars-infra/roads/deployment.yaml) — the image USER must match.
-RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin nars-roads
+# (see nars-infra/segma/deployment.yaml) — the image USER must match.
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin nars-segma
 
-COPY --chown=nars-roads:nars-roads app ./app
+COPY --chown=nars-segma:nars-segma app ./app
 # Dev fallback only: the deployed pod fetches real weights via the
 # fetch-weights initContainer into an emptyDir mounted at /srv/weights
-# (see nars-infra/roads/deployment.yaml). The emptyDir mount shadows this
+# (see nars-infra/segma/deployment.yaml). The emptyDir mount shadows this
 # copy at runtime. Kept empty in git; place a checkpoint here for local runs.
-COPY --chown=nars-roads:nars-roads weights ./weights
+COPY --chown=nars-segma:nars-segma weights ./weights
 
-ENV NARS_ROADS_WEIGHTS_PATH=/srv/weights/unet_bldg_base.pth
-ENV NARS_ROADS_TILE_SIZE=1024
-ENV HOME=/home/nars-roads
+ENV NARS_SEGMA_WEIGHTS_PATH=/srv/weights/unet_bldg_base.pth
+ENV NARS_SEGMA_TILE_SIZE=1024
+ENV HOME=/home/nars-segma
 
 # Writable scratch space for GDAL/rasterio temp artifacts (the pod mounts an
 # emptyDir at /tmp and the deployment points TMPDIR there).
-RUN chown nars-roads:nars-roads /tmp
+RUN chown nars-segma:nars-segma /tmp
 
-USER nars-roads
+USER nars-segma
 
 EXPOSE 8000
 

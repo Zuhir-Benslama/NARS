@@ -152,8 +152,8 @@ kubectl create secret generic nars-secrets -n nars \
   --from-literal=Segmentation__InternalToken="<internal-token>" \
   --dry-run=client -o yaml | kubectl apply -f -
 
-# Shared internal token + model weights URL for the nars-roads microservice:
-kubectl create secret generic nars-roads-secrets -n nars \
+# Shared internal token + model weights URL for the nars-segma microservice:
+kubectl create secret generic nars-segma-secrets -n nars \
   --from-literal=internal-token="<same internal-token as above>" \
   --from-literal=weights-url="<model-weights-url>" \
   --dry-run=client -o yaml | kubectl apply -f -

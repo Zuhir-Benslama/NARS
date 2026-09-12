@@ -52,7 +52,7 @@ jobs:
       # The Makefile owns the unit coverage gate (`make test-coverage`): it
       # applies the `Category!=Service` filter and the coverlet Threshold from
       # nars-api/NarsApi.Tests/NarsApi.Tests.csproj. CI delegates rather than hand-rolling a
-      # second copy (same principle as the infra-lint and roads-test jobs).
+      # second copy (same principle as the infra-lint and segma-test jobs).
       - name: Unit tests + coverage (make test-coverage)
         run: make test-coverage
 
@@ -167,29 +167,29 @@ jobs:
           path: nars-web/playwright-report/
           if-no-files-found: ignore
 
-  # ─── Roads test suite (nars-roads) ────────────────────────
-  # The gate intentionally lives in the Makefile (`make roads-test`): it builds
+  # ─── Roads test suite (nars-segma) ────────────────────────
+  # The gate intentionally lives in the Makefile (`make segma-test`): it builds
   # the test image and runs the exact quality commands — mypy on app/ and
   # tests/ against the real dependency stack, then pytest with a coverage
   # floor. CI delegates to it instead of hand-rolling a second copy (same
   # principle as the infra-lint job); a bare `mypy` install with no deps was
   # near-vacuous because ignore_missing_imports typed the whole stack dynamic.
-  roads-test:
+  segma-test:
     name: Roads test
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run make roads-test (mypy app/tests + pytest w/ coverage floor)
+      - name: Run make segma-test (mypy app/tests + pytest w/ coverage floor)
         env:
           # Warm the torch base layer across runs via the GitHub Actions cache.
           # type=gha needs no registry login; mode=max exports every stage layer
           # so the (multi-hundred-MB) pip-install-torch step is cached instead
           # of rebuilt cold on every push. The flags flow into the make target
           # unchanged, so the Makefile stays the single owner of the build.
-          ROADS_TEST_DOCKER_BUILD_ARGS: --cache-from=type=gha --cache-to=type=gha,mode=max
-        run: make roads-test
+          SEGMA_TEST_DOCKER_BUILD_ARGS: --cache-from=type=gha --cache-to=type=gha,mode=max
+        run: make segma-test
 
   # ─── Docs ───────────────────────────────────────────────
   # `make docs-lint` runs three gates: docs-lint-uml (renders every ```mermaid
@@ -251,7 +251,7 @@ jobs:
       - name: Build image + compile report (make docs-tex-lint)
         env:
           # type=gha warms the base/tlmgr layers across runs so the rebuild
-          # stays cheap on repeat pushes (same pattern as the roads-test job).
+          # stays cheap on repeat pushes (same pattern as the segma-test job).
           DOCS_TEX_DOCKER_BUILD_ARGS: --cache-from=type=gha --cache-to=type=gha,mode=max
         run: make docs-tex-lint
 

@@ -157,11 +157,11 @@ spec:
   policyTypes:
     - Egress
 ---
-# Allow nars-api to reach the nars-roads segmentation service (8000)
+# Allow nars-api to reach the nars-segma segmentation service (8000)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-egress-api-to-roads
+  name: allow-egress-api-to-segma
   namespace: nars
 spec:
   podSelector:
@@ -172,7 +172,7 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/name: nars-roads
+              app.kubernetes.io/name: nars-segma
               app.kubernetes.io/component: segmentation
       ports:
         - port: 8000
@@ -180,16 +180,16 @@ spec:
   policyTypes:
     - Egress
 ---
-# Allow nars-roads to reach the OTel collector (4317/4318)
+# Allow nars-segma to reach the OTel collector (4317/4318)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-egress-otel-roads
+  name: allow-egress-otel-segma
   namespace: nars
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: nars-roads
+      app.kubernetes.io/name: nars-segma
       app.kubernetes.io/component: segmentation
   egress:
     - to:
@@ -204,16 +204,16 @@ spec:
   policyTypes:
     - Egress
 ---
-# Allow nars-api to reach nars-roads (8000) — ingress side
+# Allow nars-api to reach nars-segma (8000) — ingress side
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-roads-from-api
+  name: allow-segma-from-api
   namespace: nars
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: nars-roads
+      app.kubernetes.io/name: nars-segma
       app.kubernetes.io/component: segmentation
   policyTypes:
     - Ingress
@@ -318,7 +318,7 @@ spec:
         - port: 5432
 ---
 # The fetch-weights initContainer downloads the segmentation checkpoint from
-# NARS_ROADS_WEIGHTS_URL (arbitrary host, secret-supplied). default-deny-egress
+# NARS_SEGMA_WEIGHTS_URL (arbitrary host, secret-supplied). default-deny-egress
 # would block it on NetworkPolicy-enforcing CNIs (Calico/Cilium) — allow plain
 # HTTP(S) egress only. kindnet does not enforce this; it matters for production.
 #
@@ -330,12 +330,12 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-egress-roads-weights
+  name: allow-egress-segma-weights
   namespace: nars
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: nars-roads
+      app.kubernetes.io/name: nars-segma
       app.kubernetes.io/component: segmentation
   egress:
     - to:

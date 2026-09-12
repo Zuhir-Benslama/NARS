@@ -6,13 +6,13 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nars-roads
+  name: nars-segma
   namespace: nars
 spec:
   template:
     spec:
       containers:
-        - name: nars-roads
+        - name: nars-segma
           resources:
             limits:
               nvidia.com/gpu: "1"

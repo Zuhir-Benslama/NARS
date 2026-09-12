@@ -29,14 +29,14 @@ POSTGRES_DATA_DIR  ?= data/nars/postgis
 # NARS_GPU=1 turns the control-plane node into a GPU node: kind mounts the
 # host's /dev/nvidia* device nodes + a curated NVIDIA driver bundle
 # (data/nvidia/driver, built by scripts/nvidia-driver-bundle.sh), and the
-# cluster runs the CDI device plugin + the roads-gpu overlay. Requires the host
+# cluster runs the CDI device plugin + the segma-gpu overlay. Requires the host
 # to expose /dev/nvidia* (mode 0666 works under rootless Docker). Default OFF:
 # CPU clusters still work on machines without a GPU.
 NARS_GPU        ?= 0
 GPU_NODE_IMAGE  ?= nars/gpu-node:1.32.2
 GPU_DRIVER_DIR  ?= data/nvidia/driver
-REGISTRY_IMAGES    := nars-api nars-postgis nars-vite nars-backup nars-roads
-SCALABLE_DEPLOYS   := postgis nars-api nars-frontend nars-roads
+REGISTRY_IMAGES    := nars-api nars-postgis nars-vite nars-backup nars-segma
+SCALABLE_DEPLOYS   := postgis nars-api nars-frontend nars-segma
 INGRESS_NGINX_VERSION ?= v1.12.0
 METRICS_SERVER_VERSION ?= v0.7.2
 LOCAL_PATH_PROVISIONER_VERSION ?= v0.0.30
@@ -119,9 +119,9 @@ fi
 	echo "GPG_PASSPHRASE=$$(_RND 32)" >> $@;
 	echo "GRAFANA_PASSWORD=$$(_RND 12)" >> $@;
 	echo "NARS_ADMIN_SIGNUP_TOKEN=$$(_RND 32)" >> $@;
-	echo "NARS_ROADS_INTERNAL_TOKEN=$$(_RND 32)" >> $@;
-	echo "NARS_ROADS_WEIGHTS_URL=$${NARS_ROADS_WEIGHTS_URL:-https://hf.co/nilsho01/unet-resnet34-vhr-buildings/resolve/main/unet_bldg_base.pth}" >> $@;
-	echo "NARS_ROADS_ROAD_WEIGHTS_URL=$${NARS_ROADS_ROAD_WEIGHTS_URL:-https://spacenet-dataset.s3.amazonaws.com/spacenet-model-weights/spacenet-3/01-Albu/weights/fold0_best.pth}" >> $@;
+	echo "NARS_SEGMA_INTERNAL_TOKEN=$$(_RND 32)" >> $@;
+	echo "NARS_SEGMA_WEIGHTS_URL=$${NARS_SEGMA_WEIGHTS_URL:-https://hf.co/nilsho01/unet-resnet34-vhr-buildings/resolve/main/unet_bldg_base.pth}" >> $@;
+	echo "NARS_SEGMA_ROAD_WEIGHTS_URL=$${NARS_SEGMA_ROAD_WEIGHTS_URL:-https://spacenet-dataset.s3.amazonaws.com/spacenet-model-weights/spacenet-3/01-Albu/weights/fold0_best.pth}" >> $@;
 	chmod 600 $@;
 	echo "→ Created $@ with fresh secrets (permissions: 600)"
 
@@ -136,10 +136,10 @@ JWT_SECRET         ?=
 GPG_PASSPHRASE     ?=
 GRAFANA_PASSWORD   ?=
 NARS_ADMIN_SIGNUP_TOKEN ?=
-NARS_ROADS_INTERNAL_TOKEN ?=
-NARS_ROADS_WEIGHTS_URL ?=
-NARS_ROADS_ROAD_WEIGHTS_URL ?=
-export POSTGRES_PASSWORD JWT_SECRET GPG_PASSPHRASE GRAFANA_PASSWORD NARS_ADMIN_SIGNUP_TOKEN NARS_ROADS_INTERNAL_TOKEN NARS_ROADS_WEIGHTS_URL NARS_ROADS_ROAD_WEIGHTS_URL
+NARS_SEGMA_INTERNAL_TOKEN ?=
+NARS_SEGMA_WEIGHTS_URL ?=
+NARS_SEGMA_ROAD_WEIGHTS_URL ?=
+export POSTGRES_PASSWORD JWT_SECRET GPG_PASSPHRASE GRAFANA_PASSWORD NARS_ADMIN_SIGNUP_TOKEN NARS_SEGMA_INTERNAL_TOKEN NARS_SEGMA_WEIGHTS_URL NARS_SEGMA_ROAD_WEIGHTS_URL
 
 # Piping the target's output to a consumer that closes early (e.g.
 # `make help | head`) kills the last pipeline command with SIGPIPE (141).

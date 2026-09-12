@@ -149,7 +149,7 @@ spec:
               env:
                 # Alpine's postgres uid is 70, not 999 — with HOME unset gpg
                 # tries to create '//.gnupg' and fails. Point it at the
-                # world-writable tmpdir (same pattern as nars-roads).
+                # world-writable tmpdir (same pattern as nars-segma).
                 - name: HOME
                   value: /tmp
                 - name: PGHOST

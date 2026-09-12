@@ -25,7 +25,7 @@ public interface ISegmentationClient
 }
 
 /// <summary>
-/// Talks to the nars-roads microservice over the internal cluster network.
+/// Talks to the nars-segma microservice over the internal cluster network.
 /// This client only fetches suggested features - it does not persist
 /// anything. Callers (e.g. a draft-features endpoint) are responsible for
 /// writing accepted results into ai_draft_features via EF Core.

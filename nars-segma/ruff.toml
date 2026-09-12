@@ -1,6 +1,6 @@
-# Ruff configuration for the nars-roads segmentation service.
+# Ruff configuration for the nars-segma segmentation service.
 #
-# Scoped to nars-roads/ (discovered per-file by ruff); nars-infra/scripts is
+# Scoped to nars-segma/ (discovered per-file by ruff); nars-infra/scripts is
 # linted with the default rule set by `make infra-lint-python`.
 #
 # flake8-try is enabled explicitly. app/model.py carries two # noqa: TRY003

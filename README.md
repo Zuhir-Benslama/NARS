@@ -38,7 +38,7 @@ A full-stack geographic data management application for urban addressing across 
 |---------|-------------|--------|------|
 | `nars-api/` | ASP.NET Core 10 backend API | [`nars-api/README.md`](nars-api/README.md) | [`nars-api/TODO.md`](nars-api/TODO.md) |
 | `nars-web/` | Vue 3 + TypeScript web frontend | [`nars-web/README.md`](nars-web/README.md) | [`nars-web/TODO.md`](nars-web/TODO.md) |
-| `nars-roads/` | FastAPI segmentation service — aerial tile in, GeoJSON draft features out | — | [`nars-roads/TODO.md`](nars-roads/TODO.md) |
+| `nars-segma/` | FastAPI segmentation service — aerial tile in, GeoJSON draft features out | — | [`nars-segma/TODO.md`](nars-segma/TODO.md) |
 | `nars-infra/` | k8s manifests, init/migration scripts, Dockerfiles | — | — |
 | `nars-api/NarsApi.Tests/` | Backend unit & integration tests (Testcontainers) | — | — |
 
@@ -114,12 +114,12 @@ Run `make help` for the full list. The most useful:
 - `zuhirbenslama/nars-api:latest` — ASP.NET Core 10 backend
 - `zuhirbenslama/nars-vite:latest` — Nginx-served Vue 3 SPA
 - `zuhirbenslama/nars-backup:latest` — Scheduled database backup job
-- `zuhirbenslama/nars-roads:latest` — FastAPI segmentation service (runs standalone)
+- `zuhirbenslama/nars-segma:latest` — FastAPI segmentation service (runs standalone)
 
 ## Segmentation Models
 
-The `nars-roads` service runs independent checkpoints per feature type (a model
-registry — see `nars-roads/app/main.py`), so each model can be swapped and
+The `nars-segma` service runs independent checkpoints per feature type (a model
+registry — see `nars-segma/app/main.py`), so each model can be swapped and
 released separately.
 
 | Task | Endpoint | Architecture | Checkpoint | License |

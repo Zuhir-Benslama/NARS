@@ -58,7 +58,7 @@ narstreet/
 .DS_Store
 .aider*
 
-# === Python (nars-roads, nars-infra scripts) ===
+# === Python (nars-segma, nars-infra scripts) ===
 __pycache__/
 *.py[cod]
 *.egg-info/
