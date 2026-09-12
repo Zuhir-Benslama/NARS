@@ -34,7 +34,7 @@ spec:
       max:
         cpu: 2
         # nars-segma (PyTorch inference) requests 1Gi and is capped at 4Gi —
-        # the LimitRange max must not reject its limit or the roads pods
+        # the LimitRange max must not reject its limit or the segma pods
         # fail admission control. Keep this ≥ the largest container limit.
         memory: 4Gi
       type: Container

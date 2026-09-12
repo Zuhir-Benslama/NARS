@@ -44,51 +44,51 @@ gpu-node-image: ## Build the kind GPU node image (toolkit + CDI boot hook)
 # ─── Deploy ─────────────────────────────────────────────────────
 
 .PHONY: gpu-install
-gpu-install: _gpu-preflight ## Install CDI device plugin + apply the roads GPU overlay
+gpu-install: _gpu-preflight ## Install CDI device plugin + apply the segma GPU overlay
 	@# Nodes bind the bundle at /opt/nvidia/driver; make sure it exists even if
 	@# cluster-create was skipped (e.g. gpu-install on an existing cluster).
 	@[ -d "$(GPU_DRIVER_DIR)/lib64" ] || $(SUBMAKE) gpu-driver-bundle
 	@echo "→ Installing NVIDIA device plugin..."
 	@$(KUBECTL) apply -k "$(GPU_DEVICE_DIR)"
-	@echo "→ Applying roads GPU overlay (nvidia.com/gpu: 1)..."
+	@echo "→ Applying segma GPU overlay (nvidia.com/gpu: 1)..."
 	@$(KUBECTL) apply -k "$(GPU_OVERLAY_DIR)"
 	@echo "→ Rolling nars-segma..."
 	@$(KUBECTL) rollout restart deployment/nars-segma -n "$(NAMESPACE)"
-	@echo "→ Waiting for plugin + roads..."
+	@echo "→ Waiting for plugin + segma..."
 	@$(KUBECTL) -n kube-system rollout status daemonset/nvidia-device-plugin --timeout=120s >/dev/null || true
 	@$(KUBECTL) -n "$(NAMESPACE)" rollout status deployment/nars-segma --timeout=180s || true
 	@echo "✓ GPU plumbing installed"
 
 .PHONY: gpu-status
-gpu-status: ## Show GPU availability (plugin pod, node allocatable, roads device)
+gpu-status: ## Show GPU availability (plugin pod, node allocatable, segma device)
 	@echo "=== Device plugin ==="
 	@$(KUBECTL) -n kube-system get pods -l k8s-app=nvidia-device-plugin -o wide
 	@echo "=== Node GPU allocatable ==="
 	@$(KUBECTL) get nodes -o jsonpath='{.items[*].status.allocatable.nvidia\.com/gpu}{"\n"}'
-	@echo "=== roads pod ==="
+	@echo "=== segma pod ==="
 	@$(KUBECTL) -n "$(NAMESPACE)" get pod -l app.kubernetes.io/name=nars-segma \
 		-o jsonpath='{.items[*].status.containerStatuses[0].name}{": "}{.items[*].status.containerStatuses[0].state}' 2>/dev/null; echo ""
 
 .PHONY: gpu-smoke-test
 gpu-smoke-test: ## Run a one-shot torch CUDA smoke Job on the GPU
 	@echo "→ Running torch CUDA smoke job (nars-segma image, 1 GPU)..."
-	@# Single shared GPU: scale roads down so the smoke job can schedule (the
+	@# Single shared GPU: scale segma down so the smoke job can schedule (the
 	@# image is preloaded into the node, so IfNotPresent — not Always).
 	@# .ONESHELL runs this whole recipe in ONE shell, so an EXIT trap restores
-	@# roads even if a step below fails (set -e) — same pattern as db-ef-migrate's
+	@# segma even if a step below fails (set -e) — same pattern as db-ef-migrate's
 	@# port-forward cleanup. Restore first, then trap armed for the last step.
-	@restore_roads() { \
+	@restore_segma() { \
 		$(KUBECTL) scale deployment/nars-segma -n "$(NAMESPACE)" --replicas=1 >/dev/null 2>&1 || true; \
 		$(KUBECTL) rollout status deployment/nars-segma -n "$(NAMESPACE)" --timeout=240s >/dev/null 2>&1 || true; \
 	}; \
-	trap restore_roads EXIT; \
+	trap restore_segma EXIT; \
 	$(KUBECTL) scale deployment/nars-segma -n "$(NAMESPACE)" --replicas=0 >/dev/null 2>&1 || true
 	@# A Job is deterministic (catches the fast-exiting torch one-liner), unlike
 	@# kubectl run --rm -i --attach which races pod lifecycle / keep-alives.
 	@$(KUBECTL) apply -k nars-infra/k8s/gpu-smoke
 	@# Gate the target on the job reaching Complete: a broken GPU (torch exit
 	@# code + Failed job) then fails this target instead of a silent no-op. The
-	@# EXIT trap restores roads regardless; logs still dump either way. Note a
+	@# EXIT trap restores segma regardless; logs still dump either way. Note a
 	@# quickly-failing job waits out the full timeout below — wait only polls
 	@# for the Complete condition, and a Failed condition stops it at timeout.
 	@wait_rc=0; \

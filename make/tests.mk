@@ -1,4 +1,4 @@
-# Included by the top-level Makefile (GNU make: single instance, shared vars). Target grouping: backend (nars-api/NarsApi.Tests) + roads test suites.
+# Included by the top-level Makefile (GNU make: single instance, shared vars). Target grouping: backend (nars-api/NarsApi.Tests) + segma test suites.
 
 
 .PHONY: test
@@ -22,7 +22,7 @@ test-coverage: ## Run unit tests with coverage and enforce thresholds (coverlet.
 		/p:CoverletOutputFormat=cobertura \
 		/p:CoverletOutput=TestResults/coverage.cobertura.xml
 
-# Extra `docker build` args for the roads test image. Left empty for local
+# Extra `docker build` args for the segma test image. Left empty for local
 # one-shot builds; CI supplies BuildKit gha cache flags (via env) so the heavy
 # torch base layer is warmed across runs. Keeps the Makefile as the single
 # owner of the build command while letting CI tune caching.

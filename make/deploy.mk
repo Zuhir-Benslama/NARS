@@ -26,12 +26,12 @@ _check-secrets: ## Fail fast if critical secrets are empty (prevents deploying w
 		exit 1;
 	fi
 	@if [ -z "$(NARS_SEGMA_WEIGHTS_URL)" ]; then
-		echo "✖ NARS_SEGMA_WEIGHTS_URL not set — the roads pod's fetch-weights initContainer would never become ready";
+		echo "✖ NARS_SEGMA_WEIGHTS_URL not set — the segma pod's fetch-weights initContainer would never become ready";
 		echo "  Add it to .env (see .env.example for the default URL)";
 		exit 1;
 	fi
 	@if [ -z "$(NARS_SEGMA_ROAD_WEIGHTS_URL)" ]; then
-		echo "✖ NARS_SEGMA_ROAD_WEIGHTS_URL not set — the roads pod's fetch-road-weights initContainer would never become ready";
+		echo "✖ NARS_SEGMA_ROAD_WEIGHTS_URL not set — the segma pod's fetch-road-weights initContainer would never become ready";
 		echo "  Add it to .env (see .env.example for the default SpaceNet weights URL)";
 		exit 1;
 	fi
@@ -287,11 +287,11 @@ kustomize-apply: secrets-validate _check-pinned-tag _check-local-ingresses ## Ap
 	@awk -v org="$(DOCKER_ORG)" -v tag=$(IMAGE_TAG_Q) -v images="$(REGISTRY_IMAGES)" \
 		-f "$(SCRIPTS_DIR)/kustomize-tag-rewrite.awk" < "$(KUSTOMIZE_MANIFEST)" \
 	| $(KUBECTL) apply -f -
-	@# The base/dev overlay ships the CPU roads deployment; re-apply the GPU
-	@# overlay so `make kustomize-apply` never reverts roads to CPU when
+	@# The base/dev overlay ships the CPU segma deployment; re-apply the GPU
+	@# overlay so `make kustomize-apply` never reverts segma to CPU when
 	@# NARS_GPU=1 (matches what gpu-install does on first bootstrap).
 	@if [ "$(NARS_GPU)" = "1" ]; then
-		echo "→ Re-applying roads GPU overlay (NARS_GPU=1)...";
+		echo "→ Re-applying segma GPU overlay (NARS_GPU=1)...";
 		$(KUBECTL) apply -k "$(GPU_OVERLAY_DIR)";
 	fi
 	@echo "✓ Kustomization applied"
