@@ -102,6 +102,27 @@ const FEATURE_LAYERS: maplibregl.LayerSpecification[] = [
     },
   },
   {
+    id: "nars-draft-polygon-fill",
+    type: "fill",
+    source: "drafts",
+    filter: ["==", ["get", "geomType"], "Polygon"],
+    paint: {
+      "fill-color": ["get", "fillColor"],
+      "fill-opacity": ["get", "fillOpacity"],
+    },
+  },
+  {
+    id: "nars-draft-line",
+    type: "line",
+    source: "drafts",
+    filter: ["in", ["get", "geomType"], ["literal", ["LineString", "Polygon"]]],
+    paint: {
+      "line-color": ["get", "lineColor"],
+      "line-width": ["get", "lineWidth"],
+      "line-dasharray": [4, 3],
+    },
+  },
+  {
     id: "nars-point",
     type: "circle",
     source: "features",
@@ -215,7 +236,7 @@ export function initSources(): void {
   const ctx = getCtx()
   const map = ctx.map
 
-  for (const name of ["boundaries", "scattered", "features", "selection", "endpoints"]) {
+  for (const name of ["boundaries", "scattered", "features", "selection", "endpoints", "drafts"]) {
     if (!map.getSource(name)) {
       map.addSource(name, {
         type: "geojson",
@@ -228,6 +249,7 @@ export function initSources(): void {
   ctx.scatteredSource = getGeoJSON(map, "scattered")
   ctx.featuresSource = getGeoJSON(map, "features")
   ctx.endpointsSource = getGeoJSON(map, "endpoints")
+  ctx.draftsSource = getGeoJSON(map, "drafts")
 
   debugLog("[initSources] ctx.featuresSource set:", !!ctx.featuresSource)
 

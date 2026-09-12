@@ -1,10 +1,13 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Moq;
 using NarsApi.Data;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
 using NarsApi.Services;
 using static NarsApi.Tests.TestData;
+using System.Globalization;
+using System.Text.Json;
 using Xunit;
 
 namespace NarsApi.Tests.Service;
@@ -24,7 +27,9 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : ServiceTes
         new(factory,
             Mock.Of<ISegmentationClient>(),
             new CommuneScopeService(factory),
-            Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow));
+            Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow),
+            Options.Create(new RoadRulesOptions()),
+            Options.Create(new BuildingRulesOptions()));
 
     /// <summary>Own context per service: mirrors production (context per request).</summary>
     private DraftFeaturesService CreateIsolatedService()
@@ -152,5 +157,126 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : ServiceTes
             UserRoles.NationalAdmin, null, null, null, UserId, Guid.NewGuid(), default);
 
         Assert.Equal(DraftReviewStatus.NotFound, result.Status);
+    }
+
+    private const string HorizontalRoadData = """{"type":"road","label":"","coordinates":[{"lat":2.9600,"lng":36.7200},{"lat":2.9600,"lng":36.7240}]}""";
+
+    private static string Ring(double lngC, double latC, double half = 0.0002)
+    {
+        var culture = CultureInfo.InvariantCulture;
+        string p(double lng, double lat) => $"[{lng.ToString("R", culture)},{lat.ToString("R", culture)}]";
+        var ring = $"{p(lngC - half, latC - half)},{p(lngC + half, latC - half)},{p(lngC + half, latC + half)},{p(lngC - half, latC + half)},{p(lngC - half, latC - half)}";
+        return $"{{\"type\":\"Polygon\",\"coordinates\":[[{ring}]]}}";
+    }
+
+    /// <summary>Seeds a commune-100 road owner with a road plus a nearby building draft.</summary>
+    private static async Task<(Guid RoadOwnerId, Guid RoadId, Guid DraftId)> SeedBuildingAsync(
+        AppDbContext db, int communeId, string ring, string? secondRing = null)
+    {
+        await SeedData.SeedAdminLocationsAsync(db);
+        var owner = await SeedData.CreateUserAsync(db, UserRoles.CommuneUser, communeId: communeId);
+        var roadId = await TestData.AddRoadAsync(db, owner.Id, HorizontalRoadData);
+        var draft = AiDraftFeature.Create(
+            featureType: AiDraftFeature.TypeBuilding,
+            geometryGeoJson: ring,
+            confidence: 0.9,
+            communeId: communeId,
+            sourceTileRef: "tile.png",
+            createdAt: FixedUtcNowOffset);
+        db.AiDraftFeatures.Add(draft);
+        if (secondRing is not null)
+        {
+            db.AiDraftFeatures.Add(AiDraftFeature.Create(
+                featureType: AiDraftFeature.TypeBuilding,
+                geometryGeoJson: secondRing,
+                confidence: 0.9,
+                communeId: communeId,
+                sourceTileRef: "tile.png",
+                createdAt: FixedUtcNowOffset));
+        }
+
+        await db.SaveChangesAsync();
+        return (owner.Id, roadId, draft.Id);
+    }
+
+    /// <summary>
+    /// Runs the REAL acceptance path end to end: transaction + raw row-lock
+    /// numbering + conditional update. The accepted building must show up as a
+    /// numbered house entrance owned by the road's owner.
+    /// </summary>
+    [Fact]
+    public async Task AcceptBuildingDraft_RealPath_CreatesNumberedEntrance()
+    {
+        await using var seedDb = Fixture.CreateDbContext();
+        var (roadOwnerId, roadId, draftId) = await SeedBuildingAsync(seedDb, CommuneId100, Ring(36.7220, 2.9603));
+        var reviewer = await SeedData.CreateUserAsync(seedDb, UserRoles.CommuneUser);
+
+        var svc = CreateService(Fixture.CreateDbContextFactory());
+
+        var result = await svc.AcceptDraftAsync(
+            UserRoles.NationalAdmin, null, null, null, reviewer.Id, draftId, default);
+
+        Assert.Equal(DraftReviewStatus.Success, result.Status);
+
+        await using var verifyDb = Fixture.CreateDbContext();
+        var entrance = await verifyDb.HouseEntrances.AsNoTracking()
+            .SingleAsync(e => e.RoadId == roadId);
+        Assert.Equal(roadOwnerId, entrance.UserId);
+        Assert.Equal(FeatureTypes.HouseEntranceLayers.Main, entrance.Layer);
+        var data = JsonSerializer.Deserialize<JsonElement>(entrance.Data);
+        Assert.Equal("houseEntrances", data.GetProperty("type").GetString());
+        Assert.Equal("left", data.GetProperty("side").GetString());
+        Assert.Equal(1, data.GetProperty("entranceNumber").GetInt32());
+        Assert.Equal(roadId.ToString(), data.GetProperty("roadDbId").GetString());
+
+        var reg = await verifyDb.FeatureRegistry.AsNoTracking()
+            .FirstOrDefaultAsync(r => r.Id == entrance.Id);
+        Assert.NotNull(reg);
+
+        var draft = await verifyDb.AiDraftFeatures.AsNoTracking().SingleAsync(f => f.Id == draftId);
+        Assert.Equal(AiDraftFeature.StatusAccepted, draft.Status);
+        Assert.Equal(reviewer.Id, draft.ReviewedBy);
+    }
+
+    /// <summary>
+    /// Two concurrent accepts of different buildings on the same road must each
+    /// serialize on the road row lock and get disjoint next-free numbers —
+    /// never the same entranceNumber twice.
+    /// </summary>
+    [Fact]
+    public async Task AcceptBuildingDraft_ConcurrentBuildingsOnSameRoad_GetDisjointNumbers()
+    {
+        await using var seedDb = Fixture.CreateDbContext();
+        var (_, roadId, _) = await SeedBuildingAsync(
+            seedDb, CommuneId100, Ring(36.7220, 2.9603), secondRing: Ring(36.7225, 2.9603));
+        var reviewer1 = await SeedData.CreateUserAsync(seedDb, UserRoles.CommuneUser);
+        var reviewer2 = await SeedData.CreateUserAsync(seedDb, UserRoles.CommuneUser);
+        var draftIds = await seedDb.AiDraftFeatures.AsNoTracking()
+            .Where(f => f.FeatureType == AiDraftFeature.TypeBuilding)
+            .Select(f => f.Id)
+            .ToListAsync();
+        Assert.Equal(2, draftIds.Count);
+
+        var svc1 = CreateService(Fixture.CreateDbContextFactory());
+        var svc2 = CreateService(Fixture.CreateDbContextFactory());
+
+        var results = await Task.WhenAll(
+            svc1.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, reviewer1.Id, draftIds[0], default),
+            svc2.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, reviewer2.Id, draftIds[1], default));
+
+        Assert.All(results, r => Assert.Equal(DraftReviewStatus.Success, r.Status));
+
+        await using var verifyDb = Fixture.CreateDbContext();
+        var entrances = await verifyDb.HouseEntrances.AsNoTracking()
+            .Where(e => e.RoadId == roadId)
+            .ToListAsync();
+        Assert.Equal(2, entrances.Count);
+
+        var numbers = entrances
+            .Select(e => JsonSerializer.Deserialize<JsonElement>(e.Data).GetProperty("entranceNumber").GetInt32())
+            .Order()
+            .ToList();
+        // Both buildings sit on the left of the road → both odd, disjoint.
+        Assert.Equal([1, 3], numbers);
     }
 }

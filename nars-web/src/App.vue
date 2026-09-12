@@ -9,11 +9,13 @@
 
   <template v-else-if="isFieldWorker">
     <FieldPanel />
+    <DraftsPanel />
   </template>
 
   <template v-else>
     <PhaseBar />
     <InfoPanel />
+    <DraftsPanel />
   </template>
 
   <TileControl />
@@ -46,6 +48,7 @@ import { computed, onMounted, onUnmounted } from "vue"
 import { useI18n } from "vue-i18n"
 import PhaseBar from "./components/PhaseBar.vue"
 import InfoPanel from "./components/InfoPanel.vue"
+import DraftsPanel from "./components/DraftsPanel.vue"
 import ProfileMenu from "./components/ProfileMenu.vue"
 import TileControl from "./components/TileControl.vue"
 import FeatureModal from "./components/FeatureModal.vue"

@@ -5,6 +5,7 @@
 import * as maplibregl from "maplibre-gl"
 import { getCtx, _setCtx } from "./core/state"
 import { useFeaturesStore } from "../stores/featuresStore"
+import { useDraftsStore } from "../stores/draftsStore"
 import type { MapContext } from "./core/state"
 import { initSources } from "./map-layers"
 import { updateEndpointMarkers } from "./roads/road-directions"
@@ -277,6 +278,8 @@ async function switchBaseLayer(
     initSources()
     const featuresStore = useFeaturesStore()
     featuresStore.updateSource()
+    const draftsStore = useDraftsStore()
+    draftsStore.updateSource()
     if (ctx.boundariesGeoJson) ctx.boundariesSource?.setData(ctx.boundariesGeoJson)
     if (ctx.scatteredGeoJson) ctx.scatteredSource?.setData(ctx.scatteredGeoJson)
     refreshLayerVisibility()

@@ -14,6 +14,8 @@ import { setReferenceRoad, clearReferenceRoad, setReferenceEntrance } from "../h
 import { generateNamingPanels } from "../naming-panels"
 import { computeAndApplyRoadDirections, updateEndpointMarkers } from "../roads/road-directions"
 import { useContextMenuStore, type CtxMenuItem } from "../../stores/contextMenuStore"
+import { startDraftEdit } from "../drafts/draft-edit"
+import { reviewDraft } from "../drafts/review-actions"
 import {
   enableEditGeometry,
   editFeatureInfo,
@@ -130,6 +132,45 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
 
 export function showContextMenu(x: number, y: number, dbId: string, phaseKey: string): void {
   useContextMenuStore().show(x, y, buildFeatureMenuItems(dbId, phaseKey))
+}
+
+// ─── DRAFT CONTEXT MENU ───────────────────────────────────────────────────────
+// Separate builder for AI draft hits (source "drafts"). Drafts are not phase
+// features: editing reuses the geoman edit mode and commits through the draft
+// endpoint, while accept/reject/delete act on the review queue.
+
+export function showDraftContextMenu(
+  x: number,
+  y: number,
+  draftId: string,
+  featureType: string,
+): void {
+  const items: CtxMenuItem[] = []
+
+  if (featureType === "road" || featureType === "building") {
+    items.push({
+      label: t("ctx_draft_edit_geom"),
+      onClick: () => startDraftEdit(draftId),
+    })
+    items.push({
+      label: t("ctx_draft_accept"),
+      onClick: () => void reviewDraft(draftId, "accept"),
+    })
+    items.push({
+      label: t("ctx_draft_reject"),
+      danger: true,
+      onClick: () => void reviewDraft(draftId, "reject"),
+    })
+    items.push({
+      label: t("ctx_draft_delete"),
+      danger: true,
+      onClick: () => void reviewDraft(draftId, "delete"),
+    })
+  }
+
+  items.push({ separator: true })
+  items.push(buildSnapToggleItem())
+  useContextMenuStore().show(x, y, items)
 }
 
 export function bindContextMenu(e: DrawContextEvent, dbId: string, phaseKey: string): void {

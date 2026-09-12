@@ -183,6 +183,24 @@ spec:
               value: /srv/weights/unet_bldg_base.pth
             - name: NARS_SEGMA_ROAD_WEIGHTS_PATH
               value: /srv/weights/roads_best.pth
+            # Road rules (limitation) — discard below these before features
+            # reach the API: a minimum geodesic length (metres) forbids the
+            # stub spurs skeletonization emits at tile edges, a minimum
+            # confidence drops weak detections, and the per-tile cap bounds
+            # how many drafts a single acceptance creates.
+            - name: NARS_SEGMA_ROAD_MIN_LENGTH_M
+              value: "0"
+            - name: NARS_SEGMA_ROAD_MIN_CONFIDENCE
+              value: "0"
+            - name: NARS_SEGMA_ROAD_MAX_FEATURES
+              value: "0"
+            # Building rules (limitation) — same shape as the roads rules;
+            # the confidence floor drops ghost rooftops, the cap bounds the
+            # number of building drafts per tile.
+            - name: NARS_SEGMA_BUILDING_MIN_CONFIDENCE
+              value: "0"
+            - name: NARS_SEGMA_BUILDING_MAX_FEATURES
+              value: "0"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://otel-collector.observability:4317"
             - name: OTEL_SERVICE_NAME

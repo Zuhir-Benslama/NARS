@@ -27,8 +27,48 @@ MIN_ROAD_COMPONENT_PX = 40
 MIN_BUILDING_COMPONENT_PX = 20
 
 
+def _haversine_m(points: list[tuple[float, float]]) -> float:
+    """Great-circle length of a longitude/latitude polyline in metres."""
+    import math
+
+    total = 0.0
+    for (lon1, lat1), (lon2, lat2) in zip(points, points[1:]):
+        dphi = math.radians(lat2 - lat1)
+        dlambda = math.radians(lon2 - lon1)
+        a = (
+            math.sin(dphi / 2) ** 2
+            + math.cos(math.radians(lat1))
+            * math.cos(math.radians(lat2))
+            * math.sin(dlambda / 2) ** 2
+        )
+        total += 2 * 6_371_000.0 * math.asin(math.sqrt(a))
+    return total
+
+
+def _apply_rule_cap(
+    candidates: list[tuple[float, dict]],
+    max_features: int | None,
+) -> list[tuple[float, dict]]:
+    """Limit the number of emitted features, keeping the most confident first.
+
+    Ordering is by confidence so the cap is a *limitation* rule (best roads
+    survive) rather than an arbitrary truncation of graph-iteration order.
+    Without a cap the original edge order is preserved.
+    """
+    if max_features is not None and max_features > 0:
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        return candidates[:max_features]
+    return candidates
+
+
 def mask_to_linestrings(
-    prob_mask: np.ndarray, transform: rasterio.Affine, threshold: float = 0.5
+    prob_mask: np.ndarray,
+    transform: rasterio.Affine,
+    threshold: float = 0.5,
+    *,
+    min_length_m: float = 0.0,
+    min_confidence: float = 0.0,
+    max_features: int | None = None,
 ) -> list[Feature]:
     import sknw
     from skimage.morphology import remove_small_objects, skeletonize
@@ -66,20 +106,37 @@ def mask_to_linestrings(
         except (GEOSException, ValueError, TypeError):
             logger.info("Skipping degenerate road edge", exc_info=True)
             continue
-        features.append(
-            Feature(
-                geometry=geometry,
-                properties={
-                    "confidence": round(confidence, 4),
-                    "feature_type": "road",
-                },
-            )
+
+        # Road rules (limitation): each graph edge is already a skeleton
+        # segment between junctions (degree >= 3 nodes), so separation across
+        # intersections is inherent - edges never span a crossing. These pass
+        # rules only *discard* edges that violate the cadastre conventions.
+        if confidence < min_confidence:
+            continue
+        if _haversine_m(coords) < min_length_m:
+            continue
+        features.append((confidence, geometry))
+
+    features = _apply_rule_cap(features, max_features)
+    return [
+        Feature(
+            geometry=geometry,
+            properties={
+                "confidence": round(confidence, 4),
+                "feature_type": "road",
+            },
         )
-    return features
+        for confidence, geometry in features
+    ]
 
 
 def mask_to_polygons(
-    prob_mask: np.ndarray, transform: rasterio.Affine, threshold: float = 0.5
+    prob_mask: np.ndarray,
+    transform: rasterio.Affine,
+    threshold: float = 0.5,
+    *,
+    min_confidence: float = 0.0,
+    max_features: int | None = None,
 ) -> list[Feature]:
     from scipy import ndimage
     from skimage.measure import find_contours, label
@@ -141,13 +198,18 @@ def mask_to_polygons(
             continue
 
         confidence = float(prob_mask[rows, cols][region_mask].mean())
-        features.append(
-            Feature(
-                geometry=mapping(poly),
-                properties={
-                    "confidence": round(confidence, 4),
-                    "feature_type": "building",
-                },
-            )
+        if confidence < min_confidence:
+            continue
+        features.append((confidence, mapping(poly)))
+
+    features = _apply_rule_cap(features, max_features)
+    return [
+        Feature(
+            geometry=geometry,
+            properties={
+                "confidence": round(confidence, 4),
+                "feature_type": "building",
+            },
         )
-    return features
+        for confidence, geometry in features
+    ]

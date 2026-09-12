@@ -202,6 +202,33 @@ public sealed class DraftFeaturesController(
     public async Task<IActionResult> RejectDraft(Guid id, CancellationToken cancellationToken)
         => await ReviewDraftAsync(id, accept: false, cancellationToken);
 
+    /// <summary>
+    /// Edits a pending draft's geometry (rerouting a bad road centerline,
+    /// trimming a building footprint) before it is accepted. Requires the same
+    /// reviewer scope as accept/reject; an already-reviewed draft is immutable.
+    /// </summary>
+    [HttpPut("{id:guid}")]
+    [Authorize(Policy = "CanReviewFeatures")]
+    public async Task<IActionResult> UpdateDraft(Guid id, [FromBody] DraftUpdateRequest body, CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        return ReviewResultToActionResult(await draftFeaturesService.UpdateDraftAsync(
+            CurrentUserRole, CurrentCommuneId, CurrentDairaId, CurrentWilayaId,
+            RequiredCurrentUserId, id, body.GeometryGeoJson.Trim(), cancellationToken));
+    }
+
+    /// <summary>Deletes a pending draft from the review queue.</summary>
+    [HttpDelete("{id:guid}")]
+    [Authorize(Policy = "CanReviewFeatures")]
+    public async Task<IActionResult> DeleteDraft(Guid id, CancellationToken cancellationToken = default)
+        => ReviewResultToActionResult(await draftFeaturesService.DeleteDraftAsync(
+            CurrentUserRole, CurrentCommuneId, CurrentDairaId, CurrentWilayaId,
+            RequiredCurrentUserId, id, cancellationToken));
+
     private async Task<IActionResult> ReviewDraftAsync(Guid id, bool accept, CancellationToken ct)
     {
         var result = accept
@@ -212,12 +239,20 @@ public sealed class DraftFeaturesController(
                 CurrentUserRole, CurrentCommuneId, CurrentDairaId, CurrentWilayaId,
                 RequiredCurrentUserId, id, ct);
 
-        return result.Status switch
-        {
-            DraftReviewStatus.Success => NoContent(),
-            DraftReviewStatus.NotFound => NotFound(),
-            DraftReviewStatus.AlreadyReviewed => Problem(detail: $"Draft {id} is not pending.", statusCode: 409),
-            _ => Forbid(),
-        };
+        return ReviewResultToActionResult(result);
     }
+
+    private IActionResult ReviewResultToActionResult(DraftReviewResult result) => result.Status switch
+    {
+        DraftReviewStatus.Success => NoContent(),
+        DraftReviewStatus.NotFound => NotFound(),
+        DraftReviewStatus.InvalidGeometry => Problem(
+            detail: "Geometry must be valid GeoJSON matching the draft's feature type (LineString for roads, Polygon for buildings).",
+            statusCode: 400),
+        DraftReviewStatus.RulesNotMet => Problem(
+            detail: "Draft does not meet the configured road rules (minimum length / minimum confidence).",
+            statusCode: 422),
+        DraftReviewStatus.AlreadyReviewed => Problem(detail: $"Draft is not pending.", statusCode: 409),
+        _ => Forbid(),
+    };
 }

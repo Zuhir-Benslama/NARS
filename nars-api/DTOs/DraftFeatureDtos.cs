@@ -49,3 +49,15 @@ public sealed record AiDraftFeatureDto(
     double Confidence,
     string Status,
     DateTimeOffset CreatedAt);
+
+/// <summary>
+/// Body for editing a draft's geometry (PUT /api/draft-features/{id}).
+/// The geometry must keep the draft feature type's shape (LineString for
+/// roads, Polygon for buildings) — enforced in the service.
+/// </summary>
+public sealed class DraftUpdateRequest
+{
+    [Required]
+    [MinLength(2)]
+    public string GeometryGeoJson { get; set; } = string.Empty;
+}

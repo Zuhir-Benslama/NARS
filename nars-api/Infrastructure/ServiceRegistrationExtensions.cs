@@ -68,6 +68,10 @@ public static class ServiceRegistrationExtensions
             .ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<ValidationOptions>().Bind(config.GetSection("Validation"))
             .ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<RoadRulesOptions>().Bind(config.GetSection("RoadRules"))
+            .ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<BuildingRulesOptions>().Bind(config.GetSection("BuildingRules"))
+            .ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<AccountLockoutOptions>().Bind(config.GetSection("AccountLockout"))
             .ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<OpenTelemetryOptions>().Bind(config.GetSection("OpenTelemetry"))

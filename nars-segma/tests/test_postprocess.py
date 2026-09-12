@@ -268,3 +268,108 @@ def test_polygons_skips_degenerate_regions(monkeypatch):
     features = mask_to_polygons(_building_mask(), TRANSFORM)
     assert len(features) == 1
     assert features[0].geometry.type == "Polygon"
+
+
+# ---- Road rules (limitation) -------------------------------------------
+
+
+def test_linestrings_min_length_drops_short_edge(monkeypatch):
+    # With the identity transform 1 px == 1 "degree" of longitude at the
+    # equator (~111 km). A 1-degree edge must be dropped while the 2-degree
+    # edge survives a 150 km minimum. The mask row stays >= 40 px wide so the
+    # binary survives remove_small_objects before the patched graph is used.
+    prob = np.zeros((20, 50), dtype=np.float32)
+    prob[5, 5:45] = 0.9
+    _patch_graph(
+        monkeypatch,
+        [
+            [(5, 5), (5, 6)],  # ~111 km (dropped)
+            [(5, 30), (5, 31), (5, 32)],  # ~222 km (kept)
+        ],
+    )
+    features = mask_to_linestrings(prob, TRANSFORM, min_length_m=150_000.0)
+    assert len(features) == 1
+    xs = [coord[0] for coord in features[0].geometry.coordinates]
+    assert min(xs) >= 30
+
+
+def test_linestrings_min_confidence_filters(monkeypatch):
+    prob = np.zeros((20, 50), dtype=np.float32)
+    prob[5, 5:45] = 0.9  # confident edge (kept)
+    prob[6, 5:45] = 0.4  # weak edge (dropped)
+    _patch_graph(
+        monkeypatch,
+        [
+            [(5, 5), (5, 6), (5, 7), (5, 8)],
+            [(6, 5), (6, 6), (6, 7), (6, 8)],
+        ],
+    )
+    features = mask_to_linestrings(prob, TRANSFORM, min_confidence=0.5)
+    assert len(features) == 1
+    ys = [coord[1] for coord in features[0].geometry.coordinates]
+    assert all(abs(y - 5.5) < 0.5 for y in ys)
+
+
+def test_linestrings_max_features_keeps_most_confident(monkeypatch):
+    prob = np.zeros((20, 50), dtype=np.float32)
+    prob[5, 5:45] = 0.9  # row 5 edge (higher confidence, kept)
+    prob[6, 5:45] = 0.6  # row 6 edge (dropped by the cap)
+    _patch_graph(
+        monkeypatch,
+        [
+            [(5, 5), (5, 6), (5, 7), (5, 8)],
+            [(6, 5), (6, 6), (6, 7), (6, 8)],
+        ],
+    )
+    features = mask_to_linestrings(prob, TRANSFORM, max_features=1)
+    assert len(features) == 1
+    ys = [coord[1] for coord in features[0].geometry.coordinates]
+    assert all(abs(y - 5.5) < 0.5 for y in ys)
+
+
+def test_linestrings_rule_order_preserved_without_cap(monkeypatch):
+    # Without a cap the graph edge order must survive intact (rules that only
+    # discard must not reorder the surviving edges).
+    prob = np.zeros((20, 50), dtype=np.float32)
+    prob[5, 5:45] = 0.6
+    prob[6, 5:45] = 0.9
+    _patch_graph(
+        monkeypatch,
+        [
+            [(5, 5), (5, 6), (5, 7), (5, 8)],
+            [(6, 5), (6, 6), (6, 7), (6, 8)],
+        ],
+    )
+    features = mask_to_linestrings(prob, TRANSFORM)
+    assert len(features) == 2
+    ys0 = {coord[1] for coord in features[0].geometry.coordinates}
+    ys1 = {coord[1] for coord in features[1].geometry.coordinates}
+    assert all(y == 5.5 for y in ys0)
+    assert all(y == 6.5 for y in ys1)
+
+
+# ---- Building rules (limitation) ---------------------------------------
+
+
+def test_polygons_min_confidence_filters(monkeypatch):
+    # Both squares pass the binary `> threshold` stage; the rule threshold
+    # (0.7) then drops the 0.55-mean square and keeps the 0.9 one.
+    prob = np.zeros((60, 60), dtype=np.float32)
+    prob[5:15, 5:15] = 0.55  # weak (dropped)
+    prob[35:45, 35:45] = 0.9  # strong (kept)
+    features = mask_to_polygons(prob, TRANSFORM, min_confidence=0.7)
+    assert len(features) == 1
+    ring = features[0].geometry.coordinates[0]
+    xs = [coord[0] for coord in ring]
+    assert min(xs) >= 34
+
+
+def test_polygons_max_features_keeps_most_confident(monkeypatch):
+    prob = np.zeros((60, 60), dtype=np.float32)
+    prob[5:15, 5:15] = 0.6
+    prob[35:45, 35:45] = 0.9
+    features = mask_to_polygons(prob, TRANSFORM, max_features=1)
+    assert len(features) == 1
+    ring = features[0].geometry.coordinates[0]
+    xs = [coord[0] for coord in ring]
+    assert min(xs) >= 34

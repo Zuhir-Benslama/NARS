@@ -15,6 +15,7 @@ export interface MapContext {
   scatteredSource?: GeoJSONSourceLike
   featuresSource?: GeoJSONSourceLike
   endpointsSource?: GeoJSONSourceLike
+  draftsSource?: GeoJSONSourceLike
   // Cached GeoJSON — restored into fresh sources after a setStyle() wipe
   boundariesGeoJson?: GeoJSON.FeatureCollection
   scatteredGeoJson?: GeoJSON.FeatureCollection

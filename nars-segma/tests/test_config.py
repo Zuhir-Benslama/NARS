@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.config import env_int
+from app.config import env_float, env_int
 
 
 def test_env_int_returns_default_when_unset(monkeypatch: pytest.MonkeyPatch):
@@ -41,3 +41,36 @@ def test_env_int_honors_maximum(monkeypatch: pytest.MonkeyPatch):
 def test_env_int_accepts_bound_value(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("NARS_SEGMA_TEST_INT", "1")
     assert env_int("NARS_SEGMA_TEST_INT", 4, minimum=1) == 1
+
+
+def test_env_float_returns_default_when_unset(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("NARS_SEGMA_TEST_FLOAT", raising=False)
+    assert env_float("NARS_SEGMA_TEST_FLOAT", 0.5) == 0.5
+
+
+def test_env_float_parses_float(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("NARS_SEGMA_TEST_FLOAT", "12.5")
+    assert env_float("NARS_SEGMA_TEST_FLOAT", 0.5) == 12.5
+
+
+def test_env_float_rejects_non_number(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("NARS_SEGMA_TEST_FLOAT", "high")
+    with pytest.raises(RuntimeError, match="high"):
+        env_float("NARS_SEGMA_TEST_FLOAT", 0.5)
+
+
+def test_env_float_honors_minimum(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("NARS_SEGMA_TEST_FLOAT", "-2.0")
+    with pytest.raises(RuntimeError, match=">= 0"):
+        env_float("NARS_SEGMA_TEST_FLOAT", 4.0, minimum=0)
+
+
+def test_env_float_honors_maximum(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("NARS_SEGMA_TEST_FLOAT", "1.5")
+    with pytest.raises(RuntimeError, match="<= 1"):
+        env_float("NARS_SEGMA_TEST_FLOAT", 0.5, maximum=1)
+
+
+def test_env_float_accepts_bound_value(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("NARS_SEGMA_TEST_FLOAT", "1.0")
+    assert env_float("NARS_SEGMA_TEST_FLOAT", 0.5, maximum=1) == 1.0

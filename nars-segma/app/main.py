@@ -34,7 +34,7 @@ from fastapi import (
     UploadFile,
 )
 
-from app.config import env_int
+from app.config import env_float, env_int
 from app.model import (
     InvalidTileError,
     SegmentationModel,
@@ -76,6 +76,32 @@ INFERENCE_TIMEOUT = env_int(
 # Requests park on this (their upload stays spooled on disk), not on a per-
 # request inference buffer.
 QUEUE_TIMEOUT = env_int("NARS_SEGMA_QUEUE_TIMEOUT", 30, minimum=0, maximum=300)
+
+# Road rules (limitation): discard edges below these thresholds before they
+# reach the API. The minimum length forbids the stub spurs and debris slivers
+# that the skeletonizer emits at tile edges; the minimum confidence drops weak
+# detections; the per-tile cap bounds how many drafts one acceptance run can
+# create. Separation is structural (each edge is already one junction-to-
+# junction segment) and needs no tuning.
+ROAD_MIN_LENGTH_M = env_float(
+    "NARS_SEGMA_ROAD_MIN_LENGTH_M", 0.0, minimum=0.0, maximum=10000.0
+)
+ROAD_MIN_CONFIDENCE = env_float(
+    "NARS_SEGMA_ROAD_MIN_CONFIDENCE", 0.0, minimum=0.0, maximum=1.0
+)
+ROAD_MAX_FEATURES = env_int(
+    "NARS_SEGMA_ROAD_MAX_FEATURES", 0, minimum=0, maximum=100000
+)
+
+# Building rules (limitation): same shape as the road rules, applied to the
+# polygon extraction. A minimum confidence drops ghost rooftops; the per-tile
+# cap bounds the number of building drafts one acceptance run can produce.
+BUILDING_MIN_CONFIDENCE = env_float(
+    "NARS_SEGMA_BUILDING_MIN_CONFIDENCE", 0.0, minimum=0.0, maximum=1.0
+)
+BUILDING_MAX_FEATURES = env_int(
+    "NARS_SEGMA_BUILDING_MAX_FEATURES", 0, minimum=0, maximum=100000
+)
 
 
 # Model registry: feature type -> how to build its model. Each entry is an
@@ -431,9 +457,30 @@ def _segment_task(
 
             # Per-task postprocessing: polygons for buildings, centerline
             # linestrings for roads. Dispatch is driven by the registry so a
-            # new task needs no code change here.
+            # new task needs no code change here. Road rules (min length /
+            # min confidence / per-tile cap) and building rules (min
+            # confidence / cap) are read from the environment so a cadastre
+            # convention change is a config bump, not a rebuild.
             postprocess = POSTPROCESSORS[MODEL_SPECS[task]["postprocess"]]
-            features = postprocess(fg_prob, transform, threshold=threshold)
+            if task == "roads":
+                features = postprocess(
+                    fg_prob,
+                    transform,
+                    threshold=threshold,
+                    min_length_m=ROAD_MIN_LENGTH_M,
+                    min_confidence=ROAD_MIN_CONFIDENCE,
+                    max_features=ROAD_MAX_FEATURES or None,
+                )
+            elif task == "buildings":
+                features = postprocess(
+                    fg_prob,
+                    transform,
+                    threshold=threshold,
+                    min_confidence=BUILDING_MIN_CONFIDENCE,
+                    max_features=BUILDING_MAX_FEATURES or None,
+                )
+            else:
+                features = postprocess(fg_prob, transform, threshold=threshold)
         except TileTooLargeError as exc:
             raise HTTPException(
                 status_code=413,

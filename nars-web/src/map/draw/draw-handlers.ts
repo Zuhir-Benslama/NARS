@@ -15,7 +15,12 @@ import type { MapMouseEvent as MapLibreMapMouseEvent } from "maplibre-gl"
 
 import { getCtx, updateSelectionHighlight } from "../core/state"
 import { useFeaturesStore } from "../../stores/featuresStore"
-import { showContextMenu, showMapContextMenu } from "../context-menu/context-menu"
+import { useDraftsStore } from "../../stores/draftsStore"
+import {
+  showContextMenu,
+  showDraftContextMenu,
+  showMapContextMenu,
+} from "../context-menu/context-menu"
 import { buildDrawControl, clearEdgeVisibilityPoll } from "./draw-control"
 import { ensureGeoman } from "../map-init"
 import {
@@ -211,6 +216,18 @@ function onContextMenu(e: MouseEvent): void {
   const py = e.clientY - rect.top
 
   const features = map.queryRenderedFeatures([px, py] as [number, number])
+
+  const draftHit = features.find((f) => f.source === "drafts" && f.properties?.draftId)
+  if (draftHit && draftHit.properties?.draftId) {
+    showDraftContextMenu(
+      e.clientX,
+      e.clientY,
+      draftHit.properties.draftId as string,
+      draftHit.properties.featureType as string,
+    )
+    return
+  }
+
   let feature
   if (phase.key === "cityCenter") {
     feature = features.find(
@@ -242,6 +259,12 @@ function onClick(e: MapLibreMapMouseEvent & { point: { x: number; y: number } })
 
   const phase = PHASES[appStore.currentPhase]
   const features = map.queryRenderedFeatures(e.point)
+
+  const draftHit = features.find((f) => f.source === "drafts" && f.properties?.draftId)
+  if (draftHit && draftHit.properties?.draftId) {
+    useDraftsStore().setSelectedDraftId(draftHit.properties.draftId as string)
+    return
+  }
 
   let feature
   if (phase?.key === "cityCenter") {

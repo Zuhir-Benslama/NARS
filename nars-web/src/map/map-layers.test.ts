@@ -51,8 +51,15 @@ describe("initSources", () => {
 
     mod.initSources()
 
-    expect(map.addSource).toHaveBeenCalledTimes(5)
-    for (const name of ["boundaries", "scattered", "features", "selection", "endpoints"]) {
+    expect(map.addSource).toHaveBeenCalledTimes(6)
+    for (const name of [
+      "boundaries",
+      "scattered",
+      "features",
+      "selection",
+      "endpoints",
+      "drafts",
+    ]) {
       expect(map.addSource).toHaveBeenCalledWith(name, {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },

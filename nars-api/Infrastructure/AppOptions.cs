@@ -63,6 +63,31 @@ public class ValidationOptions
     [Range(1, 1000)] public double RoadConnectivityMeters { get; set; } = 20.0;
 }
 
+/// <summary>
+/// Cadastre-limitation rules applied when an AI road draft is accepted.
+/// Mirrors the NARS_SEGMA_ROAD_* limits enforced inside the segmentation
+/// service, so a spacing/confidence convention change is a config bump and a
+/// draft that slipped past segma's postprocess rules is still blocked here.
+/// Defaults are no-ops (keep every draft) to match segma's env defaults.
+/// </summary>
+public class RoadRulesOptions
+{
+    [Range(0.0, 100_000.0)] public double MinRoadLengthM { get; set; } = 0.0;
+    [Range(0.0, 1.0)] public double MinConfidence { get; set; } = 0.0;
+    [Range(0, 100_000)] public int MaxFeaturesPerTile { get; set; } = 0;
+}
+
+/// <summary>
+/// Cadastre-limitation rules applied when an AI building draft is accepted.
+/// Mirrors the NARS_SEGMA_BUILDING_* limits enforced by the segmentation
+/// service. Defaults are no-ops (keep every draft).
+/// </summary>
+public class BuildingRulesOptions
+{
+    [Range(0.0, 1.0)] public double MinConfidence { get; set; } = 0.0;
+    [Range(0, 100_000)] public int MaxFeaturesPerTile { get; set; } = 0;
+}
+
 public class AccountLockoutOptions
 {
     [Range(1, 100)] public int MaxFailedAttempts { get; set; } = 5;

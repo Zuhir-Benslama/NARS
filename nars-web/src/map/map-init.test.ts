@@ -1,28 +1,36 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-const { mockSetStyle, mockOnce, mockCreateGeoman, mockInitSources, mockUpdateSource, mockCtx } =
-  vi.hoisted(() => ({
-    mockSetStyle: vi.fn(),
-    mockOnce: vi.fn(),
-    mockCreateGeoman: vi.fn(),
-    mockInitSources: vi.fn(),
-    mockUpdateSource: vi.fn(),
-    mockCtx: {} as {
-      map?: {
-        setStyle: unknown
-        once: unknown
-        doubleClickZoom: { disable: () => void }
-        on: unknown
-        off: unknown
-      }
-      satelliteStyle?: unknown
-      streetStyle?: unknown
-      darkStyle?: unknown
-      lightStyle?: unknown
-      geoman?: { destroyed: boolean; destroy: () => Promise<void> }
-      [key: string]: unknown
-    },
-  }))
+const {
+  mockSetStyle,
+  mockOnce,
+  mockCreateGeoman,
+  mockInitSources,
+  mockUpdateSource,
+  mockDraftUpdateSource,
+  mockCtx,
+} = vi.hoisted(() => ({
+  mockSetStyle: vi.fn(),
+  mockOnce: vi.fn(),
+  mockCreateGeoman: vi.fn(),
+  mockInitSources: vi.fn(),
+  mockUpdateSource: vi.fn(),
+  mockDraftUpdateSource: vi.fn(),
+  mockCtx: {} as {
+    map?: {
+      setStyle: unknown
+      once: unknown
+      doubleClickZoom: { disable: () => void }
+      on: unknown
+      off: unknown
+    }
+    satelliteStyle?: unknown
+    streetStyle?: unknown
+    darkStyle?: unknown
+    lightStyle?: unknown
+    geoman?: { destroyed: boolean; destroy: () => Promise<void> }
+    [key: string]: unknown
+  },
+}))
 
 const styleLoadHandlers: (() => void)[] = []
 mockOnce.mockImplementation((event: string, cb: () => void) => {
@@ -59,6 +67,9 @@ vi.mock("./roads/road-directions", () => ({ updateEndpointMarkers: vi.fn() }))
 vi.mock("./rendering/labels", () => ({ refreshLayerVisibility: vi.fn() }))
 vi.mock("../stores/featuresStore", () => ({
   useFeaturesStore: () => ({ updateSource: mockUpdateSource }),
+}))
+vi.mock("../stores/draftsStore", () => ({
+  useDraftsStore: () => ({ updateSource: mockDraftUpdateSource }),
 }))
 
 import { initMap, setBaseLayer, resetMapInit } from "./map-init"

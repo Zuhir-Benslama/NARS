@@ -5,6 +5,7 @@
 import { apiFetch } from "../../api"
 import { getCtx } from "../core/state"
 import { useFeaturesStore } from "../../stores/featuresStore"
+import { useDraftsStore } from "../../stores/draftsStore"
 import { useLayerStore } from "../../stores/layerStore"
 import { computeCircleRadius, computeCircleCenter } from "../rendering/geometry"
 import { showToast } from "../../lib/toast"
@@ -15,6 +16,7 @@ import { buildDrawControl } from "../draw/draw-control"
 import { repatchMarker } from "../draw/draw-complete"
 import { featureDataToGeometry } from "../features/feature-data"
 import type { LayerEntry, LatLng } from "../../types"
+import { commitDraftEdit, cancelDraftEdit } from "../drafts/draft-edit"
 import {
   getActiveEditEntry,
   getActiveGeomanFeatureId,
@@ -143,6 +145,12 @@ export async function commitEditMode(): Promise<void> {
   if (_commitInProgress) return
   _commitInProgress = true
   try {
+    const draftsStore = useDraftsStore()
+    if (draftsStore.activeDraftEditId) {
+      await commitDraftEdit()
+      return
+    }
+
     const entry = getActiveEditEntry()
     if (!entry) {
       disableEditMode()
@@ -177,6 +185,12 @@ export async function commitEditMode(): Promise<void> {
 // ─── CANCEL EDIT MODE ────────────────────────────────────────────────────────
 
 export async function cancelEditMode(): Promise<void> {
+  const draftsStore = useDraftsStore()
+  if (draftsStore.activeDraftEditId) {
+    await cancelDraftEdit()
+    return
+  }
+
   const entry = getActiveEditEntry()
   if (!entry) {
     disableEditMode()
