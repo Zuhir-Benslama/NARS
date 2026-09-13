@@ -29,10 +29,11 @@ MIN_BUILDING_COMPONENT_PX = 20
 
 def _haversine_m(points: list[tuple[float, float]]) -> float:
     """Great-circle length of a longitude/latitude polyline in metres."""
+    import itertools
     import math
 
     total = 0.0
-    for (lon1, lat1), (lon2, lat2) in zip(points, points[1:]):
+    for (lon1, lat1), (lon2, lat2) in itertools.pairwise(points):
         dphi = math.radians(lat2 - lat1)
         dlambda = math.radians(lon2 - lon1)
         a = (
