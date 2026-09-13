@@ -31,10 +31,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # nars-docs-tex is deliberately absent: it is a compile-tool image that
+        # make/docs.mk builds fresh with a pinned tag (docs-tex-image, :0.1.0)
+        # and the docs-tex CI job rebuilds from source every run — no consumer
+        # ever pulls a pushed copy, so publishing one would just drift.
         include:
           - image: nars-api
-            context: "."
-          - image: nars-docs-tex
             context: "."
           - image: nars-postgis
             context: "."

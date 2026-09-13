@@ -2,7 +2,7 @@
 
 
 .PHONY: test
-test: ## Run all tests
+test: ## Run nars-api backend tests (see test-coverage, segma-test, infra-test-python for the other suites)
 	@dotnet test nars-api/NarsApi.Tests/NarsApi.Tests.csproj --no-restore
 
 .PHONY: test-unit

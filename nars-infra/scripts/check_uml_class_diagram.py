@@ -5,8 +5,10 @@ it cannot notice a type or member being deleted or renamed in code. This
 script closes that gap: every ``class`` and every listed member in the
 backend class diagram must resolve to a real type/member in nars-api.
 
-Only the backend class diagram is covered. The vite component/sequence
-diagrams describe frontend components and HTTP flows, which have no trivial
+Only the backend class diagram is covered here. The frontend component diagram
+has its own equivalent guard in check_uml_vite_component_diagram.py, because
+its classes resolve differently (components, stores, composables, map modules).
+The sequence diagrams describe HTTP/dependency flows, which have no trivial
 source-level index, so they stay under render-only enforcement.
 
 Usage:

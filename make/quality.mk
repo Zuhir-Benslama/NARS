@@ -281,12 +281,14 @@ infra-lint-markdown: ## Lint docs markdown with markdownlint (style: nars-infra/
 			-s /mnt/nars-infra/.markdownlint.rb $(DOCS_MD_MNT)
 	fi
 
-# Internal: assert docs/uml/nars-class-diagram.md is in sync with nars-api.
-# docs-lint-uml proves only that the mermaid parses; this gate proves every
-# type and member listed in the backend class diagram exists in the source
-# (it previously missed a refactor that moved lockout out of RefreshTokenService
+# Internal: assert docs/uml/*.md class diagrams are in sync with their source
+# trees. docs-lint-uml proves only that the mermaid parses; this gate proves
+# every type and member listed in the backend class diagram exists in nars-api
+# and the vite component diagram's classes/members resolve in nars-web (they
+# previously missed a refactor that moved lockout out of RefreshTokenService
 # and inspection/entrance out of FieldService).
 .PHONY: infra-lint-uml-drift
-infra-lint-uml-drift: ## Assert nars-class-diagram.md types/members exist in nars-api (drift guard)
+infra-lint-uml-drift: ## Assert UML class diagrams' types/members exist in nars-api + nars-web (drift guard)
 	@command -v python3 >/dev/null 2>&1 || { echo "✖ python3 is not installed (required for infra-lint-uml-drift)"; exit 1; }
 	@python3 nars-infra/scripts/check_uml_class_diagram.py
+	@python3 nars-infra/scripts/check_uml_vite_component_diagram.py

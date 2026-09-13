@@ -162,7 +162,7 @@ public sealed class ScatteredAreaService(
     /// (outer + interior holes for each), so that spatial queries see the
     /// complete scattered geometry including holes, not just the outer shells.
     /// </summary>
-    private static List<List<object>> ExtractAllRings(JsonElement geo)
+    internal static List<List<object>> ExtractAllRings(JsonElement geo)
     {
         var result = new List<List<object>>();
         if (!geo.TryGetProperty("type", out var typeProp))

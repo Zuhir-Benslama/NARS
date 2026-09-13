@@ -197,7 +197,8 @@ jobs:
   # Makefile pipeline uses — render-mermaid-playwright.mjs, mermaid pinned to
   # 11.17.2), infra-lint-markdown (markdownlint on docs/*.md + docs/uml/*.md),
   # and infra-lint-uml-drift (asserts the backend class diagram's types/members
-  # still exist in nars-api). A mermaid syntax error, stale diagram entry, or
+  # still exist in nars-api and the vite component diagram's classes/members
+  # resolve in nars-web). A mermaid syntax error, stale diagram entry, or
   # broken markdown fails CI instead of surfacing only when someone manually
   # regenerates the (gitignored) PDFs.
   docs:

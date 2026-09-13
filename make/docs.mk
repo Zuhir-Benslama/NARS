@@ -43,7 +43,7 @@ _check-playwright:
 	fi
 
 .PHONY: docs-lint
-docs-lint: docs-lint-uml ## CI gate: render UML diagrams, lint docs markdown, check class-diagram drift
+docs-lint: docs-lint-uml ## CI gate: render UML diagrams, lint docs markdown, check diagram drift
 	@$(SUBMAKE) infra-lint-markdown
 	$(SUBMAKE) infra-lint-uml-drift
 
