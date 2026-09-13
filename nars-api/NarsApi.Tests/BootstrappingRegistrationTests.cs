@@ -218,6 +218,22 @@ public class BootstrappingRegistrationTests : IDisposable
         var options = sp.GetRequiredService<IOptions<AntiforgeryOptions>>().Value;
         Assert.Equal("X-CSRF-Token", options.HeaderName);
         Assert.Equal("X-CSRF-TOKEN-COOKIE", options.Cookie.Name);
+        Assert.Equal(Microsoft.AspNetCore.Http.CookieSecurePolicy.SameAsRequest, options.Cookie.SecurePolicy);
+    }
+
+    [Fact]
+    public void AddNarsServices_RegistersAntiforgerySecureCookieInProduction()
+    {
+        var config = BuildConfig(b => b.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["Cors:AllowedOrigins:0"] = "https://nars.dz",
+                ["Cors:AllowedOrigins:1"] = "https://api.nars.dz",
+            }));
+
+        using var sp = BuildProvider(config, environmentName: "Production");
+
+        var options = sp.GetRequiredService<IOptions<AntiforgeryOptions>>().Value;
         Assert.Equal(Microsoft.AspNetCore.Http.CookieSecurePolicy.Always, options.Cookie.SecurePolicy);
     }
 
