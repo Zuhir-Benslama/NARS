@@ -124,4 +124,72 @@ public class ScatteredAreaServiceTests
         // Another user's error must not appear under a different user's key.
         Assert.Null(service.GetLastError(Guid.NewGuid(), 1));
     }
+
+    // ── ExtractAllRings (geometry ring extraction) ────────────────────────────
+
+    [Fact]
+    public void ExtractAllRings_Polygon_ReturnsOuterAndInteriorRings()
+    {
+        var geo = ToJsonElement(
+            """{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,0]],[[0.2,0.2],[0.8,0.2],[0.5,0.5],[0.2,0.2]]]}""");
+
+        var rings = ScatteredAreaService.ExtractAllRings(geo);
+
+        Assert.Equal(2, rings.Count);
+        AssertRing(rings[0], 4, lng: 0.0, lat: 0.0);
+        AssertRing(rings[1], 4, lng: 0.2, lat: 0.2);
+    }
+
+    [Fact]
+    public void ExtractAllRings_MultiPolygon_ReturnsAllPolygonRings()
+    {
+        var geo = ToJsonElement(
+            """{"type":"MultiPolygon","coordinates":[[[[0,0],[1,0],[1,1],[0,0]]],[[[2,2],[3,2],[3,3],[2,2]]]]}""");
+
+        var rings = ScatteredAreaService.ExtractAllRings(geo);
+
+        Assert.Equal(2, rings.Count);
+        AssertRing(rings[0], 4, lng: 0.0, lat: 0.0);
+        AssertRing(rings[1], 4, lng: 2.0, lat: 2.0);
+    }
+
+    [Fact]
+    public void ExtractAllRings_UnknownGeometryType_ReturnsEmpty()
+    {
+        var geo = ToJsonElement("""{"type":"LineString","coordinates":[[0,0],[1,1]]}""");
+
+        var rings = ScatteredAreaService.ExtractAllRings(geo);
+
+        Assert.Empty(rings);
+    }
+
+    [Fact]
+    public void ExtractAllRings_MissingType_ReturnsEmpty()
+    {
+        var geo = ToJsonElement("""{"coordinates":[[[0,0],[1,0]]]}""");
+
+        var rings = ScatteredAreaService.ExtractAllRings(geo);
+
+        Assert.Empty(rings);
+    }
+
+    [Fact]
+    public void ExtractAllRings_PointsWithFewerThanTwoCoordinates_AreSkipped()
+    {
+        var geo = ToJsonElement(
+            """{"type":"Polygon","coordinates":[[[0,0],[1,0],[1],[1,0],[0,0]]]}""");
+
+        var rings = ScatteredAreaService.ExtractAllRings(geo);
+
+        var ring = Assert.Single(rings);
+        Assert.Equal(4, ring.Count); // the degenerate [1] point is dropped
+    }
+
+    private static void AssertRing(List<object> ring, int expectedCount, double lng, double lat)
+    {
+        Assert.Equal(expectedCount, ring.Count);
+        var serialized = System.Text.Json.JsonSerializer.Serialize(ring[0]);
+        Assert.Contains($"\"lng\":{lng}", serialized);
+        Assert.Contains($"\"lat\":{lat}", serialized);
+    }
 }
