@@ -432,8 +432,8 @@ classDiagram
 
     class ProfileMenu {
         User profile dropdown
-        +settings
-        +logout
+        +onSettings()
+        +onLogout()
     }
 
     class TileControl {
