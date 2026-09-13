@@ -4,6 +4,9 @@ import { createApp } from "vue"
 
 // MapLibre GL v6 is ESM-only; under a bundler the worker URL must be set
 // explicitly (it cannot be derived from import.meta.url at module scope).
+// Vite emits the worker under /assets as a raw file; its relative import of
+// maplibre-gl-shared.mjs is satisfied by copying that chunk next to it during
+// the build (scripts/copy-maplibre-worker-shared.mjs).
 setWorkerUrl(new URL("maplibre-gl/dist/maplibre-gl-worker.mjs", import.meta.url).toString())
 import { createPinia } from "pinia"
 import App from "./App.vue"

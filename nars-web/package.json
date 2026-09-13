@@ -8,8 +8,8 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc --noEmit && vite build",
-    "build:deploy": "vue-tsc --noEmit && vite build && cp -r dist/* ../../nars-api/wwwroot/tmp && rm -rf ../../nars-api/wwwroot/assets && mv ../../nars-api/wwwroot/tmp ../../nars-api/wwwroot/assets",
+    "build": "vue-tsc --noEmit && vite build && node scripts/copy-maplibre-worker-shared.mjs",
+    "build:deploy": "vue-tsc --noEmit && vite build && node scripts/copy-maplibre-worker-shared.mjs && mkdir -p ../../nars-api/wwwroot/tmp && cp -r dist/* ../../nars-api/wwwroot/tmp && rm -rf ../../nars-api/wwwroot/assets && mv ../../nars-api/wwwroot/tmp ../../nars-api/wwwroot/assets",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint src/ e2e/ --report-unused-disable-directives --max-warnings 0 && prettier --check \"src/**/*.{ts,vue,css}\" \"e2e/**/*.ts\"",
