@@ -180,27 +180,27 @@ public static class ServiceRegistrationExtensions
     private static void AddNarsHealthChecks(this IServiceCollection services, string connectionString) => services.AddHealthChecks()
             .AddNarsDatabaseHealthCheck(connectionString);
 
-private static void AddNarsAntiforgery(this IServiceCollection services, IHostEnvironment env)
-        => services.AddAntiforgery(options =>
-                                                                                      {
-                                                                                          options.HeaderName = "X-CSRF-Token";
-                                                                                          options.Cookie.Name = "X-CSRF-TOKEN-COOKIE";
-                                                                                          // Intentionally NOT HttpOnly: this is a double-submit CSRF
-                                                                                          // token cookie that the SPA must read (via JS) to send back
-                                                                                          // in the X-CSRF-Token header. Making it HttpOnly would break
-                                                                                          // every POST/PATCH/DELETE request. The cookie carries no session
-                                                                                          // material — the access/refresh JWTs are in separate cookies.
-                                                                                          // (CodeQL cs/web/cookie-httponly-not-set — false positive.)
-                                                                                          options.Cookie.HttpOnly = false;
-                                                                                          // SameAsRequest in Development: the local kind cluster and the
-                                                                                          // Vite dev server serve plain HTTP, and antiforgery's SSL check
-                                                                                          // throws (500) when the cookie is Always but the request is not
-                                                                                          // TLS — breaking the login page and every CSRF-validated call.
-                                                                                          // Production is always behind TLS, so it stays on Always.
-                                                                                          options.Cookie.SecurePolicy = env.IsDevelopment()
-                                                                                              ? CookieSecurePolicy.SameAsRequest
-                                                                                              : CookieSecurePolicy.Always;
-                                                                                      });
+    private static void AddNarsAntiforgery(this IServiceCollection services, IHostEnvironment env)
+            => services.AddAntiforgery(options =>
+                                                                                          {
+                                                                                              options.HeaderName = "X-CSRF-Token";
+                                                                                              options.Cookie.Name = "X-CSRF-TOKEN-COOKIE";
+                                                                                              // Intentionally NOT HttpOnly: this is a double-submit CSRF
+                                                                                              // token cookie that the SPA must read (via JS) to send back
+                                                                                              // in the X-CSRF-Token header. Making it HttpOnly would break
+                                                                                              // every POST/PATCH/DELETE request. The cookie carries no session
+                                                                                              // material — the access/refresh JWTs are in separate cookies.
+                                                                                              // (CodeQL cs/web/cookie-httponly-not-set — false positive.)
+                                                                                              options.Cookie.HttpOnly = false;
+                                                                                              // SameAsRequest in Development: the local kind cluster and the
+                                                                                              // Vite dev server serve plain HTTP, and antiforgery's SSL check
+                                                                                              // throws (500) when the cookie is Always but the request is not
+                                                                                              // TLS — breaking the login page and every CSRF-validated call.
+                                                                                              // Production is always behind TLS, so it stays on Always.
+                                                                                              options.Cookie.SecurePolicy = env.IsDevelopment()
+                                                                                                  ? CookieSecurePolicy.SameAsRequest
+                                                                                                  : CookieSecurePolicy.Always;
+                                                                                          });
 
     private static void AddNarsFormOptions(this IServiceCollection services, IConfiguration config)
     {
