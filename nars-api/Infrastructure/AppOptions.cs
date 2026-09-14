@@ -139,7 +139,7 @@ public class CspOptions
     public string DefaultSrc { get; set; } = "'self'";
     public string ScriptSrc { get; set; } = "'self' blob:";
     public string WorkerSrc { get; set; } = "'self' blob:";
-    public string StyleSrc { get; set; } = "'self' https://cdn.jsdelivr.net https://unpkg.com 'nonce-' https://fonts.googleapis.com";
+    public string StyleSrc { get; set; } = "'self' https://cdn.jsdelivr.net https://unpkg.com 'unsafe-inline' https://fonts.googleapis.com";
     public string ImgSrc { get; set; } = "'self' data: blob: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.arcgisonline.com";
     public string FontSrc { get; set; } = "'self' https://cdn.jsdelivr.net https://fonts.gstatic.com";
     public string ConnectSrc { get; set; } = "'self' https: data: https://*.arcgisonline.com https://*.basemaps.cartocdn.com";

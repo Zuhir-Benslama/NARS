@@ -19,6 +19,7 @@ import { useAppStore } from "./stores/appStore"
 import { apiUrl, refreshSession } from "./api"
 import { API_CONFIG, getLoginPath } from "./config"
 import { logError, createServerError } from "./lib/errors"
+import { getCsrfToken } from "./lib/csrf"
 import { showToast } from "./lib/toast"
 import { debugLog, debugError } from "./utils/debug"
 import { initTelemetry } from "./lib/telemetry"
@@ -141,6 +142,18 @@ void (async () => {
 
   if (!authResult.ok) {
     window.location.href = getLoginPath()
+    return
+  }
+
+  // Static-served pages (hard refresh on /admin, /nars/*, …) load index.html
+  // with an EMPTY <meta name="csrf-token"> — only the backend /map page
+  // injects a real token. Without one, production apiFetch aborts every
+  // state-changing request as a NETWORK error ("Erreur réseau"). Reload once
+  // through /map so the backend can inject the token; the router then hands
+  // off to the requested view and no other reload is needed.
+  if (import.meta.env.PROD && !getCsrfToken() && window.location.pathname !== "/map") {
+    debugLog("[Boot] CSRF token missing — reloading through /map for server-side injection.")
+    window.location.assign("/map")
     return
   }
 

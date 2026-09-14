@@ -259,8 +259,12 @@ public static class PipelineExtensions
     /// Sets the per-request CSP nonce + security headers on non-API pages
     /// (<c>/login</c>, <c>/map</c>). The nonce is stashed in
     /// <c>ctx.Items["csp-nonce"]</c> so <see cref="NarsApi.Controllers.PagesController"/>
-    /// can inject it into inline script tags, and embedded into script-src/style-src
-    /// so <c>'unsafe-inline'</c> is never sent in production.
+    /// can inject it into inline scripts. Scripts stay nonce-locked — every
+    /// inline &lt;script&gt; on the served page carries the nonce, so
+    /// <c>'unsafe-inline'</c> is never sent for script-src. style-src instead
+    /// relies on <c>'unsafe-inline'</c> (not a nonce): the SPA injects style
+    /// elements and style attributes at runtime, and CSS injection cannot
+    /// escalate to script execution while script-src stays nonce-bound.
     /// API responses still get the nosniff header so a reflected or stored XSS
     /// payload can never be interpreted as a script by the browser.
     /// </summary>
@@ -286,13 +290,23 @@ public static class PipelineExtensions
             var nonce = Convert.ToBase64String(nonceBytes);
             ctx.Items["csp-nonce"] = nonce;
 
+            // Scripts are nonce-locked: the nonce is appended unless the config
+            // already carries a 'nonce-' marker. Every inline <script> on the
+            // served page gets this nonce from PagesController, so script-src
+            // never needs 'unsafe-inline'.
             var scriptSrc = cspOptions.ScriptSrc.Contains("'nonce-'")
                 ? cspOptions.ScriptSrc.Replace("'nonce-'", $"'nonce-{nonce}'")
                 : $"{cspOptions.ScriptSrc} 'nonce-{nonce}'";
 
+            // style-src uses 'unsafe-inline' (see class doc): runtime-injected
+            // styles get no per-element nonce. A nonce present in style-src
+            // would *invalidate* 'unsafe-inline' (CSP3 spec), so it is neither
+            // appended here nor configured by default. Deployments that do want
+            // a style nonce can configure a 'nonce-' marker and it is still
+            // substituted per-request below.
             var styleSrc = cspOptions.StyleSrc.Contains("'nonce-'")
                 ? cspOptions.StyleSrc.Replace("'nonce-'", $"'nonce-{nonce}'")
-                : $"{cspOptions.StyleSrc} 'nonce-{nonce}'";
+                : cspOptions.StyleSrc;
 
             ctx.Response.Headers.ContentSecurityPolicy =
                 $"default-src {cspOptions.DefaultSrc}; " +
