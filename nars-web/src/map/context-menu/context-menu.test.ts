@@ -67,9 +67,9 @@ function setupPhase(key: string) {
 
 const PHASES = [
   { key: "areas", label: "Areas" },
-  { key: "districts", label: "Districts" },
   { key: "cityCenter", label: "City Center" },
   { key: "roads", label: "Roads" },
+  { key: "districts", label: "Districts" },
   { key: "houseEntrances", label: "House Entrances" },
   { key: "publicBuildings", label: "Public Buildings" },
   { key: "publicSpaces", label: "Public Spaces" },

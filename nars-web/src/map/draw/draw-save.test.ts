@@ -188,7 +188,7 @@ describe("completeDrawingWithGeometry", () => {
   })
 
   it("saves a road LineString and updates the layer store", async () => {
-    const roadsPhase = (await import("../../phases")).PHASES[3]
+    const roadsPhase = (await import("../../phases")).PHASES[2]
     setDrawingPhase(roadsPhase)
 
     mockOpenModal.mockResolvedValue({

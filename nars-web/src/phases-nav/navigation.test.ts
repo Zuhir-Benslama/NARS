@@ -129,7 +129,7 @@ describe("navigatePhase", () => {
     await navigatePhase(1)
     await navigatePhase(1)
     await navigatePhase(1)
-    expect(appStore.currentPhase).toBe(3)
+    expect(appStore.currentPhase).toBe(2)
   })
 
   it("auto-orients road directions when leaving roads with roads present", async () => {
@@ -141,10 +141,10 @@ describe("navigatePhase", () => {
     layerStore.addFeature("districts", makeEntry())
     layerStore.addFeature("cityCenter", makeEntry())
     layerStore.addFeature("roads", makeEntry({ id: "road-1", type: "line" }))
-    appStore.currentPhase = 3
+    appStore.currentPhase = 2
     await navigatePhase(1)
     expect(computeAndApplyRoadDirections).toHaveBeenCalled()
-    expect(appStore.currentPhase).toBe(4)
+    expect(appStore.currentPhase).toBe(3)
   })
 
   it("blocks forward navigation from districts when coverage is incomplete", async () => {
@@ -157,11 +157,16 @@ describe("navigatePhase", () => {
     const appStore = useAppStore()
     const layerStore = useLayerStore()
     layerStore.addFeature("areas", makeEntry())
+    layerStore.addFeature("roads", makeEntry({ id: "road-1", type: "line" }))
     appStore.currentPhase = 0
     await navigatePhase(1)
     expect(appStore.currentPhase).toBe(1)
     await navigatePhase(1)
-    expect(appStore.currentPhase).toBe(1)
+    expect(appStore.currentPhase).toBe(2)
+    await navigatePhase(1)
+    expect(appStore.currentPhase).toBe(3)
+    await navigatePhase(1)
+    expect(appStore.currentPhase).toBe(3)
   })
 
   it("blocks forward navigation from houseEntrances when entrances layer is empty", async () => {
@@ -207,8 +212,9 @@ describe("goToPhase", () => {
     const appStore = useAppStore()
     const layerStore = useLayerStore()
     layerStore.addFeature("areas", makeEntry())
-    layerStore.addFeature("districts", makeEntry())
     layerStore.addFeature("cityCenter", makeEntry())
+    layerStore.addFeature("roads", makeEntry({ id: "road-1", type: "line" }))
+    layerStore.addFeature("districts", makeEntry())
     appStore.currentPhase = 0
     await goToPhase(3)
     expect(appStore.currentPhase).toBe(3)

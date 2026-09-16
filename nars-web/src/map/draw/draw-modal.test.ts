@@ -155,8 +155,8 @@ describe("openModalForFeature", () => {
       coordinates: [127.5, 36.5],
       radius: 250,
     } as GeoJSON.Point & { radius?: number }
-    const result = await mod.openModalForFeature(PHASES[2], "feat_1", geometry as GeoJSON.Geometry)
-    expect(mockOpenModal).toHaveBeenCalledWith(2, "feat_1", { radius: 250 })
+    const result = await mod.openModalForFeature(PHASES[1], "feat_1", geometry as GeoJSON.Geometry)
+    expect(mockOpenModal).toHaveBeenCalledWith(1, "feat_1", { radius: 250 })
     expect(mockPrepareModalExtras).toHaveBeenCalled()
     expect(result).toEqual({ type: "cityCenter", label: "CC" })
   })
