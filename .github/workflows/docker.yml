@@ -29,7 +29,7 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      images: ${{ steps.filter.outputs.images }}
+      images: ${{ steps.filter.outputs.changes }}
     steps:
       - uses: actions/checkout@v4
         with:
