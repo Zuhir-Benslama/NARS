@@ -22,7 +22,45 @@ env:
   DOCKER_ORG: zuhirbenslama
 
 jobs:
+  changes:
+    name: Path filters
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      images: ${{ steps.filter.outputs.images }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          list-files: none
+          filters: |
+            nars-api:
+              - 'nars-api/**'
+              - 'nars-infra/docker/Dockerfile.nars-api'
+              - 'Directory.Build.props'
+            nars-postgis:
+              - 'nars-infra/scripts/**'
+              - 'nars-infra/docker/Dockerfile.nars-postgis'
+              - 'docs/seed_reference_data.sql'
+            nars-vite:
+              - 'nars-web/**'
+              - 'nars-infra/docker/Dockerfile.nars-vite'
+            nars-backup:
+              - 'nars-infra/scripts/**'
+              - 'nars-infra/docker/Dockerfile.nars-backup'
+              - 'docs/seed_reference_data.sql'
+            nars-segma:
+              - 'nars-segma/**'
+              - 'nars-infra/docker/Dockerfile.nars-segma'
+
   build-and-push:
+    needs: changes
+
     name: "${{ matrix.image }}"
     # Pinned runner for the image-push path: reproducible base OS/toolchain
     # for Dockerfile builds. Bump deliberately when a newer LTS is needed.
@@ -66,11 +104,12 @@ jobs:
           images: ${{ env.DOCKER_ORG }}/${{ matrix.image }}
           tags: |
             type=sha,prefix=sha-,format=short
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest
             type=ref,event=tag
             type=raw,value=${{ inputs.tag }},enable=${{ inputs.tag != '' }}
 
       - name: Build and push
+        if: github.event_name != 'push' || ${{ fromJSON(needs.changes.outputs.images) }} contains matrix.image
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}

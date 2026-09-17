@@ -84,3 +84,6 @@ captures/
 .project
 .classpath
 .settings/
+
+# kind load staging (durable TMPDIR: root FS, not the small /tmp tmpfs)
+.kind-staging-tmp/
