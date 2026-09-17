@@ -109,7 +109,7 @@ jobs:
             type=raw,value=${{ inputs.tag }},enable=${{ inputs.tag != '' }}
 
       - name: Build and push
-        if: github.event_name != 'push' || ${{ fromJSON(needs.changes.outputs.images) }} contains matrix.image
+        if: github.event_name != 'push' || contains(fromJSON(needs.changes.outputs.images), matrix.image)
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
