@@ -155,4 +155,4 @@ frontend-update: _warn-latest-tag ## Rebuild nars-vite, load into kind, and roll
 	@$(KUBECTL) rollout status deployment nars-frontend -n "$(NAMESPACE)" --timeout=120s
 	@echo "✓ nars-vite rebuilt and deployed"
 export IMAGES_SCRIPTS_DIR := $(CURDIR)/make/scripts
-export PATH := $(IMAGES_SCRIPTS_DIR):/usr/local/bin:/usr/bin:/bin:$(HOME)/.local/bin:$(HOME)/.local/bin
+export PATH := $(IMAGES_SCRIPTS_DIR):$(PATH)
