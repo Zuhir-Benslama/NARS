@@ -27,7 +27,9 @@ def test_csharp_strips_block_comment() -> None:
 
 def test_csharp_strips_string_and_char_literals() -> None:
     assert "detectBar" not in backend.strip_non_code('var msg = "detectBar()";')
-    assert "detectBar" not in backend.strip_non_code('var msg = "a \\" detectBar() \\" b";')
+    assert "detectBar" not in backend.strip_non_code(
+        'var msg = "a \\" detectBar() \\" b";'
+    )
     assert "detectBar" not in backend.strip_non_code("char c = 'd';")
 
 
@@ -78,8 +80,7 @@ def test_backend_member_deleted_but_comment_only_is_flagged(tmp_path: Path) -> N
 def test_frontend_member_deleted_but_comment_only_is_flagged(tmp_path: Path) -> None:
     src = tmp_path / "widget.ts"
     src.write_text(
-        "// deleteItem was removed in refactor 4\n"
-        "export function keepItem() {}\n",
+        "// deleteItem was removed in refactor 4\nexport function keepItem() {}\n",
         encoding="utf-8",
     )
     assert not frontend.member_visible([src], "deleteItem")
