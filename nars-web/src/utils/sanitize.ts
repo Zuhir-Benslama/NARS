@@ -40,9 +40,14 @@ const _escapeEl = typeof document !== "undefined" ? document.createElement("div"
  * Use for plain text that might contain HTML special characters.
  */
 export function escapeHtml(dirty: string): string {
-  if (!_escapeEl) return dirty
-  _escapeEl.textContent = dirty
-  return _escapeEl.innerHTML
+  if (_escapeEl) {
+    _escapeEl.textContent = dirty
+    return _escapeEl.innerHTML
+  }
+  // No DOM (SSR/test): fall back to character-encoding, matching the
+  // sanitize() fallback above. Returning the raw string here would let markup
+  // through, so never do that — encoding is provably inert either way.
+  return encodeTextAttribute(dirty)
 }
 
 /**

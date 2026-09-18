@@ -135,6 +135,9 @@ describe("sanitize", () => {
 
     async function importWithoutWindow(): Promise<typeof import("./sanitize")> {
       vi.stubGlobal("window", undefined)
+      // jsdom keeps `document` even when window is stubbed, so stub it too:
+      // the escapeHtml fallback keys off document's absence.
+      vi.stubGlobal("document", undefined)
       vi.resetModules()
       return await import("./sanitize")
     }
@@ -145,6 +148,8 @@ describe("sanitize", () => {
       expect(mod.sanitizeHtml("<strong>bold</strong> <em>italic</em>")).toBe(
         "&lt;strong&gt;bold&lt;/strong&gt; &lt;em&gt;italic&lt;/em&gt;",
       )
+      expect(mod.escapeHtml("<strong>bold</strong>")).toBe("&lt;strong&gt;bold&lt;/strong&gt;")
+      expect(mod.escapeHtml('say "hello"')).toBe("say &quot;hello&quot;")
     })
 
     it("escapes script/style blocks including content with angle brackets", async () => {

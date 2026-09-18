@@ -19,16 +19,17 @@ describe("router", () => {
     expect(paths).toContain("/nars/:wilayaName")
   })
 
-  it("route / has a redirect to /admin", async () => {
+  it("route / has a role-aware redirect function", async () => {
     const { default: router } = await import("./index")
     const routeRecord = router.options.routes.find((r) => r.path === "/")
-    expect(routeRecord?.redirect).toBe("/admin")
+    expect(typeof routeRecord?.redirect).toBe("function")
   })
 
-  it("route /map has a redirect to /", async () => {
+  it("route /map is a real (non-looping) destination, not a redirect", async () => {
     const { default: router } = await import("./index")
     const routeRecord = router.options.routes.find((r) => r.path === "/map")
-    expect(routeRecord?.redirect).toBe("/")
+    expect(routeRecord?.redirect).toBeUndefined()
+    expect(routeRecord?.component).toBeDefined()
   })
 })
 

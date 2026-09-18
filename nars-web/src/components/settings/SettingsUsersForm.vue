@@ -339,8 +339,7 @@ async function submit() {
         showToast(successMsg.value, "success")
         emit("saved")
       } else {
-        const data = (await res.json().catch(() => null)) as { detail?: string } | null
-        errorMsg.value = data?.detail ?? t("su_err_network")
+        errorMsg.value = t("su_err_network")
         showToast(errorMsg.value, "error")
       }
     } else {
@@ -366,8 +365,7 @@ async function submit() {
         resetCreateForm()
         emit("saved")
       } else {
-        const data = (await res.json().catch(() => null)) as { detail?: string } | null
-        errorMsg.value = data?.detail ?? t("su_err_network")
+        errorMsg.value = t("su_err_network")
         showToast(errorMsg.value, "error")
       }
     }

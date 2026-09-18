@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router"
+import { defineComponent } from "vue"
 import { useAppStore } from "../stores/appStore"
 import { getLoginPath } from "../config"
 
@@ -7,11 +8,17 @@ import { getLoginPath } from "../config"
 const routes = [
   {
     path: "/",
-    redirect: "/admin",
+    // Role-aware entry: admins land on the dashboard, everyone else on the
+    // map route. A blind "/admin" redirect would bounce non-admins through
+    // the guard's /map redirect and loop forever.
+    redirect: () => (useAppStore().isAdminUser ? "/admin" : "/map"),
   },
   {
     path: "/map",
-    redirect: "/",
+    name: "map",
+    // Non-admin UIs render outside <router-view>, so this matching shell only
+    // needs to exist as a stable (non-looping) destination for role redirects.
+    component: defineComponent({ name: "MapRoute", render: () => null }),
   },
   {
     path: "/admin",
@@ -40,7 +47,10 @@ router.beforeEach((to) => {
     return false
   }
   if ((to.name === "admin" || to.name === "wilaya-detail") && !appStore.isAdminUser) {
-    return false
+    // Aborting silently was the previous behavior: the URL stayed on the
+    // blocked path while App.vue rendered the non-admin UI underneath. Send
+    // them to the map route instead so the address bar reflects reality.
+    return { path: "/map" }
   }
 })
 
