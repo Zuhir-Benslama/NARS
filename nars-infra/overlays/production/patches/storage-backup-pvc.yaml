@@ -1,0 +1,14 @@
+# ⚠ REQUIRED EDIT BEFORE PRODUCTION APPLY — same REPLACE_ME_STORAGE_CLASS
+# contract as patches/storage-postgis-pvc.yaml; secrets-validate aborts the
+# deploy while this placeholder remains in the rendered overlay.
+#
+# The base backup PVC uses kind's local-path provisioner (destroyed with the
+# node — backups are best-effort local snapshots in dev only). Production must
+# point at durable managed storage so nightly backups actually survive.
+---
+- op: replace
+  path: /spec/storageClassName
+  value: REPLACE_ME_STORAGE_CLASS
+- op: replace
+  path: /spec/resources/requests/storage
+  value: 100Gi

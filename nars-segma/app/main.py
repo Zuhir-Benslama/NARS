@@ -118,6 +118,11 @@ class ModelSpec(TypedDict):
     num_classes: int
     builder: str
     postprocess: str
+    # Postprocess kwargs for this task's feature limits. Dispatch calls
+    # POSTPROCESSORS[postprocess](fg_prob, transform, threshold, **rules), so
+    # a task carries exactly the kwargs its postprocessor signature accepts —
+    # no per-task branching in the endpoint.
+    rules: dict[str, float | int | None]
 
 
 MODEL_SPECS: dict[str, ModelSpec] = {
@@ -128,6 +133,10 @@ MODEL_SPECS: dict[str, ModelSpec] = {
         "num_classes": 2,
         "builder": "smp-unet",
         "postprocess": "polygons",
+        "rules": {
+            "min_confidence": BUILDING_MIN_CONFIDENCE,
+            "max_features": BUILDING_MAX_FEATURES or None,
+        },
     },
     "roads": {
         "weights_path": os.environ.get(
@@ -136,6 +145,11 @@ MODEL_SPECS: dict[str, ModelSpec] = {
         "num_classes": 1,
         "builder": "resnet34-upsample",
         "postprocess": "linestrings",
+        "rules": {
+            "min_length_m": ROAD_MIN_LENGTH_M,
+            "min_confidence": ROAD_MIN_CONFIDENCE,
+            "max_features": ROAD_MAX_FEATURES or None,
+        },
     },
 }
 
@@ -159,6 +173,16 @@ _models_lock = threading.Lock()
 # how many inferences run in parallel; the rest wait for a permit (see
 # _segment_task) before their upload is even buffered, so they park disk, not RAM.
 INFERENCE_SEMAPHORE = threading.BoundedSemaphore(MAX_CONCURRENT_INFERENCES)
+
+# Second, tighter gate: how many predict() calls may actually be RUNNING,
+# including ones a 504 has abandoned. INFERENCE_SEMAPHORE bounds admitted
+# requests (read + waiting + postprocess); this one is acquired just before a
+# predict is dispatched and released by the predict worker itself once the
+# inference truly finishes (see _predict_and_release_compute_slot). A stale
+# inference therefore keeps its slot until it actually ends: sustained
+# pathological tiles degrade to a 503 once the running pool is exhausted,
+# rather than compounding abandoned 500MB predictions until the pod OOMs.
+INFERENCE_COMPUTE_SEMAPHORE = threading.BoundedSemaphore(MAX_CONCURRENT_INFERENCES)
 
 
 T = TypeVar("T")
@@ -293,15 +317,22 @@ def verify_internal_token(
 
 
 @app.get("/health")
-def health() -> dict:
-    """Liveness: the process is up. Does not require the model to be loaded."""
+async def health() -> dict:
+    """Liveness: the process is up. Does not require the model to be loaded.
+
+    Deliberately `async def`: it must run on the event loop, not the shared
+    threadpool. Segment endpoints are sync `def`, so a flood of segment
+    requests can saturate the 40-worker threadpool; a sync `/health` would
+    then queue behind them and the k8s liveness probe would stall. The lock
+    hold below is uncontended outside startup/lifespan and sub-microsecond."""
     return {"status": "ok", "model_loaded": _any_task_loaded()}
 
 
 @app.get("/ready")
-def ready() -> dict:
+async def ready() -> dict:
     """Readiness: only report ready when real weights are loaded, so the pod
-    never receives traffic while serving random predictions."""
+    never receives traffic while serving random predictions. Async for the
+    same threadpool-saturation reason as /health."""
     if not _any_task_loaded():
         raise HTTPException(status_code=503, detail="No model weights loaded")
     return {"status": "ready", "model_loaded": True}
@@ -336,6 +367,22 @@ def _validate_bbox(
         )
 
 
+def _predict_and_release_compute_slot(
+    model: SegmentationModel, raw: bytes, bbox: tuple[float, float, float, float]
+) -> tuple[np.ndarray, rasterio.Affine]:
+    """Run one predict and release the compute slot it occupies.
+
+    Runs on the timeout-pool worker. The slot was acquired by the endpoint
+    before dispatch; ownership transfers here, so the release happens only
+    when predict truly returns — even if the endpoint has already abandoned
+    the call with a 504. This is what keeps stale inferences counted against
+    INFERENCE_COMPUTE_SEMAPHORE instead of silently compounding memory."""
+    try:
+        return model.predict(raw, bbox=bbox)
+    finally:
+        INFERENCE_COMPUTE_SEMAPHORE.release()
+
+
 def _run_inference(
     model: SegmentationModel, raw: bytes, bbox: tuple[float, float, float, float]
 ) -> tuple[np.ndarray, rasterio.Affine]:
@@ -346,16 +393,38 @@ def _run_inference(
     an inference slot forever — the client gets a 504 on timeout, the
     abandoned thread keeps working until it finishes and then exits, and the
     next request gets a fresh thread instead of a permanently lost worker.
+
+    Before dispatch, a compute slot is acquired (see
+    INFERENCE_COMPUTE_SEMAPHORE): waiting up to QUEUE_TIMEOUT when the running
+    pool is exhausted fails with 503 so the endpoint never piles a new
+    inference on top of already-abandoned ones. The slot is handed to the
+    worker (`_predict_and_release_compute_slot`), which returns it when the
+    predict actually ends. On the 504 path this endpoint returns while the
+    slot stays held — the accounting for a stale inference does not leak.
     """
-    future = _TIMEOUT_POOL.submit(lambda: model.predict(raw, bbox=bbox))
+    if not INFERENCE_COMPUTE_SEMAPHORE.acquire(timeout=QUEUE_TIMEOUT):
+        raise HTTPException(
+            status_code=503,
+            detail="Server is at capacity; retry after a short delay",
+        )
+    try:
+        future = _TIMEOUT_POOL.submit(
+            lambda: _predict_and_release_compute_slot(model, raw, bbox)
+        )
+    except Exception:
+        # The predict never left this process; return the slot it would have
+        # used (the worker's finally never runs because it was never started).
+        INFERENCE_COMPUTE_SEMAPHORE.release()
+        raise
     try:
         return future.result(timeout=INFERENCE_TIMEOUT)
     except concurrent.futures.TimeoutError as exc:
         # cancel() is a no-op once the predict is running (the thread is
         # already mid-inference), so the abandoned thread keeps working and
-        # exits when it finishes. The inference permit is released by the
-        # caller's finally, so a single stuck tile degrades to a 504 rather
-        # than permanently exhausting a slot.
+        # exits when it finishes — releasing its compute slot then. The
+        # request-side permit is released by the caller's finally, so a single
+        # stuck tile degrades to a 504 rather than permanently exhausting a
+        # request slot; its compute slot is retained until it truly ends.
         future.cancel()
         raise HTTPException(
             status_code=504,
@@ -456,31 +525,15 @@ def _segment_task(
             )
 
             # Per-task postprocessing: polygons for buildings, centerline
-            # linestrings for roads. Dispatch is driven by the registry so a
-            # new task needs no code change here. Road rules (min length /
-            # min confidence / per-tile cap) and building rules (min
-            # confidence / cap) are read from the environment so a cadastre
-            # convention change is a config bump, not a rebuild.
-            postprocess = POSTPROCESSORS[MODEL_SPECS[task]["postprocess"]]
-            if task == "roads":
-                features = postprocess(
-                    fg_prob,
-                    transform,
-                    threshold=threshold,
-                    min_length_m=ROAD_MIN_LENGTH_M,
-                    min_confidence=ROAD_MIN_CONFIDENCE,
-                    max_features=ROAD_MAX_FEATURES or None,
-                )
-            elif task == "buildings":
-                features = postprocess(
-                    fg_prob,
-                    transform,
-                    threshold=threshold,
-                    min_confidence=BUILDING_MIN_CONFIDENCE,
-                    max_features=BUILDING_MAX_FEATURES or None,
-                )
-            else:
-                features = postprocess(fg_prob, transform, threshold=threshold)
+            # linestrings for roads. Dispatch and the per-task limits are
+            # driven entirely by the registry (MODEL_SPECS["rules"]), so a new
+            # task needs no code change here — the request supplies only the
+            # threshold, and a cadastre convention change is a config bump,
+            # not a rebuild.
+            spec = MODEL_SPECS[task]
+            features = POSTPROCESSORS[spec["postprocess"]](
+                fg_prob, transform, threshold=threshold, **spec["rules"]
+            )
         except TileTooLargeError as exc:
             raise HTTPException(
                 status_code=413,

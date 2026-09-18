@@ -12,10 +12,24 @@ kind: Kustomization
 #   kubectl kustomize nars-infra/overlays/production | kubectl apply -f -
 #   make kustomize-apply IMAGE_TAG=<commit-sha> DEPLOY_ENV=production
 #
-# ⚠ Before applying, replace the REPLACE_ME_* CIDRs in
-# patches/health-ingress.yaml (see that file).
+# ⚠ Before applying, replace the REPLACE_ME_* placeholders in:
+#   patches/health-ingress.yaml  (cluster pod/service CIDRs for /health)
+#   patches/storage-postgis-pvc.yaml  (durable storage class for the database PVC)
+#   patches/storage-backup-pvc.yaml   (durable storage class for the backup PVC)
+# The deploy path fails closed while any REPLACE_ME remains (secrets-validate).
+# patches/remove-kind-pv.yaml needs no editing — it just strips the kind-only
+# hostPath PV that the base PVC would otherwise statically bind to.
 resources:
   - ../../k8s
 patches:
   - path: patches/configmap.yaml
   - path: patches/health-ingress.yaml
+  - path: patches/storage-postgis-pvc.yaml
+    target:
+      kind: PersistentVolumeClaim
+      name: postgis-pvc
+  - path: patches/storage-backup-pvc.yaml
+    target:
+      kind: PersistentVolumeClaim
+      name: postgis-backup-pvc
+  - path: patches/remove-kind-pv.yaml

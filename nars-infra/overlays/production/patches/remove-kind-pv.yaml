@@ -1,0 +1,11 @@
+---
+# Remove the kind-only hostPath PersistentVolume from the production render.
+# postgis-pv.yaml in the base is a single-node hostPath PV whose volumeName the
+# base PVC statically binds to — impossible on a multi-node cluster. Production
+# relies on the dynamic binding configured in patches/storage-pvc.yaml, so the
+# PV itself must not appear in the production manifest.
+$patch: delete
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgis-pv

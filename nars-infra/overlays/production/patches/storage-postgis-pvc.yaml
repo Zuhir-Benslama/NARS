@@ -1,0 +1,14 @@
+# ⚠ REQUIRED EDIT BEFORE PRODUCTION APPLY — see overlays/production/README
+# context in the kustomization.yaml (secrets-validate fails closed while
+# REPLACE_ME_STORAGE_CLASS remains).
+#
+# The base postgis-pvc statically binds to the kind-only postgis-pv hostPath
+# PV (volumeName + storageClassName: manual). Production must bind dynamically
+# to durable managed storage instead: replace the storage class and drop the
+# static-binding fields.
+---
+- op: replace
+  path: /spec/storageClassName
+  value: REPLACE_ME_STORAGE_CLASS
+- op: remove
+  path: /spec/volumeName

@@ -104,7 +104,10 @@ def mask_to_linestrings(
                 continue
             geometry = mapping(line)
             confidence = float(prob_mask[pts[:, 0], pts[:, 1]].mean())
-        except (GEOSException, ValueError, TypeError):
+        except (GEOSException, ValueError, TypeError, IndexError):
+            # IndexError covers a skeleton point that landed outside the
+            # probability mask (sknw can hand back near-boundary float
+            # coordinates coerced past the array edge).
             logger.info("Skipping degenerate road edge", exc_info=True)
             continue
 

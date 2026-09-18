@@ -6,10 +6,12 @@ auth, validation, upload caps and the health/ready contract end to end."""
 
 from typing import Any
 
+import numpy as np
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from helpers import AUTH_TOKEN, make_tiff_bytes, requires_torch
+from rasterio.transform import Affine
 
 import app.main as roads
 from app.main import app
@@ -36,6 +38,7 @@ def _restore_module_globals():
             "INFERENCE_TIMEOUT",
             "QUEUE_TIMEOUT",
             "INFERENCE_SEMAPHORE",
+            "INFERENCE_COMPUTE_SEMAPHORE",
         )
     }
     yield
@@ -93,6 +96,7 @@ def _ok_spec() -> roads.ModelSpec:
         "num_classes": 2,
         "builder": "smp-unet",
         "postprocess": "polygons",
+        "rules": {"min_confidence": 0.0, "max_features": None},
     }
 
 
@@ -327,6 +331,45 @@ def test_segment_returns_504_when_inference_times_out(monkeypatch):
     assert "Inference did not complete within" in resp.json()["detail"]
 
 
+def test_abandoned_inference_keeps_compute_slot_until_it_finishes(monkeypatch):
+    """A predict the 504 path abandons must keep its compute slot until it
+    truly ends. INFERENCE_COMPUTE_SEMAPHORE is released by the predict worker,
+    not the endpoint, so stale inferences count against capacity: sustained
+    pathological tiles degrade to a 503 once the running pool is exhausted
+    instead of compounding 500MB abandoned predictions until the pod OOMs."""
+    import threading
+
+    finished = threading.Event()
+
+    class _SlowModel:
+        is_loaded = True
+
+        def predict(self, raw: bytes, bbox: tuple[float, float, float, float]):
+            finished.wait(10)  # simulate a hang the endpoint gives up on
+            return np.zeros((2, 2), dtype=np.float32), Affine.identity()
+
+    monkeypatch.setattr(roads, "INFERENCE_TIMEOUT", 0.05)
+    monkeypatch.setattr(roads, "_models", {"buildings": _SlowModel()})
+    # Fresh size-1 gate so the test has a single, controllable slot.
+    compute = threading.BoundedSemaphore(1)
+    monkeypatch.setattr(roads, "INFERENCE_COMPUTE_SEMAPHORE", compute)
+
+    resp = _post(
+        headers=AUTH,
+        params=BBOX,
+        files={"tile": ("t.tif", make_tiff_bytes(), "image/tiff")},
+    )
+    assert resp.status_code == 504
+
+    # While the abandoned predict still runs, the only compute slot is held.
+    assert compute.acquire(timeout=0.2) is False
+
+    finished.set()
+    # Once the abandoned predict returns, its worker releases the slot.
+    assert compute.acquire(timeout=5) is True
+    compute.release()
+
+
 def test_segment_schema_rejects_malformed_feature():
     from pydantic import ValidationError
 
@@ -505,6 +548,32 @@ def test_segment_returns_503_when_semaphore_exhausted(monkeypatch):
     mock_sema.acquire.assert_called_once()
 
 
+def test_segment_returns_503_when_compute_slots_exhausted(monkeypatch):
+    """The compute gate (2nd capacity layer) must also fail fast with 503 when
+    the running-inference pool is full — e.g. all slots held by abandoned
+    predicts — and must return the admission permit it held on the way in."""
+    import threading
+    from unittest.mock import MagicMock
+
+    admission = threading.BoundedSemaphore(1)
+    monkeypatch.setattr(roads, "INFERENCE_SEMAPHORE", admission)
+    mock_compute = MagicMock(spec=threading.BoundedSemaphore)
+    mock_compute.acquire.return_value = False  # pool full
+    monkeypatch.setattr(roads, "INFERENCE_COMPUTE_SEMAPHORE", mock_compute)
+    monkeypatch.setattr(roads, "_models", {"buildings": _StubModel()})
+
+    resp = _post(
+        headers=AUTH,
+        params=BBOX,
+        files={"tile": ("t.tif", b"x", "image/tiff")},
+    )
+    assert resp.status_code == 503
+    mock_compute.acquire.assert_called_once()
+    # The admission permit acquired before the compute check was returned.
+    assert admission.acquire(timeout=1.0) is True
+    admission.release()
+
+
 def test_missing_token_fails_closed(monkeypatch):
     # If the token env is missing entirely, all requests are rejected.
     monkeypatch.setattr(roads, "INTERNAL_TOKEN", "")
@@ -640,6 +709,54 @@ def test_roads_registered_with_expected_config():
     assert roads.MODEL_SPECS["buildings"]["postprocess"] == "polygons"
     assert roads.POSTPROCESSORS["polygons"] is roads.mask_to_polygons
     assert roads.POSTPROCESSORS["linestrings"] is roads.mask_to_linestrings
+
+
+def test_task_rules_wired_from_config():
+    """The per-task limits live in the registry (single source of truth), so
+    dispatch passes exactly the kwargs each postprocessor accepts. The env-var
+    -> registry wiring is pinned here so a config bump can't drift."""
+    assert roads.MODEL_SPECS["roads"]["rules"] == {
+        "min_length_m": roads.ROAD_MIN_LENGTH_M,
+        "min_confidence": roads.ROAD_MIN_CONFIDENCE,
+        "max_features": roads.ROAD_MAX_FEATURES or None,
+    }
+    assert roads.MODEL_SPECS["buildings"]["rules"] == {
+        "min_confidence": roads.BUILDING_MIN_CONFIDENCE,
+        "max_features": roads.BUILDING_MAX_FEATURES or None,
+    }
+
+
+def test_segment_dispatches_rule_kwargs_to_postprocess(monkeypatch):
+    """The endpoint forwards the registry's per-task rules (plus the request
+    threshold) as the postprocessor kwargs — no task branching in the path."""
+    seen = {}
+
+    def fake_polygons(fg_prob, transform, threshold, *, min_confidence, max_features):
+        seen["threshold"] = threshold
+        seen["min_confidence"] = min_confidence
+        seen["max_features"] = max_features
+        return []
+
+    class _ReturningModel:
+        is_loaded = True
+
+        def predict(self, raw: bytes, bbox: tuple[float, float, float, float]):
+            return np.zeros((8, 8), dtype=np.float32), Affine.identity()
+
+    monkeypatch.setitem(roads.POSTPROCESSORS, "polygons", fake_polygons)
+    monkeypatch.setattr(roads, "_models", {"buildings": _ReturningModel()})
+
+    resp = _post(
+        headers=AUTH,
+        params=BBOX,
+        files={"tile": ("t.tif", b"x", "image/tiff")},
+    )
+    assert resp.status_code == 200
+    assert seen == {
+        "threshold": 0.5,
+        "min_confidence": roads.BUILDING_MIN_CONFIDENCE,
+        "max_features": roads.BUILDING_MAX_FEATURES or None,
+    }
 
 
 def test_segment_roads_rejects_missing_token():
