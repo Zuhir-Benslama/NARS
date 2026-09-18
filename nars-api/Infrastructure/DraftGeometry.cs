@@ -323,3 +323,70 @@ public static class DraftGeometry
         return 2.0 * earthRadiusM * Math.Asin(Math.Sqrt(a));
     }
 }
+
+/// <summary>
+/// Reads and writes the <c>side</c> / <c>entranceNumber</c> fields of an
+/// entrance's <c>data</c> JSONB payload. The single implementation behind the
+/// numbering pipeline (NumberEntrancesService) and the draft-accept path
+/// (DraftFeaturesService), so the parse rules for house-number parity
+/// (odd left / even right) can never drift between the two. All readers are
+/// defensive: a malformed row (bad JSON or non-integer number) simply does not
+/// contribute, and numbering proceeds safely.
+/// </summary>
+public static class HouseEntranceData
+{
+    /// <summary>Reads the entrance's side, or null when absent/invalid.</summary>
+    public static string? TryGetSide(string data)
+    {
+        try
+        {
+            var node = JsonNode.Parse(data);
+            var side = node?["side"]?.GetValue<string>();
+            return side is "left" or "right" ? side : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Reads the entrance's number, or false when absent or non-integer.</summary>
+    public static bool TryGetEntranceNumber(string data, out int number)
+    {
+        number = 0;
+        try
+        {
+            var node = JsonNode.Parse(data);
+            if (node?["entranceNumber"] is { } numNode)
+            {
+                number = numNode.GetValue<int>();
+                return true;
+            }
+        }
+        catch
+        {
+            // A malformed row simply does not contribute to the used set.
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Reads a used entrance number from the data payload when its side matches.
+    /// Used to build the per-side used-number set under a row lock.
+    /// </summary>
+    public static bool TryReadEntranceNumber(string data, string side, out int number)
+    {
+        number = 0;
+        return TryGetSide(data) == side && TryGetEntranceNumber(data, out number);
+    }
+
+    /// <summary>Rewrites an entrance's number and label into its data JSONB.</summary>
+    public static string SetEntranceNumber(string data, int number, string label)
+    {
+        var node = JsonNode.Parse(data) ?? new JsonObject();
+        node["entranceNumber"] = number;
+        node["label"] = label;
+        return node.ToJsonString();
+    }
+}

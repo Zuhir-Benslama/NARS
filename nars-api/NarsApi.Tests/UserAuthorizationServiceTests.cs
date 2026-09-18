@@ -226,6 +226,40 @@ public class UserAuthorizationServiceTests
     }
 
     [Theory]
+    [InlineData(1, null)]
+    [InlineData(null, 1)]
+    public async Task ValidateManagedUserScopeAsync_FieldWorkerWithDairaOrWilaya_ReturnsError(int? dairaId, int? wilayaId)
+    {
+        // A field worker's scope is its commune only; explicit daira/wilaya
+        // claims must be rejected so a commune_user cannot forge them.
+        using var db = CreateInMemoryDb("ScopeManagedFieldWorkerGeo");
+        var svc = CreateService(db);
+
+        var result = await svc.ValidateManagedUserScopeAsync(
+            UserRoles.CommuneUser, callerCommuneId: 1, callerDairaId: null, callerWilayaId: null,
+            UserRoles.FieldWorker, communeId: 1, dairaId, wilayaId);
+
+        Assert.NotNull(result.Error);
+        Assert.False(result.IsAuthorizationFailure);
+    }
+
+    [Theory]
+    [InlineData(1, null)]
+    [InlineData(null, 1)]
+    public async Task ValidateCreateUserScopeAsync_FieldWorkerWithDairaOrWilaya_ReturnsError(int? dairaId, int? wilayaId)
+    {
+        using var db = CreateInMemoryDb("ScopeCreateFieldWorkerGeo");
+        var svc = CreateService(db);
+
+        var result = await svc.ValidateCreateUserScopeAsync(
+            UserRoles.CommuneUser, callerDairaId: null, callerWilayaId: null,
+            UserRoles.FieldWorker, communeId: 1, dairaId, wilayaId);
+
+        Assert.NotNull(result.Error);
+        Assert.False(result.IsAuthorizationFailure);
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData(NonExistentId)]
     public async Task ValidateCreateUserScopeAsync_DairaToCommune_InvalidCommune_ReturnsError(int? communeId)

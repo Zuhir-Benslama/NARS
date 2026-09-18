@@ -66,6 +66,15 @@ public sealed class UserAuthorizationService(
                     return AuthorizationDenied("Field workers must remain in your commune.");
                 }
 
+                // A field worker's scope is its commune only. Explicit daira_id /
+                // wilaya_id on a field worker would be minted into forgeable JWT
+                // claims with no corresponding privilege (and no validation on the
+                // update path), so reject them outright instead of storing them.
+                if (dairaId.HasValue || wilayaId.HasValue)
+                {
+                    return ValidationError("Field workers must not have an explicit daira_id or wilaya_id; their scope is their commune.");
+                }
+
                 return Valid();
 
             case (UserRoles.DairaAdmin, UserRoles.CommuneUser):
@@ -160,13 +169,16 @@ public sealed class UserAuthorizationService(
     public Task<User?> FindUserByIdAsync(Guid userId, CancellationToken ct = default)
         => db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId, ct);
 
-    public async Task<User?> FindUserByUsernameAsync(string normalizedUsername, CancellationToken ct = default)
-        => await db.Users.FirstOrDefaultAsync(u => u.Username == normalizedUsername, ct);
+    public Task<User?> FindUserByUsernameAsync(string normalizedUsername, CancellationToken ct = default)
+        => db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Username == normalizedUsername, ct);
 
     public async Task<CredentialCheckResult> VerifyCredentialsAsync(
         string normalizedUsername, string password, int maxFailedAttempts, int lockoutMinutes,
         CancellationToken ct = default)
     {
+        // Deliberately TRACKED (not AsNoTracking): the returned user feeds
+        // AccountLockoutService.ResetFailedAttemptsIfNeededAsync, which mutates
+        // the entity and persists it through SaveChanges on this context.
         var user = await db.Users.FirstOrDefaultAsync(u => u.Username == normalizedUsername, ct);
 
         // Always run BCrypt.Verify even when the user is not found.
@@ -374,6 +386,42 @@ public sealed class UserAuthorizationService(
         }
 
         return UserUpdateResult.Success();
+    }
+
+    public async Task<UserUpdateResult> DeleteManagedUserAsync(
+        Guid callerUserId, string callerRole,
+        int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
+        Guid targetUserId, CancellationToken ct = default)
+    {
+        if (callerUserId == targetUserId)
+        {
+            return UserUpdateResult.Failure(UserUpdateErrorCode.Invalid, "Cannot delete your own account.");
+        }
+
+        var target = await FindUserByIdAsync(targetUserId, ct);
+        if (target is null)
+        {
+            return UserUpdateResult.Failure(UserUpdateErrorCode.NotFound, "User not found.");
+        }
+
+        if (!CanCreateRole(callerRole, target.Role))
+        {
+            return UserUpdateResult.Failure(UserUpdateErrorCode.Forbidden);
+        }
+
+        var scopeResult = await ValidateManagedUserScopeAsync(
+            callerRole, callerCommuneId, callerDairaId, callerWilayaId,
+            target.Role, target.CommuneId, target.DairaId, target.WilayaId, ct);
+        if (scopeResult.Error is not null)
+        {
+            return scopeResult.IsAuthorizationFailure
+                ? UserUpdateResult.Failure(UserUpdateErrorCode.Forbidden, scopeResult.Error)
+                : UserUpdateResult.Failure(UserUpdateErrorCode.Invalid, scopeResult.Error);
+        }
+
+        return await DeleteUserAsync(targetUserId, ct)
+            ? UserUpdateResult.Success()
+            : UserUpdateResult.Failure(UserUpdateErrorCode.NotFound, "User not found.");
     }
 
     public async Task<bool> DeleteUserAsync(Guid userId, CancellationToken ct = default)

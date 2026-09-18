@@ -16,4 +16,10 @@ public static class RateLimitPolicies
 
     /// <summary>Fixed-window limiter for client-side error log submission.</summary>
     public const string Logs = "logs";
+
+    /// <summary>
+    /// Fixed-window limiter for the expensive upstream AI segmentation endpoint
+    /// (each request runs an inference job on the nars-segma service).
+    /// </summary>
+    public const string Segmentation = "segmentation";
 }

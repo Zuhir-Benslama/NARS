@@ -237,6 +237,22 @@ public class AdminControllerTests
         Assert.Equal(404, problem.StatusCode);
     }
 
+    [Fact]
+    public async Task GetDaira_WilayaAdmin_MissingWilayaId_Returns403()
+    {
+        // Fail closed: a wilaya_admin token missing its wilaya_id claim must be
+        // rejected before the scope check inside the report query, which would
+        // otherwise treat "no wilaya" as "any wilaya" and leak another wilaya's data.
+        var overview = new Mock<IAdminOverviewService>(MockBehavior.Strict);
+        var ctrl = CreateController(overview.Object);
+        AuthTestHelper.SetUser(ctrl, Guid.NewGuid(), UserRoles.WilayaAdmin);
+
+        var result = await ctrl.GetDaira(1, default);
+
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(403, problem.StatusCode);
+    }
+
     // ─── CanCreateRole (static helper) ──────────────────────────────────
 
     [Theory]

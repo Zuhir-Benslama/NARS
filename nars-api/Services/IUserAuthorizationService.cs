@@ -73,6 +73,15 @@ public interface IUserAuthorizationService
         int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
         Guid targetUserId, UpdateAdminRequest body,
         CancellationToken ct = default);
+    /// <summary>
+    /// Deletes a managed user, enforcing the same self-delete, role-hierarchy and
+    /// geographic-scope policy as <see cref="UpdateManagedUserAsync"/>. Returns a
+    /// structured result the caller can map to an HTTP status.
+    /// </summary>
+    Task<UserUpdateResult> DeleteManagedUserAsync(
+        Guid callerUserId, string callerRole,
+        int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
+        Guid targetUserId, CancellationToken ct = default);
     /// <summary>Deletes a user account.</summary>
     Task<bool> DeleteUserAsync(Guid userId, CancellationToken ct = default);
 }

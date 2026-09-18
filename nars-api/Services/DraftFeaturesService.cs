@@ -111,12 +111,24 @@ public class DraftFeaturesService(
     {
         if (!await CanAccessCommuneAsync(callerRole, callerCommuneId, callerDairaId, callerWilayaId, communeId, ct))
         {
+            // The caller's scope claim could not cover the commune. The service
+            // owns the uploaded stream from here (the segmentation client
+            // disposes it on every path it runs); release it before bailing.
+            await tileStream.DisposeAsync();
             throw new UnauthorizedAccessException("You do not have access to this commune.");
         }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
 
-        _ = await db.Communes.FindAsync([communeId], ct) ?? throw new KeyNotFoundException($"Commune {communeId} not found");
+        var communeExists = await db.Communes.FindAsync([communeId], ct) is not null;
+        if (!communeExists)
+        {
+            // Same ownership note as above: release the stream on the 404 path
+            // before the segmentation client ever sees it.
+            await tileStream.DisposeAsync();
+            throw new KeyNotFoundException($"Commune {communeId} not found");
+        }
+
         SegmentationResult result;
         result = await segmentationClient.SegmentTileAsync(
             featureType, tileStream, fileName, contentType, bbox, ct);
@@ -163,6 +175,8 @@ public class DraftFeaturesService(
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
 
+        _ = await db.Communes.FindAsync([communeId], ct) ?? throw new KeyNotFoundException($"Commune {communeId} not found");
+
         var query = db.AiDraftFeatures
             .Where(f => f.CommuneId == communeId && f.Status == status);
 
@@ -189,21 +203,14 @@ public class DraftFeaturesService(
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
 
-        var draft = await db.AiDraftFeatures.FirstOrDefaultAsync(f => f.Id == draftId, ct);
-        if (draft is null)
+        var loaded = await LoadDraftAndValidateAsync(
+            db, callerRole, callerCommuneId, callerDairaId, callerWilayaId, draftId, asNoTracking: false, ct);
+        if (loaded.Failure is { } failure)
         {
-            return new DraftReviewResult(DraftReviewStatus.NotFound);
+            return new DraftReviewResult(failure);
         }
 
-        if (!await CanAccessCommuneAsync(callerRole, callerCommuneId, callerDairaId, callerWilayaId, draft.CommuneId, ct))
-        {
-            return new DraftReviewResult(DraftReviewStatus.Forbidden);
-        }
-
-        if (draft.Status != AiDraftFeature.StatusPending)
-        {
-            return new DraftReviewResult(DraftReviewStatus.AlreadyReviewed);
-        }
+        var draft = loaded.Draft!;
 
         // An edit must keep the draft's geometry kind: a road draft is a
         // LineString, a building draft a Polygon. Anything else would silently
@@ -227,23 +234,14 @@ public class DraftFeaturesService(
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
 
-        var draft = await db.AiDraftFeatures.FirstOrDefaultAsync(f => f.Id == draftId, ct);
-        if (draft is null)
+        var loaded = await LoadDraftAndValidateAsync(
+            db, callerRole, callerCommuneId, callerDairaId, callerWilayaId, draftId, asNoTracking: false, ct);
+        if (loaded.Failure is { } failure)
         {
-            return new DraftReviewResult(DraftReviewStatus.NotFound);
+            return new DraftReviewResult(failure);
         }
 
-        if (!await CanAccessCommuneAsync(callerRole, callerCommuneId, callerDairaId, callerWilayaId, draft.CommuneId, ct))
-        {
-            return new DraftReviewResult(DraftReviewStatus.Forbidden);
-        }
-
-        if (draft.Status != AiDraftFeature.StatusPending)
-        {
-            return new DraftReviewResult(DraftReviewStatus.AlreadyReviewed);
-        }
-
-        db.AiDraftFeatures.Remove(draft);
+        db.AiDraftFeatures.Remove(loaded.Draft!);
         await db.SaveChangesAsync(ct);
 
         return new DraftReviewResult(DraftReviewStatus.Success);
@@ -269,22 +267,14 @@ public class DraftFeaturesService(
 
         // Read-only: the status transition below goes through a conditional
         // ExecuteUpdateAsync, so the draft is loaded without change tracking.
-        var draft = await db.AiDraftFeatures.AsNoTracking()
-            .FirstOrDefaultAsync(f => f.Id == draftId, ct);
-        if (draft is null)
+        var loaded = await LoadDraftAndValidateAsync(
+            db, callerRole, callerCommuneId, callerDairaId, callerWilayaId, draftId, asNoTracking: true, ct);
+        if (loaded.Failure is { } failure)
         {
-            return new DraftReviewResult(DraftReviewStatus.NotFound);
+            return new DraftReviewResult(failure);
         }
 
-        if (!await CanAccessCommuneAsync(callerRole, callerCommuneId, callerDairaId, callerWilayaId, draft.CommuneId, ct))
-        {
-            return new DraftReviewResult(DraftReviewStatus.Forbidden);
-        }
-
-        if (draft.Status != AiDraftFeature.StatusPending)
-        {
-            return new DraftReviewResult(DraftReviewStatus.AlreadyReviewed);
-        }
+        var draft = loaded.Draft!;
 
         if (draft.FeatureType == AiDraftFeature.TypeRoad)
         {
@@ -502,33 +492,11 @@ public class DraftFeaturesService(
     /// <summary>
     /// Reads the side + entranceNumber out of an entrance's data JSONB. Used by
     /// the numbering seam to build the used-number set. Internal so the testable
-    /// subclass can share the exact parse.
+    /// subclass can share the exact parse. The single implementation lives in
+    /// <see cref="HouseEntranceData"/>.
     /// </summary>
     protected internal static bool TryReadEntranceNumber(string data, string side, out int number)
-    {
-        number = 0;
-        try
-        {
-            var node = JsonNode.Parse(data);
-            if (node?["side"]?.GetValue<string>() != side)
-            {
-                return false;
-            }
-
-            if (node?["entranceNumber"] is { } numNode)
-            {
-                number = numNode.GetValue<int>();
-                return true;
-            }
-        }
-        catch
-        {
-            // A malformed row (bad JSON or non-integer number) simply doesn't
-            // contribute to the used set; numbering still proceeds safely.
-        }
-
-        return false;
-    }
+        => HouseEntranceData.TryReadEntranceNumber(data, side, out number);
 
     private static async Task<List<RoadCandidate>> LoadCommuneRoadsAsync(AppDbContext db, int communeId, CancellationToken ct)
     {
@@ -630,21 +598,11 @@ public class DraftFeaturesService(
 
         // Read-only: the status transition below goes through a conditional
         // ExecuteUpdateAsync, so the draft is loaded without change tracking.
-        var draft = await db.AiDraftFeatures.AsNoTracking()
-            .FirstOrDefaultAsync(f => f.Id == draftId, ct);
-        if (draft is null)
+        var loaded = await LoadDraftAndValidateAsync(
+            db, callerRole, callerCommuneId, callerDairaId, callerWilayaId, draftId, asNoTracking: true, ct);
+        if (loaded.Failure is { } failure)
         {
-            return new DraftReviewResult(DraftReviewStatus.NotFound);
-        }
-
-        if (!await CanAccessCommuneAsync(callerRole, callerCommuneId, callerDairaId, callerWilayaId, draft.CommuneId, ct))
-        {
-            return new DraftReviewResult(DraftReviewStatus.Forbidden);
-        }
-
-        if (draft.Status != "pending")
-        {
-            return new DraftReviewResult(DraftReviewStatus.AlreadyReviewed);
+            return new DraftReviewResult(failure);
         }
 
         // Atomic conditional update closes the TOCTOU window between the status
@@ -661,6 +619,41 @@ public class DraftFeaturesService(
         }
 
         return new DraftReviewResult(DraftReviewStatus.Success);
+    }
+
+    private sealed record DraftLoadResult(DraftReviewStatus? Failure, AiDraftFeature? Draft);
+
+    /// <summary>
+    /// Loads a draft by id and performs the review-preamble checks every review
+    /// operation shares: nonexistent → NotFound, out-of-scope commune → Forbidden,
+    /// not pending → AlreadyReviewed. Returns a non-null <see cref="DraftLoadResult.Failure"/>
+    /// when any check fails, otherwise the (possibly tracked) draft.
+    /// </summary>
+    private async Task<DraftLoadResult> LoadDraftAndValidateAsync(
+        AppDbContext db,
+        string callerRole, int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
+        Guid draftId, bool asNoTracking, CancellationToken ct)
+    {
+        var draft = asNoTracking
+            ? await db.AiDraftFeatures.AsNoTracking().FirstOrDefaultAsync(f => f.Id == draftId, ct)
+            : await db.AiDraftFeatures.FirstOrDefaultAsync(f => f.Id == draftId, ct);
+
+        if (draft is null)
+        {
+            return new DraftLoadResult(DraftReviewStatus.NotFound, null);
+        }
+
+        if (!await CanAccessCommuneAsync(callerRole, callerCommuneId, callerDairaId, callerWilayaId, draft.CommuneId, ct))
+        {
+            return new DraftLoadResult(DraftReviewStatus.Forbidden, null);
+        }
+
+        if (draft.Status != AiDraftFeature.StatusPending)
+        {
+            return new DraftLoadResult(DraftReviewStatus.AlreadyReviewed, null);
+        }
+
+        return new DraftLoadResult(null, draft);
     }
 
     private static DraftReviewResult ResolveConflict(AppDbContext db, Guid draftId)

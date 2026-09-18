@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
@@ -36,6 +37,7 @@ public sealed class DraftFeaturesController(
     /// commune. Does not touch production feature tables.
     /// </summary>
     [HttpPost("segment")]
+    [EnableRateLimiting(RateLimitPolicies.Segmentation)]
     // 50MB cap: a 1024x1024 georeferenced tile is typically a few MB, so this
     // allows headroom without disabling limits. Above Sonar's 8MB default
     // threshold by design (see FeatureDefaults:MultipartBodyLengthLimit). The
@@ -94,7 +96,11 @@ public sealed class DraftFeaturesController(
 
         try
         {
-            await using var stream = request.Tile.OpenReadStream();
+            // Ownership of the upload stream transfers to the service: the
+            // segmentation client disposes it (through StreamContent) once the
+            // request has been dispatched, and the service releases it on its
+            // own early-error paths. The controller must not dispose it here.
+            var stream = request.Tile.OpenReadStream();
             var summary = await draftFeaturesService.SegmentTileAsync(
                 CurrentUserRole,
                 CurrentCommuneId,
@@ -253,6 +259,17 @@ public sealed class DraftFeaturesController(
             detail: "Draft does not meet the configured road rules (minimum length / minimum confidence).",
             statusCode: 422),
         DraftReviewStatus.AlreadyReviewed => Problem(detail: $"Draft is not pending.", statusCode: 409),
-        _ => Forbid(),
+        DraftReviewStatus.Forbidden => Forbid(),
+        _ => UnknownReviewStatus(result.Status),
     };
+
+    /// <summary>
+    /// A future <see cref="DraftReviewStatus"/> value should surface as a
+    /// logged server error, not a misleading 403.
+    /// </summary>
+    private IActionResult UnknownReviewStatus(DraftReviewStatus status)
+    {
+        logger.LogError("Unhandled DraftReviewStatus '{Status}' returned by the draft-features service", status);
+        return Problem(detail: "An internal error occurred.", statusCode: 500);
+    }
 }

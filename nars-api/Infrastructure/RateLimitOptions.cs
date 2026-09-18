@@ -26,6 +26,15 @@ public class RateLimitOptions
     public int ScatteredRefreshPermitLimit { get; set; } = 5;
     public int ScatteredRefreshWindowMinutes { get; set; } = 5;
 
+    // Segmentation endpoint limits. Each request forwards a (potentially large)
+    // tile to the nars-segma inference service, which is both expensive and
+    // comparatively slow — abuse must be throttled, and the tight shared
+    // SemaphoreSlim queue makes sustained load from one user a cost-amplification
+    // vector. Fixes allow a field team to process a handful of tiles while
+    // capping runaway usage.
+    public int SegmentationPermitLimit { get; set; } = 10;
+    public int SegmentationWindowMinutes { get; set; } = 10;
+
     // General API limits
     public int ApiPermitLimit { get; set; } = 60;
     public int ApiWindowMinutes { get; set; } = 1;
@@ -111,6 +120,16 @@ public static class RateLimitExtensions
             {
                 limiter.PermitLimit = options.ScatteredRefreshPermitLimit;
                 limiter.Window = TimeSpan.FromMinutes(options.ScatteredRefreshWindowMinutes);
+            });
+
+            // "segmentation" uses a fixed window too: each permit is an expensive
+            // upstream AI inference job on nars-segma, gated behind a shared
+            // SemaphoreSlim(10). A windowed cap keeps one user from saturating
+            // the queue indefinitely.
+            rateOptions.AddFixedWindowLimiter("segmentation", limiter =>
+            {
+                limiter.PermitLimit = options.SegmentationPermitLimit;
+                limiter.Window = TimeSpan.FromMinutes(options.SegmentationWindowMinutes);
             });
 
             rateOptions.AddSlidingWindowLimiter("api", limiter =>

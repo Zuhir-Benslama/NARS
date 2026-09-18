@@ -65,6 +65,13 @@ public class AdminController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetDaira(int dairaId, CancellationToken cancellationToken = default)
     {
+        // Fail closed like Overview: a wilaya_admin whose token lost its
+        // wilaya_id claim must not silently read another wilaya's daira.
+        if (CurrentUserRole == UserRoles.WilayaAdmin && CurrentWilayaId is null)
+        {
+            return Problem(detail: "wilaya_id missing on account. Contact your administrator.", statusCode: 403);
+        }
+
         // Enforce the caller's wilaya scope inside the report query for wilaya
         // admins to avoid a separate round-trip for the daira entity.
         var expectedWilayaId = CurrentUserRole == UserRoles.WilayaAdmin ? CurrentWilayaId : null;

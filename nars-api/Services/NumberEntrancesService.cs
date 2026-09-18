@@ -1,6 +1,5 @@
 using System.Data.Common;
 using System.Globalization;
-using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
 using NarsApi.DTOs;
@@ -134,7 +133,7 @@ public sealed class NumberEntrancesService(IDbContextFactory<AppDbContext> dbFac
 
             usedNumbers[side].Add(suggested);
             var label = suggested.ToString(CultureInfo.InvariantCulture);
-            var newData = SetEntranceNumber(data, suggested, label);
+            var newData = HouseEntranceData.SetEntranceNumber(data, suggested, label);
 
             await UpdateEntranceAsync(conn, tx, id, userId, roadId, newData, ct);
             results.Add(new NumberedEntrance(id.ToString(), side, suggested, label));
@@ -163,47 +162,21 @@ public sealed class NumberEntrancesService(IDbContextFactory<AppDbContext> dbFac
         }
     }
 
-    private static string? ParseSide(string data)
-    {
-        try
-        {
-            var node = JsonNode.Parse(data);
-            var side = node?["side"]?.GetValue<string>();
-            return side is "left" or "right" ? side : null;
-        }
-        catch
-        {
-            return null;
-        }
-    }
+    private static string? ParseSide(string data) => HouseEntranceData.TryGetSide(data);
 
     private static void AddUsedNumbers(string data, Dictionary<string, HashSet<int>> usedNumbers)
     {
-        try
-        {
-            var node = JsonNode.Parse(data);
-            var side = node?["side"]?.GetValue<string>();
-            if (side is not "left" and not "right")
-            {
-                return;
-            }
-            if (node?["entranceNumber"] is { } numNode && numNode.GetValue<int>() is var num)
-            {
-                usedNumbers[side].Add(num);
-            }
-        }
-        catch
+        var side = HouseEntranceData.TryGetSide(data);
+        if (side is null)
         {
             // A malformed row (bad JSON or non-integer number) simply doesn't
             // contribute to the used set; the batch still proceeds safely.
+            return;
         }
-    }
 
-    private static string SetEntranceNumber(string data, int number, string label)
-    {
-        var node = JsonNode.Parse(data) ?? new JsonObject();
-        node["entranceNumber"] = number;
-        node["label"] = label;
-        return node.ToJsonString();
+        if (HouseEntranceData.TryGetEntranceNumber(data, out var num))
+        {
+            usedNumbers[side].Add(num);
+        }
     }
 }

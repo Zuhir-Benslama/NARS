@@ -107,7 +107,11 @@ public class AuthController(
         var result = await refreshService.RotateRefreshTokenAsync(Request.Cookies[CookieNames.RefreshToken], cancellationToken);
         if (!result.Success)
         {
-            return Problem(detail: result.Detail, statusCode: 401);
+            // Deliberately generic (an anonymous endpoint): log the specific
+            // reason server-side, but never echo "account is locked" / "user no
+            // longer exists" to a caller who may be probing accounts.
+            logger.LogInformation("Refresh rejected: {Detail}", result.Detail);
+            return Problem(detail: "Session expired. Please sign in again.", statusCode: 401);
         }
 
         if (result.RefreshExpiry is null || result.NewAccessToken is null || result.NewRawToken is null)

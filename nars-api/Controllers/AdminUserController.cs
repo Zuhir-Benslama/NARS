@@ -112,37 +112,23 @@ public class AdminUserController(
     public async Task<IActionResult> DeleteManagedUser(
         Guid userId, CancellationToken cancellationToken = default)
     {
-        if (userId == RequiredCurrentUserId)
+        var result = await authorizationService.DeleteManagedUserAsync(
+            RequiredCurrentUserId, CurrentUserRole,
+            CurrentCommuneId, CurrentDairaId, CurrentWilayaId,
+            userId, cancellationToken);
+
+        if (!result.IsSuccess)
         {
-            return Problem(detail: "Cannot delete your own account.", statusCode: 400);
+            return result.Code switch
+            {
+                UserUpdateErrorCode.NotFound => Problem(detail: result.Detail, statusCode: 404),
+                UserUpdateErrorCode.Forbidden => Forbid(),
+                _ => Problem(detail: result.Detail, statusCode: 400),
+            };
         }
 
-        var target = await authorizationService.FindUserByIdAsync(userId, cancellationToken);
-        if (target is null)
-        {
-            return Problem(detail: "User not found.", statusCode: 404);
-        }
-
-        if (!authorizationService.CanCreateRole(CurrentUserRole, target.Role))
-        {
-            return Forbid();
-        }
-
-        var scopeResult = await authorizationService.ValidateManagedUserScopeAsync(
-            CurrentUserRole, CurrentCommuneId, CurrentDairaId, CurrentWilayaId,
-            target.Role, target.CommuneId, target.DairaId, target.WilayaId,
-            cancellationToken);
-        if (scopeResult.Error is not null)
-        {
-            return scopeResult.IsAuthorizationFailure
-                ? Forbid()
-                : Problem(detail: scopeResult.Error, statusCode: 400);
-        }
-
-        await authorizationService.DeleteUserAsync(userId, cancellationToken);
-
-        logger.LogInformation("[Admin] {CallerRole} {CallerId} deleted user {UserId} ({Username})",
-            CurrentUserRole, CurrentUserId, userId, target.Username);
+        logger.LogInformation("[Admin] {CallerRole} {CallerId} deleted user {UserId}",
+            CurrentUserRole.ReplaceLineEndings(" "), CurrentUserId, userId);
 
         return NoContent();
     }
