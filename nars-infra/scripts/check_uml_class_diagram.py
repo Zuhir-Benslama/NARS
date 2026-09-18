@@ -35,6 +35,72 @@ _CLASS_RE = re.compile(r"^\s*class\s+(\w+)")
 _VISIBILITY_RE = re.compile(r"^\s*([+#~-])")
 
 
+def strip_non_code(text: str) -> str:
+    """Blank out comments and quoted literals, leaving code identifiers only.
+
+    The naive drift guard searched raw file text for \\bname\\b, so a toolbar
+    member that had been deleted still passed if its name survived inside a
+    comment, an XML doc-declared string, or a string literal (e.g. a README.md
+    snippet or a 'TODO: remove Foo' comment). This keeps identifier searches
+    honest: only a real token in code counts as the member existing.
+    """
+    out = list(text)
+    i, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        nxt = text[i + 1] if i + 1 < n else ""
+        if c == "/" and nxt == "/":
+            while i < n and text[i] != "\n":
+                out[i] = " "
+                i += 1
+        elif c == "/" and nxt == "*":
+            out[i] = out[i + 1] = " "
+            i += 2
+            while i + 1 < n and not (text[i] == "*" and text[i + 1] == "/"):
+                if text[i] != "\n":
+                    out[i] = " "
+                i += 1
+            if i + 1 < n:
+                out[i] = out[i + 1] = " "
+                i += 2
+        elif c == '"':
+            verbatim = i > 0 and text[i - 1] == "@"
+            out[i] = " "
+            i += 1
+            while i < n:
+                if text[i] == '"':
+                    if verbatim and i + 1 < n and text[i + 1] == '"':
+                        out[i] = out[i + 1] = " "
+                        i += 2
+                        continue
+                    out[i] = " "
+                    i += 1
+                    break
+                if not verbatim and text[i] == "\\" and i + 1 < n:
+                    out[i] = out[i + 1] = " "
+                    i += 2
+                    continue
+                out[i] = " "
+                i += 1
+        elif c == "'":
+            out[i] = " "
+            i += 1
+            while i < n:
+                if text[i] == "\\" and i + 1 < n:
+                    out[i] = out[i + 1] = " "
+                    i += 2
+                    continue
+                if text[i] == "'":
+                    out[i] = " "
+                    i += 1
+                    break
+                out[i] = " "
+                i += 1
+        else:
+            i += 1
+    return "".join(out)
+
+
 @dataclass
 class DiagramClass:
     name: str
@@ -79,17 +145,22 @@ def index_types(files: list[Path]) -> dict[str, list[Path]]:
     """Map type name -> files declaring it."""
     index: dict[str, list[Path]] = {}
     for file in files:
-        text = file.read_text(encoding="utf-8", errors="replace")
+        text = strip_non_code(file.read_text(encoding="utf-8", errors="replace"))
         for match in TYPE_DECL_RE.finditer(text):
             index.setdefault(match.group(1), []).append(file)
     return index
 
 
 def member_visible(files: list[Path], name: str) -> bool:
-    """True if ``name`` appears as an identifier in any of ``files``."""
+    """True if ``name`` appears as a code identifier in any of ``files``.
+
+    Comments and string literals are stripped first, so a deleted member whose
+    name survives only in prose (a 'TODO: remove Foo' comment, an XML-doc
+    snippet, a log message) no longer counts as present.
+    """
     pattern = re.compile(rf"\b{re.escape(name)}\b")
     for file in files:
-        text = file.read_text(encoding="utf-8", errors="replace")
+        text = strip_non_code(file.read_text(encoding="utf-8", errors="replace"))
         if pattern.search(text):
             return True
     return False

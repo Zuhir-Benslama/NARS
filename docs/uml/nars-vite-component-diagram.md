@@ -445,7 +445,7 @@ classDiagram
         +openCreate()
         +openEdit()
         +validate()
-        +save()
+        +onSave()
     }
 
     class SettingsModal {

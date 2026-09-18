@@ -145,6 +145,104 @@ _TYPE_DECL_RE = re.compile(r"\b(?:class|interface|record|struct|type)\s+([A-Z]\w
 _VISIBILITY_RE = re.compile(r"^\s*([+#~-])")
 
 
+def strip_non_code(text: str) -> str:
+    """Blank out comments and quoted literals, leaving code identifiers only.
+
+    The naive drift guard searched raw file text for \\bname\\b, so a deleted
+    member still passed if its name survived in a comment or a string literal
+    (a // TODO comment, a log message, a template literal). This keeps
+    identifier searches honest across the TS/TSX/Vue dialects this guard
+    indexes: line/block comments, HTML comments (Vue templates), and
+    '...', "...", and `...` literals — including escaped quotes and `${}`
+    interpolations (whose *expressions* stay intact, since they are code).
+    """
+    out = list(text)
+    i, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        nxt = text[i + 1] if i + 1 < n else ""
+        if c == "/" and nxt == "/":
+            while i < n and text[i] != "\n":
+                out[i] = " "
+                i += 1
+        elif c == "/" and nxt == "*":
+            out[i] = out[i + 1] = " "
+            i += 2
+            while i + 1 < n and not (text[i] == "*" and text[i + 1] == "/"):
+                if text[i] != "\n":
+                    out[i] = " "
+                i += 1
+            if i + 1 < n:
+                out[i] = out[i + 1] = " "
+                i += 2
+        elif c == "<" and text.startswith("<!--", i):
+            while i < n and not text.startswith("-->", i):
+                if text[i] != "\n":
+                    out[i] = " "
+                i += 1
+            if i < n:
+                out[i] = out[min(i + 1, n - 1)] = out[min(i + 2, n - 1)] = " "
+                i += 3
+        elif c == "`":
+            out[i] = " "
+            i += 1
+            while i < n:
+                if text[i] == "\\" and i + 1 < n:
+                    out[i] = out[i + 1] = " "
+                    i += 2
+                    continue
+                if text[i] == "`":
+                    out[i] = " "
+                    i += 1
+                    break
+                if text[i] == "$" and i + 1 < n and text[i + 1] == "{":
+                    i += 2  # keep the `{...}` expression: it is code
+                    depth = 1
+                    while i < n and depth > 0:
+                        if text[i] == "}":
+                            depth -= 1
+                            i += 1
+                        elif text[i] == "{":
+                            depth += 1
+                            i += 1
+                        else:
+                            i += 1
+                    continue
+                out[i] = " "
+                i += 1
+        elif c == '"':
+            out[i] = " "
+            i += 1
+            while i < n:
+                if text[i] == "\\" and i + 1 < n:
+                    out[i] = out[i + 1] = " "
+                    i += 2
+                    continue
+                if text[i] == '"':
+                    out[i] = " "
+                    i += 1
+                    break
+                out[i] = " "
+                i += 1
+        elif c == "'":
+            out[i] = " "
+            i += 1
+            while i < n:
+                if text[i] == "\\" and i + 1 < n:
+                    out[i] = out[i + 1] = " "
+                    i += 2
+                    continue
+                if text[i] == "'":
+                    out[i] = " "
+                    i += 1
+                    break
+                out[i] = " "
+                i += 1
+        else:
+            i += 1
+    return "".join(out)
+
+
 @dataclass
 class DiagramClass:
     name: str
@@ -202,19 +300,25 @@ def type_declared(files: list[Path], name: str) -> bool:
     for file in files:
         if not file.is_file():
             continue
-        text = file.read_text(encoding="utf-8", errors="replace")
+        text = strip_non_code(file.read_text(encoding="utf-8", errors="replace"))
         if _TYPE_DECL_RE.search(text) and re.search(rf"\b{re.escape(name)}\b", text):
             return True
     return False
 
 
 def member_visible(files: list[Path], name: str) -> bool:
-    """True if ``name`` appears as an identifier in any of ``files``."""
+    """True if ``name`` appears as a code identifier in any of ``files``.
+
+    Comments and string/template literals are stripped first (interpolated
+    expressions kept), so a deleted member whose name survives only in prose —
+    a // TODO comment, a Vue <!-- comment -->, a log message — no longer counts
+    as present.
+    """
     pattern = re.compile(rf"\b{re.escape(name)}\b")
     for file in files:
         if not file.is_file():
             continue
-        text = file.read_text(encoding="utf-8", errors="replace")
+        text = strip_non_code(file.read_text(encoding="utf-8", errors="replace"))
         if pattern.search(text):
             return True
     return False

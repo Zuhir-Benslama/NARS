@@ -46,4 +46,4 @@ infra-test-python: ## Run nars-infra Python utility tests with pytest (host; req
 		echo "✖ infra-test-python needs Pillow and pytest (pip install pillow pytest)"; \
 		exit 1; \
 	fi
-	python3 -m pytest nars-infra/scripts/test_png_to_pdf.py
+	python3 -m pytest nars-infra/scripts/test_png_to_pdf.py nars-infra/scripts/test_uml_drift_strip.py
