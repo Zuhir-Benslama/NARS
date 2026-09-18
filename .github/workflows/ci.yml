@@ -261,7 +261,7 @@ jobs:
   # (see make/quality.mk + the *_IMAGE vars). CI must not hand-roll a second
   # copy of that logic — it drifted before (missed the sql/nginx gates, had
   # stale hadolint/checkmake versions, and skipped the hadolint config).
-  # `make infra-lint` runs all 14 gates, using the digest-pinned tool images
+  # `make infra-lint` runs all 17 gates, using the digest-pinned tool images
   # via the docker fallback branches (the runner has docker; only `node` is
   # provided locally for the .mjs gate, matching NODE_IMAGE node:22-alpine).
   # kubectl is set up explicitly (not the runner's preinstalled copy): the
@@ -283,13 +283,13 @@ jobs:
         with:
           version: "v1.36.4"
 
-      - name: Run make infra-lint (all 14 gates)
+      - name: Run make infra-lint (all 17 gates)
         run: make infra-lint
 
   # ─── Infra utility tests (delegates to `make infra-test-python`) ────────
-  # png-to-pdf.py is a host/dev utility whose tests need Pillow + pytest; CI
-  # supplies those runner deps (pinned to the local dev versions) and lets the
-  # Makefile own the actual test invocation.
+  # nars-infra/scripts/test_*.py (png-to-pdf.py, test_uml_drift_strip.py) are
+  # host/dev utilities; CI supplies the runner deps (pinned to the local dev
+  # versions) and lets the Makefile own the actual test invocation.
   infra-test-python:
     name: Infra utility test
     runs-on: ubuntu-24.04

@@ -50,6 +50,8 @@ jobs:
             nars-vite:
               - 'nars-web/**'
               - 'nars-infra/docker/Dockerfile.nars-vite'
+              - 'nars-infra/docker/nginx.nars-vite.conf'
+              - 'nars-infra/docker/proxy-common-snippet.conf'
             nars-backup:
               - 'nars-infra/scripts/**'
               - 'nars-infra/docker/Dockerfile.nars-backup'
@@ -108,8 +110,12 @@ jobs:
             type=ref,event=tag
             type=raw,value=${{ inputs.tag }},enable=${{ inputs.tag != '' }}
 
+      # Tag pushes (v*) are still `push` events, but a release must rebuild
+      # every image for the `type=ref,event=tag` tag — running it through the
+      # paths-filter risks computing an empty diff for the tag ref and pushing
+      # zero release images. Bypass the filter for tags and dispatch.
       - name: Build and push
-        if: github.event_name != 'push' || contains(fromJSON(needs.changes.outputs.images), matrix.image)
+        if: github.event_name != 'push' || github.ref_type == 'tag' || contains(fromJSON(needs.changes.outputs.images), matrix.image)
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
