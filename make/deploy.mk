@@ -277,7 +277,7 @@ kustomize-set-image-tag: _check-tag-syntax ## Persistently pin image tags in kus
 	fi
 
 .PHONY: kustomize-apply
-kustomize-apply: secrets-validate _check-pinned-tag _check-local-ingresses ## Apply k8s manifests via kustomize (pin tags with IMAGE_TAG=<sha>)
+kustomize-apply: secrets-validate _check-pinned-tag _check-kind-cidrs _check-local-ingresses ## Apply k8s manifests via kustomize (pin tags with IMAGE_TAG=<sha>)
 	@$(SUBMAKE) postgis-pv-fix
 	@echo "→ Applying kustomization (images: $(DOCKER_ORG)/*:"$(IMAGE_TAG_Q)")..."
 	# Tag rewriting lives in nars-infra/scripts/kustomize-tag-rewrite.awk

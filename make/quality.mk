@@ -9,7 +9,7 @@ lint: ## Run cross-project linting (.NET format + infra linters)
 	$(SUBMAKE) infra-lint
 
 .PHONY: infra-lint
-infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, makefile, checkmake, sql, nginx, tag guard, observability security, markdown, uml drift)
+infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, makefile, checkmake, sql, nginx, tag guard, kind-cidr guard, local-ingress guard, observability security, markdown, uml drift, migration drift, image guard)
 	@$(SUBMAKE) infra-lint-shell
 	$(SUBMAKE) infra-lint-docker
 	$(SUBMAKE) infra-lint-yaml
@@ -20,10 +20,13 @@ infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, ma
 	$(SUBMAKE) infra-lint-sql
 	$(SUBMAKE) infra-lint-nginx
 	$(SUBMAKE) infra-lint-tag-guard
+	$(SUBMAKE) infra-lint-kind-cidr-guard
 	$(SUBMAKE) infra-lint-local-ingress-guard
 	$(SUBMAKE) infra-lint-observability-security
 	$(SUBMAKE) infra-lint-markdown
 	$(SUBMAKE) infra-lint-uml-drift
+	$(SUBMAKE) infra-lint-migration-drift
+	$(SUBMAKE) infra-lint-image-guard
 
 # File lists resolved by make ($(wildcard)) at parse time and /mnt-prefixed
 # for container use. Shell globs like /mnt/**/*.yaml must NOT be used in
@@ -33,7 +36,7 @@ infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, ma
 # shellcheck/hadolint/yamllint docker fallbacks before.
 SHELL_SCRIPTS     := $(wildcard nars-infra/scripts/*.sh)
 DOCKERFILES       := $(wildcard nars-infra/docker/Dockerfile.*)
-YAML_FILES        := $(wildcard nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml nars-infra/segma/*.yaml nars-infra/segma-gpu/*.yaml .github/workflows/*.yml)
+YAML_FILES        := $(wildcard nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml nars-infra/segma/*.yaml nars-infra/segma-gpu/*.yaml nars-infra/overlays/*.yaml nars-infra/overlays/*/*.yaml nars-infra/overlays/*/*/*.yaml .github/workflows/*.yml)
 NODE_SCRIPTS      := $(wildcard nars-infra/scripts/*.mjs)
 MIGRATIONS_SQL    := $(wildcard nars-infra/migrations/*.sql nars-infra/scripts/postgis-migration-baseline.sql)
 # docs/**/*.md — markdown lint gate (infra-lint-markdown). UML diagrams are
@@ -244,6 +247,35 @@ infra-lint-tag-guard: ## Assert _check-pinned-tag rejects 'latest' outside dev (
 	@DEPLOY_ENV=production IMAGE_TAG=latest ALLOW_LATEST=1 $(SUBMAKE) _check-pinned-tag
 	@echo "  ✓ ALLOW_LATEST=1 override accepted"
 
+# Internal: watch what CIDRs the health ingress would ship to a non-dev
+# deployment. The base carries kind's defaults (k8s/ingress-api.yaml) for local
+# clusters; the production overlay is required to replace them (overlays/
+# production/patches/health-ingress.yaml), and secrets-validate fails closed
+# while a REPLACE_ME_* placeholder remains. This guard is the belt-and-
+# suspenders for the case where someone edits the production patch to lint-clean
+# but still kind-default CIDRs — identical defaults would otherwise deploy to
+# production silently. KIND_CIDR_MANIFEST is overridable so the self-test below
+# can exercise the reject path against a fixture without touching the real
+# render (defaults to the shared kustomize render, defined in make/deploy.mk).
+# NOTE: the guard's prerequisite must stay $(KUSTOMIZE_MANIFEST) — overriding
+# that variable also relocates its $(KUSTOMIZE_MANIFEST): FORCE build rule in
+# deploy.mk, so a fixture would be OVERWRITTEN by the real render, silently
+# making the fixture test vacuous. Only KIND_CIDR_MANIFEST (the file the guard
+# greps) may be pointed at a fixture.
+KIND_CIDR_MANIFEST ?= $(KUSTOMIZE_MANIFEST)
+
+.PHONY: _check-kind-cidrs
+_check-kind-cidrs: $(if $(filter-out dev,$(DEPLOY_ENV)),$(KUSTOMIZE_MANIFEST)) ## Fail if kind-default CIDRs would be deployed outside local dev
+	@if [ "$(DEPLOY_ENV)" != "dev" ]; then
+		if grep -qE "10\.244\.0\.0/16|10\.96\.0\.0/12" "$(KIND_CIDR_MANIFEST)"; then
+			echo "✖ Refusing to deploy kind-default CIDRs (10.244.0.0/16 pod / 10.96.0.0/12 svc) in $(DEPLOY_ENV).";
+			echo "  The health ingress must be restricted to the real cluster's pod/service CIDRs.";
+			echo "  Edit $(K8S_OVERLAY_DIR)/patches/health-ingress.yaml and set";
+			echo "  REPLACE_ME_POD_CIDR / REPLACE_ME_SVC_CIDR to your cluster's actual ranges.";
+			exit 1;
+		fi
+	fi
+
 .PHONY: infra-lint-local-ingress-guard
 infra-lint-local-ingress-guard: ## Assert local ingresses are excluded from non-dev overlays (self-test)
 	@echo "→ Verifying dev overlay actually ships the local ingresses (nars-api-local)..."
@@ -258,6 +290,36 @@ infra-lint-local-ingress-guard: ## Assert local ingresses are excluded from non-
 	@echo "→ Verifying _check-local-ingresses passes in dev..."
 	@DEPLOY_ENV=dev $(SUBMAKE) _check-local-ingresses
 	@echo "  ✓ local ingresses allowed in dev"
+
+.PHONY: infra-lint-kind-cidr-guard
+infra-lint-kind-cidr-guard: ## Assert _check-kind-cidrs rejects kind-default CIDRs outside dev (self-test)
+# Fixtures override KIND_CIDR_MANIFEST (the file the guard greps) as make
+# COMMAND-LINE variables so the reject path is exercised without depending on
+# the real render. The $(KUSTOMIZE_MANIFEST) prerequisite still builds the real
+# production overlay under DEPLOY_ENV=production — a side effect shared with the
+# other guard self-tests, and step 3 below asserts that render separately.
+	@echo "→ Verifying _check-kind-cidrs rejects kind-default CIDRs in production..."
+	@_kind=$$(mktemp); _placeholder=$$(mktemp); trap 'rm -f "$$_kind" "$$_placeholder"' EXIT; \
+	printf '%s\n' '      nginx.ingress.kubernetes.io/whitelist-source-range: "10.244.0.0/16,10.96.0.0/12"' > "$$_kind"; \
+	printf '%s\n' '      nginx.ingress.kubernetes.io/whitelist-source-range: "REPLACE_ME_POD_CIDR,REPLACE_ME_SVC_CIDR"' > "$$_placeholder"; \
+	if DEPLOY_ENV=production $(SUBMAKE) _check-kind-cidrs KIND_CIDR_MANIFEST="$$_kind" >/dev/null 2>&1; then
+		echo "✖ _check-kind-cidrs unexpectedly accepted kind-default CIDRs in production";
+		exit 1;
+	fi
+	@echo "  ✓ kind-default CIDRs rejected in production"
+	@echo "→ Verifying the CIDR guard stays orthogonal to REPLACE_ME (that is secrets-validate's gate)..."
+	@if ! DEPLOY_ENV=production $(SUBMAKE) _check-kind-cidrs KIND_CIDR_MANIFEST="$$_placeholder" >/dev/null 2>&1; then
+		echo "✖ _check-kind-cidrs rejected an unedited REPLACE_ME manifest — it must stay orthogonal to secrets-validate";
+		exit 1;
+	fi
+	@echo "  ✓ unedited REPLACE_ME manifest passes the CIDR guard (secrets-validate owns that gate)"
+	@echo "→ Verifying the real production render ships no kind-default CIDRs..."
+	@echo "  (prerequisite of _check-kind-cidrs renders the production overlay and greps the shared manifest)"
+	@DEPLOY_ENV=production $(SUBMAKE) _check-kind-cidrs
+	@echo "  ✓ production overlay eliminates the kind-default CIDRs"
+	@echo "→ Verifying _check-kind-cidrs passes in dev (kind defaults are fine locally)..."
+	@DEPLOY_ENV=dev $(SUBMAKE) _check-kind-cidrs
+	@echo "  ✓ kind-default CIDRs allowed in dev"
 
 .PHONY: infra-lint-observability-security
 infra-lint-observability-security: ## Assert _check-observability-security rejects insecure Helm values in production (self-test)
@@ -292,3 +354,72 @@ infra-lint-uml-drift: ## Assert UML class diagrams' types/members exist in nars-
 	@command -v python3 >/dev/null 2>&1 || { echo "✖ python3 is not installed (required for infra-lint-uml-drift)"; exit 1; }
 	@python3 nars-infra/scripts/check_uml_class_diagram.py
 	@python3 nars-infra/scripts/check_uml_vite_component_diagram.py
+
+# Internal: assert the migrations/ DDL and the Docker-init schema
+# (create_nars_db.sql §10) cannot drift apart. The migration file itself
+# documents the trap: both files create ai_draft_features, and "divergent
+# index/constraint names silently create duplicates instead of no-oping"
+# (`CREATE INDEX IF NOT EXISTS`/`ADD CONSTRAINT IF NOT EXISTS` match by NAME).
+# This gate mechanizes that warning the way infra-lint-uml-drift mechanizes the
+# diagram-drift warning — a rename in one file without the other now fails CI
+# instead of silently double-creating objects on a real database.
+.PHONY: infra-lint-migration-drift
+infra-lint-migration-drift: ## Assert create_nars_db.sql and migrations/*.sql define identical ai_draft objects (drift guard)
+	@command -v python3 >/dev/null 2>&1 || { echo "✖ python3 is not installed (required for infra-lint-migration-drift)"; exit 1; }
+	@python3 nars-infra/scripts/check_migration_drift.py
+
+# Self-test for the images-build content-stamp machinery (make/scripts/
+# image-hash-guard.py + __image_guard + the five _build-nars-* recipes).
+# Guards the guard: the arg-order bug that shipped the stamp into a repo-root
+# Dockerfile-named file and made every build a rebuild would otherwise go
+# undetected until images-build behaves oddly. Pins the helper's contract —
+# exit 0 = rebuild, exit 1 = skip, git-ignored paths never hash, and all five
+# recipes must pass the stamp as the first __image_guard argument — so the
+# recipes, the helper, and CI's paths-filter cannot silently disagree.
+.PHONY: infra-lint-image-guard
+infra-lint-image-guard: ## Assert the images-build content-stamp guard skips unchanged images and rebuilds on real change (self-test)
+	@echo "→ Verifying all 5 _build-nars-* recipes pass the stamp as __image_guard's first argument..."
+	@count=$$(grep -cE '__image_guard "[^"]*st\.guard' make/images.mk); \
+	if [ "$$count" -ne 5 ]; then \
+		echo "✖ expected 5 __image_guard stamp-first invocations, found $$count"; \
+		exit 1; \
+	fi
+	@echo "  ✓ stamp-first argument order locked"
+	@echo "→ Verifying image-hash-guard.py skips unchanged sources but rebuilds on real change..."
+	@_fixture=$$(mktemp -d); trap 'rm -rf "$$_fixture"' EXIT; \
+	mkdir -p "$$_fixture/src" "$$_fixture/artifacts" "$$_fixture/.image-hashes"; \
+	printf 'v1\n' > "$$_fixture/src/app.txt"; \
+	printf 'artifact-1\n' > "$$_fixture/artifacts/gen.txt"; \
+	cd "$$_fixture"; \
+	git init -q; \
+	printf 'artifacts/\n' > .gitignore; \
+	git -c user.name=guard -c user.email=guard@test add -A; \
+	git -c user.name=guard -c user.email=guard commit -qm init; \
+	stamp="$$_fixture/.image-hashes/app.guard"; \
+	if python3 "$(CURDIR)/make/scripts/image-hash-guard.py" "$$stamp" 'src/**' 'artifacts/**'; then \
+		echo "  ✓ first build: no stamp → rebuild (exit 0)"; \
+	else \
+		echo "✖ first build must return 0 (rebuild)"; exit 1; \
+	fi	; \
+	if python3 "$(CURDIR)/make/scripts/image-hash-guard.py" "$$stamp" 'src/**' 'artifacts/**'; then \
+		echo "✖ unchanged sources must return 1 (skip)"; exit 1; \
+	else \
+		echo "  ✓ unchanged sources → skip (exit 1)"; \
+	fi	; \
+	printf 'artifact-2\n' > "$$_fixture/artifacts/gen.txt"; \
+	if python3 "$(CURDIR)/make/scripts/image-hash-guard.py" "$$stamp" 'src/**' 'artifacts/**'; then \
+		echo "✖ git-ignored artifact change must return 1 (skip)"; exit 1; \
+	else \
+		echo "  ✓ git-ignored artifact churn → skip (paths-filter lockstep)"; \
+	fi	; \
+	printf 'v2\n' > "$$_fixture/src/app.txt"; \
+	if python3 "$(CURDIR)/make/scripts/image-hash-guard.py" "$$stamp" 'src/**' 'artifacts/**'; then \
+		echo "  ✓ tracked source change → rebuild (exit 0)"; \
+	else \
+		echo "✖ tracked source change must return 0 (rebuild)"; exit 1; \
+	fi	; \
+	if [ -f "$$stamp" ] && grep -qE '^[0-9a-f]{64}$$' "$$stamp"; then \
+		echo "  ✓ stamp persisted at $$stamp"; \
+	else \
+		echo "✖ stamp file missing or not a sha256 digest at $$stamp"; exit 1; \
+	fi

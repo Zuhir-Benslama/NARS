@@ -20,14 +20,48 @@ canonical "what counts as a source change" per image 🔗
 import glob
 import hashlib
 import os
+import subprocess
 import sys
+
+
+def git_ignored(paths):
+    """Return the subset of `paths` that git ignores.
+
+    Mirrors the CI paths-filter exactly: dorny/paths-filter diffs TRACKED files
+    only, so gitignored build artifacts (bin/, obj/, dist/, node_modules/,
+    TestResults/) must not flip the local stamp either — otherwise every
+    dotnet build / npm ci would re-trigger an image rebuild locally while CI
+    stays green. Returns an empty set when git is unavailable or the cwd is
+    not a repository, which is the safe direction: hash everything.
+    """
+    if not paths:
+        return set()
+    try:
+        proc = subprocess.run(
+            ["git", "check-ignore", "--stdin"],
+            input="".join(p + "\n" for p in paths),
+            text=True,
+            capture_output=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return set()
+    if proc.returncode not in (0, 1):  # 128 → "not a git repository"
+        return set()
+    if proc.returncode == 0:
+        return set(proc.stdout.splitlines())
+    return set()
 
 
 def digest_of(patterns):
     h = hashlib.sha256()
     for pat in patterns:
-        for path in sorted(glob.glob(pat, recursive=True)):
-            if not os.path.isfile(path):
+        matches = sorted(
+            p for p in glob.glob(pat, recursive=True) if os.path.isfile(p)
+        )
+        ignored = git_ignored(matches)
+        for path in matches:
+            if path in ignored:
                 continue
             with open(path, "rb") as fh:
                 h.update(fh.read())

@@ -33,6 +33,11 @@ ALLOW_LATEST ?=
 # lives beside the kind staging TMPDIR (root FS, NOT the /tmp tmpfs) so it survives
 # reboots and is never reclaimed. A rebuild runs only when a stamped image's stamp
 # differs from its current content hash — identical sources → no docker build.
+# The per-image glob set MUST stay in lockstep with .github/workflows/docker.yml's
+# paths-filter (it encodes the canonical "what counts as a source change"), and
+# git-ignored paths are excluded from the hash for the same reason paths-filter
+# diffs tracked files only — on-disk build artifacts (bin/, obj/, node_modules/)
+# must never re-trigger a local rebuild.
 IMAGES_HASH_DIR ?= $(CURDIR)/.image-hashes
 .PHONY: _ensure-images-hash-dir _build-nars-api _build-nars-postgis _build-nars-vite _build-nars-backup _build-nars-segma
 _ensure-images-hash-dir:
@@ -52,7 +57,7 @@ images-build: _warn-latest-tag ## Build all Docker images
 .PHONY: _build-nars-api
 _build-nars-api: _warn-latest-tag
 	@img=nars-api; st="$(IMAGES_HASH_DIR)/$$img"; \
-	if __image_guard "$(CURDIR)/Dockerfile.nars-api" "$$st.guard" nars-api Dockerfile.nars-api Directory.Build.props nars/setup.py; then \
+	if __image_guard "$$st.guard" 'nars-api/**' 'nars-infra/docker/Dockerfile.nars-api' 'Directory.Build.props'; then \
 		echo "  → skipping $$img: unchanged content-hash (CI paths-filter agrees)"; \
 	else \
 		echo "  → $(DOCKER_ORG)/nars-api:"$(IMAGE_TAG_Q); \
@@ -63,7 +68,7 @@ _build-nars-api: _warn-latest-tag
 .PHONY: _build-nars-postgis
 _build-nars-postgis: _warn-latest-tag
 	@img=nars-postgis; st="$(IMAGES_HASH_DIR)/$$img"; \
-	if __image_guard "$(CURDIR)/Dockerfile.nars-postgis" "$$st.guard" nars-infra/scripts/create_nars_db.sql docs/seed_reference_data.sql Dockerfile.nars-postgis; then \
+	if __image_guard "$$st.guard" 'nars-infra/scripts/**' 'nars-infra/docker/Dockerfile.nars-postgis' 'docs/seed_reference_data.sql'; then \
 		echo "  → skipping $$img: unchanged content-hash (CI paths-filter agrees)"; \
 	else \
 		echo "  → $(DOCKER_ORG)/nars-postgis:"$(IMAGE_TAG_Q); \
@@ -74,7 +79,7 @@ _build-nars-postgis: _warn-latest-tag
 .PHONY: _build-nars-vite
 _build-nars-vite: _warn-latest-tag
 	@img=nars-vite; st="$(IMAGES_HASH_DIR)/$$img"; \
-	if __image_guard "$(CURDIR)/Dockerfile.nars-vite" "$$st.guard" nars-web Dockerfile.nars-vite; then \
+	if __image_guard "$$st.guard" 'nars-web/**' 'nars-infra/docker/Dockerfile.nars-vite' 'nars-infra/docker/nginx.nars-vite.conf' 'nars-infra/docker/proxy-common-snippet.conf'; then \
 		echo "  → skipping $$img: unchanged content-hash (CI paths-filter agrees)"; \
 	else \
 		echo "  → $(DOCKER_ORG)/nars-vite:"$(IMAGE_TAG_Q); \
@@ -85,7 +90,7 @@ _build-nars-vite: _warn-latest-tag
 .PHONY: _build-nars-backup
 _build-nars-backup: _warn-latest-tag
 	@img=nars-backup; st="$(IMAGES_HASH_DIR)/$$img"; \
-	if __image_guard "$(CURDIR)/Dockerfile.nars-backup" "$$st.guard" Dockerfile.nars-backup; then \
+	if __image_guard "$$st.guard" 'nars-infra/scripts/**' 'nars-infra/docker/Dockerfile.nars-backup' 'docs/seed_reference_data.sql'; then \
 		echo "  → skipping $$img: unchanged content-hash (CI paths-filter agrees)"; \
 	else \
 		echo "  → $(DOCKER_ORG)/nars-backup:"$(IMAGE_TAG_Q); \
@@ -96,7 +101,7 @@ _build-nars-backup: _warn-latest-tag
 .PHONY: _build-nars-segma
 _build-nars-segma: _warn-latest-tag
 	@img=nars-segma; st="$(IMAGES_HASH_DIR)/$$img"; \
-	if __image_guard "$(CURDIR)/Dockerfile.nars-segma" "$$st.guard" nars-segma Dockerfile.nars-segma; then \
+	if __image_guard "$$st.guard" 'nars-segma/**' 'nars-infra/docker/Dockerfile.nars-segma'; then \
 		echo "  → skipping $$img: unchanged content-hash (CI paths-filter agrees)"; \
 	else \
 		echo "  → $(DOCKER_ORG)/nars-segma:"$(IMAGE_TAG_Q); \
@@ -131,11 +136,18 @@ KIND_TMPDIR_EXPORT = TMPDIR="$(KIND_STAGING_TMPDIR)"
 KIND_STAGING_SPACE_MIN_KB ?= 15728640   # 15GiB headroom floor
 .PHONY: _guard-kind-staging-space
 _guard-kind-staging-space: _warn-latest-tag
-	@staging="$(KIND_STAGING_TMPDIR)"; mkdir -p "$$staging"; 	free_kb=$$(df -P -k "$$staging" | awk 'NR==2 {print $$4}'); 	need=$(KIND_STAGING_SPACE_MIN_KB); 	if [ "$$free_kb" -lt "$$need" ]; then 		echo "✗ Kind image staging needs >= $$need KiB free on $$staging (host FS, NOT the /tmp tmpfs)."; 		echo "  Free: $$free_kb KiB. Free space or run:  docker builder prune -f"; 		echo "  (guarded before anything is staged, so this fails fast)"; 		exit 2; 	fi
-KIND_TMPDIR_EXPORT = TMPDIR="$(KIND_STAGING_TMPDIR)"
+	@staging="$(KIND_STAGING_TMPDIR)"; mkdir -p "$$staging"; \
+	free_kb=$$(df -P -k "$$staging" | awk 'NR==2 {print $$4}'); \
+	need=$(KIND_STAGING_SPACE_MIN_KB); \
+	if [ "$$free_kb" -lt "$$need" ]; then \
+		echo "✗ Kind image staging needs >= $$need KiB free on $$staging (host FS, NOT the /tmp tmpfs)."; \
+		echo "  Free: $$free_kb KiB. Free space or run:  docker builder prune -f"; \
+		echo "  (guarded before anything is staged, so this fails fast)"; \
+		exit 2; \
+	fi
 
 .PHONY: images-load
-images-load: _warn-latest-tag ## Load locally built Docker images into the kind cluster
+images-load: _warn-latest-tag _guard-kind-staging-space ## Load locally built Docker images into the kind cluster
 	@for img in $(REGISTRY_IMAGES); do
 		full="$(DOCKER_ORG)/$$img:"$(IMAGE_TAG_Q)
 		if docker image inspect "$$full" >/dev/null 2>&1; then
@@ -148,7 +160,7 @@ images-load: _warn-latest-tag ## Load locally built Docker images into the kind 
 	@echo "✓ Images loaded"
 
 .PHONY: frontend-update
-frontend-update: _warn-latest-tag ## Rebuild nars-vite, load into kind, and rollout restart
+frontend-update: _warn-latest-tag _guard-kind-staging-space ## Rebuild nars-vite, load into kind, and rollout restart
 	@$(SUBMAKE) _build-nars-vite
 	@$(KIND_TMPDIR_MKDIR) && $(KIND_TMPDIR_EXPORT) $(KIND) load docker-image "$(DOCKER_ORG)/nars-vite:"$(IMAGE_TAG_Q) --name "$(CLUSTER_NAME)"
 	@$(KUBECTL) rollout restart deployment nars-frontend -n "$(NAMESPACE)"

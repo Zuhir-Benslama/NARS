@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+# __image_guard <stamp> <glob...>
+# Entry point the five _build-* recipes in make/images.mk invoke. Mirrors the
+# inversion the CI (docker.yml changes→paths-filter→if changed) already does:
+#   exit 0 = content UNCHANGED → recipe takes skip-branch
+#   exit 1 = content CHANGED / first → recipe takes docker-build-branch
+# Delegates to make/scripts/image-hash-guard.py (which returns the OPPOSITE
+# convention: 0=changed→rebuild, 1=unchanged→skip) and mirrors it, so the make
+# helper and the CI paths-filter permanently agree on "what counts as modified".
+helper="$(dirname "$0")/image-hash-guard.py"
+"$helper" "$@"
+mirror=$(( 1 - $? ))
+exit $mirror

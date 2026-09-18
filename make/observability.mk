@@ -88,6 +88,7 @@ observability-loki: ## Install Loki (logs)
 		--version "$(LOKI_VERSION)" \
 		--values "$(K8S_DIR)/helm-values/loki.yaml" \
 		--timeout 10m
+	@echo "✓ Loki installed"
 
 .PHONY: observability-tempo
 observability-tempo: ## Install Tempo (traces)
@@ -108,6 +109,7 @@ observability-otel-collector: ## Install OpenTelemetry Collector
 		--values "$(K8S_DIR)/helm-values/opentelemetry-collector.yaml" \
 		--set image.tag="$(OTEL_COLLECTOR_IMAGE_TAG)" \
 		--timeout 10m
+	@echo "✓ OpenTelemetry Collector installed"
 
 .PHONY: observability-servicemonitor
 observability-servicemonitor: ## Apply OTel metrics Service + ServiceMonitor (requires prometheus CRDs)
