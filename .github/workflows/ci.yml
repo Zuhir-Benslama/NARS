@@ -110,6 +110,25 @@ jobs:
         run: npm run build
         working-directory: nars-web
 
+      # Guard the /map sync invariant where a build actually exists. The API
+      # serves its own copy of the SPA from nars-api/wwwroot (synced from this
+      # build output by `make frontend-update`); a stale index.html referencing
+      # a bundle that doesn't exist blank-screens the app after login. The
+      # on-disk copy is gitignored, so enforce the ref/exists invariant here.
+      - name: Verify bundle references exist in build output
+        run: |
+          node -e '
+            const fs = require("fs");
+            const path = require("path");
+            const idx = fs.readFileSync(path.join("dist", "index.html"), "utf8");
+            const refs = [...idx.matchAll(/assets\/([A-Za-z0-9._-]+\.(?:js|css))/g)].map(m => m[1]);
+            if (refs.length === 0) { console.error("no asset refs found in dist/index.html"); process.exit(1); }
+            const missing = refs.filter(f => !fs.existsSync(path.join("dist", "assets", f)));
+            if (missing.length > 0) { console.error("missing: " + missing.join(", ")); process.exit(1); }
+            console.log(`OK: ${refs.length} bundle refs exist in dist/assets`);
+          '
+        working-directory: nars-web
+
       - name: Unit tests + coverage (thresholds enforced)
         run: npm run test:coverage
         working-directory: nars-web
