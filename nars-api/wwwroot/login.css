@@ -4,241 +4,261 @@
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: url('NARS.jpg') center center / cover no-repeat fixed;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: url("NARS.jpg") center center / cover no-repeat fixed;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
 }
 
 .container {
-    background: rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-radius: 15px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255,255,255,0.15);
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    width: 100%;
-    max-width: 450px;
-    overflow: hidden;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 15px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  width: 100%;
+  max-width: 450px;
+  overflow: hidden;
 }
 
 .form-container {
-    padding: 40px;
+  padding: 40px;
 }
 
 .form-group {
-    margin-bottom: 20px;
+  margin-bottom: 20px;
 }
 
 label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.85);
-    font-size: 14px;
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
 }
 
-input, select {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 8px;
-    font-size: 14px;
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    -webkit-appearance: none;
-    appearance: none;
-    color-scheme: dark;
-    color: #fff;
-    transition: all 0.2s;
-    -webkit-text-fill-color: #fff;
-    box-shadow: none !important;
-    letter-spacing: 0.2px;
+input,
+select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  -webkit-appearance: none;
+  appearance: none;
+  color-scheme: dark;
+  color: #fff;
+  transition: all 0.2s;
+  -webkit-text-fill-color: #fff;
+  box-shadow: none !important;
+  letter-spacing: 0.2px;
 }
 
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus {
-    -webkit-box-shadow: 0 0 0px 1000px transparent inset !important;
-    -webkit-text-fill-color: #fff !important;
-    caret-color: #fff;
-    transition: background-color 9999s ease-in-out 0s;
+  -webkit-box-shadow: 0 0 0 1000px transparent inset !important;
+  -webkit-text-fill-color: #fff !important;
+  caret-color: #fff;
+  transition: background-color 9999s ease-in-out 0s;
 }
 
 input::placeholder {
-    color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.3);
 }
 
-input:focus, select:focus {
-    outline: none;
-    border-color: rgba(255, 255, 255, 0.45);
-    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04) !important;
+input:focus,
+select:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04) !important;
 }
 
 select option {
-    background: #0d2a45;
-    color: #fff;
+  background: #0d2a45;
+  color: #fff;
 }
 
 .btn {
-    width: 100%;
-    padding: 14px;
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    margin-top: 10px;
-    letter-spacing: 0.3px;
+  width: 100%;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 10px;
+  letter-spacing: 0.3px;
 }
 
 .btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
 }
 
 .btn:active {
-    transform: translateY(0);
+  transform: translateY(0);
 }
 
 .error-message {
-    background: rgba(200, 50, 50, 0.3);
-    border: 1px solid rgba(255, 100, 100, 0.4);
-    color: #ffaaaa;
-    padding: 12px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    font-size: 14px;
-    display: none;
+  background: rgba(200, 50, 50, 0.3);
+  border: 1px solid rgba(255, 100, 100, 0.4);
+  color: #ffaaaa;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  display: none;
 }
 
 .logo {
-    text-align: center;
-    margin-bottom: 30px;
+  text-align: center;
+  margin-bottom: 30px;
 }
 
 .logo h1 {
-    color: #fff;
-    font-size: 28px;
-    margin-bottom: 5px;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font-size: 28px;
+  margin-bottom: 5px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
 }
 
 .logo p {
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
 }
 
 /* ── Language + Theme control bar ──────────────────────────────────────────── */
 
 .login-controls {
-    position: fixed;
-    top: 16px;
-    right: 16px;
-    display: flex;
-    gap: 8px;
-    z-index: 100;
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 8px;
+  z-index: 100;
 }
 
-[dir="rtl"] .login-controls { right: auto; left: 16px; }
+[dir="rtl"] .login-controls {
+  right: auto;
+  left: 16px;
+}
 
 .lc-select {
-    background: rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 8px;
-    color: #fff;
-    font-size: 12px;
-    font-weight: 600;
-    padding: 6px 24px 6px 10px;
-    cursor: pointer;
-    font-family: inherit;
-    outline: none;
-    appearance: none;
-    -webkit-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,255,0.7)'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 8px center;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 24px 6px 10px;
+  cursor: pointer;
+  font-family: inherit;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,255,0.7)'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
 }
 
-.lc-select:hover { background-color: rgba(255, 255, 255, 0.28); }
-.lc-select option { background: #1a1a2e; color: #fff; }
+.lc-select:hover {
+  background-color: rgba(255, 255, 255, 0.28);
+}
+.lc-select option {
+  background: #1a1a2e;
+  color: #fff;
+}
 
 /* ── Dark mode ───────────────────────────────────────────────────────────────── */
 /* The default styles above are the light mode.                                 */
 /* [data-theme="dark"] overrides everything to a deep dark glassmorphism.       */
 
 [data-theme="dark"] body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.55);
-    pointer-events: none;
-    z-index: 0;
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  z-index: 0;
 }
 
 [data-theme="dark"] .container {
-    position: relative;
-    z-index: 1;
-    background: rgba(15, 25, 50, 0.75);
-    border-color: rgba(255, 255, 255, 0.12);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+  position: relative;
+  z-index: 1;
+  background: rgba(15, 25, 50, 0.75);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 [data-theme="dark"] label {
-    color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.7);
 }
 
-[data-theme="dark"] .logo h1 { color: #fff; }
-[data-theme="dark"] .logo p  { color: rgba(255, 255, 255, 0.55); }
+[data-theme="dark"] .logo h1 {
+  color: #fff;
+}
+[data-theme="dark"] .logo p {
+  color: rgba(255, 255, 255, 0.55);
+}
 
 [data-theme="dark"] input {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.15);
-    color: #fff;
-    color-scheme: dark;
-    -webkit-text-fill-color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  color-scheme: dark;
+  -webkit-text-fill-color: #fff;
 }
 
 [data-theme="dark"] input::placeholder {
-    color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.25);
 }
 
 [data-theme="dark"] input:focus {
-    border-color: rgba(255, 255, 255, 0.35);
-    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04) !important;
 }
 
 [data-theme="dark"] .btn {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.18);
-    color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
 }
 
 [data-theme="dark"] .btn:hover {
-    background: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.16);
 }
 
-[data-theme="dark"] .login-controls { z-index: 101; }
+[data-theme="dark"] .login-controls {
+  z-index: 101;
+}
 
 [data-theme="dark"] .lc-select {
-    background-color: rgba(15, 25, 50, 0.7);
-    border-color: rgba(255, 255, 255, 0.18);
+  background-color: rgba(15, 25, 50, 0.7);
+  border-color: rgba(255, 255, 255, 0.18);
 }

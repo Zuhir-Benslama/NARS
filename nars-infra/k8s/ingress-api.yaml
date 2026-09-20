@@ -13,8 +13,14 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    # AI generation holds the upstream response open for the CPU-bound segma
+    # inference (~100-130s for a commune z18 tile), far past nginx's 60s
+    # default. proxy-read-timeout of 60s aborted the backend mid-inference,
+    # cancelling the API's segma call ("failed to generate roads"). Budget the
+    # whole generation window: frontend/API total timeouts are 240s, so 300s
+    # here leaves nginx out of the loop.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
     nginx.ingress.kubernetes.io/use-regex: "true"
     nginx.ingress.kubernetes.io/auth-tls-verify-client: "on"
     nginx.ingress.kubernetes.io/auth-tls-secret: "nars/nars-ca"

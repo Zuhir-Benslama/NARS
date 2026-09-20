@@ -24,9 +24,26 @@ public static class SegmentationServiceExtensions
                 client.DefaultRequestHeaders.Add("X-Internal-Token", token);
             }
 
-            client.Timeout = TimeSpan.FromSeconds(60); // large tiles + CPU inference can be slow
+            // segma inference runs on CPU and can legitimately take tens of
+            // seconds per 1024px window, so the HttpClient cap must exceed the
+            // whole resilience pipeline below. A commune-scale z18 tile is 5x5
+            // windows ~104s; budget 280s here (> the 240s total pipeline).
+            client.Timeout = TimeSpan.FromSeconds(280); // large tiles + CPU inference can be slow
         })
-        .AddStandardResilienceHandler();
+        // The StandardResilienceHandler defaults are tuned for fast HTTP APIs
+        // (10s per attempt, 30s total) — far too tight for a CPU-bound model.
+        // A single segma request decomposes into several 1024px inference
+        // windows, each potentially taking ~10-30s; killing an attempt at 10s
+        // guarantees failure (and spurious retries) for any real tile.
+        .AddStandardResilienceHandler(options =>
+        {
+            options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(180);
+            options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(240);
+            // Sampling duration must be ≥ 2× the attempt timeout.
+            options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(400);
+            options.Retry.MaxRetryAttempts = 1;
+            options.Retry.Delay = TimeSpan.FromSeconds(2);
+        });
 
         return services;
     }

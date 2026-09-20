@@ -46,7 +46,7 @@ export const MAP_CONFIG = {
   styleLoadTimeout: 10000,
 
   /** Max zoom for raster tile sources */
-  tileMaxZoomSatellite: 17,
+  tileMaxZoomSatellite: 18,
   tileMaxZoomStreet: 19,
   tileMaxZoomLight: 19,
   tileMaxZoomDark: 19,
@@ -153,6 +153,21 @@ export const UI_CONFIG = {
 
   /** Default text color for entrance markers */
   entranceTextColor: "#000000",
+} as const
+
+// ─── GENERATION CONFIG ───────────────────────────────────────────────────────
+
+export const GEN_CONFIG = {
+  /** Milestones of the generate-roads flow (percent when each stage begins). */
+  progressMilestones: {
+    tiles: 5,
+    detect: 35,
+    save: 70,
+    done: 100,
+  } as const,
+
+  /** How long the bar stays at 100% before fading out, in milliseconds. */
+  completeSettleMs: 400,
 } as const
 
 // ─── GEOMETRY CONSTANTS ───────────────────────────────────────────────────────

@@ -13,6 +13,7 @@ import { setHouseNumbers } from "../house-numbering"
 import { setReferenceRoad, clearReferenceRoad, setReferenceEntrance } from "../house-entrances"
 import { generateNamingPanels } from "../naming-panels"
 import { computeAndApplyRoadDirections, updateEndpointMarkers } from "../roads/road-directions"
+import { generateRoadsFromUrbanAreas } from "../generate/generate-roads"
 import { useContextMenuStore, type CtxMenuItem } from "../../stores/contextMenuStore"
 import { startDraftEdit } from "../drafts/draft-edit"
 import { reviewDraft } from "../drafts/review-actions"
@@ -106,6 +107,13 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
     })
   }
 
+  if (isRoadsPhase) {
+    items.push({
+      label: t("ctx_generate_roads"),
+      onClick: () => void generateRoadsFromUrbanAreas(),
+    })
+  }
+
   const isCurrentRef = isRoad && dbId === useAppStore().referenceRoadDbId
   if (isRoad && isHouseEntrancesPhase && !isCurrentRef) {
     items.push({
@@ -190,6 +198,10 @@ export async function showMapContextMenu(
   const items: CtxMenuItem[] = []
 
   if (phase.key === "roads") {
+    items.push({
+      label: t("ctx_generate_roads"),
+      onClick: () => void generateRoadsFromUrbanAreas(),
+    })
     items.push({
       label: t("ctx_road_dir"),
       onClick: () => computeAndApplyRoadDirections(),

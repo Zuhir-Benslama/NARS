@@ -287,13 +287,6 @@ kustomize-apply: secrets-validate _check-pinned-tag _check-kind-cidrs _check-loc
 	@awk -v org="$(DOCKER_ORG)" -v tag=$(IMAGE_TAG_Q) -v images="$(REGISTRY_IMAGES)" \
 		-f "$(SCRIPTS_DIR)/kustomize-tag-rewrite.awk" < "$(KUSTOMIZE_MANIFEST)" \
 	| $(KUBECTL) apply -f -
-	@# The base/dev overlay ships the CPU segma deployment; re-apply the GPU
-	@# overlay so `make kustomize-apply` never reverts segma to CPU when
-	@# NARS_GPU=1 (matches what gpu-install does on first bootstrap).
-	@if [ "$(NARS_GPU)" = "1" ]; then
-		echo "→ Re-applying segma GPU overlay (NARS_GPU=1)...";
-		$(KUBECTL) apply -k "$(GPU_OVERLAY_DIR)";
-	fi
 	@echo "✓ Kustomization applied"
 
 	@echo "→ Waiting for postgis..."

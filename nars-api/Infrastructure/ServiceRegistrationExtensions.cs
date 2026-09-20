@@ -72,6 +72,8 @@ public static class ServiceRegistrationExtensions
             .ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<BuildingRulesOptions>().Bind(config.GetSection("BuildingRules"))
             .ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<SegmentationOptions>().Bind(config.GetSection("Segmentation"))
+            .ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<AccountLockoutOptions>().Bind(config.GetSection("AccountLockout"))
             .ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<OpenTelemetryOptions>().Bind(config.GetSection("OpenTelemetry"))
@@ -148,6 +150,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IUserCreationService, UserCreationService>();
         services.AddScoped<ICommuneScopeService, CommuneScopeService>();
         services.AddScoped<IDraftFeaturesService, DraftFeaturesService>();
+        services.AddScoped<IRoadGenerationService, RoadGenerationService>();
         services.AddSingleton<ILogSanitizer, LogSanitizer>();
         services.AddSingleton<ISecurityStampCache, SecurityStampCache>();
         services.AddScoped<IPageAuthService, PageAuthService>();

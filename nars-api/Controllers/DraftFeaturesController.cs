@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using System.Text.Json;
 using NarsApi.DTOs;
 using NarsApi.Infrastructure;
 using NarsApi.Models;
@@ -13,6 +14,7 @@ namespace NarsApi.Controllers;
 [Authorize]
 public sealed class DraftFeaturesController(
     IDraftFeaturesService draftFeaturesService,
+    IRoadGenerationService roadGenerationService,
     ILogger<DraftFeaturesController> logger,
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
@@ -234,6 +236,48 @@ public sealed class DraftFeaturesController(
         => ReviewResultToActionResult(await draftFeaturesService.DeleteDraftAsync(
             CurrentUserRole, CurrentCommuneId, CurrentDairaId, CurrentWilayaId,
             RequiredCurrentUserId, id, cancellationToken));
+
+    /// <summary>
+    /// Materializes pending AI road drafts for a commune into production road
+    /// features, enforcing the roads-phase cadastre rules (containment in the
+    /// urban areas, turn angle ≤ the configured limit, minimum length/
+    /// confidence, connectivity to the existing road network with endpoint
+    /// snapping). Drafts that fail a rule stay pending and are reported in
+    /// <c>dropped</c>. The caller must have access to the commune, which also
+    /// owns the materialized roads.
+    /// </summary>
+    [HttpPost("generate-roads")]
+    public async Task<ActionResult<GenerateRoadsResponse>> GenerateRoads(
+        [FromBody] GenerateRoadsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        if (request.CommuneId is null)
+        {
+            return Problem(detail: "communeId is required.", statusCode: 400);
+        }
+
+        try
+        {
+            var summary = await roadGenerationService.GenerateAsync(
+                CurrentUserRole, CurrentCommuneId, CurrentDairaId, CurrentWilayaId,
+                RequiredCurrentUserId, request.CommuneId.Value, request.DraftIds, cancellationToken);
+            return Ok(new GenerateRoadsResponse(
+                summary.Dropped,
+                summary.Created
+                    .Select(road => new GeneratedRoadDto(
+                        road.DbId, road.Layer, road.Label, JsonSerializer.SerializeToElement(road.Data)))
+                    .ToList()));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+    }
 
     private async Task<IActionResult> ReviewDraftAsync(Guid id, bool accept, CancellationToken ct)
     {

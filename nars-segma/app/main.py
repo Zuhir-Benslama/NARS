@@ -69,8 +69,10 @@ MAX_CONCURRENT_INFERENCES = env_int(
 # Wall-clock ceiling on a single predict() call.  A pathological tile that
 # hangs the model would otherwise hold a semaphore slot indefinitely; with
 # MAX_CONCURRENT_INFERENCES=2 just two such tiles exhaust all capacity.
+# 240s leaves ample headroom over the ~104s a 19x19 z18 tile (25 inference
+# windows — the resolution the roads model fires at) measures end-to-end.
 INFERENCE_TIMEOUT = env_int(
-    "NARS_SEGMA_INFERENCE_TIMEOUT", 120, minimum=1, maximum=3600
+    "NARS_SEGMA_INFERENCE_TIMEOUT", 240, minimum=1, maximum=3600
 )
 # How long a request waits for an inference slot before failing with 503.
 # Requests park on this (their upload stays spooled on disk), not on a per-
@@ -78,13 +80,14 @@ INFERENCE_TIMEOUT = env_int(
 QUEUE_TIMEOUT = env_int("NARS_SEGMA_QUEUE_TIMEOUT", 30, minimum=0, maximum=300)
 
 # Road rules (limitation): discard edges below these thresholds before they
-# reach the API. The minimum length forbids the stub spurs and debris slivers
-# that the skeletonizer emits at tile edges; the minimum confidence drops weak
-# detections; the per-tile cap bounds how many drafts one acceptance run can
-# create. Separation is structural (each edge is already one junction-to-
-# junction segment) and needs no tuning.
+# reach the API. The minimum length (default 10m) forbids the stub spurs and
+# debris slivers the skeletonizer emits at tile edges and across short
+# junction-to-junction hops; the minimum confidence drops weak detections;
+# the per-tile cap bounds how many drafts one acceptance run can create.
+# Separation is structural (each edge is already one junction-to-junction
+# segment) and needs no tuning.
 ROAD_MIN_LENGTH_M = env_float(
-    "NARS_SEGMA_ROAD_MIN_LENGTH_M", 0.0, minimum=0.0, maximum=10000.0
+    "NARS_SEGMA_ROAD_MIN_LENGTH_M", 10.0, minimum=0.0, maximum=10000.0
 )
 ROAD_MIN_CONFIDENCE = env_float(
     "NARS_SEGMA_ROAD_MIN_CONFIDENCE", 0.0, minimum=0.0, maximum=1.0
@@ -143,7 +146,11 @@ MODEL_SPECS: dict[str, ModelSpec] = {
             "NARS_SEGMA_ROAD_WEIGHTS_PATH", "weights/roads_best.pth"
         ),
         "num_classes": 1,
-        "builder": "resnet34-upsample",
+        # Env-driven so the trained DeepLabV3+/ConvNeXt roads model
+        # (builder "deeplabv3p-convnext", see app/deeplabv3p.py) can be
+        # promoted and rolled back without a rebuild — flipping
+        # NARS_SEGMA_ROAD_BUILDER is the whole rollout.
+        "builder": os.environ.get("NARS_SEGMA_ROAD_BUILDER", "resnet34-upsample"),
         "postprocess": "linestrings",
         "rules": {
             "min_length_m": ROAD_MIN_LENGTH_M,

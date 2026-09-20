@@ -830,6 +830,7 @@ export interface paths {
             /** Format: int32 */
             CommuneId?: number | string
             Tile?: components["schemas"]["IFormFile"]
+            FeatureType?: string
             /** Format: double */
             MinLon?: number | string
             /** Format: double */
@@ -965,6 +966,109 @@ export interface paths {
             [name: string]: unknown
           }
           content?: never
+        }
+      }
+    }
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/draft-features/{id}": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put: {
+      parameters: {
+        query?: never
+        header?: never
+        path: {
+          id: string
+        }
+        cookie?: never
+      }
+      requestBody: {
+        content: {
+          "application/json": components["schemas"]["DraftUpdateRequest"]
+          "text/json": components["schemas"]["DraftUpdateRequest"]
+          "application/*+json": components["schemas"]["DraftUpdateRequest"]
+        }
+      }
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown
+          }
+          content?: never
+        }
+      }
+    }
+    post?: never
+    delete: {
+      parameters: {
+        query?: never
+        header?: never
+        path: {
+          id: string
+        }
+        cookie?: never
+      }
+      requestBody?: never
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown
+          }
+          content?: never
+        }
+      }
+    }
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/draft-features/generate-roads": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: {
+      parameters: {
+        query?: never
+        header?: never
+        path?: never
+        cookie?: never
+      }
+      requestBody: {
+        content: {
+          "application/json": components["schemas"]["GenerateRoadsRequest"]
+          "text/json": components["schemas"]["GenerateRoadsRequest"]
+          "application/*+json": components["schemas"]["GenerateRoadsRequest"]
+        }
+      }
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            "text/plain": components["schemas"]["GenerateRoadsResponse"]
+            "application/json": components["schemas"]["GenerateRoadsResponse"]
+            "text/json": components["schemas"]["GenerateRoadsResponse"]
+          }
         }
       }
     }
@@ -1214,6 +1318,78 @@ export interface paths {
     }
     put?: never
     post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/features/number-entrances": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: {
+      parameters: {
+        query?: never
+        header?: never
+        path?: never
+        cookie?: never
+      }
+      requestBody: {
+        content: {
+          "application/json": components["schemas"]["NumberEntrancesRequest"]
+          "text/json": components["schemas"]["NumberEntrancesRequest"]
+          "application/*+json": components["schemas"]["NumberEntrancesRequest"]
+        }
+      }
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown
+          }
+          content?: never
+        }
+        /** @description Bad Request */
+        400: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            "text/plain": components["schemas"]["ProblemDetails"]
+            "application/json": components["schemas"]["ProblemDetails"]
+            "text/json": components["schemas"]["ProblemDetails"]
+          }
+        }
+        /** @description Not Found */
+        404: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            "text/plain": components["schemas"]["ProblemDetails"]
+            "application/json": components["schemas"]["ProblemDetails"]
+            "text/json": components["schemas"]["ProblemDetails"]
+          }
+        }
+        /** @description Conflict */
+        409: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            "text/plain": components["schemas"]["ProblemDetails"]
+            "application/json": components["schemas"]["ProblemDetails"]
+            "text/json": components["schemas"]["ProblemDetails"]
+          }
+        }
+      }
+    }
     delete?: never
     options?: never
     head?: never
@@ -2326,6 +2502,9 @@ export interface components {
       /** Format: int32 */
       wilaya_id: null | number | string
     }
+    DraftUpdateRequest: {
+      geometryGeoJson: string
+    }
     FeatureSaveRequest: {
       type: string
       layer: string
@@ -2347,6 +2526,23 @@ export interface components {
       data: components["schemas"]["JsonNode"]
       status: string
     }
+    GeneratedRoadDto: {
+      /** Format: uuid */
+      dbId: string
+      layer: string
+      label: string
+      data: components["schemas"]["JsonElement"]
+    }
+    GenerateRoadsRequest: {
+      /** Format: int32 */
+      communeId: null | number | string
+      draftIds: string[]
+    }
+    GenerateRoadsResponse: {
+      /** Format: int32 */
+      dropped: number | string
+      created: components["schemas"]["GeneratedRoadDto"][]
+    }
     /** Format: binary */
     IFormFile: string
     JsonElement: unknown
@@ -2361,6 +2557,11 @@ export interface components {
       context: null | string
       url: null | string
       method: null | string
+    }
+    NumberEntrancesRequest: {
+      /** Format: uuid */
+      roadId: string
+      entranceIds: string[]
     }
     PagedResponseOfAiDraftFeatureDto: {
       items: components["schemas"]["AiDraftFeatureDto"][]
@@ -2391,8 +2592,10 @@ export interface components {
     }
     SegmentSummaryResponse: {
       /** Format: int32 */
-      buildingCount: number | string
-      draftIds: string[]
+      buildingCount?: number | string
+      /** Format: int32 */
+      roadCount?: number | string
+      draftIds?: string[]
     }
     SignInRequest: {
       username: string

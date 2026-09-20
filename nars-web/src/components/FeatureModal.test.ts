@@ -63,19 +63,19 @@ vi.mock("../phases", () => ({
     },
     {
       index: 1,
-      key: "cityCenter",
-      label: "phase_cityCenter_label",
-      drawType: "circle",
-      color: "#e74c3c",
-      hint: "phase_cityCenter_hint",
-    },
-    {
-      index: 2,
       key: "roads",
       label: "phase_roads_label",
       drawType: "polyline",
       color: "#3498db",
       hint: "phase_roads_hint",
+    },
+    {
+      index: 2,
+      key: "cityCenter",
+      label: "phase_cityCenter_label",
+      drawType: "circle",
+      color: "#e74c3c",
+      hint: "phase_cityCenter_hint",
     },
     {
       index: 3,
@@ -253,7 +253,7 @@ describe("FeatureModal", () => {
 
   it("shows road type selector for roads phase", async () => {
     mockModalStore.visible = true
-    mockModalStore.phaseIndex = 2 // roads
+    mockModalStore.phaseIndex = 1 // roads
 
     const wrapper = mount(FeatureModal)
     await nextTick()
@@ -349,7 +349,7 @@ describe("FeatureModal", () => {
 
   it("disables name input for city center", async () => {
     mockModalStore.visible = true
-    mockModalStore.phaseIndex = 1 // cityCenter
+    mockModalStore.phaseIndex = 2 // cityCenter
 
     const wrapper = mount(FeatureModal)
     await nextTick()

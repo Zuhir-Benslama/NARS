@@ -350,7 +350,7 @@ describe("onContextMenu", () => {
       geometry: { type: "Point", coordinates: [10, 20] },
       properties: { dbId: "db1", phaseKey: "areas", label: "A" },
     })
-    appStore.currentPhase = 1 // cityCenter
+    appStore.currentPhase = 2 // cityCenter
     const ctx = mockGetCtx()
     ctx.map.project = vi.fn(() => ({ x: 15, y: 15 }))
     ctx.map.queryRenderedFeatures = vi.fn(() => [
@@ -366,7 +366,7 @@ describe("onContextMenu", () => {
   })
 
   it("shows the map context menu when nothing is found", async () => {
-    appStore.currentPhase = 1
+    appStore.currentPhase = 2 // cityCenter
     const ctx = mockGetCtx()
     ctx.map.queryRenderedFeatures = vi.fn(() => [])
     registerDrawHandlers()

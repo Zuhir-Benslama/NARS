@@ -159,12 +159,47 @@ images-load: _warn-latest-tag _guard-kind-staging-space ## Load locally built Do
 	done
 	@echo "✓ Images loaded"
 
+# The SPA has two HTML entrypoints that must reference the SAME hashed bundle:
+# / (nginx image) and /map (nars-api's own wwwroot copy). Redeploying only
+# nars-vite makes /map stale and 404s its bundle -> blank page after login.
+# frontend-update therefore redeploys BOTH images atomically and then verifies
+# the running pods agree.
 .PHONY: frontend-update
-frontend-update: _warn-latest-tag _guard-kind-staging-space ## Rebuild nars-vite, load into kind, and rollout restart
+frontend-update: _warn-latest-tag _guard-kind-staging-space ## Rebuild nars-vite + sync nars-api/wwwroot, load, rollout restart, verify bundle sync
+	@echo "→ Rebuilding nars-web and syncing nars-api/wwwroot..."
+	@(cd nars-web && npm run build:deploy)
 	@$(SUBMAKE) _build-nars-vite
+	@$(SUBMAKE) _build-nars-api
 	@$(KIND_TMPDIR_MKDIR) && $(KIND_TMPDIR_EXPORT) $(KIND) load docker-image "$(DOCKER_ORG)/nars-vite:"$(IMAGE_TAG_Q) --name "$(CLUSTER_NAME)"
+	@$(KIND_TMPDIR_MKDIR) && $(KIND_TMPDIR_EXPORT) $(KIND) load docker-image "$(DOCKER_ORG)/nars-api:"$(IMAGE_TAG_Q) --name "$(CLUSTER_NAME)"
 	@$(KUBECTL) rollout restart deployment nars-frontend -n "$(NAMESPACE)"
 	@$(KUBECTL) rollout status deployment nars-frontend -n "$(NAMESPACE)" --timeout=120s
-	@echo "✓ nars-vite rebuilt and deployed"
+	@$(KUBECTL) rollout restart deployment nars-api -n "$(NAMESPACE)"
+	@$(KUBECTL) rollout status deployment nars-api -n "$(NAMESPACE)" --timeout=180s
+	@$(SUBMAKE) _check-bundle-sync
+	@echo "✓ nars-vite + nars-api wwwroot rebuilt, deployed, and bundle-sync verified"
+
+# Live post-deploy guard: fetch the index.html served by BOTH entrypoints from
+# the running pods and assert they reference the identical bundle assets, and
+# that the entry bundle exists in both images. Catches any future drift between
+# the nginx-served / and the API-served /map (the blank-page-after-login bug).
+.PHONY: _check-bundle-sync
+_check-bundle-sync:
+	@echo "→ Verifying / and /map serve the same bundle..."
+	@tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
+	if $(KUBECTL) exec -n "$(NAMESPACE)" deploy/nars-frontend -- cat /usr/share/nginx/html/index.html > "$$tmp/frontend.html" 2>/dev/null \
+		&& $(KUBECTL) exec -n "$(NAMESPACE)" deploy/nars-api -- cat /app/wwwroot/index.html > "$$tmp/api.html" 2>/dev/null \
+		&& python3 nars-infra/scripts/check_frontend_bundle_sync.py --frontend "$$tmp/frontend.html" --api "$$tmp/api.html"; then \
+		refs=$$(grep -oE 'assets/[A-Za-z0-9._-]+' "$$tmp/api.html" | sed 's#assets/##' | sort -u); \
+		for f in $$refs; do \
+			$(KUBECTL) exec -n "$(NAMESPACE)" deploy/nars-frontend -- sh -c 'test -f /usr/share/nginx/html/assets/'"$$f" || { echo "  ✖ $$f missing in nars-vite image (entrypoint mismatch!)"; exit 1; }; \
+			$(KUBECTL) exec -n "$(NAMESPACE)" deploy/nars-api -- sh -c 'test -f /app/wwwroot/assets/'"$$f" || { echo "  ✖ $$f missing in nars-api image (entrypoint mismatch!)"; exit 1; }; \
+		done; \
+		count=$$(echo $$refs | wc -w); \
+		[ "$$count" -gt 0 ] && echo "  ✓ all $$count referenced assets present in both images"; \
+	else \
+		echo "  ✖ bundle sync check failed — / and /map disagree (run make frontend-update)"; \
+		exit 1; \
+	fi
 export IMAGES_SCRIPTS_DIR := $(CURDIR)/make/scripts
 export PATH := $(IMAGES_SCRIPTS_DIR):$(PATH)

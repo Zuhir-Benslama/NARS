@@ -176,6 +176,19 @@ def road_model():
     )
 
 
+@pytest.fixture(scope="module")
+def convnext_model():
+    # DeepLabV3+/ConvNeXt-Tiny with no weights on disk: random init is fine —
+    # the builder must return a valid network and every predict path has to
+    # run end-to-end without a checkpoint present.
+    return SegmentationModel(
+        weights_path="/nonexistent/roads_dlv3p_convnext_tiny.pth",
+        tile_size=32,
+        num_classes=1,
+        builder="deeplabv3p-convnext",
+    )
+
+
 @requires_torch
 def test_predict_shapes_and_georeferenced_transform(model):
     raw = make_tiff_bytes(width=64, height=48)
@@ -217,6 +230,8 @@ def test_predict_bbox_fallback_when_transform_has_no_crs(model):
 
 @requires_torch
 def test_predict_decodes_windows_not_whole_image(model, monkeypatch):
+    import app.model as roads_model
+
     raw = make_tiff_bytes(width=100, height=80)
     seen = []
 
@@ -228,11 +243,57 @@ def test_predict_decodes_windows_not_whole_image(model, monkeypatch):
         ).copy()
 
     monkeypatch.setattr(model, "_predict_tile", fake_predict)
+    monkeypatch.setattr(roads_model, "OVERLAP_PX", 0)
     building, _ = model.predict(raw, bbox=(0.0, 0.0, 1.0, 1.0))
     # 80x100 with tile_size=32 -> rows 32/32/16, cols 32/32/32/4
     assert set(seen) == {(32, 32), (32, 4), (16, 32), (16, 4)}
     assert building.shape == (80, 100)
     assert np.allclose(building, 0.9)
+
+
+@requires_torch
+def test_predict_overlap_windows_max_merged(model, monkeypatch):
+    # With overlap, window ORIGINS advance by stride = tile_size - overlap
+    # while each chip stays tile_size^2, and shared pixels keep the max of the
+    # overlapping predictions (a road crossing a seam must not lose
+    # probability to the last writer).
+    import app.model as roads_model
+
+    raw = make_tiff_bytes(width=48, height=48)
+    seen = []
+    first = True
+
+    def fake_predict(chip):
+        nonlocal first
+
+        import numpy as np
+
+        seen.append(chip.shape[:2])
+        # First window emits a strong road; every later window a weak one.
+        # In the overlap strip the strong value must survive the max-merge.
+        if first:
+            first = False
+            return np.broadcast_to(
+                np.array([0.1, 0.99], dtype=np.float32),
+                (*chip.shape[:2], 2),
+            ).copy()
+        return np.broadcast_to(
+            np.array([0.1, 0.2], dtype=np.float32),
+            (*chip.shape[:2], 2),
+        ).copy()
+
+    monkeypatch.setattr(model, "_predict_tile", fake_predict)
+    # 48x48, tile_size=32, overlap 16 -> step 16 -> 3x3 chip windows, each
+    # exactly 32x32 (or clipped to 48 at the bottom/right edges).
+    monkeypatch.setattr(roads_model, "OVERLAP_PX", 16)
+    probs, _ = model.predict(raw, bbox=(0.0, 0.0, 1.0, 1.0))
+    assert set(seen) == {(32, 32), (32, 16), (16, 32), (16, 16)}
+    # The strong first window covered rows 0:32/cols 0:32 and is never lowered
+    # by the weaker overlapping windows; the bottom/right strips only ever saw
+    # the weak prediction.
+    assert np.allclose(probs[:32, :32], 0.99)
+    assert np.allclose(probs[32:, :], 0.2)
+    assert np.allclose(probs[:, 32:], 0.2)
 
 
 @requires_torch
@@ -302,6 +363,25 @@ def test_road_predict_shapes_and_probability_range(road_model):
 
 
 @requires_torch
+def test_road_model_skips_imagenet_normalization(model, road_model):
+    # The SpaceNet roads checkpoint was trained on plain /255 input; the
+    # buildings model expects ImageNet mean/std. The two must not share a
+    # preprocessing path or roads emit an all-background mask everywhere.
+    from app.model import IMAGENET_MEAN, IMAGENET_STD
+
+    assert model.imagenet_norm is True
+    assert road_model.imagenet_norm is False
+
+    img = np.full((2, 2, 3), 0.5, dtype=np.float32)
+    t_road = road_model._preprocess(img)
+    t_bldg = model._preprocess(img)
+    # .cpu(): on a CUDA host the fixtures land on the GPU device.
+    assert np.allclose(t_road[0, :, 0, 0].detach().cpu().numpy(), 0.5)
+    expected = (0.5 - IMAGENET_MEAN) / IMAGENET_STD
+    assert np.allclose(t_bldg[0, :, 0, 0].detach().cpu().numpy(), expected)
+
+
+@requires_torch
 def test_road_weights_load_sets_is_loaded(tmp_path, road_model):
     # Roads checkpoints produced by convert_roads.py load strict=True through
     # the same SegmentationModel code path as buildings checkpoints.
@@ -317,3 +397,82 @@ def test_road_weights_load_sets_is_loaded(tmp_path, road_model):
     )
     assert loaded.is_loaded
     assert loaded.net is not road_model.net
+
+
+# ── DeepLabV3+ / ConvNeXt roads builder ──────────────────────────────────
+
+
+@requires_torch
+def test_road_model_uses_deeplabv3p_convnext_builder():
+    # The migrated roads architecture: DeepLabV3+ head over a timm ConvNeXt-
+    # Tiny encoder, single sigmoid logit, ImageNet-normalized input (the flag
+    # must come out True — only resnet34-upsample is plain /255).
+    from app.deeplabv3p import DeepLabV3Plus
+
+    convnext_model = SegmentationModel(
+        weights_path="/nonexistent/dlv3p.pth",
+        tile_size=32,
+        num_classes=1,
+        builder="deeplabv3p-convnext",
+    )
+    assert convnext_model.builder == "deeplabv3p-convnext"
+    assert isinstance(convnext_model.net, DeepLabV3Plus)
+    assert convnext_model.activation == "sigmoid"
+    assert convnext_model.imagenet_norm is True
+    assert convnext_model.net.classifier.out_channels == 1
+
+
+@requires_torch
+def test_road_model_deeplabv3p_predicts_probability_map():
+    convnext_model = SegmentationModel(
+        weights_path="/nonexistent/dlv3p.pth",
+        tile_size=32,
+        num_classes=1,
+        builder="deeplabv3p-convnext",
+    )
+    raw = make_tiff_bytes(width=32, height=32)
+    road, transform = convnext_model.predict(raw, bbox=(0.0, 0.0, 1.0, 1.0))
+    assert road.shape == (32, 32)
+    assert road.min() >= 0.0
+    assert road.max() <= 1.0
+    assert transform == DEFAULT_TRANSFORM
+
+
+@requires_torch
+def test_road_model_deeplabv3p_round_trips_checkpoint(tmp_path, convnext_model):
+    # The serving contract: a trained DeepLabV3+/ConvNeXt checkpoint is a
+    # plain state_dict loaded weights_only=True, exactly like roads_best.pth.
+    import torch
+
+    checkpoint = tmp_path / "roads_dlv3p_convnext_tiny.pth"
+    torch.save(convnext_model.net.state_dict(), checkpoint)
+    loaded = SegmentationModel(
+        weights_path=str(checkpoint),
+        tile_size=32,
+        num_classes=1,
+        builder="deeplabv3p-convnext",
+    )
+    assert loaded.is_loaded
+    assert loaded.net is not convnext_model.net
+
+
+# ── CUDA-only enforcement ────────────────────────────────────────────────
+
+
+def test_model_fails_closed_without_cuda(monkeypatch):
+    # Production is CUDA-only (NARS_SEGMA_REQUIRE_CUDA defaults to 1): if no
+    # CUDA device can be seen, building any SegmentationModel must raise so
+    # _load_model unregisters the task and /ready fails closed — a CPU pod can
+    # never silently serve random-weight predictions.
+    import torch
+
+    import app.model as roads_model
+
+    monkeypatch.setattr(roads_model, "REQUIRE_CUDA", True)
+    monkeypatch.setattr(
+        torch,
+        "cuda",
+        type("_NoCuda", (), {"is_available": staticmethod(lambda: False)}),
+    )
+    with pytest.raises(roads_model.CudaUnavailableError):
+        SegmentationModel(weights_path="/nonexistent/weights.pth", tile_size=32)

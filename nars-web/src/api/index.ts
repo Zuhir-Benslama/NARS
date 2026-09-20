@@ -218,7 +218,12 @@ export async function apiFetch(path: string, options: ApiFetchOptions = {}): Pro
             : controller.signal,
           headers: {
             ...fetchOptions.headers,
-            ...(hasBody ? { "Content-Type": "application/json" } : {}),
+            // Multipart bodies (FormData) are self-describing; setting an
+            // explicit Content-Type without the generated boundary would break
+            // them, so only JSON bodies annotate their encoding.
+            ...(hasBody && !(fetchOptions.body instanceof FormData)
+              ? { "Content-Type": "application/json" }
+              : {}),
             ...csrfHeaders,
           },
         })

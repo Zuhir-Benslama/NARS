@@ -26,6 +26,7 @@ infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, ma
 	$(SUBMAKE) infra-lint-markdown
 	$(SUBMAKE) infra-lint-uml-drift
 	$(SUBMAKE) infra-lint-migration-drift
+	$(SUBMAKE) infra-lint-frontend-wwwroot-sync
 	$(SUBMAKE) infra-lint-image-guard
 
 # File lists resolved by make ($(wildcard)) at parse time and /mnt-prefixed
@@ -36,7 +37,7 @@ infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, ma
 # shellcheck/hadolint/yamllint docker fallbacks before.
 SHELL_SCRIPTS     := $(wildcard nars-infra/scripts/*.sh)
 DOCKERFILES       := $(wildcard nars-infra/docker/Dockerfile.*)
-YAML_FILES        := $(wildcard nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml nars-infra/segma/*.yaml nars-infra/segma-gpu/*.yaml nars-infra/overlays/*.yaml nars-infra/overlays/*/*.yaml nars-infra/overlays/*/*/*.yaml .github/workflows/*.yml)
+YAML_FILES        := $(wildcard nars-infra/k8s/*.yaml nars-infra/k8s/helm-values/*.yaml nars-infra/segma/*.yaml nars-infra/overlays/*.yaml nars-infra/overlays/*/*.yaml nars-infra/overlays/*/*/*.yaml .github/workflows/*.yml)
 NODE_SCRIPTS      := $(wildcard nars-infra/scripts/*.mjs)
 MIGRATIONS_SQL    := $(wildcard nars-infra/migrations/*.sql nars-infra/scripts/postgis-migration-baseline.sql)
 # docs/**/*.md — markdown lint gate (infra-lint-markdown). UML diagrams are
@@ -367,6 +368,17 @@ infra-lint-uml-drift: ## Assert UML class diagrams' types/members exist in nars-
 infra-lint-migration-drift: ## Assert create_nars_db.sql and migrations/*.sql define identical ai_draft objects (drift guard)
 	@command -v python3 >/dev/null 2>&1 || { echo "✖ python3 is not installed (required for infra-lint-migration-drift)"; exit 1; }
 	@python3 nars-infra/scripts/check_migration_drift.py
+
+# Local gate for the / vs /map bundle-sync guard (see check_frontend_bundle_sync.py).
+# Runs only when a fresh local dist exists; the deploy-time _check-bundle-sync and
+# the NarsApi.WwwrootAssetSyncTests cover the committed/CI and live-cluster paths.
+.PHONY: infra-lint-frontend-wwwroot-sync
+infra-lint-frontend-wwwroot-sync: ## Assert a local nars-web build stays in sync with nars-api/wwwroot (drift guard)
+	@if [ -f nars-web/dist/index.html ] && [ -f nars-api/wwwroot/index.html ]; then \
+		python3 nars-infra/scripts/check_frontend_bundle_sync.py --frontend nars-web/dist/index.html --api nars-api/wwwroot/index.html; \
+	else \
+		echo "  ↷ nars-web/dist missing — skipping (deploy-time bundle-sync check still applies)"; \
+	fi
 
 # Self-test for the images-build content-stamp machinery (make/scripts/
 # image-hash-guard.py + __image_guard + the five _build-nars-* recipes).

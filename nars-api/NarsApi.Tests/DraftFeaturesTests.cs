@@ -222,6 +222,109 @@ public class DraftFeaturesUnitTests
     }
 
     [Fact]
+    public async Task SegmentTile_Roads_DuplicateGeometry_IsSkipped()
+    {
+        const string roadJson = """{"type":"LineString","coordinates":[[7.4331682920,36.0157336911],[7.4332755804,36.0156816227]]}""";
+        var (db, factory) = CreateInMemoryDbPair("DraftsSegmentDuplicate");
+        await using (db)
+        {
+            await SeedAsync(db);
+            db.AiDraftFeatures.Add(AiDraftFeature.Create(
+                AiDraftFeature.TypeRoad, roadJson, 0.6, CommuneId100, "tile.png", FixedUtcNow));
+            await db.SaveChangesAsync();
+
+            // The re-detection carries the same centerline with slightly
+            // different decimal precision — it must not be re-inserted.
+            var segmentation = new Mock<ISegmentationClient>();
+            segmentation.Setup(s => s.SegmentTileAsync(
+                    It.IsAny<string>(), It.IsAny<Stream>(), "tile.png", "image/png",
+                    It.IsAny<(double, double, double, double)>(), default))
+                .ReturnsAsync(new SegmentationResult
+                {
+                    Roads = [new SegmentedFeature("""{"type":"LineString","coordinates":[[7.43316829,36.01573369],[7.43327558,36.01568162]]}""", 0.61, AiDraftFeature.TypeRoad)],
+                });
+            var svc = CreateService(db, segmentation.Object, factory);
+            using var stream = new MemoryStream([1, 2, 3]);
+
+            var summary = await svc.SegmentTileAsync(UserRoles.NationalAdmin, null, null, null, CommuneId100,
+                AiDraftFeature.TypeRoad, stream, "tile.png", "image/png", (1.0, 1.0, 2.0, 2.0), default);
+
+            Assert.Equal(1, summary.RoadCount);
+            Assert.Empty(summary.DraftIds);
+            Assert.Single(await db.AiDraftFeatures.ToListAsync());
+        }
+    }
+
+    [Fact]
+    public async Task SegmentTile_Roads_DistinctGeometry_IsSaved()
+    {
+        const string roadJson = """{"type":"LineString","coordinates":[[7.4331682920,36.0157336911],[7.4332755804,36.0156816227]]}""";
+        const string otherRoadJson = """{"type":"LineString","coordinates":[[7.4370000000,36.0160000000],[7.4380000000,36.0165000000]]}""";
+        var (db, factory) = CreateInMemoryDbPair("DraftsSegmentDistinct");
+        await using (db)
+        {
+            await SeedAsync(db);
+            db.AiDraftFeatures.Add(AiDraftFeature.Create(
+                AiDraftFeature.TypeRoad, roadJson, 0.6, CommuneId100, "tile.png", FixedUtcNow));
+            await db.SaveChangesAsync();
+
+            var segmentation = new Mock<ISegmentationClient>();
+            segmentation.Setup(s => s.SegmentTileAsync(
+                    It.IsAny<string>(), It.IsAny<Stream>(), "tile.png", "image/png",
+                    It.IsAny<(double, double, double, double)>(), default))
+                .ReturnsAsync(new SegmentationResult
+                {
+                    Roads =
+                    [
+                        new SegmentedFeature("""{"type":"LineString","coordinates":[[7.43316829,36.01573369],[7.43327558,36.01568162]]}""", 0.6, AiDraftFeature.TypeRoad),
+                        new SegmentedFeature(otherRoadJson, 0.7, AiDraftFeature.TypeRoad),
+                    ],
+                });
+            var svc = CreateService(db, segmentation.Object, factory);
+            using var stream = new MemoryStream([1, 2, 3]);
+
+            var summary = await svc.SegmentTileAsync(UserRoles.NationalAdmin, null, null, null, CommuneId100,
+                AiDraftFeature.TypeRoad, stream, "tile.png", "image/png", (1.0, 1.0, 2.0, 2.0), default);
+
+            Assert.Equal(2, summary.RoadCount);
+            var id = Assert.Single(summary.DraftIds);
+            var saved = await db.AiDraftFeatures.ToListAsync();
+            Assert.Equal(2, saved.Count);
+            Assert.Contains(saved, d => d.Id == id && d.GeometryGeoJson == otherRoadJson);
+        }
+    }
+
+    [Fact]
+    public async Task SegmentTile_Roads_GeometryWithoutCoordinates_IsNotDeduplicated()
+    {
+        var (db, factory) = CreateInMemoryDbPair("DraftsSegmentNoCoords");
+        await using (db)
+        {
+            await SeedAsync(db);
+            db.AiDraftFeatures.Add(AiDraftFeature.Create(
+                AiDraftFeature.TypeRoad, """{"type":"LineString"}""", 0.6, CommuneId100, "tile.png", FixedUtcNow));
+            await db.SaveChangesAsync();
+
+            var segmentation = new Mock<ISegmentationClient>();
+            segmentation.Setup(s => s.SegmentTileAsync(
+                    It.IsAny<string>(), It.IsAny<Stream>(), "tile.png", "image/png",
+                    It.IsAny<(double, double, double, double)>(), default))
+                .ReturnsAsync(new SegmentationResult
+                {
+                    Roads = [new SegmentedFeature("""{"type":"LineString"}""", 0.6, AiDraftFeature.TypeRoad)],
+                });
+            var svc = CreateService(db, segmentation.Object, factory);
+            using var stream = new MemoryStream([1, 2, 3]);
+
+            var summary = await svc.SegmentTileAsync(UserRoles.NationalAdmin, null, null, null, CommuneId100,
+                AiDraftFeature.TypeRoad, stream, "tile.png", "image/png", (1.0, 1.0, 2.0, 2.0), default);
+
+            Assert.Single(summary.DraftIds);
+            Assert.Equal(2, (await db.AiDraftFeatures.ToListAsync()).Count);
+        }
+    }
+
+    [Fact]
     public async Task AcceptDraft_OutOfScopeCommune_ReturnsForbidden()
     {
         var (db, factory) = CreateInMemoryDbPair("DraftsAcceptOutOfScope");

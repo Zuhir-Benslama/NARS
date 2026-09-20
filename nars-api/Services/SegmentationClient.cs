@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using Microsoft.Extensions.Options;
+using NarsApi.Infrastructure;
 using NarsApi.Models;
 
 namespace NarsApi.Services;
@@ -30,10 +32,12 @@ public interface ISegmentationClient
 /// anything. Callers (e.g. a draft-features endpoint) are responsible for
 /// writing accepted results into ai_draft_features via EF Core.
 /// </summary>
-public sealed class SegmentationClient(HttpClient httpClient, ILogger<SegmentationClient> logger) : ISegmentationClient
+public sealed class SegmentationClient(
+    HttpClient httpClient, IOptions<SegmentationOptions> options, ILogger<SegmentationClient> logger) : ISegmentationClient
 {
     private readonly HttpClient _httpClient = httpClient;
     private readonly ILogger<SegmentationClient> _logger = logger;
+    private readonly SegmentationOptions _options = options.Value;
 
     public async Task<SegmentationResult> SegmentTileAsync(
         string featureType,
@@ -43,9 +47,8 @@ public sealed class SegmentationClient(HttpClient httpClient, ILogger<Segmentati
         (double MinLon, double MinLat, double MaxLon, double MaxLat) bbox,
         CancellationToken cancellationToken = default)
     {
-        var endpoint = featureType.Equals(AiDraftFeature.TypeRoad, StringComparison.OrdinalIgnoreCase)
-            ? "roads"
-            : "buildings";
+        var isRoad = featureType.Equals(AiDraftFeature.TypeRoad, StringComparison.OrdinalIgnoreCase);
+        var endpoint = isRoad ? "roads" : "buildings";
 
         using var content = new MultipartFormDataContent();
         using var streamContent = new StreamContent(tileStream);
@@ -56,7 +59,8 @@ public sealed class SegmentationClient(HttpClient httpClient, ILogger<Segmentati
         // separators (e.g. "2,95" from a comma-locale) in the coordinates.
         var query = string.Create(
             CultureInfo.InvariantCulture,
-            $"?min_lon={bbox.MinLon}&min_lat={bbox.MinLat}&max_lon={bbox.MaxLon}&max_lat={bbox.MaxLat}");
+            $"?min_lon={bbox.MinLon}&min_lat={bbox.MinLat}&max_lon={bbox.MaxLon}&max_lat={bbox.MaxLat}"
+                + $"&threshold={(isRoad ? _options.RoadThreshold : _options.BuildingThreshold)}");
 
         using var response = await _httpClient.PostAsync($"/segment/{endpoint}{query}", content, cancellationToken);
 

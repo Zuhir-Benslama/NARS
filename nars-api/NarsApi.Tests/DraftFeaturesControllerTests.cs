@@ -1,6 +1,7 @@
+using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
 using NarsApi.Controllers;
@@ -26,6 +27,7 @@ public class DraftFeaturesControllerTests
         var svc = new Mock<IDraftFeaturesService>();
         var ctrl = new DraftFeaturesController(
             svc.Object,
+            Mock.Of<IRoadGenerationService>(),
             Mock.Of<ILogger<DraftFeaturesController>>(),
             Mock.Of<IWebHostEnvironment>());
         AuthTestHelper.SetUser(ctrl, UserId, role, communeId, dairaId, wilayaId);
@@ -259,7 +261,7 @@ public class DraftFeaturesControllerTests
 
         var result = await ctrl.SegmentTile(request, default);
 
-        Assert.IsType<ForbidResult>(result.Result);
+        Assert.IsType<ForbidResult>(result.Result!);
     }
 
     [Fact]
@@ -368,7 +370,7 @@ public class DraftFeaturesControllerTests
 
         var result = await ctrl.ListDrafts(CommuneId101, null, status: "pending");
 
-        Assert.IsType<ForbidResult>(result.Result);
+        Assert.IsType<ForbidResult>(result.Result!);
     }
 
     // ── Accept / Reject / Update / Delete review glue ────────────────────────
@@ -510,5 +512,95 @@ public class DraftFeaturesControllerTests
         Assert.IsType<NoContentResult>(result);
         svc.Verify(s => s.DeleteDraftAsync(
             UserRoles.NationalAdmin, null, null, null, UserId, draftId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // ── POST /api/draft-features/generate-roads ──────────────────────────────
+
+    private static (DraftFeaturesController ctrl, Mock<IRoadGenerationService> roadGen) CreateGenerateController(
+        string role, int? communeId = null)
+    {
+        var roadGen = new Mock<IRoadGenerationService>();
+        var ctrl = new DraftFeaturesController(
+            Mock.Of<IDraftFeaturesService>(),
+            roadGen.Object,
+            Mock.Of<ILogger<DraftFeaturesController>>(),
+            Mock.Of<IWebHostEnvironment>());
+        AuthTestHelper.SetUser(ctrl, UserId, role, communeId, null, null);
+        return (ctrl, roadGen);
+    }
+
+    private static OkObjectResult ExpectOk(IActionResult result)
+        => Assert.IsType<OkObjectResult>(result);
+
+    [Fact]
+    public async Task GenerateRoads_MissingCommuneId_ReturnsBadRequest()
+    {
+        var (ctrl, _) = CreateGenerateController(UserRoles.NationalAdmin);
+        var body = new GenerateRoadsRequest { CommuneId = null, DraftIds = [Guid.NewGuid()] };
+
+        ActionResult<GenerateRoadsResponse> result = await ctrl.GenerateRoads(body, default);
+
+        ExpectProblem(result.Result!, 400);
+    }
+
+    [Fact]
+    public async Task GenerateRoads_EmptyDraftIds_ReturnsBadRequest()
+    {
+        var (ctrl, roadGen) = CreateGenerateController(UserRoles.CommuneUser, communeId: CommuneId100);
+        ctrl.ModelState.AddModelError("DraftIds", "DraftIds must contain at least one id.");
+        var body = new GenerateRoadsRequest { CommuneId = CommuneId100, DraftIds = [] };
+
+        ActionResult<GenerateRoadsResponse> result = await ctrl.GenerateRoads(body, default);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result!);
+        roadGen.Verify(s => s.GenerateAsync(
+            It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<int?>(),
+            It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<IReadOnlyList<Guid>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task GenerateRoads_Success_ReturnsCreatedRoads()
+    {
+        var (ctrl, roadGen) = CreateGenerateController(UserRoles.CommuneUser, communeId: CommuneId100);
+        var draftId = Guid.NewGuid();
+        var roadId = Guid.NewGuid();
+        var data = JsonNode.Parse("""{"type":"road","coordinates":[{"lat":36.716,"lng":2.951}]}""")!.AsObject();
+        roadGen.Setup(s => s.GenerateAsync(
+                It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<int?>(),
+                UserId, CommuneId100, It.IsAny<IReadOnlyList<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RoadGenerationSummary(
+                [new GeneratedRoad(roadId, FeatureTypes.RoadLayers.Street, "", data)],
+                Dropped: 2));
+        var body = new GenerateRoadsRequest { CommuneId = CommuneId100, DraftIds = [draftId] };
+
+        ActionResult<GenerateRoadsResponse> result = await ctrl.GenerateRoads(body, default);
+
+        var ok = ExpectOk(result.Result!);
+        var response = Assert.IsType<GenerateRoadsResponse>(ok.Value);
+        Assert.Equal(2, response.Dropped);
+        var road = Assert.Single(response.Created);
+        Assert.Equal(roadId, road.DbId);
+        Assert.Equal(FeatureTypes.RoadLayers.Street, road.Layer);
+        Assert.Equal("road", road.Data.GetProperty("type").GetString());
+        roadGen.Verify(s => s.GenerateAsync(
+            UserRoles.CommuneUser, CommuneId100, null, null, UserId, CommuneId100,
+            It.Is<IReadOnlyList<Guid>>(ids => ids.SequenceEqual(new[] { draftId })), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateRoads_ForbiddenCommune_ReturnsForbid()
+    {
+        var (ctrl, roadGen) = CreateGenerateController(UserRoles.CommuneUser, communeId: CommuneId100);
+        roadGen.Setup(s => s.GenerateAsync(
+                It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<int?>(),
+                It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<IReadOnlyList<Guid>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new UnauthorizedAccessException());
+        var body = new GenerateRoadsRequest { CommuneId = CommuneId101, DraftIds = [Guid.NewGuid()] };
+
+        ActionResult<GenerateRoadsResponse> result = await ctrl.GenerateRoads(body, default);
+
+        Assert.IsType<ForbidResult>(result.Result!);
     }
 }

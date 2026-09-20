@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "http://localhost:5000/"
+      "url": "http://localhost:8080/"
     }
   ],
   "paths": {
@@ -1010,6 +1010,9 @@
                   "Tile": {
                     "$ref": "#/components/schemas/IFormFile"
                   },
+                  "FeatureType": {
+                    "type": "string"
+                  },
                   "MinLon": {
                     "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
                     "type": ["number", "string"],
@@ -1171,6 +1174,113 @@
         "responses": {
           "200": {
             "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/draft-features/{id}": {
+      "put": {
+        "tags": ["DraftFeatures"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftUpdateRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftUpdateRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["DraftFeatures"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/draft-features/generate-roads": {
+      "post": {
+        "tags": ["DraftFeatures"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateRoadsRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateRoadsRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateRoadsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateRoadsResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateRoadsResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateRoadsResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -1401,6 +1511,96 @@
         "responses": {
           "200": {
             "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/features/number-entrances": {
+      "post": {
+        "tags": ["Features"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NumberEntrancesRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NumberEntrancesRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/NumberEntrancesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -2738,6 +2938,16 @@
           }
         }
       },
+      "DraftUpdateRequest": {
+        "required": ["geometryGeoJson"],
+        "type": "object",
+        "properties": {
+          "geometryGeoJson": {
+            "minLength": 2,
+            "type": "string"
+          }
+        }
+      },
       "FeatureSaveRequest": {
         "required": ["type", "layer", "label", "data"],
         "type": "object",
@@ -2808,6 +3018,62 @@
           }
         }
       },
+      "GeneratedRoadDto": {
+        "required": ["dbId", "layer", "label", "data"],
+        "type": "object",
+        "properties": {
+          "dbId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "layer": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/JsonElement"
+          }
+        }
+      },
+      "GenerateRoadsRequest": {
+        "required": ["communeId", "draftIds"],
+        "type": "object",
+        "properties": {
+          "communeId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["null", "integer", "string"],
+            "format": "int32"
+          },
+          "draftIds": {
+            "maxItems": 5000,
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "GenerateRoadsResponse": {
+        "required": ["dropped", "created"],
+        "type": "object",
+        "properties": {
+          "dropped": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "created": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GeneratedRoadDto"
+            }
+          }
+        }
+      },
       "IFormFile": {
         "type": "string",
         "format": "binary"
@@ -2847,6 +3113,25 @@
           },
           "method": {
             "type": ["null", "string"]
+          }
+        }
+      },
+      "NumberEntrancesRequest": {
+        "required": ["roadId", "entranceIds"],
+        "type": "object",
+        "properties": {
+          "roadId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "entranceIds": {
+            "maxItems": 200,
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         }
       },
@@ -2928,10 +3213,14 @@
         }
       },
       "SegmentSummaryResponse": {
-        "required": ["buildingCount", "draftIds"],
         "type": "object",
         "properties": {
           "buildingCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "roadCount": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": ["integer", "string"],
             "format": "int32"

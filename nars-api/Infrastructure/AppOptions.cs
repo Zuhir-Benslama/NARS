@@ -75,6 +75,23 @@ public class RoadRulesOptions
     [Range(0.0, 100_000.0)] public double MinRoadLengthM { get; set; } = 0.0;
     [Range(0.0, 1.0)] public double MinConfidence { get; set; } = 0.0;
     [Range(0, 100_000)] public int MaxFeaturesPerTile { get; set; } = 0;
+
+    /// <summary>
+    /// Distance a generated road vertex may sit outside an urban-area polygon
+    /// and still be accepted (the imagery bbox / model can bulge a hair past
+    /// the drawn boundary). Roads beyond this are dropped as out-of-area.
+    /// </summary>
+    [Range(0.0, 1000.0)] public double InsideToleranceMeters { get; set; } = 30.0;
+
+    /// <summary>
+    /// Radius around a generated road's corridor in which mapped roads count as
+    /// the existing network for the connectivity rule. Endpoint connectivity is
+    /// only enforced against this local set; when a commune has roads mapped
+    /// only far away (a legacy/demo road, or a mapped district kilometres away)
+    /// the generated roads seed the network for this locality, exactly like the
+    /// no-roads-at-all case.
+    /// </summary>
+    [Range(100, 50_000)] public double RoadNetworkSearchMeters { get; set; } = 3000.0;
 }
 
 /// <summary>
@@ -86,6 +103,20 @@ public class BuildingRulesOptions
 {
     [Range(0.0, 1.0)] public double MinConfidence { get; set; } = 0.0;
     [Range(0, 100_000)] public int MaxFeaturesPerTile { get; set; } = 0;
+}
+
+/// <summary>
+/// Inference parameters forwarded to the nars-segma service on each /segment
+/// request. The model binarizes its probability map at this threshold before
+/// vectorizing: the roads (SpaceNet) model fire around 0.4-0.98 at z18 and its
+/// end-of-street details sit below 0.5, so 0.4 recovers the faint tail that
+/// the default 0.5 clips. Buildings keep 0.5 because their polygons are dense
+/// and unambiguous in the same imagery.
+/// </summary>
+public class SegmentationOptions
+{
+    [Range(0.0, 1.0)] public double RoadThreshold { get; set; } = 0.3;
+    [Range(0.0, 1.0)] public double BuildingThreshold { get; set; } = 0.5;
 }
 
 public class AccountLockoutOptions

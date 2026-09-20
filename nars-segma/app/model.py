@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     import torch
 
 __all__ = [
+    "CudaUnavailableError",
     "InvalidTileError",
     "SegmentationModel",
     "TileTooLargeError",
@@ -50,15 +51,45 @@ IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 # values above this threshold are assumed to be [0,255] and rescaled.
 FLOAT_BYTE_SCALE_THRESHOLD = 2.0
 
+# nars-segma is CUDA-only: the deployment requests an nvidia.com/gpu and the
+# models fail closed without a CUDA device (see SegmentationModel.__init__).
+# Set to 0 only for CPU-only tooling/tests (e.g. the unit-test suite).
+REQUIRE_CUDA = os.environ.get("NARS_SEGMA_REQUIRE_CUDA", "1").strip().lower() not in (
+    "0",
+    "false",
+    "no",
+    "",
+)
+
+
+class CudaUnavailableError(RuntimeError):
+    """Raised when REQUIRE_CUDA is set but torch cannot see a CUDA device."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "CUDA is required but torch.cuda.is_available() is False; "
+            "nars-segma is CUDA-only. Schedule the pod on a GPU node, or "
+            "set NARS_SEGMA_REQUIRE_CUDA=0 for CPU-only tooling/tests."
+        )
+
 
 # Hard ceiling on decoded pixels (H x W) per tile. The upload-size cap bounds
 # the compressed bytes, but a highly compressible TIFF can decompress to
 # gigabytes, so we also bound the decoded footprint before allocating the
-# output arrays. 25M pixels keeps the working set well under the pod's 4Gi
-# limit while still accommodating far larger tiles than the service sees.
+# output arrays. 64M pixels (an 8000x8000 tile) keeps the working set within
+# the pod's 4Gi limit and accommodates a 19x19 z18 grid (~23.6M px) — the
+# largest input the road pipeline produces. (A 2x upscale test raised decoded
+# pixels to 94M with NO recall gain, so the cap stays at 64M.)
 MAX_DECODED_PIXELS = env_int(
-    "NARS_SEGMA_MAX_DECODED_PIXELS", 25_000_000, minimum=1_000, maximum=1_000_000_000
+    "NARS_SEGMA_MAX_DECODED_PIXELS", 64_000_000, minimum=1_000, maximum=1_000_000_000
 )
+
+# Overlap (pixels) between neighbouring decode windows. Neighbouring windows
+# are max-merged, so a thin road crossing a seam keeps its full probability on
+# both sides instead of being cut exactly where windows abut. At a 1024px tile
+# a 256px overlap costs ~25% more windows — cheap on the GPU serving path.
+# Capped below the tile size in predict() so small test tiles can't degenerate.
+OVERLAP_PX = env_int("NARS_SEGMA_OVERLAP_PX", 256, minimum=0, maximum=1024)
 
 
 class TileTooLargeError(ValueError):
@@ -96,9 +127,21 @@ class SegmentationModel:
         # that is passed through sigmoid instead (softmax of a single value is
         # a constant 1.0, so it would destroy the probability estimate).
         self.activation = "softmax" if num_classes > 1 else "sigmoid"
-        self.device = torch.device(
-            device or ("cuda" if torch.cuda.is_available() else "cpu")
-        )
+        cuda_available = bool(torch.cuda.is_available())
+        if REQUIRE_CUDA and not cuda_available:
+            raise CudaUnavailableError()
+        self.device = torch.device(device or ("cuda" if cuda_available else "cpu"))
+        # Preprocessing contract per task. The smp-resnet34 buildings model
+        # (HOT fAIr) was trained with ImageNet mean/std normalization, as
+        # segmentation_models_pytorch expects. The SpaceNet 3 champion roads
+        # checkpoint (resnet34-upsample) was trained on plain `/255` inputs —
+        # its test harness divides by 255 only, no per-channel mean/std (see
+        # albu-solution/src/augmentations/functional.py img_to_tensor). Feeding
+        # it ImageNet-normalized pixels statistically shifted the activations
+        # far negative and the model emitted an all-background mask everywhere
+        # (a real regression seen on dense urban tiles). The flag keeps the
+        # correct transform per architecture.
+        self.imagenet_norm = builder != "resnet34-upsample"
         self.is_loaded = False
         self.net = self._build_model()
 
@@ -128,6 +171,14 @@ class SegmentationModel:
             from app.road_model import Resnet34Upsample
 
             return Resnet34Upsample(num_classes=self.num_classes, num_channels=3)
+
+        if self.builder == "deeplabv3p-convnext":
+            from app.deeplabv3p import DeepLabV3Plus
+
+            # Serving builds pretrained=False: the trained ConvNeXt encoder is
+            # carried in the exported checkpoint (see app/deeplabv3p.py), so
+            # inference never downloads ImageNet weights over the network.
+            return DeepLabV3Plus(num_classes=self.num_classes, pretrained=False)
 
         import segmentation_models_pytorch as smp
 
@@ -207,8 +258,12 @@ class SegmentationModel:
 
     def _preprocess(self, img: np.ndarray) -> torch.Tensor:
         torch = _import_torch()
-        normed = (img - IMAGENET_MEAN) / IMAGENET_STD
-        tensor = torch.from_numpy(normed.transpose(2, 0, 1)).float()
+        # See `imagenet_norm` in __init__: only architectures trained with the
+        # ImageNet statistics get them; the SpaceNet roads model expects the
+        # raw /255-scaled tensor and goes straight through.
+        if self.imagenet_norm:
+            img = (img - IMAGENET_MEAN) / IMAGENET_STD
+        tensor = torch.from_numpy(img.transpose(2, 0, 1)).float()
         return tensor.unsqueeze(0).to(self.device)
 
     def _predict_tile(self, img: np.ndarray) -> np.ndarray:
@@ -279,9 +334,10 @@ class SegmentationModel:
         The tile's own transform is used only when it can be trusted to
         describe an EPSG:4326-style geographic raster (see
         `_embedded_transform`); otherwise one is built from the supplied
-        bbox, assuming EPSG:4326. For tiles larger than self.tile_size a
-        simple non-overlapping grid is used. Swap in overlap-and-blend if
-        seam artifacts show up in practice on real imagery."""
+        bbox, assuming EPSG:4326. For tiles larger than self.tile_size an
+        overlapping grid (stride = tile_size - OVERLAP_PX) is decoded and the
+        window predictions are max-merged, so a thin road that crosses a
+        window seam keeps its full probability instead of being cut there."""
         with MemoryFile(raw_bytes) as memfile:
             try:
                 with memfile.open() as src:
@@ -304,21 +360,35 @@ class SegmentationModel:
                     # drift between tiles and create brightness seams.
                     scale = self._integer_scale(src)
 
-                    step = self.tile_size
-                    for y in range(0, h, step):
+                    # Walk the raster in overlapping windows and max-merge
+                    # each prediction into the prob map. Each chip is still
+                    # tile_size^2 (full native resolution for the network);
+                    # the window ORIGINS advance by step = tile_size - overlap,
+                    # so neighbouring windows re-score a shared strip. Overlap
+                    # rescues thin road segments that fall exactly on a window
+                    # seam (see OVERLAP_PX); max (not average) keeps a high-
+                    # confidence detection intact and cannot lower one the
+                    # model already fired on. The overlap is clamped below half
+                    # the tile so small test tiles and degenerate configs stay
+                    # sane.
+                    overlap = min(OVERLAP_PX, self.tile_size // 2)
+                    step = max(self.tile_size - overlap, 1)
+                    for y0 in range(0, h, step):
+                        y = min(y0, h - 1)
+                        y_end = min(y0 + self.tile_size, h)
                         for x0 in range(0, w, step):
-                            y_end = min(y + step, h)
-                            x_end = min(x0 + step, w)
-                            window = Window.from_slices((y, y_end), (x0, x_end))
+                            x = min(x0, w - 1)
+                            x_end = min(x0 + self.tile_size, w)
+                            window = Window.from_slices((y, y_end), (x, x_end))
                             chip = self._normalize_window(
                                 src.read(window=window), scale=scale
                             )
                             chip_probs = self._predict_tile(chip)
-                            # The grid is strictly non-overlapping, so each
-                            # pixel is written exactly once; `=` (not `+=`)
-                            # keeps the map exact if overlap-and-blend is
-                            # added later.
-                            probs[y:y_end, x0:x_end] = chip_probs
+                            # `max` over the overlap region (not `=`): a pixel
+                            # seen by multiple windows keeps the strongest
+                            # prediction instead of the last writer.
+                            region = probs[y:y_end, x:x_end]
+                            np.maximum(region, chip_probs, out=region)
             except RasterioIOError as exc:
                 # Decoding a garbage/truncated upload raises here; surface it
                 # as a 4xx client error instead of a 500.

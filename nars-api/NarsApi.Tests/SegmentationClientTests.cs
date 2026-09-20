@@ -3,7 +3,9 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
+using NarsApi.Infrastructure;
 using NarsApi.Models;
 using NarsApi.Services;
 using Xunit;
@@ -37,11 +39,14 @@ public class SegmentationClientTests
     private const double MaxLat = 4.5;
 
     private static (SegmentationClient Client, StubHandler Handler) CreateClient(
-        HttpResponseMessage response)
+        HttpResponseMessage response, SegmentationOptions? options = null)
     {
         var handler = new StubHandler(_ => response);
         var http = new HttpClient(handler) { BaseAddress = new Uri("http://segma.internal") };
-        return (new SegmentationClient(http, Mock.Of<ILogger<SegmentationClient>>()), handler);
+        return (
+            new SegmentationClient(http, Options.Create(options ?? new SegmentationOptions()),
+                Mock.Of<ILogger<SegmentationClient>>()),
+            handler);
     }
 
     private static Stream Tile() => new MemoryStream([1, 2, 3]);
@@ -98,6 +103,25 @@ public class SegmentationClientTests
         Assert.Contains("min_lat=-2.25", handler.LastRequest.RequestUri.Query);
         Assert.Contains("max_lon=3.75", handler.LastRequest.RequestUri.Query);
         Assert.Contains("max_lat=4.5", handler.LastRequest.RequestUri.Query);
+        Assert.Contains("threshold=0.3", handler.LastRequest.RequestUri.Query);
+    }
+
+    [Fact]
+    public async Task SegmentTileAsync_ThresholdsFollowFeatureTypeAndConfiguration()
+    {
+        var (roadClient, roadHandler) = CreateClient(
+            Json(HttpStatusCode.OK, """{"roads":{"features":[]}}"""),
+            new SegmentationOptions { RoadThreshold = 0.37, BuildingThreshold = 0.55 });
+        var (buildingClient, buildingHandler) = CreateClient(
+            Json(HttpStatusCode.OK, """{"buildings":{"features":[]}}"""),
+            new SegmentationOptions { RoadThreshold = 0.37, BuildingThreshold = 0.55 });
+
+        await roadClient.SegmentTileAsync(AiDraftFeature.TypeRoad, Tile(), "tile.png", "image/png", Bbox);
+        await buildingClient.SegmentTileAsync(AiDraftFeature.TypeBuilding, Tile(), "tile.png", "image/png", Bbox);
+
+        Assert.Contains("threshold=0.37", roadHandler.LastRequest!.RequestUri!.Query);
+        Assert.Contains("threshold=0.55", buildingHandler.LastRequest!.RequestUri!.Query);
+        Assert.Equal("http://segma.internal/segment/buildings", buildingHandler.LastRequest.RequestUri!.GetLeftPart(UriPartial.Path));
     }
 
     [Fact]

@@ -54,6 +54,19 @@ These rules exist because data has been destroyed multiple times. Violating them
 - `make db-backup` and `make db-restore` handle database backups
 - Check `Makefile` before assuming a target exists
 
+### Frontend Redeployment (bundle sync)
+
+- The SPA has TWO HTML entrypoints that must reference the SAME hashed bundle:
+  `/` (nginx image) and `/map` (nars-api's own copy in `nars-api/wwwroot/`)
+- `make frontend-update` is the ONLY safe way to deploy a frontend change — it
+  rebuilds nars-web, synces `nars-api/wwwroot/`, rebuilds+restarts BOTH images,
+  and fails at the end if the running pods disagree
+- Never update just the nars-vite image for a frontend change — redeploying only
+  nars-vite leaves `/map` stale, which 404s its bundle (blank page after login)
+- `nars-api/wwwroot/` is committed; keep it in sync with the frontend build
+  (`npm run build:deploy`) and check `nars-api/wwwroot/index.html` references
+  actually exist in `nars-api/wwwroot/assets/`
+
 ### Code Quality
 
 - Run `dotnet build --no-restore` to check for compilation errors

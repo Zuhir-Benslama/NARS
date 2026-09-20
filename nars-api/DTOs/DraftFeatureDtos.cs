@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 
 namespace NarsApi.DTOs;
 
@@ -61,3 +62,34 @@ public sealed class DraftUpdateRequest
     [MinLength(2)]
     public string GeometryGeoJson { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// Body for POST /api/draft-features/generate-roads. Consumes the road draft
+/// ids returned by the segmentation endpoint for the commune; only drafts that
+/// satisfy the roads-phase cadastre rules are materialized.
+/// </summary>
+public sealed class GenerateRoadsRequest
+{
+    [Required]
+    public int? CommuneId { get; set; }
+
+    [Required]
+    [MinLength(1)]
+    [MaxLength(5000)]
+    public List<Guid> DraftIds { get; set; } = [];
+}
+
+/// <summary>
+/// A road materialized from an AI draft. <see cref="Data"/> is the full
+/// production feature payload (type, label, roadTypeKey, lat/lng coordinates)
+/// the front-end layer store expects, so it can add the road without a reload.
+/// </summary>
+public sealed record GeneratedRoadDto(Guid DbId, string Layer, string Label, JsonElement Data);
+
+/// <summary>
+/// Result of POST /api/draft-features/generate-roads. Roads that violate the
+/// cadastre rules stay pending and are counted in <see cref="Dropped"/>.
+/// </summary>
+public sealed record GenerateRoadsResponse(
+    int Dropped,
+    IReadOnlyList<GeneratedRoadDto> Created);

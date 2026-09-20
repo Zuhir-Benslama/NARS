@@ -3,25 +3,22 @@
 
 GPU_NODE_DIR    ?= nars-infra/docker
 GPU_DEVICE_DIR  ?= nars-infra/k8s/nvidia-device-plugin
-GPU_OVERLAY_DIR ?= nars-infra/segma-gpu
 
 # ─── Preflight ──────────────────────────────────────────────────
 
-# Internal: refuse to proceed with GPU plumbing unless the host really can
-# donate a GPU. Checks are cheap and non-destructive.
+# Internal: refuse to proceed with the GPU-required stack unless the host
+# really can donate a GPU. Checks are cheap and non-destructive.
 .PHONY: _gpu-preflight-host
 _gpu-preflight-host:
-	@if [ "$(NARS_GPU)" != "1" ]; then exit 0; fi
 	@for dev in nvidiactl nvidia-modeset nvidia-uvm nvidia-uvm-tools nvidia0; do \
 		if [ -e "/dev/$$dev" ]; then continue; fi; \
-		echo "✖ NARS_GPU=1 but /dev/$$dev is missing — is the NVIDIA kernel module loaded?"; \
+		echo "✖ NARS GPU required but /dev/$$dev is missing — is the NVIDIA kernel module loaded?"; \
 		exit 1; \
 	done; \
 	echo "✓ Host GPU device nodes present"
 
 .PHONY: _gpu-preflight
-_gpu-preflight: _gpu-preflight-host ## GPU preflight checks (NARS_GPU=1 only)
-	@if [ "$(NARS_GPU)" != "1" ]; then exit 0; fi
+_gpu-preflight: _gpu-preflight-host ## GPU preflight checks (always on — GPU is required)
 	@git check-ignore $(GPU_DRIVER_DIR) >/dev/null 2>&1 \
 		|| echo "  ⚠ $(GPU_DRIVER_DIR) is inside the repo — add it to .gitignore (see docs)";
 	@echo "✓ GPU preflight done (driver bundle is built by cluster-create/gpu-install)"
@@ -44,20 +41,15 @@ gpu-node-image: ## Build the kind GPU node image (toolkit + CDI boot hook)
 # ─── Deploy ─────────────────────────────────────────────────────
 
 .PHONY: gpu-install
-gpu-install: _gpu-preflight ## Install CDI device plugin + apply the segma GPU overlay
+gpu-install: _gpu-preflight ## Install CDI device plugin (the segma GPU limit is baked into its Deployment)
 	@# Nodes bind the bundle at /opt/nvidia/driver; make sure it exists even if
 	@# cluster-create was skipped (e.g. gpu-install on an existing cluster).
 	@[ -d "$(GPU_DRIVER_DIR)/lib64" ] || $(SUBMAKE) gpu-driver-bundle
 	@echo "→ Installing NVIDIA device plugin..."
 	@$(KUBECTL) apply -k "$(GPU_DEVICE_DIR)"
-	@echo "→ Applying segma GPU overlay (nvidia.com/gpu: 1)..."
-	@$(KUBECTL) apply -k "$(GPU_OVERLAY_DIR)"
-	@echo "→ Rolling nars-segma..."
-	@$(KUBECTL) rollout restart deployment/nars-segma -n "$(NAMESPACE)"
-	@echo "→ Waiting for plugin + segma..."
+	@echo "→ Waiting for plugin..."
 	@$(KUBECTL) -n kube-system rollout status daemonset/nvidia-device-plugin --timeout=120s >/dev/null || true
-	@$(KUBECTL) -n "$(NAMESPACE)" rollout status deployment/nars-segma --timeout=180s || true
-	@echo "✓ GPU plumbing installed"
+	@echo "✓ GPU device plugin installed (segma requests nvidia.com/gpu in its Deployment)"
 
 .PHONY: gpu-status
 gpu-status: ## Show GPU availability (plugin pod, node allocatable, segma device)

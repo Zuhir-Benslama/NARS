@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         | sed 's#^deb #deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] #' \
         > /etc/apt/sources.list.d/nvidia-container-toolkit.list \
     && apt-get update \
-    && apt-get install -y --no-install-recommends nvidia-container-toolkit=1.20.0-1 \
+    && apt-get install -y --no-install-recommends nvidia-container-toolkit=1.20.1-1 \
     && rm -rf /var/lib/apt/lists/*
 
 # The k8s-device-plugin container expects the toolkit under the NVIDIA

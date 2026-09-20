@@ -19,6 +19,24 @@ except ImportError:
 
 requires_torch = pytest.mark.skipif(not _TORCH_AVAILABLE, reason="torch not installed")
 
+
+def _cuda_is_available() -> bool:
+    if not _TORCH_AVAILABLE:
+        return False
+    import torch
+
+    return bool(torch.cuda.is_available())
+
+
+# Only for the handful of tests that must run real kernels on a real CUDA
+# device (e.g. the fail-closed device-selection test's negative path runs on
+# CPU). Skipped when torch has no CUDA — e.g. a CPU-only CI worker.
+requires_cuda = pytest.mark.skipif(
+    not _TORCH_AVAILABLE or not _cuda_is_available(),
+    reason="CUDA not available",
+)
+
+
 # Single source of truth for the internal auth token. conftest.py sets it as
 # NARS_SEGMA_INTERNAL_TOKEN (before any app import) and test_api.py uses it in
 # request headers, so the two can never drift apart.

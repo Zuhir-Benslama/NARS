@@ -16,6 +16,11 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    # AI generation holds /api responses open for CPU-bound segma inference
+    # (~100-130s for a commune z18 tile); the 60s default aborted generation.
+    # Budget the full window (frontend/API totals are 240s).
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
     nginx.ingress.kubernetes.io/use-regex: "true"
 spec:
   ingressClassName: nginx

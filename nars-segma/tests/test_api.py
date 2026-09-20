@@ -704,11 +704,21 @@ def test_roads_registered_with_expected_config():
     assert "buildings" in roads.MODEL_SPECS
     assert "roads" in roads.MODEL_SPECS
     assert roads.MODEL_SPECS["roads"]["num_classes"] == 1
+    # Default builder is the current production roads model. The env override
+    # (NARS_SEGMA_ROAD_BUILDER) lets the trained DeepLabV3+/ConvNeXt model be
+    # promoted/rolled back by flipping one env var.
     assert roads.MODEL_SPECS["roads"]["builder"] == "resnet34-upsample"
     assert roads.MODEL_SPECS["roads"]["postprocess"] == "linestrings"
     assert roads.MODEL_SPECS["buildings"]["postprocess"] == "polygons"
     assert roads.POSTPROCESSORS["polygons"] is roads.mask_to_polygons
     assert roads.POSTPROCESSORS["linestrings"] is roads.mask_to_linestrings
+
+
+def test_road_min_length_defaults_to_10m():
+    # The 10m floor is what forbids the sub-10m spur stubs the skeletonizer
+    # emits at tile edges / junction hops. A config bump must not silently
+    # bring the old 0.0 default back.
+    assert roads.ROAD_MIN_LENGTH_M == 10.0
 
 
 def test_task_rules_wired_from_config():

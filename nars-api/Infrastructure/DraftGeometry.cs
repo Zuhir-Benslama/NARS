@@ -61,6 +61,36 @@ public static class DraftGeometry
     }
 
     /// <summary>
+    /// Reads a GeoJSON LineString as an ordered (Lat, Lng) vertex list. Returns
+    /// false when the geometry is not a LineString, a vertex is malformed, or
+    /// fewer than two points remain — the caller then rejects the draft.
+    /// GeoJSON coordinate arrays may carry a trailing Z value; only the first
+    /// two entries (lng, lat) are used.
+    /// </summary>
+    public static bool TryGetLineCoordinates(string geometryGeoJson, out IReadOnlyList<(double Lat, double Lng)> vertices)
+    {
+        vertices = [];
+        if (!TryReadLineCoordinates(geometryGeoJson, out var coordinates) || coordinates.Count < 2)
+        {
+            return false;
+        }
+
+        var list = new List<(double Lat, double Lng)>(coordinates.Count);
+        foreach (var point in coordinates)
+        {
+            if (!TryGetLonLat(point, out var lon, out var lat))
+            {
+                return false;
+            }
+
+            list.Add((lat, lon));
+        }
+
+        vertices = list;
+        return vertices.Count >= 2;
+    }
+
+    /// <summary>
     /// Validates a draft edit: the geometry must be a GeoJSON object whose
     /// top-level type matches the draft's feature type (LineString for roads,
     /// Polygon for buildings) and whose coordinates parse. This keeps a road

@@ -25,14 +25,16 @@ DOCKER_TOKEN       ?=
 BACKUP_DIR         ?= backup
 DB_NAME            ?= nars_db
 POSTGRES_DATA_DIR  ?= data/nars/postgis
-# ─── GPU (opt-in) ────────────────────────────────────────────────
-# NARS_GPU=1 turns the control-plane node into a GPU node: kind mounts the
-# host's /dev/nvidia* device nodes + a curated NVIDIA driver bundle
-# (data/nvidia/driver, built by scripts/nvidia-driver-bundle.sh), and the
-# cluster runs the CDI device plugin + the segma-gpu overlay. Requires the host
-# to expose /dev/nvidia* (mode 0666 works under rootless Docker). Default OFF:
-# CPU clusters still work on machines without a GPU.
-NARS_GPU        ?= 0
+# ─── GPU (required) ─────────────────────────────────────────────
+# The nars-segma road/building models are CUDA-only (NARS_SEGMA_REQUIRE_CUDA
+# fails closed without CUDA), and the segma Deployment requests an
+# nvidia.com/gpu, so the cluster node MUST expose the host GPU: kind mounts
+# /dev/nvidia* + a curated NVIDIA driver bundle (data/nvidia/driver, built by
+# scripts/nvidia-driver-bundle.sh) and the cluster runs the nvidia device
+# plugin. Requires the host to expose /dev/nvidia* (mode 0666 works under
+# rootless Docker). Set NARS_GPU=0 only for a legacy CPU-only dev cluster that
+# cannot schedule nars-segma.
+NARS_GPU        ?= 1
 GPU_NODE_IMAGE  ?= nars/gpu-node:1.32.2
 GPU_DRIVER_DIR  ?= data/nvidia/driver
 REGISTRY_IMAGES    := nars-api nars-postgis nars-vite nars-backup nars-segma

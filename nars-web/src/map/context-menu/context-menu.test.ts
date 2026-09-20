@@ -11,6 +11,7 @@ const {
   mockSetReferenceEntrance,
   mockGenerateNamingPanels,
   mockComputeAndApplyRoadDirections,
+  mockGenerateRoadsFromUrbanAreas,
   mockUpdateEndpointMarkersExport,
   mockEnableEditGeometry,
   mockEditFeatureInfo,
@@ -27,6 +28,7 @@ const {
   mockSetReferenceEntrance: vi.fn(),
   mockGenerateNamingPanels: vi.fn(),
   mockComputeAndApplyRoadDirections: vi.fn(),
+  mockGenerateRoadsFromUrbanAreas: vi.fn(() => Promise.resolve({ created: 0, dropped: 0 })),
   mockUpdateEndpointMarkersExport: vi.fn(),
   mockEnableEditGeometry: vi.fn(),
   mockEditFeatureInfo: vi.fn(),
@@ -49,6 +51,9 @@ vi.mock("../roads/road-directions", () => ({
   computeAndApplyRoadDirections: mockComputeAndApplyRoadDirections,
   updateEndpointMarkers: mockUpdateEndpointMarkersExport,
 }))
+vi.mock("../generate/generate-roads", () => ({
+  generateRoadsFromUrbanAreas: mockGenerateRoadsFromUrbanAreas,
+}))
 vi.mock("./ctx-menu-actions", () => ({
   enableEditGeometry: mockEnableEditGeometry,
   editFeatureInfo: mockEditFeatureInfo,
@@ -67,8 +72,8 @@ function setupPhase(key: string) {
 
 const PHASES = [
   { key: "areas", label: "Areas" },
-  { key: "cityCenter", label: "City Center" },
   { key: "roads", label: "Roads" },
+  { key: "cityCenter", label: "City Center" },
   { key: "districts", label: "Districts" },
   { key: "houseEntrances", label: "House Entrances" },
   { key: "publicBuildings", label: "Public Buildings" },
@@ -156,6 +161,27 @@ describe("showContextMenu / bindContextMenu", () => {
     expect(mockComputeAndApplyRoadDirections).toHaveBeenCalled()
   })
 
+  it("includes generate-roads item for any feature hit in the roads phase", () => {
+    setupPhase("roads")
+
+    mod.showContextMenu(0, 0, "a1", "areas")
+
+    const store = useContextMenuStore()
+    const genItem = store.items.find((i: any) => i.label === "ctx_generate_roads")
+    expect(genItem).toBeDefined()
+    genItem.onClick()
+    expect(mockGenerateRoadsFromUrbanAreas).toHaveBeenCalled()
+  })
+
+  it("does not include generate-roads item outside the roads phase", () => {
+    setupPhase("houseEntrances")
+
+    mod.showContextMenu(0, 0, "r1", "roads")
+
+    const store = useContextMenuStore()
+    expect(store.items.some((i: any) => i.label === "ctx_generate_roads")).toBe(false)
+  })
+
   it("shows cityCenter lock when not on cityCenter phase", () => {
     setupPhase("areas")
 
@@ -219,6 +245,16 @@ describe("showMapContextMenu", () => {
     expect(roadDirItem).toBeDefined()
     roadDirItem.onClick()
     expect(mockComputeAndApplyRoadDirections).toHaveBeenCalled()
+  })
+
+  it("adds generate-roads item for roads phase", async () => {
+    await mod.showMapContextMenu(0, 0, mkPhase("roads"))
+
+    const store = useContextMenuStore()
+    const genItem = store.items.find((i: any) => i.label === "ctx_generate_roads")
+    expect(genItem).toBeDefined()
+    genItem.onClick()
+    expect(mockGenerateRoadsFromUrbanAreas).toHaveBeenCalled()
   })
 
   it("adds setHouseNumbers for houseEntrances phase", async () => {

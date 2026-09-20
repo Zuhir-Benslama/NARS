@@ -18,8 +18,11 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    # AI generation holds /api responses open ~100-130s for CPU-bound segma
+    # inference; the 60s default aborted it mid-inference. Budget the whole
+    # generation window (frontend/API totals are 240s).
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
     nginx.ingress.kubernetes.io/use-regex: "true"
 spec:
   ingressClassName: nginx
@@ -70,6 +73,10 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    # AI generation holds /api responses open ~100-130s (segma CPU inference);
+    # raises nginx's 60s default so generation isn't aborted mid-window.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
     nginx.ingress.kubernetes.io/use-regex: "true"
 spec:
   ingressClassName: nginx

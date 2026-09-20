@@ -20,6 +20,7 @@
   <FeatureModal />
   <ToastContainer />
   <ConfirmDialog />
+  <GenerationProgress />
 
   <div v-if="appStore.loadError" class="load-error-banner">
     <span>{{ t("app_load_error") }}</span>
@@ -54,6 +55,7 @@ import EditSaveButton from "./components/EditSaveButton.vue"
 import ContextMenu from "./components/ContextMenu.vue"
 import ToastContainer from "./components/ToastContainer.vue"
 import ConfirmDialog from "./components/ConfirmDialog.vue"
+import GenerationProgress from "./components/GenerationProgress.vue"
 import { useAppStore } from "./stores/appStore"
 import { destroyMap } from "./map"
 

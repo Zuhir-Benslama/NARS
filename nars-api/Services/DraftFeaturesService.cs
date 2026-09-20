@@ -140,8 +140,35 @@ public class DraftFeaturesService(
             ? result.Roads
             : result.Buildings;
 
+        // Re-running generation on the same imagery produces the same
+        // centerlines; skip anything already in the commune's queue so a
+        // second run does not pile up duplicate drafts (or duplicate roads on
+        // a second generate). Signatures are coordinate-rounded to ~1.1 m, so
+        // a repeat detection from identical or near-identical geometry is
+        // caught while genuinely distinct streets stay distinct.
+        var featureTypeKey = features.FirstOrDefault()?.FeatureType;
+        HashSet<string> seen = [];
+        if (featureTypeKey is not null)
+        {
+            var existingGeometry = await db.AiDraftFeatures
+                .Where(f => f.CommuneId == communeId && f.FeatureType == featureTypeKey)
+                .AsNoTracking()
+                .Select(f => f.GeometryGeoJson)
+                .ToListAsync(ct);
+            seen = existingGeometry
+                .Select(DraftSignature)
+                .OfType<string>()
+                .ToHashSet(StringComparer.Ordinal);
+        }
+
         foreach (var feature in features)
         {
+            var signature = DraftSignature(feature.GeometryGeoJson);
+            if (signature is not null && !seen.Add(signature))
+            {
+                continue;
+            }
+
             draftEntities.Add(AiDraftFeature.Create(
                 featureType: feature.FeatureType,
                 geometryGeoJson: feature.GeometryGeoJson,
@@ -686,4 +713,50 @@ public class DraftFeaturesService(
         int communeId, CancellationToken ct)
         => communeScope.CanAccessCommuneAsync(
             callerRole, callerCommuneId, callerDairaId, callerWilayaId, communeId, ct);
+
+    /// <summary>
+    /// Canonical geometry signature used to deduplicate drafts across segment
+    /// runs. Parses the GeoJSON, rounds every coordinate to 5 decimals
+    /// (~1.1 m at this latitude) and re-serializes, so a re-detection with
+    /// identical or near-identical geometry produces the same signature while
+    /// streets that are genuinely meters apart stay distinct. Returns null when
+    /// the geometry cannot be parsed (don't deduplicate unknowns).
+    /// </summary>
+    private static string? DraftSignature(string geometryGeoJson)
+    {
+        try
+        {
+            var node = JsonNode.Parse(geometryGeoJson);
+            if (node?["coordinates"] is not JsonArray coordinates)
+            {
+                return null;
+            }
+            RoundCoordinates(coordinates);
+            return node.ToJsonString();
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static void RoundCoordinates(JsonArray array)
+    {
+        if (array.Count > 0 && array.All(item => item is JsonValue))
+        {
+            for (var i = 0; i < array.Count; i++)
+            {
+                if (array[i] is JsonValue value && value.TryGetValue<double>(out var number))
+                {
+                    array[i] = JsonValue.Create(Math.Round(number, 5));
+                }
+            }
+            return;
+        }
+
+        foreach (var child in array.OfType<JsonArray>())
+        {
+            RoundCoordinates(child);
+        }
+    }
 }

@@ -189,7 +189,7 @@ spec:
             # confidence drops weak detections, and the per-tile cap bounds
             # how many drafts a single acceptance creates.
             - name: NARS_SEGMA_ROAD_MIN_LENGTH_M
-              value: "0"
+              value: "10"
             - name: NARS_SEGMA_ROAD_MIN_CONFIDENCE
               value: "0"
             - name: NARS_SEGMA_ROAD_MAX_FEATURES
@@ -219,6 +219,11 @@ spec:
             limits:
               cpu: "2"
               memory: "4Gi"
+              # The road/building models are CUDA-only and fail closed without
+              # CUDA, so this pod MUST land on the GPU node. The device plugin
+              # (installed by gpu-install) advertises nvidia.com/gpu on the
+              # kind control-plane node; a CPU-only cluster cannot schedule it.
+              nvidia.com/gpu: "1"
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

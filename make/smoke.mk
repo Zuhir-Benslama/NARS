@@ -48,6 +48,22 @@ smoke-test: ## Post-deploy smoke test: verify /health, frontend, and API auth
 	else
 		fail "POST /api/signin → $$auth (expected 401)";
 	fi;
+	echo "  4. Frontend/API bundle sync...";
+	# / and /map are served from two copies (nginx image vs nars-api wwwroot);
+	# if they drift, /map 404s its bundle -> blank page after login.
+	if command -v kubectl >/dev/null 2>&1 && kubectl get deploy nars-frontend -n "$(NAMESPACE)" >/dev/null 2>&1; then
+		_b=$$(mktemp); _a=$$(mktemp);
+		if kubectl exec -n "$(NAMESPACE)" deploy/nars-frontend -- cat /usr/share/nginx/html/index.html > "$$_b" 2>/dev/null \
+			&& kubectl exec -n "$(NAMESPACE)" deploy/nars-api -- cat /app/wwwroot/index.html > "$$_a" 2>/dev/null \
+			&& python3 nars-infra/scripts/check_frontend_bundle_sync.py --frontend "$$_b" --api "$$_a" >/dev/null; then
+			pass "/ and /map serve the same bundle";
+		else
+			fail "/ and /map bundle mismatch (nginx vs nars-api wwwroot) — run make frontend-update";
+		fi;
+		rm -f "$$_b" "$$_a";
+	else
+		echo "  ↷ kubectl unavailable or cluster not up — skipping";
+	fi;
 	echo "";
 	if [ "$$failed" -eq 0 ]; then
 		echo "✓ All smoke tests passed!";
