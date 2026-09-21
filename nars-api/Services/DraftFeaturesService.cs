@@ -97,6 +97,7 @@ public class DraftFeaturesService(
     ISegmentationClient segmentationClient,
     ICommuneScopeService communeScope,
     IDateTimeProvider timeProvider,
+    IOptions<ValidationOptions> validationOptions,
     IOptions<RoadRulesOptions> roadRules,
     IOptions<BuildingRulesOptions> buildingRules) : IDraftFeaturesService
 {
@@ -161,10 +162,35 @@ public class DraftFeaturesService(
                 .ToHashSet(StringComparer.Ordinal);
         }
 
+        // Road drafts must already obey the roads-phase rules (length,
+        // confidence, turn angle, urban containment, connectivity) or they are
+        // not queued for review at all — the same engine the generate-roads
+        // and single-accept paths run, so the review queue only ever holds
+        // roads that can be materialized (or become network seeds).
+        var isRoads = featureType.Equals(AiDraftFeature.TypeRoad, StringComparison.OrdinalIgnoreCase);
+        IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> areaRings = [];
+        IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> roadNetwork = [];
+        if (isRoads && features.Count > 0)
+        {
+            areaRings = await RoadPhaseRules.LoadUrbanAreaRingsAsync(db, communeId, ct);
+            roadNetwork = await RoadPhaseRules.LoadRoadNetworkAsync(db, communeId, ct);
+        }
+
         foreach (var feature in features)
         {
             var signature = DraftSignature(feature.GeometryGeoJson);
             if (signature is not null && !seen.Add(signature))
+            {
+                continue;
+            }
+
+            if (isRoads
+                && feature.FeatureType == AiDraftFeature.TypeRoad
+                && (!DraftGeometry.TryGetLineCoordinates(feature.GeometryGeoJson, out var vertices)
+                    || RoadPhaseRules.Evaluate(
+                        vertices, feature.Confidence, areaRings, roadNetwork,
+                        validationOptions.Value, roadRules.Value, snapEndpoints: false)
+                        .Violation != RoadPhaseViolation.None))
             {
                 continue;
             }
@@ -315,28 +341,38 @@ public class DraftFeaturesService(
 
     /// <summary>
     /// Materializes an accepted road draft into the production roads table.
-    /// The road rules (minimum geodesic length, minimum confidence — mirrored
-    /// from segma's NARS_SEGMA_ROAD_* env) gate the promotion, so a stub spur
-    /// or a weak detection that slipped past postprocessing is still blocked
-    /// here. The status transition reserves the draft first (one concurrent
+    /// Every roads-phase rule gates the promotion through <see
+    /// cref="RoadPhaseRules"/> (minimum geodesic length, minimum confidence,
+    /// turn angle, urban containment, endpoint snapping onto the network). The
+    /// rules are mirrored from segma's NARS_SEGMA_ROAD_* env and are the same
+    /// set the bulk generate-roads path and the segmentation pre-filter enforce,
+    /// so a road can never be accepted alone while generated roads obey rules
+    /// it skips. The status transition reserves the draft first (one concurrent
     /// reviewer wins); the loser's not-yet-saved road row is detached, never
     /// committed.
     /// </summary>
     private async Task<DraftReviewResult> AcceptRoadDraftAsync(
         AppDbContext db, AiDraftFeature draft, Guid userId, CancellationToken ct)
     {
-        if (!DraftGeometry.TryGetLineLengthM(draft.GeometryGeoJson, out var lengthM)
-            || lengthM < roadRules.Value.MinRoadLengthM)
+        if (!DraftGeometry.TryGetLineCoordinates(draft.GeometryGeoJson, out var vertices))
         {
             return new DraftReviewResult(DraftReviewStatus.RulesNotMet);
         }
 
-        if (draft.Confidence < roadRules.Value.MinConfidence)
+        var areaRings = await RoadPhaseRules.LoadUrbanAreaRingsAsync(db, draft.CommuneId, ct);
+        var roadNetwork = await RoadPhaseRules.LoadRoadNetworkAsync(db, draft.CommuneId, ct);
+
+        var outcome = RoadPhaseRules.Evaluate(
+            vertices, draft.Confidence, areaRings, roadNetwork,
+            validationOptions.Value, roadRules.Value, snapEndpoints: true);
+        if (outcome.Violation != RoadPhaseViolation.None)
         {
             return new DraftReviewResult(DraftReviewStatus.RulesNotMet);
         }
 
-        var dataJson = DraftGeometry.ToRoadData(draft.GeometryGeoJson).ToJsonString();
+        var data = DraftGeometry.ToRoadData(draft.GeometryGeoJson);
+        data["coordinates"] = RoadPhaseRules.ToJsonCoordinates(outcome.Coordinates);
+        var dataJson = data.ToJsonString();
         var entity = FeatureTypeRegistry.CreateEntity(
             FeatureTypes.Road,
             Guid.CreateVersion7(),

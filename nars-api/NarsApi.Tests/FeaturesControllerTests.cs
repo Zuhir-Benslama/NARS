@@ -242,6 +242,40 @@ public class FeaturesControllerTests
         }
     }
 
+    // ── POST /api/clear-roads ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task ClearRoads_NotConfirmed_Returns400()
+    {
+        var (db, factory) = CreateInMemoryDbPair("FeaturesTest");
+        await using (db)
+        {
+            var ctrl = CreateController(db, factory: factory);
+            var result = await ctrl.ClearRoads(new ClearFeaturesRequest(Confirm: false));
+            var objResult = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(400, objResult.StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task ClearRoads_Confirmed_Returns200()
+    {
+        var featureServiceMock = new Mock<IFeatureService>();
+        featureServiceMock.Setup(s => s.ClearAllRoadsAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(3);
+        var (db, factory) = CreateInMemoryDbPair("FeaturesTest");
+        await using (db)
+        {
+            var ctrl = CreateController(db, featureService: featureServiceMock.Object, factory: factory);
+
+            var result = await ctrl.ClearRoads(new ClearFeaturesRequest(Confirm: true));
+            var ok = Assert.IsType<OkObjectResult>(result);
+            Assert.Equal(200, ok.StatusCode);
+            featureServiceMock.Verify(
+                s => s.ClearAllRoadsAsync(UserId, It.IsAny<CancellationToken>()), Times.Once);
+        }
+    }
+
     // ── POST /api/update/{id} ─────────────────────────────────────────────
 
     [Fact]

@@ -16,6 +16,7 @@ const {
   mockEnableEditGeometry,
   mockEditFeatureInfo,
   mockRemoveFeature,
+  mockRemoveAllRoads,
   mockFindLayerEntryByDbId,
   mockT,
 } = vi.hoisted(() => ({
@@ -33,6 +34,7 @@ const {
   mockEnableEditGeometry: vi.fn(),
   mockEditFeatureInfo: vi.fn(),
   mockRemoveFeature: vi.fn(),
+  mockRemoveAllRoads: vi.fn(),
   mockFindLayerEntryByDbId: vi.fn(),
   mockT: vi.fn((key: string) => key),
 }))
@@ -58,6 +60,7 @@ vi.mock("./ctx-menu-actions", () => ({
   enableEditGeometry: mockEnableEditGeometry,
   editFeatureInfo: mockEditFeatureInfo,
   removeFeature: mockRemoveFeature,
+  removeAllRoads: mockRemoveAllRoads,
   findLayerEntryByDbId: mockFindLayerEntryByDbId,
 }))
 vi.mock("../../i18n", () => ({ t: mockT }))
@@ -182,6 +185,28 @@ describe("showContextMenu / bindContextMenu", () => {
     expect(store.items.some((i: any) => i.label === "ctx_generate_roads")).toBe(false)
   })
 
+  it("includes remove-all-roads item in the roads phase", () => {
+    setupPhase("roads")
+
+    mod.showContextMenu(0, 0, "r1", "roads")
+
+    const store = useContextMenuStore()
+    const item = store.items.find((i: any) => i.label === "ctx_remove_all_roads")
+    expect(item).toBeDefined()
+    expect(item.danger).toBe(true)
+    item.onClick()
+    expect(mockRemoveAllRoads).toHaveBeenCalled()
+  })
+
+  it("does not include remove-all-roads item outside the roads phase", () => {
+    setupPhase("houseEntrances")
+
+    mod.showContextMenu(0, 0, "r1", "roads")
+
+    const store = useContextMenuStore()
+    expect(store.items.some((i: any) => i.label === "ctx_remove_all_roads")).toBe(false)
+  })
+
   it("shows cityCenter lock when not on cityCenter phase", () => {
     setupPhase("areas")
 
@@ -257,6 +282,17 @@ describe("showMapContextMenu", () => {
     expect(mockGenerateRoadsFromUrbanAreas).toHaveBeenCalled()
   })
 
+  it("adds remove-all-roads item for roads phase", async () => {
+    await mod.showMapContextMenu(0, 0, mkPhase("roads"))
+
+    const store = useContextMenuStore()
+    const item = store.items.find((i: any) => i.label === "ctx_remove_all_roads")
+    expect(item).toBeDefined()
+    expect(item.danger).toBe(true)
+    item.onClick()
+    expect(mockRemoveAllRoads).toHaveBeenCalled()
+  })
+
   it("adds setHouseNumbers for houseEntrances phase", async () => {
     await mod.showMapContextMenu(0, 0, mkPhase("houseEntrances"))
 
@@ -303,6 +339,7 @@ describe("re-exports", () => {
     expect(mod.enableEditGeometry).toBe(mockEnableEditGeometry)
     expect(mod.editFeatureInfo).toBe(mockEditFeatureInfo)
     expect(mod.removeFeature).toBe(mockRemoveFeature)
+    expect(mod.removeAllRoads).toBe(mockRemoveAllRoads)
     expect(mod.findLayerEntryByDbId).toBe(mockFindLayerEntryByDbId)
     expect(mod.computeAndApplyRoadDirections).toBe(mockComputeAndApplyRoadDirections)
     expect(mod.updateEndpointMarkers).toBe(mockUpdateEndpointMarkersExport)

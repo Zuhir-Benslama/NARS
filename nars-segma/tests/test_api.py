@@ -714,11 +714,13 @@ def test_roads_registered_with_expected_config():
     assert roads.POSTPROCESSORS["linestrings"] is roads.mask_to_linestrings
 
 
-def test_road_min_length_defaults_to_10m():
-    # The 10m floor is what forbids the sub-10m spur stubs the skeletonizer
-    # emits at tile edges / junction hops. A config bump must not silently
-    # bring the old 0.0 default back.
-    assert roads.ROAD_MIN_LENGTH_M == 10.0
+def test_road_min_length_defaults_to_0():
+    # The min-length floor is 0 by default: segma does not know the commune's
+    # mapped roads, so whether a short edge is a keepable junction stub or a
+    # deleteable isolated spur is decided by the API's roads-phase rules. A
+    # config bump must not silently bring an old 10.0 default back to the
+    # API's face without the API seeing the network first.
+    assert roads.ROAD_MIN_LENGTH_M == 0.0
 
 
 def test_task_rules_wired_from_config():

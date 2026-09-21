@@ -64,17 +64,32 @@ public class ValidationOptions
 }
 
 /// <summary>
-/// Cadastre-limitation rules applied when an AI road draft is accepted.
-/// Mirrors the NARS_SEGMA_ROAD_* limits enforced inside the segmentation
-/// service, so a spacing/confidence convention change is a config bump and a
-/// draft that slipped past segma's postprocess rules is still blocked here.
-/// Defaults are no-ops (keep every draft) to match segma's env defaults.
+/// Cadastre-limitation rules applied when an AI road draft is accepted or
+/// generated. The length/confidence limits mirror the NARS_SEGMA_ROAD_* limits
+/// that used to be enforced inside the segmentation service, so a convention
+/// change is a config bump. Roads shorter than <see cref="MinRoadLengthM"/> are
+/// removed only when isolated — farther than <see cref="RoadIsolationMeters"/>
+/// from any road: a short stub that connects is topology, not noise. segma's own
+/// min-length floor is relaxed to 0 (the network is the sole judge).
 /// </summary>
 public class RoadRulesOptions
 {
-    [Range(0.0, 100_000.0)] public double MinRoadLengthM { get; set; } = 0.0;
+    /// <summary>
+    /// Minimum geodesic length for a standalone road. A road below this is kept
+    /// when it touches another road or lies within <see cref="RoadIsolationMeters"/>
+    /// of one (junction stubs are roads, not delete candidates).
+    /// </summary>
+    [Range(0.0, 100_000.0)] public double MinRoadLengthM { get; set; } = 10.0;
+
     [Range(0.0, 1.0)] public double MinConfidence { get; set; } = 0.0;
     [Range(0, 100_000)] public int MaxFeaturesPerTile { get; set; } = 0;
+
+    /// <summary>
+    /// A candidate road with no road of the commune's network within this
+    /// edge-to-edge distance is considered isolated. Used only by the
+    /// minimum-length rule: short + isolated = removed, short + connected = kept.
+    /// </summary>
+    [Range(0.0, 1000.0)] public double RoadIsolationMeters { get; set; } = 20.0;
 
     /// <summary>
     /// Distance a generated road vertex may sit outside an urban-area polygon

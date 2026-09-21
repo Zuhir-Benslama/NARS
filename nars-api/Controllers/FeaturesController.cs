@@ -119,6 +119,26 @@ public class FeaturesController(
         return Ok(ApiResponse.Ok($"Deleted {total} features"));
     }
 
+    /// <summary>Deletes all roads owned by the authenticated user, including their house entrances.</summary>
+    [HttpPost("clear-roads")]
+    [EnableRateLimiting(RateLimitPolicies.Clear)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> ClearRoads([FromBody] ClearFeaturesRequest body, CancellationToken cancellationToken = default)
+    {
+        if (!body.Confirm)
+        {
+            return Problem(detail: "Set \"confirm\": true to delete all roads.", statusCode: 400);
+        }
+
+        var total = await featureService.ClearAllRoadsAsync(RequiredCurrentUserId, cancellationToken);
+
+        logger.LogInformation("[Features] User {UserId} cleared all roads ({Total} deleted)", CurrentUserId, total);
+
+        return Ok(ApiResponse.Ok($"Deleted {total} roads"));
+    }
+
     /// <summary>Returns feature count breakdown by type for the authenticated user.</summary>
     [HttpGet("stats")]
     [ProducesResponseType(StatusCodes.Status200OK)]

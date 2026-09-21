@@ -90,3 +90,7 @@ captures/
 
 # image content-hash stamps (make/images.mk images-build)
 .image-hashes/
+
+# Local build/experiment leftovers (not part of the repo)
+.tmp-cluster-up/
+nars/

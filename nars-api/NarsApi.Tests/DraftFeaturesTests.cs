@@ -28,7 +28,8 @@ public class DraftFeaturesUnitTests
         ISegmentationClient segmentationClient,
         IDateTimeProvider timeProvider,
         RoadRulesOptions? roadRules = null,
-        BuildingRulesOptions? buildingRules = null) : DraftFeaturesService(dbFactory, segmentationClient, new CommuneScopeService(dbFactory), timeProvider, Options.Create(roadRules ?? new RoadRulesOptions()), Options.Create(buildingRules ?? new BuildingRulesOptions()))
+        BuildingRulesOptions? buildingRules = null,
+        ValidationOptions? validation = null) : DraftFeaturesService(dbFactory, segmentationClient, new CommuneScopeService(dbFactory), timeProvider, Options.Create(validation ?? new ValidationOptions()), Options.Create(roadRules ?? new RoadRulesOptions()), Options.Create(buildingRules ?? new BuildingRulesOptions()))
     {
         protected override async Task<int> TryReviewDraftAsync(
             AppDbContext db, Guid draftId, string newStatus, Guid reviewedBy, DateTimeOffset reviewedAt, CancellationToken ct)
@@ -83,17 +84,115 @@ public class DraftFeaturesUnitTests
         ISegmentationClient? segmentationClient = null,
         IDbContextFactory<AppDbContext>? factory = null,
         RoadRulesOptions? roadRules = null,
-        BuildingRulesOptions? buildingRules = null) =>
+        BuildingRulesOptions? buildingRules = null,
+        ValidationOptions? validation = null) =>
         new TestableDraftFeaturesService(
             factory ?? new TestDbContextFactory(db),
             segmentationClient ?? Mock.Of<ISegmentationClient>(),
             Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow),
             roadRules,
-            buildingRules);
+            buildingRules,
+            validation);
 
     private static async Task SeedAsync(AppDbContext db)
     {
         await SeedData.SeedAdminLocationsAsync(db);
+    }
+
+    // Road drafts placed at the synthetic location of SeedData.AddDraftAsync
+    // (GeoJSON [lng, lat] vertices ≈ lng 36.72..36.73, lat 2.96..2.97) must lie
+    // inside a CommuneId100 urban area (owned by a user in that commune) or the
+    // containment rule rejects them before acceptance.
+    private static string SyntheticRoadAreaData()
+        => """
+            {"type":"areas","label":"","areaTypeKey":"central_urban","coordinates":[
+              {"lat":2.95,"lng":36.71},
+              {"lat":2.95,"lng":36.74},
+              {"lat":2.98,"lng":36.74},
+              {"lat":2.98,"lng":36.71}]}
+            """;
+
+    private static async Task<Guid> SeedSyntheticRoadUrbanAreaAsync(AppDbContext db)
+    {
+        var owner = await SeedData.CreateUserAsync(db, UserRoles.CommuneUser, communeId: CommuneId100);
+        db.Areas.Add(new Area
+        {
+            Id = Guid.NewGuid(),
+            UserId = owner.Id,
+            Layer = FeatureTypes.AreaLayers.CentralUrban,
+            Label = "Urban",
+            Data = SyntheticRoadAreaData(),
+        });
+        await db.SaveChangesAsync();
+        return owner.Id;
+    }
+
+    // Community-area box for the El Tarf road fixtures
+    // (lng 7.430..7.440 / lat 36.014..36.017), owned by a CommuneId100 user.
+    private static string ElTarfAreaData()
+        => """
+            {"type":"areas","label":"","areaTypeKey":"central_urban","coordinates":[
+              {"lat":36.014,"lng":7.430},
+              {"lat":36.014,"lng":7.440},
+              {"lat":36.017,"lng":7.440},
+              {"lat":36.017,"lng":7.430}]}
+            """;
+
+    private static async Task SeedElTarfUrbanAreaAsync(AppDbContext db)
+    {
+        var owner = await SeedData.CreateUserAsync(db, UserRoles.CommuneUser, communeId: CommuneId100);
+        db.Areas.Add(new Area
+        {
+            Id = Guid.NewGuid(),
+            UserId = owner.Id,
+            Layer = FeatureTypes.AreaLayers.CentralUrban,
+            Label = "Urban",
+            Data = ElTarfAreaData(),
+        });
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>Seeds a CommuneId100-owned box area; returns the owner user id.</summary>
+    private static async Task<Guid> AddAreaAsync(
+        AppDbContext db, double minLat, double maxLat, double minLng, double maxLng)
+    {
+        var owner = await SeedData.CreateUserAsync(db, UserRoles.CommuneUser, communeId: CommuneId100);
+        db.Areas.Add(new Area
+        {
+            Id = Guid.NewGuid(),
+            UserId = owner.Id,
+            Layer = FeatureTypes.AreaLayers.CentralUrban,
+            Label = "Urban",
+            Data = $$"""
+                {"type":"areas","label":"","areaTypeKey":"central_urban","coordinates":[
+                  {"lat":{{minLat}},"lng":{{minLng}}},
+                  {"lat":{{minLat}},"lng":{{maxLng}}},
+                  {"lat":{{maxLat}},"lng":{{maxLng}}},
+                  {"lat":{{maxLat}},"lng":{{minLng}}}]}
+                """,
+        });
+        await db.SaveChangesAsync();
+        return owner.Id;
+    }
+
+    /// <summary>Seeds a network road in CommuneId100 owned by <paramref name="ownerId"/>.</summary>
+    private static async Task AddNetworkRoadAsync(
+        AppDbContext db, Guid ownerId, double lon1, double lat1, double lon2, double lat2)
+    {
+        db.Roads.Add(new Road
+        {
+            Id = Guid.NewGuid(),
+            UserId = ownerId,
+            Layer = FeatureTypes.RoadLayers.Street,
+            Label = "Network",
+            Data = $$"""
+                {"type":"road","label":"","roadTypeKey":"street","coordinates":[
+                  {"lat":{{lat1}},"lng":{{lon1}}},
+                  {"lat":{{lat2}},"lng":{{lon2}}}]}
+                """,
+            UpdatedAt = FixedUtcNow,
+        });
+        await db.SaveChangesAsync();
     }
 
     [Fact]
@@ -193,17 +292,19 @@ public class DraftFeaturesUnitTests
     [Fact]
     public async Task SegmentTile_Roads_InScopeCommune_PersistsDraftsAsRoads()
     {
+        const string roadJson = """{"type":"LineString","coordinates":[[7.4370000000,36.0160000000],[7.4380000000,36.0165000000]]}""";
         var (db, factory) = CreateInMemoryDbPair("DraftsSegmentRoads");
         await using (db)
         {
             await SeedAsync(db);
+            await SeedElTarfUrbanAreaAsync(db);
             var segmentation = new Mock<ISegmentationClient>();
             segmentation.Setup(s => s.SegmentTileAsync(
                     It.IsAny<string>(), It.IsAny<Stream>(), "tile.png", "image/png",
                     It.IsAny<(double, double, double, double)>(), default))
                 .ReturnsAsync(new SegmentationResult
                 {
-                    Roads = [new SegmentedFeature("""{"type":"LineString"}""", 0.9, AiDraftFeature.TypeRoad)],
+                    Roads = [new SegmentedFeature(roadJson, 0.9, AiDraftFeature.TypeRoad)],
                 });
             var svc = CreateService(db, segmentation.Object, factory);
             using var stream = new MemoryStream([1, 2, 3]);
@@ -264,6 +365,7 @@ public class DraftFeaturesUnitTests
         await using (db)
         {
             await SeedAsync(db);
+            await SeedElTarfUrbanAreaAsync(db);
             db.AiDraftFeatures.Add(AiDraftFeature.Create(
                 AiDraftFeature.TypeRoad, roadJson, 0.6, CommuneId100, "tile.png", FixedUtcNow));
             await db.SaveChangesAsync();
@@ -295,7 +397,7 @@ public class DraftFeaturesUnitTests
     }
 
     [Fact]
-    public async Task SegmentTile_Roads_GeometryWithoutCoordinates_IsNotDeduplicated()
+    public async Task SegmentTile_Roads_GeometryWithoutCoordinates_IsDroppedByRoadRules()
     {
         var (db, factory) = CreateInMemoryDbPair("DraftsSegmentNoCoords");
         await using (db)
@@ -319,8 +421,9 @@ public class DraftFeaturesUnitTests
             var summary = await svc.SegmentTileAsync(UserRoles.NationalAdmin, null, null, null, CommuneId100,
                 AiDraftFeature.TypeRoad, stream, "tile.png", "image/png", (1.0, 1.0, 2.0, 2.0), default);
 
-            Assert.Single(summary.DraftIds);
-            Assert.Equal(2, (await db.AiDraftFeatures.ToListAsync()).Count);
+            Assert.Equal(1, summary.RoadCount);
+            Assert.Empty(summary.DraftIds);
+            Assert.Single(await db.AiDraftFeatures.ToListAsync());
         }
     }
 
@@ -347,6 +450,7 @@ public class DraftFeaturesUnitTests
         await using (db)
         {
             await SeedAsync(db);
+            await SeedSyntheticRoadUrbanAreaAsync(db);
             var draftId = await SeedData.AddDraftAsync(db, CommuneId100);
             var svc = CreateService(db, factory: factory);
 
@@ -401,6 +505,7 @@ public class DraftFeaturesUnitTests
         await using (db)
         {
             await SeedAsync(db);
+            await SeedSyntheticRoadUrbanAreaAsync(db);
             var draftId = await SeedData.AddDraftAsync(db, CommuneId100);
             var svc = CreateService(db, factory: factory);
 
@@ -418,6 +523,7 @@ public class DraftFeaturesUnitTests
         await using (db)
         {
             await SeedAsync(db);
+            await SeedSyntheticRoadUrbanAreaAsync(db);
             var draftId = await SeedData.AddDraftAsync(db, CommuneId100);
             var svc = CreateService(db, factory: factory);
 
@@ -448,6 +554,12 @@ public class DraftFeaturesUnitTests
         await using (db)
         {
             await SeedAsync(db);
+            // ~11 m at 5000 m minimum length. A network must already exist for
+            // the too-short rules to prune — a far-away mapped road (~30 km)
+            // provides one without being within the isolation distance, so the
+            // draft is a genuinely isolated spur and is removed.
+            var owner = await SeedData.CreateUserAsync(db, UserRoles.CommuneUser, communeId: CommuneId100);
+            await AddNetworkRoadAsync(db, owner.Id, 37.0000, 2.9700, 37.5000, 2.9700);
             var draft = AiDraftFeature.Create(
                 featureType: AiDraftFeature.TypeRoad,
                 geometryGeoJson: """{"type":"LineString","coordinates":[[36.7200,2.9600],[36.7201,2.9601]]}""",
@@ -462,7 +574,8 @@ public class DraftFeaturesUnitTests
             var result = await svc.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, UserId, draft.Id, default);
 
             Assert.Equal(DraftReviewStatus.RulesNotMet, result.Status);
-            Assert.Empty(db.Roads);
+            // The seeded network road is the only road — the draft created none.
+            Assert.DoesNotContain(db.Roads, r => r.UserId == UserId);
             db.ChangeTracker.Clear();
             var reloaded = await db.AiDraftFeatures.FindAsync(draft.Id);
             Assert.Equal(AiDraftFeature.StatusPending, reloaded!.Status);
@@ -491,6 +604,196 @@ public class DraftFeaturesUnitTests
 
             Assert.Equal(DraftReviewStatus.RulesNotMet, result.Status);
             Assert.Empty(db.Roads);
+        }
+    }
+
+    [Fact]
+    public async Task AcceptRoadDraft_OutsideUrbanArea_ReturnsRulesNotMet()
+    {
+        var (db, factory) = CreateInMemoryDbPair("DraftsAcceptOutsideArea");
+        await using (db)
+        {
+            await SeedAsync(db);
+            var draftId = await SeedData.AddDraftAsync(db, CommuneId100);
+            var svc = CreateService(db, factory: factory);
+
+            var result = await svc.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, UserId, draftId, default);
+
+            Assert.Equal(DraftReviewStatus.RulesNotMet, result.Status);
+            Assert.Empty(db.Roads);
+            db.ChangeTracker.Clear();
+            var reloaded = await db.AiDraftFeatures.FindAsync(draftId);
+            Assert.Equal(AiDraftFeature.StatusPending, reloaded!.Status);
+        }
+    }
+
+    [Fact]
+    public async Task AcceptRoadDraft_EndpointsFarFromNetwork_SeedTheGraph()
+    {
+        var (db, factory) = CreateInMemoryDbPair("DraftsAcceptUnconnected");
+        await using (db)
+        {
+            await SeedAsync(db);
+            var owner = await SeedSyntheticRoadUrbanAreaAsync(db);
+            // A local network road (within the 3000 m search radius of the draft's
+            // corridor) sits ~500 m from both endpoints. Connectivity is a merge,
+            // not a rejection: the endpoints are beyond the 20 m snap tolerance so
+            // they keep their coordinates and the road seeds/extents the graph.
+            await AddNetworkRoadAsync(db, owner, 36.7200, 2.9655, 36.7300, 2.9655);
+            var draftId = await SeedData.AddDraftAsync(db, CommuneId100);
+            var svc = CreateService(db, factory: factory);
+
+            var result = await svc.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, UserId, draftId, default);
+
+            Assert.Equal(DraftReviewStatus.Success, result.Status);
+            var road = Assert.Single(db.Roads, r => r.Label == string.Empty);
+            Assert.Equal(UserId, road.UserId);
+            var data = JsonSerializer.Deserialize<JsonElement>(road.Data);
+            var coords = data.GetProperty("coordinates");
+            Assert.Equal(2, coords.GetArrayLength());
+            Assert.Equal(36.72, coords[0].GetProperty("lng").GetDouble(), 4);
+            Assert.Equal(2.96, coords[0].GetProperty("lat").GetDouble(), 4);
+            Assert.Equal(36.73, coords[1].GetProperty("lng").GetDouble(), 4);
+            Assert.Equal(2.97, coords[1].GetProperty("lat").GetDouble(), 4);
+            db.ChangeTracker.Clear();
+            var reloaded = await db.AiDraftFeatures.FindAsync(draftId);
+            Assert.Equal(AiDraftFeature.StatusAccepted, reloaded!.Status);
+        }
+    }
+
+    [Fact]
+    public async Task AcceptRoadDraft_SnapsConnectedEndpointsOntoNetwork()
+    {
+        var (db, factory) = CreateInMemoryDbPair("DraftsAcceptSnap");
+        await using (db)
+        {
+            await SeedAsync(db);
+            var owner = await AddAreaAsync(db, 36.7199, 36.7203, 2.9595, 2.9605);
+            // East-west network at lat 36.7201, ~11 m from both draft endpoints
+            // (draft spans lat 36.7200..36.7202).
+            await AddNetworkRoadAsync(db, owner, 2.9595, 36.7201, 2.9605, 36.7201);
+            var draft = AiDraftFeature.Create(
+                featureType: AiDraftFeature.TypeRoad,
+                geometryGeoJson: """{"type":"LineString","coordinates":[[2.9600,36.7200],[2.9600,36.7202]]}""",
+                confidence: 0.9,
+                communeId: CommuneId100,
+                sourceTileRef: "tile.png",
+                createdAt: FixedUtcNowOffset);
+            db.AiDraftFeatures.Add(draft);
+            await db.SaveChangesAsync();
+            var svc = CreateService(db, factory: factory);
+
+            var result = await svc.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, UserId, draft.Id, default);
+
+            Assert.Equal(DraftReviewStatus.Success, result.Status);
+            db.ChangeTracker.Clear();
+            var road = Assert.Single(db.Roads.Where(r => r.Label == ""));
+            var data = JsonSerializer.Deserialize<JsonElement>(road.Data);
+            var coords = data.GetProperty("coordinates");
+            Assert.Equal(2, coords.GetArrayLength());
+            Assert.Equal(36.7201, coords[0].GetProperty("lat").GetDouble(), 5);
+            Assert.Equal(36.7201, coords[1].GetProperty("lat").GetDouble(), 5);
+            Assert.Equal(2.9600, coords[0].GetProperty("lng").GetDouble(), 5);
+        }
+    }
+
+    [Fact]
+    public async Task AcceptRoadDraft_ShortAndNearNetwork_IsAccepted()
+    {
+        var (db, factory) = CreateInMemoryDbPair("DraftsAcceptShortNear");
+        await using (db)
+        {
+            await SeedAsync(db);
+            var owner = await AddAreaAsync(db, 36.7199, 36.7203, 2.9595, 2.9605);
+            // East-west network at lat 36.7201; the ~4.5 m draft sits ~11 m
+            // north of it. Short but within the isolation distance of a road,
+            // so it is a connection, not a delete candidate — and it snaps on.
+            await AddNetworkRoadAsync(db, owner, 2.9595, 36.7201, 2.9605, 36.7201);
+            var draft = AiDraftFeature.Create(
+                featureType: AiDraftFeature.TypeRoad,
+                geometryGeoJson: """{"type":"LineString","coordinates":[[2.9599,36.7202],[2.95995,36.7202]]}""",
+                confidence: 0.9,
+                communeId: CommuneId100,
+                sourceTileRef: "tile.png",
+                createdAt: FixedUtcNowOffset);
+            db.AiDraftFeatures.Add(draft);
+            await db.SaveChangesAsync();
+            var svc = CreateService(db, factory: factory);
+
+            var result = await svc.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, UserId, draft.Id, default);
+
+            Assert.Equal(DraftReviewStatus.Success, result.Status);
+            db.ChangeTracker.Clear();
+            var road = Assert.Single(db.Roads.Where(r => r.Label == ""));
+            var data = JsonSerializer.Deserialize<JsonElement>(road.Data);
+            var coords = data.GetProperty("coordinates");
+            Assert.Equal(2, coords.GetArrayLength());
+            Assert.Equal(36.7201, coords[0].GetProperty("lat").GetDouble(), 5);
+            Assert.Equal(36.7201, coords[1].GetProperty("lat").GetDouble(), 5);
+            Assert.Equal(2.9599, coords[0].GetProperty("lng").GetDouble(), 5);
+        }
+    }
+
+    [Fact]
+    public async Task AcceptRoadDraft_ShortAndIsolated_WithNoNetwork_IsAccepted()
+    {
+        var (db, factory) = CreateInMemoryDbPair("DraftsAcceptShortIsolated");
+        await using (db)
+        {
+            await SeedAsync(db);
+            // Inside the urban area, ~4.5 m long, and no road exists in the
+            // commune — a bootstrap draft. It seeds the network rather than being
+            // pruned: the too-short rule only removes a spur once a network to be
+            // a spur OF exists.
+            await AddAreaAsync(db, 36.7199, 36.7203, 2.9595, 2.9605);
+            var draft = AiDraftFeature.Create(
+                featureType: AiDraftFeature.TypeRoad,
+                geometryGeoJson: """{"type":"LineString","coordinates":[[2.9600,36.7200],[2.96005,36.7200]]}""",
+                confidence: 0.9,
+                communeId: CommuneId100,
+                sourceTileRef: "tile.png",
+                createdAt: FixedUtcNowOffset);
+            db.AiDraftFeatures.Add(draft);
+            await db.SaveChangesAsync();
+            var svc = CreateService(db, factory: factory);
+
+            var result = await svc.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, UserId, draft.Id, default);
+
+            Assert.Equal(DraftReviewStatus.Success, result.Status);
+            var road = Assert.Single(db.Roads);
+            var data = JsonSerializer.Deserialize<JsonElement>(road.Data);
+            Assert.Equal(2.96, data.GetProperty("coordinates")[0].GetProperty("lng").GetDouble(), 5);
+            db.ChangeTracker.Clear();
+            var reloaded = await db.AiDraftFeatures.FindAsync(draft.Id);
+            Assert.Equal(AiDraftFeature.StatusAccepted, reloaded!.Status);
+        }
+    }
+
+    [Fact]
+    public async Task SegmentTile_Roads_OutsideUrbanArea_IsDropped()
+    {
+        const string roadJson = """{"type":"LineString","coordinates":[[7.4370000000,36.0160000000],[7.4380000000,36.0165000000]]}""";
+        var (db, factory) = CreateInMemoryDbPair("DraftsSegmentOutsideArea");
+        await using (db)
+        {
+            await SeedAsync(db);
+            var segmentation = new Mock<ISegmentationClient>();
+            segmentation.Setup(s => s.SegmentTileAsync(
+                    It.IsAny<string>(), It.IsAny<Stream>(), "tile.png", "image/png",
+                    It.IsAny<(double, double, double, double)>(), default))
+                .ReturnsAsync(new SegmentationResult
+                {
+                    Roads = [new SegmentedFeature(roadJson, 0.9, AiDraftFeature.TypeRoad)],
+                });
+            var svc = CreateService(db, segmentation.Object, factory);
+            using var stream = new MemoryStream([1, 2, 3]);
+
+            var summary = await svc.SegmentTileAsync(UserRoles.NationalAdmin, null, null, null, CommuneId100,
+                AiDraftFeature.TypeRoad, stream, "tile.png", "image/png", (1.0, 1.0, 2.0, 2.0), default);
+
+            Assert.Equal(1, summary.RoadCount);
+            Assert.Empty(summary.DraftIds);
+            Assert.Empty(await db.AiDraftFeatures.ToListAsync());
         }
     }
 
@@ -742,6 +1045,7 @@ public class DraftFeaturesUnitTests
         await using (db)
         {
             await SeedAsync(db);
+            await SeedSyntheticRoadUrbanAreaAsync(db);
             var draftId = await SeedData.AddDraftAsync(db, CommuneId100);
             var svc = CreateService(db, factory: factory);
             await svc.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, UserId, draftId, default);
@@ -794,6 +1098,7 @@ public class DraftFeaturesUnitTests
         await using (db)
         {
             await SeedAsync(db);
+            await SeedSyntheticRoadUrbanAreaAsync(db);
             var draftId = await SeedData.AddDraftAsync(db, CommuneId100);
             var svc = CreateService(db, factory: factory);
             await svc.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, UserId, draftId, default);

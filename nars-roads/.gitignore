@@ -1,0 +1,8 @@
+# Generated/bulk artifacts — labels.jsonl is committed (provenance), the rest
+# is reproducible from prepare_local_labels.py / train_roads.py.
+.venv/
+data/tiles/
+data/chips/
+__pycache__/
+checkpoints/
+*.pyc

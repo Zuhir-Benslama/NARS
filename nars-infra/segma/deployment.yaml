@@ -80,9 +80,10 @@ spec:
               cpu: "250m"
               memory: "256Mi"
         - name: fetch-road-weights
-          # Pulls the raw SpaceNet 3 champion roads checkpoint (a pickled
-          # model, not a state_dict) into /srv/weights for the conversion
-          # initContainer. Fail-safe like fetch-weights.
+          # Pulls the roads model state_dict (DeepLabV3+/ConvNeXt-Tiny,
+          # trained on commune-validated drafts — plain weights_only-safe
+          # state_dict, no conversion needed) into /srv/weights. Fail-safe
+          # like fetch-weights.
           image: curlimages/curl:8.10.1@sha256:d9b4541e214bcd85196d6e92e2753ac6d0ea699f0af5741f8c6cccbfcf00ef4b
           imagePullPolicy: IfNotPresent
           command: ["/bin/sh", "-c"]
@@ -94,7 +95,7 @@ spec:
                 exit 1
               fi
               curl --fail --silent --show-error --location \
-                "$NARS_SEGMA_ROAD_WEIGHTS_URL" -o /srv/weights/fold0_best.pth
+                "$NARS_SEGMA_ROAD_WEIGHTS_URL" -o /srv/weights/roads_best.pth
               ls -lh /srv/weights
           env:
             - name: NARS_SEGMA_ROAD_WEIGHTS_URL
@@ -123,48 +124,6 @@ spec:
             limits:
               cpu: "250m"
               memory: "256Mi"
-        - name: convert-roads-weights
-          # The SpaceNet roads checkpoint is a legacy pickled model object; the
-          # serving image only loads plain state_dicts (weights_only=True,
-          # ref app/scripts/convert_roads.py). Convert once here so the main
-          # container never touches untrusted pickle bytes. Runs in the app
-          # image (has torch) after fetch-road-weights completes. This script
-          # runs offline, so a malicious pickle has no network or secrets.
-          image: zuhirbenslama/nars-segma:latest
-          imagePullPolicy: IfNotPresent
-          command: ["python", "-m", "app.scripts.convert_roads"]
-          args:
-            - --input
-            - /srv/weights/fold0_best.pth
-            - --output
-            - /srv/weights/roads_best.pth
-          env:
-            - name: TMPDIR
-              value: /tmp
-            - name: HOME
-              value: /tmp
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 10001
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            seccompProfile:
-              type: RuntimeDefault
-            capabilities:
-              drop:
-                - ALL
-          volumeMounts:
-            - name: weights
-              mountPath: /srv/weights
-            - name: temp
-              mountPath: /tmp
-          resources:
-            requests:
-              cpu: "500m"
-              memory: "1Gi"
-            limits:
-              cpu: "2"
-              memory: "4Gi"
       containers:
         - name: nars-segma
           # ⚠ Dev default only — override via kustomize in CI/CD (e.g.
@@ -183,13 +142,21 @@ spec:
               value: /srv/weights/unet_bldg_base.pth
             - name: NARS_SEGMA_ROAD_WEIGHTS_PATH
               value: /srv/weights/roads_best.pth
-            # Road rules (limitation) — discard below these before features
-            # reach the API: a minimum geodesic length (metres) forbids the
-            # stub spurs skeletonization emits at tile edges, a minimum
-            # confidence drops weak detections, and the per-tile cap bounds
-            # how many drafts a single acceptance creates.
+            # Roads model = DeepLabV3+/ConvNeXt-Tiny trained on commune-
+            # validated drafts (nars-roads/, timm==0.9.7). The builder flag
+            # selects it over the legacy SpaceNet resnet34-upsample; weights
+            # come from the fetch-road-weights initContainer as a plain
+            # state_dict (safe weights_only load).
+            - name: NARS_SEGMA_ROAD_BUILDER
+              value: deeplabv3p-convnext
+            # Road rules (limitation). The minimum length floor is 0: segma
+            # cannot see the commune's mapped network, so whether a short edge
+            # is a keepable junction stub or a deleteable isolated spur is the
+            # API's roads-phase rules' decision (which do see it). Confidence
+            # drops weak detections; the per-tile cap bounds how many drafts a
+            # single acceptance creates.
             - name: NARS_SEGMA_ROAD_MIN_LENGTH_M
-              value: "10"
+              value: "0"
             - name: NARS_SEGMA_ROAD_MIN_CONFIDENCE
               value: "0"
             - name: NARS_SEGMA_ROAD_MAX_FEATURES

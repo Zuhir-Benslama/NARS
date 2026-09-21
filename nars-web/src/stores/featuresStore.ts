@@ -44,6 +44,13 @@ export const useFeaturesStore = defineStore("features", {
       this.updateSource()
     },
 
+    // Drop every feature belonging to a phase (e.g. all roads) in one shot —
+    // a single setData rebuild instead of one updateSource per removal.
+    removeAllPhase(phaseKey: string) {
+      this.features = this.features.filter((f) => f.properties?.phaseKey !== phaseKey)
+      this.updateSource()
+    },
+
     update(
       id: string,
       patch: Partial<Pick<MaplibreFeature, "geometry">> & {

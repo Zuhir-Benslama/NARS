@@ -1,0 +1,2 @@
+# Build/serving artifacts — baked into the image at build time, never committed.
+weights/*.pth

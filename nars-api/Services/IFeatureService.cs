@@ -18,6 +18,8 @@ public interface IFeatureService
     Task<bool> DeleteFeatureAsync(Guid featureId, Guid userId, string featureType, CancellationToken ct);
     /// <summary>Deletes all features owned by the user and returns how many were deleted.</summary>
     Task<int> ClearAllFeaturesAsync(Guid userId, CancellationToken ct);
+    /// <summary>Deletes all roads owned by the user (with their house entrances and registry entries) and returns how many roads were deleted.</summary>
+    Task<int> ClearAllRoadsAsync(Guid userId, CancellationToken ct);
     /// <summary>
     /// Queues a background recompute of the user's scattered area layer after an
     /// area feature is created, updated, or deleted. No-op when the user has no

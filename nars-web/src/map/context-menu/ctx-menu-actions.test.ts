@@ -49,6 +49,7 @@ vi.mock("../roads/road-directions", () => ({ updateEndpointMarkers: mockUpdateEn
 
 let _setCtx: (ctx: any) => void
 let mockFeaturesStoreRemove: ReturnType<typeof vi.fn>
+let mockFeaturesStoreRemoveAllPhase: ReturnType<typeof vi.fn>
 let mod: any
 let useLayerStore: any
 let useAppStore: any
@@ -62,11 +63,13 @@ beforeEach(async () => {
   const stateMod = await import("../core/state")
   _setCtx = stateMod._setCtx
   mockFeaturesStoreRemove = vi.fn()
+  mockFeaturesStoreRemoveAllPhase = vi.fn()
   vi.doMock("../../stores/featuresStore", () => ({
     useFeaturesStore: () => ({
       getAll: vi.fn().mockReturnValue([]),
       add: vi.fn(),
       remove: mockFeaturesStoreRemove,
+      removeAllPhase: mockFeaturesStoreRemoveAllPhase,
       update: vi.fn(),
     }),
   }))
@@ -245,5 +248,71 @@ describe("removeFeature", () => {
     await mod.removeFeature("rd1")
 
     expect(mockUpdateEndpointMarkers).toHaveBeenCalled()
+  })
+})
+
+describe("removeAllRoads", () => {
+  it("returns early when there are no roads", async () => {
+    await mod.removeAllRoads()
+
+    expect(mockShowConfirm).not.toHaveBeenCalled()
+    expect(mockShowToast).toHaveBeenCalledWith("ctx_roads_none", "info")
+  })
+
+  it("returns early when confirm is denied", async () => {
+    addLayerEntry("roads", { dbId: "r1", data: { type: "roads", label: "Road" } })
+    mockShowConfirm.mockResolvedValue(false)
+
+    await mod.removeAllRoads()
+
+    expect(mockApiFetch).not.toHaveBeenCalled()
+  })
+
+  it("clears roads from layer and feature stores on success", async () => {
+    addLayerEntry("roads", { dbId: "r1", data: { type: "roads", label: "Road A" } })
+    addLayerEntry("roads", { dbId: "r2", data: { type: "roads", label: "Road B" } })
+    addLayerEntry("areas", { dbId: "a1", data: { type: "areas", label: "Area" } })
+    mockShowConfirm.mockResolvedValue(true)
+    mockApiFetch.mockResolvedValue({ ok: true })
+
+    await mod.removeAllRoads()
+
+    expect(mockApiFetch).toHaveBeenCalledWith("/api/features/clear-roads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: true }),
+    })
+    expect(useLayerStore().roads).toHaveLength(0)
+    expect(useLayerStore().areas).toHaveLength(1)
+    expect(mockFeaturesStoreRemoveAllPhase).toHaveBeenCalledWith("roads")
+    expect(mockUpdateEndpointMarkers).toHaveBeenCalled()
+    expect(mockShowToast).toHaveBeenCalledWith("ctx_roads_removed_all", "success")
+  })
+
+  it("clears selection when the selected feature is a road", async () => {
+    addLayerEntry("roads", {
+      dbId: "sel",
+      data: { type: "roads", label: "Selected Road" },
+    })
+    useSelectionStore().setSelectedFeatureDbId("sel")
+    mockShowConfirm.mockResolvedValue(true)
+    mockApiFetch.mockResolvedValue({ ok: true })
+
+    await mod.removeAllRoads()
+
+    expect(useSelectionStore().selectedFeatureDbId).toBeNull()
+  })
+
+  it("does not clear stores when the API call fails", async () => {
+    addLayerEntry("roads", { dbId: "r2", data: { type: "roads", label: "Road C" } })
+    mockShowConfirm.mockResolvedValue(true)
+    mockApiFetch.mockRejectedValue(new Error("Network failure"))
+
+    await mod.removeAllRoads()
+
+    expect(useLayerStore().roads).toHaveLength(1)
+    expect(mockFeaturesStoreRemoveAllPhase).not.toHaveBeenCalled()
+    expect(mockUpdateEndpointMarkers).not.toHaveBeenCalled()
+    expect(mockShowToast).toHaveBeenCalledWith("map_delete_failed", expect.any(String))
   })
 })

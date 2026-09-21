@@ -21,6 +21,7 @@ import {
   enableEditGeometry,
   editFeatureInfo,
   removeFeature,
+  removeAllRoads,
   findLayerEntryByDbId,
 } from "./ctx-menu-actions"
 
@@ -28,6 +29,7 @@ export {
   enableEditGeometry,
   editFeatureInfo,
   removeFeature,
+  removeAllRoads,
   findLayerEntryByDbId,
   computeAndApplyRoadDirections,
   updateEndpointMarkers,
@@ -111,6 +113,11 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
     items.push({
       label: t("ctx_generate_roads"),
       onClick: () => void generateRoadsFromUrbanAreas(),
+    })
+    items.push({
+      label: t("ctx_remove_all_roads"),
+      danger: true,
+      onClick: () => void removeAllRoads(),
     })
   }
 
@@ -205,6 +212,11 @@ export async function showMapContextMenu(
     items.push({
       label: t("ctx_road_dir"),
       onClick: () => computeAndApplyRoadDirections(),
+    })
+    items.push({
+      label: t("ctx_remove_all_roads"),
+      danger: true,
+      onClick: () => void removeAllRoads(),
     })
   } else if (phase.key === "houseEntrances") {
     items.push({

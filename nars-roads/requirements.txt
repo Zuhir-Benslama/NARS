@@ -1,0 +1,12 @@
+# Training/data-prep runtime for the nars-roads model (Phase C).
+#
+# The venv is created with `python3 -m venv --system-site-packages .venv` so
+# the heavy pieces come from the host system Python 3.14 (see below) and the
+# one thing that must be PINNED to nars-segma's serving requirements is pulled
+# in explicitly. timm must equal the serving pin (nars-segma/requirements.txt
+# timm==0.9.7) so the ConvNeXt-Tiny encoder state_dict key names are identical
+# at training and inference time.
+timm==0.9.7
+
+# Provided by the host system python (inherited via --system-site-packages):
+#   torch==2.13.0+cu130   numpy==2.3.5   pillow==12.3.0   requests

@@ -265,8 +265,9 @@ public class RoadGenerationUnitTests
             await SeedRoadAsync(db, userId); // east-west network at lat 36.7165
             var svc = CreateService(db, factory);
 
-            // Both endpoints sit ~11 m off the network (within 20 m), so they
-            // are snapped onto lat 36.7165; endpoints further away would drop.
+            // Both endpoints sit ~11 m off the network (within the 20 m snap
+            // tolerance), so they are pulled onto lat 36.7165. Endpoints further
+            // away are left at their original coordinates (they seed the graph).
             var summary = await svc.GenerateAsync(
                 UserRole, CommuneId100, null, null, userId, CommuneId100, [draftId], default);
 
@@ -279,13 +280,17 @@ public class RoadGenerationUnitTests
     }
 
     [Fact]
-    public async Task Generate_UnconnectableEndpoint_DropsAndLeavesDraftPending()
+    public async Task Generate_UnconnectableEndpoint_SeedsNetworkInsteadOfDropping()
     {
         var (db, factory) = CreateInMemoryDbPair("RoadGenUnconnected");
         await using (db)
         {
             await SeedAdminLocationsAsync(db);
-            // Inside the urban area but ~500 m from the seeded network.
+            // Inside the urban area but ~500 m from the seeded network. The
+            // paper rule used to drop such a road as Disconnected; connectivity
+            // is a merge (not a rejection), so a road that cannot reach the
+            // network seeds it instead — otherwise generation from a sparse
+            // commune could never get started.
             var (userId, draftId) = await SeedCommuneAsync(
                 db, LineGeoJson((2.9510, 36.7210), (2.9520, 36.7210)));
             await AddUrbanAreaAsync(db, userId);
@@ -295,9 +300,12 @@ public class RoadGenerationUnitTests
             var summary = await svc.GenerateAsync(
                 UserRole, CommuneId100, null, null, userId, CommuneId100, [draftId], default);
 
-            Assert.Empty(summary.Created);
-            Assert.Equal(1, summary.Dropped);
-            Assert.Equal(AiDraftFeature.StatusPending, await DraftStatusAsync(factory, draftId));
+            var road = Assert.Single(summary.Created);
+            Assert.Equal(0, summary.Dropped);
+            // No endpoint was within the snap tolerance, so the seed kept its
+            // original coordinates rather than being pulled off-course.
+            Assert.Equal(36.7210, road.Data["coordinates"]![0]!["lat"]!.GetValue<double>(), 6);
+            Assert.Equal(AiDraftFeature.StatusAccepted, await DraftStatusAsync(factory, draftId));
         }
     }
 
@@ -329,7 +337,7 @@ public class RoadGenerationUnitTests
     }
 
     [Fact]
-    public async Task Generate_LocalAndRemoteRoads_StillRequiresConnectionToLocal()
+    public async Task Generate_LocalAndRemoteRoads_SnapsOntoLocalRoad()
     {
         var (db, factory) = CreateInMemoryDbPair("RoadGenLocalAndRemote");
         await using (db)
@@ -342,8 +350,9 @@ public class RoadGenerationUnitTests
             await SeedRoadAsync(db, userId, 2.9600, 36.7600, 2.9630, 36.7600); // remote
             var svc = CreateService(db, factory);
 
-            // A local mapped road still gates connectivity (and wins snapping),
-            // despite a second, far-away road co-existing in the commune.
+            // A local mapped road wins endpoint snapping (the draft sits ~11 m
+            // north of it), despite a second, far-away road co-existing in the
+            // commune.
             var summary = await svc.GenerateAsync(
                 UserRole, CommuneId100, null, null, userId, CommuneId100, [draftId], default);
 
@@ -384,6 +393,139 @@ public class RoadGenerationUnitTests
             Assert.Equal(AiDraftFeature.StatusPending, await DraftStatusAsync(factory, outId));
             Assert.Equal(AiDraftFeature.StatusPending, await DraftStatusAsync(factory, turnId));
             Assert.Equal(AiDraftFeature.StatusPending, await DraftStatusAsync(factory, lowConfId));
+        }
+    }
+
+    [Fact]
+    public async Task Generate_ShortDraftWithNoNetwork_SeedsTheNetwork()
+    {
+        var (db, factory) = CreateInMemoryDbPair("RoadGenShortIsolated");
+        await using (db)
+        {
+            await SeedAdminLocationsAsync(db);
+            // A ~4.5 m draft inside the area with no road anywhere near it —
+            // short AND trivially "isolated". With no network to be a spur of,
+            // it is the bootstrap: it seeds the commune's road network instead
+            // of being pruned.
+            var (userId, draftId) = await SeedCommuneAsync(
+                db, LineGeoJson((2.9520, 36.7160), (2.95205, 36.7160)));
+            await AddUrbanAreaAsync(db, userId);
+            var svc = CreateService(db, factory);
+
+            var summary = await svc.GenerateAsync(
+                UserRole, CommuneId100, null, null, userId, CommuneId100, [draftId], default);
+
+            var road = Assert.Single(summary.Created);
+            Assert.Equal(0, summary.Dropped);
+            Assert.Equal(36.7160, road.Data["coordinates"]![0]!["lat"]!.GetValue<double>(), 6);
+            Assert.Equal(AiDraftFeature.StatusAccepted, await DraftStatusAsync(factory, draftId));
+        }
+    }
+
+    [Fact]
+    public async Task Generate_KeepsShortDraftNearNetwork()
+    {
+        var (db, factory) = CreateInMemoryDbPair("RoadGenShortNear");
+        await using (db)
+        {
+            await SeedAdminLocationsAsync(db);
+            // A ~4.5 m stub sitting ~11 m north of the seeded network road:
+            // short, but within the isolation distance of a road, so it is kept
+            // (and snapped onto it) rather than removed.
+            var (userId, draftId) = await SeedCommuneAsync(
+                db, LineGeoJson((2.9520, 36.7166), (2.95205, 36.7166)));
+            await AddUrbanAreaAsync(db, userId);
+            await SeedRoadAsync(db, userId); // east-west network at lat 36.7165
+            var svc = CreateService(db, factory);
+
+            var summary = await svc.GenerateAsync(
+                UserRole, CommuneId100, null, null, userId, CommuneId100, [draftId], default);
+
+            var road = Assert.Single(summary.Created);
+            Assert.Equal(0, summary.Dropped);
+            var coords = road.Data["coordinates"]!.AsArray();
+            Assert.Equal(2, coords.Count);
+            Assert.Equal(36.7165, coords[0]!["lat"]!.GetValue<double>(), 6);
+            Assert.Equal(36.7165, coords[1]!["lat"]!.GetValue<double>(), 6);
+            Assert.Equal(2.9520, coords[0]!["lng"]!.GetValue<double>(), 5);
+            Assert.Equal(AiDraftFeature.StatusAccepted, await DraftStatusAsync(factory, draftId));
+        }
+    }
+
+    [Fact]
+    public async Task Generate_SplitsRoadAtNetworkCrossing()
+    {
+        var (db, factory) = CreateInMemoryDbPair("RoadGenSplitCrossing");
+        await using (db)
+        {
+            await SeedAdminLocationsAsync(db);
+            // The east-west draft runs ~11 m north of a parallel network road
+            // and crosses a perpendicular network road at its midpoint. It must
+            // be split at the crossing into two roads sharing that node, each
+            // snapped onto the parallel road at its free end.
+            var (userId, draftId) = await SeedCommuneAsync(
+                db, LineGeoJson((2.9512, 36.7166), (2.9538, 36.7166)));
+            await AddUrbanAreaAsync(db, userId);
+            await SeedRoadAsync(db, userId, 2.9510, 36.7165, 2.9540, 36.7165); // parallel
+            await SeedRoadAsync(db, userId, 2.9525, 36.7160, 2.9525, 36.7170); // crossing
+            var svc = CreateService(db, factory);
+
+            var summary = await svc.GenerateAsync(
+                UserRole, CommuneId100, null, null, userId, CommuneId100, [draftId], default);
+
+            Assert.Equal(2, summary.Created.Count);
+            Assert.Equal(0, summary.Dropped);
+            var first = summary.Created[0].Data["coordinates"]!.AsArray();
+            var second = summary.Created[1].Data["coordinates"]!.AsArray();
+            Assert.Equal(2, first.Count);
+            Assert.Equal(2, second.Count);
+            // Both pieces share the crossing node (36.7166 lat, 2.9525 lng).
+            Assert.Equal(36.7166, first[1]!["lat"]!.GetValue<double>(), 6);
+            Assert.Equal(2.9525, first[1]!["lng"]!.GetValue<double>(), 5);
+            Assert.Equal(36.7166, second[0]!["lat"]!.GetValue<double>(), 6);
+            Assert.Equal(2.9525, second[0]!["lng"]!.GetValue<double>(), 5);
+            // Free ends snapped onto the parallel network road.
+            Assert.Equal(36.7165, first[0]!["lat"]!.GetValue<double>(), 6);
+            Assert.Equal(36.7165, second[1]!["lat"]!.GetValue<double>(), 6);
+            Assert.Equal(AiDraftFeature.StatusAccepted, await DraftStatusAsync(factory, draftId));
+        }
+    }
+
+    [Fact]
+    public async Task Generate_SplitPiecesWithUnsnappableFreeEnds_AreSeeds()
+    {
+        var (db, factory) = CreateInMemoryDbPair("RoadGenSplitUnconnected");
+        await using (db)
+        {
+            await SeedAdminLocationsAsync(db);
+            // The draft crosses the network road but its free ends are ~115 m
+            // from it: splitting produces two pieces whose free endpoints are
+            // too far to snap. They are not dropped as dangling spurs — each
+            // piece extends the commune's graph from its shared crossing node.
+            var (userId, draftId) = await SeedCommuneAsync(
+                db, LineGeoJson((2.9512, 36.7166), (2.9538, 36.7166)));
+            await AddUrbanAreaAsync(db, userId);
+            await SeedRoadAsync(db, userId, 2.9525, 36.7160, 2.9525, 36.7170); // crossing only
+            var svc = CreateService(db, factory);
+
+            var summary = await svc.GenerateAsync(
+                UserRole, CommuneId100, null, null, userId, CommuneId100, [draftId], default);
+
+            Assert.Equal(2, summary.Created.Count);
+            Assert.Equal(0, summary.Dropped);
+            var ordered = summary.Created
+                .OrderBy(r => r.Data["coordinates"]![0]!["lng"]!.GetValue<double>())
+                .ToList();
+            var left = ordered[0];   // free end (2.9512) → crossing (2.9525)
+            var right = ordered[1];  // crossing (2.9525) → free end (2.9538)
+            // Both pieces share the crossing node.
+            Assert.Equal(2.9525, left.Data["coordinates"]![1]!["lng"]!.GetValue<double>(), 5);
+            Assert.Equal(36.7166, left.Data["coordinates"]![1]!["lat"]!.GetValue<double>(), 6);
+            Assert.Equal(2.9525, right.Data["coordinates"]![0]!["lng"]!.GetValue<double>(), 5);
+            // Free ends were beyond the snap tolerance and kept their coords.
+            Assert.Equal(2.9512, left.Data["coordinates"]![0]!["lng"]!.GetValue<double>(), 5);
+            Assert.Equal(2.9538, right.Data["coordinates"]![1]!["lng"]!.GetValue<double>(), 5);
+            Assert.Equal(AiDraftFeature.StatusAccepted, await DraftStatusAsync(factory, draftId));
         }
     }
 
@@ -504,5 +646,126 @@ public class RoadGenerationGeometryTests
         Assert.False(RoadGenerationGeometry.IsNearLine(36.7166, 2.9520, [], 3000.0));
         Assert.False(RoadGenerationGeometry.IsNearLine(
             36.7166, 2.9520, [(36.7165, 2.9510)], 3000.0));
+    }
+
+    [Fact]
+    public void DistanceBetweenLinesM_CrossingSegments_IsZero()
+    {
+        IReadOnlyList<(double Lat, double Lng)> horizontal = [(36.7165, 2.9510), (36.7165, 2.9540)];
+        IReadOnlyList<(double Lat, double Lng)> vertical = [(36.7160, 2.9525), (36.7170, 2.9525)];
+
+        Assert.Equal(0.0, RoadGenerationGeometry.DistanceBetweenLinesM(horizontal, vertical), 4);
+    }
+
+    [Fact]
+    public void DistanceBetweenLinesM_ParallelSeparated_MatchesMetresPerDegree()
+    {
+        // 0.0001° of latitude apart ≈ 11.13 m.
+        IReadOnlyList<(double Lat, double Lng)> a = [(36.7165, 2.9510), (36.7165, 2.9540)];
+        IReadOnlyList<(double Lat, double Lng)> b = [(36.7166, 2.9510), (36.7166, 2.9540)];
+
+        var distance = RoadGenerationGeometry.DistanceBetweenLinesM(a, b);
+
+        Assert.InRange(distance, 11.0, 11.5);
+    }
+
+    [Fact]
+    public void DistanceBetweenLinesM_TouchingEndpoint_IsZero()
+    {
+        // b hangs off the end of a but shares the endpoint (36.7165, 2.9540).
+        IReadOnlyList<(double Lat, double Lng)> a = [(36.7165, 2.9510), (36.7165, 2.9540)];
+        IReadOnlyList<(double Lat, double Lng)> b = [(36.7165, 2.9540), (36.7167, 2.9540)];
+
+        Assert.Equal(0.0, RoadGenerationGeometry.DistanceBetweenLinesM(a, b), 4);
+    }
+
+    [Fact]
+    public void SplitLineAtCrossings_NoNetwork_ReturnsOriginalLine()
+    {
+        IReadOnlyList<(double Lat, double Lng)> line = [(36.7165, 2.9510), (36.7165, 2.9540)];
+
+        var pieces = RoadGenerationGeometry.SplitLineAtCrossings(line, []);
+
+        var piece = Assert.Single(pieces);
+        Assert.Equal(2, piece.Count);
+        Assert.Equal(36.7165, piece[0].Lat, 6);
+        Assert.Equal(2.9510, piece[0].Lng, 6);
+        Assert.Equal(2.9540, piece[1].Lng, 6);
+    }
+
+    [Fact]
+    public void SplitLineAtCrossings_SingleCrossing_SplitsIntoTwo()
+    {
+        // East-west line crossed in its interior by a north-south road.
+        IReadOnlyList<(double Lat, double Lng)> line = [(36.7165, 2.9510), (36.7165, 2.9540)];
+        IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> network =
+        [
+            [(36.7160, 2.9525), (36.7170, 2.9525)],
+        ];
+
+        var pieces = RoadGenerationGeometry.SplitLineAtCrossings(line, network);
+
+        Assert.Equal(2, pieces.Count);
+        Assert.Equal(2, pieces[0].Count);
+        Assert.Equal(2, pieces[1].Count);
+        // Both pieces share the crossing node; the original order is preserved.
+        Assert.Equal(2.9525, pieces[0][^1].Lng, 5);
+        Assert.Equal(36.7165, pieces[0][^1].Lat, 5);
+        Assert.Equal(2.9525, pieces[1][0].Lng, 5);
+        Assert.Equal(2.9510, pieces[0][0].Lng, 5);
+        Assert.Equal(2.9540, pieces[1][^1].Lng, 5);
+    }
+
+    [Fact]
+    public void SplitLineAtCrossings_MultipleCrossings_SplitsIntoThree()
+    {
+        IReadOnlyList<(double Lat, double Lng)> line = [(36.7165, 2.9510), (36.7165, 2.9560)];
+        IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> network =
+        [
+            [(36.7160, 2.9525), (36.7170, 2.9525)],
+            [(36.7160, 2.9545), (36.7170, 2.9545)],
+        ];
+
+        var pieces = RoadGenerationGeometry.SplitLineAtCrossings(line, network);
+
+        Assert.Equal(3, pieces.Count);
+        Assert.Equal(2.9525, pieces[0][^1].Lng, 5);
+        Assert.Equal(2.9545, pieces[1][^1].Lng, 5);
+        Assert.Equal(2.9545, pieces[2][0].Lng, 5);
+        Assert.Equal(2.9560, pieces[2][^1].Lng, 5);
+    }
+
+    [Fact]
+    public void SplitLineAtCrossings_EndpointTouch_DoesNotSplit()
+    {
+        // The line merely ends on the crossing road (a T-junction): snapping
+        // merges it, there is nothing to split.
+        IReadOnlyList<(double Lat, double Lng)> line = [(36.7165, 2.9510), (36.7165, 2.9525)];
+        IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> network =
+        [
+            [(36.7160, 2.9525), (36.7170, 2.9525)],
+        ];
+
+        var pieces = RoadGenerationGeometry.SplitLineAtCrossings(line, network);
+
+        var piece = Assert.Single(pieces);
+        Assert.Equal(2, piece.Count);
+        Assert.Equal(36.7165, piece[1].Lat, 5);
+    }
+
+    [Fact]
+    public void SplitLineAtCrossings_ParallelRoad_DoesNotSplit()
+    {
+        // Collinear/parallel roads share no interior crossing.
+        IReadOnlyList<(double Lat, double Lng)> line = [(36.7165, 2.9510), (36.7165, 2.9540)];
+        IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> network =
+        [
+            [(36.7166, 2.9510), (36.7166, 2.9540)],
+        ];
+
+        var pieces = RoadGenerationGeometry.SplitLineAtCrossings(line, network);
+
+        var piece = Assert.Single(pieces);
+        Assert.Equal(2, piece.Count);
     }
 }

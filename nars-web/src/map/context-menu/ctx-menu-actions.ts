@@ -157,3 +157,45 @@ export async function removeFeature(dbId: string): Promise<void> {
     showToast(t("map_delete_failed", { error: t(getUserMessageKey(err)) }), "error")
   }
 }
+
+// ─── REMOVE ALL ROADS ─────────────────────────────────────────────────────────
+// Bulk-deletes every road of the current user (backend cascades their house
+// entrances). No undo: like the "clear" endpoint this is a destructive admin
+// action guarded only by the confirm dialog.
+
+export async function removeAllRoads(): Promise<void> {
+  const layerStore = useLayerStore()
+  const count = layerStore.roads.length
+  if (count === 0) {
+    showToast(t("ctx_roads_none"), "info")
+    return
+  }
+
+  const selectionStore = useSelectionStore()
+  const selectedEntry =
+    selectionStore.selectedFeatureDbId !== null
+      ? findLayerEntryByDbId(selectionStore.selectedFeatureDbId)
+      : null
+
+  const confirmed = await showConfirm(t("ctx_roads_clear_confirm", { count }))
+  if (!confirmed) return
+
+  try {
+    await apiFetch("/api/features/clear-roads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: true }),
+    })
+
+    layerStore.clearLayer("roads")
+    useFeaturesStore().removeAllPhase("roads")
+    if (selectedEntry?.data.type === "roads") {
+      selectionStore.setSelectedFeatureDbId(null)
+    }
+    updateEndpointMarkers()
+
+    showToast(t("ctx_roads_removed_all"), "success")
+  } catch (err) {
+    showToast(t("map_delete_failed", { error: t(getUserMessageKey(err)) }), "error")
+  }
+}

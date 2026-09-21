@@ -256,6 +256,39 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : Servi
     }
 
     [Fact]
+    public async Task ClearRoads_RemovesRoadsAndTheirEntrancesButKeepsOtherFeatures()
+    {
+        var controller = CreateController();
+        var roadData = new { coordinates = new[] { new { lat = 36.71, lng = 2.95 }, new { lat = 36.72, lng = 2.96 } } };
+        var areaData = new { coordinates = new[] { new { lat = 36.71, lng = 2.95 }, new { lat = 36.73, lng = 2.95 }, new { lat = 36.73, lng = 2.97 }, new { lat = 36.71, lng = 2.97 } } };
+
+        await controller.SaveFeature(new FeatureSaveRequest(
+            Type: FeatureTypes.Road, Layer: FeatureTypes.RoadLayers.Street, Label: "Road A",
+            Data: ToJsonElement(roadData)));
+        await controller.SaveFeature(new FeatureSaveRequest(
+            Type: FeatureTypes.Road, Layer: FeatureTypes.RoadLayers.Street, Label: "Road B",
+            Data: ToJsonElement(roadData)));
+        await controller.SaveFeature(new FeatureSaveRequest(
+            Type: FeatureTypes.Area, Layer: FeatureTypes.AreaLayers.CentralUrban, Label: "Area Survives",
+            Data: ToJsonElement(areaData)));
+
+        var road = await Db.Roads.FirstAsync(r => r.UserId == _userId && r.Label == "Road A");
+        var entranceService = new EntranceService(Fixture.CreateDbContextFactory());
+        await entranceService.CreateEntranceAsync(road.Id, _userId, "Entrance A", "{}");
+
+        var result = await controller.ClearRoads(new ClearFeaturesRequest(Confirm: true));
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(200, ok.StatusCode);
+
+        Assert.Equal(0, await Db.Roads.CountAsync(r => r.UserId == _userId));
+        Assert.Equal(0, await Db.HouseEntrances.CountAsync(e => e.UserId == _userId));
+        Assert.Equal(1, await Db.Areas.CountAsync(a => a.UserId == _userId));
+        // Only the surviving area keeps its registry entry; roads and their
+        // entrances must not leave orphaned rows behind.
+        Assert.Equal(1, await Db.FeatureRegistry.CountAsync());
+    }
+
+    [Fact]
     public async Task UpdateFeature_ValidUpdate_Returns200()
     {
         var controller = CreateController();

@@ -127,6 +127,48 @@ public sealed class FeatureService(
         return total;
     }
 
+    public async Task<int> ClearAllRoadsAsync(Guid userId, CancellationToken ct)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+
+        var roadIds = await db.Roads
+            .Where(r => r.UserId == userId)
+            .Select(r => r.Id)
+            .ToListAsync(ct);
+
+        if (roadIds.Count > 0)
+        {
+            // Roads own their entrances (see DeleteFeatureAsync): the schema has
+            // no FK/cascade, so the same bulk contract is enforced here —
+            // removing all roads must not leave orphaned house_entrances rows.
+            var entranceIds = await db.HouseEntrances
+                .Where(e => e.RoadId != null && roadIds.Contains(e.RoadId.Value))
+                .Select(e => e.Id)
+                .ToListAsync(ct);
+
+            if (entranceIds.Count > 0)
+            {
+                await db.FeatureRegistry
+                    .Where(r => entranceIds.Contains(r.Id))
+                    .ExecuteDeleteAsync(ct);
+                await db.HouseEntrances
+                    .Where(e => e.RoadId != null && roadIds.Contains(e.RoadId.Value))
+                    .ExecuteDeleteAsync(ct);
+            }
+
+            await db.FeatureRegistry
+                .Where(r => roadIds.Contains(r.Id))
+                .ExecuteDeleteAsync(ct);
+            await db.Roads
+                .Where(r => roadIds.Contains(r.Id))
+                .ExecuteDeleteAsync(ct);
+        }
+
+        await tx.CommitAsync(ct);
+        return roadIds.Count;
+    }
+
     public async ValueTask QueueScatteredRefreshAsync(Guid userId, int? communeId)
     {
         if (communeId is null)

@@ -28,6 +28,7 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : ServiceTes
             Mock.Of<ISegmentationClient>(),
             new CommuneScopeService(factory),
             Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow),
+            Options.Create(new ValidationOptions()),
             Options.Create(new RoadRulesOptions()),
             Options.Create(new BuildingRulesOptions()));
 
@@ -49,11 +50,33 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : ServiceTes
         return (user.Id, communeId);
     }
 
+    /// <summary>
+    /// Seeds a central-urban area in <paramref name="communeId"/> covering the
+    /// AddDraftAsync road (GeoJSON vertices ≈ lng 36.72..36.73, lat 2.96..2.97):
+    /// the produce-roads rules reject any road draft outside an urban polygon,
+    /// so integration accepts of road drafts need it to succeed.
+    /// </summary>
+    private static async Task SeedRoadAcceptSiteAsync(AppDbContext db, int communeId)
+    {
+        var owner = await SeedData.CreateUserAsync(db, UserRoles.CommuneUser, communeId: communeId);
+        db.Areas.Add(new Area
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = owner.Id,
+            Layer = FeatureTypes.AreaLayers.CentralUrban,
+            Label = "Urban",
+            Data = """{"type":"areas","label":"","areaTypeKey":"central_urban","coordinates":[{"lat":2.95,"lng":36.71},{"lat":2.95,"lng":36.74},{"lat":2.98,"lng":36.74},{"lat":2.98,"lng":36.71}]}""",
+            CreatedAt = FixedUtcNow,
+        });
+        await db.SaveChangesAsync();
+    }
+
     [Fact]
     public async Task AcceptDraft_RealConditionalUpdate_TransitionsAndStampsReviewer()
     {
         await using var seedDb = Fixture.CreateDbContext();
         var (reviewerId, _) = await SeedReviewerAndCommuneAsync(seedDb, CommuneId100);
+        await SeedRoadAcceptSiteAsync(seedDb, CommuneId100);
         var draftId = await SeedData.AddDraftAsync(seedDb, CommuneId100);
 
         var svc = CreateService(Fixture.CreateDbContextFactory());
@@ -98,6 +121,7 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : ServiceTes
         await using var seedDb = Fixture.CreateDbContext();
         var (firstReviewerId, _) = await SeedReviewerAndCommuneAsync(seedDb, CommuneId100);
         var secondReviewer = await SeedData.CreateUserAsync(seedDb, UserRoles.CommuneUser);
+        await SeedRoadAcceptSiteAsync(seedDb, CommuneId100);
         var draftId = await SeedData.AddDraftAsync(seedDb, CommuneId100);
 
         var factory1 = Fixture.CreateDbContextFactory();
@@ -126,6 +150,7 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : ServiceTes
         var (reviewer1Seed, _) = await SeedReviewerAndCommuneAsync(seedDb, CommuneId100);
         var reviewer2 = await SeedData.CreateUserAsync(seedDb, UserRoles.CommuneUser);
         var reviewer2Id = reviewer2.Id;
+        await SeedRoadAcceptSiteAsync(seedDb, CommuneId100);
         var draftId = await SeedData.AddDraftAsync(seedDb, CommuneId100);
 
         var factory1 = Fixture.CreateDbContextFactory();

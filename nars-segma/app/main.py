@@ -80,14 +80,16 @@ INFERENCE_TIMEOUT = env_int(
 QUEUE_TIMEOUT = env_int("NARS_SEGMA_QUEUE_TIMEOUT", 30, minimum=0, maximum=300)
 
 # Road rules (limitation): discard edges below these thresholds before they
-# reach the API. The minimum length (default 10m) forbids the stub spurs and
-# debris slivers the skeletonizer emits at tile edges and across short
-# junction-to-junction hops; the minimum confidence drops weak detections;
-# the per-tile cap bounds how many drafts one acceptance run can create.
+# reach the API. The minimum confidence drops weak detections; the per-tile
+# cap bounds how many drafts one acceptance run can create. The minimum
+# length floor is 0 by default (this service does not know the commune's
+# existing roads): whether a short edge is a keepable junction stub or a
+# deleteable isolated spur is decided by the API's roads-phase rules, which
+# see the real network.
 # Separation is structural (each edge is already one junction-to-junction
 # segment) and needs no tuning.
 ROAD_MIN_LENGTH_M = env_float(
-    "NARS_SEGMA_ROAD_MIN_LENGTH_M", 10.0, minimum=0.0, maximum=10000.0
+    "NARS_SEGMA_ROAD_MIN_LENGTH_M", 0.0, minimum=0.0, maximum=10000.0
 )
 ROAD_MIN_CONFIDENCE = env_float(
     "NARS_SEGMA_ROAD_MIN_CONFIDENCE", 0.0, minimum=0.0, maximum=1.0
