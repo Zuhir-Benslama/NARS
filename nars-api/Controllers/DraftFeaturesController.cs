@@ -271,7 +271,8 @@ public sealed class DraftFeaturesController(
                 summary.Created
                     .Select(road => new GeneratedRoadDto(
                         road.DbId, road.Layer, road.Label, JsonSerializer.SerializeToElement(road.Data)))
-                    .ToList()));
+                    .ToList(),
+                GenerateRoadsDroppedDto.From(summary.Breakdown)));
         }
         catch (UnauthorizedAccessException)
         {

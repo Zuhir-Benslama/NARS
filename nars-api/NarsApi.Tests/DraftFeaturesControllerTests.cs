@@ -571,7 +571,8 @@ public class DraftFeaturesControllerTests
                 UserId, CommuneId100, It.IsAny<IReadOnlyList<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new RoadGenerationSummary(
                 [new GeneratedRoad(roadId, FeatureTypes.RoadLayers.Street, "", data)],
-                Dropped: 2));
+                Dropped: 2,
+                new RoadDropBreakdown(TooShort: 0, LowConfidence: 0, ExcessiveTurnAngle: 0, OutsideUrbanArea: 2, InvalidGeometry: 0)));
         var body = new GenerateRoadsRequest { CommuneId = CommuneId100, DraftIds = [draftId] };
 
         ActionResult<GenerateRoadsResponse> result = await ctrl.GenerateRoads(body, default);

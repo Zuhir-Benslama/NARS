@@ -3058,7 +3058,7 @@
         }
       },
       "GenerateRoadsResponse": {
-        "required": ["dropped", "created"],
+        "required": ["dropped", "created", "breakdown"],
         "type": "object",
         "properties": {
           "dropped": {
@@ -3071,6 +3071,46 @@
             "items": {
               "$ref": "#/components/schemas/GeneratedRoadDto"
             }
+          },
+          "breakdown": {
+            "$ref": "#/components/schemas/GenerateRoadsDroppedDto"
+          }
+        }
+      },
+      "GenerateRoadsDroppedDto": {
+        "required": [
+          "tooShort",
+          "lowConfidence",
+          "excessiveTurnAngle",
+          "outsideUrbanArea",
+          "invalidGeometry"
+        ],
+        "type": "object",
+        "properties": {
+          "tooShort": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "lowConfidence": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "excessiveTurnAngle": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "outsideUrbanArea": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "invalidGeometry": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
           }
         }
       },

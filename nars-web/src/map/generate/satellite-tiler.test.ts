@@ -6,6 +6,7 @@ import {
   tileGrid,
   chooseTileZoom,
   gridBounds,
+  splitBoundsAtZoom,
 } from "./satellite-tiler"
 
 const WORLD = { minLon: -180, minLat: -90, maxLon: 180, maxLat: 90 }
@@ -111,3 +112,57 @@ describe("gridBounds", () => {
     expect(gb.minLat).toBeCloseTo(-85.05112878, 6)
   })
 })
+
+describe("splitBoundsAtZoom", () => {
+  it("keeps a single chunk when the grid already fits the cap", () => {
+    const small = { minLon: 2.954, minLat: 36.719, maxLon: 2.964, maxLat: 36.725 }
+    const chunks = splitBoundsAtZoom(small, 18)
+    expect(chunks).toHaveLength(1)
+    const { width, height } = chunks[0]!
+    expect(width).toBeLessThanOrEqual(24)
+    expect(height).toBeLessThanOrEqual(24)
+  })
+
+  it("splits an oversized commune into z18 chunks all within the cap", () => {
+    // A single-z18-guess larger than one 24-tile span (~0.05° across), i.e. a
+    // region that used to force the z17 fallback. Each chunk must stay z18 and
+    // within the 24x24 cap (a 0.035° x 0.03° box → a couple of chunks, not the
+    // ~200 a whole-wilaya box would emit).
+    const big = { minLon: 7.42, minLat: 36.5, maxLon: 7.455, maxLat: 36.53 }
+    const chunks = splitBoundsAtZoom(big, 18)
+    expect(chunks.length).toBeGreaterThan(1)
+    for (const chunk of chunks) {
+      expect(chunk.zoom).toBe(18)
+      expect(chunk.width).toBeLessThanOrEqual(24)
+      expect(chunk.height).toBeLessThanOrEqual(24)
+      expect(chunk.width).toBeGreaterThan(0)
+      expect(chunk.height).toBeGreaterThan(0)
+    }
+  })
+
+  it("chunks tile the containing grid exactly without gaps or overlap", () => {
+    const big = { minLon: 7.42, minLat: 36.5, maxLon: 7.455, maxLat: 36.53 }
+    const containing = tileGrid(big, 18)
+    const chunks = splitBoundsAtZoom(big, 18)
+
+    const covered = tilesCovered(chunks)
+    expect(new Set(covered.map((c) => `${c.x},${c.y}`))).toEqual(
+      new Set(allGridTiles(containing).map((c) => `${c.x},${c.y}`)),
+    )
+    expect(covered.length).toBe(containing.width * containing.height)
+  })
+})
+
+function allGridTiles(grid: { x0: number; y0: number; width: number; height: number }) {
+  const tiles: { x: number; y: number }[] = []
+  for (let row = 0; row < grid.height; row += 1) {
+    for (let col = 0; col < grid.width; col += 1) {
+      tiles.push({ x: grid.x0 + col, y: grid.y0 + row })
+    }
+  }
+  return tiles
+}
+
+function tilesCovered(chunks: { x0: number; y0: number; width: number; height: number }[]) {
+  return chunks.flatMap((c) => allGridTiles(c))
+}

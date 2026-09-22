@@ -107,10 +107,20 @@ export interface GeneratedRoad {
   }
 }
 
+/** Mirrors GenerateRoadsDroppedDto (camelCased by the API serializer). */
+export interface GenerateRoadsDropBreakdown {
+  tooShort: number
+  lowConfidence: number
+  excessiveTurnAngle: number
+  outsideUrbanArea: number
+  invalidGeometry: number
+}
+
 /** Mirrors GenerateRoadsResponse (camelCased by the API serializer). */
 export interface GenerateRoadsResponse {
   dropped: number
   created: GeneratedRoad[]
+  breakdown: GenerateRoadsDropBreakdown
 }
 
 /** POST /api/draft-features/generate-roads — rule-checked auto-save of drafts. */

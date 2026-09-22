@@ -21,8 +21,10 @@ __all__ = ["mask_to_linestrings", "mask_to_polygons"]
 logger = logging.getLogger("nars-segma.postprocess")
 
 # Simplification tolerance in degrees. ~0.00002 deg is roughly 2m at the
-# equator - tune per your imagery resolution.
-SIMPLIFY_TOLERANCE = 0.00002
+# equator. Bumped to 0.00004 (~4m) so skeletonized centerlines reaching the
+# roads-phase rules are smoother: the turn-angle rule (≥ 135°) sees fewer
+# pixel-level zig-zags far from real street geometry.
+SIMPLIFY_TOLERANCE = 0.00004
 MIN_ROAD_COMPONENT_PX = 40
 MIN_BUILDING_COMPONENT_PX = 20
 

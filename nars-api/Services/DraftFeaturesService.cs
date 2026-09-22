@@ -104,6 +104,16 @@ public class DraftFeaturesService(
     private static readonly string HouseEntrancesTable =
         FeatureTypeRegistry.GetDescriptor(FeatureTypes.HouseEntrance)?.TableName ?? "house_entrances";
 
+    /// <summary>
+    /// Urban-containment tolerance applied at the draft pre-filter. Wider than
+    /// the materialization value (<see cref="RoadRulesOptions.InsideToleranceMeters"/>)
+    /// so detections a few tens of metres outside a drawn polygon ring (but
+    /// still inside the detection bbox) reach the review queue; the strict value
+    /// is re-applied when a draft is materialized, so the queue acts as an
+    /// over-inclusive filter followed by a strict acceptance gate.
+    /// </summary>
+    private const double RoadDraftContainmentToleranceM = 50.0;
+
     public async Task<SegmentSummaryResponse> SegmentTileAsync(
         string callerRole, int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
         int communeId, string featureType, Stream tileStream, string fileName, string contentType,
@@ -189,7 +199,8 @@ public class DraftFeaturesService(
                 && (!DraftGeometry.TryGetLineCoordinates(feature.GeometryGeoJson, out var vertices)
                     || RoadPhaseRules.Evaluate(
                         vertices, feature.Confidence, areaRings, roadNetwork,
-                        validationOptions.Value, roadRules.Value, snapEndpoints: false)
+                        validationOptions.Value, roadRules.Value, snapEndpoints: false,
+                        insideToleranceOverrideM: RoadDraftContainmentToleranceM)
                         .Violation != RoadPhaseViolation.None))
             {
                 continue;

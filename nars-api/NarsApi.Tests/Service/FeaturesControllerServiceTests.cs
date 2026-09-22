@@ -289,6 +289,95 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : Servi
     }
 
     [Fact]
+    public async Task ClearRoads_ResetsAcceptedRoadDraftsToPending()
+    {
+        var controller = CreateController();
+        var roadData = new { coordinates = new[] { new { lat = 36.71, lng = 2.95 }, new { lat = 36.72, lng = 2.96 } } };
+
+        await controller.SaveFeature(new FeatureSaveRequest(
+            Type: FeatureTypes.Road, Layer: FeatureTypes.RoadLayers.Street, Label: "Road A",
+            Data: ToJsonElement(roadData)));
+
+        // Seed an accepted road draft plus a record-reviewing (rejected) one so
+        // the reset is scoped to exactly the accepted->pending transition.
+        var acceptedDraft = AiDraftFeature.Create(
+            featureType: AiDraftFeature.TypeRoad,
+            geometryGeoJson: """{"type":"LineString","coordinates":[[36.71,2.95],[36.72,2.96]]}""",
+            confidence: 0.9,
+            communeId: 1,
+            sourceTileRef: "tile.png",
+            createdAt: FixedUtcNowOffset);
+        var rejectedDraft = AiDraftFeature.Create(
+            featureType: AiDraftFeature.TypeRoad,
+            geometryGeoJson: """{"type":"LineString","coordinates":[[36.70,2.94],[36.71,2.95]]}""",
+            confidence: 0.8,
+            communeId: 1,
+            sourceTileRef: "tile.png",
+            createdAt: FixedUtcNowOffset);
+        Db.AiDraftFeatures.AddRange(acceptedDraft, rejectedDraft);
+        await Db.SaveChangesAsync();
+
+        var reviewer = await CreateUserAsync();
+        var acceptedEntry = Db.Entry(acceptedDraft);
+        acceptedEntry.Property(f => f.Status).CurrentValue = AiDraftFeature.StatusAccepted;
+        acceptedEntry.Property(f => f.ReviewedBy).CurrentValue = reviewer;
+        acceptedEntry.Property(f => f.ReviewedAt).CurrentValue = FixedUtcNowOffset;
+        var rejectedEntry = Db.Entry(rejectedDraft);
+        rejectedEntry.Property(f => f.Status).CurrentValue = AiDraftFeature.StatusRejected;
+        rejectedEntry.Property(f => f.ReviewedBy).CurrentValue = reviewer;
+        rejectedEntry.Property(f => f.ReviewedAt).CurrentValue = FixedUtcNowOffset;
+        await Db.SaveChangesAsync();
+
+        var result = await controller.ClearRoads(new ClearFeaturesRequest(Confirm: true));
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(200, ok.StatusCode);
+
+        // Roads were deleted AND the accepted draft that fed them is reusable
+        // again (pending, review metadata cleared) so re-detection doesn't dedup
+        // against it. Rejected drafts stay rejected — they're intentional.
+        var acceptedAfter = await Db.AiDraftFeatures.AsNoTracking().SingleAsync(f => f.Id == acceptedDraft.Id);
+        Assert.Equal(AiDraftFeature.StatusPending, acceptedAfter.Status);
+        Assert.Null(acceptedAfter.ReviewedBy);
+        Assert.Null(acceptedAfter.ReviewedAt);
+
+        var rejectedAfter = await Db.AiDraftFeatures.AsNoTracking().SingleAsync(f => f.Id == rejectedDraft.Id);
+        Assert.Equal(AiDraftFeature.StatusRejected, rejectedAfter.Status);
+        Assert.Equal(reviewer, rejectedAfter.ReviewedBy);
+
+        Assert.Equal(0, await Db.Roads.CountAsync(r => r.UserId == _userId));
+        Assert.Equal(0, await Db.HouseEntrances.CountAsync(e => e.UserId == _userId)); // unchanged: irrelevant here
+    }
+
+    [Fact]
+    public async Task ClearRoads_NoRoads_StillResetsAcceptedRoadDrafts()
+    {
+        var controller = CreateController();
+
+        var acceptedDraft = AiDraftFeature.Create(
+            featureType: AiDraftFeature.TypeRoad,
+            geometryGeoJson: """{"type":"LineString","coordinates":[[36.71,2.95],[36.72,2.96]]}""",
+            confidence: 0.9,
+            communeId: 1,
+            sourceTileRef: "tile.png",
+            createdAt: FixedUtcNowOffset);
+        var acceptedEntry = Db.Entry(acceptedDraft);
+        acceptedEntry.Property(f => f.Status).CurrentValue = AiDraftFeature.StatusAccepted;
+        acceptedEntry.Property(f => f.ReviewedBy).CurrentValue = await CreateUserAsync();
+        acceptedEntry.Property(f => f.ReviewedAt).CurrentValue = FixedUtcNowOffset;
+        Db.AiDraftFeatures.Add(acceptedDraft);
+        await Db.SaveChangesAsync();
+
+        var result = await controller.ClearRoads(new ClearFeaturesRequest(Confirm: true));
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(200, ok.StatusCode);
+
+        var after = await Db.AiDraftFeatures.AsNoTracking().SingleAsync(f => f.Id == acceptedDraft.Id);
+        Assert.Equal(AiDraftFeature.StatusPending, after.Status);
+        Assert.Null(after.ReviewedBy);
+        Assert.Null(after.ReviewedAt);
+    }
+
+    [Fact]
     public async Task UpdateFeature_ValidUpdate_Returns200()
     {
         var controller = CreateController();

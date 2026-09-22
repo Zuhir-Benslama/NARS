@@ -7,7 +7,7 @@ using NarsApi.Models;
 
 namespace NarsApi.Services;
 
-public sealed class FeatureService(
+public class FeatureService(
     IDbContextFactory<AppDbContext> dbFactory,
     IBackgroundTaskQueue bgQueue,
     IFeatureCleanupService cleanupService,
@@ -165,8 +165,47 @@ public sealed class FeatureService(
                 .ExecuteDeleteAsync(ct);
         }
 
+        // Accepted road drafts mean "a road was materialized from this draft".
+        // Once their roads are gone the drafts no longer describe live data, so
+        // revert them to pending: otherwise the next AI re-detection dedups
+        // against them and the user can never regenerate the commune's roads.
+        // Drafts are commune-scoped, so resolve the caller's commune from the
+        // user row rather than from the deleted road ids.
+        var communeId = await db.Users
+            .Where(u => u.Id == userId)
+            .Select(u => u.CommuneId)
+            .SingleOrDefaultAsync(ct);
+
+        if (communeId is not null)
+        {
+            await ResetRoadDraftsForClearAsync(db, communeId.Value, ct);
+        }
+
         await tx.CommitAsync(ct);
         return roadIds.Count;
+    }
+
+    /// <summary>
+    /// Reverts accepted road drafts for <paramref name="communeId"/> back to
+    /// pending after their roads were cleared, leaving the review queue reusable
+    /// for regeneration. Uses a PostgreSQL-only conditional update; kept virtual
+    /// so unit tests can substitute a tracked-equivalent on the InMemory
+    /// provider (same convention as RoadGenerationService).
+    /// </summary>
+    protected virtual async Task<int> ResetRoadDraftsForClearAsync(
+        AppDbContext db, int communeId, CancellationToken ct)
+    {
+        var affected = await db.AiDraftFeatures
+            .Where(f => f.CommuneId == communeId
+                && f.FeatureType == AiDraftFeature.TypeRoad
+                && f.Status == AiDraftFeature.StatusAccepted)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(f => f.Status, AiDraftFeature.StatusPending)
+                .SetProperty(f => f.ReviewedBy, (Guid?)null)
+                .SetProperty(f => f.ReviewedAt, (DateTimeOffset?)null), ct);
+
+        await db.SaveChangesAsync(ct);
+        return affected;
     }
 
     public async ValueTask QueueScatteredRefreshAsync(Guid userId, int? communeId)

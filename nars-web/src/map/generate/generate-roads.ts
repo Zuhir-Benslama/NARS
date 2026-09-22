@@ -17,12 +17,17 @@ import { getUserMessageKey } from "../../lib/errors"
 import { debugError } from "../../utils/debug"
 import { refreshLayerVisibility } from "../rendering/labels"
 import { updateEndpointMarkers } from "../roads/road-directions"
-import { renderSatelliteTile } from "./satellite-tiler"
+import { renderSatelliteGrid, splitBoundsAtZoom } from "./satellite-tiler"
 import { importFeaturesIntoGeoman } from "./geoman-import"
-import { EDIT_CONFIG, GEN_CONFIG } from "../../config"
+import { EDIT_CONFIG, GEN_CONFIG, MAP_CONFIG } from "../../config"
 import type { LayerEntry } from "../../types"
 import type { TileBounds } from "../../api/drafts"
-import { segmentTile, generateRoadsFromDraftIds, type GeneratedRoad } from "../../api/drafts"
+import {
+  segmentTile,
+  generateRoadsFromDraftIds,
+  listDrafts,
+  type GeneratedRoad,
+} from "../../api/drafts"
 
 const { tiles, detect, save, done } = GEN_CONFIG.progressMilestones
 
@@ -120,6 +125,29 @@ async function addGeneratedRoads(roads: GeneratedRoad[]): Promise<void> {
 }
 
 /**
+ * Lists every pending road draft for a commune. Used as a fallback input when
+ * a generate run finds no *new* detections (see the no-detections branch of
+ * generateRoadsFromUrbanAreas). Pages through the draft queue in chunks since
+ * the API caps each page at Pagination.MaxTake (500).
+ */
+async function listPendingRoadDraftIds(communeId: number): Promise<string[]> {
+  const ids: string[] = []
+  const take = 500
+  for (let skip = 0; ; skip += take) {
+    const drafts = await listDrafts({
+      communeId,
+      featureType: "road",
+      status: "pending",
+      skip,
+      take,
+    })
+    ids.push(...drafts.map((d) => d.id))
+    if (drafts.length < take) break
+  }
+  return ids
+}
+
+/**
  * Runs the full generate-roads flow. Returns the created/dropped counts, or
  * null when the flow was skipped/failed (details reported via toasts).
  */
@@ -141,26 +169,60 @@ export async function generateRoadsFromUrbanAreas(): Promise<GenerateRoadsResult
     showToast(t("gen_roads_in_progress"), "warning")
     return null
   }
-  generation.setProgress(tiles)
 
   showToast(t("gen_roads_started"), "info")
 
   try {
-    const tile = await renderSatelliteTile(bounds)
-    generation.setProgress(detect, "gen_roads_stage_detect")
-
-    const segment = await segmentTile({ communeId, tile: tile.blob, bounds: tile.bounds })
-    if (!segment.draftIds.length) {
-      showToast(t("gen_roads_no_detections"), "info")
-      generation.complete()
-      return { created: 0, dropped: 0 }
+    // Segment every chunk at the highest satellite zoom (z18) so a commune
+    // wider than the 24x24-tile grid cap is covered by several z18 images
+    // instead of falling back to z17 where the model under-detects roads.
+    const grids = splitBoundsAtZoom(bounds, MAP_CONFIG.tileMaxZoomSatellite)
+    const allDraftIds: string[] = []
+    for (let i = 0; i < grids.length; i += 1) {
+      generation.setProgress(tiles, i === 0 ? "gen_roads_stage_tiles" : "gen_roads_stage_chunk")
+      const tile = await renderSatelliteGrid(grids[i])
+      const segment = await segmentTile({ communeId, tile: tile.blob, bounds: tile.bounds })
+      allDraftIds.push(...segment.draftIds)
     }
 
+    if (!allDraftIds.length) {
+      // Segmentation dedups every detection against the drafts already stored
+      // for the commune — including drafts whose roads the user just deleted
+      // (clear-roads now reverts accepted road drafts to pending instead of
+      // deleting them). So a fresh run after "remove all roads" finds nothing
+      // new: the AI would just re-create the same geometry. Fall back to the
+      // commune's pending road drafts so the network can be rebuilt from the
+      // review queue instead of stalling with "no roads detected".
+      const pendingIds = await listPendingRoadDraftIds(communeId)
+      if (!pendingIds.length) {
+        showToast(t("gen_roads_no_detections"), "info")
+        generation.complete()
+        return { created: 0, dropped: 0 }
+      }
+      showToast(t("gen_roads_reusing_drafts"), "info")
+      allDraftIds.push(...pendingIds)
+    }
+
+    generation.setProgress(detect, "gen_roads_stage_detect")
+    const summary = await generateRoadsFromDraftIds(communeId, allDraftIds)
     generation.setProgress(save, "gen_roads_stage_save")
-    const summary = await generateRoadsFromDraftIds(communeId, segment.draftIds)
     generation.setProgress(done, "gen_roads_stage_done")
     generation.complete()
     await addGeneratedRoads(summary.created)
+
+    if (summary.dropped > 0) {
+      const breakdown = summary.breakdown
+      showToast(
+        t("gen_roads_done_breakdown", {
+          tooShort: breakdown.tooShort,
+          lowConfidence: breakdown.lowConfidence,
+          turnAngle: breakdown.excessiveTurnAngle,
+          outside: breakdown.outsideUrbanArea,
+          invalid: breakdown.invalidGeometry,
+        }),
+        "success",
+      )
+    }
     showToast(
       t("gen_roads_done", { created: summary.created.length, dropped: summary.dropped }),
       "success",

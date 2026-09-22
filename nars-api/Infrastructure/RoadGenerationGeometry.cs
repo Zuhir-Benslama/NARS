@@ -336,6 +336,161 @@ public static class RoadGenerationGeometry
         return pieces.Count == 0 ? [line] : pieces;
     }
 
+    /// <summary>
+    /// Extends a ray starting at (<paramref name="lat"/>, <paramref name="lng"/>)
+    /// in the direction of the road's final bearing (toward
+    /// <paramref name="prevLat"/>/<paramref name="prevLng"/>) and returns the
+    /// closest network segment it hits within <paramref name="maxDistanceM"/>.
+    /// The first hit becomes a T-junction, so the extension never pierces a road
+    /// it passes over — welding stops at the nearest crossing. Returns false when
+    /// the ray touches nothing within range.
+    /// </summary>
+    public static bool TryExtendToNetwork(
+        double lat, double lng, double prevLat, double prevLng,
+        IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> network,
+        double maxDistanceM,
+        out (double Lat, double Lng) hit)
+    {
+        hit = (lat, lng);
+        var cosLat = Math.Cos(lat * Math.PI / 180.0);
+
+        // Direction of travel as a unit vector in a local east/north metre
+        // frame (x = east, y = north), so every point in this method uses the
+        // same axes and the ray/segment intersection below is exact even for
+        // perfectly axis-aligned roads.
+        var north = (lat - prevLat) * EarthMetersPerDegreeLat;
+        var east = (lng - prevLng) * cosLat * EarthMetersPerDegreeLat;
+        var length = Math.Sqrt(north * north + east * east);
+        if (length < 1e-9)
+        {
+            return false;
+        }
+
+        var dNorth = north / length;
+        var dEast = east / length;
+
+        var bestSquared = double.MaxValue;
+        (double Lat, double Lng) best = (lat, lng);
+        var hitFound = false;
+
+        foreach (var road in network)
+        {
+            for (var i = 0; i + 1 < road.Count; i++)
+            {
+                var aLat = road[i].Lat;
+                var aLng = road[i].Lng;
+                var bLat = road[i + 1].Lat;
+                var bLng = road[i + 1].Lng;
+
+                // Segment endpoints in the ray's local east/north frame.
+                var aEast = (aLng - lng) * cosLat * EarthMetersPerDegreeLat;
+                var aNorth = (aLat - lat) * EarthMetersPerDegreeLat;
+                var sEast = (bLng - aLng) * cosLat * EarthMetersPerDegreeLat;
+                var sNorth = (bLat - aLat) * EarthMetersPerDegreeLat;
+
+                // Ray O + t*d ; segment a + u*s, solved component-wise:
+                //   t*dEast - u*sEast = aEast
+                //   t*dNorth - u*sNorth = aNorth
+                var det = dEast * (-sNorth) - (-sEast) * dNorth;
+                if (Math.Abs(det) < 1e-9)
+                {
+                    continue;
+                }
+
+                var t = (aEast * (-sNorth) - (-sEast) * aNorth) / det;
+                var u = (dEast * aNorth - dNorth * aEast) / det;
+
+                // u in [0,1] and t strictly forward of the origin. A hit exactly
+                // at the origin would be a degenerate junction — skip it.
+                const double forwardEps = 0.25;
+                if (u < -1e-9 || u > 1.0 + 1e-9 || t < forwardEps)
+                {
+                    continue;
+                }
+
+                var dSq = t * t;
+                if (dSq < bestSquared)
+                {
+                    bestSquared = dSq;
+                    var hitLat = lat + t * (dNorth / EarthMetersPerDegreeLat);
+                    var hitLng = lng + t * (dEast / (cosLat * EarthMetersPerDegreeLat));
+                    best = (hitLat, hitLng);
+                    hitFound = true;
+                }
+            }
+        }
+
+        if (!hitFound || Math.Sqrt(bestSquared) > maxDistanceM)
+        {
+            return false;
+        }
+
+        hit = best;
+        return true;
+    }
+
+    /// <summary>
+    /// True when <paramref name="line"/> has a proper interior-interior crossing
+    /// with any segment of any road in <paramref name="network"/> (the same test
+    /// <see cref="SplitLineAtCrossings"/> uses). The weld pass rejects a snapped
+    /// endpoint when moving it would make the road pierce another road instead of
+    /// merely touching it.
+    /// </summary>
+    public static bool ProperlyCrossesAnyNetworkSegment(
+        IReadOnlyList<(double Lat, double Lng)> line,
+        IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> network)
+    {
+        if (line.Count < 2 || network.Count == 0)
+        {
+            return false;
+        }
+
+        var cosLat = Math.Cos(line[0].Lat * Math.PI / 180.0);
+        for (var i = 0; i + 1 < line.Count; i++)
+        {
+            var aLat = line[i].Lat;
+            var aLng = line[i].Lng;
+            var bLat = line[i + 1].Lat;
+            var bLng = line[i + 1].Lng;
+
+            // Near-degenerate segment (sub-epsilon length): projection can flicker
+            // a crossing when a road hugs its own endpoint; skip.
+            if (Math.Abs((bLat - aLat) * EarthMetersPerDegreeLat) < 1e-6
+                && Math.Abs((bLng - aLng) * cosLat * EarthMetersPerDegreeLat) < 1e-6)
+            {
+                continue;
+            }
+
+            foreach (var road in network)
+            {
+                for (var j = 0; j + 1 < road.Count; j++)
+                {
+                    var cLat = road[j].Lat;
+                    var cLng = road[j].Lng;
+                    var dLat = road[j + 1].Lat;
+                    var dLng = road[j + 1].Lng;
+
+                    var cX = (cLng - line[0].Lng) * cosLat * EarthMetersPerDegreeLat;
+                    var cY = (cLat - line[0].Lat) * EarthMetersPerDegreeLat;
+                    var dX = (dLng - line[0].Lng) * cosLat * EarthMetersPerDegreeLat;
+                    var dY = (dLat - line[0].Lat) * EarthMetersPerDegreeLat;
+
+                    var aX = (aLng - line[0].Lng) * cosLat * EarthMetersPerDegreeLat;
+                    var aY = (aLat - line[0].Lat) * EarthMetersPerDegreeLat;
+                    var bX = (bLng - line[0].Lng) * cosLat * EarthMetersPerDegreeLat;
+                    var bY = (bLat - line[0].Lat) * EarthMetersPerDegreeLat;
+
+                    if (TrySegmentInteriorIntersection(aX, aY, bX, bY, cX, cY, dX, dY, out _))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     private static void AddPiece(
         List<IReadOnlyList<(double Lat, double Lng)>> pieces,
         IReadOnlyList<(double Lat, double Lng)> piece)

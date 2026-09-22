@@ -5,6 +5,7 @@ import { GEN_CONFIG, EDIT_CONFIG } from "../../config"
 const {
   mockSegmentTile,
   mockGenerateRoads,
+  mockListDrafts,
   mockRenderTile,
   mockShowToast,
   mockGetUserMessageKey,
@@ -15,6 +16,7 @@ const {
 } = vi.hoisted(() => ({
   mockSegmentTile: vi.fn(),
   mockGenerateRoads: vi.fn(),
+  mockListDrafts: vi.fn(),
   mockRenderTile: vi.fn(),
   mockShowToast: vi.fn(),
   mockGetUserMessageKey: vi.fn(() => "err_unknown"),
@@ -27,8 +29,12 @@ const {
 vi.mock("../../api/drafts", () => ({
   segmentTile: mockSegmentTile,
   generateRoadsFromDraftIds: mockGenerateRoads,
+  listDrafts: mockListDrafts,
 }))
-vi.mock("./satellite-tiler", () => ({ renderSatelliteTile: mockRenderTile }))
+vi.mock("./satellite-tiler", async () => {
+  const actual = await vi.importActual<typeof import("./satellite-tiler")>("./satellite-tiler")
+  return { ...actual, renderSatelliteGrid: mockRenderTile }
+})
 vi.mock("./geoman-import", () => ({ importFeaturesIntoGeoman: mockImportFeaturesIntoGeoman }))
 vi.mock("../../i18n", () => ({ t: (key: string) => key }))
 vi.mock("../../lib/toast", () => ({ showToast: mockShowToast }))
@@ -97,7 +103,18 @@ beforeEach(async () => {
 
   const draftsMod = await import("../../api/drafts")
   mockSegmentTile.mockResolvedValue({ buildingCount: 0, roadCount: 0, draftIds: [] })
-  mockGenerateRoads.mockResolvedValue({ created: [], dropped: 0 })
+  mockListDrafts.mockResolvedValue([])
+  mockGenerateRoads.mockResolvedValue({
+    created: [],
+    dropped: 0,
+    breakdown: {
+      tooShort: 0,
+      lowConfidence: 0,
+      excessiveTurnAngle: 0,
+      outsideUrbanArea: 0,
+      invalidGeometry: 0,
+    },
+  })
   mockRenderTile.mockResolvedValue(TILE)
 
   const appMod = await import("../../stores/appStore")
@@ -196,7 +213,17 @@ describe("generateRoadsFromUrbanAreas", () => {
     const created = [road("r1"), road("r2")]
     seedUrbanArea()
     mockSegmentTile.mockResolvedValue({ buildingCount: 0, roadCount: 2, draftIds: ["d1", "d2"] })
-    mockGenerateRoads.mockResolvedValue({ created, dropped: 1 })
+    mockGenerateRoads.mockResolvedValue({
+      created,
+      dropped: 1,
+      breakdown: {
+        tooShort: 1,
+        lowConfidence: 0,
+        excessiveTurnAngle: 0,
+        outsideUrbanArea: 0,
+        invalidGeometry: 0,
+      },
+    })
 
     const result = await generateRoadsFromUrbanAreas()
 
@@ -213,6 +240,7 @@ describe("generateRoadsFromUrbanAreas", () => {
     expect(first).toMatchObject({ geometry: { type: "LineString" } })
     expect(first.properties.lineWidth).toBe(EDIT_CONFIG.edgeLineWidth)
     expect(mockUpdateEndpointMarkers).toHaveBeenCalled()
+    expect(mockShowToast).toHaveBeenCalledWith("gen_roads_done_breakdown", "success")
     expect(mockShowToast).toHaveBeenCalledWith("gen_roads_done", "success")
 
     const generation = useGenerationStore()
@@ -238,15 +266,72 @@ describe("generateRoadsFromUrbanAreas", () => {
     expect(useGenerationStore().active).toBe(false)
   })
 
-  it("reports success with zero counts when nothing was detected", async () => {
+  it("reports success with zero counts when nothing was detected and no drafts remain", async () => {
     seedUrbanArea()
     mockSegmentTile.mockResolvedValue({ buildingCount: 0, roadCount: 0, draftIds: [] })
+    mockListDrafts.mockResolvedValue([])
 
     const result = await generateRoadsFromUrbanAreas()
 
     expect(result).toEqual({ created: 0, dropped: 0 })
     expect(mockGenerateRoads).not.toHaveBeenCalled()
+    expect(mockListDrafts).toHaveBeenCalledWith({
+      communeId: 42,
+      featureType: "road",
+      status: "pending",
+      skip: 0,
+      take: 500,
+    })
     expect(mockShowToast).toHaveBeenCalledWith("gen_roads_no_detections", "info")
+  })
+
+  it("rebuilds from the commune's pending drafts when segmentation finds nothing new", async () => {
+    seedUrbanArea()
+    mockSegmentTile.mockResolvedValue({ buildingCount: 0, roadCount: 0, draftIds: [] })
+    mockListDrafts.mockResolvedValue([{ id: "d-pending-1" }, { id: "d-pending-2" }] as any)
+    mockGenerateRoads.mockResolvedValue({
+      created: [road("r1")],
+      dropped: 1,
+      breakdown: {
+        tooShort: 1,
+        lowConfidence: 0,
+        excessiveTurnAngle: 0,
+        outsideUrbanArea: 0,
+        invalidGeometry: 0,
+      },
+    })
+
+    const result = await generateRoadsFromUrbanAreas()
+
+    expect(mockGenerateRoads).toHaveBeenCalledWith(42, ["d-pending-1", "d-pending-2"])
+    expect(result).toEqual({ created: 1, dropped: 1 })
+    expect(mockShowToast).not.toHaveBeenCalledWith("gen_roads_no_detections", "info")
+    expect(useLayerStore().$state.roads).toHaveLength(1)
+  })
+
+  it("pages past the 500-draft cap when collecting pending road drafts", async () => {
+    seedUrbanArea()
+    mockSegmentTile.mockResolvedValue({ buildingCount: 0, roadCount: 0, draftIds: [] })
+    const fullPage = Array.from({ length: 500 }, (_, i) => ({ id: `d-${i}` }))
+    mockListDrafts
+      .mockResolvedValueOnce(fullPage as any)
+      .mockResolvedValueOnce([{ id: "d-500" }] as any)
+    mockGenerateRoads.mockResolvedValue({ created: [], dropped: 0 })
+
+    const result = await generateRoadsFromUrbanAreas()
+
+    expect(mockGenerateRoads).toHaveBeenCalledWith(42, [
+      ...Array.from({ length: 500 }, (_, i) => `d-${i}`),
+      "d-500",
+    ])
+    expect(result).toEqual({ created: 0, dropped: 0 })
+    expect(mockListDrafts).toHaveBeenNthCalledWith(2, {
+      communeId: 42,
+      featureType: "road",
+      status: "pending",
+      skip: 500,
+      take: 500,
+    })
   })
 
   it("skips roads with too few coordinates and does not duplicate dbIds", async () => {

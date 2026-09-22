@@ -40,7 +40,31 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
 }
 
-/** Slippy-map tile column for a longitude at zoom (Web Mercator). */
+/** Splits a bbox into orthogonal sub-grids, each within the per-axis tile cap at the given zoom. */
+export function splitBoundsAtZoom(bounds: TileBounds, zoom: number): TileGrid[] {
+  const grid = tileGrid(bounds, zoom)
+  if (grid.width <= MAX_GRID_DIM && grid.height <= MAX_GRID_DIM) {
+    return [grid]
+  }
+
+  const cols = Math.ceil(grid.width / MAX_GRID_DIM)
+  const rows = Math.ceil(grid.height / MAX_GRID_DIM)
+  const chunks: TileGrid[] = []
+  for (let r = 0; r < rows; r += 1) {
+    for (let c = 0; c < cols; c += 1) {
+      const width = c + 1 === cols ? grid.width - c * MAX_GRID_DIM : MAX_GRID_DIM
+      const height = r + 1 === rows ? grid.height - r * MAX_GRID_DIM : MAX_GRID_DIM
+      chunks.push({
+        zoom,
+        x0: grid.x0 + c * MAX_GRID_DIM,
+        y0: grid.y0 + r * MAX_GRID_DIM,
+        width,
+        height,
+      })
+    }
+  }
+  return chunks
+}
 export function lonToTileX(lon: number, zoom: number): number {
   const n = 2 ** zoom
   const x = ((lon + 180) / 360) * n
@@ -126,10 +150,8 @@ function loadTileImage(url: string): Promise<HTMLImageElement> {
   })
 }
 
-/** Fetches the satellite tiles covering bounds and composites them into a JPEG. */
-export async function renderSatelliteTile(bounds: TileBounds): Promise<RenderedSatelliteTile> {
-  const maxZoom = MAP_CONFIG.tileMaxZoomSatellite
-  const grid = tileGrid(bounds, chooseTileZoom(bounds, maxZoom))
+/** Fetches the satellite tiles covering a grid and composites them into a JPEG. */
+export async function renderSatelliteGrid(grid: TileGrid): Promise<RenderedSatelliteTile> {
   const width = grid.width * TILE_SIZE
   const height = grid.height * TILE_SIZE
 
@@ -162,4 +184,15 @@ export async function renderSatelliteTile(bounds: TileBounds): Promise<RenderedS
   })
 
   return { blob, bounds: gridBounds(grid), width, height }
+}
+
+/**
+ * Fetches the satellite tiles covering bounds and composites them into a JPEG.
+ * Always renders the grids returned by <see cref="splitBoundsAtZoom"/> at the
+ * highest satellite zoom so a large commune is chunked into several 24x24-tile
+ * z18 images rather than silently dropping to z17 (the "few roads" regression).
+ */
+export async function renderSatelliteTile(bounds: TileBounds): Promise<RenderedSatelliteTile> {
+  const maxZoom = MAP_CONFIG.tileMaxZoomSatellite
+  return renderSatelliteGrid(tileGrid(bounds, chooseTileZoom(bounds, maxZoom)))
 }

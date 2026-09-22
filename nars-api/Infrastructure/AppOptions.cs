@@ -59,7 +59,7 @@ public class ValidationOptions
 {
     [Range(10, 100_000)] public int MaxCoordinateCount { get; set; } = 10_000;
     [Range(0.1, 1000)] public double DistrictBoundaryToleranceMeters { get; set; } = 10.0;
-    [Range(10, 180)] public double RoadTurnAngleDegrees { get; set; } = 90.0;
+    [Range(10, 180)] public double RoadTurnAngleDegrees { get; set; } = 135.0;
     [Range(1, 1000)] public double RoadConnectivityMeters { get; set; } = 20.0;
 }
 
@@ -68,16 +68,17 @@ public class ValidationOptions
 /// generated. The length/confidence limits mirror the NARS_SEGMA_ROAD_* limits
 /// that used to be enforced inside the segmentation service, so a convention
 /// change is a config bump. Roads shorter than <see cref="MinRoadLengthM"/> are
-/// removed only when isolated — farther than <see cref="RoadIsolationMeters"/>
-/// from any road: a short stub that connects is topology, not noise. segma's own
-/// min-length floor is relaxed to 0 (the network is the sole judge).
+/// removed once a network exists (a bootstrap pass keeps every seed so the
+/// first roads can be created); the weld pass then re-connects longer dangling
+/// fragments onto the network. segma's own min-length floor is relaxed to 0
+/// (the network is the sole judge).
 /// </summary>
 public class RoadRulesOptions
 {
     /// <summary>
-    /// Minimum geodesic length for a standalone road. A road below this is kept
-    /// when it touches another road or lies within <see cref="RoadIsolationMeters"/>
-    /// of one (junction stubs are roads, not delete candidates).
+    /// Minimum geodesic length for a road. Once any road network exists,
+    /// candidates below this are dropped regardless of proximity; during a
+    /// bootstrap (no roads at all) every seed is kept so generation can start.
     /// </summary>
     [Range(0.0, 100_000.0)] public double MinRoadLengthM { get; set; } = 10.0;
 
@@ -107,6 +108,17 @@ public class RoadRulesOptions
     /// no-roads-at-all case.
     /// </summary>
     [Range(100, 50_000)] public double RoadNetworkSearchMeters { get; set; } = 3000.0;
+
+    /// <summary>
+    /// Maximum distance a dangling road endpoint may be from the commune's road
+    /// network and still be welded onto it after generation. Endpoints within
+    /// <see cref="ValidationOptions.RoadConnectivityMeters"/> are snapped during
+    /// rule evaluation; this wider radius lets the weld pass pull the rest in —
+    /// preferring a straight continuation of the road's final bearing, falling
+    /// back to a nearest-point projection — so isolated fragments become one
+    /// connected graph instead of dead ends.
+    /// </summary>
+    [Range(0.0, 1000.0)] public double RoadWeldRadiusM { get; set; } = 50.0;
 }
 
 /// <summary>

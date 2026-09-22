@@ -21,14 +21,13 @@ public enum RoadPhaseViolation
     None,
 
     /// <summary>
-    /// The road is shorter than <see cref="RoadRulesOptions.MinRoadLengthM"/>
-    /// and isolated — farther than <see cref="RoadRulesOptions.RoadIsolationMeters"/>
-    /// from every road of the network. The rule only prunes once a network
-    /// exists: during a bootstrap pass (no roads at all yet) every short
-    /// segment would be trivially "isolated", which would prevent the first
-    /// roads from ever being created, so empty-network seeds are kept. A short
-    /// stub that touches or sits within the isolation distance of a road is
-    /// kept: it is a connection, not a spur.
+    /// The road is shorter than <see cref="RoadRulesOptions.MinRoadLengthM"/>.
+    /// The rule only prunes once a network exists: during a bootstrap pass (no
+    /// roads at all yet) every segment is the first of its graph, so
+    /// empty-network seeds are kept. Once a network exists any sub-minimum road
+    /// is dropped regardless of proximity — a 5 m spur beside a road is noise,
+    /// not topology; the weld pass re-connects genuinely dangling fragments
+    /// that are long enough to be roads.
     /// </summary>
     TooShort,
 
@@ -77,6 +76,11 @@ public static class RoadPhaseRules
     /// <param name="rules">Length, confidence, containment-tolerance and search-radius thresholds.</param>
     /// <param name="snapEndpoints">True to snap connected endpoints onto the network (materialization);
     /// false keeps the original vertices (draft pre-filtering only).</param>
+    /// <param name="insideToleranceOverrideM">Optional override for the urban-containment
+    /// tolerance; defaults to <paramref name="rules"/>.InsideToleranceMeters. The draft
+    /// pre-filter passes a wider value so detections near the detection-bbox edge (which
+    /// can sit outside a drawn polygon ring by a few tens of metres) still reach the
+    /// review queue; materialization keeps the strict cadastre value.</param>
     public static RoadPhaseOutcome Evaluate(
         IReadOnlyList<(double Lat, double Lng)> vertices,
         double confidence,
@@ -84,23 +88,23 @@ public static class RoadPhaseRules
         IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> roadNetwork,
         ValidationOptions validation,
         RoadRulesOptions rules,
-        bool snapEndpoints)
+        bool snapEndpoints,
+        double? insideToleranceOverrideM = null)
     {
         if (vertices.Count < 2)
         {
             return new RoadPhaseOutcome(RoadPhaseViolation.TooShort, vertices);
         }
 
-        // A short road is only removed when it is also isolated AND a network
-        // already exists: a sub-minimum spur that touches a road (or sits
-        // within the isolation distance) is a connection, not a delete
-        // candidate, and during a bootstrap pass (no roads yet) every short
-        // segment would be trivially "isolated" — pruning it would prevent the
-        // first roads from ever being created. Distance to the network is 0 for
-        // a touching/shared-junction road, so the nearest road decides.
+        // A short road is only removed when a network already exists: during a
+        // bootstrap pass (no roads yet) every segment is the first of its graph,
+        // and pruning it would prevent the first roads from ever being created.
+        // Once a network exists, any sub-minimum road is dropped regardless of
+        // proximity — a short stub beside a road is noise, not topology, and the
+        // weld pass re-connects longer dangling fragments that merely miss the
+        // network by a few tens of metres.
         if (roadNetwork.Count > 0
-            && LineLengthM(vertices) < rules.MinRoadLengthM
-            && IsIsolatedFromNetwork(vertices, roadNetwork, rules.RoadIsolationMeters))
+            && LineLengthM(vertices) < rules.MinRoadLengthM)
         {
             return new RoadPhaseOutcome(RoadPhaseViolation.TooShort, vertices);
         }
@@ -115,7 +119,7 @@ public static class RoadPhaseRules
             return new RoadPhaseOutcome(RoadPhaseViolation.ExcessiveTurnAngle, vertices);
         }
 
-        if (!IsWithinUrbanAreasM(vertices, urbanRings, rules.InsideToleranceMeters))
+        if (!IsWithinUrbanAreasM(vertices, urbanRings, insideToleranceOverrideM ?? rules.InsideToleranceMeters))
         {
             return new RoadPhaseOutcome(RoadPhaseViolation.OutsideUrbanArea, vertices);
         }
@@ -133,15 +137,24 @@ public static class RoadPhaseRules
             if (localNetwork.Count > 0)
             {
                 result = SnapEndpoints(vertices, localNetwork, validation.RoadConnectivityMeters);
+
+                // A snap can pull both endpoints onto the same network node,
+                // collapsing the road to a zero-length polyline — the min-length
+                // rule already ran on the original vertices, so it is re-verified
+                // on the mutated line here.
+                if (LineLengthM(result) < rules.MinRoadLengthM)
+                {
+                    return new RoadPhaseOutcome(RoadPhaseViolation.TooShort, result);
+                }
             }
 
             if (!IsWithinUrbanAreasM(result, urbanRings, rules.InsideToleranceMeters)
-                || VerticesTurnAngleExceeds(result, validation.RoadTurnAngleDegrees))
+                || PostSnapTurnAngleExceeds(result, validation.RoadTurnAngleDegrees))
             {
                 // A snap moved an endpoint outside an area edge or introduced an
                 // acute turn at the junction — reject the mutated line.
                 return new RoadPhaseOutcome(
-                    VerticesTurnAngleExceeds(result, validation.RoadTurnAngleDegrees)
+                    PostSnapTurnAngleExceeds(result, validation.RoadTurnAngleDegrees)
                         ? RoadPhaseViolation.ExcessiveTurnAngle
                         : RoadPhaseViolation.OutsideUrbanArea,
                     result);
@@ -288,6 +301,36 @@ public static class RoadPhaseRules
         return false;
     }
 
+    /// <summary>
+    /// Turn-angle re-check after endpoint snapping. The pre-snap line already
+    /// passed <see cref="VerticesTurnAngleExceeds"/>; a snap only ever moves the
+    /// line's first and/or last vertex, so only the triples touching those ends
+    /// can newly exceed the limit. Re-testing the entire line would let a
+    /// legitimately straight fragment be rejected because the junction it snaps
+    /// into reads as an acute turn — the two end triples are the whole, honest
+    /// scope of the "did the snap introduce a U-turn" question. Returns true
+    /// when either end triple exceeds <paramref name="maxDegrees"/>.
+    /// </summary>
+    private static bool PostSnapTurnAngleExceeds(
+        IReadOnlyList<(double Lat, double Lng)> snapped, double maxDegrees)
+        => TripleTurnAngleExceeds(snapped, 0, maxDegrees)
+            || TripleTurnAngleExceeds(snapped, snapped.Count - 3, maxDegrees);
+
+    /// <summary>The turn angle at the (i+1)-th vertex exceeds <paramref name="maxDegrees"/>.</summary>
+    private static bool TripleTurnAngleExceeds(
+        IReadOnlyList<(double Lat, double Lng)> vertices, int i, double maxDegrees)
+    {
+        if (i < 0 || i + 2 >= vertices.Count)
+        {
+            return false;
+        }
+
+        var a = vertices[i];
+        var b = vertices[i + 1];
+        var c = vertices[i + 2];
+        return GeometryHelper.ComputeTurnAngle(a.Lat, a.Lng, b.Lat, b.Lng, c.Lat, c.Lng) > maxDegrees;
+    }
+
     private static bool IsWithinUrbanAreasM(
         IReadOnlyList<(double Lat, double Lng)> vertices,
         IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> areaRings,
@@ -368,17 +411,4 @@ public static class RoadPhaseRules
             .Where(road => RoadGenerationGeometry.IsNearLine(centroidLat, centroidLng, road, maxDistanceM))
             .ToList();
     }
-
-    /// <summary>
-    /// True when <em>no</em> road of the network lies within
-    /// <paramref name="isolationMeters"/> of the candidate — the second half of
-    /// the minimum-length rule. Distance to a touching road is 0, so candidates
-    /// that share a junction with the network are never isolated.
-    /// </summary>
-    private static bool IsIsolatedFromNetwork(
-        IReadOnlyList<(double Lat, double Lng)> vertices,
-        IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> roadNetwork,
-        double isolationMeters)
-        => !roadNetwork.Any(road =>
-            RoadGenerationGeometry.DistanceBetweenLinesM(vertices, road) <= isolationMeters);
 }

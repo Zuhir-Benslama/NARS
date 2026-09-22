@@ -670,11 +670,12 @@ public class DraftFeaturesUnitTests
             await SeedAsync(db);
             var owner = await AddAreaAsync(db, 36.7199, 36.7203, 2.9595, 2.9605);
             // East-west network at lat 36.7201, ~11 m from both draft endpoints
-            // (draft spans lat 36.7200..36.7202).
+            // (draft runs parallel at lat 36.7200). Snapping pulls the whole
+            // line up onto the network without collapsing it.
             await AddNetworkRoadAsync(db, owner, 2.9595, 36.7201, 2.9605, 36.7201);
             var draft = AiDraftFeature.Create(
                 featureType: AiDraftFeature.TypeRoad,
-                geometryGeoJson: """{"type":"LineString","coordinates":[[2.9600,36.7200],[2.9600,36.7202]]}""",
+                geometryGeoJson: """{"type":"LineString","coordinates":[[2.9595,36.7200],[2.9605,36.7200]]}""",
                 confidence: 0.9,
                 communeId: CommuneId100,
                 sourceTileRef: "tile.png",
@@ -693,12 +694,12 @@ public class DraftFeaturesUnitTests
             Assert.Equal(2, coords.GetArrayLength());
             Assert.Equal(36.7201, coords[0].GetProperty("lat").GetDouble(), 5);
             Assert.Equal(36.7201, coords[1].GetProperty("lat").GetDouble(), 5);
-            Assert.Equal(2.9600, coords[0].GetProperty("lng").GetDouble(), 5);
+            Assert.Equal(2.9595, coords[0].GetProperty("lng").GetDouble(), 5);
         }
     }
 
     [Fact]
-    public async Task AcceptRoadDraft_ShortAndNearNetwork_IsAccepted()
+    public async Task AcceptRoadDraft_ShortNearNetwork_IsRejected()
     {
         var (db, factory) = CreateInMemoryDbPair("DraftsAcceptShortNear");
         await using (db)
@@ -706,8 +707,11 @@ public class DraftFeaturesUnitTests
             await SeedAsync(db);
             var owner = await AddAreaAsync(db, 36.7199, 36.7203, 2.9595, 2.9605);
             // East-west network at lat 36.7201; the ~4.5 m draft sits ~11 m
-            // north of it. Short but within the isolation distance of a road,
-            // so it is a connection, not a delete candidate — and it snaps on.
+            // north of it. A network already exists, so the sub-minimum stub is
+            // noise, not topology — it is a delete candidate even though it is
+            // within the old isolation distance. (The generate-roads weld pass
+            // reconnects dangling fragments that are long enough to be roads;
+            // the single-accept path simply rejects the short one.)
             await AddNetworkRoadAsync(db, owner, 2.9595, 36.7201, 2.9605, 36.7201);
             var draft = AiDraftFeature.Create(
                 featureType: AiDraftFeature.TypeRoad,
@@ -722,15 +726,9 @@ public class DraftFeaturesUnitTests
 
             var result = await svc.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, UserId, draft.Id, default);
 
-            Assert.Equal(DraftReviewStatus.Success, result.Status);
+            Assert.Equal(DraftReviewStatus.RulesNotMet, result.Status);
             db.ChangeTracker.Clear();
-            var road = Assert.Single(db.Roads.Where(r => r.Label == ""));
-            var data = JsonSerializer.Deserialize<JsonElement>(road.Data);
-            var coords = data.GetProperty("coordinates");
-            Assert.Equal(2, coords.GetArrayLength());
-            Assert.Equal(36.7201, coords[0].GetProperty("lat").GetDouble(), 5);
-            Assert.Equal(36.7201, coords[1].GetProperty("lat").GetDouble(), 5);
-            Assert.Equal(2.9599, coords[0].GetProperty("lng").GetDouble(), 5);
+            Assert.Empty(db.Roads.Where(r => r.Label == ""));
         }
     }
 
@@ -794,6 +792,43 @@ public class DraftFeaturesUnitTests
             Assert.Equal(1, summary.RoadCount);
             Assert.Empty(summary.DraftIds);
             Assert.Empty(await db.AiDraftFeatures.ToListAsync());
+        }
+    }
+
+    [Fact]
+    public async Task SegmentTile_Roads_JustOutsideArea_QueuedByWiderPreFilterTolerance()
+    {
+        // El Tarf area spans lat 36.014..36.017; this road sits at lat 36.0136,
+        // ~44.5 m south of the area's bottom edge — outside the strict 30 m
+        // materialization tolerance but inside the 50 m pre-filter, so the
+        // detection still reaches the review queue (where a human can trim it).
+        const string roadJson = """{"type":"LineString","coordinates":[[7.4370000000,36.0136000000],[7.4380000000,36.0145000000]]}""";
+        var (db, factory) = CreateInMemoryDbPair("DraftsSegmentEdgeTolerance");
+        await using (db)
+        {
+            await SeedAsync(db);
+            await SeedElTarfUrbanAreaAsync(db);
+            var segmentation = new Mock<ISegmentationClient>();
+            segmentation.Setup(s => s.SegmentTileAsync(
+                    It.IsAny<string>(), It.IsAny<Stream>(), "tile.png", "image/png",
+                    It.IsAny<(double, double, double, double)>(), default))
+                .ReturnsAsync(new SegmentationResult
+                {
+                    Roads = [new SegmentedFeature(roadJson, 0.9, AiDraftFeature.TypeRoad)],
+                });
+            var svc = CreateService(db, segmentation.Object, factory, roadRules: new RoadRulesOptions { InsideToleranceMeters = 30.0 });
+            using var stream = new MemoryStream([1, 2, 3]);
+
+            var summary = await svc.SegmentTileAsync(UserRoles.NationalAdmin, null, null, null, CommuneId100,
+                AiDraftFeature.TypeRoad, stream, "tile.png", "image/png", (1.0, 1.0, 2.0, 2.0), default);
+
+            // The pre-filter override (50 m) admits it even though the cadastre
+            // materialization value is 30 m.
+            Assert.Equal(1, summary.RoadCount);
+            var id = Assert.Single(summary.DraftIds);
+            var saved = await db.AiDraftFeatures.ToListAsync();
+            var draft = Assert.Single(saved);
+            Assert.Equal(id, draft.Id);
         }
     }
 

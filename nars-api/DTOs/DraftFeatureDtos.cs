@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
+using NarsApi.Services;
 
 namespace NarsApi.DTOs;
 
@@ -88,8 +89,22 @@ public sealed record GeneratedRoadDto(Guid DbId, string Layer, string Label, Jso
 
 /// <summary>
 /// Result of POST /api/draft-features/generate-roads. Roads that violate the
-/// cadastre rules stay pending and are counted in <see cref="Dropped"/>.
+/// cadastre rules stay pending and are counted in <see cref="Dropped"/>, with a
+/// per-rule <see cref="Breakdown"/> of why so the UI can report the reasons.
 /// </summary>
 public sealed record GenerateRoadsResponse(
     int Dropped,
-    IReadOnlyList<GeneratedRoadDto> Created);
+    IReadOnlyList<GeneratedRoadDto> Created,
+    GenerateRoadsDroppedDto Breakdown);
+
+/// <summary>Per-rule drop counts from a generate-roads pass.</summary>
+public sealed record GenerateRoadsDroppedDto(
+    int TooShort,
+    int LowConfidence,
+    int ExcessiveTurnAngle,
+    int OutsideUrbanArea,
+    int InvalidGeometry)
+{
+    public static GenerateRoadsDroppedDto From(RoadDropBreakdown b)
+        => new(b.TooShort, b.LowConfidence, b.ExcessiveTurnAngle, b.OutsideUrbanArea, b.InvalidGeometry);
+}

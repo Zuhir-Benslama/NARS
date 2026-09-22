@@ -11,13 +11,57 @@ namespace NarsApi.Services;
 public sealed record GeneratedRoad(Guid DbId, string Layer, string Label, JsonObject Data);
 
 /// <summary>
-/// Results of a generation pass. <see cref="Created"/> holds the roads written
-/// to the production tables (one per accepted piece — a seed split at crossings
-/// yields several); <see cref="Dropped"/> counts the seeds that produced no road
-/// (rejected by the cadastre rules and left pending), so the UI can report an
-/// honest created/rejected breakdown.
+/// Number of seeds dropped by each cadastre rule (and unparseable geometry),
+/// so tuning the next pass is evidence-based instead of guesswork. Sums to at
+/// most <see cref="RoadGenerationSummary.Dropped"/> — the first failing piece
+/// of each dropped seed is counted once, matching how the drop itself is
+/// attributed.
 /// </summary>
-public sealed record RoadGenerationSummary(IReadOnlyList<GeneratedRoad> Created, int Dropped);
+public sealed record RoadDropBreakdown(
+    int TooShort,
+    int LowConfidence,
+    int ExcessiveTurnAngle,
+    int OutsideUrbanArea,
+    int InvalidGeometry);
+
+internal sealed class RoadDropTally
+{
+    public int TooShort;
+    public int LowConfidence;
+    public int ExcessiveTurnAngle;
+    public int OutsideUrbanArea;
+    public int InvalidGeometry;
+
+    public void Count(RoadPhaseViolation violation) =>
+        _ = violation switch
+        {
+            RoadPhaseViolation.TooShort => TooShort++,
+            RoadPhaseViolation.LowConfidence => LowConfidence++,
+            RoadPhaseViolation.ExcessiveTurnAngle => ExcessiveTurnAngle++,
+            RoadPhaseViolation.OutsideUrbanArea => OutsideUrbanArea++,
+            _ => 0,
+        };
+
+    public RoadDropBreakdown ToBreakdown() =>
+        new(TooShort, LowConfidence, ExcessiveTurnAngle, OutsideUrbanArea, InvalidGeometry);
+}
+
+/// <summary>
+/// Results of a generation pass. <see cref="Created"/> holds the roads written
+/// to the production tables after the post-accept weld + merge passes (a seed
+/// split at crossings may yield several pieces that are then fused back into
+/// one road); <see cref="Dropped"/> counts the seeds that produced no road
+/// (rejected by the cadastre rules and left pending), so the UI can report an
+/// honest created/rejected breakdown. <see cref="Welded"/> counts the dangling
+/// endpoints a road's creation pass re-connected onto the network; <see cref="Merged"/>
+/// counts the roads fused back together after being split at shared junctions.
+/// </summary>
+public sealed record RoadGenerationSummary(
+    IReadOnlyList<GeneratedRoad> Created,
+    int Dropped,
+    RoadDropBreakdown Breakdown,
+    int Welded = 0,
+    int Merged = 0);
 
 public interface IRoadGenerationService
 {
@@ -83,7 +127,7 @@ public class RoadGenerationService(
             .ToListAsync(ct);
         if (drafts.Count == 0)
         {
-            return new RoadGenerationSummary([], 0);
+            return new RoadGenerationSummary([], 0, new RoadDropBreakdown(0, 0, 0, 0, 0));
         }
 
         var areaRings = await RoadPhaseRules.LoadUrbanAreaRingsAsync(db, communeId, ct);
@@ -93,15 +137,19 @@ public class RoadGenerationService(
         var rules = roadRulesOptions.Value;
 
         var now = timeProvider.UtcNow;
-        var created = new List<GeneratedRoad>(drafts.Count);
         var acceptedIds = new List<Guid>(drafts.Count);
         var dropped = 0;
+        var tally = new RoadDropTally();
 
         // The connected network grows during the pass: existing mapped roads,
         // then each accepted piece. Later drafts split at and snap onto it, so
         // generated roads never pierce each other and become one connected graph
-        // instead of isolated fragments.
+        // instead of isolated fragments. The candidate values are the SAME
+        // mutable List objects referenced here, so the post-accept weld pass can
+        // mutate them and the network snapshot stays coherent.
         var acceptedPolylines = new List<IReadOnlyList<(double Lat, double Lng)>>(roadNetwork);
+        var candidates = new List<List<(double Lat, double Lng)>>();
+        var candidateDrafts = new List<AiDraftFeature>();
 
         // Higher-confidence seeds go first: they win the crossings and become
         // the network the weaker drafts must connect to.
@@ -110,6 +158,7 @@ public class RoadGenerationService(
             if (!DraftGeometry.TryGetLineCoordinates(draft.GeometryGeoJson, out var seedVertices))
             {
                 dropped++;
+                tally.InvalidGeometry++;
                 continue;
             }
 
@@ -131,20 +180,22 @@ public class RoadGenerationService(
                     snapEndpoints: true);
                 if (outcome.Violation != RoadPhaseViolation.None || outcome.Coordinates.Count < 2)
                 {
+                    if (outcome.Violation != RoadPhaseViolation.None)
+                    {
+                        tally.Count(outcome.Violation);
+                    }
+                    else
+                    {
+                        tally.InvalidGeometry++;
+                    }
+
                     continue;
                 }
 
-                var roadId = Guid.CreateVersion7();
-                var roadData = DraftGeometry.ToRoadData(draft.GeometryGeoJson);
-                roadData["coordinates"] = RoadPhaseRules.ToJsonCoordinates(outcome.Coordinates);
-                var entity = FeatureTypeRegistry.CreateEntity(
-                    FeatureTypes.Road, roadId, userId, FeatureTypes.RoadLayers.Street, string.Empty, roadData.ToJsonString(), now)
-                    ?? throw new InvalidOperationException("FeatureTypeRegistry has no Road descriptor");
-                FeatureTypeRegistry.AddToDbContext(db, entity);
-                db.FeatureRegistry.Add(new FeatureRegistry { Id = roadId, FeatureType = FeatureTypes.Road });
-
-                created.Add(new GeneratedRoad(roadId, FeatureTypes.RoadLayers.Street, string.Empty, roadData));
-                acceptedPolylines.Add(outcome.Coordinates);
+                var coords = new List<(double Lat, double Lng)>(outcome.Coordinates);
+                candidates.Add(coords);
+                candidateDrafts.Add(draft);
+                acceptedPolylines.Add(coords);
                 createdForSeed++;
             }
 
@@ -157,9 +208,42 @@ public class RoadGenerationService(
             acceptedIds.Add(draft.Id);
         }
 
+        if (candidates.Count == 0)
+        {
+            return new RoadGenerationSummary([], dropped, tally.ToBreakdown());
+        }
+
+        // Post-accept topology: weld dangling endpoints onto the network (both
+        // endpoints of every candidate; straight extension preferred, else
+        // nearest point), then fuse collinear roads that were split at shared
+        // junctions back into single features. The weld mutates the candidate
+        // List objects in place, which the caller's network snapshot sees too.
+        var welded = RoadNetworkTopology.WeldEndpoints(
+            candidates, acceptedPolylines, areaRings, validation, rules);
+        var merged = RoadNetworkTopology.MergeCollinearRoads(candidates);
+        var mergedCount = candidates.Count - merged.Count;
+
+        var created = new List<GeneratedRoad>(merged.Count);
+        foreach (var component in merged)
+        {
+            // The merged road is owned by the commune scope of its first source
+            // draft (all candidates share the caller's commune by construction).
+            var source = candidateDrafts[component.MemberIndices[0]];
+            var roadId = Guid.CreateVersion7();
+            var roadData = DraftGeometry.ToRoadData(source.GeometryGeoJson);
+            roadData["coordinates"] = RoadPhaseRules.ToJsonCoordinates(component.Vertices);
+            var entity = FeatureTypeRegistry.CreateEntity(
+                FeatureTypes.Road, roadId, userId, FeatureTypes.RoadLayers.Street, string.Empty, roadData.ToJsonString(), now)
+                ?? throw new InvalidOperationException("FeatureTypeRegistry has no Road descriptor");
+            FeatureTypeRegistry.AddToDbContext(db, entity);
+            db.FeatureRegistry.Add(new FeatureRegistry { Id = roadId, FeatureType = FeatureTypes.Road });
+
+            created.Add(new GeneratedRoad(roadId, FeatureTypes.RoadLayers.Street, string.Empty, roadData));
+        }
+
         if (created.Count == 0)
         {
-            return new RoadGenerationSummary([], dropped);
+            return new RoadGenerationSummary([], dropped, tally.ToBreakdown());
         }
 
         var affected = await TransitionDraftsToAcceptedAsync(db, acceptedIds, userId, now, ct);
@@ -167,11 +251,11 @@ public class RoadGenerationService(
         {
             // A concurrent review transitioned some drafts between our read and
             // here; do not let their roads commit as duplicates.
-            return new RoadGenerationSummary([], dropped + acceptedIds.Count - affected);
+            return new RoadGenerationSummary([], dropped + acceptedIds.Count - affected, tally.ToBreakdown());
         }
 
         await db.SaveChangesAsync(ct);
-        return new RoadGenerationSummary(created, dropped);
+        return new RoadGenerationSummary(created, dropped, tally.ToBreakdown(), welded, mergedCount);
     }
 
     /// <summary>

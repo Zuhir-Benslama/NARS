@@ -2542,6 +2542,19 @@ export interface components {
       /** Format: int32 */
       dropped: number | string
       created: components["schemas"]["GeneratedRoadDto"][]
+      breakdown: components["schemas"]["GenerateRoadsDroppedDto"]
+    }
+    GenerateRoadsDroppedDto: {
+      /** Format: int32 */
+      tooShort: number | string
+      /** Format: int32 */
+      lowConfidence: number | string
+      /** Format: int32 */
+      excessiveTurnAngle: number | string
+      /** Format: int32 */
+      outsideUrbanArea: number | string
+      /** Format: int32 */
+      invalidGeometry: number | string
     }
     /** Format: binary */
     IFormFile: string
