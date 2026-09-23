@@ -114,7 +114,7 @@
   "gen_roads_no_detections": "لم تُكتشف أي طرق في الصورة الفضائية.",
   "gen_roads_reusing_drafts": "لا اكتشافات جديدة؛ إعادة التوليد من مسودات الطرق المعلّقة للبلدية.",
   "gen_roads_done": "تم إنشاء {created} طريقًا، واستبعاد {dropped}.",
-  "gen_roads_done_breakdown": "المستبعدة: {tooShort} قصيرة جدًا · {lowConfidence} ثقة منخفضة · {turnAngle} زاوية · {outside} خارج النطاق · {invalid} غير مقروءة.",
+  "gen_roads_done_breakdown": "المستبعدة: {tooShort} قصيرة جدًا · {lowConfidence} ثقة منخفضة · {turnAngle} زاوية · {outside} خارج النطاق · {tooClose} قريبة جدًا · {invalid} غير مقروءة.",
   "gen_roads_failed": "فشل توليد الطرق: {error}",
   "gen_roads_in_progress": "توليد الطرق قيد التنفيذ بالفعل.",
   "gen_roads_stage_tiles": "يتم عرض القطع الفضائية…",

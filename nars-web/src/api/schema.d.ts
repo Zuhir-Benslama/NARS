@@ -2554,6 +2554,8 @@ export interface components {
       /** Format: int32 */
       outsideUrbanArea: number | string
       /** Format: int32 */
+      tooClose: number | string
+      /** Format: int32 */
       invalidGeometry: number | string
     }
     /** Format: binary */

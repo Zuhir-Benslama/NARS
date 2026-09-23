@@ -41,6 +41,16 @@ public static class RoadNetworkTopology
     /// <summary>Maximum divergence from a straight line that still counts as collinear.</summary>
     public const double MergeCollinearDegrees = 15.0;
 
+    /// <summary>
+    /// Maximum a member's interior vertices may stray from the established chain
+    /// corridor and still count as duplicate coverage of that corridor. A member
+    /// whose far end closes back onto the chain and whose interior stays within
+    /// this deviation is a re-draw of the same road — it must not be spliced in
+    /// (that would fold the polyline back on itself). A member whose interior
+    /// bends further away is a genuine loop/ring and stays allowed.
+    /// </summary>
+    private const double FoldMaxDeviationM = 10.0;
+
     /// <summary>Hard cap on weld iterations; termination is already guaranteed, this is a safety net.</summary>
     private const int MaxWeldPasses = 10;
 
@@ -338,10 +348,30 @@ public static class RoadNetworkTopology
         foreach (var group in groups.Values)
         {
             var memberIndices = group.ToArray();
-            var vertices = group.Count == 1
-                ? candidates[group[0]]
-                : BuildChain(group.Select(i => candidates[i]).ToList(), toleranceM);
-            result.Add(new MergedComponent(vertices, memberIndices));
+            if (group.Count == 1)
+            {
+                result.Add(new MergedComponent(candidates[group[0]], memberIndices));
+                continue;
+            }
+
+            var chain = BuildChain(group.Select(i => candidates[i]).ToList(), toleranceM);
+            if (chain is not null && !HasFold(chain, toleranceM))
+            {
+                result.Add(new MergedComponent(chain, memberIndices));
+            }
+            else
+            {
+                // The corridor cannot be concatenated without folding back on
+                // itself or duplicating it (same physical road detected twice,
+                // e.g. one fragment overlapping another near-clone). No single
+                // polyline represents the group honestly — keep the members as
+                // their original separate roads rather than materialize a
+                // collapsed loop.
+                foreach (var i in group)
+                {
+                    result.Add(new MergedComponent(candidates[i], [i]));
+                }
+            }
         }
 
         return result;
@@ -358,9 +388,14 @@ public static class RoadNetworkTopology
             return false;
         }
 
-        // Share an endpoint within tolerance: either of a's ends hits b.
+        // Share an endpoint within tolerance: an end of either road hits the
+        // other road (its interior counts — a T-junction or a stub lying on a
+        // longer body). Both directions are tested so the union does not depend
+        // on which road happens to come first in index order.
         var touches = RoadGenerationGeometry.TrySnapToNetwork(a[0].Lat, a[0].Lng, [b], toleranceM, out _)
-            || RoadGenerationGeometry.TrySnapToNetwork(a[^1].Lat, a[^1].Lng, [b], toleranceM, out _);
+            || RoadGenerationGeometry.TrySnapToNetwork(a[^1].Lat, a[^1].Lng, [b], toleranceM, out _)
+            || RoadGenerationGeometry.TrySnapToNetwork(b[0].Lat, b[0].Lng, [a], toleranceM, out _)
+            || RoadGenerationGeometry.TrySnapToNetwork(b[^1].Lat, b[^1].Lng, [a], toleranceM, out _);
         if (!touches)
         {
             return false;
@@ -379,13 +414,20 @@ public static class RoadNetworkTopology
     {
         var a1 = BearingDeg(a[0], a[^1]);
         var b1 = BearingDeg(b[0], b[^1]);
-        var diff = Math.Abs(ModDeg(a1 - b1));
-        if (diff > 90.0)
+
+        // Undirected line separation: reduce the raw bearing difference to
+        // [0, 180] (roads heading the same way and roads heading opposite ways
+        // on the same line are both collinear), then reflect > 90° into the
+        // [0, 90] wedge. A naive "180 - diff" on an unwrapped difference — like
+        // the 355° wraparound of two roads 5° apart — reported ~175° and kept
+        // genuinely straight continuations from ever merging.
+        var diff = ModDeg(a1 - b1);
+        if (diff > 180.0)
         {
-            diff = 180.0 - diff;
+            diff = 360.0 - diff;
         }
 
-        return diff;
+        return diff > 90.0 ? 180.0 - diff : diff;
     }
 
     private static double BearingDeg((double Lat, double Lng) from, (double Lat, double Lng) to)
@@ -402,13 +444,34 @@ public static class RoadNetworkTopology
     /// chain and concatenates their vertex lists, dropping the duplicated
     /// junction point between neighbours. The chain is built greedily from both
     /// open ends, which is exact for the straight corridors these roads follow.
+    ///
+    /// Three guards protect the assembly from the failure mode this code used to
+    /// hit — roads that share only an endpoint yet cover the SAME corridor (a
+    /// near-identical duplicate of an already-merged road):
+    /// <list type="bullet">
+    /// <item>The chain is seeded with the longest member (ties: more vertices,
+    /// then lower index), so the true corridor spine dominates and an index-first
+    /// short fragment cannot anchor the assembly.</item>
+    /// <item>A member is only spliced at a chain open end when one of its
+    /// <em>own endpoints</em> actually lies on that end — a road that merely
+    /// spans or passes through the anchor is not a continuation.</item>
+    /// <item>A member whose far end closes back onto the chain is a loop: it is
+    /// rejected unless its interior genuinely departs from the chain corridor
+    /// (a real ring road), keeping near-duplicate roads from folding the merged
+    /// polyline back on itself.</item>
+    /// </list>
+    /// Returns null when a member could not be placed without duplicating or
+    /// folding the corridor — the caller keeps the members as separate roads.
     /// </summary>
-    private static List<(double Lat, double Lng)> BuildChain(
+    private static List<(double Lat, double Lng)>? BuildChain(
         List<IReadOnlyList<(double Lat, double Lng)>> members,
         double toleranceM)
     {
-        var chain = new List<(double Lat, double Lng)>(members[0]);
-        var used = new HashSet<int>([0]);
+        var used = new HashSet<int>();
+        var seed = PickSeed(members);
+        used.Add(seed);
+
+        var chain = new List<(double Lat, double Lng)>(members[seed]);
         var openA = chain[0];
         var openB = chain[^1];
 
@@ -422,27 +485,20 @@ public static class RoadNetworkTopology
                     continue;
                 }
 
-                var member = members[i];
-
                 // Append at openB, dropping the shared junction vertex.
-                if (RoadGenerationGeometry.TrySnapToNetwork(openB.Lat, openB.Lng, [member], toleranceM, out _))
+                if (ExtendChain(members[i], openB, chain, toleranceM))
                 {
-                    var ordered = OrderToward(member, openB);
-                    chain.AddRange(ordered.Skip(1));
-                    openB = ordered[^1];
+                    openB = chain[^1];
                     used.Add(i);
                     advanced = true;
                     break;
                 }
 
-                // Prepend at openA: order the member so its end touching openA is
-                // first, then splice its remaining vertices (from the far end,
-                // skipping the shared junction vertex) in front of the chain.
-                if (RoadGenerationGeometry.TrySnapToNetwork(openA.Lat, openA.Lng, [member], toleranceM, out _))
+                // Prepend at openA: splice the member's vertices in front so its
+                // far end becomes the new open end.
+                if (ExtendChain(members[i], openA, chain, toleranceM, prepend: true))
                 {
-                    var ordered = OrderToward(member, openA);
-                    chain.InsertRange(0, ordered.Skip(1).Reverse());
-                    openA = ordered[^1];
+                    openA = chain[0];
                     used.Add(i);
                     advanced = true;
                     break;
@@ -451,14 +507,160 @@ public static class RoadNetworkTopology
 
             if (!advanced)
             {
-                // Defensive: a disjoint member would break the chain. It should
-                // not happen with collinear endpoint-touching inputs; keep the
-                // chain built so far and stop.
-                break;
+                // A member joined the group (endpoint tolerance) but cannot be
+                // placed without duplicating or folding the corridor. Fall back
+                // to separate roads rather than silently dropping it.
+                return null;
             }
         }
 
         return chain;
+    }
+
+    /// <summary>Picks the seed member: the longest; ties broken by vertex count,
+    /// then by lower index (deterministic on the caller's ordering).</summary>
+    private static int PickSeed(List<IReadOnlyList<(double Lat, double Lng)>> members)
+    {
+        var best = 0;
+        var bestLength = LineLengthM(members[0]);
+        for (var i = 1; i < members.Count; i++)
+        {
+            var length = LineLengthM(members[i]);
+            var better = length > bestLength + 1e-9
+                || (Math.Abs(length - bestLength) <= 1e-9 && members[i].Count > members[best].Count);
+            if (better)
+            {
+                best = i;
+                bestLength = length;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// Splices <paramref name="member"/> onto <paramref name="chain"/> at
+    /// <paramref name="anchor"/> (an open chain end), dropping the shared
+    /// junction vertex. Appends the member's remaining vertices after the chain
+    /// unless <paramref name="prepend"/> is set, in which case they are reversed
+    /// in front. Applies only to a copy, so a rejected splice leaves the chain
+    /// untouched.
+    /// </summary>
+    private static bool ExtendChain(
+        IReadOnlyList<(double Lat, double Lng)> member,
+        (double Lat, double Lng) anchor,
+        List<(double Lat, double Lng)> chain,
+        double toleranceM,
+        bool prepend = false)
+    {
+        // Junction fidelity: the anchor must be one of the member's own
+        // endpoints. Testing the member as a whole would let a road whose body
+        // merely passes through the open end get spliced in as a continuation.
+        var squaredTolerance = toleranceM * toleranceM;
+        if (SquaredDistanceM(member[0], anchor) > squaredTolerance
+            && SquaredDistanceM(member[^1], anchor) > squaredTolerance)
+        {
+            return false;
+        }
+
+        var ordered = OrderToward(member, anchor);
+        if (SquaredDistanceM(ordered[0], anchor) > squaredTolerance)
+        {
+            return false;
+        }
+
+        // Fold guard: the member's far end closing onto the chain means this
+        // splice would loop the polyline back onto itself. Tolerate it only for
+        // a genuine ring, whose interior swings away from the chain corridor.
+        if (ChainDistanceM(ordered[^1], chain) <= toleranceM && !IsGenuineRing(member, chain))
+        {
+            return false;
+        }
+
+        var candidate = new List<(double Lat, double Lng)>(chain.Count + ordered.Count - 1);
+        if (prepend)
+        {
+            candidate.AddRange(ordered.Skip(1).Reverse());
+            candidate.AddRange(chain);
+        }
+        else
+        {
+            candidate.AddRange(chain);
+            candidate.AddRange(ordered.Skip(1));
+        }
+
+        chain.Clear();
+        chain.AddRange(candidate);
+        return true;
+    }
+
+    /// <summary>
+    /// True when a member whose far end closes onto the chain is a genuine ring
+    /// rather than a near-duplicate of the corridor: it must have interior
+    /// vertices, and at least one must depart from the chain corridor by more
+    /// than <see cref="FoldMaxDeviationM"/>. A two-vertex member (empty
+    /// interior) with both ends on the chain is a pure duplicate segment.
+    /// </summary>
+    private static bool IsGenuineRing(
+        IReadOnlyList<(double Lat, double Lng)> member,
+        IReadOnlyList<(double Lat, double Lng)> chain)
+    {
+        if (member.Count < 3)
+        {
+            return false;
+        }
+
+        for (var i = 1; i < member.Count - 1; i++)
+        {
+            if (ChainDistanceM(member[i], chain) > FoldMaxDeviationM)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// True when two non-adjacent vertices of the chain coincide within
+    /// tolerance — a folded/collapsed polyline that must not be materialized.
+    /// </summary>
+    private static bool HasFold(IReadOnlyList<(double Lat, double Lng)> chain, double toleranceM)
+    {
+        var squaredTolerance = toleranceM * toleranceM;
+        for (var i = 0; i < chain.Count; i++)
+        {
+            for (var j = i + 2; j < chain.Count; j++)
+            {
+                if (SquaredDistanceM(chain[i], chain[j]) <= squaredTolerance)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Shortest distance in metres from a point to a polyline
+    /// (0 for a point on any segment), in the local equirectangular plane.</summary>
+    private static double ChainDistanceM(
+        (double Lat, double Lng) point,
+        IReadOnlyList<(double Lat, double Lng)> chain)
+    {
+        var cosLat = Math.Cos(point.Lat * Math.PI / 180.0);
+        var minSquared = double.MaxValue;
+        for (var i = 0; i + 1 < chain.Count; i++)
+        {
+            var dSquared = SquaredSegmentDistanceM(
+                point.Lat, point.Lng, chain[i].Lat, chain[i].Lng, chain[i + 1].Lat, chain[i + 1].Lng, cosLat);
+            if (dSquared < minSquared)
+            {
+                minSquared = dSquared;
+            }
+        }
+
+        return Math.Sqrt(minSquared);
     }
 
     /// <summary>Orders a member so its end nearest <paramref name="anchor"/>
@@ -478,5 +680,27 @@ public static class RoadNetworkTopology
         var dLat = (b.Lat - a.Lat) * 111_320.0;
         var dLng = (b.Lng - a.Lng) * cosLat * 111_320.0;
         return dLat * dLat + dLng * dLng;
+    }
+
+    private static double SquaredSegmentDistanceM(
+        double lat, double lng, double aLat, double aLng, double bLat, double bLng, double cosLat)
+    {
+        var ax = (aLng - lng) * cosLat * 111_320.0;
+        var ay = (aLat - lat) * 111_320.0;
+        var bx = (bLng - lng) * cosLat * 111_320.0;
+        var by = (bLat - lat) * 111_320.0;
+
+        var dx = bx - ax;
+        var dy = by - ay;
+        var lenSq = dx * dx + dy * dy;
+        if (lenSq == 0.0)
+        {
+            return ax * ax + ay * ay;
+        }
+
+        var t = Math.Clamp(-(ax * dx + ay * dy) / lenSq, 0.0, 1.0);
+        var px = ax + t * dx;
+        var py = ay + t * dy;
+        return px * px + py * py;
     }
 }

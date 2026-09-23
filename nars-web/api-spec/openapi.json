@@ -3083,6 +3083,7 @@
           "lowConfidence",
           "excessiveTurnAngle",
           "outsideUrbanArea",
+          "tooClose",
           "invalidGeometry"
         ],
         "type": "object",
@@ -3103,6 +3104,11 @@
             "format": "int32"
           },
           "outsideUrbanArea": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "tooClose": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": ["integer", "string"],
             "format": "int32"

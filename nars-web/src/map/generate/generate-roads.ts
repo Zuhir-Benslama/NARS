@@ -218,6 +218,7 @@ export async function generateRoadsFromUrbanAreas(): Promise<GenerateRoadsResult
           lowConfidence: breakdown.lowConfidence,
           turnAngle: breakdown.excessiveTurnAngle,
           outside: breakdown.outsideUrbanArea,
+          tooClose: breakdown.tooClose,
           invalid: breakdown.invalidGeometry,
         }),
         "success",

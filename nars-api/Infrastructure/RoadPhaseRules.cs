@@ -39,6 +39,14 @@ public enum RoadPhaseViolation
 
     /// <summary>Some vertex lies outside every urban area by more than the tolerance.</summary>
     OutsideUrbanArea,
+
+    /// <summary>
+    /// The road's corridor parallels or overlaps an existing network road,
+    /// staying within <see cref="RoadRulesOptions.MinRoadSeparationMeters"/> of
+    /// it for at least <see cref="RoadRulesOptions.MinRoadLengthM"/> in total —
+    /// the same street detected twice, not a distinct road.
+    /// </summary>
+    TooClose,
 }
 
 /// <summary>
@@ -161,7 +169,97 @@ public static class RoadPhaseRules
             }
         }
 
+        // Minimum separation: a candidate that runs alongside a single network
+        // road for a road-length worth of corridor is the same street detected
+        // twice (the roads-phase engine's own duplicate guard). Measured on the
+        // mutated result so a snap that pulls a road onto an existing corridor
+        // is caught; runs whether or not endpoints were snapped, so it also
+        // filters duplicate detections at the draft pre-filter.
+        var maxAlongside = MaxAlongsideLengthM(result, roadNetwork, rules.MinRoadSeparationMeters);
+        if (maxAlongside >= rules.MinRoadLengthM)
+        {
+            return new RoadPhaseOutcome(RoadPhaseViolation.TooClose, result);
+        }
+
         return new RoadPhaseOutcome(RoadPhaseViolation.None, result);
+    }
+
+    /// <summary>
+    /// Longest extent of <paramref name="candidate"/> that lies within
+    /// <paramref name="maxDistanceM"/> of any single road of the network — the
+    /// alongside length against that one road. Roads too far from the candidate
+    /// to matter are skipped by a line-line distance quick reject; the winner's
+    /// extent is what a re-detected parallel/overlapping street would report,
+    /// while a junction approach stays short regardless of how many roads the
+    /// candidate crosses nearby. 0 when <paramref name="network"/> carries
+    /// nothing to measure against (empty bootstrap).
+    /// </summary>
+    private static double MaxAlongsideLengthM(
+        IReadOnlyList<(double Lat, double Lng)> candidate,
+        IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> network,
+        double maxDistanceM)
+    {
+        if (candidate.Count < 2 || network.Count == 0 || maxDistanceM <= 0.0)
+        {
+            return 0.0;
+        }
+
+        var best = 0.0;
+        foreach (var road in network)
+        {
+            if (RoadGenerationGeometry.DistanceBetweenLinesM(candidate, road) >= maxDistanceM)
+            {
+                continue;
+            }
+
+            var along = AlongsideLengthM(candidate, road, maxDistanceM);
+            if (along > best)
+            {
+                best = along;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// Total geodesic length of <paramref name="candidate"/> lying within
+    /// <paramref name="maxDistanceM"/> of <paramref name="road"/>, estimated by
+    /// sampling the corridor every metre (plenty for a 3.5 m band over roads
+    /// measured in tens of metres).
+    /// </summary>
+    private static double AlongsideLengthM(
+        IReadOnlyList<(double Lat, double Lng)> candidate,
+        IReadOnlyList<(double Lat, double Lng)> road,
+        double maxDistanceM)
+    {
+        const double stepM = 1.0;
+        var along = 0.0;
+        for (var i = 0; i + 1 < candidate.Count; i++)
+        {
+            var a = candidate[i];
+            var b = candidate[i + 1];
+            var segmentStart = a;
+            var segLen = DraftGeometry.HaversineM(a.Lng, a.Lat, b.Lng, b.Lat);
+            if (segLen <= 1e-9)
+            {
+                continue;
+            }
+
+            var steps = Math.Max(1, (int)Math.Ceiling(segLen / stepM));
+            for (var s = 0; s < steps; s++)
+            {
+                var t = (s + 0.5) / steps;
+                var lat = segmentStart.Lat + t * (b.Lat - segmentStart.Lat);
+                var lng = segmentStart.Lng + t * (b.Lng - segmentStart.Lng);
+                if (RoadGenerationGeometry.IsNearLine(lat, lng, road, maxDistanceM))
+                {
+                    along += segLen / steps;
+                }
+            }
+        }
+
+        return along;
     }
 
     /// <summary>Serializes a vertex list as the production <c>coordinates</c> [{lat, lng}, ...].</summary>

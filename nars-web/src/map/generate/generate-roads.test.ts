@@ -112,6 +112,7 @@ beforeEach(async () => {
       lowConfidence: 0,
       excessiveTurnAngle: 0,
       outsideUrbanArea: 0,
+      tooClose: 0,
       invalidGeometry: 0,
     },
   })
@@ -221,6 +222,7 @@ describe("generateRoadsFromUrbanAreas", () => {
         lowConfidence: 0,
         excessiveTurnAngle: 0,
         outsideUrbanArea: 0,
+        tooClose: 0,
         invalidGeometry: 0,
       },
     })
@@ -297,6 +299,7 @@ describe("generateRoadsFromUrbanAreas", () => {
         lowConfidence: 0,
         excessiveTurnAngle: 0,
         outsideUrbanArea: 0,
+        tooClose: 0,
         invalidGeometry: 0,
       },
     })

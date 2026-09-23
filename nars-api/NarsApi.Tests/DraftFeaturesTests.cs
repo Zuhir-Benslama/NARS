@@ -662,16 +662,18 @@ public class DraftFeaturesUnitTests
     }
 
     [Fact]
-    public async Task AcceptRoadDraft_SnapsConnectedEndpointsOntoNetwork()
+    public async Task AcceptRoadDraft_ParallelToNetwork_IsRejectedAsTooClose()
     {
-        var (db, factory) = CreateInMemoryDbPair("DraftsAcceptSnap");
+        var (db, factory) = CreateInMemoryDbPair("DraftsAcceptParallelDup");
         await using (db)
         {
             await SeedAsync(db);
             var owner = await AddAreaAsync(db, 36.7199, 36.7203, 2.9595, 2.9605);
-            // East-west network at lat 36.7201, ~11 m from both draft endpoints
-            // (draft runs parallel at lat 36.7200). Snapping pulls the whole
-            // line up onto the network without collapsing it.
+            // East-west network at lat 36.7201; the draft runs parallel ~11 m
+            // away at lat 36.7200. Snapping pulls the whole line up onto the
+            // network, and the post-snap result is a duplicate corridor — the
+            // min-separation rule must reject the accept (this is the
+            // duplicate-road defect, not a wiring game).
             await AddNetworkRoadAsync(db, owner, 2.9595, 36.7201, 2.9605, 36.7201);
             var draft = AiDraftFeature.Create(
                 featureType: AiDraftFeature.TypeRoad,
@@ -686,15 +688,10 @@ public class DraftFeaturesUnitTests
 
             var result = await svc.AcceptDraftAsync(UserRoles.NationalAdmin, null, null, null, UserId, draft.Id, default);
 
-            Assert.Equal(DraftReviewStatus.Success, result.Status);
+            Assert.Equal(DraftReviewStatus.RulesNotMet, result.Status);
             db.ChangeTracker.Clear();
-            var road = Assert.Single(db.Roads.Where(r => r.Label == ""));
-            var data = JsonSerializer.Deserialize<JsonElement>(road.Data);
-            var coords = data.GetProperty("coordinates");
-            Assert.Equal(2, coords.GetArrayLength());
-            Assert.Equal(36.7201, coords[0].GetProperty("lat").GetDouble(), 5);
-            Assert.Equal(36.7201, coords[1].GetProperty("lat").GetDouble(), 5);
-            Assert.Equal(2.9595, coords[0].GetProperty("lng").GetDouble(), 5);
+            Assert.Null(await db.Roads.FirstOrDefaultAsync(r => r.Label == ""));
+            Assert.Equal(AiDraftFeature.StatusPending, (await db.AiDraftFeatures.FindAsync(draft.Id))!.Status);
         }
     }
 

@@ -285,23 +285,57 @@ public class RoadGenerationUnitTests
         await using (db)
         {
             await SeedAdminLocationsAsync(db);
+            // Two vertical network roads 90 m apart. The draft runs between
+            // them: each endpoint sits ~18 m off its road (inside the 20 m snap
+            // tolerance) and is pulled onto it, bridging the gap as a genuine
+            // crossing segment — no corridor is duplicated, so the road survives.
+            var (userId, draftId) = await SeedCommuneAsync(
+                db, LineGeoJson((2.9512, 36.7166), (2.9518, 36.7166)));
+            await AddUrbanAreaAsync(db, userId);
+            await SeedRoadAsync(db, userId, 2.9510, 36.7164, 2.9510, 36.7168);
+            await SeedRoadAsync(db, userId, 2.9520, 36.7164, 2.9520, 36.7168);
+            var svc = CreateService(db, factory);
+
+            var summary = await svc.GenerateAsync(
+                UserRole, CommuneId100, null, null, userId, CommuneId100, [draftId], default);
+
+            var road = Assert.Single(summary.Created);
+            Assert.Equal(0, summary.Dropped);
+            var coords = road.Data["coordinates"]!.AsArray();
+            Assert.Equal(2, coords.Count);
+            // Both endpoints pulled onto the network.
+            Assert.Equal(2.9510, coords[0]!["lng"]!.GetValue<double>(), 5);
+            Assert.Equal(2.9520, coords[1]!["lng"]!.GetValue<double>(), 5);
+            Assert.Equal(36.7166, coords[0]!["lat"]!.GetValue<double>(), 6);
+            Assert.Equal(36.7166, coords[1]!["lat"]!.GetValue<double>(), 6);
+        }
+    }
+
+    [Fact]
+    public async Task Generate_ParallelToExistingNetwork_IsDroppedAsTooClose()
+    {
+        var (db, factory) = CreateInMemoryDbPair("RoadGenParallelDup");
+        await using (db)
+        {
+            await SeedAdminLocationsAsync(db);
+            // A draft running parallel ~11 m north of a mapped road: both
+            // endpoints sit within the 20 m snap tolerance and are pulled onto
+            // the road, collapsing the road onto a duplicate corridor. The
+            // min-separation rule must prune it (this is the duplicate-road
+            // defect the toggle fixes), not accept an overlapping twin.
             var (userId, draftId) = await SeedCommuneAsync(
                 db, LineGeoJson((2.9512, 36.7166), (2.9538, 36.7166)));
             await AddUrbanAreaAsync(db, userId);
             await SeedRoadAsync(db, userId); // east-west network at lat 36.7165
             var svc = CreateService(db, factory);
 
-            // Both endpoints sit ~11 m off the network (within the 20 m snap
-            // tolerance), so they are pulled onto lat 36.7165. Endpoints further
-            // away are left at their original coordinates (they seed the graph).
             var summary = await svc.GenerateAsync(
                 UserRole, CommuneId100, null, null, userId, CommuneId100, [draftId], default);
 
-            var road = Assert.Single(summary.Created);
-            var coords = road.Data["coordinates"]!.AsArray();
-            Assert.Equal(2, coords.Count);
-            Assert.Equal(36.7165, coords[0]!["lat"]!.GetValue<double>(), 6);
-            Assert.Equal(36.7165, coords[1]!["lat"]!.GetValue<double>(), 6);
+            Assert.Empty(summary.Created);
+            Assert.Equal(1, summary.Dropped);
+            Assert.Equal(1, summary.Breakdown.TooClose);
+            Assert.Equal(AiDraftFeature.StatusPending, await DraftStatusAsync(factory, draftId));
         }
     }
 
@@ -395,7 +429,7 @@ public class RoadGenerationUnitTests
     }
 
     [Fact]
-    public async Task Generate_LocalAndRemoteRoads_SnapsOntoLocalRoad()
+    public async Task Generate_LocalAndRemoteRoads_ParallelDuplicateIsDroppedAsTooClose()
     {
         var (db, factory) = CreateInMemoryDbPair("RoadGenLocalAndRemote");
         await using (db)
@@ -408,16 +442,17 @@ public class RoadGenerationUnitTests
             await SeedRoadAsync(db, userId, 2.9600, 36.7600, 2.9630, 36.7600); // remote
             var svc = CreateService(db, factory);
 
-            // A local mapped road wins endpoint snapping (the draft sits ~11 m
-            // north of it), despite a second, far-away road co-existing in the
-            // commune.
+            // The duplicate detection was evaluated against the LOCAL road: if
+            // the snap had latched onto the far-away road instead, the result
+            // would not be a near-coinciding corridor and would be kept. Being
+            // pruned as TooClose proves the local road won, exactly as its
+            // older sibling asserted.
             var summary = await svc.GenerateAsync(
                 UserRole, CommuneId100, null, null, userId, CommuneId100, [draftId], default);
 
-            var road = Assert.Single(summary.Created);
-            var coords = road.Data["coordinates"]!.AsArray();
-            Assert.Equal(36.7165, coords[0]!["lat"]!.GetValue<double>(), 6);
-            Assert.Equal(36.7165, coords[1]!["lat"]!.GetValue<double>(), 6);
+            Assert.Empty(summary.Created);
+            Assert.Equal(1, summary.Dropped);
+            Assert.Equal(1, summary.Breakdown.TooClose);
         }
     }
 
@@ -514,41 +549,73 @@ public class RoadGenerationUnitTests
     }
 
     [Fact]
-    public async Task Generate_SplitsRoadAtNetworkCrossing()
+    public async Task Generate_SnappedFreeEndPiece_FusesThroughCrossingIntoOneRoad()
     {
         var (db, factory) = CreateInMemoryDbPair("RoadGenSplitCrossing");
         await using (db)
         {
             await SeedAdminLocationsAsync(db);
-            // The east-west draft runs ~11 m north of a parallel network road
-            // and crosses a perpendicular network road at its midpoint. It must
-            // be split at the crossing into two roads sharing that node, each
-            // snapped onto the parallel road at its free end.
+            // The east-west draft crosses a perpendicular network road at its
+            // midpoint and is split into two pieces sharing that node. The west
+            // piece's free end snaps onto a SHORT parallel network stub (only a
+            // few metres of it are alongside, so min-separation does not fire).
+            // End-to-end the two pieces are a straight continuation, so the
+            // merge fuses them back through the crossing node into one road:
+            // free ends kept, junction not duplicated.
             var (userId, draftId) = await SeedCommuneAsync(
                 db, LineGeoJson((2.9512, 36.7166), (2.9538, 36.7166)));
             await AddUrbanAreaAsync(db, userId);
-            await SeedRoadAsync(db, userId, 2.9510, 36.7165, 2.9540, 36.7165); // parallel
+            await SeedRoadAsync(db, userId, 2.9509, 36.7165, 2.9511, 36.7165); // short stub
             await SeedRoadAsync(db, userId, 2.9525, 36.7160, 2.9525, 36.7170); // crossing
             var svc = CreateService(db, factory);
 
             var summary = await svc.GenerateAsync(
                 UserRole, CommuneId100, null, null, userId, CommuneId100, [draftId], default);
 
-            Assert.Equal(2, summary.Created.Count);
+            Assert.Equal(1, summary.Merged);
+            var road = Assert.Single(summary.Created);
             Assert.Equal(0, summary.Dropped);
-            var first = summary.Created[0].Data["coordinates"]!.AsArray();
-            var second = summary.Created[1].Data["coordinates"]!.AsArray();
-            Assert.Equal(2, first.Count);
-            Assert.Equal(2, second.Count);
-            // Both pieces share the crossing node (36.7166 lat, 2.9525 lng).
-            Assert.Equal(36.7166, first[1]!["lat"]!.GetValue<double>(), 6);
-            Assert.Equal(2.9525, first[1]!["lng"]!.GetValue<double>(), 5);
-            Assert.Equal(36.7166, second[0]!["lat"]!.GetValue<double>(), 6);
-            Assert.Equal(2.9525, second[0]!["lng"]!.GetValue<double>(), 5);
-            // Free ends snapped onto the parallel network road.
-            Assert.Equal(36.7165, first[0]!["lat"]!.GetValue<double>(), 6);
-            Assert.Equal(36.7165, second[1]!["lat"]!.GetValue<double>(), 6);
+            var coords = road.Data["coordinates"]!.AsArray();
+            Assert.Equal(3, coords.Count);
+            // West free end snapped onto the stub; middle is the crossing node.
+            Assert.Equal(36.7165, coords[0]!["lat"]!.GetValue<double>(), 6);
+            Assert.Equal(2.9511, coords[0]!["lng"]!.GetValue<double>(), 5);
+            Assert.Equal(36.7166, coords[1]!["lat"]!.GetValue<double>(), 6);
+            Assert.Equal(2.9525, coords[1]!["lng"]!.GetValue<double>(), 5);
+            Assert.Equal(36.7166, coords[2]!["lat"]!.GetValue<double>(), 6);
+            Assert.Equal(2.9538, coords[2]!["lng"]!.GetValue<double>(), 5);
             Assert.Equal(AiDraftFeature.StatusAccepted, await DraftStatusAsync(factory, draftId));
+        }
+    }
+
+    [Fact]
+    public async Task Generate_LongParallelNetworkSnap_IsDroppedAsTooClose()
+    {
+        var (db, factory) = CreateInMemoryDbPair("RoadGenSplitCrossing");
+        await using (db)
+        {
+            await SeedAdminLocationsAsync(db);
+            // The draft runs parallel ~11 m north of a long mapped road and is
+            // cut at a crossing road. Each piece's free end snaps onto the
+            // parallel road, turning both pieces into duplicate corridors — the
+            // exact defect this toggle removes. (The old behaviour "split into
+            // two snapped roads" created those duplicates; crossing-split +
+            // merge composability itself is covered by
+            // Generate_SplitPiecesWithUnsnappableFreeEnds_AreSeedsThenMerged.)
+            var (userId, draftId) = await SeedCommuneAsync(
+                db, LineGeoJson((2.9512, 36.7166), (2.9538, 36.7166)));
+            await AddUrbanAreaAsync(db, userId);
+            await SeedRoadAsync(db, userId, 2.9510, 36.7165, 2.9540, 36.7165); // long parallel
+            await SeedRoadAsync(db, userId, 2.9525, 36.7160, 2.9525, 36.7170); // crossing
+            var svc = CreateService(db, factory);
+
+            var summary = await svc.GenerateAsync(
+                UserRole, CommuneId100, null, null, userId, CommuneId100, [draftId], default);
+
+            Assert.Empty(summary.Created);
+            Assert.Equal(1, summary.Dropped);
+            Assert.Equal(2, summary.Breakdown.TooClose);
+            Assert.Equal(AiDraftFeature.StatusPending, await DraftStatusAsync(factory, draftId));
         }
     }
 
@@ -968,6 +1035,102 @@ public class RoadGenerationGeometryTests
     }
 
     [Fact]
+    public void MergeCollinearRoads_DuplicateCorridorWithBend_DoesNotFold()
+    {
+        // The commune's roads 11/51: identical start P, near-identical end Q
+        // (~60 µm apart), 51 detouring ~3.8 m off the P→Q chord at its mid
+        // vertex. The old chain assembly spliced both in and folded the merged
+        // polyline back on itself ([P,Q,mid,P]) — the 90° look-alike the user
+        // reported. The fold guards must leave both detections as clean,
+        // non-folded components.
+        (double Lat, double Lng) p = (36.01600057935144, 7.434689104557037);
+        (double Lat, double Lng) q = (36.01568384198998, 7.433299778776534);
+        (double Lat, double Lng) mid = (36.015780, 7.433710);
+        (double Lat, double Lng) qPrime = (36.01568382, 7.43329972);
+        IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> candidates =
+        [
+            [p, q],
+            [p, mid, qPrime],
+        ];
+
+        var merged = RoadNetworkTopology.MergeCollinearRoads(candidates);
+
+        Assert.Equal(2, merged.Count);
+        Assert.All(merged, c => Assert.Single(c.MemberIndices));
+        Assert.All(merged, c => Assert.Equal(0, SelfOverlapCount(c.Vertices)));
+    }
+
+    [Fact]
+    public void MergeCollinearRoads_SameHeadingAroundBearingWrap_JoinsIntoOne()
+    {
+        // Real roads 225/362: one street drawn as two collinear detections
+        // sharing endpoint B and both heading ~260°. The old bearing-wrap bug
+        // read the ~5° corridor separation as ~175° (355° wrapped) and never
+        // fused them; the undirected line difference must.
+        (double Lat, double Lng) a = (36.010823962730356, 7.418161332607269);
+        (double Lat, double Lng) b = (36.0104985258095, 7.416729032993317);
+        (double Lat, double Lng) c = (36.01047249085583, 7.416600286960602);
+        (double Lat, double Lng) d = (36.01039004683588, 7.415988743305206);
+        IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> candidates =
+        [
+            [a, b],
+            [b, c, d],
+        ];
+
+        var merged = RoadNetworkTopology.MergeCollinearRoads(candidates);
+
+        var component = Assert.Single(merged);
+        Assert.Equal(4, component.Vertices.Count);
+        Assert.Equal([0, 1], component.MemberIndices);
+        Assert.Equal(0, SelfOverlapCount(component.Vertices));
+    }
+
+    [Fact]
+    public void MergeCollinearRoads_StubOnLongBody_IndexOrderInvariant()
+    {
+        // A 100 m stub lying on a long road's interior. The old touch check
+        // only ran a's endpoints against b, so the outcome depended on which
+        // road came first in index order (a fold when the stub was first).
+        // Both orders must now resolve identically: the pavement stays intact,
+        // no folded polyline is produced.
+        IReadOnlyList<(double Lat, double Lng)> longRoad = [(36.7155, 2.9500), (36.7155, 2.9540)];
+        IReadOnlyList<(double Lat, double Lng)> stub = [(36.7155, 2.9515), (36.7155, 2.9525)];
+
+        var forward = RoadNetworkTopology.MergeCollinearRoads([longRoad, stub]);
+        var backward = RoadNetworkTopology.MergeCollinearRoads([stub, longRoad]);
+
+        Assert.Equal(forward.Count, backward.Count);
+        Assert.All(forward, c => Assert.Single(c.MemberIndices));
+        Assert.All(backward, c => Assert.Single(c.MemberIndices));
+        Assert.All(forward.Concat(backward), c => Assert.Equal(0, SelfOverlapCount(c.Vertices)));
+    }
+
+    private static int SelfOverlapCount(IReadOnlyList<(double Lat, double Lng)> vertices)
+    {
+        var count = 0;
+        for (var i = 0; i < vertices.Count; i++)
+        {
+            for (var j = i + 2; j < vertices.Count; j++)
+            {
+                if (SquaredMetres(vertices[i], vertices[j]) <= 1.0)
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
+    }
+
+    private static double SquaredMetres((double Lat, double Lng) a, (double Lat, double Lng) b)
+    {
+        var cosLat = Math.Cos(a.Lat * Math.PI / 180.0);
+        var dLat = (b.Lat - a.Lat) * 111_320.0;
+        var dLng = (b.Lng - a.Lng) * cosLat * 111_320.0;
+        return dLat * dLat + dLng * dLng;
+    }
+
+    [Fact]
     public void WeldEndpoints_StraightExtension_ConnectsEndpoint()
     {
         // Endpoint at (36.7166, 2.9520) heads due east; a network road crosses
@@ -1043,5 +1206,103 @@ public class RoadGenerationGeometryTests
             new RoadRulesOptions { RoadWeldRadiusM = 50.0 });
 
         Assert.Equal(0, welded);
+    }
+
+    [Fact]
+    public void Evaluate_ParallelDuplicateWithinSeparation_IsTooClose()
+    {
+        // The candidate runs ~2 m south of an existing east-west road for its
+        // whole length: the same street detected twice, must be pruned.
+        IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> network =
+        [
+            [(36.7166, 2.9510), (36.7166, 2.9540)],
+        ];
+        IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> areaRings =
+        [
+            [(36.7160, 2.9500), (36.7160, 2.9550), (36.7170, 2.9550), (36.7170, 2.9500)],
+        ];
+        var outcome = RoadPhaseRules.Evaluate(
+            [(36.71662, 2.9510), (36.71662, 2.9540)],
+            confidence: 0.9,
+            areaRings,
+            network,
+            new ValidationOptions { RoadTurnAngleDegrees = 135.0, RoadConnectivityMeters = 20.0 },
+            new RoadRulesOptions { MinRoadLengthM = 10.0, MinRoadSeparationMeters = 3.5 },
+            snapEndpoints: true);
+
+        Assert.Equal(RoadPhaseViolation.TooClose, outcome.Violation);
+    }
+
+    [Fact]
+    public void Evaluate_TJunctionApproach_NotTooClose()
+    {
+        // A road ending perpendicular on a network road (a T-junction): only a
+        // ~3.5 m approach lies in the separation band, well under the 10 m
+        // alongside threshold — kept.
+        IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> network =
+        [
+            [(36.7160, 2.9525), (36.7170, 2.9525)],
+        ];
+        IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> areaRings =
+        [
+            [(36.7160, 2.9500), (36.7160, 2.9550), (36.7170, 2.9550), (36.7170, 2.9500)],
+        ];
+        var outcome = RoadPhaseRules.Evaluate(
+            [(36.7165, 2.9510), (36.7165, 2.9525)],
+            confidence: 0.9,
+            areaRings,
+            network,
+            new ValidationOptions { RoadTurnAngleDegrees = 135.0, RoadConnectivityMeters = 20.0 },
+            new RoadRulesOptions { MinRoadLengthM = 10.0, MinRoadSeparationMeters = 3.5 },
+            snapEndpoints: true);
+
+        Assert.Equal(RoadPhaseViolation.None, outcome.Violation);
+    }
+
+    [Fact]
+    public void Evaluate_CollinearContinuationOfNetwork_NotTooClose()
+    {
+        // The candidate continues the network road end-to-end from its junction
+        // (a genuine straight street the merge will fuse). Only the junction
+        // approach is within the band — the rest of the road is beyond the
+        // network road's extent and must not count as alongside.
+        IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> network =
+        [
+            [(36.7166, 2.9525), (36.7166, 2.9540)],
+        ];
+        IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> areaRings =
+        [
+            [(36.7160, 2.9500), (36.7160, 2.9550), (36.7170, 2.9550), (36.7170, 2.9500)],
+        ];
+        var outcome = RoadPhaseRules.Evaluate(
+            [(36.7166, 2.9510), (36.7166, 2.9525)],
+            confidence: 0.9,
+            areaRings,
+            network,
+            new ValidationOptions { RoadTurnAngleDegrees = 135.0, RoadConnectivityMeters = 20.0 },
+            new RoadRulesOptions { MinRoadLengthM = 10.0, MinRoadSeparationMeters = 3.5 },
+            snapEndpoints: true);
+
+        Assert.Equal(RoadPhaseViolation.None, outcome.Violation);
+    }
+
+    [Fact]
+    public void Evaluate_BootstrapEmptyNetwork_NotTooClose()
+    {
+        // No network yet (first roads of a commune): nothing to be too close to.
+        IReadOnlyList<IReadOnlyList<(double Lat, double Lng)>> areaRings =
+        [
+            [(36.7160, 2.9500), (36.7160, 2.9550), (36.7170, 2.9550), (36.7170, 2.9500)],
+        ];
+        var outcome = RoadPhaseRules.Evaluate(
+            [(36.7165, 2.9510), (36.7165, 2.9525)],
+            confidence: 0.9,
+            areaRings,
+            [],
+            new ValidationOptions { RoadTurnAngleDegrees = 135.0, RoadConnectivityMeters = 20.0 },
+            new RoadRulesOptions { MinRoadLengthM = 10.0, MinRoadSeparationMeters = 3.5 },
+            snapEndpoints: true);
+
+        Assert.Equal(RoadPhaseViolation.None, outcome.Violation);
     }
 }

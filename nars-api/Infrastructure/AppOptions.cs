@@ -119,6 +119,18 @@ public class RoadRulesOptions
     /// connected graph instead of dead ends.
     /// </summary>
     [Range(0.0, 1000.0)] public double RoadWeldRadiusM { get; set; } = 50.0;
+
+    /// <summary>
+    /// Minimum separation between a road and the existing network. A candidate
+    /// whose corridor lies within this distance of a single network road for at
+    /// least <see cref="MinRoadLengthM"/> in total is the same street detected
+    /// twice (a parallel or overlapping re-draw), not a distinct road — it is
+    /// dropped as <see cref="RoadPhaseViolation.TooClose"/>. A short
+    /// junction-approach (where the road merely converges onto a network road)
+    /// stays inside this band for only ~<c>separation / sin(angle)</c> metres and
+    /// is kept, so only genuinely alongside duplicates are pruned.
+    /// </summary>
+    [Range(0.0, 100.0)] public double MinRoadSeparationMeters { get; set; } = 3.5;
 }
 
 /// <summary>

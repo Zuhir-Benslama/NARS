@@ -103,8 +103,9 @@ public sealed record GenerateRoadsDroppedDto(
     int LowConfidence,
     int ExcessiveTurnAngle,
     int OutsideUrbanArea,
+    int TooClose,
     int InvalidGeometry)
 {
     public static GenerateRoadsDroppedDto From(RoadDropBreakdown b)
-        => new(b.TooShort, b.LowConfidence, b.ExcessiveTurnAngle, b.OutsideUrbanArea, b.InvalidGeometry);
+        => new(b.TooShort, b.LowConfidence, b.ExcessiveTurnAngle, b.OutsideUrbanArea, b.TooClose, b.InvalidGeometry);
 }

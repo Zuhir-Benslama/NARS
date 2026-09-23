@@ -22,6 +22,7 @@ public sealed record RoadDropBreakdown(
     int LowConfidence,
     int ExcessiveTurnAngle,
     int OutsideUrbanArea,
+    int TooClose,
     int InvalidGeometry);
 
 internal sealed class RoadDropTally
@@ -30,6 +31,7 @@ internal sealed class RoadDropTally
     public int LowConfidence;
     public int ExcessiveTurnAngle;
     public int OutsideUrbanArea;
+    public int TooClose;
     public int InvalidGeometry;
 
     public void Count(RoadPhaseViolation violation) =>
@@ -39,11 +41,12 @@ internal sealed class RoadDropTally
             RoadPhaseViolation.LowConfidence => LowConfidence++,
             RoadPhaseViolation.ExcessiveTurnAngle => ExcessiveTurnAngle++,
             RoadPhaseViolation.OutsideUrbanArea => OutsideUrbanArea++,
+            RoadPhaseViolation.TooClose => TooClose++,
             _ => 0,
         };
 
     public RoadDropBreakdown ToBreakdown() =>
-        new(TooShort, LowConfidence, ExcessiveTurnAngle, OutsideUrbanArea, InvalidGeometry);
+        new(TooShort, LowConfidence, ExcessiveTurnAngle, OutsideUrbanArea, TooClose, InvalidGeometry);
 }
 
 /// <summary>
@@ -127,7 +130,7 @@ public class RoadGenerationService(
             .ToListAsync(ct);
         if (drafts.Count == 0)
         {
-            return new RoadGenerationSummary([], 0, new RoadDropBreakdown(0, 0, 0, 0, 0));
+            return new RoadGenerationSummary([], 0, new RoadDropBreakdown(0, 0, 0, 0, 0, 0));
         }
 
         var areaRings = await RoadPhaseRules.LoadUrbanAreaRingsAsync(db, communeId, ct);
@@ -168,13 +171,23 @@ public class RoadGenerationService(
             // same snapping step in Evaluate merges them onto the network.
             var pieces = RoadGenerationGeometry.SplitLineAtCrossings(seedVertices, acceptedPolylines);
             var createdForSeed = 0;
+
+            // A seed's whole piece set is evaluated against the network as it
+            // stood *before* this seed added anything. Sibling pieces are
+            // collinear continuations of the same line (a straight street cut at
+            // its crossings), so letting an earlier sibling act as the network
+            // for a later one would wrongly flag the continuation as TooClose;
+            // they also never cross each other, so excluding them changes no
+            // split or snap.
+            var seedAccepted = new List<(List<(double Lat, double Lng)> Coords, AiDraftFeature Draft)>(pieces.Count);
             foreach (var piece in pieces)
             {
                 // The roads-phase rules (length + isolation, confidence, turn
-                // angle, urban containment, connectivity + endpoint snapping)
-                // live in RoadPhaseRules — the same engine as the single-accept
-                // path and the segmentation draft pre-filter, so every piece
-                // obeys the identical rule set.
+                // angle, urban containment, connectivity + endpoint snapping and
+                // minimum separation from the existing network) live in
+                // RoadPhaseRules — the same engine as the single-accept path and
+                // the segmentation draft pre-filter, so every piece obeys the
+                // identical rule set.
                 var outcome = RoadPhaseRules.Evaluate(
                     piece, draft.Confidence, areaRings, acceptedPolylines, validation, rules,
                     snapEndpoints: true);
@@ -192,11 +205,15 @@ public class RoadGenerationService(
                     continue;
                 }
 
-                var coords = new List<(double Lat, double Lng)>(outcome.Coordinates);
-                candidates.Add(coords);
-                candidateDrafts.Add(draft);
-                acceptedPolylines.Add(coords);
+                seedAccepted.Add((new List<(double Lat, double Lng)>(outcome.Coordinates), draft));
                 createdForSeed++;
+            }
+
+            foreach (var (coords, source) in seedAccepted)
+            {
+                candidates.Add(coords);
+                candidateDrafts.Add(source);
+                acceptedPolylines.Add(coords);
             }
 
             if (createdForSeed == 0)

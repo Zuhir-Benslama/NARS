@@ -113,6 +113,7 @@ export interface GenerateRoadsDropBreakdown {
   lowConfidence: number
   excessiveTurnAngle: number
   outsideUrbanArea: number
+  tooClose: number
   invalidGeometry: number
 }
 

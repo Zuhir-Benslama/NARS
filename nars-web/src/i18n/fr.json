@@ -114,7 +114,7 @@
   "gen_roads_no_detections": "Aucune route détectée dans l'image satellite.",
   "gen_roads_reusing_drafts": "Aucune nouvelle détection ; régénération à partir des chemins en attente de la commune.",
   "gen_roads_done": "{created} route(s) créée(s), {dropped} rejetée(s).",
-  "gen_roads_done_breakdown": "Rejetées : {tooShort} trop courtes · {lowConfidence} confiance faible · {turnAngle} angle · {outside} hors zone · {invalid} illisibles.",
+  "gen_roads_done_breakdown": "Rejetées : {tooShort} trop courtes · {lowConfidence} confiance faible · {turnAngle} angle · {outside} hors zone · {tooClose} trop proches · {invalid} illisibles.",
   "gen_roads_failed": "Échec de la génération des routes : {error}",
   "gen_roads_in_progress": "La génération des routes est déjà en cours.",
   "gen_roads_stage_tiles": "Rendu des tuiles satellite…",
