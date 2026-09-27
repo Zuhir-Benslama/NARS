@@ -123,7 +123,6 @@ fi
 	echo "NARS_ADMIN_SIGNUP_TOKEN=$$(_RND 32)" >> $@;
 	echo "NARS_SEGMA_INTERNAL_TOKEN=$$(_RND 32)" >> $@;
 	echo "NARS_SEGMA_WEIGHTS_URL=$${NARS_SEGMA_WEIGHTS_URL:-https://hf.co/nilsho01/unet-resnet34-vhr-buildings/resolve/main/unet_bldg_base.pth}" >> $@;
-	echo "NARS_SEGMA_ROAD_WEIGHTS_URL=$${NARS_SEGMA_ROAD_WEIGHTS_URL:-https://spacenet-dataset.s3.amazonaws.com/spacenet-model-weights/spacenet-3/01-Albu/weights/fold0_best.pth}" >> $@;
 	chmod 600 $@;
 	echo "→ Created $@ with fresh secrets (permissions: 600)"
 
@@ -140,8 +139,7 @@ GRAFANA_PASSWORD   ?=
 NARS_ADMIN_SIGNUP_TOKEN ?=
 NARS_SEGMA_INTERNAL_TOKEN ?=
 NARS_SEGMA_WEIGHTS_URL ?=
-NARS_SEGMA_ROAD_WEIGHTS_URL ?=
-export POSTGRES_PASSWORD JWT_SECRET GPG_PASSPHRASE GRAFANA_PASSWORD NARS_ADMIN_SIGNUP_TOKEN NARS_SEGMA_INTERNAL_TOKEN NARS_SEGMA_WEIGHTS_URL NARS_SEGMA_ROAD_WEIGHTS_URL
+export POSTGRES_PASSWORD JWT_SECRET GPG_PASSPHRASE GRAFANA_PASSWORD NARS_ADMIN_SIGNUP_TOKEN NARS_SEGMA_INTERNAL_TOKEN NARS_SEGMA_WEIGHTS_URL
 
 # Piping the target's output to a consumer that closes early (e.g.
 # `make help | head`) kills the last pipeline command with SIGPIPE (141).

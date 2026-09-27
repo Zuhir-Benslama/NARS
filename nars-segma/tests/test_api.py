@@ -33,6 +33,7 @@ def _restore_module_globals():
         name: getattr(roads, name)
         for name in (
             "_models",
+            "_load_errors",
             "INTERNAL_TOKEN",
             "MAX_TILE_BYTES",
             "INFERENCE_TIMEOUT",
@@ -72,7 +73,14 @@ def _post_roads(**kwargs):
 def test_health_reports_model_not_loaded():
     resp = client.get("/health")
     assert resp.status_code == 200
-    assert resp.json() == {"status": "ok", "model_loaded": False}
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert body["model_loaded"] is False
+    # Every registered task is named, not just the ones that happen to be in
+    # _models: a task that failed to load is absent from _models, so a report
+    # built from _models alone would silently omit it.
+    assert set(body["tasks"]) == set(roads.MODEL_SPECS)
+    assert all(entry["loaded"] is False for entry in body["tasks"].values())
 
 
 def test_ready_503_without_model():
@@ -86,8 +94,49 @@ def test_ready_200_and_health_when_model_loaded(monkeypatch):
     monkeypatch.setattr(roads, "_models", {"buildings": _StubModel(is_loaded=True)})
     ready = client.get("/ready")
     assert ready.status_code == 200
-    assert ready.json() == {"status": "ready", "model_loaded": True}
-    assert client.get("/health").json() == {"status": "ok", "model_loaded": True}
+    assert ready.json()["status"] == "ready"
+    assert ready.json()["model_loaded"] is True
+    health = client.get("/health").json()
+    assert health["model_loaded"] is True
+    assert health["tasks"]["buildings"] == {"loaded": True}
+    # Still ready with a task down, but says which one.
+    assert health["tasks"]["roads"]["loaded"] is False
+
+
+def test_health_names_task_whose_load_failed(monkeypatch):
+    # The regression that hid a real outage: roads 503'd on every request
+    # because its checkpoint could not be loaded, while model_loaded stayed
+    # True from the buildings task, so nothing said roads was down.
+    monkeypatch.setattr(roads, "_models", {"buildings": _StubModel(is_loaded=True)})
+    monkeypatch.setattr(
+        roads,
+        "_load_errors",
+        {"roads": "_pickle.UnpicklingError: Weights only load failed"},
+    )
+    body = client.get("/health").json()
+    assert body["model_loaded"] is True
+    assert body["tasks"]["buildings"] == {"loaded": True}
+    roads_entry = body["tasks"]["roads"]
+    assert roads_entry["loaded"] is False
+    assert "UnpicklingError" in roads_entry["error"]
+
+
+def test_segment_503_detail_carries_load_error(monkeypatch):
+    # The 503 itself must name the cause, so "roads model not ready" does not
+    # read as a transient blip when the checkpoint will never load.
+    monkeypatch.setattr(roads, "_models", {})
+    monkeypatch.setattr(
+        roads,
+        "_load_errors",
+        {"roads": "_pickle.UnpicklingError: Weights only load failed"},
+    )
+    resp = _post_roads(
+        headers=AUTH,
+        params=BBOX,
+        files={"tile": ("t.tif", b"x", "image/tiff")},
+    )
+    assert resp.status_code == 503
+    assert "UnpicklingError" in resp.json()["detail"]
 
 
 def _ok_spec() -> roads.ModelSpec:
@@ -723,6 +772,24 @@ def test_road_min_length_defaults_to_0():
     assert roads.ROAD_MIN_LENGTH_M == 0.0
 
 
+def test_road_net_straightening_ships_on_and_noding_ships_off():
+    """Straightening is a pure win and ships enabled; noding is not.
+
+    Noding works (blind crossings 1574 -> 17 measured on the commune's own road
+    drafts) but every cut is a new fragment. Those drafts are already fragments —
+    median 9.1 m, 51.7% already below the API's 10 m MinRoadLengthM floor — and
+    noding drops the median to 3.1 m, putting 72% of pieces under that floor for
+    the API's roads-phase rules to delete, which tears apart the junctions the
+    pass just created. The API's topology pass is what assembles the network, so
+    the crossing fix belongs there. Both are one env bump away.
+    """
+    assert roads.ROAD_NET_MAX_ANGLE_DEG == 20.0
+    assert roads.ROAD_NET_MAX_DEVIATION_RATIO == 0.30
+    assert roads.ROAD_NET_OPTIONS.straighten_enabled is True
+    assert roads.ROAD_NET_NODE_TOLERANCE_M == 0.0
+    assert roads.ROAD_NET_OPTIONS.node_enabled is False
+
+
 def test_task_rules_wired_from_config():
     """The per-task limits live in the registry (single source of truth), so
     dispatch passes exactly the kwargs each postprocessor accepts. The env-var
@@ -731,6 +798,7 @@ def test_task_rules_wired_from_config():
         "min_length_m": roads.ROAD_MIN_LENGTH_M,
         "min_confidence": roads.ROAD_MIN_CONFIDENCE,
         "max_features": roads.ROAD_MAX_FEATURES or None,
+        "network_options": roads.ROAD_NET_OPTIONS,
     }
     assert roads.MODEL_SPECS["buildings"]["rules"] == {
         "min_confidence": roads.BUILDING_MIN_CONFIDENCE,
@@ -844,7 +912,11 @@ def test_ready_200_when_only_roads_loaded(monkeypatch):
     # pod ready even if buildings failed to load (independent release/rollback).
     monkeypatch.setattr(roads, "_models", {"roads": _StubModel(is_loaded=True)})
     assert client.get("/ready").status_code == 200
-    assert client.get("/health").json() == {"status": "ok", "model_loaded": True}
+    health = client.get("/health").json()
+    assert health["status"] == "ok"
+    assert health["model_loaded"] is True
+    assert health["tasks"]["roads"] == {"loaded": True}
+    assert health["tasks"]["buildings"]["loaded"] is False
 
 
 # ── Boundary-value tests for validation helpers ────────────────────────────

@@ -41,6 +41,7 @@ from app.model import (
     TileTooLargeError,
 )
 from app.postprocess import mask_to_linestrings, mask_to_polygons
+from app.roadnet import RoadNetOptions
 from app.schemas import Feature, FeatureCollection, SegmentResponse
 
 logging.basicConfig(level=logging.INFO)
@@ -98,6 +99,43 @@ ROAD_MAX_FEATURES = env_int(
     "NARS_SEGMA_ROAD_MAX_FEATURES", 0, minimum=0, maximum=100000
 )
 
+# Road network cleanup (post-extraction, still a limitation rule): the skeleton
+# centerlines of coarse imagery wobble by metres between neighbouring pixels
+# ("dents"), and two roads that cross are independent LineStrings that intersect
+# mid-segment with no node in common. These tune the two passes that address both
+# — see app/roadnet.py.
+#
+# Straightening ships on. Noding ships OFF by default: it works (blind crossings
+# 1574 -> 17 on the commune's own drafts) but every cut is a new fragment, and
+# these drafts are already fragments — median 9.1 m, 51.7% already under the
+# API's 10 m MinRoadLengthM floor. Noding drops the median to 3.1 m and puts 72%
+# of pieces under that floor, which the API's roads-phase rules then delete,
+# tearing apart the junctions the pass just created. The API's topology pass
+# (WeldEndpoints/MergeCollinearRoads) is the component that assembles the
+# network, so the crossing work belongs there. Raise the tolerance to enable.
+ROAD_NET_MAX_ANGLE_DEG = env_float(
+    "NARS_SEGMA_ROAD_NET_MAX_ANGLE_DEG", 20.0, minimum=0.0, maximum=60.0
+)
+ROAD_NET_MAX_DEVIATION_RATIO = env_float(
+    "NARS_SEGMA_ROAD_NET_MAX_DEVIATION_RATIO", 0.30, minimum=0.0, maximum=1.0
+)
+ROAD_NET_NODE_TOLERANCE_M = env_float(
+    "NARS_SEGMA_ROAD_NET_NODE_TOLERANCE_M", 0.0, minimum=0.0, maximum=50.0
+)
+# Only crossings this sharp are noded. Shallower ones are twin centrelines of
+# the same road traced a few metres apart, not a junction: cutting them shatters
+# the network into sub-minimum fragments the API deletes (see app/roadnet.py).
+# Only consulted once a non-zero node tolerance is set.
+ROAD_NET_MIN_NODE_ANGLE_DEG = env_float(
+    "NARS_SEGMA_ROAD_NET_MIN_NODE_ANGLE_DEG", 20.0, minimum=0.0, maximum=90.0
+)
+ROAD_NET_OPTIONS = RoadNetOptions(
+    max_angle_deg=ROAD_NET_MAX_ANGLE_DEG,
+    max_deviation_ratio=ROAD_NET_MAX_DEVIATION_RATIO,
+    node_tolerance_m=ROAD_NET_NODE_TOLERANCE_M,
+    min_node_angle_deg=ROAD_NET_MIN_NODE_ANGLE_DEG,
+)
+
 # Building rules (limitation): same shape as the road rules, applied to the
 # polygon extraction. A minimum confidence drops ghost rooftops; the per-tile
 # cap bounds the number of building drafts one acceptance run can produce.
@@ -123,11 +161,12 @@ class ModelSpec(TypedDict):
     num_classes: int
     builder: str
     postprocess: str
-    # Postprocess kwargs for this task's feature limits. Dispatch calls
-    # POSTPROCESSORS[postprocess](fg_prob, transform, threshold, **rules), so
-    # a task carries exactly the kwargs its postprocessor signature accepts —
-    # no per-task branching in the endpoint.
-    rules: dict[str, float | int | None]
+    # Postprocess kwargs for this task's feature limits and geometry cleanup.
+    # Dispatch calls POSTPROCESSORS[postprocess](fg_prob, transform, threshold,
+    # **rules), so a task carries exactly the kwargs its postprocessor signature
+    # accepts — no per-task branching in the endpoint. Values are the scalar
+    # limits plus the RoadNetOptions bundle the road pass is tuned with.
+    rules: dict[str, Any]
 
 
 MODEL_SPECS: dict[str, ModelSpec] = {
@@ -158,6 +197,7 @@ MODEL_SPECS: dict[str, ModelSpec] = {
             "min_length_m": ROAD_MIN_LENGTH_M,
             "min_confidence": ROAD_MIN_CONFIDENCE,
             "max_features": ROAD_MAX_FEATURES or None,
+            "network_options": ROAD_NET_OPTIONS,
         },
     },
 }
@@ -176,6 +216,14 @@ POSTPROCESSORS: dict[str, Callable[..., list[Feature]]] = {
 # transitions.
 _models: dict[str, SegmentationModel] = {}
 _models_lock = threading.Lock()
+
+# Task -> why its model failed to load, for tasks _load_model rejected. Kept so
+# /health can name the broken task and its cause instead of collapsing the
+# whole registry into a single boolean: a per-task load failure leaves the pod
+# "ready" (other tasks serve) while that task 503s on every request, and a
+# boolean health field hides exactly that. Never holds a traceback, just the
+# exception text.
+_load_errors: dict[str, str] = {}
 
 # Each inference can peak at ~500MB (25M-px prob maps + windows), so unbounded
 # threadpool concurrency on a 4Gi pod is an OOM risk. A small semaphore caps
@@ -271,16 +319,18 @@ def _load_model(task: str, spec: ModelSpec) -> SegmentationModel | None:
             tile_size=TILE_SIZE,
             builder=spec["builder"],
         )
-    except Exception:  # a load failure must never abort startup
+    except Exception as exc:  # a load failure must never abort startup
         logger.exception(
             "Failed to load weights for task '%s'; it will be unavailable", task
         )
+        _load_errors[task] = f"{type(exc).__name__}: {exc}"
         return None
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     with _models_lock:
+        _load_errors.clear()
         for task, spec in MODEL_SPECS.items():
             model = _load_model(task, spec)
             if model is not None:
@@ -288,6 +338,7 @@ async def lifespan(_app: FastAPI):
     yield
     with _models_lock:
         _models.clear()
+        _load_errors.clear()
 
 
 app = FastAPI(
@@ -305,6 +356,27 @@ def _any_task_loaded() -> bool:
     registered task is usable — the pod must not receive traffic then."""
     with _models_lock:
         return any(model is not None and model.is_loaded for model in _models.values())
+
+
+def _task_status() -> dict[str, dict[str, object]]:
+    """Per-task model availability, for every registered task.
+
+    Iterates MODEL_SPECS, not _models: a task that failed to load is absent
+    from _models, so iterating the registry is what makes a broken task visible
+    instead of silently missing. Callers get {"loaded": bool} plus "error" for
+    the ones that did not load, which is what turned a 503 on /segment/roads
+    into a mystery — model_loaded only ever reflected whichever task loaded
+    first.
+    """
+    with _models_lock:
+        return {
+            task: (
+                {"loaded": True}
+                if (model := _models.get(task)) is not None and model.is_loaded
+                else {"loaded": False, "error": _load_errors.get(task, "unavailable")}
+            )
+            for task in MODEL_SPECS
+        }
 
 
 def verify_internal_token(
@@ -333,18 +405,30 @@ async def health() -> dict:
     threadpool. Segment endpoints are sync `def`, so a flood of segment
     requests can saturate the 40-worker threadpool; a sync `/health` would
     then queue behind them and the k8s liveness probe would stall. The lock
-    hold below is uncontended outside startup/lifespan and sub-microsecond."""
-    return {"status": "ok", "model_loaded": _any_task_loaded()}
+    hold below is uncontended outside startup/lifespan and sub-microsecond.
+
+    `model_loaded` is the historical any-task boolean, kept for the liveness
+    probe; `tasks` is per-task so a task that is down gets named instead of
+    being hidden behind whichever task loaded successfully."""
+    return {
+        "status": "ok",
+        "model_loaded": _any_task_loaded(),
+        "tasks": _task_status(),
+    }
 
 
 @app.get("/ready")
 async def ready() -> dict:
     """Readiness: only report ready when real weights are loaded, so the pod
     never receives traffic while serving random predictions. Async for the
-    same threadpool-saturation reason as /health."""
+    same threadpool-saturation reason as /health.
+
+    Stays ready when only *some* tasks are down — the healthy ones must keep
+    serving — so the per-task map rides along in the body to say which ones
+    are not."""
     if not _any_task_loaded():
         raise HTTPException(status_code=503, detail="No model weights loaded")
-    return {"status": "ready", "model_loaded": True}
+    return {"status": "ready", "model_loaded": True, "tasks": _task_status()}
 
 
 def _validate_bbox(
@@ -507,8 +591,19 @@ def _segment_task(
     # reject with 503 without reading (and discarding) up to MAX_TILE_BYTES.
     with _models_lock:
         model = _models.get(task)
+        load_error = _load_errors.get(task)
     if model is None or not model.is_loaded:
-        raise HTTPException(status_code=503, detail=f"{task} model not ready")
+        # Name the recorded cause: "roads model not ready" on its own reads as
+        # a transient blip, when it can be a checkpoint that will never load
+        # (builder/weights mismatch) and needs an image or config fix.
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"{task} model not ready: {load_error}"
+                if load_error
+                else f"{task} model not ready"
+            ),
+        )
 
     # Capacity gate before buffering the upload or allocating the prob maps:
     # at most MAX_CONCURRENT_INFERENCES requests hold a raw buffer + prob maps

@@ -2,6 +2,7 @@
 Mask -> vector conversion.
 
 Roads:     threshold -> clean -> skeletonize -> graph -> simplified LineStrings
+           -> straightened -> noded
 Buildings: threshold -> clean -> connected components -> simplified Polygons
 """
 
@@ -14,6 +15,7 @@ import rasterio
 from shapely.errors import GEOSException
 from shapely.geometry import LineString, Polygon, mapping
 
+from app.roadnet import RoadNetOptions, metres_per_degree_lon, node_network, straighten
 from app.schemas import Feature
 
 __all__ = ["mask_to_linestrings", "mask_to_polygons"]
@@ -72,10 +74,12 @@ def mask_to_linestrings(
     min_length_m: float = 0.0,
     min_confidence: float = 0.0,
     max_features: int | None = None,
+    network_options: RoadNetOptions | None = None,
 ) -> list[Feature]:
     import sknw
     from skimage.morphology import remove_small_objects, skeletonize
 
+    options = network_options or RoadNetOptions()
     binary = prob_mask > threshold
     binary = remove_small_objects(binary, max_size=MIN_ROAD_COMPONENT_PX - 1)
     if not binary.any():
@@ -84,7 +88,10 @@ def mask_to_linestrings(
     skeleton = skeletonize(binary)
     graph = sknw.build_sknw(skeleton, multi=True)
 
-    features = []
+    # Tracks each surviving pixel of an edge so confidence can be re-derived
+    # per emitted piece below: noding splits one edge into several roads, and
+    # a piece's own pixels are a truer score than its parent edge's average.
+    edges: list[tuple[LineString, np.ndarray]] = []
     for _, _, edge_data in graph.edges(data=True):
         pts = edge_data.get("pts")
         if pts is None or len(pts) < 2:
@@ -104,24 +111,57 @@ def mask_to_linestrings(
             line = line.simplify(SIMPLIFY_TOLERANCE, preserve_topology=False)
             if not line.is_valid or line.geom_type != "LineString":
                 continue
-            geometry = mapping(line)
-            confidence = float(prob_mask[pts[:, 0], pts[:, 1]].mean())
         except (GEOSException, ValueError, TypeError, IndexError):
             # IndexError covers a skeleton point that landed outside the
             # probability mask (sknw can hand back near-boundary float
             # coordinates coerced past the array edge).
             logger.info("Skipping degenerate road edge", exc_info=True)
             continue
+        edges.append((line, pts))
 
-        # Road rules (limitation): each graph edge is already a skeleton
-        # segment between junctions (degree >= 3 nodes), so separation across
-        # intersections is inherent - edges never span a crossing. These pass
-        # rules only *discard* edges that violate the cadastre conventions.
-        if confidence < min_confidence:
+    if not edges:
+        return []
+
+    mpd_lon = metres_per_degree_lon(float(transform.f))
+
+    # Straighten per edge first, then node across the whole set: noding
+    # introduces shared vertices that straightening must not be allowed to
+    # remove from one arm of a junction and not the other, which would tear
+    # the network apart again.
+    straightened: list[tuple[LineString, np.ndarray]] = []
+    for line, pts in edges:
+        coords = straighten(list(line.coords), mpd_lon=mpd_lon, options=options)
+        try:
+            candidate = LineString(coords)
+        except (GEOSException, ValueError, TypeError):
+            logger.info("Skipping road edge lost while straightening", exc_info=True)
             continue
-        if _haversine_m(coords) < min_length_m:
+        if candidate.length == 0 or not candidate.is_valid:
             continue
-        features.append((confidence, geometry))
+        straightened.append((candidate, pts))
+
+    if not straightened:
+        return []
+
+    noded = node_network(
+        [line for line, _ in straightened], mpd_lon=mpd_lon, options=options
+    )
+
+    inverse = ~transform
+    features = []
+    for (parent, parent_pts), pieces in zip(straightened, noded, strict=True):
+        # Road rules (limitation) apply to the geometry actually emitted: a
+        # noded piece shorter than the floor must be judged on its own length,
+        # not on the length of the edge it was cut from. Separation across
+        # intersections is structural - noding means no piece spans a crossing.
+        for piece in pieces or [parent]:
+            coords = list(piece.coords)
+            confidence = _confidence_for_piece(prob_mask, inverse, coords, parent_pts)
+            if confidence < min_confidence:
+                continue
+            if _haversine_m(coords) < min_length_m:
+                continue
+            features.append((confidence, mapping(piece)))
 
     features = _apply_rule_cap(features, max_features)
     return [
@@ -134,6 +174,38 @@ def mask_to_linestrings(
         )
         for confidence, geometry in features
     ]
+
+
+def _confidence_for_piece(
+    prob_mask: np.ndarray,
+    inverse: rasterio.Affine,
+    coords: list[tuple[float, float]],
+    parent_pts: np.ndarray,
+) -> float:
+    """Mean road probability over the pixels a piece actually covers.
+
+    The piece's own vertices are mapped back to mask pixels; when none land
+    inside the mask (a piece can be shorter than one pixel) the parent edge's
+    pixels are the best available proxy.
+    """
+    rows: np.ndarray = np.empty(len(coords), dtype=np.intp)
+    cols: np.ndarray = np.empty(len(coords), dtype=np.intp)
+    for i, (lon, lat) in enumerate(coords):
+        col, row = inverse * (lon, lat)
+        rows[i] = int(row)
+        cols[i] = int(col)
+
+    height, width = prob_mask.shape
+    inside = (rows >= 0) & (rows < height) & (cols >= 0) & (cols < width)
+    if not inside.any():
+        return float(prob_mask[parent_pts[:, 0], parent_pts[:, 1]].mean())
+
+    pixels = prob_mask[rows[inside], cols[inside]]
+    # Each vertex is one sample; on a sub-pixel piece that over-weights a
+    # single pixel, so blend with the parent edge's mean to stay stable.
+    return float(
+        0.5 * pixels.mean() + 0.5 * prob_mask[parent_pts[:, 0], parent_pts[:, 1]].mean()
+    )
 
 
 def mask_to_polygons(

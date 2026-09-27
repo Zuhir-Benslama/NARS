@@ -44,10 +44,18 @@ FROM base
 RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin nars-segma
 
 COPY --chown=nars-segma:nars-segma app ./app
-# Dev fallback only: the deployed pod fetches real weights via the
-# fetch-weights initContainer into an emptyDir mounted at /srv/weights
-# (see nars-infra/segma/deployment.yaml). The emptyDir mount shadows this
-# copy at runtime. Kept empty in git; place a checkpoint here for local runs.
+# The roads checkpoint ships in the image. The pod mounts an emptyDir at
+# /srv/weights (see nars-infra/segma/deployment.yaml) for the buildings
+# checkpoint fetched by the fetch-weights initContainer, and that mount
+# SHADOWS this directory at runtime — so the same copy is also baked at
+# /srv/weights-baked, a path no volume mount covers. The seed-road-weights
+# initContainer copies it back into the emptyDir. Without that second copy the
+# only way to reach these weights would be a download URL, and the previous
+# one pointed at a raw SpaceNet pickle that the deeplabv3p-convnext builder
+# cannot load (UnpicklingError -> /segment/roads 503).
+#
+# weights/*.pth is gitignored, so a build host must have the checkpoint present.
+COPY --chown=nars-segma:nars-segma weights /srv/weights-baked
 COPY --chown=nars-segma:nars-segma weights ./weights
 
 ENV NARS_SEGMA_WEIGHTS_PATH=/srv/weights/unet_bldg_base.pth

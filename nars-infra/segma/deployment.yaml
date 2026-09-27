@@ -79,31 +79,36 @@ spec:
             limits:
               cpu: "250m"
               memory: "256Mi"
-        - name: fetch-road-weights
-          # Pulls the roads model state_dict (DeepLabV3+/ConvNeXt-Tiny,
-          # trained on commune-validated drafts — plain weights_only-safe
-          # state_dict, no conversion needed) into /srv/weights. Fail-safe
-          # like fetch-weights.
-          image: curlimages/curl:8.10.1@sha256:d9b4541e214bcd85196d6e92e2753ac6d0ea699f0af5741f8c6cccbfcf00ef4b
+        - name: seed-road-weights
+          # Copies the roads checkpoint (DeepLabV3+/ConvNeXt-Tiny, trained on
+          # commune-validated drafts) out of the image layer into the emptyDir
+          # at /srv/weights. It is baked at /srv/weights-baked precisely
+          # because the /srv/weights mount hides /srv/weights in the image.
+          #
+          # This used to download the checkpoint from the `road-weights-url`
+          # secret instead, but that URL pointed at the raw SpaceNet champion
+          # *pickle* (pytorch_zoo.unet.Resnet34_upsample) while the builder is
+          # deeplabv3p-convnext. torch.load(weights_only=True) rejected it with
+          # UnpicklingError, the task was left unregistered, and every
+          # /segment/roads request returned 503 while /health still reported
+          # model_loaded:true from the buildings task. Serving from the image
+          # removes both the mismatch and the 94MB-per-start download.
+          image: zuhirbenslama/nars-segma:latest
           imagePullPolicy: IfNotPresent
           command: ["/bin/sh", "-c"]
           args:
             - |
               set -e
-              if [ -z "$NARS_SEGMA_ROAD_WEIGHTS_URL" ]; then
-                echo "NARS_SEGMA_ROAD_WEIGHTS_URL is not set; cannot fetch road weights" >&2
+              src=/srv/weights-baked/roads_dlv3p_convnext_tiny.pth
+              dst=/srv/weights/roads_best.pth
+              if [ ! -f "$src" ]; then
+                echo "roads checkpoint missing from image at $src" >&2
+                echo "weights/*.pth is gitignored: place the checkpoint in" >&2
+                echo "nars-segma/weights/ before building the image" >&2
                 exit 1
               fi
-              curl --fail --silent --show-error --location \
-                "$NARS_SEGMA_ROAD_WEIGHTS_URL" -o /srv/weights/roads_best.pth
+              cp "$src" "$dst"
               ls -lh /srv/weights
-          env:
-            - name: NARS_SEGMA_ROAD_WEIGHTS_URL
-              valueFrom:
-                secretKeyRef:
-                  name: nars-segma-secrets
-                  key: road-weights-url
-                  optional: true
           securityContext:
             runAsNonRoot: true
             runAsUser: 10001
@@ -145,8 +150,8 @@ spec:
             # Roads model = DeepLabV3+/ConvNeXt-Tiny trained on commune-
             # validated drafts (nars-roads/, timm==0.9.7). The builder flag
             # selects it over the legacy SpaceNet resnet34-upsample; weights
-            # come from the fetch-road-weights initContainer as a plain
-            # state_dict (safe weights_only load).
+            # come from the seed-road-weights initContainer, which copies the
+            # plain state_dict baked into the image (safe weights_only load).
             - name: NARS_SEGMA_ROAD_BUILDER
               value: deeplabv3p-convnext
             # Road rules (limitation). The minimum length floor is 0: segma
@@ -157,10 +162,47 @@ spec:
             # single acceptance creates.
             - name: NARS_SEGMA_ROAD_MIN_LENGTH_M
               value: "0"
+            # The confidence floor is the road quality lever that matters. At 0
+            # the service emitted 53% of its drafts under 10 m - median 3.1 m,
+            # median confidence 0.49, barely over the 0.5 mask threshold. Those
+            # marginal spurs are what made drafts look like roads crossing each
+            # other, not the roads themselves. Measured on the commune's 1,837
+            # road drafts: floor 0.6 -> 959 drafts, median 38 m, 25% under 10 m,
+            # blind crossings 3,196 -> 2,248, keeping 91% of network length;
+            # floor 0.7 -> 733 drafts, median 56 m, 17% under 10 m, crossings
+            # 1,399, keeping 85%. Start at 0.6 and tighten only after eyeballing
+            # a tile - each step discards real low-confidence road. Deliberately
+            # no length floor: a short edge is the API's roads-phase decision,
+            # not segma's, because only the API sees the mapped network.
             - name: NARS_SEGMA_ROAD_MIN_CONFIDENCE
-              value: "0"
+              value: "0.6"
             - name: NARS_SEGMA_ROAD_MAX_FEATURES
               value: "0"
+            # Road network cleanup. The skeleton centerlines of ~20 m/px
+            # imagery wobble between neighbouring pixels (visible as small
+            # dents) and two roads that cross are independent LineStrings that
+            # intersect mid-segment with no shared node. The angle/deviation
+            # pair straightens the dents (see app/roadnet.py). Set either to 0
+            # to disable that pass.
+            - name: NARS_SEGMA_ROAD_NET_MAX_ANGLE_DEG
+              value: "20"
+            - name: NARS_SEGMA_ROAD_NET_MAX_DEVIATION_RATIO
+              value: "0.30"
+            # Noding is OFF. It works (blind crossings 1574 -> 17 on the
+            # commune's drafts) but every cut is a new fragment, and these
+            # drafts are already fragments - median 9.1 m, 51.7% already under
+            # the API's 10 m MinRoadLengthM floor. Noding drops the median to
+            # 3.1 m and puts 72% of pieces under that floor, which the API's
+            # roads-phase rules then delete, tearing apart the junctions the
+            # pass just created. The API's topology pass assembles the network,
+            # so the crossing work belongs there. Set >0 to enable.
+            - name: NARS_SEGMA_ROAD_NET_NODE_TOLERANCE_M
+              value: "0"
+            # Only crossings this sharp are noded, and only once a non-zero
+            # tolerance is set. Shallower ones are twin centrelines of the same
+            # road traced a few metres apart, not a junction.
+            - name: NARS_SEGMA_ROAD_NET_MIN_NODE_ANGLE_DEG
+              value: "20"
             # Building rules (limitation) — same shape as the roads rules;
             # the confidence floor drops ghost rooftops, the cap bounds the
             # number of building drafts per tile.
