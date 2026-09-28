@@ -6,10 +6,14 @@ metadata:
   namespace: nars
 spec:
   hard:
-    requests.cpu: "4"
-    requests.memory: 8Gi
-    limits.cpu: "8"
-    limits.memory: 16Gi
+    # Sized for the planned production host (96-core / 256GB) with 4 segma
+    # replicas at 8 CPU / 12Gi each. A quota is a ceiling, not a reservation, so
+    # these values do not constrain the 16-CPU dev kind node, which only ever
+    # runs one segma replica.
+    requests.cpu: "12"
+    requests.memory: 24Gi
+    limits.cpu: "48"
+    limits.memory: 64Gi
     persistentvolumeclaims: 5
     services: 15
     pods: 20
@@ -32,9 +36,9 @@ spec:
         cpu: 100m
         memory: 128Mi
       max:
-        cpu: 2
-        # nars-segma (PyTorch inference) requests 1Gi and is capped at 4Gi —
-        # the LimitRange max must not reject its limit or the segma pods
-        # fail admission control. Keep this ≥ the largest container limit.
-        memory: 4Gi
+        # Must be >= the largest container limit or the offending pod is
+        # rejected at admission with "maximum cpu usage per Container is 2, but
+        # limit is 8". nars-segma is that largest container: 8 CPU / 12Gi.
+        cpu: 8
+        memory: 12Gi
       type: Container
