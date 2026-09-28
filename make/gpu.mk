@@ -48,7 +48,27 @@ gpu-install: _gpu-preflight ## Install CDI device plugin (the segma GPU limit is
 	@echo "→ Installing NVIDIA device plugin..."
 	@$(KUBECTL) apply -k "$(GPU_DEVICE_DIR)"
 	@echo "→ Waiting for plugin..."
-	@$(KUBECTL) -n kube-system rollout status daemonset/nvidia-device-plugin --timeout=120s >/dev/null || true
+	@$(KUBECTL) -n kube-system rollout status daemonset/nvidia-device-plugin --timeout=120s
+	@# A Ready plugin pod is NOT sufficient: the kubelet registers the extended
+	@# resource asynchronously, so a manifest requesting nvidia.com/gpu can
+	@# still be rejected seconds later with a confusing API-server error
+	@# ("unknown field ...resources.nvidia.com/gpu"). Block until the node
+	@# actually advertises the resource, and fail loudly instead of letting
+	@# the next target discover the problem.
+	@echo "→ Waiting for nvidia.com/gpu to be advertised on the node..."
+	@_waited=0; _gpu=""; \
+	while [ "$$_waited" -lt 120 ]; do \
+		_gpu=$$($(KUBECTL) get nodes -o jsonpath='{.items[*].status.allocatable.nvidia\.com/gpu}' 2>/dev/null); \
+		case "$$_gpu" in *[!0-9]*|"") ;; *) echo "  nvidia.com/gpu allocatable: $$_gpu"; break;; esac; \
+		_waited=$$((_waited+1)); sleep 1; \
+	done; \
+	if [ -z "$$_gpu" ] || [ "$$_waited" -ge 120 ]; then \
+		echo "✖ nvidia.com/gpu was never advertised on any node."; \
+		echo "  The device plugin is registered but never published the resource."; \
+		echo "  Inspect it with: make gpu-status"; \
+		echo "  (On a cold cluster the plugin image is often still pulling — that is transient.)"; \
+		exit 1; \
+	fi
 	@echo "✓ GPU device plugin installed (segma requests nvidia.com/gpu in its Deployment)"
 
 .PHONY: gpu-status
