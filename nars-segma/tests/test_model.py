@@ -7,10 +7,16 @@ stays runnable on machines without the ML stack.
 
 import numpy as np
 import pytest
-from helpers import DEFAULT_TRANSFORM, make_tiff_bytes, requires_torch
+from helpers import (
+    DEFAULT_TRANSFORM,
+    make_tiff_bytes,
+    requires_cuda,
+    requires_torch,
+)
 from rasterio.io import MemoryFile
 from rasterio.transform import Affine, from_bounds
 
+import app.model as model_module
 from app.model import InvalidTileError, SegmentationModel, TileTooLargeError
 
 
@@ -476,3 +482,58 @@ def test_model_fails_closed_without_cuda(monkeypatch):
     )
     with pytest.raises(roads_model.CudaUnavailableError):
         SegmentationModel(weights_path="/nonexistent/weights.pth", tile_size=32)
+
+
+# ── Mixed precision (NARS_SEGMA_AMP) ─────────────────────────────────────
+#
+# The CUDA branch cannot be exercised on a CPU-only box: `use_amp` keys off
+# `self.device.type == "cuda"`, and forcing that on a host with no CUDA device
+# would make the very first `.to(device)` fail. Those two cases are therefore
+# gated on `requires_cuda` and only run on a GPU host; the CPU-path cases below
+# cover the default everywhere.
+
+
+def test_amp_defaults_off(monkeypatch):
+    # The default is deliberate: the 0.6 road confidence floor was calibrated
+    # against FP32 probability maps.
+    monkeypatch.setattr(model_module, "USE_AMP", False)
+    assert (
+        SegmentationModel(weights_path="/nonexistent/w.pth", tile_size=32).use_amp
+        is False
+    )
+
+
+def test_amp_ignored_on_cpu(monkeypatch, caplog):
+    # FP16 autocast is not supported on CPU, so a CPU run must stay in FP32
+    # rather than raising mid-inference. This is the path the test suite takes.
+    monkeypatch.setattr(model_module, "USE_AMP", True)
+    built = SegmentationModel(
+        weights_path="/nonexistent/w.pth", tile_size=32, device="cpu"
+    )
+    assert built.device.type == "cpu"
+    assert built.use_amp is False
+    assert "staying in FP32" in caplog.text
+
+
+@requires_cuda
+def test_amp_enabled_when_cuda(monkeypatch):
+    monkeypatch.setattr(model_module, "USE_AMP", True)
+    assert (
+        SegmentationModel(weights_path="/nonexistent/w.pth", tile_size=32).use_amp
+        is True
+    )
+
+
+@requires_cuda
+def test_amp_preserves_float32_probability_contract(monkeypatch):
+    # Only the matmuls run in FP16; sigmoid/softmax are on autocast's fp32 list,
+    # so predict must still return float32 probabilities in [0, 1] or the
+    # 0.6 confidence floor downstream would consume half-precision values.
+    monkeypatch.setattr(model_module, "USE_AMP", True)
+    built = SegmentationModel(weights_path="/nonexistent/w.pth", tile_size=32)
+    assert built.use_amp is True
+    raw = make_tiff_bytes(width=64, height=48)
+    probs, _ = built.predict(raw, bbox=(0.0, 0.0, 1.0, 1.0))
+    assert probs.dtype == np.float32
+    assert probs.min() >= 0.0
+    assert probs.max() <= 1.0

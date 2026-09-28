@@ -61,6 +61,16 @@ REQUIRE_CUDA = os.environ.get("NARS_SEGMA_REQUIRE_CUDA", "1").strip().lower() no
     "",
 )
 
+# Mixed-precision inference. Off by default, and the default is the safe
+# choice, not an oversight: the road confidence floor
+# (NARS_SEGMA_ROAD_MIN_CONFIDENCE, 0.6) was calibrated against FP32 probability
+# maps, and FP16 shifts the distribution enough to move which pieces survive the
+# floor. Enabling this roughly doubles throughput on an L4, which is worth weeks
+# on a national backfill, but it must be adopted only after comparing generated
+# geometry FP32-vs-FP16 and re-validating the 0.6 threshold against real output.
+# CUDA only; FP16 autocast on CPU is unsupported, so a CPU run stays FP32.
+USE_AMP = os.environ.get("NARS_SEGMA_AMP", "0").strip().lower() in ("1", "true", "yes")
+
 
 class CudaUnavailableError(RuntimeError):
     """Raised when REQUIRE_CUDA is set but torch cannot see a CUDA device."""
@@ -142,6 +152,13 @@ class SegmentationModel:
         # (a real regression seen on dense urban tiles). The flag keeps the
         # correct transform per architecture.
         self.imagenet_norm = builder != "resnet34-upsample"
+        # CUDA-only mixed precision; see USE_AMP for why this defaults off.
+        self.use_amp = USE_AMP and self.device.type == "cuda"
+        if USE_AMP and not self.use_amp:
+            logger.warning(
+                "NARS_SEGMA_AMP requested but device is %s; staying in FP32",
+                self.device.type,
+            )
         self.is_loaded = False
         self.net = self._build_model()
 
@@ -284,11 +301,22 @@ class SegmentationModel:
             )
 
         with torch.no_grad():
-            logits = self.net(x)
-            if self.activation == "sigmoid":
-                probs = torch.sigmoid(logits)
+            if self.use_amp:
+                # Only the matmuls run in FP16. Sigmoid and softmax are on
+                # autocast's fp32 list, so `probs` is already fp32 by the time
+                # the resize below runs and the float32 return contract holds.
+                with torch.autocast(device_type="cuda", dtype=torch.float16):
+                    logits = self.net(x)
+                    if self.activation == "sigmoid":
+                        probs = torch.sigmoid(logits)
+                    else:
+                        probs = F.softmax(logits, dim=1)
             else:
-                probs = F.softmax(logits, dim=1)
+                logits = self.net(x)
+                if self.activation == "sigmoid":
+                    probs = torch.sigmoid(logits)
+                else:
+                    probs = F.softmax(logits, dim=1)
 
         if (h, w) != (self.tile_size, self.tile_size):
             probs = F.interpolate(
