@@ -84,14 +84,18 @@ Capacity model, derived from the current code rather than guessed:
 
 ## Production server bring-up (post-purchase)
 
-Target hardware: 2U rackmount, 1x 96-core single socket (raised from 64 when
-GeoServer was added to the same box), 256GB ECC DDR5, 4x NVIDIA L4 24GB,
-4x 3.84TB NVMe Gen4 in RAID10, 2x 10GbE, dual PSU, UPS.
+Target hardware: 2U rackmount, 1x 96-core single socket (raised from 64 to
+co-schedule the imagery tile serving with the GPU fleet on the same box), 256GB
+ECC DDR5, 4x NVIDIA L4 24GB, 4x 3.84TB NVMe Gen4 in RAID10, 2x 10GbE, dual PSU,
+UPS.
 Four L4s would put a full 1,541-commune backfill at ~9 days versus ~36 on one
 GPU, but both numbers scale from the same unvalidated s/window estimate and must
 be re-derived once a real commune is profiled end to end.
-Co-scheduling GeoServer pushes concurrent demand to roughly 64-72 cores, so 64
-would leave no headroom for the throughput the GPU fleet is meant to deliver.
+Co-scheduling tile serving alongside the workers pushes concurrent demand to
+roughly 64-72 cores, so 64 would leave no headroom for the throughput the GPU
+fleet is meant to deliver. Note this is now static-file serving (nginx over a
+pre-built pyramid, see "Satellite imagery" below), which is far lighter on CPU
+and memory than the GeoServer JVM originally assumed here.
 
 Do these before or during commissioning. Left unchanged, the current limits
 leave most of the box idle.
@@ -154,49 +158,75 @@ leave most of the box idle.
 - [ ] Pin image digests rather than `latest` before this reaches production. See
       "Deployment robustness" above.
 
-## GeoServer and satellite imagery
+## Satellite imagery (nginx XYZ tiles)
 
 Decisions taken: z18 over urban extents only, bulk ingest of a fixed mosaic,
-GeoServer co-scheduled on the NARS server, internal/company users only. This
-replaces the direct Esri World Imagery fetches and removes the third-party
-dependency from the async pipeline.
+co-scheduled on the NARS server, internal/company users only. This replaces the
+direct Esri World Imagery fetches and removes the third-party dependency from
+the async pipeline.
 
 Storage stays within the 4x 3.84TB RAID10 above. z18 over urban extents is
-~0.5-0.7TB, plus a comparable GeoWebCache, so the earlier sizing concern is
-retired. A national z18 pyramid would have been ~8-15TB and is deliberately not
-what we are building.
+~0.5-0.7TB, so the earlier sizing concern is retired. A national z18 pyramid
+would have been ~8-15TB and is deliberately not what we are building.
 
-Raster stores, because they serve different purposes:
+**GeoServer is no longer part of this plan. Serve a pre-built gdal2tiles XYZ
+pyramid from nginx instead.** The reasoning:
+
+- The tile path is static file serving. `gdal2tiles.py -t xyz` already writes
+  exactly `{z}/{x}/{y}.png` at 256px in EPSG:3857, which is the contract
+  `satellite-tiler.ts` consumes. A JVM would only be reading files off disk.
+- GeoServer could not be made to publish a single layer here. Store config was
+  accepted (HTTP 201) but resource enumeration always returned empty, and
+  publishing returned HTTP 500 `Failed to create reader from null`
+  (`gce.geotiff: Argument "input" should not be null`). Reproduced on
+  `kartoza/geoserver` 3.0.1, 2.26.1 and 2.28.5.
+- It was not a raster/GDAL problem: a vector Shapefile store failed identically,
+  so the catalog itself is at fault. Ruled out along the way: JSON REST request
+  bodies (`CannotResolveClassException`, writes must use XML), the `datastores`
+  vs `coveragestores` distinction, and a GDAL/GeoTools version skew (2.26.1
+  pairs GDAL 3.0.4 with GeoTools 32.1; 2.28.5 pairs 3.8.4 with 34.5, and both
+  fail). File access itself is fine - the tif is readable as the `geoserveruser`
+  process.
+- Heap cost is not justified. The plan below budgeted 8-16GB of JVM heap while
+  the `nars-limits` LimitRange caps any container at 12Gi. Static files need
+  none of it.
+- Verified locally: `gdal2tiles -t xyz -z 12-14` on a test raster emitted
+  `12/2132/2487.png` at 256x256, `EPSG:3857` - a direct match for the frontend.
+
+What this gives up, and the trigger to revisit: no WMS/WMTS, no runtime styling,
+no arbitrary on-the-fly zoom or custom `SRS`/`BBOX` query rendering. If OGC
+services or per-request styling become a real requirement, do not resurrect
+GeoServer - use a lightweight tile server (Martin or Tegola, both Rust, orders
+of magnitude lighter than a JVM).
+
+Raster sources, because they serve different purposes:
 - z10-14 national (~50-120GB) for basemap display across the whole country.
 - z18 urban (~0.5-0.7TB) for segmentation input, clipped to the union of the
   `areas` urban polygons, which is exactly the clip geometry the ingest needs.
 
 - [ ] Confirm the imagery licence permits internal republication as tiles.
       Internal-only use sidesteps public redistribution, but the upstream terms
-      still have to allow it. Do this before the bulk ingest, not after.
+      still have to allow it. Do this before the bulk ingest, not after. This
+      blocks every item below.
 - [ ] Build the ingest pipeline: pull the mosaic from the national imagery API
       for urban extents, clip to the `areas` union, reproject to EPSG:3857, then
-      build the z18 XYZ pyramid offline with GDAL `gdal2tiles.py -t xyz -r bilinear`.
-      Build offline; do not have GeoServer generate tiles.
-- [ ] Add GeoServer manifests under `nars-infra/`. This is greenfield, nothing
-      exists today. Give the JVM 8-16GB heap, not the whole machine, and let the
-      remaining RAM be page cache for the pyramid.
-- [ ] Configure GeoWebCache with a pre-seeded disk cache over the same extent, a
-      `TileLayer` disk quota, and a trash buffer around 10% so the cache cannot
-      grow unbounded. Dynamic rendering only as a fallback.
-- [ ] Configure CORS on the GeoServer XYZ endpoint. `satellite-tiler.ts` sets
+      build the XYZ pyramid offline with GDAL `gdal2tiles.py -t xyz -r bilinear`.
+- [ ] Add a tiles Deployment under `nars-infra/` (greenfield, nothing exists
+      today): nginx with `root` on the pyramid PVC, plus the CORS headers below.
+      Reuse the pattern from `nars-frontend` (`zuhirbenslama/nars-vite:latest`).
+- [ ] Configure CORS on the tile endpoint. `satellite-tiler.ts` sets
       `img.crossOrigin = "anonymous"` then calls `ctx.drawImage` and
       `canvas.toBlob`, so a missing `Access-Control-Allow-Origin` taints the
-      canvas and throws a `SecurityError`. Esri sent these headers; GeoServer
-      will not unless configured.
-- [ ] Publish GeoServer EPSG:3857 XYZ at 256px. `lonToTileX`/`latToTileY` in
+      canvas and throws a `SecurityError`. Esri sent these headers; nginx will
+      not unless configured.
+- [ ] Serve EPSG:3857 XYZ at 256px. `lonToTileX`/`latToTileY` in
       `satellite-tiler.ts` are standard slippy math, so any other tiling scheme
-      forces frontend changes.
-- [ ] Expose GeoServer on two paths: nginx-ingress with the existing mTLS
+      forces frontend changes. `gdal2tiles -t xyz` already matches it.
+- [ ] Expose tiles on two paths: nginx-ingress with the existing mTLS
       (`nars-infra/k8s/ingress-api.yaml:25`) for the browser, and ClusterIP-only
       with no ingress for the segma worker, which never leaves the cluster and
       so needs neither TLS nor a client cert.
-- [ ] Set `VITE_TILE_SATELLITE` to the GeoServer XYZ template
+- [ ] Set `VITE_TILE_SATELLITE` to the tile XYZ template
       (`nars-web/src/config/index.ts:57`). This is the whole frontend cutover;
       the code substitutes `{z}/{x}/{y}` by name, so no frontend change is needed.
 - [ ] Assert per-commune z18 coverage before any backfill, and fail loudly on
@@ -205,13 +235,15 @@ Raster stores, because they serve different purposes:
       which is exactly the "few roads" regression already debugged once.
 - [ ] Port `renderSatelliteGrid` to server-side GDAL. Canvas compositing is a
       browser API, so an async worker needs its own equivalent to assemble the
-      georeferenced 6144x6144 JPEG. GeoServer unblocks the imagery source but
-      does not remove this work.
+      georeferenced 6144x6144 JPEG. Serving our own imagery does not remove this
+      work.
 - [ ] Parallelize the tile fetch in `satellite-tiler.ts`. It awaits one tile at a
       time in a nested double loop, which is 576 sequential round-trips per 24x24
-      chunk. Acceptable against a CDN edge, a real drag against our own
-      GeoServer. Batch it 8-16 concurrent.
-- [ ] Treat GeoServer as an added SPOF on an already single-server deployment. A
-      pre-seeded local GeoWebCache survives a GeoServer restart, which softens
-      but does not remove the exposure.
+      chunk. Acceptable against a CDN edge, a real drag against our own origin.
+      Batch it 8-16 concurrent.
+- [ ] Re-cut the pyramid when source imagery updates, rather than re-rendering
+      per request. Static tiles are all-or-nothing per build, which is an
+      acceptable trade for a fixed pre-decided mosaic. Keep the previous pyramid
+      on disk until the new one passes the coverage assertion above, so a bad
+      ingest is a rollback rather than an outage.
 
