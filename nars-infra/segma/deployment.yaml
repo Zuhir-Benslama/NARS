@@ -222,17 +222,23 @@ spec:
             - name: HOME
               value: /tmp
           resources:
+            # Sized for postprocessing, not the GPU. GDAL polygonize and the
+            # roadnet geometry ops dominate wall time, so the previous 2-CPU cap
+            # throttled the dominant cost: 4 replicas reserved 8 cores of a
+            # 96-core production host. Memory covers MAX_CONCURRENT_INFERENCES
+            # (2) 1024 px prob-map windows plus both models, with headroom for a
+            # third window if that knob is raised after benchmarking.
             requests:
-              cpu: "500m"
-              memory: "1Gi"
-            limits:
               cpu: "2"
               memory: "4Gi"
-              # The road/building models are CUDA-only and fail closed without
-              # CUDA, so this pod MUST land on the GPU node. The device plugin
-              # (installed by gpu-install) advertises nvidia.com/gpu on the
-              # kind control-plane node; a CPU-only cluster cannot schedule it.
-              nvidia.com/gpu: "1"
+            limits:
+              cpu: "8"
+              memory: "12Gi"
+            # The road/building models are CUDA-only and fail closed without
+            # CUDA, so this pod MUST land on the GPU node. The device plugin
+            # (installed by gpu-install) advertises nvidia.com/gpu on the
+            # kind control-plane node; a CPU-only cluster cannot schedule it.
+            nvidia.com/gpu: "1"
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
