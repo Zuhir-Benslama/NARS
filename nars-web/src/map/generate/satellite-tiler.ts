@@ -35,6 +35,11 @@ const TILE_SIZE = 256
 // model detected nothing.
 const MAX_GRID_DIM = 24
 const LAT_LIMIT = 85.05112878
+// Tiles per chunk fetched in parallel. A 24x24 chunk is 576 tiles, and fetching
+// them one at a time cost 576 serial round-trips per chunk. 16 is comfortably
+// under the HTTP/1.1 6-connection-per-host limit multiplied by a few, and well
+// below what saturates a local tile server.
+const TILE_FETCH_CONCURRENCY = 16
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
@@ -150,6 +155,32 @@ function loadTileImage(url: string): Promise<HTMLImageElement> {
   })
 }
 
+/**
+ * Runs `fn` over `items` with at most `limit` calls in flight, returning results
+ * in input order. The index cursor is claimed synchronously before each `await`,
+ * so workers never collide and the output order is independent of completion
+ * order — which is what lets `renderSatelliteGrid` keep drawing row-major.
+ */
+export async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  if (items.length === 0) return results
+  const workers = Math.max(1, Math.min(limit, items.length))
+  let next = 0
+  async function drain(): Promise<void> {
+    while (next < items.length) {
+      const index = next
+      next += 1
+      results[index] = await fn(items[index]!, index)
+    }
+  }
+  await Promise.all(Array.from({ length: workers }, () => drain()))
+  return results
+}
+
 /** Fetches the satellite tiles covering a grid and composites them into a JPEG. */
 export async function renderSatelliteGrid(grid: TileGrid): Promise<RenderedSatelliteTile> {
   const width = grid.width * TILE_SIZE
@@ -161,15 +192,23 @@ export async function renderSatelliteGrid(grid: TileGrid): Promise<RenderedSatel
   const ctx = canvas.getContext("2d")
   if (!ctx) throw new Error("canvas unsupported")
 
-  const tiles: { img: HTMLImageElement; x: number; y: number }[] = []
+  // Enumerated row-major so the composite is byte-identical to a serial fetch,
+  // whatever order the tiles actually come back in.
+  const slots: { x: number; y: number; url: string }[] = []
   for (let row = 0; row < grid.height; row += 1) {
     for (let col = 0; col < grid.width; col += 1) {
-      const url = tileUrl(grid.x0 + col, grid.y0 + row, grid.zoom)
-      tiles.push({ img: await loadTileImage(url), x: col * TILE_SIZE, y: row * TILE_SIZE })
+      slots.push({
+        x: col * TILE_SIZE,
+        y: row * TILE_SIZE,
+        url: tileUrl(grid.x0 + col, grid.y0 + row, grid.zoom),
+      })
     }
   }
-  for (const { img, x, y } of tiles) {
-    ctx.drawImage(img, x, y)
+  const images = await mapWithConcurrency(slots, TILE_FETCH_CONCURRENCY, (slot) =>
+    loadTileImage(slot.url),
+  )
+  for (let i = 0; i < slots.length; i += 1) {
+    ctx.drawImage(images[i]!, slots[i]!.x, slots[i]!.y)
   }
 
   const blob = await new Promise<Blob>((resolve, reject) => {

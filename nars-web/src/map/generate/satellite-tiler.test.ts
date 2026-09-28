@@ -7,6 +7,7 @@ import {
   chooseTileZoom,
   gridBounds,
   splitBoundsAtZoom,
+  mapWithConcurrency,
 } from "./satellite-tiler"
 
 const WORLD = { minLon: -180, minLat: -90, maxLon: 180, maxLat: 90 }
@@ -150,6 +151,62 @@ describe("splitBoundsAtZoom", () => {
       new Set(allGridTiles(containing).map((c) => `${c.x},${c.y}`)),
     )
     expect(covered.length).toBe(containing.width * containing.height)
+  })
+})
+
+describe("mapWithConcurrency", () => {
+  it("returns results in input order regardless of completion order", async () => {
+    const delays = [30, 5, 20, 1, 10]
+    const result = await mapWithConcurrency(delays, 3, async (delay, index) => {
+      await new Promise((r) => setTimeout(r, delay))
+      return index
+    })
+    expect(result).toEqual([0, 1, 2, 3, 4])
+  })
+
+  it("never exceeds the concurrency limit", async () => {
+    let inFlight = 0
+    let peak = 0
+    const items = Array.from({ length: 24 }, (_, i) => i)
+    await mapWithConcurrency(items, 4, async () => {
+      inFlight += 1
+      peak = Math.max(peak, inFlight)
+      await new Promise((r) => setTimeout(r, 1))
+      inFlight -= 1
+      return null
+    })
+    expect(peak).toBeLessThanOrEqual(4)
+    expect(peak).toBeGreaterThan(1)
+  })
+
+  it("calls the mapper exactly once per item", async () => {
+    const seen: number[] = []
+    await mapWithConcurrency([5, 6, 7, 8], 3, async (_item, index) => {
+      seen.push(index)
+      return null
+    })
+    expect(seen.sort((a, b) => a - b)).toEqual([0, 1, 2, 3])
+  })
+
+  it("handles an empty input without spawning workers", async () => {
+    const result = await mapWithConcurrency([], 16, async () => {
+      throw new Error("should not be called")
+    })
+    expect(result).toEqual([])
+  })
+
+  it("propagates a mapper rejection to the caller", async () => {
+    await expect(
+      mapWithConcurrency([1, 2, 3], 2, async (item) => {
+        if (item === 2) throw new Error("satellite tile failed to load: tile/2")
+        return item
+      }),
+    ).rejects.toThrow("satellite tile failed to load: tile/2")
+  })
+
+  it("processes every item even when a limit of 0 is requested", async () => {
+    const result = await mapWithConcurrency([1, 2, 3], 0, async (item) => item * 2)
+    expect(result).toEqual([2, 4, 6])
   })
 })
 
