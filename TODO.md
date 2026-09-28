@@ -2,20 +2,56 @@
 
 ## Deployment robustness
 
+Three defects were fixed on 2026-09-28 while bringing a cold cluster up; they
+are recorded because the first two were silent and could have been mistaken for
+a GPU/hardware problem:
+
+- [x] `nvidia.com/gpu` sat as a *sibling* of `limits`/`requests` in
+      `nars-infra/segma/deployment.yaml` (since `3d7b894`). `ResourceRequirements`
+      only defines `limits`/`requests`/`claims`, so the API server rejected the
+      Deployment with a confusing `strict decoding error: unknown field
+      ...resources.nvidia.com/gpu`. It went unnoticed for ~3 commits because the
+      already-running pod kept serving while every fresh apply failed. Verified
+      with a server-side dry-run of both placements: nested is accepted, sibling
+      is not. Fixed in `ca42d91`.
+- [x] `nars-limits` LimitRange capped containers at 2 CPU / 4Gi, so the segma
+      limit increase to 8 CPU / 12Gi was rejected at admission ("maximum cpu
+      usage per Container is 2, but limit is 8"), and the namespace ResourceQuota
+      would have been exceeded too. Both raised for 4 segma replicas on the
+      96-core host. A quota is a ceiling, not a reservation, so the 16-CPU dev
+      kind node is unaffected. Fixed in `7938949`.
+- [x] `make cluster-up` on a *cold* cluster applied GPU manifests before the
+      device plugin had advertised the extended resource; `gpu-install` only
+      waited for the DaemonSet rollout and ended in `|| true`. The kubelet
+      registers the resource asynchronously, so plugin Ready != resource
+      advertised. `make/gpu.mk` now polls node allocatable and fails with a
+      pointer to `make gpu-status`. Fixed in `60e0089`.
+
+Remaining:
+
 - [ ] Pin `IMAGE_TAG=<commit-sha>` instead of `latest` so a bad rollout is
       rollback-able. `latest` is mutable and the previous image gets garbage-
       collected, leaving no rollback path. `make deploy` already warns about
       this; make the non-dev deploy pipeline require a pinned tag
       (guards exist in `make/images.mk`: `_check-pinned-tag` / `_warn-latest-tag`).
+- [ ] Add a server-side dry-run of the rendered manifests to CI. A plain
+      `kubectl kustomize` parse cannot catch the `nvidia.com/gpu` class of bug,
+      since the YAML is well-formed; only the API server rejects it.
 
 ## National-scale rollout (58 wilayas / ~1,541 communes)
 
 Capacity model, derived from the current code rather than guessed:
 - A z18 chunk is capped at 24x24 tiles x 256px = 6144x6144 px, which segma
   decomposes at `NARS_SEGMA_TILE_SIZE=1024` into 36 windows.
-- Bir Bouhouche = 3 chunks = 108 windows. Measured ~19 s/window on an
-  unsaturated dev GPU, so ~34 min per commune and ~1.5 communes/hour.
-- 1,541 communes x 34 min = ~873 h, i.e. ~36 days of continuous time on one GPU.
+- Bir Bouhouche = 3 chunks = 108 windows.
+- **No end-to-end minutes/commune figure is trustworthy yet.** An earlier draft of
+  this file asserted ~19 s/window -> ~34 min/commune -> ~36 days on one GPU.
+  That chain is not supported: 19 s was a single synthetic HTTP observation, and
+  a background-only `predict()` profiles at 1.55 s, a forward pass alone at
+  0.40 s (FP32) / 0.05 s (FP16). Service-level timings measured on the RTX 2060
+  for a *synthetic* 1024px grid, warm cache: roads 2.0 s, buildings 3.2 s
+  (roads 13.4 s on first call). None of these is a real commune tile, so treat
+  every derived number below as provisional until a real-tile profile exists.
 
 - [ ] Benchmark one real commune on the target GPU and record a true
       minutes/commune number. Every sizing decision below depends on it.
@@ -30,8 +66,9 @@ Capacity model, derived from the current code rather than guessed:
       fetches in `nars-web/src/map/generate/satellite-tiler.ts`, called from
       `generate-roads.ts:179`. Current unauthenticated browser-side fetching would
       also rate limit at ~166k requests for a national backfill.
-- [ ] Size the GPU fleet from measured throughput. ~2 weeks for a full backfill
-      needs 2-4 GPUs; ~2 days needs ~17-35. `nars-infra/segma/deployment.yaml`
+- [ ] Size the GPU fleet from measured throughput. Provisional arithmetic only:
+      a 2-week backfill would need 2-4 GPUs and a 2-day one ~17-35, but both
+      inherit the unvalidated s/window figure above. `nars-infra/segma/deployment.yaml`
       requests `nvidia.com/gpu: 1` at `replicas: 1` and is CUDA-only, so there is
       no CPU fallback for production.
 - [ ] Retune segma concurrency when scaling out. `MAX_CONCURRENT_INFERENCES`
@@ -50,7 +87,9 @@ Capacity model, derived from the current code rather than guessed:
 Target hardware: 2U rackmount, 1x 96-core single socket (raised from 64 when
 GeoServer was added to the same box), 256GB ECC DDR5, 4x NVIDIA L4 24GB,
 4x 3.84TB NVMe Gen4 in RAID10, 2x 10GbE, dual PSU, UPS.
-Four L4s put a full 1,541-commune backfill at ~9 days versus ~36 on one GPU.
+Four L4s would put a full 1,541-commune backfill at ~9 days versus ~36 on one
+GPU, but both numbers scale from the same unvalidated s/window estimate and must
+be re-derived once a real commune is profiled end to end.
 Co-scheduling GeoServer pushes concurrent demand to roughly 64-72 cores, so 64
 would leave no headroom for the throughput the GPU fleet is meant to deliver.
 
