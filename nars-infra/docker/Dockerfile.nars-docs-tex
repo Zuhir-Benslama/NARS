@@ -8,7 +8,7 @@
 # listings/...), which is far smaller than the 2.7 GB full scheme needed to
 # compile it — see docs/code-review (gates at completion) and make/docs.mk.
 
-FROM texlive/texlive:latest-small@sha256:ed19d0b6014018f182949fe1239829ad3efb91eab91ea0fe696fbaca27a31631
+FROM texlive/texlive:latest-small@sha256:d8c68913acc819f2b8ae57f6141a97edec63275d92ec4ca8e0e03d2e35c918e9
 
 # Install exactly the packages docs/nars_documentation.tex requires on top of
 # the small scheme. `tlmgr install` is a no-op for anything already present.
