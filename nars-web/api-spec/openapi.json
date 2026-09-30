@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "http://localhost:8080/"
+      "url": "http://localhost:5001/"
     }
   ],
   "paths": {
@@ -1505,6 +1505,76 @@
         }
       }
     },
+    "/api/features/clear-roads": {
+      "post": {
+        "tags": ["Features"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClearFeaturesRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClearFeaturesRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClearFeaturesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/features/stats": {
       "get": {
         "tags": ["Features"],
@@ -2038,6 +2108,191 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/generation/jobs": {
+      "post": {
+        "tags": ["GenerationJob"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGenerationJobRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGenerationJobRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGenerationJobRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationJobView"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationJobView"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationJobView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/generation/jobs/{jobId}": {
+      "get": {
+        "tags": ["GenerationJob"],
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationJobView"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationJobView"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationJobView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/generation/jobs/{jobId}/chunks/{chunkId}/raster": {
+      "post": {
+        "tags": ["GenerationJob"],
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "chunkId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Raster": {
+                    "$ref": "#/components/schemas/IFormFile"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationJobView"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationJobView"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationJobView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/generation/jobs/{jobId}/cancel": {
+      "post": {
+        "tags": ["GenerationJob"],
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationJobView"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationJobView"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationJobView"
                 }
               }
             }
@@ -2938,6 +3193,25 @@
           }
         }
       },
+      "CreateGenerationJobRequest": {
+        "required": ["communeId", "grids"],
+        "type": "object",
+        "properties": {
+          "communeId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["null", "integer", "string"],
+            "format": "int32"
+          },
+          "grids": {
+            "maxItems": 4096,
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GenerationGridDto"
+            }
+          }
+        }
+      },
       "DraftUpdateRequest": {
         "required": ["geometryGeoJson"],
         "type": "object",
@@ -3037,46 +3311,6 @@
           }
         }
       },
-      "GenerateRoadsRequest": {
-        "required": ["communeId", "draftIds"],
-        "type": "object",
-        "properties": {
-          "communeId": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": ["null", "integer", "string"],
-            "format": "int32"
-          },
-          "draftIds": {
-            "maxItems": 5000,
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        }
-      },
-      "GenerateRoadsResponse": {
-        "required": ["dropped", "created", "breakdown"],
-        "type": "object",
-        "properties": {
-          "dropped": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": ["integer", "string"],
-            "format": "int32"
-          },
-          "created": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/GeneratedRoadDto"
-            }
-          },
-          "breakdown": {
-            "$ref": "#/components/schemas/GenerateRoadsDroppedDto"
-          }
-        }
-      },
       "GenerateRoadsDroppedDto": {
         "required": [
           "tooShort",
@@ -3117,6 +3351,289 @@
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": ["integer", "string"],
             "format": "int32"
+          }
+        }
+      },
+      "GenerateRoadsRequest": {
+        "required": ["communeId", "draftIds"],
+        "type": "object",
+        "properties": {
+          "communeId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["null", "integer", "string"],
+            "format": "int32"
+          },
+          "draftIds": {
+            "maxItems": 5000,
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "GenerateRoadsResponse": {
+        "required": ["dropped", "created", "breakdown"],
+        "type": "object",
+        "properties": {
+          "dropped": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "created": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GeneratedRoadDto"
+            }
+          },
+          "breakdown": {
+            "$ref": "#/components/schemas/GenerateRoadsDroppedDto"
+          }
+        }
+      },
+      "GenerationChunkView": {
+        "required": [
+          "id",
+          "chunkKey",
+          "zoom",
+          "x0",
+          "y0",
+          "width",
+          "height",
+          "minLon",
+          "minLat",
+          "maxLon",
+          "maxLat",
+          "status",
+          "attempts",
+          "error",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "chunkKey": {
+            "type": "string"
+          },
+          "zoom": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "x0": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "y0": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "width": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "height": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "minLon": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": ["null", "number", "string"],
+            "format": "double"
+          },
+          "minLat": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": ["null", "number", "string"],
+            "format": "double"
+          },
+          "maxLon": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": ["null", "number", "string"],
+            "format": "double"
+          },
+          "maxLat": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": ["null", "number", "string"],
+            "format": "double"
+          },
+          "status": {
+            "type": "string"
+          },
+          "attempts": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "error": {
+            "type": ["null", "string"]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": ["null", "string"],
+            "format": "date-time"
+          }
+        }
+      },
+      "GenerationGridDto": {
+        "required": [
+          "chunkKey",
+          "zoom",
+          "x0",
+          "y0",
+          "width",
+          "height",
+          "minLon",
+          "minLat",
+          "maxLon",
+          "maxLat"
+        ],
+        "type": "object",
+        "properties": {
+          "chunkKey": {
+            "type": "string"
+          },
+          "zoom": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "x0": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "y0": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "width": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "height": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "minLon": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": ["number", "string"],
+            "format": "double"
+          },
+          "minLat": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": ["number", "string"],
+            "format": "double"
+          },
+          "maxLon": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": ["number", "string"],
+            "format": "double"
+          },
+          "maxLat": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": ["number", "string"],
+            "format": "double"
+          }
+        }
+      },
+      "GenerationJobView": {
+        "required": [
+          "id",
+          "communeId",
+          "status",
+          "stage",
+          "totalChunks",
+          "doneChunks",
+          "progress",
+          "draftIds",
+          "error",
+          "createdAt",
+          "updatedAt",
+          "chunks",
+          "result"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "communeId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "stage": {
+            "type": ["null", "string"]
+          },
+          "totalChunks": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "doneChunks": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "progress": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": ["number", "string"],
+            "format": "double"
+          },
+          "draftIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "error": {
+            "type": ["null", "string"]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": ["null", "string"],
+            "format": "date-time"
+          },
+          "chunks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GenerationChunkView"
+            }
+          },
+          "result": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/JsonElement"
+              }
+            ]
           }
         }
       },
@@ -3402,6 +3919,9 @@
     },
     {
       "name": "Field"
+    },
+    {
+      "name": "GenerationJob"
     },
     {
       "name": "Locations"

@@ -274,16 +274,36 @@ kustomize-set-image-tag: _check-tag-syntax ## Persistently pin image tags in kus
 	fi
 
 .PHONY: kustomize-apply
-kustomize-apply: secrets-validate _check-pinned-tag _check-kind-cidrs _check-local-ingresses ## Apply k8s manifests via kustomize (pin tags with IMAGE_TAG=<sha>)
+kustomize-apply: secrets-validate _check-pinned-tag _check-kind-cidrs _check-local-ingresses ## Apply k8s manifests via kustomize (pin tags with IMAGE_TAG=<sha>, digests outside dev)
 	@$(SUBMAKE) postgis-pv-fix
 	@echo "→ Applying kustomization (images: $(DOCKER_ORG)/*:"$(IMAGE_TAG_Q)")..."
 	# Tag rewriting lives in nars-infra/scripts/kustomize-tag-rewrite.awk
 	# (documented + diff-tested against the former inline awk program).
 	# Reads the shared render (see $(KUSTOMIZE_MANIFEST) above) instead of
 	# re-running `kubectl kustomize`, which already ran in the gates above.
+	# In non-dev environments the pinned tag is then dereferenced to its
+	# registry DIGEST (kustomize-digest-rewrite.awk), so a re-tagged image can
+	# never change what a production deployment runs. The dereference resolves
+	# against the registry this docker context is logged into and fails closed
+	# if the pushed image cannot be inspected (see resolve-image-digests.sh).
+	@if [ "$(DEPLOY_ENV)" != "dev" ]; then \
+		"$(SCRIPTS_DIR)/resolve-image-digests.sh" "$(DOCKER_ORG)" "$(IMAGE_TAG)" $(REGISTRY_IMAGES) \
+			> "$(LOG_DIR)/digests.$(IMAGE_TAG).txt" \
+			|| { echo "✖ Refusing to deploy without registry digests — run 'make images-push' (and docker login) first."; exit 1; }; \
+	fi
 	@awk -v org="$(DOCKER_ORG)" -v tag=$(IMAGE_TAG_Q) -v images="$(REGISTRY_IMAGES)" \
 		-f "$(SCRIPTS_DIR)/kustomize-tag-rewrite.awk" < "$(KUSTOMIZE_MANIFEST)" \
-	| $(KUBECTL) apply -f -
+		> "$(LOG_DIR)/kustomize-rendered.yaml"
+	@if [ "$(DEPLOY_ENV)" != "dev" ]; then \
+		awk -v org="$(DOCKER_ORG)" -v images="$(REGISTRY_IMAGES)" \
+			-v digest_file="$(LOG_DIR)/digests.$(IMAGE_TAG).txt" \
+			-f "$(SCRIPTS_DIR)/kustomize-digest-rewrite.awk" \
+			< "$(LOG_DIR)/kustomize-rendered.yaml" > "$(LOG_DIR)/kustomize-digests.yaml" \
+			|| { echo "✖ Image digest pinning failed (see above) — refusing to apply."; exit 1; }; \
+		$(KUBECTL) apply -f "$(LOG_DIR)/kustomize-digests.yaml"; \
+	else \
+		$(KUBECTL) apply -f "$(LOG_DIR)/kustomize-rendered.yaml"; \
+	fi
 	@echo "✓ Kustomization applied"
 
 	@echo "→ Waiting for postgis..."

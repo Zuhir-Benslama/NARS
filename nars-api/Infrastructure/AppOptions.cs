@@ -185,6 +185,29 @@ public class RefreshTokenPruningOptions
     [Range(1, 720)] public int IntervalHours { get; set; } = 24;
 }
 
+public class RoadGenerationJobOptions
+{
+    /// <summary>Parallel worker loops draining the generation_job queue.</summary>
+    [Range(1, 64)] public int WorkerCount { get; set; } = 2;
+
+    /// <summary>Idle poll cadence when the queue is empty.</summary>
+    [Range(100, 120_000)] public int ClaimPollIntervalMs { get; set; } = 2_000;
+
+    /// <summary>Chunk/acceptance heartbeat cadence while processing.</summary>
+    [Range(1_000, 300_000)] public int HeartbeatIntervalMs { get; set; } = 30_000;
+
+    /// <summary>
+    /// A running chunk (or accepting job) whose heartbeat is older than this is
+    /// reclaimed by another worker (crashed-process recovery).
+    /// </summary>
+    [Range(1, 60)] public int StaleClaimAfterMinutes { get; set; } = 5;
+
+    /// <summary>Retry budget per chunk (claims + stale re-claims).</summary>
+    [Range(1, 10)] public int MaxAttempts { get; set; } = 3;
+
+    public TimeSpan StaleClaimAfter => TimeSpan.FromMinutes(StaleClaimAfterMinutes);
+}
+
 public class AdminSignupOptions
 {
     [Required] public string SignupToken { get; set; } = string.Empty;
@@ -210,9 +233,9 @@ public class CspOptions
     public string ScriptSrc { get; set; } = "'self' blob:";
     public string WorkerSrc { get; set; } = "'self' blob:";
     public string StyleSrc { get; set; } = "'self' https://cdn.jsdelivr.net https://unpkg.com 'unsafe-inline' https://fonts.googleapis.com";
-    public string ImgSrc { get; set; } = "'self' data: blob: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.arcgisonline.com";
+    public string ImgSrc { get; set; } = "'self' data: blob: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.arcgisonline.com https://tiles.nars.dz";
     public string FontSrc { get; set; } = "'self' https://cdn.jsdelivr.net https://fonts.gstatic.com";
-    public string ConnectSrc { get; set; } = "'self' https: data: https://*.arcgisonline.com https://*.basemaps.cartocdn.com";
+    public string ConnectSrc { get; set; } = "'self' https: data: https://*.arcgisonline.com https://*.basemaps.cartocdn.com https://tiles.nars.dz";
     public string FrameAncestors { get; set; } = "'none'";
     public string BaseUri { get; set; } = "'self'";
     public string FormAction { get; set; } = "'self'";

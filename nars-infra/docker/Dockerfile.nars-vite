@@ -6,6 +6,11 @@ WORKDIR /app
 COPY nars-web/package.json nars-web/package-lock.json ./
 RUN npm ci --ignore-scripts
 COPY nars-web/ .
+# VITE_TILE_SATELLITE mirrors the Esri default in src/config/index.ts (a `??`
+# fallback there means an EMPTY build-arg would override it, not fall through —
+# so callers must omit this arg entirely unless they have a real satellite URL).
+ARG VITE_TILE_SATELLITE=https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}
+ENV VITE_TILE_SATELLITE=$VITE_TILE_SATELLITE
 RUN npm run build
 
 FROM nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10 AS final

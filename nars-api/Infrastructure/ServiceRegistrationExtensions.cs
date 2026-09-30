@@ -82,6 +82,8 @@ public static class ServiceRegistrationExtensions
             .ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<RefreshTokenPruningOptions>().Bind(config.GetSection("RefreshTokenPruning"))
             .ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<RoadGenerationJobOptions>().Bind(config.GetSection("RoadGenerationJob"))
+            .ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<AdminSignupOptions>().Bind(config.GetSection("AdminSignup"))
             .ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<CspOptions>().Bind(config.GetSection("Csp"))
@@ -151,6 +153,8 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ICommuneScopeService, CommuneScopeService>();
         services.AddScoped<IDraftFeaturesService, DraftFeaturesService>();
         services.AddScoped<IRoadGenerationService, RoadGenerationService>();
+        services.AddScoped<IGenerationJobService, GenerationJobService>();
+        services.AddHostedService<GenerationJobWorker>();
         services.AddSingleton<ILogSanitizer, LogSanitizer>();
         services.AddSingleton<ISecurityStampCache, SecurityStampCache>();
         services.AddScoped<IPageAuthService, PageAuthService>();

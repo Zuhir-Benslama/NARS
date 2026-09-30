@@ -1291,6 +1291,67 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/features/clear-roads": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: {
+      parameters: {
+        query?: never
+        header?: never
+        path?: never
+        cookie?: never
+      }
+      requestBody: {
+        content: {
+          "application/json": components["schemas"]["ClearFeaturesRequest"]
+          "text/json": components["schemas"]["ClearFeaturesRequest"]
+          "application/*+json": components["schemas"]["ClearFeaturesRequest"]
+        }
+      }
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown
+          }
+          content?: never
+        }
+        /** @description Bad Request */
+        400: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            "text/plain": components["schemas"]["ProblemDetails"]
+            "application/json": components["schemas"]["ProblemDetails"]
+            "text/json": components["schemas"]["ProblemDetails"]
+          }
+        }
+        /** @description Too Many Requests */
+        429: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            "text/plain": components["schemas"]["ProblemDetails"]
+            "application/json": components["schemas"]["ProblemDetails"]
+            "text/json": components["schemas"]["ProblemDetails"]
+          }
+        }
+      }
+    }
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/features/stats": {
     parameters: {
       query?: never
@@ -1731,6 +1792,173 @@ export interface paths {
             "text/plain": components["schemas"]["ProblemDetails"]
             "application/json": components["schemas"]["ProblemDetails"]
             "text/json": components["schemas"]["ProblemDetails"]
+          }
+        }
+      }
+    }
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/generation/jobs": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: {
+      parameters: {
+        query?: never
+        header?: never
+        path?: never
+        cookie?: never
+      }
+      requestBody: {
+        content: {
+          "application/json": components["schemas"]["CreateGenerationJobRequest"]
+          "text/json": components["schemas"]["CreateGenerationJobRequest"]
+          "application/*+json": components["schemas"]["CreateGenerationJobRequest"]
+        }
+      }
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            "text/plain": components["schemas"]["GenerationJobView"]
+            "application/json": components["schemas"]["GenerationJobView"]
+            "text/json": components["schemas"]["GenerationJobView"]
+          }
+        }
+      }
+    }
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/generation/jobs/{jobId}": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: {
+      parameters: {
+        query?: never
+        header?: never
+        path: {
+          jobId: string
+        }
+        cookie?: never
+      }
+      requestBody?: never
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            "text/plain": components["schemas"]["GenerationJobView"]
+            "application/json": components["schemas"]["GenerationJobView"]
+            "text/json": components["schemas"]["GenerationJobView"]
+          }
+        }
+      }
+    }
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/generation/jobs/{jobId}/chunks/{chunkId}/raster": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: {
+      parameters: {
+        query?: never
+        header?: never
+        path: {
+          jobId: string
+          chunkId: string
+        }
+        cookie?: never
+      }
+      requestBody: {
+        content: {
+          "application/x-www-form-urlencoded": {
+            Raster?: components["schemas"]["IFormFile"]
+          }
+        }
+      }
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            "text/plain": components["schemas"]["GenerationJobView"]
+            "application/json": components["schemas"]["GenerationJobView"]
+            "text/json": components["schemas"]["GenerationJobView"]
+          }
+        }
+      }
+    }
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/generation/jobs/{jobId}/cancel": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: {
+      parameters: {
+        query?: never
+        header?: never
+        path: {
+          jobId: string
+        }
+        cookie?: never
+      }
+      requestBody?: never
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            "text/plain": components["schemas"]["GenerationJobView"]
+            "application/json": components["schemas"]["GenerationJobView"]
+            "text/json": components["schemas"]["GenerationJobView"]
           }
         }
       }
@@ -2502,6 +2730,11 @@ export interface components {
       /** Format: int32 */
       wilaya_id: null | number | string
     }
+    CreateGenerationJobRequest: {
+      /** Format: int32 */
+      communeId: null | number | string
+      grids: components["schemas"]["GenerationGridDto"][]
+    }
     DraftUpdateRequest: {
       geometryGeoJson: string
     }
@@ -2533,17 +2766,6 @@ export interface components {
       label: string
       data: components["schemas"]["JsonElement"]
     }
-    GenerateRoadsRequest: {
-      /** Format: int32 */
-      communeId: null | number | string
-      draftIds: string[]
-    }
-    GenerateRoadsResponse: {
-      /** Format: int32 */
-      dropped: number | string
-      created: components["schemas"]["GeneratedRoadDto"][]
-      breakdown: components["schemas"]["GenerateRoadsDroppedDto"]
-    }
     GenerateRoadsDroppedDto: {
       /** Format: int32 */
       tooShort: number | string
@@ -2557,6 +2779,91 @@ export interface components {
       tooClose: number | string
       /** Format: int32 */
       invalidGeometry: number | string
+    }
+    GenerateRoadsRequest: {
+      /** Format: int32 */
+      communeId: null | number | string
+      draftIds: string[]
+    }
+    GenerateRoadsResponse: {
+      /** Format: int32 */
+      dropped: number | string
+      created: components["schemas"]["GeneratedRoadDto"][]
+      breakdown: components["schemas"]["GenerateRoadsDroppedDto"]
+    }
+    GenerationChunkView: {
+      /** Format: uuid */
+      id: string
+      chunkKey: string
+      /** Format: int32 */
+      zoom: number | string
+      /** Format: int32 */
+      x0: number | string
+      /** Format: int32 */
+      y0: number | string
+      /** Format: int32 */
+      width: number | string
+      /** Format: int32 */
+      height: number | string
+      /** Format: double */
+      minLon: null | number | string
+      /** Format: double */
+      minLat: null | number | string
+      /** Format: double */
+      maxLon: null | number | string
+      /** Format: double */
+      maxLat: null | number | string
+      status: string
+      /** Format: int32 */
+      attempts: number | string
+      error: null | string
+      /** Format: date-time */
+      createdAt: string
+      /** Format: date-time */
+      updatedAt: null | string
+    }
+    GenerationGridDto: {
+      chunkKey: string
+      /** Format: int32 */
+      zoom: number | string
+      /** Format: int32 */
+      x0: number | string
+      /** Format: int32 */
+      y0: number | string
+      /** Format: int32 */
+      width: number | string
+      /** Format: int32 */
+      height: number | string
+      /** Format: double */
+      minLon: number | string
+      /** Format: double */
+      minLat: number | string
+      /** Format: double */
+      maxLon: number | string
+      /** Format: double */
+      maxLat: number | string
+    }
+    GenerationJobView: {
+      /** Format: uuid */
+      id: string
+      /** Format: int32 */
+      communeId: number | string
+      status: string
+      stage: null | string
+      /** Format: int32 */
+      totalChunks: number | string
+      /** Format: int32 */
+      doneChunks: number | string
+      /** Format: double */
+      progress: number | string
+      draftIds: string[]
+      error: null | string
+      /** Format: date-time */
+      createdAt: string
+      /** Format: date-time */
+      updatedAt: null | string
+      chunks: components["schemas"]["GenerationChunkView"][]
+      result: null | components["schemas"]["JsonElement"]
     }
     /** Format: binary */
     IFormFile: string

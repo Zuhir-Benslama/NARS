@@ -1,0 +1,133 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tiles-pvc
+  namespace: nars
+  labels:
+    app.kubernetes.io/name: nars-tiles
+    app.kubernetes.io/component: tiles
+spec:
+  accessModes:
+    - ReadWriteOnce
+  # Statically bound to tiles-pv (kind dev). Production replaces the storage
+  # class and drops volumeName — see overlays/production/patches/storage-tiles-pvc.yaml.
+  storageClassName: manual
+  volumeName: tiles-pv
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nars-tiles
+  namespace: nars
+  labels:
+    app.kubernetes.io/name: nars-tiles
+    app.kubernetes.io/component: tiles
+    app.kubernetes.io/version: "latest"
+spec:
+  # RWO PVC + single-writer ingest make >1 replica pointless in dev; the
+  # pyramid read path is pure nginx so a second replica adds nothing today.
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nars-tiles
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nars-tiles
+        app.kubernetes.io/component: tiles
+    spec:
+      # No cluster API access is needed — do not mount the default SA token.
+      serviceAccountName: nars-tiles
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 10
+      securityContext:
+        # runAsNonRoot is intentionally NOT set: the entrypoint supervises
+        # nginx (which binds :80 via NET_BIND_SERVICE) and spawn-fcgi (which
+        # setuid/chowns the fcgiwrap socket to www-data). UID 0 + the two
+        # caps below is baseline-PSA-compliant (namespace enforce=baseline).
+        # restricted would warn on runAsUser 0 — same noise PostGIS's init.
+        runAsUser: 0
+        fsGroup: 0
+      containers:
+        - name: nginx
+          # ⚠ Dev default only — override via kustomize in CI/CD.
+          image: zuhirbenslama/nars-tiles:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          env:
+            - name: TILES_DATA_DIR
+              value: /data
+            # Public URL advertised by WMS GetCapabilities. Served host must
+            # match the ingress (nginx-ingress with mTLS, ingress-tiles.yaml).
+            - name: TILES_PUBLIC_URL
+              value: https://tiles.nars.dz/wms
+          # Same readiness/health contract as the image's own HEALTHCHECK:
+          # MapServer answers GetCapabilities only once the mapfile loads, so
+          # this gates readiness until the WMS backend is actually callable.
+          readinessProbe:
+            httpGet:
+              path: /wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetCapabilities
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetCapabilities
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            # spawn-fcgi setuid/chown + nginx binding :80 need exactly these
+            # three caps; all are in the baseline-PSA allowed list.
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - CHOWN
+                - SETGID
+                - SETUID
+                - NET_BIND_SERVICE
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: tiles-data
+              mountPath: /data
+      volumes:
+        - name: tiles-data
+          persistentVolumeClaim:
+            claimName: tiles-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tiles
+  namespace: nars
+  labels:
+    app.kubernetes.io/name: nars-tiles
+    app.kubernetes.io/component: tiles
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: nars-tiles
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http

@@ -59,6 +59,10 @@ jobs:
             nars-segma:
               - 'nars-segma/**'
               - 'nars-infra/docker/Dockerfile.nars-segma'
+            nars-tiles:
+              - 'nars-infra/docker/Dockerfile.nars-tiles'
+              - 'nars-infra/docker/mapserver/**'
+              - 'nars-infra/scripts/mapserver-entrypoint.sh'
 
   build-and-push:
     needs: changes
@@ -86,6 +90,8 @@ jobs:
             context: "."
           - image: nars-segma
             context: "nars-segma/"
+          - image: nars-tiles
+            context: "."
 
     steps:
       - uses: actions/checkout@v4
@@ -110,6 +116,18 @@ jobs:
             type=ref,event=tag
             type=raw,value=${{ inputs.tag }},enable=${{ inputs.tag != '' }}
 
+      # VITE_TILE_SATELLITE is baked into the nars-vite build. The frontend's
+      # `??` fallback means an EMPTY build-arg would override the Dockerfile's
+      # Esri default and break satellite tiles, so the arg is emitted ONLY when
+      # the repository variable is set (and only for the vite image).
+      - name: Compute VITE_TILE_SATELLITE build arg (nars-vite only)
+        id: tile_args
+        if: matrix.image == 'nars-vite'
+        run: |
+          if [ -n "${{ vars.VITE_TILE_SATELLITE }}" ]; then
+            echo "value=VITE_TILE_SATELLITE=${{ vars.VITE_TILE_SATELLITE }}" >> "$GITHUB_OUTPUT"
+          fi
+
       # Tag pushes (v*) are still `push` events, but a release must rebuild
       # every image for the `type=ref,event=tag` tag — running it through the
       # paths-filter risks computing an empty diff for the tag ref and pushing
@@ -123,6 +141,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: ${{ steps.tile_args.outputs.value }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 

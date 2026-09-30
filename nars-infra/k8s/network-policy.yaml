@@ -348,3 +348,32 @@ spec:
           protocol: TCP
   policyTypes:
     - Egress
+---
+# Allow nars-tiles to be reached on :80 from the nginx-ingress controller
+# (browser path via the mTLS ingress) and from nars-segma (ClusterIP-only
+# path — the worker fetches tiles in-cluster, no ingress, no TLS).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-tiles-from-ingress-and-segma
+  namespace: nars
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: nars-tiles
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+              app.kubernetes.io/component: controller
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: nars-segma
+      ports:
+        - port: 80

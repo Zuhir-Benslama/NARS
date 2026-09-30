@@ -1,0 +1,79 @@
+# ─── NARS satellite imagery WMS mapfile (MapServer 8.4, Debian trixie) ──────
+#
+# Serves the /data/sources/{*.tif} urban rasters via WMS:GetMap, including the
+# mode=tile extension that MapLibre uses as a WMS fallback. The static XYZ
+# pyramid under /data/tiles is served by nginx directly (never MapServer), so
+# this mapfile only ever re-renders WMS requests.
+#
+# Hard requirements (source-verified, these are NOT optional):
+#   * MAP-level PROJECTION init=epsg:3857 — mode=tile silently fails without it
+#     (maputil.c enforces it despite the docs claiming it is optional).
+#   * TILEITEM "location" — the column gdaltindex writes; the tileindex rasters
+#     must be referenced by ABSOLUTE path (msTryBuildPath3's CWD fallback is a
+#     silent failure mode).
+#   * SIZE 256 256 alongside the raster layer — mode=tile derives the tile
+#     size from the map SIZE.
+#
+# The __WMS_ONLINERESOURCE__ placeholder is replaced at boot by
+# mapserver-entrypoint.sh from the TILES_PUBLIC_URL env var.
+
+MAP
+  NAME "nars-xyz"
+  STATUS ON
+  SIZE 256 256
+  IMAGETYPE png
+  UNITS meters
+  # EPSG:3857 world extent (MapServer tile math is anchored to this).
+  EXTENT -20037508.342789244 -20037508.342789244 20037508.342789244 20037508.342789244
+
+  PROJECTION
+    "init=epsg:3857"
+  END
+
+  # Hidden OGR helper layer: exposes the GPKG tileindex as a layer MapServer can
+  # use as a TILEINDEX. STATUS OFF + TYPE POLYGON => never rendered itself.
+  LAYER
+    NAME "tileindex"
+    TYPE POLYGON
+    STATUS OFF
+    CONNECTIONTYPE OGR
+    CONNECTION "/data/sources/tileindex.gpkg"
+    DATA "tileindex"
+    PROJECTION
+      "init=epsg:3857"
+    END
+  END
+
+  # The raster layer fed by the tileindex. MapServer re-renders WMS from these
+  # source rasters; the pre-built pyramid is never consulted here.
+  LAYER
+    NAME "xyz"
+    TYPE RASTER
+    STATUS ON
+    TILEINDEX "tileindex"
+    TILEITEM "location"
+    PROJECTION
+      "init=epsg:3857"
+    END
+    METADATA
+      "wms_title" "NARS satellite imagery"
+      "wms_extent" "-20037508.342789244 -20037508.342789244 20037508.342789244 20037508.342789244"
+      # Tile-mode WMS: serve exact 256px tiles, no edge bleed / metatile seams.
+      "tile_map_edge_buffer" "0"
+      "tile_metatile_level" "0"
+    END
+  END
+
+  WEB
+    METADATA
+      "wms_title" "NARS satellite imagery"
+      # mode=tile is a GetMap request — no other OWS endpoints are exposed.
+      "wms_enable_request" "GetCapabilities GetMap"
+      "wms_srs" "EPSG:3857 EPSG:4326"
+      # MapLibre/WMS clients omit STYLES; do not reject their GetMap calls.
+      "wms_allow_getmap_without_styles" "true"
+      # Templated at boot from TILES_PUBLIC_URL by mapserver-entrypoint.sh.
+      "wms_onlineresource" "__WMS_ONLINERESOURCE__"
+    END
+  END
+END

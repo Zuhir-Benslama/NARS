@@ -81,6 +81,25 @@ These rules exist because data has been destroyed multiple times. Violating them
 - Namespace: `nars`
 - Database: PostGIS in `nars_db`
 
+### Rootless Image Builds
+
+Under an uid-mapped runtime, container uid 0 is NOT the owner of dirs the image
+pre-chowns to a service user (e.g. Debian's `www-data`). A root process writing
+into such a dir fails with `Permission denied` (EACCES) even though the same
+image works on a normal host. This bit both `/run/fcgiwrap` and
+`/var/log/nginx` in `nars-tiles` (see TODO.md "Deployment robustness").
+Rules of thumb:
+
+- Do not `chown` dirs to a service user at build time if the entrypoint runs
+  some process as root. Keep dirs root-owned and let the process chown only the
+  socket/file it hands the service user (spawn-fcgi does this for fcgiwrap).
+- For nginx, log to `/dev/stderr` + `/dev/stdout` (inherited fds work under any
+  mapping) instead of `/var/log/nginx`.
+- `docker inspect` `.Id` is the config digest; a pod's `imageID` is the manifest
+  digest of the OCI index. They differ on multi-arch images — don't chase a
+  "stale image" theory from that mismatch; use `crictl images`/`inspecti` on the
+  node and the build timestamp.
+
 ## Remember
 
 Data loss is permanent. Code bugs can be fixed. Broken tests can be repaired.

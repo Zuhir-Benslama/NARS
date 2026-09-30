@@ -1,0 +1,13 @@
+---
+# Production API autoscaling. The base HPA keeps nars-api at 2-4; the 96-core
+# production box can absorb the commune-wide roads/building runs that peg CPU,
+# so let the HPA scale 4-8. minReplicas 4 keeps headroom under the ~3s-per-
+# request roads loop; averageUtilization 70 stays as the base.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: nars-api
+  namespace: nars
+spec:
+  minReplicas: 4
+  maxReplicas: 8

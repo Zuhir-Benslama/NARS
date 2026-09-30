@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { setActivePinia, createPinia } from "pinia"
-import { GEN_CONFIG, EDIT_CONFIG } from "../../config"
+import { GEN_CONFIG, EDIT_CONFIG, MAP_CONFIG } from "../../config"
+import type { GenerateRoadsResponse } from "../../api/drafts"
 
 const {
-  mockSegmentTile,
+  mockCreateGenerationJob,
+  mockGetGenerationJob,
+  mockUploadRaster,
+  mockCancelGenerationJob,
   mockGenerateRoads,
   mockListDrafts,
   mockRenderTile,
@@ -14,7 +18,10 @@ const {
   mockUpdateEndpointMarkers,
   mockImportFeaturesIntoGeoman,
 } = vi.hoisted(() => ({
-  mockSegmentTile: vi.fn(),
+  mockCreateGenerationJob: vi.fn(),
+  mockGetGenerationJob: vi.fn(),
+  mockUploadRaster: vi.fn(),
+  mockCancelGenerationJob: vi.fn(),
   mockGenerateRoads: vi.fn(),
   mockListDrafts: vi.fn(),
   mockRenderTile: vi.fn(),
@@ -27,10 +34,20 @@ const {
 }))
 
 vi.mock("../../api/drafts", () => ({
-  segmentTile: mockSegmentTile,
   generateRoadsFromDraftIds: mockGenerateRoads,
   listDrafts: mockListDrafts,
 }))
+vi.mock("../../api/generation", async () => {
+  const actual =
+    await vi.importActual<typeof import("../../api/generation")>("../../api/generation")
+  return {
+    ...actual,
+    createGenerationJob: mockCreateGenerationJob,
+    getGenerationJob: mockGetGenerationJob,
+    uploadGenerationChunkRaster: mockUploadRaster,
+    cancelGenerationJob: mockCancelGenerationJob,
+  }
+})
 vi.mock("./satellite-tiler", async () => {
   const actual = await vi.importActual<typeof import("./satellite-tiler")>("./satellite-tiler")
   return { ...actual, renderSatelliteGrid: mockRenderTile }
@@ -53,12 +70,32 @@ let useFeaturesStore: any
 let useGenerationStore: any
 let generateRoadsFromUrbanAreas: any
 let urbanAreaBounds: any
+let splitBoundsAtZoom: any
+let gridBounds: any
+let toGenerationGrid: any
+
+/** The bounds the seeded urban area (a single point) produces at zoom 18. */
+const AREA_BOUNDS = { minLon: 3.0, minLat: 36.75, maxLon: 3.0, maxLat: 36.75 }
+const CREATED_AT = "2026-01-01T00:00:00Z"
 
 const TILE = {
   blob: new Blob(["x"]),
-  bounds: { minLon: 2.9, minLat: 36.7, maxLon: 3.1, maxLat: 36.8 },
+  bounds: AREA_BOUNDS,
   width: 256,
   height: 256,
+}
+
+const EMPTY_RESULT: GenerateRoadsResponse = {
+  dropped: 0,
+  created: [],
+  breakdown: {
+    tooShort: 0,
+    lowConfidence: 0,
+    excessiveTurnAngle: 0,
+    outsideUrbanArea: 0,
+    tooClose: 0,
+    invalidGeometry: 0,
+  },
 }
 
 function seedUrbanArea(dbId = "area-1", coords = [{ lat: 36.75, lng: 3.0 }]) {
@@ -92,6 +129,61 @@ function road(id: string) {
   }
 }
 
+/** A job in the given state whose chunks mirror exactly the grids the flow splits. */
+function jobView(overrides: Record<string, unknown> = {}) {
+  const grids = splitBoundsAtZoom(AREA_BOUNDS, MAP_CONFIG.tileMaxZoomSatellite)
+  const chunks = grids.map(
+    (g: { zoom: number; x0: number; y0: number; width: number; height: number }, i: number) => ({
+      id: `chunk-${i}`,
+      chunkKey: String(i),
+      zoom: g.zoom,
+      x0: g.x0,
+      y0: g.y0,
+      width: g.width,
+      height: g.height,
+      minLon: null,
+      minLat: null,
+      maxLon: null,
+      maxLat: null,
+      status: "awaiting_raster",
+      attempts: 0,
+      error: null,
+      createdAt: CREATED_AT,
+      updatedAt: null,
+    }),
+  )
+  return {
+    id: "job-1",
+    communeId: 42,
+    status: "active",
+    stage: "segment",
+    totalChunks: grids.length,
+    doneChunks: 0,
+    progress: 0,
+    draftIds: [],
+    error: null,
+    createdAt: CREATED_AT,
+    updatedAt: null,
+    chunks,
+    result: null,
+    ...overrides,
+  }
+}
+
+/** Creates a done job from the same grid split, with the given result payload. */
+function doneJobView(result = EMPTY_RESULT) {
+  const base = jobView()
+  return {
+    ...base,
+    status: "done",
+    stage: "accept",
+    doneChunks: base.totalChunks,
+    progress: 1,
+    result,
+    chunks: base.chunks.map((c: { id: string }) => ({ ...c, status: "done" })),
+  }
+}
+
 afterEach(() => {
   vi.useRealTimers()
 })
@@ -102,21 +194,16 @@ beforeEach(async () => {
   setActivePinia(createPinia())
 
   const draftsMod = await import("../../api/drafts")
-  mockSegmentTile.mockResolvedValue({ buildingCount: 0, roadCount: 0, draftIds: [] })
   mockListDrafts.mockResolvedValue([])
-  mockGenerateRoads.mockResolvedValue({
-    created: [],
-    dropped: 0,
-    breakdown: {
-      tooShort: 0,
-      lowConfidence: 0,
-      excessiveTurnAngle: 0,
-      outsideUrbanArea: 0,
-      tooClose: 0,
-      invalidGeometry: 0,
-    },
-  })
+  mockGenerateRoads.mockResolvedValue(EMPTY_RESULT)
   mockRenderTile.mockResolvedValue(TILE)
+
+  const satMod = await import("./satellite-tiler")
+  splitBoundsAtZoom = satMod.splitBoundsAtZoom
+  gridBounds = satMod.gridBounds
+
+  const generationApi = await import("../../api/generation")
+  toGenerationGrid = generationApi.toGenerationGrid
 
   const appMod = await import("../../stores/appStore")
   useAppStore = appMod.useAppStore
@@ -176,65 +263,72 @@ describe("generateRoadsFromUrbanAreas", () => {
     const result = await generateRoadsFromUrbanAreas()
     expect(result).toBeNull()
     expect(mockShowToast).toHaveBeenCalledWith("gen_roads_no_commune", "error")
-    expect(mockSegmentTile).not.toHaveBeenCalled()
+    expect(mockCreateGenerationJob).not.toHaveBeenCalled()
   })
 
   it("informs and stops when no urban area is drawn", async () => {
     const result = await generateRoadsFromUrbanAreas()
     expect(result).toBeNull()
     expect(mockShowToast).toHaveBeenCalledWith("gen_roads_no_urban_area", "info")
-    expect(mockSegmentTile).not.toHaveBeenCalled()
+    expect(mockCreateGenerationJob).not.toHaveBeenCalled()
   })
 
   it("starts the progress bar and does not re-run while active", async () => {
     const store = useGenerationStore()
     seedUrbanArea()
-    let releaseSegment!: () => void
-    mockSegmentTile.mockImplementationOnce(
-      () =>
-        new Promise(
-          (resolve) => (releaseSegment = () => resolve({ roadCount: 1, draftIds: ["d1"] })),
-        ),
+    let releaseCreate!: () => void
+    mockCreateGenerationJob.mockImplementationOnce(
+      () => new Promise((resolve) => (releaseCreate = () => resolve(jobView()))),
     )
+    mockGetGenerationJob.mockResolvedValue(doneJobView({ ...EMPTY_RESULT, created: [road("r1")] }))
 
     const first = generateRoadsFromUrbanAreas()
     expect(store.active).toBe(true)
-    expect(store.progress).toBe(5)
+    expect(store.progress).toBe(0)
 
     const second = await generateRoadsFromUrbanAreas()
     expect(second).toBeNull()
     expect(mockShowToast).toHaveBeenCalledWith("gen_roads_in_progress", "warning")
 
-    releaseSegment()
-    mockGenerateRoads.mockResolvedValue({ created: [road("r1")], dropped: 0 })
+    releaseCreate()
     await first
   })
 
-  it("runs the full flow and adds created roads to the stores", async () => {
+  it("creates one job per grid split, uploads every chunk, then applies the result", async () => {
     const created = [road("r1"), road("r2")]
     seedUrbanArea()
-    mockSegmentTile.mockResolvedValue({ buildingCount: 0, roadCount: 2, draftIds: ["d1", "d2"] })
-    mockGenerateRoads.mockResolvedValue({
-      created,
-      dropped: 1,
-      breakdown: {
-        tooShort: 1,
-        lowConfidence: 0,
-        excessiveTurnAngle: 0,
-        outsideUrbanArea: 0,
-        tooClose: 0,
-        invalidGeometry: 0,
-      },
-    })
+    mockCreateGenerationJob.mockResolvedValue(jobView())
+    mockGetGenerationJob.mockResolvedValue(
+      doneJobView({
+        dropped: 1,
+        created,
+        breakdown: {
+          tooShort: 1,
+          lowConfidence: 0,
+          excessiveTurnAngle: 0,
+          outsideUrbanArea: 0,
+          tooClose: 0,
+          invalidGeometry: 0,
+        },
+      }),
+    )
 
     const result = await generateRoadsFromUrbanAreas()
 
-    expect(mockSegmentTile).toHaveBeenCalledWith({
-      communeId: 42,
-      tile: TILE.blob,
-      bounds: TILE.bounds,
+    const grids = splitBoundsAtZoom(AREA_BOUNDS, MAP_CONFIG.tileMaxZoomSatellite)
+    expect(mockCreateGenerationJob).toHaveBeenCalledTimes(1)
+    expect(mockCreateGenerationJob).toHaveBeenCalledWith(
+      42,
+      grids.map((grid: any, index: number) =>
+        toGenerationGrid(String(index), grid.zoom, grid, gridBounds(grid)),
+      ),
+    )
+
+    expect(mockUploadRaster).toHaveBeenCalledTimes(grids.length)
+    grids.forEach((_grid: unknown, i: number) => {
+      expect(mockUploadRaster).toHaveBeenCalledWith("job-1", `chunk-${i}`, TILE.blob, `${i}.jpg`)
     })
-    expect(mockGenerateRoads).toHaveBeenCalledWith(42, ["d1", "d2"])
+
     expect(result).toEqual({ created: 2, dropped: 1 })
     expect(useLayerStore().$state.roads).toHaveLength(2)
     expect(useFeaturesStore().getAll()).toHaveLength(2)
@@ -258,8 +352,8 @@ describe("generateRoadsFromUrbanAreas", () => {
   it("hides the progress bar after the settle delay on success", async () => {
     vi.useFakeTimers()
     seedUrbanArea()
-    mockSegmentTile.mockResolvedValue({ buildingCount: 0, roadCount: 1, draftIds: ["d1"] })
-    mockGenerateRoads.mockResolvedValue({ created: [road("r1")], dropped: 0 })
+    mockCreateGenerationJob.mockResolvedValue(jobView())
+    mockGetGenerationJob.mockResolvedValue(doneJobView({ ...EMPTY_RESULT, created: [road("r1")] }))
 
     await generateRoadsFromUrbanAreas()
     expect(useGenerationStore().active).toBe(true)
@@ -270,7 +364,8 @@ describe("generateRoadsFromUrbanAreas", () => {
 
   it("reports success with zero counts when nothing was detected and no drafts remain", async () => {
     seedUrbanArea()
-    mockSegmentTile.mockResolvedValue({ buildingCount: 0, roadCount: 0, draftIds: [] })
+    mockCreateGenerationJob.mockResolvedValue(jobView())
+    mockGetGenerationJob.mockResolvedValue(doneJobView())
     mockListDrafts.mockResolvedValue([])
 
     const result = await generateRoadsFromUrbanAreas()
@@ -287,9 +382,10 @@ describe("generateRoadsFromUrbanAreas", () => {
     expect(mockShowToast).toHaveBeenCalledWith("gen_roads_no_detections", "info")
   })
 
-  it("rebuilds from the commune's pending drafts when segmentation finds nothing new", async () => {
+  it("rebuilds from the commune's pending drafts when the run created none", async () => {
     seedUrbanArea()
-    mockSegmentTile.mockResolvedValue({ buildingCount: 0, roadCount: 0, draftIds: [] })
+    mockCreateGenerationJob.mockResolvedValue(jobView())
+    mockGetGenerationJob.mockResolvedValue(doneJobView())
     mockListDrafts.mockResolvedValue([{ id: "d-pending-1" }, { id: "d-pending-2" }] as any)
     mockGenerateRoads.mockResolvedValue({
       created: [road("r1")],
@@ -308,18 +404,56 @@ describe("generateRoadsFromUrbanAreas", () => {
 
     expect(mockGenerateRoads).toHaveBeenCalledWith(42, ["d-pending-1", "d-pending-2"])
     expect(result).toEqual({ created: 1, dropped: 1 })
+    expect(mockShowToast).toHaveBeenCalledWith("gen_roads_reusing_drafts", "info")
     expect(mockShowToast).not.toHaveBeenCalledWith("gen_roads_no_detections", "info")
     expect(useLayerStore().$state.roads).toHaveLength(1)
   })
 
+  it("merges the fallback acceptance counts into the report", async () => {
+    seedUrbanArea()
+    mockCreateGenerationJob.mockResolvedValue(jobView())
+    mockGetGenerationJob.mockResolvedValue(doneJobView())
+    mockListDrafts.mockResolvedValue([{ id: "d-pending-1" }] as any)
+    mockGenerateRoads.mockResolvedValue({
+      created: [road("r1")],
+      dropped: 2,
+      breakdown: {
+        tooShort: 1,
+        lowConfidence: 1,
+        excessiveTurnAngle: 0,
+        outsideUrbanArea: 0,
+        tooClose: 0,
+        invalidGeometry: 0,
+      },
+    })
+
+    const result = await generateRoadsFromUrbanAreas()
+
+    expect(mockShowToast).toHaveBeenCalledWith("gen_roads_done_breakdown", "success")
+    expect(result).toEqual({ created: 1, dropped: 2 })
+    expect(mockShowToast).toHaveBeenCalledWith("gen_roads_done", "success")
+  })
+
   it("pages past the 500-draft cap when collecting pending road drafts", async () => {
     seedUrbanArea()
-    mockSegmentTile.mockResolvedValue({ buildingCount: 0, roadCount: 0, draftIds: [] })
+    mockCreateGenerationJob.mockResolvedValue(jobView())
+    mockGetGenerationJob.mockResolvedValue(doneJobView())
     const fullPage = Array.from({ length: 500 }, (_, i) => ({ id: `d-${i}` }))
     mockListDrafts
       .mockResolvedValueOnce(fullPage as any)
       .mockResolvedValueOnce([{ id: "d-500" }] as any)
-    mockGenerateRoads.mockResolvedValue({ created: [], dropped: 0 })
+    mockGenerateRoads.mockResolvedValue({
+      created: [],
+      dropped: 0,
+      breakdown: {
+        tooShort: 0,
+        lowConfidence: 0,
+        excessiveTurnAngle: 0,
+        outsideUrbanArea: 0,
+        tooClose: 0,
+        invalidGeometry: 0,
+      },
+    })
 
     const result = await generateRoadsFromUrbanAreas()
 
@@ -337,14 +471,37 @@ describe("generateRoadsFromUrbanAreas", () => {
     })
   })
 
+  it("shows the accepting stage while the job runs the acceptance pass", async () => {
+    vi.useFakeTimers()
+    seedUrbanArea()
+    mockCreateGenerationJob.mockResolvedValue(jobView())
+    // Initial fetch → accepting; first re-fetch → accepting again (so the
+    // progress bar transitions to the detect milestone); second re-fetch → done.
+    mockGetGenerationJob
+      .mockResolvedValueOnce(jobView({ status: "accepting", stage: "accept" }))
+      .mockResolvedValueOnce(jobView({ status: "accepting", stage: "accept" }))
+      .mockResolvedValue(doneJobView({ ...EMPTY_RESULT, created: [road("r1")] }))
+
+    const pending = generateRoadsFromUrbanAreas()
+    await vi.advanceTimersByTimeAsync(2_500)
+
+    const generation = useGenerationStore()
+    expect(generation.stage).toBe("gen_roads_stage_detect")
+    expect(generation.progress).toBe(GEN_CONFIG.progressMilestones.detect)
+
+    await vi.advanceTimersByTimeAsync(2_500)
+    await pending
+    expect(generation.stage).toBe("gen_roads_stage_done")
+  })
+
   it("skips roads with too few coordinates and does not duplicate dbIds", async () => {
     const created = [
       road("r3"),
       { ...road("r4"), data: { coordinates: [{ lat: 36.7, lng: 3.0 }] } },
     ]
     seedUrbanArea()
-    mockSegmentTile.mockResolvedValue({ buildingCount: 0, roadCount: 2, draftIds: ["d1", "d2"] })
-    mockGenerateRoads.mockResolvedValue({ created, dropped: 0 })
+    mockCreateGenerationJob.mockResolvedValue(jobView())
+    mockGetGenerationJob.mockResolvedValue(doneJobView({ ...EMPTY_RESULT, created }))
 
     const result = await generateRoadsFromUrbanAreas()
 
@@ -355,24 +512,52 @@ describe("generateRoadsFromUrbanAreas", () => {
   })
 
   it("warns when generated roads could not be imported into geoman", async () => {
-    const created = [road("r1")]
     seedUrbanArea()
     mockImportFeaturesIntoGeoman.mockResolvedValueOnce(0)
-    mockSegmentTile.mockResolvedValue({ buildingCount: 0, roadCount: 1, draftIds: ["d1"] })
-    mockGenerateRoads.mockResolvedValue({ created, dropped: 0 })
+    mockCreateGenerationJob.mockResolvedValue(jobView())
+    mockGetGenerationJob.mockResolvedValue(doneJobView({ ...EMPTY_RESULT, created: [road("r1")] }))
 
     await generateRoadsFromUrbanAreas()
 
     expect(mockShowToast).toHaveBeenCalledWith("gen_roads_geoman_failed", "warning")
   })
 
-  it("shows an error toast when a step fails", async () => {
+  it("informs when the job ends cancelled", async () => {
     seedUrbanArea()
-    mockSegmentTile.mockRejectedValue(new Error("boom"))
+    mockCreateGenerationJob.mockResolvedValue(jobView())
+    mockGetGenerationJob.mockResolvedValue(jobView({ status: "cancelled", stage: "segment" }))
+
+    const result = await generateRoadsFromUrbanAreas()
+
+    expect(result).toEqual({ created: 0, dropped: 0 })
+    expect(mockShowToast).toHaveBeenCalledWith("gen_roads_cancelled", "info")
+    expect(mockGenerateRoads).not.toHaveBeenCalled()
+    expect(useGenerationStore().progress).toBe(100)
+  })
+
+  it("cancels the partially uploaded job when a chunk upload fails", async () => {
+    seedUrbanArea()
+    mockCreateGenerationJob.mockResolvedValue(jobView())
+    mockUploadRaster.mockRejectedValueOnce(new Error("network"))
+    mockGetGenerationJob.mockResolvedValue(doneJobView())
 
     const result = await generateRoadsFromUrbanAreas()
 
     expect(result).toBeNull()
+    expect(mockCancelGenerationJob).toHaveBeenCalledTimes(1)
+    expect(mockCancelGenerationJob).toHaveBeenCalledWith("job-1")
+    expect(mockShowToast).toHaveBeenCalledWith("gen_roads_failed", "error")
+    expect(useGenerationStore().active).toBe(false)
+  })
+
+  it("shows an error toast when job creation fails", async () => {
+    seedUrbanArea()
+    mockCreateGenerationJob.mockRejectedValue(new Error("boom"))
+
+    const result = await generateRoadsFromUrbanAreas()
+
+    expect(result).toBeNull()
+    expect(mockCancelGenerationJob).not.toHaveBeenCalled()
     expect(mockShowToast).toHaveBeenCalledWith("gen_roads_failed", "error")
     expect(mockDebugError).toHaveBeenCalled()
     expect(useGenerationStore().active).toBe(false)

@@ -20,6 +20,7 @@ infra-lint: ## Run all nars-infra linters (shell, docker, yaml, python, node, ma
 	$(SUBMAKE) infra-lint-sql
 	$(SUBMAKE) infra-lint-nginx
 	$(SUBMAKE) infra-lint-tag-guard
+	$(SUBMAKE) infra-lint-digest-guard
 	$(SUBMAKE) infra-lint-kind-cidr-guard
 	$(SUBMAKE) infra-lint-local-ingress-guard
 	$(SUBMAKE) infra-lint-observability-security
@@ -248,6 +249,43 @@ infra-lint-tag-guard: ## Assert _check-pinned-tag rejects 'latest' outside dev (
 	@DEPLOY_ENV=production IMAGE_TAG=latest ALLOW_LATEST=1 $(SUBMAKE) _check-pinned-tag
 	@echo "  ✓ ALLOW_LATEST=1 override accepted"
 
+.PHONY: infra-lint-digest-guard
+infra-lint-digest-guard: ## Assert kustomize-digest-rewrite pins images and fails closed (self-test)
+# All steps are offline: they exercise the awk rewriter and the
+# resolve-image-digests.sh parser against fixtures (the script's
+# INSPECT_JSON_FILE test seam), never a real registry.
+	@tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
+	echo "→ Preparing digest-rewrite fixture..."; \
+	printf 'nars-api sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nnars-tiles sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n' > "$$tmp/digests"; \
+	printf '  image: zuhirbenslama/nars-api:sha-abc\n  image: zuhirbenslama/nars-tiles:sha-abc\n' > "$$tmp/in"; \
+	awk -v org=zuhirbenslama -v images="nars-api nars-tiles" -v digest_file="$$tmp/digests" \
+		-f "$(SCRIPTS_DIR)/kustomize-digest-rewrite.awk" < "$$tmp/in" > "$$tmp/out"; \
+	if ! grep -q 'zuhirbenslama/nars-api@sha256:aaa' "$$tmp/out" || ! grep -q 'zuhirbenslama/nars-tiles@sha256:bbb' "$$tmp/out"; then \
+		echo '✖ digest rewrite did not produce @sha256 pins'; cat "$$tmp/out"; exit 1; \
+	fi; \
+	if grep -q ':sha-abc' "$$tmp/out"; then \
+		echo '✖ digest rewrite left a bare ":tag" reference behind'; exit 1; \
+	fi; \
+	echo "  ✓ images rewritten to @sha256 digests"; \
+	echo "→ Verifying fail-closed when a digest is missing..."; \
+	printf 'nars-api sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n' > "$$tmp/digests2"; \
+	if awk -v org=zuhirbenslama -v images="nars-api nars-tiles" -v digest_file="$$tmp/digests2" \
+		-f "$(SCRIPTS_DIR)/kustomize-digest-rewrite.awk" < "$$tmp/in" >/dev/null 2>&1; then \
+		echo '✖ digest rewrite passed with a missing digest — must fail closed'; exit 1; \
+	fi; \
+	echo "  ✓ missing digest rejected (fail closed)"; \
+	echo "→ Verifying already-digested references are left untouched..."; \
+	printf '  image: zuhirbenslama/nars-api@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\n' > "$$tmp/in2"; \
+	awk -v org=zuhirbenslama -v images="nars-api nars-tiles" -v digest_file="$$tmp/digests" \
+		-f "$(SCRIPTS_DIR)/kustomize-digest-rewrite.awk" < "$$tmp/in2" > "$$tmp/out2"; \
+	grep -q '@sha256:cccc' "$$tmp/out2" || { echo '✖ digested reference was unexpectedly modified'; exit 1; }; \
+	echo "  ✓ digested reference left intact"; \
+	echo "→ Verifying resolve-image-digests.sh parses docker manifest inspect --verbose output..."; \
+	printf '[{"Ref":"docker.io/zuhirbenslama/nars-api:sha-abc","Descriptor":{"mediaType":"application/vnd.oci.image.index.v1+json","digest":"sha256:f00d","size":123},"SchemaV2Manifest":{}}]' > "$$tmp/inspect.json"; \
+	out=$$(INSPECT_JSON_FILE="$$tmp/inspect.json" "$(SCRIPTS_DIR)/resolve-image-digests.sh" zuhirbenslama sha-abc nars-api); \
+	printf '%s\n' "$$out" | grep -q '^nars-api sha256:f00d$$' || { echo "✖ resolver parsed the wrong digest: $$out"; exit 1; }; \
+	echo "  ✓ resolver extracts the manifest digest"
+
 # Internal: watch what CIDRs the health ingress would ship to a non-dev
 # deployment. The base carries kind's defaults (k8s/ingress-api.yaml) for local
 # clusters; the production overlay is required to replace them (overlays/
@@ -381,19 +419,19 @@ infra-lint-frontend-wwwroot-sync: ## Assert a local nars-web build stays in sync
 	fi
 
 # Self-test for the images-build content-stamp machinery (make/scripts/
-# image-hash-guard.py + __image_guard + the five _build-nars-* recipes).
+# image-hash-guard.py + __image_guard + the six _build-nars-* recipes).
 # Guards the guard: the arg-order bug that shipped the stamp into a repo-root
 # Dockerfile-named file and made every build a rebuild would otherwise go
 # undetected until images-build behaves oddly. Pins the helper's contract —
-# exit 0 = rebuild, exit 1 = skip, git-ignored paths never hash, and all five
+# exit 0 = rebuild, exit 1 = skip, git-ignored paths never hash, and all six
 # recipes must pass the stamp as the first __image_guard argument — so the
 # recipes, the helper, and CI's paths-filter cannot silently disagree.
 .PHONY: infra-lint-image-guard
 infra-lint-image-guard: ## Assert the images-build content-stamp guard skips unchanged images and rebuilds on real change (self-test)
-	@echo "→ Verifying all 5 _build-nars-* recipes pass the stamp as __image_guard's first argument..."
+	@echo "→ Verifying all 6 _build-nars-* recipes pass the stamp as __image_guard's first argument..."
 	@count=$$(grep -cE '__image_guard "[^"]*st\.guard' make/images.mk); \
-	if [ "$$count" -ne 5 ]; then \
-		echo "✖ expected 5 __image_guard stamp-first invocations, found $$count"; \
+	if [ "$$count" -ne 6 ]; then \
+		echo "✖ expected 6 __image_guard stamp-first invocations, found $$count"; \
 		exit 1; \
 	fi
 	@echo "  ✓ stamp-first argument order locked"
@@ -435,3 +473,64 @@ infra-lint-image-guard: ## Assert the images-build content-stamp guard skips unc
 	else \
 		echo "✖ stamp file missing or not a sha256 digest at $$stamp"; exit 1; \
 	fi
+
+# Server-side validation of the rendered manifests. A plain `kubectl kustomize`
+# parse cannot catch the class of bug the nvidia.com/gpu sibling-placement was:
+# the YAML is well-formed, only the API server rejects it ("strict decoding
+# error: unknown field"). This gate renders the overlay, boots a THROWAWAY kind
+# cluster, REALLY applies the admission scaffold (Namespace + LimitRange +
+# ResourceQuota + PV — the namespace must exist for namespaced objects to be
+# admitted, and keeping the quota/limit objects present shapes admission like
+# production), then dry-runs the remainder server-side. Heavier than the other
+# gates (it spawns a cluster), so it is deliberately NOT part of `make
+# infra-lint` — CI runs it as its own job.
+.PHONY: infra-lint-k8s-dry-run
+infra-lint-k8s-dry-run: ## Server-side dry-run of the rendered manifests against a throwaway kind cluster (CI gate)
+	@command -v $(KIND) >/dev/null 2>&1 || { echo "✖ $(KIND) is not installed → https://kind.sigs.k8s.io/docs/user/quick-start/"; exit 1; }
+	@command -v python3 >/dev/null 2>&1 || { echo "✖ python3 is not installed (required to split the render)"; exit 1; }
+	@echo "→ Server-side dry-run of $(K8S_OVERLAY_DIR) on a throwaway kind cluster..."
+	@set -e; \
+	tmpdir=$$(mktemp -d); \
+	cluster="nars-dryrun-$$$$"; \
+	kctx="kind-$$cluster"; \
+	trap '$(KIND) delete cluster --name "$$cluster" >/dev/null 2>&1 || true; rm -rf "$$tmpdir"' EXIT; \
+	echo "→ Creating throwaway kind cluster '$$cluster'..."; \
+	$(KIND) create cluster --name "$$cluster" >/dev/null; \
+	$(KUBECTL) --context "$$kctx" wait --for=condition=Ready node/$$cluster-control-plane --timeout=180s >/dev/null; \
+	echo "→ Rendering $(K8S_OVERLAY_DIR)..."; \
+	$(KUBECTL) kustomize "$(K8S_OVERLAY_DIR)" > "$$tmpdir/render.yaml"; \
+	$(KUBECTL) --context "$$kctx" apply --dry-run=client -o json -f "$$tmpdir/render.yaml" > "$$tmpdir/render.json"; \
+	python3 nars-infra/scripts/split_k8s_render.py "$$tmpdir/render.json" "$$tmpdir/scaffold.json" "$$tmpdir/rest.json"; \
+	echo "→ Applying admission scaffold (namespace + limitrange + quota + PV)..."; \
+	$(KUBECTL) --context "$$kctx" apply -f "$$tmpdir/scaffold.json" >/dev/null; \
+	echo "→ Server-side dry-run of the remaining render objects..."; \
+	$(KUBECTL) --context "$$kctx" apply --dry-run=server -f "$$tmpdir/rest.json" >/dev/null; \
+	echo "  ✓ $(K8S_OVERLAY_DIR) accepted by the API server"; \
+	echo "→ Self-test: the historical unknown-field bug must be rejected..."; \
+	cat > "$$tmpdir/bad-unknown-field.yaml" <<-'BADEOF'
+	apiVersion: apps/v1
+	kind: Deployment
+	metadata:
+	  name: nars-segma
+	  namespace: nars
+	spec:
+	  selector:
+	    matchLabels:
+	      app: nars-segma
+	  template:
+	    metadata:
+	      labels:
+	        app: nars-segma
+	    spec:
+	      containers:
+	        - name: nars-segma
+	          image: zuhirbenslama/nars-segma:latest
+	          resources:
+	            resources.nvidia.com/gpu: "1"
+	BADEOF
+	if $(KUBECTL) --context "$$kctx" apply --dry-run=server -f "$$tmpdir/bad-unknown-field.yaml" >/dev/null 2>&1; then \
+		echo "✖ server-side dry-run unexpectedly accepted resources.nvidia.com/gpu as a sibling of limits/requests"; \
+		exit 1; \
+	fi; \
+	echo "  ✓ unknown-field bug rejected by the API server"
+	@echo "✓ $(K8S_OVERLAY_DIR) validated server-side on a real API server"

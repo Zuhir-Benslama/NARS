@@ -35,6 +35,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     // ── AI draft features (review queue) ────────────────────────────────────
     public DbSet<AiDraftFeature> AiDraftFeatures { get; set; }
 
+    // ── Async road-generation jobs ──────────────────────────────────────────
+    public DbSet<GenerationJob> GenerationJobs { get; set; }
+    public DbSet<GenerationJobChunk> GenerationJobChunks { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -189,5 +193,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         // ── ai_draft_features (created by SQL migration, EF just queries/updates) ─
         modelBuilder.ApplyConfiguration(new AiDraftFeatureConfiguration());
+
+        // ── generation_jobs / generation_job_chunks (created by SQL migration) ─
+        modelBuilder.ApplyConfiguration(new GenerationJobConfiguration());
+        modelBuilder.ApplyConfiguration(new GenerationJobChunkConfiguration());
     }
 }

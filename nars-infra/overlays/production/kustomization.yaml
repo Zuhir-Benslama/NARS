@@ -16,6 +16,7 @@ kind: Kustomization
 #   patches/health-ingress.yaml  (cluster pod/service CIDRs for /health)
 #   patches/storage-postgis-pvc.yaml  (durable storage class for the database PVC)
 #   patches/storage-backup-pvc.yaml   (durable storage class for the backup PVC)
+#   patches/storage-tiles-pvc.yaml    (durable storage class for the tiles PVC)
 # The deploy path fails closed while any REPLACE_ME remains (secrets-validate).
 # patches/remove-kind-pv.yaml needs no editing — it just strips the kind-only
 # hostPath PV that the base PVC would otherwise statically bind to.
@@ -32,4 +33,11 @@ patches:
     target:
       kind: PersistentVolumeClaim
       name: postgis-backup-pvc
+  - path: patches/storage-tiles-pvc.yaml
+    target:
+      kind: PersistentVolumeClaim
+      name: tiles-pvc
+  - path: patches/segma-scale.yaml
+  - path: patches/api-scale.yaml
   - path: patches/remove-kind-pv.yaml
+  - path: patches/remove-tiles-pv.yaml

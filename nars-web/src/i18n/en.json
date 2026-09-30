@@ -122,6 +122,7 @@
   "gen_roads_stage_detect": "Detecting roads…",
   "gen_roads_stage_save": "Saving roads…",
   "gen_roads_stage_done": "Done",
+  "gen_roads_step": "Step {current} of {total}",
   "gen_roads_geoman_failed": "Generated roads were created but couldn't be added to the map editor.",
   "draft_accept": "Accept",
   "draft_accepted": "Draft accepted and materialized.",

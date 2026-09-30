@@ -1,0 +1,25 @@
+---
+# Production segma sizing — one replica per L4 GPU on the 4×L4 box. The base
+# defaults to replicas: 1, which the single-GPU dev cluster keeps. Each replica
+# requests nvidia.com/gpu: 1 (base), so 4 replicas only schedule where 4 GPUs
+# exist: a CPU-only or single-GPU cluster leaves the extras Pending, which is
+# the intended fail-closed signal rather than silently sharing a model load.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nars-segma
+  namespace: nars
+spec:
+  replicas: 4
+  template:
+    spec:
+      containers:
+        - name: nars-segma
+          env:
+            # Concurrency sized conservatively for the pod memory limit (12Gi,
+            # base). The code default is 2; stating it here makes the per-
+            # deployment knob explicit. Re-derive from wall-clock throughput
+            # measured on the production box at commissioning — 4 replicas ×
+            # this value is the peak concurrent inferences.
+            - name: NARS_SEGMA_MAX_CONCURRENT_INFERENCES
+              value: "2"

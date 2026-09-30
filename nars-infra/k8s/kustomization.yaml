@@ -13,12 +13,15 @@ resources:
   - service-account.yaml
   - postgis-pv.yaml
   - postgis.yaml
+  - tiles-pv.yaml
+  - tiles.yaml
   - app-deployment.yaml
   - app-service.yaml
   - frontend-deployment.yaml
   - frontend-service.yaml
   - ingress-api.yaml
   - ingress-frontend.yaml
+  - ingress-tiles.yaml
   # nars-api-local and nars-frontend-local live in ingress-local.yaml but are
   # NOT listed here — they are dev-only and added by the development overlay
   # (nars-infra/overlays/dev). Keeping them out of the base keeps the base
@@ -60,15 +63,21 @@ images:
   # Enforced: `make kustomize-apply` refuses IMAGE_TAG=latest when
   # DEPLOY_ENV != dev (see the _check-pinned-tag Makefile guard).
   #
-  # 'make kustomize-apply' rewrites the four image tags at build time, so the
-  # values here are just the default (this file is never mutated). To persist
-  # a pin in this file manually, use:
+  # 'make kustomize-apply' rewrites the image tags (and the
+  # app.kubernetes.io/version label) at build time, so the values here are just
+  # the default (this file is never mutated). To persist a pin in this file
+  # manually, use:
   #   make kustomize-set-image-tag IMAGE_TAG=<commit-sha>
   #   (requires the standalone 'kustomize' binary)
   #
-  # The same apply-time rewrite also pins the app.kubernetes.io/version label
-  # on Deployments, so pod metadata always advertises the image tag actually
-  # running (Services/PVCs carry no version label — they run no image).
+  # In NON-dev deploys (DEPLOY_ENV != dev, e.g. production), kustomize-apply
+  # goes one step further: the pinned tag is dereferenced to its registry
+  # DIGEST (kustomize-digest-rewrite.awk + resolve-image-digests.sh) before
+  # apply, so a re-tagged/overwritten image tag can never change what runs.
+  #
+  # The version label always advertises the image TAG actually requested (the
+  # provenance/commit), while the container image field carries the byte-exact
+  # digest — Service/PVC objects carry no version label (they run no image).
   #
   # For production, use a specific commit SHA. Example:
   #   make kustomize-apply IMAGE_TAG=abc1234 DEPLOY_ENV=production
@@ -85,4 +94,6 @@ images:
   - name: zuhirbenslama/nars-backup
     newTag: latest
   - name: zuhirbenslama/nars-segma
+    newTag: latest
+  - name: zuhirbenslama/nars-tiles
     newTag: latest

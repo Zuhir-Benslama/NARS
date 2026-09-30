@@ -32,13 +32,14 @@ cluster-up: prerequisites _check-secrets ## Full bootstrap: create cluster, buil
 	$(SUBMAKE) images-load
 	$(SUBMAKE) gpu-install
 	$(SUBMAKE) kustomize-apply
+	$(SUBMAKE) proxy-up
 	@echo ""
-	@echo "✓ Cluster '$(CLUSTER_NAME)' is ready!"
+	@echo "✓ Cluster '$(CLUSTER_NAME)' is ready and reachable!"
 	@echo ""
-	@echo "  Proxy:         make proxy-up"
+	@echo "  Visit:         http://localhost:$(APP_PORT)/"
+	@echo "  Health:        http://localhost:$(APP_PORT)/health"
 	@echo "  Mobile app:    make adb-reverse"
 	@echo "  Smoke test:    make smoke-test"
-	@echo "  Visit:         http://localhost:$(APP_PORT)/"
 	@echo "  Stop proxy:    make proxy-down"
 	@echo "  Stop pods:     make cluster-stop"
 	@echo "  Tear down:     make cluster-down (data preserved)"

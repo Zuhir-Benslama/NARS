@@ -122,6 +122,7 @@
   "gen_roads_stage_detect": "جارٍ اكتشاف الطرق…",
   "gen_roads_stage_save": "جارٍ حفظ الطرق…",
   "gen_roads_stage_done": "اكتمل",
+  "gen_roads_step": "الخطوة {current} من {total}",
   "gen_roads_geoman_failed": "تم إنشاء الطرق المولّدة لكن تعذّرت إضافتها إلى محرر الخريطة.",
   "draft_accept": "قبول",
   "draft_accepted": "تم قبول المسودة وتجسيدها.",

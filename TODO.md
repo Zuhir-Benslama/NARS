@@ -27,16 +27,56 @@ a GPU/hardware problem:
       advertised. `make/gpu.mk` now polls node allocatable and fails with a
       pointer to `make gpu-status`. Fixed in `60e0089`.
 
+Two rootless-runtime fixes were needed on 2026-09-30 while deploying `nars-tiles`
+to the rootless kind cluster (host rootless Docker, uid-mapped). Both presented
+as an identical, hard-to-read symptom — nginx `[emerg] ... failed (13: Permission
+denied)` at boot — and BOTH stem from the same underlying rule: *under a
+uid-mapped runtime, a directory Debian pre-chowns to a service user
+(`www-data`) is unwritable by the container-root process, because container
+uid 0 maps to a different host sub-uid than the `www-data` owner.* They are
+recorded because the first fix looked complete (fcgiwrap spawned) yet the pod
+kept crash-looping on the next writable path:
+
+- [x] `/run/fcgiwrap` — image + entrypoint used to `chown www-data:www-data`, so
+      creating the socket/pidfile as root hit EACCES. The dir is now kept
+      root-owned; `spawn-fcgi` chowns JUST the socket (0660), which is all the
+      www-data nginx workers need to connect. `mapserver-entrypoint.sh` +
+      `Dockerfile.nars-tiles`.
+- [x] `/var/log/nginx` — even after the above, nginx's master (uid 0) reopens
+      `error.log`/`access.log` after dropping workers to www-data, and the dir is
+      www-data:adm. Runtime `chown root:root` did NOT survive the pod's user
+      namespace. Robust fix: nginx logs to `/dev/stderr` + `/dev/stdout` (inherited
+      fds work under any uid mapping), via a committed overlay of Debian's stock
+      `nginx.conf` (`nars-infra/docker/nginx.conf`). The entrypoint chown was
+      then removed so it cannot become a boot-time landmine.
+
+Operational lessons from the same deploy, worth internalising:
+
+- `docker inspect` `.Id` (config digest) ≠ the `imageID` containerd reports for a
+  pod (manifest digest for the OCI index). Do not chase "stale image" theories
+  from this mismatch alone — `crictl inspecti` + build timestamp are the ground
+  truth. (A long "the pod must be running the old image" detour here was exactly
+  that mistake.)
+- `kind load docker-image`/`ctr -n k8s.io import` both register the tag; verify
+  what the CRI will actually resolve with `crictl images` on the node before
+  blaming the rollout.
+- `make kustomize-apply` on an unchanged `latest`-tagged spec will NOT create a
+  new ReplicaSet; `kubectl rollout restart deploy/<name>` (or scale 0→1) is
+  required to pick up a newly loaded image.
+
 Remaining:
 
-- [ ] Pin `IMAGE_TAG=<commit-sha>` instead of `latest` so a bad rollout is
-      rollback-able. `latest` is mutable and the previous image gets garbage-
-      collected, leaving no rollback path. `make deploy` already warns about
-      this; make the non-dev deploy pipeline require a pinned tag
-      (guards exist in `make/images.mk`: `_check-pinned-tag` / `_warn-latest-tag`).
-- [ ] Add a server-side dry-run of the rendered manifests to CI. A plain
-      `kubectl kustomize` parse cannot catch the `nvidia.com/gpu` class of bug,
-      since the YAML is well-formed; only the API server rejects it.
+- [x] Pin `IMAGE_TAG=<commit-sha>` instead of `latest` so a bad rollout is
+      rollback-able. `docker.yml` already tags pushes `sha-<short>`; the
+      deploy path refuses `latest` outside dev via `_check-pinned-tag`
+      (gated on `kustomize-apply` and `images-push`, self-tested by
+      `infra-lint-tag-guard`).
+- [x] Add a server-side dry-run of the rendered manifests to CI. New
+      `make infra-lint-k8s-dry-run` renders the overlay, boots a throwaway
+      kind cluster, really applies the admission scaffold (namespace +
+      LimitRange + ResourceQuota + PV), dry-runs the remainder server-side,
+      and self-tests that the historical `resources.nvidia.com/gpu` sibling
+      shape is rejected; wired as the `k8s-dry-run` CI job.
 
 ## National-scale rollout (58 wilayas / ~1,541 communes)
 
@@ -55,32 +95,43 @@ Capacity model, derived from the current code rather than guessed:
 
 - [ ] Benchmark one real commune on the target GPU and record a true
       minutes/commune number. Every sizing decision below depends on it.
-- [ ] Build the async job pipeline. This is the real blocker, not hardware:
-      the flow is synchronous browser -> nars-api -> segma, and
-      `NARS_SEGMA_INFERENCE_TIMEOUT` is capped at 3600 s
-      (`nars-segma/app/main.py:75`), so an average ~5 h wilaya job cannot fit in
-      a request. Nothing can resume, so a failure at hour 4 redoes hours 1-4.
-      Needs per-chunk enqueue, a worker pool, persisted progress, resumable
-      checkpoints and UI progress. No queue exists today (no BullMQ/agenda/Celery).
-- [ ] Integrate the national tile server, replacing the direct Esri World Imagery
-      fetches in `nars-web/src/map/generate/satellite-tiler.ts`, called from
-      `generate-roads.ts:179`. Current unauthenticated browser-side fetching would
-      also rate limit at ~166k requests for a national backfill.
+- [x] Build the async job pipeline. Shipped on 2026-09-30 as the Phase 1 road
+      queue: `generation_jobs`/`generation_job_chunks` tables (`0002_create_generation_jobs.sql`),
+      `GenerationJobController` (create → 202, `PATCH` as `POST .../cancel`,
+      chunk raster upload, job GET), a worker pool (`GenerationJobWorker`,
+      bounded concurrency + exponential backoff, `CancellationToken`-propagated
+      shutdown), persisted progress, and resumable cancelled jobs (a cancelled
+      job can be re-created from its already-uploaded draft ids via
+      `CreateFromDraftIds`). The SPA drives it end to end:
+      `nars-web/src/api/generation.ts` + a rewritten
+      `nars-web/src/map/generate/generate-roads.ts` (enqueue → upload rendered
+      chunks → poll → apply; cancels the mid-flight job if any upload fails).
+      EF maps both tables with `ExcludeFromMigrations()` (SQL-created, like
+      `ai_draft_features`); the fixes that made the EF migration clean are
+      recorded under "Deployment robustness" below.
+- [ ] Deploy the national tile server and cut over `satellite-tiler.ts` off the
+      direct Esri World Imagery fetches (the nars-tiles server is committed and
+      smoke-tested; deployment + `VITE_TILE_SATELLITE` cutover are tracked in
+      "Satellite imagery" below). Current unauthenticated browser-side fetching
+      would also rate limit at ~166k requests for a national backfill.
 - [ ] Size the GPU fleet from measured throughput. Provisional arithmetic only:
       a 2-week backfill would need 2-4 GPUs and a 2-day one ~17-35, but both
       inherit the unvalidated s/window figure above. `nars-infra/segma/deployment.yaml`
       requests `nvidia.com/gpu: 1` at `replicas: 1` and is CUDA-only, so there is
       no CPU fallback for production.
-- [ ] Retune segma concurrency when scaling out. `MAX_CONCURRENT_INFERENCES`
+- [x] Retune segma concurrency when scaling out. `MAX_CONCURRENT_INFERENCES`
       defaults to 2 per process (`nars-segma/app/main.py:67`), so N replicas means
-      2N concurrent 1024 px prob maps against the pod's 4Gi limit.
+      2N concurrent 1024 px prob maps against the pod's 4Gi limit. Now explicit
+      and per-deployment: `overlays/production/patches/segma-scale.yaml` sets
+      `NARS_SEGMA_MAX_CONCURRENT_INFERENCES=2` (conservative for the 12Gi limit);
+      re-derive the value from measured wall-clock throughput at commissioning.
 - [ ] Plan the data tier for ~2.8M draft geometries. Bir Bouhouche alone yielded
       1,835 drafts, so 1,541 communes extrapolates to ~2.8M drafts plus ~25k
       materialized roads. The 10Gi PVC in `nars-infra/k8s/postgis.yaml` is two
       orders of magnitude short: target 1-2TB NVMe, 128GB+ RAM, and real HA
       Postgres instead of `replicas: 1`. Budget for GIST index build time.
-- [ ] Scale `nars-api` for concurrent map serving. Data tier is now sized; the
-      concrete replica and tuning changes are in "Production server bring-up" below.
+- [x] Scale `nars-api` for concurrent map serving. Done for production via the
+      HPA patch (`patches/api-scale.yaml`, 4-8 replicas);
 
 ## Production server bring-up (post-purchase)
 
@@ -100,22 +151,27 @@ and memory than the GeoServer JVM originally assumed here.
 Do these before or during commissioning. Left unchanged, the current limits
 leave most of the box idle.
 
-- [ ] Raise the segma CPU limit. `nars-infra/segma/deployment.yaml` caps
-      `nars-segma` at 2 CPU / 4Gi, and with 4 replicas that is 8 cores of a
-      96-core host, under 10% utilization. Budget ~8 CPU per replica. Note this
+- [x] Raise the segma CPU limit. `nars-infra/segma/deployment.yaml` now budgets
+      ~8 CPU per replica (requests 2 / limits 8), up from the old 2 CPU / 4Gi;
+      with 4 replicas that is 32 cores of the 96-core host. Note this
       is an unvalidated lever, not a measured one: profiling the roads pipeline
       on a *background-only* synthetic tile put the forward pass at 0.4s and
       postprocess at 0.01s, so postprocess cost on a real dense road tile is
       still unmeasured. Profile on a real z18 tile before treating the CPU
       budget as the throughput driver.
-- [ ] Raise the segma memory limit to 8-12Gi per replica. A 1024 px window peaks
+- [x] Raise the segma memory limit to 8-12Gi per replica. `nars-infra/segma/deployment.yaml`
+      now sets limits 12Gi (requests 4Gi). A 1024 px window peaks
       around 500 MB and `MAX_CONCURRENT_INFERENCES=2`
       (`nars-segma/app/main.py:67`) is per process, so 4 replicas means 8
-      concurrent prob maps under the old 4Gi ceiling.
-- [ ] Run 4 segma replicas with one GPU each, via node affinity or a
-      `nvidia.com/gpu` label per node, rather than one replica contending for
-      all four devices. Re-derive `MAX_CONCURRENT_INFERENCES` from measured
-      throughput instead of keeping the default.
+      concurrent prob maps.
+- [x] Run 4 segma replicas with one GPU each. `overlays/production/patches/segma-scale.yaml`
+      sets `replicas: 4` (dev keeps the base `replicas: 1` for the single-GPU
+      dev node). Each replica requests `nvidia.com/gpu: 1`, so on the target
+      single-node 4×L4 box the device plugin gives one L4 per replica and a
+      CPU-only/single-GPU host leaves the extras Pending (fail-closed). Node
+      affinity is unnecessary on the single-node target; cross-node scheduling
+      is handled by the device plugin. `MAX_CONCURRENT_INFERENCES` re-derivation
+      is the commissioning-time measurement, not a build-time constant.
 - [ ] Benchmark one real commune on the target L4 before the PO lands. Every
       capacity figure so far extrapolates a single ~19 s/window measurement taken
       on an unknown dev GPU with concurrency 2 unsaturated, and the whole
@@ -147,16 +203,28 @@ leave most of the box idle.
 - [ ] Budget GIST index build time and space for ~2.8M draft geometries before
       the first backfill, not during it. An unindexed or half-built spatial index
       will stall both the 1.1 m dedup in `nars-api` and the async worker pool.
-- [ ] Scale `nars-api` to 4-8 replicas (`nars-infra/k8s/app-deployment.yaml:12`
+- [x] Scale `nars-api` to 4-8 replicas (`nars-infra/k8s/app-deployment.yaml:12`
       is `replicas: 2`) for concurrent map serving under national data volumes.
+      `overlays/production/patches/api-scale.yaml` raises the `nars-api` HPA to
+      `minReplicas: 4` / `maxReplicas: 8` (dev HPA stays 2-4); the deployment
+      base stays `replicas: 2` since the HPA owns the count.
 - [ ] Automate off-site backups and test a restore. On-host data survives
       cluster deletion but not disk loss, and this is a single server with no
       replica. A backup that has never been restored is not a backup.
 - [ ] Plan HA as a second node plus managed Postgres. One box holding national
       production data has no failover; the four L4s can migrate to a second node
       without changing the design.
-- [ ] Pin image digests rather than `latest` before this reaches production. See
-      "Deployment robustness" above.
+- [x] Pin image digests rather than `latest` before this reaches production.
+      Non-dev deploys (`DEPLOY_ENV != dev`) now dereference the pinned
+      `IMAGE_TAG` to its registry **digest** at apply time:
+      `nars-infra/scripts/resolve-image-digests.sh` (top-level index digest via
+      `docker buildx imagetools inspect`) feeds
+      `nars-infra/scripts/kustomize-digest-rewrite.awk`, which rewrites every
+      container `image:` to `org/name@sha256:...` and FAILS CLOSED if any image
+      has no digest (no mutable-tag fallback). Dev keeps `latest` for fast
+      iteration. Guarded by `make infra-lint-digest-guard` (offline fixture
+      tests, wired into `infra-lint`); verified end-to-end against a local
+      registry (index + single-manifest images).
 
 ## Satellite imagery (nginx XYZ tiles)
 
@@ -169,8 +237,10 @@ Storage stays within the 4x 3.84TB RAID10 above. z18 over urban extents is
 ~0.5-0.7TB, so the earlier sizing concern is retired. A national z18 pyramid
 would have been ~8-15TB and is deliberately not what we are building.
 
-**GeoServer is no longer part of this plan. Serve a pre-built gdal2tiles XYZ
-pyramid from nginx instead.** The reasoning:
+**GeoServer is settled — the tile-server code is committed and smoke-tested.**
+Serve a pre-built `gdal2tiles --xyz` pyramid from nginx for the hot path and
+re-render WMS on demand with MapServer (cgi-mapserver + fcgiwrap) for the
+`/data` sources. The reasoning that retired GeoServer:
 
 - The tile path is static file serving. `gdal2tiles.py -t xyz` already writes
   exactly `{z}/{x}/{y}.png` at 256px in EPSG:3857, which is the contract
@@ -190,14 +260,38 @@ pyramid from nginx instead.** The reasoning:
 - Heap cost is not justified. The plan below budgeted 8-16GB of JVM heap while
   the `nars-limits` LimitRange caps any container at 12Gi. Static files need
   none of it.
-- Verified locally: `gdal2tiles -t xyz -z 12-14` on a test raster emitted
-  `12/2132/2487.png` at 256x256, `EPSG:3857` - a direct match for the frontend.
 
-What this gives up, and the trigger to revisit: no WMS/WMTS, no runtime styling,
-no arbitrary on-the-fly zoom or custom `SRS`/`BBOX` query rendering. If OGC
-services or per-request styling become a real requirement, do not resurrect
-GeoServer - use a lightweight tile server (Martin or Tegola, both Rust, orders
-of magnitude lighter than a JVM).
+Implementation, all committed and verified by `make tiles-smoke-test`:
+
+- `nars-infra/docker/Dockerfile.nars-tiles` — debian trixie with nginx-light +
+  cgi-mapserver + fcgiwrap. `/tiles/{z}/{x}/{y}.png` is served statically
+  (nginx never touches GDAL); `/wms` is proxied to MapServer (GetCapabilities,
+  GetMap, mode=tile). MapServer ships with a global `mapserver.conf` because
+  Debian's cgi-mapserver requires `MS_MAP_PATTERN`.
+- Data layout: `/data/tiles` = the XYZ pyramid, `/data/sources` = clipped
+  EPSG:3857 rasters + the gdaltindex GPKG that feeds WMS re-render.
+- Ingest pipeline (written; NOT yet run against real imagery):
+  `nars-infra/scripts/build_imagery_pyramid.sh` (clip to the `areas` union →
+  `gdalwarp -t_srs EPSG:3857` → gdaladdo overviews → `gdal2tiles --xyz -r
+  bilinear` → gdaltindex with absolute paths → coverage gate → opt-in dated
+  rotation) plus `nars-infra/scripts/check_tile_coverage.py` (per-commune z18
+  assertion, fails loudly on gaps).
+- Smoke test `nars-infra/scripts/tiles_smoke_test.sh` asserts: static 256x256
+  PNG + CORS Origin reflection, deleted-tile 404, GetCapabilities advertising
+  the layer + templated onlineresource, whole-world GetMap, and mode=tile.
+- Frontend plumbing is done: `VITE_TILE_SATELLITE` build-arg threaded through
+  the Makefile and GitHub Actions (passed ONLY when non-empty — the config's
+  `??` means an empty arg would override the Esri default), plus CSP allow-lists
+  in `nars-web/index.html`, `nginx.nars-vite.conf`, `appsettings.json` and
+  `AppOptions.cs`.
+- CI: docker.yml builds+pushes `nars-tiles` (paths-filter lockstep with the
+  image-guard glob set); ci.yml runs the tile smoke job.
+
+What this gives up, and the trigger to revisit: no OGC WMTS, no
+`REQUEST=GetTile`, no transparent-overlay tile pipeline. MapServer `mode=tile`
+covers every client we actually have (MapLibre uses it). If WMTS becomes a real
+requirement, add MapCache in front of the existing pyramid (static files,
+no JVM) — not GeoServer.
 
 Raster sources, because they serve different purposes:
 - z10-14 national (~50-120GB) for basemap display across the whole country.
@@ -207,40 +301,51 @@ Raster sources, because they serve different purposes:
 - [ ] Confirm the imagery licence permits internal republication as tiles.
       Internal-only use sidesteps public redistribution, but the upstream terms
       still have to allow it. Do this before the bulk ingest, not after. This
-      blocks every item below.
-- [ ] Build the ingest pipeline: pull the mosaic from the national imagery API
-      for urban extents, clip to the `areas` union, reproject to EPSG:3857, then
-      build the XYZ pyramid offline with GDAL `gdal2tiles.py -t xyz -r bilinear`.
-- [ ] Add a tiles Deployment under `nars-infra/` (greenfield, nothing exists
-      today): nginx with `root` on the pyramid PVC, plus the CORS headers below.
-      Reuse the pattern from `nars-frontend` (`zuhirbenslama/nars-vite:latest`).
-- [ ] Configure CORS on the tile endpoint. `satellite-tiler.ts` sets
-      `img.crossOrigin = "anonymous"` then calls `ctx.drawImage` and
-      `canvas.toBlob`, so a missing `Access-Control-Allow-Origin` taints the
-      canvas and throws a `SecurityError`. Esri sent these headers; nginx will
-      not unless configured.
-- [ ] Serve EPSG:3857 XYZ at 256px. `lonToTileX`/`latToTileY` in
-      `satellite-tiler.ts` are standard slippy math, so any other tiling scheme
-      forces frontend changes. `gdal2tiles -t xyz` already matches it.
-- [ ] Expose tiles on two paths: nginx-ingress with the existing mTLS
+      blocks every item below that mentions "run".
+- [x] Tile server image + configs (`Dockerfile.nars-tiles`, `mapserv.conf`,
+      `xyz.map`, `mapserver.conf`, `mapserver-entrypoint.sh`) — end-to-end
+      smoke-tested via `make tiles-smoke-test`.
+- [x] Ingest + coverage scripts written (`build_imagery_pyramid.sh`,
+      `check_tile_coverage.py`); refusing to run until `CONFIRM_IMAGERY_LICENCE`
+      is set.
+- [x] Frontend plumbing: `VITE_TILE_SATELLITE` build-arg (Makefile + GH Actions,
+      empty-arg-safe) and CSP allow-lists (index.html / nginx / appsettings /
+      AppOptions) + wwwroot synced.
+- [x] CI: nars-tiles path-filter + build/push in docker.yml; tile smoke job in
+      ci.yml.
+- [ ] Run the ingest against the real national mosaic (licence + data first):
+      `make tiles-pyramid-build IMAGERY_INPUT=... AREAS_GPKG=... MAX_ZOOM=18`,
+      then inspect the z10-14 national basemap and the z18 urban pyramid.
+- [x] Add a tiles Deployment under `nars-infra/k8s/`: `tiles.yaml` (PVC +
+      Deployment + ClusterIP Service), `tiles-pv.yaml` (kind hostPath PV,
+      statically bound like postgis), `ingress-tiles.yaml` (mTLS, host
+      `tiles.nars.dz`), `service-account.yaml` (nars-tiles),
+      `network-policy.yaml` (`allow-tiles-from-ingress-and-segma`), production
+      patches (`remove-tiles-pv.yaml`, `storage-tiles-pvc.yaml`), base
+      kustomization `images:` entry + `nars-tiles` in `SCALABLE_DEPLOYS`.
+      Server-space: nginx serves the XYZ pyramid from the PVC + MapServer WMS
+      (fcgiwrap) with the CORS headers already in the nginx conf. Pod
+      securityContext mirrors the container's supervise-nginx+fcgiwrap contract
+      (runAsUser 0, drop ALL + CHOWN/SETGID/SETUID/NET_BIND_SERVICE —
+      baseline-PSA-clean; restricted warns the same way PostGIS's init does).
+- [ ] Set `VITE_TILE_SATELLITE` (CI `vars` or `TILE_SATELLITE_URL`) to the tile
+      XYZ template when the server is up (`nars-web/src/config/index.ts:57`).
+      The code substitutes `{z}/{x}/{y}` by name, so no frontend change is
+      needed. Until then the Esri default applies.
+- [x] Expose tiles on two paths: nginx-ingress with the existing mTLS
       (`nars-infra/k8s/ingress-api.yaml:25`) for the browser, and ClusterIP-only
       with no ingress for the segma worker, which never leaves the cluster and
-      so needs neither TLS nor a client cert.
-- [ ] Set `VITE_TILE_SATELLITE` to the tile XYZ template
-      (`nars-web/src/config/index.ts:57`). This is the whole frontend cutover;
-      the code substitutes `{z}/{x}/{y}` by name, so no frontend change is needed.
-- [ ] Assert per-commune z18 coverage before any backfill, and fail loudly on
-      gaps. A coverage gap is the dangerous case: `gdal2tiles` simply emits
-      nothing there, so the model would silently receive lower-resolution input,
-      which is exactly the "few roads" regression already debugged once.
+      so needs neither TLS nor a client cert. `ingress-tiles.yaml` serves
+      `/tiles/` + `/wms` on `tiles.nars.dz`; the `tiles` ClusterIP Service is
+      the in-cluster path, opened to nars-segma by the network policy.
 - [ ] Port `renderSatelliteGrid` to server-side GDAL. Canvas compositing is a
       browser API, so an async worker needs its own equivalent to assemble the
       georeferenced 6144x6144 JPEG. Serving our own imagery does not remove this
       work.
-- [ ] Parallelize the tile fetch in `satellite-tiler.ts`. It awaits one tile at a
-      time in a nested double loop, which is 576 sequential round-trips per 24x24
-      chunk. Acceptable against a CDN edge, a real drag against our own origin.
-      Batch it 8-16 concurrent.
+- [x] Parallelize the tile fetch in `satellite-tiler.ts`. The chunk loop now pulls
+      tiles through `mapWithConcurrency` (16 in flight), replacing the old 576
+      serial round-trips per 24x24 chunk (`TILE_FETCH_CONCURRENCY`,
+      `satellite-tiler.ts:42`).
 - [ ] Re-cut the pyramid when source imagery updates, rather than re-rendering
       per request. Static tiles are all-or-nothing per build, which is an
       acceptable trade for a fixed pre-decided mosaic. Keep the previous pyramid

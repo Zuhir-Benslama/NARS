@@ -122,6 +122,7 @@
   "gen_roads_stage_detect": "Détection des routes…",
   "gen_roads_stage_save": "Enregistrement des routes…",
   "gen_roads_stage_done": "Terminé",
+  "gen_roads_step": "Étape {current} sur {total}",
   "gen_roads_geoman_failed": "Les routes générées ont été créées mais n'ont pas pu être ajoutées à l'éditeur cartographique.",
   "draft_accept": "Accepter",
   "draft_accepted": "Brouillon accepté et matérialisé.",

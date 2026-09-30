@@ -210,6 +210,23 @@ jobs:
           SEGMA_TEST_DOCKER_BUILD_ARGS: --cache-from=type=gha --cache-to=type=gha,mode=max
         run: make segma-test
 
+  # ─── Tile server smoke (nars-tiles) ────────────────────────
+  # `make tiles-smoke-test` builds nars-tiles from source, synthesizes a tiny
+  # world pyramid in a pinned GDAL image, boots the server, and asserts the
+  # full contract: static XYZ 200 + CORS + 256x256 PNG, deleted-tile 404, WMS
+  # GetCapabilities (layer + templated onlineresource), whole-world GetMap, and
+  # mode=tile. The Makefile owns the pipeline (single source of truth, same as
+  # infra-lint/segma-test); this job just invokes it with a pinned runner.
+  tiles-smoke:
+    name: Tile server smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run make tiles-smoke-test
+        run: make tiles-smoke-test
+
   # ─── Docs ───────────────────────────────────────────────
   # `make docs-lint` runs three gates: docs-lint-uml (renders every ```mermaid
   # block under docs/uml/*.md with the same Playwright-based renderer the
@@ -304,6 +321,38 @@ jobs:
 
       - name: Run make infra-lint (all 17 gates)
         run: make infra-lint
+
+  # ─── K8s manifests server-side dry-run (delegates to `make
+  # infra-lint-k8s-dry-run`) ─────────────────────────────
+  # A plain `kubectl kustomize` parse cannot catch the class of bug that the
+  # nvidia.com/gpu sibling-placement was — the YAML is well-formed, only the
+  # API server rejects it ("strict decoding error: unknown field"). This job
+  # renders the overlay and dry-runs it server-side against a real API server
+  # (a throwaway kind cluster) — see make/quality.mk. It also self-tests that
+  # the historical bad-manifest shape is rejected. kind is installed manually
+  # (pinned, like kubectl) so the Makefile stays the single owner of the gate
+  # logic.
+  k8s-dry-run:
+    name: K8s manifests (server-side dry-run)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.36.4"
+
+      - name: Install kind
+        run: |
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+          kind version
+
+      - name: Run make infra-lint-k8s-dry-run
+        run: make infra-lint-k8s-dry-run
 
   # ─── Infra utility tests (delegates to `make infra-test-python`) ────────
   # nars-infra/scripts/test_*.py (png-to-pdf.py, test_uml_drift_strip.py) are

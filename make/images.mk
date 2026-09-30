@@ -15,6 +15,13 @@ IMAGE_TAG ?= latest
 # (_warn-latest-tag / _check-pinned-tag) additionally reject hostile tags.
 IMAGE_TAG_Q = '$(subst ','"'"',$(IMAGE_TAG))'
 
+# Optional override for the satellite raster tile URL baked into nars-vite
+# (VITE_TILE_SATELLITE). Leave unset to bake the Esri fallback the Dockerfile
+# defaults to. IMPORTANT: the frontend config uses `??` (not `||`), so passing
+# an empty build-arg would OVERRIDE the Dockerfile default and break satellite
+# tiles — recipes must pass --build-arg ONLY when this is non-empty.
+TILE_SATELLITE_URL ?=
+
 # Charset guard for IMAGE_TAG, shared by _warn-latest-tag and _check-pinned-tag.
 # Evaluated against the escaped value, so a hostile tag is rejected instead of
 # being interpolated into a shell command. Same whitelist as
@@ -39,7 +46,7 @@ ALLOW_LATEST ?=
 # diffs tracked files only — on-disk build artifacts (bin/, obj/, node_modules/)
 # must never re-trigger a local rebuild.
 IMAGES_HASH_DIR ?= $(CURDIR)/.image-hashes
-.PHONY: _ensure-images-hash-dir _build-nars-api _build-nars-postgis _build-nars-vite _build-nars-backup _build-nars-segma
+.PHONY: _ensure-images-hash-dir _build-nars-api _build-nars-postgis _build-nars-vite _build-nars-backup _build-nars-segma _build-nars-tiles
 _ensure-images-hash-dir:
 	@mkdir -p "$(IMAGES_HASH_DIR)"
 
@@ -52,6 +59,7 @@ images-build: _warn-latest-tag ## Build all Docker images
 	$(SUBMAKE) _build-nars-vite
 	$(SUBMAKE) _build-nars-backup
 	$(SUBMAKE) _build-nars-segma
+	$(SUBMAKE) _build-nars-tiles
 	@echo "✓ All images built"
 
 .PHONY: _build-nars-api
@@ -83,8 +91,13 @@ _build-nars-vite: _warn-latest-tag
 		echo "  → skipping $$img: unchanged content-hash (CI paths-filter agrees)"; \
 	else \
 		echo "  → $(DOCKER_ORG)/nars-vite:"$(IMAGE_TAG_Q); \
+		args=""; \
+		if [ -n "$(TILE_SATELLITE_URL)" ]; then \
+			args="--build-arg VITE_TILE_SATELLITE=$(TILE_SATELLITE_URL)"; \
+			echo "    · VITE_TILE_SATELLITE=$(TILE_SATELLITE_URL)"; \
+		fi; \
 		docker build -f "$(DOCKER_DIR)/Dockerfile.nars-vite" \
-			-t "$(DOCKER_ORG)/nars-vite:"$(IMAGE_TAG_Q) .; \
+			-t "$(DOCKER_ORG)/nars-vite:"$(IMAGE_TAG_Q) $$args .; \
 	fi
 
 .PHONY: _build-nars-backup
@@ -107,6 +120,17 @@ _build-nars-segma: _warn-latest-tag
 		echo "  → $(DOCKER_ORG)/nars-segma:"$(IMAGE_TAG_Q); \
 		docker build -f "$(DOCKER_DIR)/Dockerfile.nars-segma" \
 			-t "$(DOCKER_ORG)/nars-segma:"$(IMAGE_TAG_Q) nars-segma/; \
+	fi
+
+.PHONY: _build-nars-tiles
+_build-nars-tiles: _warn-latest-tag
+	@img=nars-tiles; st="$(IMAGES_HASH_DIR)/$$img"; \
+	if __image_guard "$$st.guard" 'nars-infra/scripts/mapserver-entrypoint.sh' 'nars-infra/docker/mapserver/**' 'nars-infra/docker/Dockerfile.nars-tiles'; then \
+		echo "  → skipping $$img: unchanged content-hash (CI paths-filter agrees)"; \
+	else \
+		echo "  → $(DOCKER_ORG)/nars-tiles:"$(IMAGE_TAG_Q); \
+		docker build -f "$(DOCKER_DIR)/Dockerfile.nars-tiles" \
+			-t "$(DOCKER_ORG)/nars-tiles:"$(IMAGE_TAG_Q) .; \
 	fi
 
 .PHONY: images-push

@@ -128,6 +128,8 @@ public class BootstrappingRegistrationTests : IDisposable
         Assert.IsType<UserCreationService>(sp.GetRequiredService<IUserCreationService>());
         Assert.IsType<CommuneScopeService>(sp.GetRequiredService<ICommuneScopeService>());
         Assert.IsType<DraftFeaturesService>(sp.GetRequiredService<IDraftFeaturesService>());
+        Assert.IsType<RoadGenerationService>(sp.GetRequiredService<IRoadGenerationService>());
+        Assert.IsType<GenerationJobService>(sp.GetRequiredService<IGenerationJobService>());
         Assert.IsType<ErrorLogService>(sp.GetRequiredService<IErrorLogService>());
     }
 
@@ -138,6 +140,7 @@ public class BootstrappingRegistrationTests : IDisposable
 
         Assert.Contains(sp.GetServices<IHostedService>(), s => s.GetType() == typeof(BackgroundQueueProcessor));
         Assert.Contains(sp.GetServices<IHostedService>(), s => s.GetType() == typeof(RefreshTokenPruner));
+        Assert.Contains(sp.GetServices<IHostedService>(), s => s.GetType() == typeof(GenerationJobWorker));
     }
 
     [Fact]

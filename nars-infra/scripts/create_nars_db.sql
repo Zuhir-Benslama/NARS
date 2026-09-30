@@ -469,6 +469,113 @@ COMMENT ON TABLE public.ai_draft_features IS
     'AI-suggested road/building features awaiting human review before promotion to production feature tables.';
 
 -- ══════════════════════════════════════════════════════════════════════════════
+-- 11.  Generation jobs (async "generate roads from urban areas")
+-- ══════════════════════════════════════════════════════════════════════════════
+-- Mirrors nars-infra/migrations/0002_create_generation_jobs.sql. Jobs split an
+-- urban bounding box into a zoom-18 tile grid; the client uploads each rendered
+-- chunk as a raster, and the nars-api worker pool runs segmentation per chunk
+-- (nars-segma via DraftFeaturesService.SegmentTileAsync) then the roads-phase
+-- acceptance (RoadGenerationService.GenerateAsync) once all chunks are done,
+-- storing the GenerateRoadsResponse JSON in result. Heartbeat + FOR UPDATE
+-- SKIP LOCKED claims make crashed workers recoverable; attempts cap retries.
+--
+-- ⚠ NAMES MUST STAY IN SYNC with that migration file: both are applied to the
+-- same databases (this script runs at Docker image init; `make
+-- db-migrate-nars` re-applies the migration) and are idempotent BY NAME —
+-- divergent index/constraint names silently create duplicates instead of
+-- no-oping.
+
+CREATE TABLE IF NOT EXISTS public.generation_jobs
+(
+    id                  uuid                     NOT NULL DEFAULT gen_random_uuid(),
+    commune_id          integer                  NOT NULL,
+    created_by          uuid                     NOT NULL,
+    status              character varying(20)    NOT NULL DEFAULT 'pending',
+    stage               character varying(10),
+    total_chunks        integer                  NOT NULL,
+    done_chunks         integer                  NOT NULL DEFAULT 0,
+    progress            real                     NOT NULL DEFAULT 0,
+    draft_ids           jsonb                    NOT NULL DEFAULT '[]'::jsonb,
+    caller_role         character varying(20)    NOT NULL,
+    caller_commune_id   integer,
+    caller_daira_id     integer,
+    caller_wilaya_id    integer,
+    result              jsonb,
+    error               text,
+    accept_heartbeat_at timestamp with time zone,
+    created_at          timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at          timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT generation_jobs_pkey PRIMARY KEY (id),
+    CONSTRAINT chk_generation_job_status CHECK (status IN ('pending', 'active', 'accepting', 'done', 'failed', 'cancelled')),
+    CONSTRAINT chk_generation_job_stage CHECK (stage IS NULL OR stage IN ('segment', 'accept')),
+    CONSTRAINT chk_generation_job_chunk_counts CHECK (
+        total_chunks > 0 AND total_chunks <= 4096
+        AND done_chunks >= 0 AND done_chunks <= total_chunks
+    ),
+    CONSTRAINT chk_generation_job_progress CHECK (progress >= 0 AND progress <= 1),
+    CONSTRAINT generation_jobs_commune_fk FOREIGN KEY (commune_id)
+        REFERENCES public.communes (commune_id)
+        ON UPDATE NO ACTION ON DELETE RESTRICT,
+    CONSTRAINT generation_jobs_created_by_fk FOREIGN KEY (created_by)
+        REFERENCES public.users (id)
+        ON UPDATE NO ACTION ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS ix_generation_job_commune
+    ON public.generation_jobs (commune_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS ix_generation_job_status
+    ON public.generation_jobs (status, created_at);
+
+CREATE TABLE IF NOT EXISTS public.generation_job_chunks
+(
+    id                  uuid                     NOT NULL DEFAULT gen_random_uuid(),
+    job_id              uuid                     NOT NULL,
+    chunk_key           character varying(40)    NOT NULL,
+    zoom                integer                  NOT NULL,
+    x0                  integer                  NOT NULL,
+    y0                  integer                  NOT NULL,
+    width               integer                  NOT NULL,
+    height              integer                  NOT NULL,
+    min_lon             double precision,
+    min_lat             double precision,
+    max_lon             double precision,
+    max_lat             double precision,
+    raster              bytea,
+    raster_file_name    character varying(255),
+    raster_content_type character varying(30)    NOT NULL DEFAULT 'image/jpeg',
+    status              character varying(20)    NOT NULL DEFAULT 'awaiting_raster',
+    attempts            integer                  NOT NULL DEFAULT 0,
+    error               text,
+    heartbeat_at        timestamp with time zone,
+    created_at          timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at          timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT generation_job_chunks_pkey PRIMARY KEY (id),
+    CONSTRAINT generation_job_chunks_job_key UNIQUE (job_id, chunk_key),
+    CONSTRAINT chk_generation_job_chunk_status CHECK (status IN ('awaiting_raster', 'ready', 'running', 'done', 'failed', 'cancelled')),
+    CONSTRAINT chk_generation_job_chunk_grid CHECK (
+        zoom > 0 AND zoom <= 30
+        AND x0 >= 0 AND y0 >= 0
+        AND width > 0 AND height > 0
+    ),
+    CONSTRAINT generation_job_chunks_job_fk FOREIGN KEY (job_id)
+        REFERENCES public.generation_jobs (id)
+        ON UPDATE NO ACTION ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS ix_generation_job_chunks_job
+    ON public.generation_job_chunks (job_id);
+CREATE INDEX IF NOT EXISTS ix_generation_job_chunks_claim
+    ON public.generation_job_chunks (status, created_at);
+CREATE INDEX IF NOT EXISTS ix_generation_job_chunks_heartbeat
+    ON public.generation_job_chunks (heartbeat_at)
+    WHERE status = 'running';
+
+COMMENT ON TABLE public.generation_jobs IS
+    'Async "generate roads from urban areas" runs: user-facing job record with progress and result.';
+COMMENT ON TABLE public.generation_job_chunks IS
+    'Per-grid-chunk work items of a generation job; rasters uploaded by the client, processed by the nars-api worker pool.';
+
+-- ══════════════════════════════════════════════════════════════════════════════
 -- Verification
 -- ══════════════════════════════════════════════════════════════════════════════
 DO $$

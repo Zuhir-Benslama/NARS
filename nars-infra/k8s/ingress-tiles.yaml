@@ -1,0 +1,45 @@
+---
+# ─── Tiles Ingress (secure, browser path) ─────────────────────────────────
+# Serves tiles.nars.dz with TLS + mTLS client certificate authentication —
+# same contract as the API ingress (ingress-api.yaml): HTTP → HTTPS, and HTTPS
+# requires a client cert signed by the nars-ca. The SPA's MapLibre fetches
+# /tiles/{z}/{x}/{y}.png cross-origin; the nars-tiles nginx already emits
+# Access-Control-Allow-Origin: <origin> + Vary: Origin.
+#
+# The segma worker does NOT use this ingress: it reaches the identical
+# ClusterIP Service (tiles:80) directly inside the cluster — no TLS, no cert.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tiles
+  namespace: nars
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/auth-tls-verify-client: "on"
+    nginx.ingress.kubernetes.io/auth-tls-secret: "nars/nars-ca"
+    nginx.ingress.kubernetes.io/auth-tls-verify-depth: "1"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - tiles.nars.dz
+      secretName: nars-tls
+  rules:
+    - host: tiles.nars.dz
+      http:
+        paths:
+          - path: /tiles(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: tiles
+                port:
+                  number: 80
+          - path: /wms
+            pathType: Exact
+            backend:
+              service:
+                name: tiles
+                port:
+                  number: 80
