@@ -38,7 +38,18 @@ CID="nars-tiles-smoke-$$"
 TMP="$(mktemp -d)"
 cleanup() {
     docker rm -f "${CID}" >/dev/null 2>&1 || true
-    rm -rf "${TMP}"
+    # The GDAL synthesis container runs as root (default image user): on a
+    # non-rootless docker (CI runner, prod) that leaves root-owned dirs in
+    # ${TMP}, so a plain `rm -rf` trips EACCES. Fall back to deleting through
+    # the same container as root — which is exactly the invoking user under
+    # rootless docker, so both daemon modes clean up. (Do NOT `--user` the
+    # synth: in rootless user-namespace mapping container-uid ≠ host-uid and
+    # the writes become unfindable.)
+    rm -rf -- "${TMP}" 2>/dev/null || {
+        docker run --rm -v "${TMP}:/data" "${TILES_GDAL_IMAGE}" \
+            sh -c 'find /data -mindepth 1 -delete'
+        rm -rf -- "${TMP}" 2>/dev/null || true
+    }
 }
 trap cleanup EXIT INT TERM
 
