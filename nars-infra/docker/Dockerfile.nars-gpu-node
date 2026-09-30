@@ -12,7 +12,7 @@
 # Base = default kind v0.27.0 node image. Debian bookworm with containerd
 # v2.0.2, which enables CRI CDI injection by default (verified via
 # `containerd config dump` → enable_cdi = true).
-FROM kindest/node:v1.32.2@sha256:f226345927d7e348497136874b6d207e0b32cc52154ad8323129352923a3142f
+FROM kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
 
 # nvidia-container-toolkit (provides nvidia-ctk, used for CDI spec generation
 # and by the k8s-device-plugin). Installed INSIDE the node container so no
