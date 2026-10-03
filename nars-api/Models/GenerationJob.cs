@@ -7,7 +7,10 @@ namespace NarsApi.Models;
 /// urban areas" run. Status constants mirror the SQL CHECK constraint values.
 /// The chunk work items live in <see cref="GenerationJobChunk"/>; once every
 /// chunk is processed the worker runs the roads-phase acceptance and stores
-/// the GenerateRoadsResponse JSON in <see cref="Result"/>.
+/// the GenerateRoadsResponse JSON in <see cref="Result"/>. When
+/// <see cref="GenerateDistricts"/> is set the job does not finish there: it
+/// advances to <see cref="StageDistricts"/> for one more pass that partitions
+/// the urban zones into district drafts.
 /// </summary>
 public sealed class GenerationJob
 {
@@ -22,6 +25,7 @@ public sealed class GenerationJob
     // Active-phase stages.
     public const string StageSegment = "segment";
     public const string StageAccept = "accept";
+    public const string StageDistricts = "districts";
 
     public Guid Id { get; internal set; }
     public int CommuneId { get; internal set; }
@@ -33,6 +37,14 @@ public sealed class GenerationJob
     public double Progress { get; internal set; }
     public List<Guid> DraftIds { get; internal set; } = [];
 
+    /// <summary>
+    /// When true the worker runs the districts phase (partitioning the urban
+    /// zones along the primary roads into district drafts) after the roads
+    /// acceptance completes, instead of finishing the job. Captured at creation
+    /// so the decision cannot change mid-run.
+    /// </summary>
+    public bool GenerateDistricts { get; internal set; }
+
     // Caller scope captured at creation so the worker can re-run segmentation
     // and the acceptance pass with the same authority the caller had.
     public string CallerRole { get; internal set; } = null!;
@@ -41,6 +53,13 @@ public sealed class GenerationJob
     public int? CallerWilayaId { get; internal set; }
 
     public JsonElement? Result { get; internal set; }
+
+    /// <summary>
+    /// DistrictGenerationSummary JSON of the districts phase. Separate from
+    /// <see cref="Result"/> (which stays the roads response the web already
+    /// parses) so adding the phase did not reshape an existing response.
+    /// </summary>
+    public JsonElement? DistrictsResult { get; internal set; }
     public string? Error { get; internal set; }
     public DateTimeOffset? AcceptHeartbeatAt { get; internal set; }
     public DateTimeOffset CreatedAt { get; internal set; }
@@ -56,7 +75,8 @@ public sealed class GenerationJob
         int? callerDairaId,
         int? callerWilayaId,
         int totalChunks,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        bool generateDistricts = false)
     {
         return new GenerationJob
         {
@@ -72,6 +92,7 @@ public sealed class GenerationJob
             UpdatedAt = createdAt,
             Status = StatusPending,
             Stage = StageSegment,
+            GenerateDistricts = generateDistricts,
         };
     }
 

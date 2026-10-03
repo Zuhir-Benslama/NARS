@@ -213,7 +213,8 @@ _check-bundle-sync:
 	@tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
 	if $(KUBECTL) exec -n "$(NAMESPACE)" deploy/nars-frontend -- cat /usr/share/nginx/html/index.html > "$$tmp/frontend.html" 2>/dev/null \
 		&& $(KUBECTL) exec -n "$(NAMESPACE)" deploy/nars-api -- cat /app/wwwroot/index.html > "$$tmp/api.html" 2>/dev/null \
-		&& python3 nars-infra/scripts/check_frontend_bundle_sync.py --frontend "$$tmp/frontend.html" --api "$$tmp/api.html"; then \
+		&& $(KUBECTL) exec -n "$(NAMESPACE)" deploy/nars-api -- ls -1 /app/wwwroot/assets > "$$tmp/api-assets.txt" 2>/dev/null \
+		&& python3 nars-infra/scripts/check_frontend_bundle_sync.py --frontend "$$tmp/frontend.html" --api "$$tmp/api.html" --api-assets-listing "$$tmp/api-assets.txt"; then \
 		refs=$$(grep -oE 'assets/[A-Za-z0-9._-]+' "$$tmp/api.html" | sed 's#assets/##' | sort -u); \
 		for f in $$refs; do \
 			$(KUBECTL) exec -n "$(NAMESPACE)" deploy/nars-frontend -- sh -c 'test -f /usr/share/nginx/html/assets/'"$$f" || { echo "  ✖ $$f missing in nars-vite image (entrypoint mismatch!)"; exit 1; }; \

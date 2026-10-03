@@ -36,6 +36,7 @@ from fastapi import (
 
 from app.config import env_float, env_int
 from app.model import (
+    AMP,
     InvalidTileError,
     SegmentationModel,
     TileTooLargeError,
@@ -161,6 +162,10 @@ class ModelSpec(TypedDict):
     num_classes: int
     builder: str
     postprocess: str
+    # Whether this task's inference runs under FP16 autocast. Per task, not
+    # global: see AMP in app/model.py for why buildings take it and roads are
+    # pinned to FP32. The registry is the only place that decision is made.
+    amp: bool
     # Postprocess kwargs for this task's feature limits and geometry cleanup.
     # Dispatch calls POSTPROCESSORS[postprocess](fg_prob, transform, threshold,
     # **rules), so a task carries exactly the kwargs its postprocessor signature
@@ -177,6 +182,7 @@ MODEL_SPECS: dict[str, ModelSpec] = {
         "num_classes": 2,
         "builder": "smp-unet",
         "postprocess": "polygons",
+        "amp": AMP,
         "rules": {
             "min_confidence": BUILDING_MIN_CONFIDENCE,
             "max_features": BUILDING_MAX_FEATURES or None,
@@ -193,6 +199,10 @@ MODEL_SPECS: dict[str, ModelSpec] = {
         # NARS_SEGMA_ROAD_BUILDER is the whole rollout.
         "builder": os.environ.get("NARS_SEGMA_ROAD_BUILDER", "resnet34-upsample"),
         "postprocess": "linestrings",
+        # FP32, hardcoded: the 0.6 road confidence floor was calibrated against
+        # FP32 probability maps, and no env var may override this. Re-validate
+        # the floor against FP16 output before ever changing it.
+        "amp": False,
         "rules": {
             "min_length_m": ROAD_MIN_LENGTH_M,
             "min_confidence": ROAD_MIN_CONFIDENCE,
@@ -318,6 +328,7 @@ def _load_model(task: str, spec: ModelSpec) -> SegmentationModel | None:
             num_classes=spec["num_classes"],
             tile_size=TILE_SIZE,
             builder=spec["builder"],
+            amp=spec["amp"],
         )
     except Exception as exc:  # a load failure must never abort startup
         logger.exception(

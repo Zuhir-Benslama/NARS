@@ -37,6 +37,7 @@ if TYPE_CHECKING:
 __all__ = [
     "CudaUnavailableError",
     "InvalidTileError",
+    "NonFiniteProbabilitiesError",
     "SegmentationModel",
     "TileTooLargeError",
 ]
@@ -61,15 +62,26 @@ REQUIRE_CUDA = os.environ.get("NARS_SEGMA_REQUIRE_CUDA", "1").strip().lower() no
     "",
 )
 
-# Mixed-precision inference. Off by default, and the default is the safe
-# choice, not an oversight: the road confidence floor
+# Mixed-precision inference, decided PER MODEL rather than globally — see the
+# `amp` argument on SegmentationModel and the per-task entries in MODEL_SPECS
+# (main.py).
+#
+# Buildings opt in and this defaults to on: they carry no calibrated confidence
+# floor (NARS_SEGMA_BUILDING_MIN_CONFIDENCE is 0 and the mask threshold is a
+# fixed 0.5), so FP16's shift of the probability distribution costs nothing that
+# was ever tuned against it, and it buys roughly 2x throughput on the GPU's
+# tensor cores. Set NARS_SEGMA_AMP=0 to fall back to FP32 for A/B comparison.
+#
+# Roads stay FP32 and no env var can reach them. The road confidence floor
 # (NARS_SEGMA_ROAD_MIN_CONFIDENCE, 0.6) was calibrated against FP32 probability
-# maps, and FP16 shifts the distribution enough to move which pieces survive the
-# floor. Enabling this roughly doubles throughput on an L4, which is worth weeks
-# on a national backfill, but it must be adopted only after comparing generated
-# geometry FP32-vs-FP16 and re-validating the 0.6 threshold against real output.
+# maps, and FP16 moves enough of the distribution across that floor to change
+# which pieces are emitted at all. Adopting FP16 for roads is a measurement
+# task — compare generated geometry FP32-vs-FP16, then re-validate 0.6 against
+# real output — so it must not be reachable by a rollout flag that skips the
+# comparison.
+#
 # CUDA only; FP16 autocast on CPU is unsupported, so a CPU run stays FP32.
-USE_AMP = os.environ.get("NARS_SEGMA_AMP", "0").strip().lower() in ("1", "true", "yes")
+AMP = os.environ.get("NARS_SEGMA_AMP", "1").strip().lower() in ("1", "true", "yes")
 
 
 class CudaUnavailableError(RuntimeError):
@@ -80,6 +92,28 @@ class CudaUnavailableError(RuntimeError):
             "CUDA is required but torch.cuda.is_available() is False; "
             "nars-segma is CUDA-only. Schedule the pod on a GPU node, or "
             "set NARS_SEGMA_REQUIRE_CUDA=0 for CPU-only tooling/tests."
+        )
+
+
+class NonFiniteProbabilitiesError(RuntimeError):
+    """Raised when a forward pass yields NaN/Inf probabilities.
+
+    Checkpoint activations that exceed FP16's 65504 overflow to inf and
+    propagate, so a model running under autocast can emit non-finite maps. The
+    message names the likely cause so the operator has somewhere to start.
+    """
+
+    def __init__(self, use_amp: bool) -> None:
+        hint = (
+            "Inference ran under FP16 autocast, which is the likely cause — "
+            "set NARS_SEGMA_AMP=0 to retry in FP32. "
+            if use_amp
+            else ""
+        )
+        super().__init__(
+            f"{hint}Model produced NaN/Inf probabilities; refusing to serve "
+            "them because a non-finite confidence silently passes every "
+            "downstream floor."
         )
 
 
@@ -127,6 +161,7 @@ class SegmentationModel:
         num_classes: int = 2,
         device: str | None = None,
         builder: str = "smp-unet",
+        amp: bool = False,
     ):
         torch = _import_torch()
         self.tile_size = tile_size
@@ -152,11 +187,15 @@ class SegmentationModel:
         # (a real regression seen on dense urban tiles). The flag keeps the
         # correct transform per architecture.
         self.imagenet_norm = builder != "resnet34-upsample"
-        # CUDA-only mixed precision; see USE_AMP for why this defaults off.
-        self.use_amp = USE_AMP and self.device.type == "cuda"
-        if USE_AMP and not self.use_amp:
+        # Opt-in per model, never inferred: a caller that forgets `amp` gets
+        # FP32, which is the safe default for a checkpoint whose probabilities
+        # something downstream was calibrated against. Only CUDA runs FP16 —
+        # autocast has no CPU support, so a CPU model stays in FP32 rather than
+        # raising mid-inference.
+        self.use_amp = amp and self.device.type == "cuda"
+        if amp and not self.use_amp:
             logger.warning(
-                "NARS_SEGMA_AMP requested but device is %s; staying in FP32",
+                "FP16 autocast requested but device is %s; staying in FP32",
                 self.device.type,
             )
         self.is_loaded = False
@@ -323,7 +362,18 @@ class SegmentationModel:
                 probs, size=(h, w), mode="bilinear", align_corners=False
             )
 
-        return probs.squeeze(0).permute(1, 2, 0).cpu().numpy()
+        out = probs.squeeze(0).permute(1, 2, 0).cpu().numpy()
+        # Fail closed on non-finite probabilities instead of returning them.
+        # The failure this guards is silent: `NaN < min_confidence` is False,
+        # so a NaN region passes every downstream confidence floor and gets
+        # emitted as a real polygon carrying `confidence: null`. FP16 autocast
+        # is the likeliest source — activations past 65504 overflow to inf and
+        # propagate through the network — which is why this is checked even
+        # though the shipped checkpoints stay well inside FP16 range. One
+        # numpy pass over the finished map, no per-window device sync.
+        if not np.isfinite(out).all():
+            raise NonFiniteProbabilitiesError(self.use_amp)
+        return out
 
     @staticmethod
     def _embedded_transform(src: rasterio.DatasetReader) -> rasterio.Affine | None:

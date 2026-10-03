@@ -171,7 +171,7 @@ function jobView(overrides: Record<string, unknown> = {}) {
 }
 
 /** Creates a done job from the same grid split, with the given result payload. */
-function doneJobView(result = EMPTY_RESULT) {
+function doneJobView(result = EMPTY_RESULT, extra: Record<string, unknown> = {}) {
   const base = jobView()
   return {
     ...base,
@@ -181,6 +181,7 @@ function doneJobView(result = EMPTY_RESULT) {
     progress: 1,
     result,
     chunks: base.chunks.map((c: { id: string }) => ({ ...c, status: "done" })),
+    ...extra,
   }
 }
 
@@ -322,6 +323,7 @@ describe("generateRoadsFromUrbanAreas", () => {
       grids.map((grid: any, index: number) =>
         toGenerationGrid(String(index), grid.zoom, grid, gridBounds(grid)),
       ),
+      false,
     )
 
     expect(mockUploadRaster).toHaveBeenCalledTimes(grids.length)
@@ -329,7 +331,7 @@ describe("generateRoadsFromUrbanAreas", () => {
       expect(mockUploadRaster).toHaveBeenCalledWith("job-1", `chunk-${i}`, TILE.blob, `${i}.jpg`)
     })
 
-    expect(result).toEqual({ created: 2, dropped: 1 })
+    expect(result).toEqual({ created: 2, dropped: 1, districts: 0 })
     expect(useLayerStore().$state.roads).toHaveLength(2)
     expect(useFeaturesStore().getAll()).toHaveLength(2)
     const [first] = useFeaturesStore().getAll()
@@ -370,7 +372,7 @@ describe("generateRoadsFromUrbanAreas", () => {
 
     const result = await generateRoadsFromUrbanAreas()
 
-    expect(result).toEqual({ created: 0, dropped: 0 })
+    expect(result).toEqual({ created: 0, dropped: 0, districts: 0 })
     expect(mockGenerateRoads).not.toHaveBeenCalled()
     expect(mockListDrafts).toHaveBeenCalledWith({
       communeId: 42,
@@ -403,7 +405,7 @@ describe("generateRoadsFromUrbanAreas", () => {
     const result = await generateRoadsFromUrbanAreas()
 
     expect(mockGenerateRoads).toHaveBeenCalledWith(42, ["d-pending-1", "d-pending-2"])
-    expect(result).toEqual({ created: 1, dropped: 1 })
+    expect(result).toEqual({ created: 1, dropped: 1, districts: 0 })
     expect(mockShowToast).toHaveBeenCalledWith("gen_roads_reusing_drafts", "info")
     expect(mockShowToast).not.toHaveBeenCalledWith("gen_roads_no_detections", "info")
     expect(useLayerStore().$state.roads).toHaveLength(1)
@@ -430,7 +432,7 @@ describe("generateRoadsFromUrbanAreas", () => {
     const result = await generateRoadsFromUrbanAreas()
 
     expect(mockShowToast).toHaveBeenCalledWith("gen_roads_done_breakdown", "success")
-    expect(result).toEqual({ created: 1, dropped: 2 })
+    expect(result).toEqual({ created: 1, dropped: 2, districts: 0 })
     expect(mockShowToast).toHaveBeenCalledWith("gen_roads_done", "success")
   })
 
@@ -461,7 +463,7 @@ describe("generateRoadsFromUrbanAreas", () => {
       ...Array.from({ length: 500 }, (_, i) => `d-${i}`),
       "d-500",
     ])
-    expect(result).toEqual({ created: 0, dropped: 0 })
+    expect(result).toEqual({ created: 0, dropped: 0, districts: 0 })
     expect(mockListDrafts).toHaveBeenNthCalledWith(2, {
       communeId: 42,
       featureType: "road",
@@ -505,7 +507,7 @@ describe("generateRoadsFromUrbanAreas", () => {
 
     const result = await generateRoadsFromUrbanAreas()
 
-    expect(result).toEqual({ created: 2, dropped: 0 })
+    expect(result).toEqual({ created: 2, dropped: 0, districts: 0 })
     expect(useLayerStore().$state.roads).toHaveLength(1)
     expect(useFeaturesStore().getAll()).toHaveLength(1)
     expect(mockImportFeaturesIntoGeoman.mock.calls[0][0]).toHaveLength(1)
@@ -529,7 +531,7 @@ describe("generateRoadsFromUrbanAreas", () => {
 
     const result = await generateRoadsFromUrbanAreas()
 
-    expect(result).toEqual({ created: 0, dropped: 0 })
+    expect(result).toEqual({ created: 0, dropped: 0, districts: 0 })
     expect(mockShowToast).toHaveBeenCalledWith("gen_roads_cancelled", "info")
     expect(mockGenerateRoads).not.toHaveBeenCalled()
     expect(useGenerationStore().progress).toBe(100)
@@ -561,5 +563,50 @@ describe("generateRoadsFromUrbanAreas", () => {
     expect(mockShowToast).toHaveBeenCalledWith("gen_roads_failed", "error")
     expect(mockDebugError).toHaveBeenCalled()
     expect(useGenerationStore().active).toBe(false)
+  })
+
+  it("forwards the districts flag and reports the district drafts", async () => {
+    seedUrbanArea()
+    mockCreateGenerationJob.mockResolvedValue(jobView())
+    mockGetGenerationJob.mockResolvedValue(
+      doneJobView(EMPTY_RESULT, {
+        districtsResult: {
+          districts: [
+            { draftId: "d1", areaM2: 1200, lat: 36.7, lng: 2.9 },
+            { draftId: "d2", areaM2: 900, lat: 36.71, lng: 2.91 },
+          ],
+          absorbedSlivers: 1,
+          primaryRoadCount: 2,
+          urbanAreaCount: 1,
+        },
+      }),
+    )
+
+    const result = await generateRoadsFromUrbanAreas(true)
+
+    expect(mockCreateGenerationJob).toHaveBeenCalledWith(42, expect.any(Array), true)
+    expect(result?.districts).toBe(2)
+    // t() is mocked to identity here, so the toast sees the raw key.
+    expect(mockShowToast).toHaveBeenCalledWith("gen_districts_done", "success")
+  })
+
+  it("warns when the districts phase produced nothing", async () => {
+    seedUrbanArea()
+    mockCreateGenerationJob.mockResolvedValue(jobView())
+    mockGetGenerationJob.mockResolvedValue(
+      doneJobView(EMPTY_RESULT, {
+        districtsResult: {
+          districts: [],
+          absorbedSlivers: 0,
+          primaryRoadCount: 0,
+          urbanAreaCount: 1,
+        },
+      }),
+    )
+
+    const result = await generateRoadsFromUrbanAreas(true)
+
+    expect(result?.districts).toBe(0)
+    expect(mockShowToast).toHaveBeenCalledWith("gen_districts_none", "info")
   })
 })

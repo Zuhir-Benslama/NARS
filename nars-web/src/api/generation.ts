@@ -56,6 +56,16 @@ export interface GenerationJobView {
   updatedAt: string | null
   chunks: GenerationChunkView[]
   result: GenerateRoadsResponse | null
+  generateDistricts: boolean
+  districtsResult: GenerateDistrictsResponse | null
+}
+
+/** Mirrors GenerateDistrictsResponse — the districts phase summary. */
+export interface GenerateDistrictsResponse {
+  districts: { draftId: string; areaM2: number; lat: number; lng: number }[]
+  absorbedSlivers: number
+  primaryRoadCount: number
+  urbanAreaCount: number
 }
 
 export const GENERATION_JOB_STATUS = {
@@ -71,11 +81,12 @@ export const GENERATION_JOB_STATUS = {
 export async function createGenerationJob(
   communeId: number,
   grids: GenerationGridDto[],
+  generateDistricts = false,
 ): Promise<GenerationJobView> {
   const res = await apiFetch("/api/generation/jobs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ communeId, grids }),
+    body: JSON.stringify({ communeId, grids, generateDistricts }),
   })
   return (await res.json()) as GenerationJobView
 }

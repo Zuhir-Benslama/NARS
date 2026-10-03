@@ -30,7 +30,8 @@ public sealed class GenerationJobService(
 
     public async Task<GenerationJobView> CreateAsync(
         string callerRole, int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
-        Guid userId, int communeId, IReadOnlyList<GenerationGridDto> grids, CancellationToken ct)
+        Guid userId, int communeId, IReadOnlyList<GenerationGridDto> grids,
+        bool generateDistricts = false, CancellationToken ct = default)
     {
         if (grids.Count is 0 or > MaxGridSize)
         {
@@ -80,7 +81,7 @@ public sealed class GenerationJobService(
         var now = timeProvider.UtcNow;
         var job = GenerationJob.Create(
             communeId, userId, callerRole, callerCommuneId, callerDairaId, callerWilayaId,
-            grids.Count, now);
+            grids.Count, now, generateDistricts);
 
         db.GenerationJobs.Add(job);
 
@@ -230,6 +231,15 @@ public sealed class GenerationJobService(
             return await CompleteAcceptClaimAsync(db, jobId.Value, now, ct);
         }
 
+        // Districts last: it only becomes claimable once an acceptance pass has
+        // advanced the job to the districts stage, and every chunk is done by
+        // then, so the chunk scan above can never compete for the same job.
+        var districtsJobId = await ClaimDistrictsJobIdAsync(db, now, staleClaimAfter, ct);
+        if (districtsJobId is not null)
+        {
+            return await CompleteDistrictsClaimAsync(db, districtsJobId.Value, now, ct);
+        }
+
         return null;
     }
 
@@ -355,6 +365,55 @@ public sealed class GenerationJobService(
             (chunk.MinLon!.Value, chunk.MinLat!.Value, chunk.MaxLon!.Value, chunk.MaxLat!.Value),
             chunk.RasterFileName ?? $"{chunk.ChunkKey}.jpg",
             chunk.RasterContentType);
+    }
+
+    private static async Task<Guid?> ClaimDistrictsJobIdAsync(
+        AppDbContext db, DateTimeOffset now, TimeSpan staleClaimAfter, CancellationToken ct)
+    {
+        var stale = now - staleClaimAfter;
+
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var connection = db.Database.GetDbConnection();
+        await using var cmd = connection.CreateCommand();
+        cmd.Transaction = tx.GetDbTransaction();
+        cmd.CommandText = """
+            SELECT j.id
+            FROM generation_jobs AS j
+            WHERE j.status = 'active'
+              AND j.stage = 'districts'
+              AND j.generate_districts
+              AND (j.accept_heartbeat_at IS NULL OR j.accept_heartbeat_at < @stale)
+            ORDER BY j.updated_at
+            FOR UPDATE SKIP LOCKED
+            LIMIT 1
+            """;
+        SqlFragments.AddParam(cmd, "@stale", stale);
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        if (!await reader.ReadAsync(ct))
+        {
+            await tx.RollbackAsync(ct);
+            return null;
+        }
+
+        var result = reader.GetGuid(0);
+        await reader.DisposeAsync();
+        await tx.CommitAsync(ct);
+        return result;
+    }
+
+    private static async Task<GenerationDistrictsWorkItem> CompleteDistrictsClaimAsync(
+        AppDbContext db, Guid jobId, DateTimeOffset now, CancellationToken ct)
+    {
+        var job = await db.GenerationJobs.SingleAsync(j => j.Id == jobId, ct);
+
+        job.AcceptHeartbeatAt = now;
+        job.UpdatedAt = now;
+        await db.SaveChangesAsync(ct);
+
+        return new GenerationDistrictsWorkItem(
+            job.Id, job.CallerRole, job.CallerCommuneId,
+            job.CallerDairaId, job.CallerWilayaId, job.CommuneId);
     }
 
     private static async Task<GenerationAcceptWorkItem> CompleteAcceptClaimAsync(
@@ -505,12 +564,26 @@ public sealed class GenerationJobService(
             return;
         }
 
-        job.Status = GenerationJob.StatusDone;
-        job.Stage = null;
         job.Result = result;
         job.Error = null;
         job.AcceptHeartbeatAt = null;
         job.Progress = 1.0;
+
+        if (job.GenerateDistricts)
+        {
+            // Roads are done but the job continues: stay claimable in the
+            // districts stage (status 'active' + a stale-null heartbeat) so a
+            // worker picks up the partition pass. Progress stays at 1.0 — the
+            // chunk grid the client tracks is complete.
+            job.Status = GenerationJob.StatusActive;
+            job.Stage = GenerationJob.StageDistricts;
+        }
+        else
+        {
+            job.Status = GenerationJob.StatusDone;
+            job.Stage = null;
+        }
+
         job.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
     }
@@ -521,6 +594,42 @@ public sealed class GenerationJobService(
 
         var job = await db.GenerationJobs.FindAsync([jobId], ct);
         if (job is null || job.Status != GenerationJob.StatusAccepting)
+        {
+            return;
+        }
+
+        job.Status = GenerationJob.StatusFailed;
+        job.Error = error;
+        job.AcceptHeartbeatAt = null;
+        job.UpdatedAt = now;
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task CompleteDistrictsAsync(Guid jobId, JsonElement result, DateTimeOffset now, CancellationToken ct)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+
+        var job = await db.GenerationJobs.FindAsync([jobId], ct);
+        if (job is null || job.Stage != GenerationJob.StageDistricts)
+        {
+            return;
+        }
+
+        job.Status = GenerationJob.StatusDone;
+        job.Stage = null;
+        job.DistrictsResult = result;
+        job.Error = null;
+        job.AcceptHeartbeatAt = null;
+        job.UpdatedAt = now;
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task FailDistrictsAsync(Guid jobId, string error, DateTimeOffset now, CancellationToken ct)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+
+        var job = await db.GenerationJobs.FindAsync([jobId], ct);
+        if (job is null || job.Stage != GenerationJob.StageDistricts)
         {
             return;
         }
@@ -567,6 +676,6 @@ public sealed class GenerationJobService(
         return new GenerationJobView(
             job.Id, job.CommuneId, job.Status, job.Stage, job.TotalChunks, job.DoneChunks,
             job.Progress, job.DraftIds.ToList(), job.Error, job.CreatedAt, job.UpdatedAt,
-            chunks, job.Result);
+            chunks, job.Result, job.GenerateDistricts, job.DistrictsResult);
     }
 }

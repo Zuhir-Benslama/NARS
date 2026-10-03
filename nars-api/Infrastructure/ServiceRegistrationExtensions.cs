@@ -70,6 +70,8 @@ public static class ServiceRegistrationExtensions
             .ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<RoadRulesOptions>().Bind(config.GetSection("RoadRules"))
             .ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<DistrictGenerationOptions>().Bind(config.GetSection("DistrictGeneration"))
+            .ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<BuildingRulesOptions>().Bind(config.GetSection("BuildingRules"))
             .ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<SegmentationOptions>().Bind(config.GetSection("Segmentation"))
@@ -153,6 +155,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ICommuneScopeService, CommuneScopeService>();
         services.AddScoped<IDraftFeaturesService, DraftFeaturesService>();
         services.AddScoped<IRoadGenerationService, RoadGenerationService>();
+        services.AddScoped<IDistrictGenerationService, DistrictGenerationService>();
         services.AddScoped<IGenerationJobService, GenerationJobService>();
         services.AddHostedService<GenerationJobWorker>();
         services.AddSingleton<ILogSanitizer, LogSanitizer>();

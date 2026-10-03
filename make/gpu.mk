@@ -48,7 +48,11 @@ gpu-install: _gpu-preflight ## Install CDI device plugin (the segma GPU limit is
 	@echo "→ Installing NVIDIA device plugin..."
 	@$(KUBECTL) apply -k "$(GPU_DEVICE_DIR)"
 	@echo "→ Waiting for plugin..."
-	@$(KUBECTL) -n kube-system rollout status daemonset/nvidia-device-plugin --timeout=120s
+	@# Generous timeout on purpose: nvcr.io is not preloaded into the node, so a
+	@# cold cluster pulls the plugin image from the registry first. That pull
+	@# exceeded the previous 120s and failed cluster-up on a fast host, even
+	@# though the DaemonSet rolled out healthy moments later.
+	@$(KUBECTL) -n kube-system rollout status daemonset/nvidia-device-plugin --timeout=300s
 	@# A Ready plugin pod is NOT sufficient: the kubelet registers the extended
 	@# resource asynchronously, so a manifest requesting nvidia.com/gpu can
 	@# still be rejected seconds later with a confusing API-server error
@@ -57,12 +61,12 @@ gpu-install: _gpu-preflight ## Install CDI device plugin (the segma GPU limit is
 	@# the next target discover the problem.
 	@echo "→ Waiting for nvidia.com/gpu to be advertised on the node..."
 	@_waited=0; _gpu=""; \
-	while [ "$$_waited" -lt 120 ]; do \
+	while [ "$$_waited" -lt 180 ]; do \
 		_gpu=$$($(KUBECTL) get nodes -o jsonpath='{.items[*].status.allocatable.nvidia\.com/gpu}' 2>/dev/null); \
 		case "$$_gpu" in *[!0-9]*|"") ;; *) echo "  nvidia.com/gpu allocatable: $$_gpu"; break;; esac; \
 		_waited=$$((_waited+1)); sleep 1; \
 	done; \
-	if [ -z "$$_gpu" ] || [ "$$_waited" -ge 120 ]; then \
+	if [ -z "$$_gpu" ] || [ "$$_waited" -ge 180 ]; then \
 		echo "✖ nvidia.com/gpu was never advertised on any node."; \
 		echo "  The device plugin is registered but never published the resource."; \
 		echo "  Inspect it with: make gpu-status"; \

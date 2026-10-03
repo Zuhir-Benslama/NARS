@@ -11,6 +11,12 @@ public enum GenerationWorkKind
 
     /// <summary>Run the roads-phase acceptance for a fully-segmented job.</summary>
     Accept,
+
+    /// <summary>
+    /// Run the districts phase for a job whose roads acceptance completed and
+    /// which asked for districts (job.GenerateDistricts).
+    /// </summary>
+    Districts,
 }
 
 /// <summary>
@@ -49,6 +55,21 @@ public sealed record GenerationAcceptWorkItem(
     IReadOnlyList<Guid> DraftIds);
 
 /// <summary>
+/// A claimed districts pass: the roads acceptance is done and the job was
+/// created with GenerateDistricts, so the worker runs
+/// IDistrictGenerationService.GenerateAsync over the job's commune with the
+/// job creator's scope. Like the acceptance pass it is reclaimable when
+/// <c>accept_heartbeat_at</c> goes stale.
+/// </summary>
+public sealed record GenerationDistrictsWorkItem(
+    Guid JobId,
+    string CallerRole,
+    int? CallerCommuneId,
+    int? CallerDairaId,
+    int? CallerWilayaId,
+    int CommuneId);
+
+/// <summary>
 /// Orchestrates the async road-generation queue: job lifecycle, per-chunk
 /// raster uploads, and the FOR UPDATE SKIP LOCKED claim surface used by the
 /// worker pool. All user-facing methods enforce commune scope against the
@@ -58,7 +79,8 @@ public interface IGenerationJobService
 {
     Task<GenerationJobView> CreateAsync(
         string callerRole, int? callerCommuneId, int? callerDairaId, int? callerWilayaId,
-        Guid userId, int communeId, IReadOnlyList<GenerationGridDto> grids, CancellationToken ct);
+        Guid userId, int communeId, IReadOnlyList<GenerationGridDto> grids,
+        bool generateDistricts = false, CancellationToken ct = default);
 
     Task<GenerationJobView> GetViewAsync(
         Guid jobId, string callerRole, int? callerCommuneId, int? callerDairaId,
@@ -75,9 +97,11 @@ public interface IGenerationJobService
     /// <summary>
     /// Claims one unit of work: first a ready or stale-running chunk of a
     /// segment-phase job (bounded by <paramref name="maxAttempts"/>), then an
-    /// acceptance pass when every chunk of an 'accepting' job is done. Returns
-    /// null when nothing is claimable. The signature's now/tolerances are
-    /// injected by the worker so the eligibility rules stay testable.
+    /// acceptance pass when every chunk of an 'accepting' job is done, then a
+    /// districts pass for an 'active' job sitting in the districts stage.
+    /// Returns null when nothing is claimable. The signature's
+    /// now/tolerances are injected by the worker so the eligibility rules stay
+    /// testable.
     /// </summary>
     Task<object?> ClaimNextWorkAsync(
         DateTimeOffset now, TimeSpan staleClaimAfter, int maxAttempts, CancellationToken ct);
@@ -100,7 +124,17 @@ public interface IGenerationJobService
     Task<bool> CompleteChunkAsync(
         Guid jobId, Guid chunkId, IReadOnlyList<Guid> draftIds, DateTimeOffset now, CancellationToken ct);
 
+    /// <summary>
+    /// Records the acceptance result. A job created with GenerateDistricts does
+    /// not finish here: it advances to the districts stage so the worker picks
+    /// it up for one more pass.
+    /// </summary>
     Task CompleteAcceptAsync(Guid jobId, JsonElement result, DateTimeOffset now, CancellationToken ct);
 
     Task FailAcceptAsync(Guid jobId, string error, DateTimeOffset now, CancellationToken ct);
+
+    /// <summary>Finishes a job whose districts phase completed.</summary>
+    Task CompleteDistrictsAsync(Guid jobId, JsonElement result, DateTimeOffset now, CancellationToken ct);
+
+    Task FailDistrictsAsync(Guid jobId, string error, DateTimeOffset now, CancellationToken ct);
 }

@@ -277,7 +277,7 @@ cluster-wait: ## Wait for API server and nodes to be ready
 			[ "$$i" -ge 60 ] && { echo "Timed out waiting for nodes"; exit 1; };
 		done;
 	fi;
-	$(KUBECTL) wait --for=condition=Ready node --all --timeout=120s
+	$(KUBECTL) wait --for=condition=Ready node --all --timeout=180s
 	@echo "✓ Cluster ready"
 
 .PHONY: kubeconfig-fix

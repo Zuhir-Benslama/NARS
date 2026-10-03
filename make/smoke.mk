@@ -52,15 +52,21 @@ smoke-test: ## Post-deploy smoke test: verify /health, frontend, and API auth
 	# / and /map are served from two copies (nginx image vs nars-api wwwroot);
 	# if they drift, /map 404s its bundle -> blank page after login.
 	if command -v kubectl >/dev/null 2>&1 && kubectl get deploy nars-frontend -n "$(NAMESPACE)" >/dev/null 2>&1; then
-		_b=$$(mktemp); _a=$$(mktemp);
+		_b=$$(mktemp); _a=$$(mktemp); _assets=$$(mktemp);
+		# The two index.html files are copied into temp dirs, so the script cannot
+		# find a sibling assets/ dir and its existence check would be skipped —
+		# which is how a /map 404ing its bundle passed this test before. Pass the
+		# deployed listing (ls -1 of the pod's assets dir) so existence is
+		# verified against the running image, not the repo working tree.
 		if kubectl exec -n "$(NAMESPACE)" deploy/nars-frontend -- cat /usr/share/nginx/html/index.html > "$$_b" 2>/dev/null \
 			&& kubectl exec -n "$(NAMESPACE)" deploy/nars-api -- cat /app/wwwroot/index.html > "$$_a" 2>/dev/null \
-			&& python3 nars-infra/scripts/check_frontend_bundle_sync.py --frontend "$$_b" --api "$$_a" >/dev/null; then
-			pass "/ and /map serve the same bundle";
+			&& kubectl exec -n "$(NAMESPACE)" deploy/nars-api -- ls -1 /app/wwwroot/assets > "$$_assets" 2>/dev/null \
+			&& python3 nars-infra/scripts/check_frontend_bundle_sync.py --frontend "$$_b" --api "$$_a" --api-assets-listing "$$_assets" >/dev/null; then
+			pass "/ and /map serve the same bundle (present in the deployed wwwroot)";
 		else
-			fail "/ and /map bundle mismatch (nginx vs nars-api wwwroot) — run make frontend-update";
+			fail "/ and /map bundle check failed (mismatch, or a referenced bundle missing from the deployed images) — run make frontend-update";
 		fi;
-		rm -f "$$_b" "$$_a";
+		rm -f "$$_b" "$$_a" "$$_assets";
 	else
 		echo "  ↷ kubectl unavailable or cluster not up — skipping";
 	fi;

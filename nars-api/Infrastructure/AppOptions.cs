@@ -134,6 +134,26 @@ public class RoadRulesOptions
 }
 
 /// <summary>
+/// Tuning for the districts generation phase, which partitions a commune's
+/// urban zones (central_urban + secondary_urban) along the primary road network
+/// (boulevards and avenues) into reviewable district drafts.
+/// </summary>
+public class DistrictGenerationOptions
+{
+    /// <summary>
+    /// Minimum area, in square metres, for a partition piece to survive as its
+    /// own district. Anything smaller is a sliver produced by two cuts meeting
+    /// at a shallow angle or by a road ending just inside the zone boundary;
+    /// it is absorbed whole into the neighbouring district it shares the longest
+    /// boundary with, so the partition stays gapless and overlap-free. Set to 0
+    /// to keep every piece (including slivers). Default 50,000 m² (~0.05 km²),
+    /// comfortably below a city block but above the hairline wedges two roads
+    /// tend to carve out near a junction.
+    /// </summary>
+    [Range(0.0, 10_000_000.0)] public double MinDistrictAreaM2 { get; set; } = 50_000.0;
+}
+
+/// <summary>
 /// Cadastre-limitation rules applied when an AI building draft is accepted.
 /// Mirrors the NARS_SEGMA_BUILDING_* limits enforced by the segmentation
 /// service. Defaults are no-ops (keep every draft).

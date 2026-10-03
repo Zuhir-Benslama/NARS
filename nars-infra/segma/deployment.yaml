@@ -138,6 +138,18 @@ spec:
           ports:
             - containerPort: 8000
           env:
+            # CUDA-only, pinned explicitly rather than left to the app default.
+            # The models raise CudaUnavailableError without a CUDA device, so
+            # this pod fails closed and never becomes Ready instead of serving
+            # predictions from a CPU (see nars-segma/app/model.py).
+            - name: NARS_SEGMA_REQUIRE_CUDA
+              value: "1"
+            # FP16 autocast for the buildings model only; the registry pins
+            # roads to FP32 because their 0.6 confidence floor was calibrated
+            # against FP32 probability maps. See AMP in nars-segma/app/model.py.
+            # Set to "0" to A/B the buildings output against FP32.
+            - name: NARS_SEGMA_AMP
+              value: "1"
             - name: NARS_SEGMA_INTERNAL_TOKEN
               valueFrom:
                 secretKeyRef:

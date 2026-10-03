@@ -145,6 +145,7 @@ def _ok_spec() -> roads.ModelSpec:
         "num_classes": 2,
         "builder": "smp-unet",
         "postprocess": "polygons",
+        "amp": False,
         "rules": {"min_confidence": 0.0, "max_features": None},
     }
 
@@ -686,6 +687,14 @@ def test_segment_end_to_end_returns_geojson(monkeypatch: pytest.MonkeyPatch):
     to pass the fail-closed readiness gate while still exercising the whole
     predict -> postprocess -> response pipeline."""
     from app.main import app as live_app
+
+    # Randomly initialized weights blow past FP16's 65504 range and overflow to
+    # NaN, which the non-finite guard in predict() rejects with a 500. Real
+    # checkpoints stay well inside FP16 (verified on the GPU), so this test
+    # pins FP32: it covers the request contract, not precision — the guard and
+    # the FP16 path have their own tests in test_model.py. Must be set before
+    # TestClient enters lifespan, which is what builds the models.
+    monkeypatch.setitem(roads.MODEL_SPECS["buildings"], "amp", False)
 
     with TestClient(live_app) as live:
         assert roads._models["buildings"] is not None

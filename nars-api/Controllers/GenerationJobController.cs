@@ -62,7 +62,8 @@ public sealed class GenerationJobController(
         {
             var view = await generationJobService.CreateAsync(
                 CurrentUserRole, CurrentCommuneId, CurrentDairaId, CurrentWilayaId,
-                RequiredCurrentUserId, request.CommuneId.Value, request.Grids, cancellationToken);
+                RequiredCurrentUserId, request.CommuneId.Value, request.Grids,
+                request.GenerateDistricts ?? false, cancellationToken);
             return CreatedAtAction(nameof(Get), new { jobId = view.Id }, view);
         }
         catch (UnauthorizedAccessException)

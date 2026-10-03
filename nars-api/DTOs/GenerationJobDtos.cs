@@ -33,6 +33,16 @@ public sealed class CreateGenerationJobRequest
     [MinLength(1)]
     [MaxLength(4096)]
     public List<GenerationGridDto> Grids { get; set; } = [];
+
+    /// <summary>
+    /// When true the job runs the districts phase after the roads acceptance:
+    /// the worker partitions the commune's urban areas along its boulevards and
+    /// avenues and writes the pieces as pending district drafts. The phase needs
+    /// no imagery of its own — it reads the areas and roads already mapped.
+    /// Nullable so an older client that omits the field is not a breaking
+    /// change: absent means false, i.e. roads-only as before.
+    /// </summary>
+    public bool? GenerateDistricts { get; set; }
 }
 
 /// <summary>
@@ -72,6 +82,20 @@ public sealed record GenerationChunkView(
 /// per-chunk list; <see cref="Result"/> holds the GenerateRoadsResponse JSON
 /// (dropped/created/breakdown) once the job reaches <c>done</c>.
 /// </summary>
+/// <summary>A district draft created by the districts phase.</summary>
+public sealed record GeneratedDistrictDto(Guid DraftId, double AreaM2, double Lat, double Lng);
+
+/// <summary>
+/// Districts-phase outcome stored in generation_jobs.districts_result. The
+/// drafts are rows in the review queue (ai_draft_features), not districts yet —
+/// a reviewer accepts each one to materialize it.
+/// </summary>
+public sealed record GenerateDistrictsResponse(
+    IReadOnlyList<GeneratedDistrictDto> Districts,
+    int AbsorbedSlivers,
+    int PrimaryRoadCount,
+    int UrbanAreaCount);
+
 public sealed record GenerationJobView(
     Guid Id,
     int CommuneId,
@@ -85,4 +109,6 @@ public sealed record GenerationJobView(
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt,
     IReadOnlyList<GenerationChunkView> Chunks,
-    JsonElement? Result);
+    JsonElement? Result,
+    bool GenerateDistricts = false,
+    JsonElement? DistrictsResult = null);

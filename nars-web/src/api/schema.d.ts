@@ -2734,6 +2734,8 @@ export interface components {
       /** Format: int32 */
       communeId: null | number | string
       grids: components["schemas"]["GenerationGridDto"][]
+      /** @default false */
+      generateDistricts: boolean
     }
     DraftUpdateRequest: {
       geometryGeoJson: string
@@ -2790,6 +2792,25 @@ export interface components {
       dropped: number | string
       created: components["schemas"]["GeneratedRoadDto"][]
       breakdown: components["schemas"]["GenerateRoadsDroppedDto"]
+    }
+    GeneratedDistrictDto: {
+      /** Format: uuid */
+      draftId: string
+      /** Format: double */
+      areaM2: number | string
+      /** Format: double */
+      lat: number | string
+      /** Format: double */
+      lng: number | string
+    }
+    GenerateDistrictsResponse: {
+      districts: components["schemas"]["GeneratedDistrictDto"][]
+      /** Format: int32 */
+      absorbedSlivers: number | string
+      /** Format: int32 */
+      primaryRoadCount: number | string
+      /** Format: int32 */
+      urbanAreaCount: number | string
     }
     GenerationChunkView: {
       /** Format: uuid */
@@ -2864,6 +2885,8 @@ export interface components {
       updatedAt: null | string
       chunks: components["schemas"]["GenerationChunkView"][]
       result: null | components["schemas"]["JsonElement"]
+      generateDistricts: boolean
+      districtsResult: null | components["schemas"]["JsonElement"]
     }
     /** Format: binary */
     IFormFile: string

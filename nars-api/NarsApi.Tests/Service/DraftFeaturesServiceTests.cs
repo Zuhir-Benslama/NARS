@@ -72,6 +72,79 @@ public class DraftFeaturesServiceTests(NarsDatabaseFixture fixture) : ServiceTes
     }
 
     [Fact]
+    public async Task AcceptDistrictDraft_MaterializesDistrictAndStampsReviewer()
+    {
+        await using var seedDb = Fixture.CreateDbContext();
+        var (reviewerId, _) = await SeedReviewerAndCommuneAsync(seedDb, CommuneId100);
+        var draft = AiDraftFeature.Create(
+            featureType: AiDraftFeature.TypeDistrict,
+            geometryGeoJson: """{"type":"Polygon","coordinates":[[[2.95,36.71],[2.95,36.74],[2.98,36.74],[2.98,36.71],[2.95,36.71]]]}""",
+            confidence: 1.0,
+            communeId: CommuneId100,
+            sourceTileRef: null,
+            createdAt: FixedUtcNow,
+            source: AiDraftFeature.SourceDistrictPartition);
+        seedDb.AiDraftFeatures.Add(draft);
+        await seedDb.SaveChangesAsync();
+
+        var svc = CreateService(Fixture.CreateDbContextFactory());
+
+        var result = await svc.AcceptDraftAsync(
+            UserRoles.NationalAdmin, null, null, null, reviewerId, draft.Id, default);
+
+        Assert.Equal(DraftReviewStatus.Success, result.Status);
+
+        await using var verifyDb = Fixture.CreateDbContext();
+        var stored = await verifyDb.AiDraftFeatures.AsNoTracking().SingleAsync(d => d.Id == draft.Id);
+        Assert.Equal(AiDraftFeature.StatusAccepted, stored.Status);
+        Assert.Equal(reviewerId, stored.ReviewedBy);
+        Assert.NotNull(stored.ReviewedAt);
+
+        var district = await verifyDb.Districts.AsNoTracking().SingleAsync();
+        Assert.Equal(reviewerId, district.UserId);
+
+        // Parse rather than substring-match: the column is jsonb, so Postgres
+        // re-serializes it with its own spacing.
+        using var districtJson = System.Text.Json.JsonDocument.Parse(district.Data);
+        Assert.Equal("districts", districtJson.RootElement.GetProperty("type").GetString());
+        Assert.Equal(
+            FeatureTypes.DistrictLayers.DistrictLayer,
+            districtJson.RootElement.GetProperty("districtTypeKey").GetString());
+        Assert.True(districtJson.RootElement.GetProperty("coordinates").GetArrayLength() >= 4);
+    }
+
+    [Fact]
+    public async Task AcceptDistrictDraft_RejectsNonPolygonGeometry()
+    {
+        await using var seedDb = Fixture.CreateDbContext();
+        var (reviewerId, _) = await SeedReviewerAndCommuneAsync(seedDb, CommuneId100);
+        var draft = AiDraftFeature.Create(
+            featureType: AiDraftFeature.TypeDistrict,
+            geometryGeoJson: """{"type":"Polygon","coordinates":[[[2.95,36.71],[2.95,36.74]]]}""",
+            confidence: 1.0,
+            communeId: CommuneId100,
+            sourceTileRef: null,
+            createdAt: FixedUtcNow,
+            source: AiDraftFeature.SourceDistrictPartition);
+        seedDb.AiDraftFeatures.Add(draft);
+        await seedDb.SaveChangesAsync();
+
+        var svc = CreateService(Fixture.CreateDbContextFactory());
+
+        var result = await svc.AcceptDraftAsync(
+            UserRoles.NationalAdmin, null, null, null, reviewerId, draft.Id, default);
+
+        Assert.Equal(DraftReviewStatus.InvalidGeometry, result.Status);
+
+        await using var verifyDb = Fixture.CreateDbContext();
+        // Nothing materialized, and the draft stays reviewable.
+        Assert.False(await verifyDb.Districts.AsNoTracking().AnyAsync());
+        Assert.Equal(
+            AiDraftFeature.StatusPending,
+            await verifyDb.AiDraftFeatures.AsNoTracking().Where(d => d.Id == draft.Id).Select(d => d.Status).SingleAsync());
+    }
+
+    [Fact]
     public async Task AcceptDraft_RealConditionalUpdate_TransitionsAndStampsReviewer()
     {
         await using var seedDb = Fixture.CreateDbContext();

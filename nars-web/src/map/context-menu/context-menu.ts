@@ -114,6 +114,13 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
       label: t("ctx_generate_roads"),
       onClick: () => void generateRoadsFromUrbanAreas(),
     })
+    // Same job, districts phase included: the async queue always runs
+    // segmentation + acceptance first, so districts can only ride along with a
+    // full run rather than being triggered on their own.
+    items.push({
+      label: t("ctx_generate_roads_and_districts"),
+      onClick: () => void generateRoadsFromUrbanAreas(true),
+    })
     items.push({
       label: t("ctx_remove_all_roads"),
       danger: true,
@@ -208,6 +215,13 @@ export async function showMapContextMenu(
     items.push({
       label: t("ctx_generate_roads"),
       onClick: () => void generateRoadsFromUrbanAreas(),
+    })
+    // Same job, districts phase included: the async queue always runs
+    // segmentation + acceptance first, so districts can only ride along with a
+    // full run rather than being triggered on their own.
+    items.push({
+      label: t("ctx_generate_roads_and_districts"),
+      onClick: () => void generateRoadsFromUrbanAreas(true),
     })
     items.push({
       label: t("ctx_road_dir"),

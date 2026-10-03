@@ -3194,7 +3194,7 @@
         }
       },
       "CreateGenerationJobRequest": {
-        "required": ["communeId", "grids"],
+        "required": ["communeId", "grids", "generateDistricts"],
         "type": "object",
         "properties": {
           "communeId": {
@@ -3209,6 +3209,10 @@
             "items": {
               "$ref": "#/components/schemas/GenerationGridDto"
             }
+          },
+          "generateDistricts": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -3394,6 +3398,58 @@
           }
         }
       },
+      "GeneratedDistrictDto": {
+        "required": ["draftId", "areaM2", "lat", "lng"],
+        "type": "object",
+        "properties": {
+          "draftId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "areaM2": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": ["number", "string"],
+            "format": "double"
+          },
+          "lat": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": ["number", "string"],
+            "format": "double"
+          },
+          "lng": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": ["number", "string"],
+            "format": "double"
+          }
+        }
+      },
+      "GenerateDistrictsResponse": {
+        "required": ["districts", "absorbedSlivers", "primaryRoadCount", "urbanAreaCount"],
+        "type": "object",
+        "properties": {
+          "districts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GeneratedDistrictDto"
+            }
+          },
+          "absorbedSlivers": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "primaryRoadCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "urbanAreaCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          }
+        }
+      },
       "GenerationChunkView": {
         "required": [
           "id",
@@ -3567,7 +3623,9 @@
           "createdAt",
           "updatedAt",
           "chunks",
-          "result"
+          "result",
+          "generateDistricts",
+          "districtsResult"
         ],
         "type": "object",
         "properties": {
@@ -3626,6 +3684,19 @@
             }
           },
           "result": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/JsonElement"
+              }
+            ]
+          },
+          "generateDistricts": {
+            "type": "boolean"
+          },
+          "districtsResult": {
             "oneOf": [
               {
                 "type": "null"

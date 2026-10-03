@@ -74,13 +74,21 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
             // The EF chain deliberately does NOT own ai_draft_features — it is
             // created by nars-infra/migrations/0001_create_ai_draft_features.sql,
             // applied in production via `make db-migrate-nars` (see
-            // AiDraftFeatureConfiguration). Re-apply that same idempotent script
-            // so the test schema matches a migrated production cluster.
-            var sqlPath = FindInfraSqlPath(
-                "nars-infra", "migrations", "0001_create_ai_draft_features.sql");
-            await using var draftCmd = conn.CreateCommand();
-            draftCmd.CommandText = await File.ReadAllTextAsync(sqlPath);
-            await draftCmd.ExecuteNonQueryAsync();
+            // AiDraftFeatureConfiguration). Re-apply every SQL migration in
+            // order so the test schema matches a migrated production cluster:
+            // 0001 creates the draft table, 0002 no-ops on EF's generation_jobs,
+            // and 0003 widens the draft feature_type / job stage CHECKs that the
+            // districts generation phase depends on (a 'district' draft row
+            // would otherwise be rejected here but accepted in production).
+            var migrationsDir = FindInfraSqlDirectory("nars-infra", "migrations");
+            foreach (var sqlPath in Directory
+                         .EnumerateFiles(migrationsDir, "*.sql")
+                         .OrderBy(p => p, StringComparer.Ordinal))
+            {
+                await using var sqlCmd = conn.CreateCommand();
+                sqlCmd.CommandText = await File.ReadAllTextAsync(sqlPath);
+                await sqlCmd.ExecuteNonQueryAsync();
+            }
 
             _initialized = true;
         }
@@ -171,6 +179,29 @@ public sealed class NarsDatabaseFixture : IAsyncLifetime
 
         throw new InvalidOperationException(
             $"Could not locate {Path.Combine(relativeParts)} — walk up from {AppContext.BaseDirectory} found no repo root.");
+    }
+
+    /// <summary>
+    /// Directory sibling of <see cref="FindInfraSqlPath"/>: walks up from the
+    /// test binaries looking for an existing DIRECTORY (the migrations folder),
+    /// so the fixture applies every migration file in name order instead of a
+    /// hardcoded list that would silently skip ones added later.
+    /// </summary>
+    private static string FindInfraSqlDirectory(params string[] relativeParts)
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null)
+        {
+            var candidate = Path.Combine(new[] { dir.FullName }.Concat(relativeParts).ToArray());
+            if (Directory.Exists(candidate))
+            {
+                return candidate;
+            }
+            dir = dir.Parent!;
+        }
+
+        throw new InvalidOperationException(
+            $"Could not locate directory {Path.Combine(relativeParts)} — walk up from {AppContext.BaseDirectory} found no repo root.");
     }
 
     /// <summary>

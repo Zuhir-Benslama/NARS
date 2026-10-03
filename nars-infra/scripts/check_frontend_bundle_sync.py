@@ -17,6 +17,12 @@ Usage:
     python3 nars-infra/scripts/check_frontend_bundle_sync.py \
         --frontend nars-web/dist/index.html \
         --api nars-api/wwwroot/index.html
+
+When the entrypoints were copied out of running pods (which is how the deploy
+guards check them), they sit in a temp dir with no sibling ``assets/``, so the
+on-disk existence check would be skipped. Pass ``--api-assets-listing`` with the
+output of ``ls -1 <pod's assets dir>`` to check existence against the files that
+are actually deployed instead.
 """
 
 from __future__ import annotations
@@ -34,6 +40,12 @@ def collect_assets(path: Path) -> set[str]:
     return {name for name in _ASSET_RE.findall(text) if name}
 
 
+def read_listing(path: Path) -> set[str]:
+    """Parse a `ls -1` style listing into a set of filenames."""
+    text = path.read_text(encoding="utf-8")
+    return {line.strip() for line in text.splitlines() if line.strip()}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Check that two index.html entrypoints reference the same bundle assets."
@@ -43,6 +55,16 @@ def main() -> int:
     )
     parser.add_argument(
         "--api", required=True, type=Path, help="backend-served (wwwroot) index.html"
+    )
+    parser.add_argument(
+        "--api-assets-listing",
+        type=Path,
+        default=None,
+        help=(
+            "file listing the deployed wwwroot assets dir, one filename per line "
+            "(e.g. `ls -1 /app/wwwroot/assets` from the running pod). Use when "
+            "--api was copied out of a container and has no sibling assets/ dir."
+        ),
     )
     args = parser.parse_args()
 
@@ -71,22 +93,51 @@ def main() -> int:
         )
         return 1
 
-    assets_dir = args.api.parent / "assets"
-    if assets_dir.is_dir():
-        missing = {name for name in api_assets if not (assets_dir / name).is_file()}
+    # Existence check. Order matters: an explicit listing is what the deploy
+    # guards pass (the entrypoint is in a temp dir there, so the sibling-dir
+    # fallback below can never fire), and it is the only source that reflects
+    # the files actually deployed rather than the repo working tree.
+    if args.api_assets_listing is not None:
+        if not args.api_assets_listing.is_file():
+            print(
+                f"✖ missing assets listing: {args.api_assets_listing}",
+                file=sys.stderr,
+            )
+            return 2
+        available = read_listing(args.api_assets_listing)
+        missing = {name for name in api_assets if name not in available}
         if missing:
             print(
-                "✖ nars-api/wwwroot/index.html references bundle(s) missing on disk: "
-                f"{sorted(missing)}",
+                "✖ /map references bundle(s) absent from the deployed wwwroot "
+                f"assets dir: {sorted(missing)}",
                 file=sys.stderr,
             )
             return 1
     else:
-        print(
-            "  ↷ api entrypoint has no sibling assets/ dir — "
-            "skipping on-disk existence check",
-            file=sys.stderr,
-        )
+        assets_dir = args.api.parent / "assets"
+        if assets_dir.is_dir():
+            missing = {name for name in api_assets if not (assets_dir / name).is_file()}
+            if missing:
+                print(
+                    "✖ nars-api/wwwroot/index.html references bundle(s) missing "
+                    f"on disk: {sorted(missing)}",
+                    file=sys.stderr,
+                )
+                return 1
+        else:
+            # Loud on purpose: a skipped existence check is not a pass. Say so
+            # on stdout (where callers show it) and name the flag that closes it.
+            print(
+                "  ↷ WARNING: existence check did NOT run — no sibling assets/ "
+                "dir next to the api entrypoint. Pass --api-assets-listing to "
+                "verify the deployed files.",
+                file=sys.stderr,
+            )
+            print(
+                "  ↷ existence check skipped (no sibling assets/ dir) — "
+                "bundles are equal but their presence on disk is UNVERIFIED",
+                file=sys.stdout,
+            )
 
     print(
         f"✓ / and /map reference the same {len(api_assets)} asset(s): {sorted(api_assets)}"

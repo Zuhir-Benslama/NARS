@@ -484,7 +484,12 @@ def test_model_fails_closed_without_cuda(monkeypatch):
         SegmentationModel(weights_path="/nonexistent/weights.pth", tile_size=32)
 
 
-# ── Mixed precision (NARS_SEGMA_AMP) ─────────────────────────────────────
+# ── Mixed precision (per-model `amp`) ───────────────────────────────────────
+#
+# FP16 is opt-in per model via the `amp` kwarg, not a global: buildings take it,
+# roads are pinned to FP32 because the 0.6 road confidence floor was calibrated
+# against FP32 probability maps (see AMP in app/model.py). The default is off,
+# so a caller that forgets `amp` gets the calibrated FP32 path.
 #
 # The CUDA branch cannot be exercised on a CPU-only box: `use_amp` keys off
 # `self.device.type == "cuda"`, and forcing that on a host with no CUDA device
@@ -493,22 +498,18 @@ def test_model_fails_closed_without_cuda(monkeypatch):
 # cover the default everywhere.
 
 
-def test_amp_defaults_off(monkeypatch):
-    # The default is deliberate: the 0.6 road confidence floor was calibrated
-    # against FP32 probability maps.
-    monkeypatch.setattr(model_module, "USE_AMP", False)
+def test_amp_defaults_off():
     assert (
         SegmentationModel(weights_path="/nonexistent/w.pth", tile_size=32).use_amp
         is False
     )
 
 
-def test_amp_ignored_on_cpu(monkeypatch, caplog):
+def test_amp_ignored_on_cpu(caplog):
     # FP16 autocast is not supported on CPU, so a CPU run must stay in FP32
     # rather than raising mid-inference. This is the path the test suite takes.
-    monkeypatch.setattr(model_module, "USE_AMP", True)
     built = SegmentationModel(
-        weights_path="/nonexistent/w.pth", tile_size=32, device="cpu"
+        weights_path="/nonexistent/w.pth", tile_size=32, device="cpu", amp=True
     )
     assert built.device.type == "cpu"
     assert built.use_amp is False
@@ -516,24 +517,69 @@ def test_amp_ignored_on_cpu(monkeypatch, caplog):
 
 
 @requires_cuda
-def test_amp_enabled_when_cuda(monkeypatch):
-    monkeypatch.setattr(model_module, "USE_AMP", True)
+def test_amp_enabled_when_requested():
     assert (
-        SegmentationModel(weights_path="/nonexistent/w.pth", tile_size=32).use_amp
+        SegmentationModel(
+            weights_path="/nonexistent/w.pth", tile_size=32, amp=True
+        ).use_amp
         is True
     )
 
 
+def test_roads_pinned_to_fp32_and_buildings_opt_in():
+    # The calibration guarantee is enforced by the registry, so assert it there:
+    # roads must never be FP16, and buildings follow NARS_SEGMA_AMP (on by
+    # default). If someone adds an env override for roads, this fails.
+    import app.main as main_module
+
+    assert main_module.MODEL_SPECS["roads"]["amp"] is False
+    assert main_module.MODEL_SPECS["buildings"]["amp"] is model_module.AMP
+
+
 @requires_cuda
-def test_amp_preserves_float32_probability_contract(monkeypatch):
+def test_amp_preserves_float32_probability_contract():
     # Only the matmuls run in FP16; sigmoid/softmax are on autocast's fp32 list,
     # so predict must still return float32 probabilities in [0, 1] or the
     # 0.6 confidence floor downstream would consume half-precision values.
-    monkeypatch.setattr(model_module, "USE_AMP", True)
-    built = SegmentationModel(weights_path="/nonexistent/w.pth", tile_size=32)
+    built = SegmentationModel(weights_path="/nonexistent/w.pth", tile_size=32, amp=True)
     assert built.use_amp is True
     raw = make_tiff_bytes(width=64, height=48)
     probs, _ = built.predict(raw, bbox=(0.0, 0.0, 1.0, 1.0))
     assert probs.dtype == np.float32
     assert probs.min() >= 0.0
     assert probs.max() <= 1.0
+
+
+# ── Non-finite probability guard ────────────────────────────────────────────
+
+
+@requires_torch
+def test_nonfinite_probabilities_raise(monkeypatch):
+    # FP16 autocast can overflow (activations past 65504 -> inf -> NaN through
+    # the network). A NaN map must never be returned: `NaN < min_confidence` is
+    # False, so it passes every downstream floor and is emitted as a polygon
+    # with `confidence: null`. predict() must raise instead.
+    import torch
+
+    built = SegmentationModel(weights_path="/nonexistent/w.pth", tile_size=32)
+
+    def _nan_forward(x):
+        out = torch.zeros((x.shape[0], built.num_classes, x.shape[2], x.shape[3]))
+        out[0, 0, 0, 0] = float("nan")
+        return out
+
+    monkeypatch.setattr(built.net, "forward", _nan_forward)
+    with pytest.raises(model_module.NonFiniteProbabilitiesError):
+        built.predict(make_tiff_bytes(width=16, height=16), bbox=(0.0, 0.0, 1.0, 1.0))
+
+
+@requires_torch
+def test_nonfinite_error_names_amp_as_the_likely_cause():
+    # The operator reading a 500 needs the next step in the message, and the
+    # FP16 hint is only actionable when autocast was actually on.
+    assert "NARS_SEGMA_AMP=0" in str(
+        model_module.NonFiniteProbabilitiesError(use_amp=True)
+    )
+    assert "NARS_SEGMA_AMP=0" not in str(
+        model_module.NonFiniteProbabilitiesError(use_amp=False)
+    )

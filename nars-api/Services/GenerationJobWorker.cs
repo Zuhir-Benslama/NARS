@@ -46,6 +46,7 @@ public sealed class GenerationJobWorker(
                 var jobs = scope.ServiceProvider.GetRequiredService<IGenerationJobService>();
                 var drafts = scope.ServiceProvider.GetRequiredService<IDraftFeaturesService>();
                 var roads = scope.ServiceProvider.GetRequiredService<IRoadGenerationService>();
+                var districts = scope.ServiceProvider.GetRequiredService<IDistrictGenerationService>();
                 var time = scope.ServiceProvider.GetRequiredService<IDateTimeProvider>();
 
                 var work = await jobs.ClaimNextWorkAsync(
@@ -64,6 +65,9 @@ public sealed class GenerationJobWorker(
                         break;
                     case GenerationAcceptWorkItem accept:
                         await ProcessAcceptAsync(jobs, roads, time, accept, stoppingToken);
+                        break;
+                    case GenerationDistrictsWorkItem districtsWork:
+                        await ProcessDistrictsAsync(jobs, districts, time, districtsWork, stoppingToken);
                         break;
                 }
             }
@@ -177,6 +181,67 @@ public sealed class GenerationJobWorker(
             catch (Exception inner) when (inner is not OperationCanceledException)
             {
                 logger.LogError(inner, "Failed to record acceptance failure for job {JobId}.", work.JobId);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Districts phase. Runs after the roads acceptance for jobs created with
+    /// GenerateDistricts: partitions the commune's urban zones along the primary
+    /// roads and writes the pieces as pending district drafts. Nothing is
+    /// materialized into the districts table here — the drafts go to the review
+    /// queue like any other suggestion. The phase is geometry work with no
+    /// raster, so it finishes in one pass; the heartbeat loop is kept anyway so
+    /// a slow partition on a large commune cannot be mistaken for a crashed
+    /// worker and claimed twice.
+    /// </summary>
+    private async Task ProcessDistrictsAsync(
+        IGenerationJobService jobs,
+        IDistrictGenerationService districts,
+        IDateTimeProvider time,
+        GenerationDistrictsWorkItem work,
+        CancellationToken stoppingToken)
+    {
+        using var heartbeats = CreateHeartbeatLoop(
+            stoppingToken,
+            options.Value.HeartbeatIntervalMs,
+            logger,
+            "districts phase of job {JobId}",
+            work.JobId,
+            (_) => jobs.HeartbeatAcceptAsync(work.JobId, time.UtcNow, stoppingToken));
+
+        try
+        {
+            var summary = await districts.GenerateAsync(
+                work.CallerRole, work.CallerCommuneId, work.CallerDairaId, work.CallerWilayaId,
+                work.CommuneId, stoppingToken);
+
+            var response = new GenerateDistrictsResponse(
+                summary.Drafts
+                    .Select(d => new GeneratedDistrictDto(
+                        d.DraftId, d.AreaM2, d.Lat, d.Lng))
+                    .ToList(),
+                summary.AbsorbedSlivers,
+                summary.PrimaryRoadCount,
+                summary.UrbanAreaCount);
+
+            await jobs.CompleteDistrictsAsync(
+                work.JobId, JsonSerializer.SerializeToElement(response, SerializerOptions), time.UtcNow, stoppingToken);
+
+            logger.LogInformation(
+                "Generation job {JobId} districts phase done: {Count} district drafts created, {Absorbed} sliver(s) absorbed.",
+                work.JobId, summary.Drafts.Count, summary.AbsorbedSlivers);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Districts phase for job {JobId} failed: {Message}", work.JobId, ex.Message);
+            try
+            {
+                await jobs.FailDistrictsAsync(work.JobId, ex.Message, time.UtcNow, stoppingToken);
+            }
+            catch (Exception inner) when (inner is not OperationCanceledException)
+            {
+                logger.LogError(inner, "Failed to record districts failure for job {JobId}.", work.JobId);
             }
         }
     }

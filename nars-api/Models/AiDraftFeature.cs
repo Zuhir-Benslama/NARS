@@ -8,9 +8,11 @@ namespace NarsApi.Models;
 /// </summary>
 public sealed class AiDraftFeature
 {
-    // Draft feature-type keys (the segmentation client can emit roads or buildings).
+    // Draft feature-type keys (the segmentation client emits roads or
+    // buildings; the districts generation phase emits district polygons).
     public const string TypeRoad = "road";
     public const string TypeBuilding = "building";
+    public const string TypeDistrict = "district";
 
     // Status values.
     public const string StatusPending = "pending";
@@ -18,10 +20,17 @@ public sealed class AiDraftFeature
     public const string StatusRejected = "rejected";
     public const string StatusEdited = "edited";
 
+    // Provenance values stored in the `source` column (VARCHAR(20), unconstrained).
+    // Segmentation-produced drafts keep the column default; districts come from
+    // the geometry partition in DistrictGenerationService, not from imagery, so
+    // the review queue can tell the two apart at a glance.
+    public const string SourceSegmentation = "ai_segmentation";
+    public const string SourceDistrictPartition = "district_generation";
+
     public Guid Id { get; private set; }
-    public string FeatureType { get; private set; } = null!; // "road" | "building"
+    public string FeatureType { get; private set; } = null!; // "road" | "building" | "district"
     public string GeometryGeoJson { get; private set; } = null!;
-    public string Source { get; private set; } = "ai_segmentation";
+    public string Source { get; private set; } = SourceSegmentation;
     public double Confidence { get; private set; }
     public string Status { get; private set; } = StatusPending; // pending | accepted | rejected | edited
     public int CommuneId { get; private set; }
@@ -38,9 +47,10 @@ public sealed class AiDraftFeature
         double confidence,
         int communeId,
         string? sourceTileRef,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        string? source = null)
     {
-        if (featureType is not (TypeRoad or TypeBuilding))
+        if (featureType is not (TypeRoad or TypeBuilding or TypeDistrict))
         {
             throw new ArgumentException($"Unknown feature type: {featureType}", nameof(featureType));
         }
@@ -53,6 +63,7 @@ public sealed class AiDraftFeature
             Confidence = confidence,
             CommuneId = communeId,
             SourceTileRef = sourceTileRef,
+            Source = source ?? SourceSegmentation,
             CreatedAt = createdAt,
             Status = StatusPending,
         };

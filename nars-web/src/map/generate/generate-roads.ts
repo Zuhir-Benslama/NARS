@@ -50,6 +50,8 @@ const JOB_POLL_INTERVAL_MS = 2_500
 export interface GenerateRoadsResult {
   created: number
   dropped: number
+  /** District drafts created by the optional districts phase (0 when skipped). */
+  districts: number
 }
 
 /** Union bounds of the commune's urban areas, or null when none are drawn. */
@@ -199,7 +201,9 @@ function reflectJobProgress(job: GenerationJobView): void {
  * created/dropped counts, or null when the flow was skipped/failed (details
  * reported via toasts).
  */
-export async function generateRoadsFromUrbanAreas(): Promise<GenerateRoadsResult | null> {
+export async function generateRoadsFromUrbanAreas(
+  generateDistricts = false,
+): Promise<GenerateRoadsResult | null> {
   const communeId = useAppStore().user?.commune?.id ?? null
   if (communeId == null) {
     showToast(t("gen_roads_no_commune"), "error")
@@ -231,6 +235,7 @@ export async function generateRoadsFromUrbanAreas(): Promise<GenerateRoadsResult
       grids.map((grid, index) =>
         toGenerationGrid(String(index), grid.zoom, grid, gridBounds(grid)),
       ),
+      generateDistricts,
     )
     jobId = job.id
 
@@ -267,10 +272,22 @@ export async function generateRoadsFromUrbanAreas(): Promise<GenerateRoadsResult
     if (view.status === GENERATION_JOB_STATUS.cancelled) {
       showToast(t("gen_roads_cancelled"), "info")
       generation.complete()
-      return { created: 0, dropped: 0 }
+      return { created: 0, dropped: 0, districts: 0 }
     }
 
-    // 3. Result-shaped GenerateRoadsResponse (dropped/created/breakdown).
+    // 3. Districts phase summary. Reported here, before the early returns
+    // below: a run can yield districts even when it detected no new roads, as
+    // long as the commune already has boulevards/avenues to cut along.
+    const districtDrafts = view.districtsResult?.districts ?? []
+    if (generateDistricts) {
+      if (districtDrafts.length > 0) {
+        showToast(t("gen_districts_done", { count: districtDrafts.length }), "success")
+      } else {
+        showToast(t("gen_districts_none"), "info")
+      }
+    }
+
+    // 4. Result-shaped GenerateRoadsResponse (dropped/created/breakdown).
     const created: GeneratedRoad[] = [...(view.result?.created ?? [])]
     let dropped = view.result?.dropped ?? 0
     const breakdown = view.result?.breakdown ?? {
@@ -282,7 +299,7 @@ export async function generateRoadsFromUrbanAreas(): Promise<GenerateRoadsResult
       invalidGeometry: 0,
     }
 
-    // 4. Fallback when the run produced no roads but the queue still holds
+    // 5. Fallback when the run produced no roads but the queue still holds
     //    accept-ready drafts (clear-roads re-created pending rows; segmentation
     //    dedup blocks a second re-detection). A single acceptance pass on the
     //    pending ids rebuilds the network.
@@ -303,7 +320,7 @@ export async function generateRoadsFromUrbanAreas(): Promise<GenerateRoadsResult
       } else {
         showToast(t("gen_roads_no_detections"), "info")
         generation.complete()
-        return { created: 0, dropped: 0 }
+        return { created: 0, dropped: 0, districts: districtDrafts.length }
       }
     }
 
@@ -326,7 +343,7 @@ export async function generateRoadsFromUrbanAreas(): Promise<GenerateRoadsResult
       )
     }
     showToast(t("gen_roads_done", { created: created.length, dropped }), "success")
-    return { created: created.length, dropped }
+    return { created: created.length, dropped, districts: districtDrafts.length }
   } catch (err) {
     if (jobId) await cancelJobQuietly(jobId)
     generation.abort()

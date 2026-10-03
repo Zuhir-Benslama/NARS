@@ -345,9 +345,62 @@ public class DraftFeaturesService(
             return await AcceptRoadDraftAsync(db, draft, userId, ct);
         }
 
+        if (draft.FeatureType == AiDraftFeature.TypeDistrict)
+        {
+            return await AcceptDistrictDraftAsync(db, draft, userId, ct);
+        }
+
         // Building drafts are materialized as auto-numbered house entrances on
         // the nearest road in the commune (Phase 2).
         return await AcceptBuildingDraftAsync(db, draft, userId, ct);
+    }
+
+    /// <summary>
+    /// Materializes an accepted district draft into the production districts
+    /// table. Unlike the manual drawing path (ValidationController.ValidateDistrict)
+    /// this runs no overlap/adjacency/coverage gate: a generated partition piece
+    /// SATISFIES those rules by construction — pieces never overlap, they tile
+    /// the urban zone, and each one touches a sibling — so running the manual
+    /// gate here would reject the generator's own output. In particular the
+    /// manual overlap check is a bare ST_Intersects, which counts a shared edge
+    /// as an overlap. The geometry is still validated as a parseable polygon
+    /// with at least three vertices, and the review race is settled exactly like
+    /// the road/building paths.
+    /// </summary>
+    private async Task<DraftReviewResult> AcceptDistrictDraftAsync(
+        AppDbContext db, AiDraftFeature draft, Guid userId, CancellationToken ct)
+    {
+        if (!DraftGeometry.TryGetPolygonRing(draft.GeometryGeoJson, out var ring) || ring.Count < 3)
+        {
+            return new DraftReviewResult(DraftReviewStatus.InvalidGeometry);
+        }
+
+        var dataJson = DraftGeometry.ToDistrictData(draft.GeometryGeoJson).ToJsonString();
+        var districtId = Guid.CreateVersion7();
+        var entity = FeatureTypeRegistry.CreateEntity(
+            FeatureTypes.District,
+            districtId,
+            userId,
+            FeatureTypes.DistrictLayers.DistrictLayer,
+            label: string.Empty,
+            dataJson)
+            ?? throw new InvalidOperationException("FeatureTypeRegistry has no District descriptor");
+        var entry = FeatureTypeRegistry.AddToDbContext(db, entity)
+            ?? throw new InvalidOperationException("FeatureTypeRegistry has no District descriptor");
+        db.FeatureRegistry.Add(new FeatureRegistry { Id = districtId, FeatureType = FeatureTypes.District });
+
+        var reviewedAt = timeProvider.UtcNow;
+        var affected = await TryReviewDraftAsync(db, draft.Id, AiDraftFeature.StatusAccepted, userId, reviewedAt, ct);
+        if (affected == 0)
+        {
+            // Lost the review race: the winner materialized their district, so
+            // detach ours rather than committing a duplicate.
+            entry.State = EntityState.Detached;
+            return ResolveConflict(db, draft.Id);
+        }
+
+        await db.SaveChangesAsync(ct);
+        return new DraftReviewResult(DraftReviewStatus.Success);
     }
 
     /// <summary>

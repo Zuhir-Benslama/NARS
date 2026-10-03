@@ -142,6 +142,40 @@ public static class DraftGeometry
     }
 
     /// <summary>
+    /// Builds the production <c>data</c> JSONB payload for a materialized
+    /// district: mirrors the FeatureData object the web front-end sends for
+    /// user-drawn districts (<c>type</c> + <c>label</c> + <c>districtTypeKey</c>
+    /// + coordinates as lat/lng objects). District drafts are GeoJSON Polygons in
+    /// [lng, lat] order, so this is the same inverse conversion
+    /// <see cref="ToRoadData"/> performs for lines.
+    ///
+    /// <paramref name="districtLayer"/> defaults to the plain
+    /// <see cref="FeatureTypes.DistrictLayers.DistrictLayer"/> layer: a generated
+    /// partition piece is a generic district, not a housing estate / urban pole
+    /// the generator cannot infer.
+    /// </summary>
+    public static JsonObject ToDistrictData(
+        string geometryGeoJson, string districtLayer = FeatureTypes.DistrictLayers.DistrictLayer)
+    {
+        var coordinates = new JsonArray();
+        if (TryGetPolygonRing(geometryGeoJson, out var ring))
+        {
+            foreach (var (lon, lat) in ring)
+            {
+                coordinates.Add(new JsonObject { ["lat"] = lat, ["lng"] = lon });
+            }
+        }
+
+        return new JsonObject
+        {
+            ["type"] = "districts",
+            ["label"] = "",
+            ["districtTypeKey"] = districtLayer,
+            ["coordinates"] = coordinates,
+        };
+    }
+
+    /// <summary>
     /// Extracts the outer ring of a GeoJSON Polygon as (Lon, Lat) pairs. The
     /// expected geometry kind for a building draft. Returns false when the
     /// geometry is not a Polygon or its ring is malformed.

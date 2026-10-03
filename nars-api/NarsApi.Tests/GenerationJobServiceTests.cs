@@ -38,7 +38,7 @@ public class GenerationJobServiceTests
 
         var view = await service.CreateAsync(
             UserRoles.NationalAdmin, null, null, null, OwnerId, TestData.CommuneId100,
-            [Grid("0,0"), Grid("0,1")], CancellationToken.None);
+            [Grid("0,0"), Grid("0,1")], false, CancellationToken.None);
 
         Assert.Equal(TestData.CommuneId100, view.CommuneId);
         Assert.Equal(GenerationJob.StatusPending, view.Status);
@@ -57,7 +57,7 @@ public class GenerationJobServiceTests
 
         await Assert.ThrowsAsync<ArgumentException>(() => service.CreateAsync(
             UserRoles.NationalAdmin, null, null, null, OwnerId, TestData.CommuneId100,
-            [Grid("0,0"), Grid("0,0")], CancellationToken.None));
+            [Grid("0,0"), Grid("0,0")], false, CancellationToken.None));
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public class GenerationJobServiceTests
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() => service.CreateAsync(
             UserRoles.NationalAdmin, null, null, null, OwnerId, TestData.NonExistentId,
-            [Grid("0,0")], CancellationToken.None));
+            [Grid("0,0")], false, CancellationToken.None));
     }
 
     [Fact]
@@ -78,7 +78,7 @@ public class GenerationJobServiceTests
         // Field worker scoped to commune 101 cannot start a generation run for 100.
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.CreateAsync(
             UserRoles.FieldWorker, TestData.CommuneId101, null, null, OwnerId, TestData.CommuneId100,
-            [Grid("0,0")], CancellationToken.None));
+            [Grid("0,0")], false, CancellationToken.None));
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public class GenerationJobServiceTests
         var service = await CreateServiceAsync();
 
         var created = await service.CreateAsync(
-            UserRoles.NationalAdmin, null, null, null, OwnerId, TestData.CommuneId100, [Grid("0,0")], CancellationToken.None);
+            UserRoles.NationalAdmin, null, null, null, OwnerId, TestData.CommuneId100, [Grid("0,0")], false, CancellationToken.None);
         var chunk = created.Chunks.Single();
 
         var view = await service.UploadChunkRasterAsync(
@@ -104,7 +104,7 @@ public class GenerationJobServiceTests
         var service = await CreateServiceAsync();
 
         var created = await service.CreateAsync(
-            UserRoles.NationalAdmin, null, null, null, OwnerId, TestData.CommuneId100, [Grid("0,0")], CancellationToken.None);
+            UserRoles.NationalAdmin, null, null, null, OwnerId, TestData.CommuneId100, [Grid("0,0")], false, CancellationToken.None);
         var chunk = created.Chunks.Single();
 
         await service.UploadChunkRasterAsync(
@@ -122,7 +122,7 @@ public class GenerationJobServiceTests
         var service = await CreateServiceAsync();
 
         var created = await service.CreateAsync(
-            UserRoles.NationalAdmin, null, null, null, OwnerId, TestData.CommuneId100, [Grid("0,0")], CancellationToken.None);
+            UserRoles.NationalAdmin, null, null, null, OwnerId, TestData.CommuneId100, [Grid("0,0")], false, CancellationToken.None);
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() => service.UploadChunkRasterAsync(
             created.Id, Guid.CreateVersion7(), UserRoles.NationalAdmin, null, null, null,
@@ -136,7 +136,7 @@ public class GenerationJobServiceTests
 
         var created = await service.CreateAsync(
             UserRoles.NationalAdmin, null, null, null, OwnerId, TestData.CommuneId100,
-            [Grid("0,0"), Grid("0,1")], CancellationToken.None);
+            [Grid("0,0"), Grid("0,1")], false, CancellationToken.None);
         var chunkA = created.Chunks[0];
         var chunkB = created.Chunks[1];
 
@@ -164,7 +164,7 @@ public class GenerationJobServiceTests
         var service = await CreateServiceAsync();
 
         var created = await service.CreateAsync(
-            UserRoles.NationalAdmin, null, null, null, OwnerId, TestData.CommuneId100, [Grid("0,0")], CancellationToken.None);
+            UserRoles.NationalAdmin, null, null, null, OwnerId, TestData.CommuneId100, [Grid("0,0")], false, CancellationToken.None);
         var chunk = created.Chunks.Single();
         await service.CompleteChunkAsync(created.Id, chunk.Id, [Guid.CreateVersion7()], FixedUtcNow, CancellationToken.None);
 
@@ -178,13 +178,114 @@ public class GenerationJobServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_WithDistrictsFlag_RecordsTheFlagButStillStartsOnRoads()
+    {
+        var service = await CreateServiceAsync();
+
+        var view = await service.CreateAsync(
+            UserRoles.NationalAdmin, null, null, null, OwnerId, TestData.CommuneId100,
+            [Grid("0,0")], true, CancellationToken.None);
+
+        // Districts ride on top of a normal run: the queue still has to segment
+        // and accept roads before it can cut the zones.
+        Assert.True(view.GenerateDistricts);
+        Assert.Equal(GenerationJob.StatusPending, view.Status);
+        Assert.Equal(GenerationJob.StageSegment, view.Stage);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithoutDistrictsFlag_LeavesTheFlagOff()
+    {
+        var service = await CreateServiceAsync();
+
+        var view = await service.CreateAsync(
+            UserRoles.NationalAdmin, null, null, null, OwnerId, TestData.CommuneId100,
+            [Grid("0,0")], false, CancellationToken.None);
+
+        Assert.False(view.GenerateDistricts);
+    }
+
+    [Fact]
+    public async Task CompleteAcceptAsync_WithDistricts_MovesOnInsteadOfFinishing()
+    {
+        var service = await CreateServiceAsync();
+
+        var created = await service.CreateAsync(
+            UserRoles.NationalAdmin, null, null, null, OwnerId, TestData.CommuneId100, [Grid("0,0")], true, CancellationToken.None);
+        var chunk = created.Chunks.Single();
+        await service.CompleteChunkAsync(created.Id, chunk.Id, [Guid.CreateVersion7()], FixedUtcNow, CancellationToken.None);
+
+        var result = JsonSerializer.SerializeToElement("""{"dropped":0,"created":[],"breakdown":{}}""", new JsonSerializerOptions());
+        await service.CompleteAcceptAsync(created.Id, result, FixedUtcNow, CancellationToken.None);
+
+        var view = await service.GetViewAsync(created.Id, UserRoles.NationalAdmin, null, null, null, CancellationToken.None);
+
+        // Not done: the districts phase still has to run.
+        Assert.Equal(GenerationJob.StageDistricts, view.Stage);
+        Assert.NotEqual(GenerationJob.StatusDone, view.Status);
+        Assert.True(view.Result.HasValue);
+    }
+
+    [Fact]
+    public async Task CompleteAcceptAsync_WithoutDistricts_StillFinishesAsBefore()
+    {
+        var service = await CreateServiceAsync();
+
+        var created = await service.CreateAsync(
+            UserRoles.NationalAdmin, null, null, null, OwnerId, TestData.CommuneId100, [Grid("0,0")], false, CancellationToken.None);
+        var chunk = created.Chunks.Single();
+        await service.CompleteChunkAsync(created.Id, chunk.Id, [Guid.CreateVersion7()], FixedUtcNow, CancellationToken.None);
+
+        var result = JsonSerializer.SerializeToElement("""{"dropped":0,"created":[],"breakdown":{}}""", new JsonSerializerOptions());
+        await service.CompleteAcceptAsync(created.Id, result, FixedUtcNow, CancellationToken.None);
+
+        var view = await service.GetViewAsync(created.Id, UserRoles.NationalAdmin, null, null, null, CancellationToken.None);
+        Assert.Equal(GenerationJob.StatusDone, view.Status);
+    }
+
+    [Fact]
+    public async Task CompleteDistrictsAsync_SetsDoneWithDistrictsResult()
+    {
+        var service = await CreateServiceAsync();
+
+        var created = await service.CreateAsync(
+            UserRoles.NationalAdmin, null, null, null, OwnerId, TestData.CommuneId100, [Grid("0,0")], true, CancellationToken.None);
+        var chunk = created.Chunks.Single();
+        await service.CompleteChunkAsync(created.Id, chunk.Id, [Guid.CreateVersion7()], FixedUtcNow, CancellationToken.None);
+        await service.CompleteAcceptAsync(
+            created.Id,
+            JsonSerializer.SerializeToElement("""{"dropped":0,"created":[],"breakdown":{}}""", new JsonSerializerOptions()),
+            FixedUtcNow,
+            CancellationToken.None);
+
+        var districts = JsonSerializer.SerializeToElement(
+            """{"districts":[{"draftId":"0199b8a0-0000-7000-8000-000000000001","areaM2":1000,"lat":36.7,"lng":2.9}],"absorbedSlivers":1,"primaryRoadCount":2,"urbanAreaCount":1}""",
+            new JsonSerializerOptions());
+        await service.CompleteDistrictsAsync(created.Id, districts, FixedUtcNow, CancellationToken.None);
+
+        var view = await service.GetViewAsync(created.Id, UserRoles.NationalAdmin, null, null, null, CancellationToken.None);
+
+        Assert.Equal(GenerationJob.StatusDone, view.Status);
+        Assert.True(view.DistrictsResult.HasValue);
+
+        // The in-memory provider round-trips the jsonb column as a JSON string
+        // rather than an object, so unwrap whichever shape came back.
+        var stored = view.DistrictsResult!.Value;
+        using var parsed = JsonDocument.Parse(
+            stored.ValueKind == JsonValueKind.String ? stored.GetString()! : stored.GetRawText());
+        Assert.Equal(1, parsed.RootElement.GetProperty("absorbedSlivers").GetInt32());
+        Assert.Equal(1, parsed.RootElement.GetProperty("districts").GetArrayLength());
+        Assert.Equal(2, parsed.RootElement.GetProperty("primaryRoadCount").GetInt32());
+    }
+
+    [Fact]
     public async Task CancelAsync_CancelsOpenChunksAndKeepsDoneOnes()
     {
         var service = await CreateServiceAsync();
 
         var created = await service.CreateAsync(
             UserRoles.NationalAdmin, null, null, null, OwnerId, TestData.CommuneId100,
-            [Grid("0,0"), Grid("0,1")], CancellationToken.None);
+            [Grid("0,0"), Grid("0,1")], false, CancellationToken.None);
         await service.UploadChunkRasterAsync(
             created.Id, created.Chunks[0].Id, UserRoles.NationalAdmin, null, null, null,
             [1], "a.jpg", "image/jpeg", CancellationToken.None);
@@ -204,7 +305,7 @@ public class GenerationJobServiceTests
         var service = await CreateServiceAsync();
 
         var created = await service.CreateAsync(
-            UserRoles.NationalAdmin, null, null, null, OwnerId, TestData.CommuneId100, [Grid("0,0")], CancellationToken.None);
+            UserRoles.NationalAdmin, null, null, null, OwnerId, TestData.CommuneId100, [Grid("0,0")], false, CancellationToken.None);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.GetViewAsync(
             created.Id, UserRoles.FieldWorker, TestData.CommuneId101, null, null, CancellationToken.None));

@@ -445,12 +445,13 @@ CREATE TABLE IF NOT EXISTS public.ai_draft_features
     created_at      timestamp with time zone NOT NULL DEFAULT now(),
     source_tile_ref character varying(255),
     CONSTRAINT ai_draft_features_pkey PRIMARY KEY (id),
-    CONSTRAINT chk_ai_draft_feature_type CHECK (feature_type IN ('road', 'building')),
+    CONSTRAINT chk_ai_draft_feature_type CHECK (feature_type IN ('road', 'building', 'district')),
     CONSTRAINT chk_ai_draft_confidence CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 1)),
     CONSTRAINT chk_ai_draft_status CHECK (status IN ('pending', 'accepted', 'rejected', 'edited')),
     CONSTRAINT chk_ai_draft_geometry_matches_type CHECK (
         (feature_type = 'road' AND geometry->>'type' = 'LineString')
         OR (feature_type = 'building' AND geometry->>'type' IN ('Polygon', 'MultiPolygon'))
+        OR (feature_type = 'district' AND geometry->>'type' = 'Polygon')
     ),
     CONSTRAINT ai_draft_features_commune_fk FOREIGN KEY (commune_id)
         REFERENCES public.communes (commune_id)
@@ -466,7 +467,7 @@ CREATE INDEX IF NOT EXISTS ix_ai_draft_created_at
     ON public.ai_draft_features (created_at DESC);
 
 COMMENT ON TABLE public.ai_draft_features IS
-    'AI-suggested road/building features awaiting human review before promotion to production feature tables.';
+    'AI-suggested road/building/district features awaiting human review before promotion to production feature tables.';
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 11.  Generation jobs (async "generate roads from urban areas")
@@ -503,11 +504,13 @@ CREATE TABLE IF NOT EXISTS public.generation_jobs
     result              jsonb,
     error               text,
     accept_heartbeat_at timestamp with time zone,
+    generate_districts  boolean                  NOT NULL DEFAULT false,
+    districts_result    jsonb,
     created_at          timestamp with time zone NOT NULL DEFAULT now(),
     updated_at          timestamp with time zone NOT NULL DEFAULT now(),
     CONSTRAINT generation_jobs_pkey PRIMARY KEY (id),
     CONSTRAINT chk_generation_job_status CHECK (status IN ('pending', 'active', 'accepting', 'done', 'failed', 'cancelled')),
-    CONSTRAINT chk_generation_job_stage CHECK (stage IS NULL OR stage IN ('segment', 'accept')),
+    CONSTRAINT chk_generation_job_stage CHECK (stage IS NULL OR stage IN ('segment', 'accept', 'districts')),
     CONSTRAINT chk_generation_job_chunk_counts CHECK (
         total_chunks > 0 AND total_chunks <= 4096
         AND done_chunks >= 0 AND done_chunks <= total_chunks
