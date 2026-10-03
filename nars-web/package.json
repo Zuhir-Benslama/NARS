@@ -1,7 +1,7 @@
 {
   "name": "nars-frontend-maplibre",
   "version": "1.0.0",
-  "description": "NARS \u2014 National Addressing Reference System (Maplibre GL JS version)",
+  "description": "NARS — National Addressing Reference System (Maplibre GL JS version)",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -22,7 +22,7 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test --config=e2e/playwright.config.ts",
-    "audit": "npm audit --audit-level=high",
+    "audit": "npm audit --omit=dev --audit-level=high",
     "prepare": "husky",
     "codegen:fetch-spec": "curl -s ${NARS_API_URL:-http://localhost:5000}/openapi/v1.json -o api-spec/openapi.json",
     "codegen:types": "openapi-typescript api-spec/openapi.json -o src/api/schema.d.ts && prettier --write \"src/api/schema.d.ts\"",
@@ -40,7 +40,7 @@
     "@turf/length": "^7.3.5",
     "@turf/line-intersect": "^7.3.5",
     "@turf/nearest-point-on-line": "^7.3.5",
-    "dompurify": "^3.4.10",
+    "dompurify": "^3.4.16",
     "graphology": "^0.26.0",
     "maplibre-gl": "^6.8.0",
     "pinia": "^3.0.4",
