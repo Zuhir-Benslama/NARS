@@ -57,7 +57,7 @@
         <div class="modal-field">
           <label>
             {{ t("label_decision_no") }}
-            <span class="req">*</span>
+            <span v-if="decisionRequired" class="req">*</span>
           </label>
           <input
             v-model="modalStore.decisionNumber"
@@ -70,7 +70,7 @@
         <div class="modal-field">
           <label>
             {{ t("label_decision_date") }}
-            <span class="req">*</span>
+            <span v-if="decisionRequired" class="req">*</span>
           </label>
           <input
             v-model="modalStore.decisionDate"
@@ -178,6 +178,11 @@ const modalRef = ref<HTMLElement | null>(null)
 useFocusTrap(modalRef, () => modalStore.visible)
 
 const { validate, buildModalResult, isMainUrban, isCityCenter } = useFeatureValidation(modalStore)
+
+// Roads may exist without an administrative decision (AI-generated), so the
+// decision fields are only mandatory for the other phases. Keep the asterisks
+// in sync with useFeatureValidation's rule.
+const decisionRequired = computed(() => phase.value?.key !== "roads")
 
 // ── Computed display helpers ──────────────────────────────────────────────────
 

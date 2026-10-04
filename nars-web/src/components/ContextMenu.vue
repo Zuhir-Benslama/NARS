@@ -11,13 +11,17 @@
         <div v-if="item.separator" class="ctx-separator" />
         <div
           v-else
-          :class="['ctx-item', { 'ctx-danger': item.danger }]"
+          :class="['ctx-item', { 'ctx-danger': item.danger, 'ctx-disabled': item.disabled }]"
           role="menuitem"
-          tabindex="0"
+          :tabindex="item.disabled ? -1 : 0"
+          :aria-disabled="item.disabled ? 'true' : undefined"
           :aria-label="item.label"
           @click="handleClick(item)"
         >
           {{ item.label }}
+          <span v-if="item.disabled && item.disabledReason" class="ctx-disabled-reason">
+            {{ item.disabledReason }}
+          </span>
         </div>
       </template>
     </div>
@@ -84,8 +88,11 @@ function onKeyDown(e: KeyboardEvent) {
   items[idx]?.focus()
 }
 
-function handleClick(item: { onClick?: () => void }) {
+function handleClick(item: { disabled?: boolean; onClick?: () => void }) {
   store.hide()
+  // Disabled items are inert by construction: their reason is rendered inline,
+  // so no handler can be wired to them by mistake.
+  if (item.disabled) return
   item.onClick?.()
 }
 
@@ -121,6 +128,21 @@ onUnmounted(() => {
 }
 .ctx-danger {
   color: var(--danger-color);
+}
+.ctx-disabled {
+  color: var(--dropdown-item);
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ctx-disabled:hover {
+  background: transparent;
+}
+.ctx-disabled-reason {
+  display: block;
+  font-size: 11px;
+  opacity: 0.8;
+  white-space: normal;
+  max-width: 220px;
 }
 .ctx-separator {
   border-top: 1px solid var(--dropdown-border, #eee);

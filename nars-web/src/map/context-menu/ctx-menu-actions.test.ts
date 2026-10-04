@@ -12,6 +12,7 @@ const {
   mockCloseRing,
   mockDebugError,
   mockUpdateEndpointMarkers,
+  mockOpenEditModal,
 } = vi.hoisted(() => ({
   mockApiFetch: vi.fn(),
   mockShowToast: vi.fn(),
@@ -29,6 +30,7 @@ const {
   mockCloseRing: vi.fn((ring) => ring),
   mockDebugError: vi.fn(),
   mockUpdateEndpointMarkers: vi.fn(),
+  mockOpenEditModal: vi.fn(),
 }))
 
 vi.mock("../../api", () => ({ apiFetch: mockApiFetch }))
@@ -46,6 +48,10 @@ vi.mock("../../utils/debug", () => ({
   debugLog: vi.fn(),
 }))
 vi.mock("../roads/road-directions", () => ({ updateEndpointMarkers: mockUpdateEndpointMarkers }))
+vi.mock("../../stores/modalStore", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../stores/modalStore")>()),
+  openEditModal: mockOpenEditModal,
+}))
 
 let _setCtx: (ctx: any) => void
 let mockFeaturesStoreRemove: ReturnType<typeof vi.fn>
@@ -183,6 +189,48 @@ describe("editFeatureInfo", () => {
     await mod.editFeatureInfo("he1")
 
     expect(mockShowToast).not.toHaveBeenCalled()
+  })
+
+  it("sends the label at the top level so the label column is updated", async () => {
+    addLayerEntry("roads", {
+      dbId: "r1",
+      type: "line",
+      data: {
+        type: "roads",
+        label: "",
+        coordinates: [{ lat: 36, lng: 127 }],
+        decisionNumber: "",
+        decisionDate: "",
+        roadTypeKey: "street",
+      },
+    })
+    mockOpenEditModal.mockResolvedValue({
+      type: "roads",
+      label: "Rue Exemple",
+      decisionNumber: "",
+      decisionDate: "",
+      roadTypeKey: "avenue",
+    })
+    mockApiFetch.mockResolvedValue({ success: true })
+
+    await mod.editFeatureInfo("r1")
+
+    expect(mockApiFetch).toHaveBeenCalledTimes(1)
+    const [url, init] = mockApiFetch.mock.calls[0]
+    expect(url).toBe("/api/features/r1")
+    expect(init.method).toBe("PUT")
+    const body = JSON.parse(init.body)
+    // Top-level label drives FeatureService's label-column write...
+    expect(body.label).toBe("Rue Exemple")
+    // ...while data carries the full merged payload for the JSONB column.
+    expect(body.data).toMatchObject({
+      type: "roads",
+      label: "Rue Exemple",
+      roadTypeKey: "avenue",
+    })
+    // Geometry must survive the info edit.
+    expect(body.data.coordinates).toEqual([{ lat: 36, lng: 127 }])
+    expect(mockShowToast).toHaveBeenCalledWith("map_feature_updated", "success")
   })
 })
 

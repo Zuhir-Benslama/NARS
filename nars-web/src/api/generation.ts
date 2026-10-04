@@ -125,6 +125,25 @@ export async function cancelGenerationJob(jobId: string): Promise<GenerationJobV
   return (await res.json()) as GenerationJobView
 }
 
+/**
+ * POST /api/generation/districts — runs the districts phase on its own.
+ *
+ * Unlike the job-driven path this needs no satellite imagery and no road run:
+ * the partition is PostGIS work over the urban areas and boulevards/avenues
+ * already mapped, so it is a single request rather than a polled job. Rejects
+ * with the API's ProblemDetails detail when the commune has no urban area or
+ * no primary road to cut along (400), or out of scope (403).
+ */
+export async function generateDistricts(communeId: number): Promise<GenerateDistrictsResponse> {
+  const res = await apiFetch("/api/generation/districts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ communeId }),
+    timeout: 240_000,
+  })
+  return (await res.json()) as GenerateDistrictsResponse
+}
+
 /** Map a grid to the wire shape the API expects (adds the surrounding bounds). */
 export function toGenerationGrid(
   chunkKey: string,

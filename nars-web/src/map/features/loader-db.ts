@@ -75,7 +75,17 @@ function processFeature(
       return "ok"
     }
 
-    const data = rawData as FeatureDataByType
+    // Normalize data.type to the resolved phase key. The producers that
+    // materialize features write this field inconsistently — DraftGeometry
+    // emits "road" for roads but "districts"/"houseEntrances" for the others,
+    // and toApiSaveShape's canonical wire form is singular ("area", "road",
+    // "district") — while nothing server-side ever reads it: the phase is
+    // authoritative from the layer/feature_type columns resolved above.
+    // Consumers match on entry.data.type === phaseKey (context-menu edit,
+    // geometry commits, layerStore.updateFeature), so without this a reloaded
+    // generated road kept type "road", matched no phase, and every action on it
+    // failed with "unknown feature type".
+    const data = { ...rawData, type: phaseKey } as FeatureDataByType
 
     const layerEntry: LayerEntry = {
       id: `feat_${feature.id}`,

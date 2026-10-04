@@ -2115,6 +2115,96 @@
         }
       }
     },
+    "/api/generation/districts": {
+      "post": {
+        "tags": ["GenerationDistricts"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateDistrictsRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateDistrictsRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateDistrictsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateDistrictsResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateDistrictsResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateDistrictsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not Implemented"
+          }
+        }
+      }
+    },
     "/api/generation/jobs": {
       "post": {
         "tags": ["GenerationJob"],
@@ -3194,7 +3284,7 @@
         }
       },
       "CreateGenerationJobRequest": {
-        "required": ["communeId", "grids", "generateDistricts"],
+        "required": ["communeId", "grids"],
         "type": "object",
         "properties": {
           "communeId": {
@@ -3211,8 +3301,7 @@
             }
           },
           "generateDistricts": {
-            "type": "boolean",
-            "default": false
+            "type": ["null", "boolean"]
           }
         }
       },
@@ -3293,6 +3382,69 @@
           },
           "status": {
             "type": "string"
+          }
+        }
+      },
+      "GeneratedDistrictDto": {
+        "required": ["draftId", "areaM2", "lat", "lng"],
+        "type": "object",
+        "properties": {
+          "draftId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "areaM2": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": ["number", "string"],
+            "format": "double"
+          },
+          "lat": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": ["number", "string"],
+            "format": "double"
+          },
+          "lng": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": ["number", "string"],
+            "format": "double"
+          }
+        }
+      },
+      "GenerateDistrictsRequest": {
+        "required": ["communeId"],
+        "type": "object",
+        "properties": {
+          "communeId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["null", "integer", "string"],
+            "format": "int32"
+          }
+        }
+      },
+      "GenerateDistrictsResponse": {
+        "required": ["districts", "absorbedSlivers", "primaryRoadCount", "urbanAreaCount"],
+        "type": "object",
+        "properties": {
+          "districts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GeneratedDistrictDto"
+            }
+          },
+          "absorbedSlivers": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "primaryRoadCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
+          },
+          "urbanAreaCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": ["integer", "string"],
+            "format": "int32"
           }
         }
       },
@@ -3395,58 +3547,6 @@
           },
           "breakdown": {
             "$ref": "#/components/schemas/GenerateRoadsDroppedDto"
-          }
-        }
-      },
-      "GeneratedDistrictDto": {
-        "required": ["draftId", "areaM2", "lat", "lng"],
-        "type": "object",
-        "properties": {
-          "draftId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "areaM2": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
-            "type": ["number", "string"],
-            "format": "double"
-          },
-          "lat": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
-            "type": ["number", "string"],
-            "format": "double"
-          },
-          "lng": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
-            "type": ["number", "string"],
-            "format": "double"
-          }
-        }
-      },
-      "GenerateDistrictsResponse": {
-        "required": ["districts", "absorbedSlivers", "primaryRoadCount", "urbanAreaCount"],
-        "type": "object",
-        "properties": {
-          "districts": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/GeneratedDistrictDto"
-            }
-          },
-          "absorbedSlivers": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": ["integer", "string"],
-            "format": "int32"
-          },
-          "primaryRoadCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": ["integer", "string"],
-            "format": "int32"
-          },
-          "urbanAreaCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": ["integer", "string"],
-            "format": "int32"
           }
         }
       },
@@ -3623,9 +3723,7 @@
           "createdAt",
           "updatedAt",
           "chunks",
-          "result",
-          "generateDistricts",
-          "districtsResult"
+          "result"
         ],
         "type": "object",
         "properties": {
@@ -3694,18 +3792,10 @@
             ]
           },
           "generateDistricts": {
-            "type": "boolean"
+            "type": "boolean",
+            "default": false
           },
-          "districtsResult": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/JsonElement"
-              }
-            ]
-          }
+          "districtsResult": {}
         }
       },
       "IFormFile": {
@@ -3990,6 +4080,9 @@
     },
     {
       "name": "Field"
+    },
+    {
+      "name": "GenerationDistricts"
     },
     {
       "name": "GenerationJob"

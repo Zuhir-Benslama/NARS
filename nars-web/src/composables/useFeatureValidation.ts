@@ -27,8 +27,14 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
             modalStore.districtTypeKey === "industry_zone")
         ) && !(key === "areas" && modalStore.areaTypeKey === "central_urban")
       if (labelRequired && !modalStore.label.trim()) errors.label = "Required"
-      if (!modalStore.decisionNumber.trim()) errors.decisionNumber = "Required"
-      if (!modalStore.decisionDate.trim()) errors.decisionDate = "Required"
+      // Roads can be AI-generated, which carries no administrative decision —
+      // the backend materializes them with blank decision fields
+      // (RoadGenerationService/DraftGeometry.ToRoadData). Requiring them made
+      // every generated road unsaveable, so they stay optional for roads only.
+      if (key !== "roads") {
+        if (!modalStore.decisionNumber.trim()) errors.decisionNumber = "Required"
+        if (!modalStore.decisionDate.trim()) errors.decisionDate = "Required"
+      }
     }
 
     if (key === "cityCenter") {

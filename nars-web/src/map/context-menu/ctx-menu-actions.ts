@@ -81,7 +81,11 @@ export async function editFeatureInfo(dbId: string): Promise<void> {
     await apiFetch(`/api/features/${dbId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ data: { ...entry.data, ...result } }),
+      // `label` is sent at the top level as well as inside `data`: the API's
+      // FeatureUpdateRequest binds Label separately and only rewrites the
+      // label column when it is non-null (FeatureService keeps the old value
+      // otherwise), so omitting it left e.g. roads.label stuck at ''.
+      body: JSON.stringify({ label: result.label, data: { ...entry.data, ...result } }),
     })
 
     useLayerStore().updateFeature(entry.data.type, dbId, result)

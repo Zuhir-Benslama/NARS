@@ -47,6 +47,35 @@ describe("ContextMenu", () => {
     expect(wrapper.find(".ctx-item").classes()).toContain("ctx-danger")
   })
 
+  it("renders a disabled item as inert and shows its reason", async () => {
+    const store = useContextMenuStore()
+    store.show(100, 200, [
+      { label: "Remove", danger: true, disabled: true, disabledReason: "Switch to Roads phase" },
+    ])
+    const wrapper = mount(ContextMenu, { global: globalOpts })
+    await nextTick()
+
+    const item = wrapper.find(".ctx-item")
+    expect(item.classes()).toContain("ctx-disabled")
+    expect(item.attributes("aria-disabled")).toBe("true")
+    expect(item.attributes("tabindex")).toBe("-1")
+    expect(item.text()).toContain("Remove")
+    expect(item.text()).toContain("Switch to Roads phase")
+  })
+
+  it("never fires a disabled item's onClick", async () => {
+    const onClick = vi.fn()
+    const store = useContextMenuStore()
+    // A disabled item must be inert even if a handler is somehow attached.
+    store.show(100, 200, [{ label: "Remove", disabled: true, onClick }])
+    const wrapper = mount(ContextMenu, { global: globalOpts })
+    await nextTick()
+
+    await wrapper.find(".ctx-item").trigger("click")
+
+    expect(onClick).not.toHaveBeenCalled()
+  })
+
   it("renders separators", async () => {
     const store = useContextMenuStore()
     store.show(100, 200, [{ label: "Edit" }, { separator: true }, { label: "Delete" }])

@@ -107,6 +107,58 @@ describe("loader-db", () => {
     expect(mockFeaturesStoreBatchAdd.mock.calls[0][0]).toHaveLength(1)
   })
 
+  // Regression: DraftGeometry.ToRoadData writes data.type = "road" (singular),
+  // but every consumer matches entry.data.type against the PHASES key "roads".
+  // A reloaded generated road therefore matched no phase, so the context menu
+  // bailed out with "unknown feature type" and geometry edits silently no-op'd.
+  it("normalizes a DB-shaped road's data.type ('road') to the phase key", async () => {
+    const feature = {
+      id: "road-singular",
+      layer: "street",
+      data: { type: "road", coordinates: [{ lat: 36.0, lng: 127.0 }], label: "" },
+      geometry: null,
+    }
+    mockApiFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([feature]) })
+    mockGetFeatureType.mockReturnValue("line")
+    mockBuildGeoJsonFeature.mockReturnValue({
+      geometry: { type: "LineString", coordinates: [[127.0, 36.0]] },
+      properties: { label: "" },
+    })
+
+    await loadFromDatabase()
+
+    const { useLayerStore } = await import("../../stores/layerStore")
+    const entry = useLayerStore().getFeature("road-singular")
+    expect(entry).not.toBeNull()
+    expect(entry?.data.type).toBe("roads")
+    // The rest of the payload is passed through untouched.
+    expect(entry?.data.coordinates).toEqual([{ lat: 36.0, lng: 127.0 }])
+  })
+
+  it("normalizes data.type for every feature type, not just roads", async () => {
+    const features = [
+      { id: "a", layer: "central_urban", data: { type: "areas", coordinates: [] } },
+      { id: "d", layer: "district", data: { type: "districts", coordinates: [] } },
+      { id: "c", layer: "city_center", data: { type: "city_center", radius: 100 } },
+      { id: "h", layer: "main_entrance", data: { type: "house_entrance", coordinates: [] } },
+      { id: "n", layer: "naming_panel", data: { type: "naming_panel", coordinates: [] } },
+    ]
+    mockApiFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve(features) })
+    mockGetFeatureType.mockReturnValue("geojson")
+    mockBuildGeoJsonFeature.mockReturnValue(null)
+
+    await loadFromDatabase()
+
+    const { useLayerStore } = await import("../../stores/layerStore")
+    const store = useLayerStore()
+    // The phase key is authoritative; the stored data.type is normalized to it.
+    expect(store.getFeature("a")?.data.type).toBe("areas")
+    expect(store.getFeature("d")?.data.type).toBe("districts")
+    expect(store.getFeature("c")?.data.type).toBe("cityCenter")
+    expect(store.getFeature("h")?.data.type).toBe("houseEntrances")
+    expect(store.getFeature("n")?.data.type).toBe("namingPanels")
+  })
+
   it("handles scattered features", async () => {
     const feature = {
       id: "2",

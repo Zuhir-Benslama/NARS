@@ -4,6 +4,11 @@ export interface CtxMenuItem {
   label?: string
   danger?: boolean
   separator?: boolean
+  /** Rendered inert (muted, not clickable) but still listed, so a rule the
+   *  user is temporarily blocked by stays discoverable instead of vanishing. */
+  disabled?: boolean
+  /** Why the item is disabled, shown inline next to the label. */
+  disabledReason?: string
   onClick?: () => void
 }
 

@@ -1802,6 +1802,78 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/generation/districts": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: {
+      parameters: {
+        query?: never
+        header?: never
+        path?: never
+        cookie?: never
+      }
+      requestBody: {
+        content: {
+          "application/json": components["schemas"]["GenerateDistrictsRequest"]
+          "text/json": components["schemas"]["GenerateDistrictsRequest"]
+          "application/*+json": components["schemas"]["GenerateDistrictsRequest"]
+        }
+      }
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            "text/plain": components["schemas"]["GenerateDistrictsResponse"]
+            "application/json": components["schemas"]["GenerateDistrictsResponse"]
+            "text/json": components["schemas"]["GenerateDistrictsResponse"]
+          }
+        }
+        /** @description Bad Request */
+        400: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            "text/plain": components["schemas"]["ProblemDetails"]
+            "application/json": components["schemas"]["ProblemDetails"]
+            "text/json": components["schemas"]["ProblemDetails"]
+          }
+        }
+        /** @description Forbidden */
+        403: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            "text/plain": components["schemas"]["ProblemDetails"]
+            "application/json": components["schemas"]["ProblemDetails"]
+            "text/json": components["schemas"]["ProblemDetails"]
+          }
+        }
+        /** @description Not Implemented */
+        501: {
+          headers: {
+            [name: string]: unknown
+          }
+          content?: never
+        }
+      }
+    }
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/generation/jobs": {
     parameters: {
       query?: never
@@ -2734,8 +2806,7 @@ export interface components {
       /** Format: int32 */
       communeId: null | number | string
       grids: components["schemas"]["GenerationGridDto"][]
-      /** @default false */
-      generateDistricts: boolean
+      generateDistricts?: null | boolean
     }
     DraftUpdateRequest: {
       geometryGeoJson: string
@@ -2760,6 +2831,29 @@ export interface components {
       type: string
       data: components["schemas"]["JsonNode"]
       status: string
+    }
+    GeneratedDistrictDto: {
+      /** Format: uuid */
+      draftId: string
+      /** Format: double */
+      areaM2: number | string
+      /** Format: double */
+      lat: number | string
+      /** Format: double */
+      lng: number | string
+    }
+    GenerateDistrictsRequest: {
+      /** Format: int32 */
+      communeId: null | number | string
+    }
+    GenerateDistrictsResponse: {
+      districts: components["schemas"]["GeneratedDistrictDto"][]
+      /** Format: int32 */
+      absorbedSlivers: number | string
+      /** Format: int32 */
+      primaryRoadCount: number | string
+      /** Format: int32 */
+      urbanAreaCount: number | string
     }
     GeneratedRoadDto: {
       /** Format: uuid */
@@ -2792,25 +2886,6 @@ export interface components {
       dropped: number | string
       created: components["schemas"]["GeneratedRoadDto"][]
       breakdown: components["schemas"]["GenerateRoadsDroppedDto"]
-    }
-    GeneratedDistrictDto: {
-      /** Format: uuid */
-      draftId: string
-      /** Format: double */
-      areaM2: number | string
-      /** Format: double */
-      lat: number | string
-      /** Format: double */
-      lng: number | string
-    }
-    GenerateDistrictsResponse: {
-      districts: components["schemas"]["GeneratedDistrictDto"][]
-      /** Format: int32 */
-      absorbedSlivers: number | string
-      /** Format: int32 */
-      primaryRoadCount: number | string
-      /** Format: int32 */
-      urbanAreaCount: number | string
     }
     GenerationChunkView: {
       /** Format: uuid */
@@ -2885,8 +2960,9 @@ export interface components {
       updatedAt: null | string
       chunks: components["schemas"]["GenerationChunkView"][]
       result: null | components["schemas"]["JsonElement"]
+      /** @default false */
       generateDistricts: boolean
-      districtsResult: null | components["schemas"]["JsonElement"]
+      districtsResult?: unknown
     }
     /** Format: binary */
     IFormFile: string

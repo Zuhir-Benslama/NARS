@@ -14,6 +14,7 @@ import { setReferenceRoad, clearReferenceRoad, setReferenceEntrance } from "../h
 import { generateNamingPanels } from "../naming-panels"
 import { computeAndApplyRoadDirections, updateEndpointMarkers } from "../roads/road-directions"
 import { generateRoadsFromUrbanAreas } from "../generate/generate-roads"
+import { generateDistrictsFromUrbanAreas } from "../generate/generate-districts"
 import { useContextMenuStore, type CtxMenuItem } from "../../stores/contextMenuStore"
 import { startDraftEdit } from "../drafts/draft-edit"
 import { reviewDraft } from "../drafts/review-actions"
@@ -58,12 +59,22 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
   const currentPhaseKey = currentPhase?.key ?? ""
   const isRoad = phaseKey === "roads"
   const isRoadsPhase = currentPhaseKey === "roads"
+  const isDistrictsPhase = currentPhaseKey === "districts"
   const isHouseEntrancesPhase = currentPhaseKey === "houseEntrances"
   const roadInHousePhase = isRoad && isHouseEntrancesPhase
   const isCurrentPhase = phaseKey === currentPhaseKey
-  const isArea = phaseKey === "areas"
-  const canEdit = (isCurrentPhase || isArea) && !roadInHousePhase && phaseKey !== "houseEntrances"
+  // Per-phase rule: a feature may only be edited/removed while its OWN phase is
+  // the active one. Areas used to be exempt (`|| isArea`), which let the urban
+  // area be destroyed from any phase — see alert_areas_uneditable_in_districts.
+  // Roads are off-limits in the house entrances phase, and house entrances are
+  // driven by their own reference-road/entrance flow rather than this menu.
+  const canEdit = isCurrentPhase && !roadInHousePhase && phaseKey !== "houseEntrances"
   const isCityCenter = phaseKey === "cityCenter"
+  // Genuine phase mismatch (as opposed to "this feature type has no edit path
+  // here"): show the actions disabled with the reason, so the rule is
+  // discoverable instead of the items silently missing.
+  const phaseMismatch = !isCurrentPhase && !isCityCenter && phaseKey !== "houseEntrances"
+  const phaseLabel = t(PHASES.find((p) => p.key === phaseKey)?.label ?? "")
   const isMainEntrance =
     phaseKey === "houseEntrances" &&
     (state.houseEntrances?.some(
@@ -82,23 +93,36 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
 
   const items: CtxMenuItem[] = []
 
-  if (canEdit && !isCityCenter) {
-    items.push({
-      label: t("ctx_edit_geom"),
-      onClick: () => enableEditGeometry(dbId),
-    })
+  const blockedEdit = t("alert_switch_phase_to_edit", { phase: phaseLabel })
+  const blockedRemove = t("alert_switch_phase_to_remove", { phase: phaseLabel })
+
+  if (!isCityCenter) {
+    if (canEdit) {
+      items.push({ label: t("ctx_edit_geom"), onClick: () => enableEditGeometry(dbId) })
+    } else if (phaseMismatch) {
+      items.push({ label: t("ctx_edit_geom"), disabled: true, disabledReason: blockedEdit })
+    }
   }
   if (canEdit) {
     items.push({
       label: t("ctx_edit_info"),
       onClick: () => editFeatureInfo(dbId),
     })
+  } else if (phaseMismatch) {
+    items.push({ label: t("ctx_edit_info"), disabled: true, disabledReason: blockedEdit })
   }
   if (canEdit) {
     items.push({
       label: t("ctx_remove"),
       danger: true,
       onClick: () => removeFeature(dbId),
+    })
+  } else if (phaseMismatch) {
+    items.push({
+      label: t("ctx_remove"),
+      danger: true,
+      disabled: true,
+      disabledReason: blockedRemove,
     })
   }
 
@@ -114,17 +138,20 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
       label: t("ctx_generate_roads"),
       onClick: () => void generateRoadsFromUrbanAreas(),
     })
-    // Same job, districts phase included: the async queue always runs
-    // segmentation + acceptance first, so districts can only ride along with a
-    // full run rather than being triggered on their own.
-    items.push({
-      label: t("ctx_generate_roads_and_districts"),
-      onClick: () => void generateRoadsFromUrbanAreas(true),
-    })
     items.push({
       label: t("ctx_remove_all_roads"),
       danger: true,
       onClick: () => void removeAllRoads(),
+    })
+  }
+
+  // Districts are cut from data the user has already mapped (urban areas +
+  // boulevards/avenues), so the phase has its own action: it posts straight to
+  // the standalone districts endpoint and never re-runs road segmentation.
+  if (isDistrictsPhase) {
+    items.push({
+      label: t("ctx_generate_districts"),
+      onClick: () => void generateDistrictsFromUrbanAreas(),
     })
   }
 
@@ -216,13 +243,6 @@ export async function showMapContextMenu(
       label: t("ctx_generate_roads"),
       onClick: () => void generateRoadsFromUrbanAreas(),
     })
-    // Same job, districts phase included: the async queue always runs
-    // segmentation + acceptance first, so districts can only ride along with a
-    // full run rather than being triggered on their own.
-    items.push({
-      label: t("ctx_generate_roads_and_districts"),
-      onClick: () => void generateRoadsFromUrbanAreas(true),
-    })
     items.push({
       label: t("ctx_road_dir"),
       onClick: () => computeAndApplyRoadDirections(),
@@ -231,6 +251,11 @@ export async function showMapContextMenu(
       label: t("ctx_remove_all_roads"),
       danger: true,
       onClick: () => void removeAllRoads(),
+    })
+  } else if (phase.key === "districts") {
+    items.push({
+      label: t("ctx_generate_districts"),
+      onClick: () => void generateDistrictsFromUrbanAreas(),
     })
   } else if (phase.key === "houseEntrances") {
     items.push({

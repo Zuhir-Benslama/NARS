@@ -46,6 +46,25 @@ public sealed class CreateGenerationJobRequest
 }
 
 /// <summary>
+/// Body for POST /api/generation/districts — the districts phase on its own,
+/// with no imagery and no road run.
+/// </summary>
+/// <remarks>
+/// The phase needs no satellite tiles of its own: it partitions the commune's
+/// urban areas along the boulevards and avenues already mapped, entirely in
+/// PostGIS. It used to be reachable only as the tail of a generation job
+/// (<see cref="CreateGenerationJobRequest.GenerateDistricts"/>), which forced a
+/// full re-segmentation of the commune just to re-cut districts. This endpoint
+/// runs the pass directly so the districts phase is independent of the roads
+/// phase.
+/// </remarks>
+public sealed class GenerateDistrictsRequest
+{
+    [Required]
+    public int? CommuneId { get; set; }
+}
+
+/// <summary>
 /// Multipart form body for POST /api/generation/jobs/{id}/chunks/{chunkId}/raster.
 /// Bounds are NOT part of the upload: they come from the grid the client
 /// declared when creating the job.
