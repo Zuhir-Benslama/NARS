@@ -19,7 +19,16 @@ FROM texlive/texlive:latest-small@sha256:ed19d0b6014018f182949fe1239829ad3efb91e
 # inside `tools` — they are not standalone tlpdb names in TeX Live 2026; both
 # bundles are already present in latest-small. algpseudocode ships in
 # `algorithmicx`; `algorithms` provides `algorithm`.
+#
+# `tlmgr update --self` is REQUIRED first, not cosmetic. tlnet rolls forward
+# independently of the pinned base image, and once the repository's format
+# moves past what the image's tlmgr understands, EVERY tlmgr subcommand aborts
+# with "tlmgr itself needs to be updated" and exit 255 — including the
+# `option repository` call below, so the build fails before installing
+# anything. Self-updating the manager against the same verified mirror is the
+# documented remedy and is what makes this layer survive a tlnet format bump.
 RUN tlmgr option repository https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet \
+    && tlmgr update --self \
     && tlmgr install \
 	babel \
 	geometry \
