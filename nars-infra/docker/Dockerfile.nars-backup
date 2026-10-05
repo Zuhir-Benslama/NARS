@@ -1,7 +1,7 @@
 # ─── PostGIS Backup Image ──────────────────────────────────────────────
 # Extends postgres:17-alpine with gnupg for GPG-encrypted pg_dump backups.
 # This avoids installing gnupg at runtime on every CronJob execution.
-FROM postgres:17-alpine@sha256:af194ccf3e2d7fe367012c7b88ce8b816c5c889b18a5b316799a1f0d7eac746a
+FROM postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
 
 LABEL org.opencontainers.image.title="NARS Backup" \
       org.opencontainers.image.description="GPG-encrypted pg_dump backups" \
