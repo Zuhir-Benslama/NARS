@@ -14,6 +14,7 @@ const {
   mockGetUserMessageKey,
   mockShowToast,
   mockDebugError,
+  mockUpdateEndpointMarkers,
 } = vi.hoisted(() => ({
   mockApiFetch: vi.fn(),
   mockSetEditDragActive: vi.fn(),
@@ -27,6 +28,7 @@ const {
   mockGetUserMessageKey: vi.fn((): string => "err_unknown"),
   mockShowToast: vi.fn(),
   mockDebugError: vi.fn(),
+  mockUpdateEndpointMarkers: vi.fn(),
 }))
 
 vi.mock("../../api", () => ({ apiFetch: mockApiFetch }))
@@ -42,6 +44,7 @@ vi.mock("../edit/edit-mode", () => ({
 }))
 vi.mock("../undo", () => ({ recordDelete: mockRecordDelete }))
 vi.mock("../rendering/labels", () => ({ refreshLayerVisibility: mockRefreshLayerVisibility }))
+vi.mock("../roads/road-markers", () => ({ updateEndpointMarkers: mockUpdateEndpointMarkers }))
 vi.mock("../../lib/errors", () => ({ getUserMessageKey: mockGetUserMessageKey }))
 vi.mock("../../lib/toast", () => ({ showToast: mockShowToast }))
 vi.mock("../../utils/debug", () => ({
@@ -223,6 +226,52 @@ describe("onEditEnd", () => {
       { lat: 36.0, lng: 127.0 },
       { lat: 36.1, lng: 127.1 },
     ])
+  })
+
+  it("refreshes road endpoint markers while a road is edited", () => {
+    const entry = addLayerEntry("roads", { dbId: "rd1", data: { coordinates: [] } })
+    mockGetActiveEditEntry.mockReturnValue(entry)
+    mod.registerGeomanEvents()
+    const handler = getHandler("gm:editend")
+
+    handler({
+      feature: {
+        _geoJson: {
+          geometry: {
+            type: "LineString",
+            coordinates: [
+              [127.0, 36.0],
+              [127.1, 36.1],
+            ],
+          },
+        },
+      },
+    })
+
+    expect(mockUpdateEndpointMarkers).toHaveBeenCalled()
+  })
+
+  it("does not refresh road endpoint markers for non-road features", () => {
+    const entry = addLayerEntry("areas", { dbId: "ar1", data: { coordinates: [] } })
+    mockGetActiveEditEntry.mockReturnValue(entry)
+    mod.registerGeomanEvents()
+    const handler = getHandler("gm:editend")
+
+    handler({
+      feature: {
+        _geoJson: {
+          geometry: {
+            type: "LineString",
+            coordinates: [
+              [127.0, 36.0],
+              [127.1, 36.1],
+            ],
+          },
+        },
+      },
+    })
+
+    expect(mockUpdateEndpointMarkers).not.toHaveBeenCalled()
   })
 
   it("snaps dragged vertex when active snap phases exist", () => {

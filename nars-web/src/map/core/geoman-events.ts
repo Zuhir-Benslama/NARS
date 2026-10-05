@@ -13,6 +13,7 @@ import { getActiveSnapPhases, snapPointForEdit, setEditDragActive } from "../sna
 import { disableEditMode, getActiveEditEntry, isEditMode } from "../edit/edit-mode"
 import { recordDelete } from "../undo"
 import { refreshLayerVisibility } from "../rendering/labels"
+import { updateEndpointMarkers } from "../roads/road-markers"
 import { getUserMessageKey } from "../../lib/errors"
 import { showToast } from "../../lib/toast"
 import { t } from "../../i18n"
@@ -140,6 +141,15 @@ function onEditEnd(e: GeomanEditEvent): void {
     const newCoords = positionsToLatLng(outerRing)
     layerStore.updateFeatureData(layerEntry.dbId, { coordinates: newCoords })
     featuresStore.update(layerEntry.id, { geometry })
+  }
+
+  // Road endpoint markers live in their own GeoJSON source, not in the
+  // features source, so they do not follow the edited line until the markers
+  // are rebuilt from the layer store. Without this they stay at the pre-edit
+  // position for the whole edit session (gm:editend fires on every vertex
+  // drag, so this tracks the line live instead of only after save).
+  if (layerEntry.data.type === "roads") {
+    updateEndpointMarkers()
   }
 }
 

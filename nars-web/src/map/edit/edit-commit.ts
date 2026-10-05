@@ -17,6 +17,7 @@ import { repatchMarker } from "../draw/draw-complete"
 import { featureDataToGeometry } from "../features/feature-data"
 import type { LayerEntry, LatLng } from "../../types"
 import { commitDraftEdit, cancelDraftEdit } from "../drafts/draft-edit"
+import { updateEndpointMarkers } from "../roads/road-markers"
 import {
   getActiveEditEntry,
   getActiveGeomanFeatureId,
@@ -174,6 +175,9 @@ export async function commitEditMode(): Promise<void> {
 
     const phase = PHASES.find((p) => p.key === entry.data.type)
     if (phase) {
+      if (phase.key === "roads") {
+        updateEndpointMarkers()
+      }
       void buildDrawControl(phase)
       repatchMarker()
     }
@@ -223,6 +227,9 @@ export async function cancelEditMode(): Promise<void> {
 
   const phase = PHASES.find((p) => p.key === entry.data.type)
   if (phase) {
+    if (phase.key === "roads") {
+      updateEndpointMarkers()
+    }
     void buildDrawControl(phase)
     repatchMarker()
   }
