@@ -26,8 +26,7 @@ import { registerDrawHandlers, destroyDrawHandlers } from "./draw-handlers"
 import { patchGeomanMarkerPointerSnap } from "./draw-marker-patch"
 import { installSnapInterceptors, uninstallSnapInterceptors } from "../snapping/snapping"
 import { setDrawingPhase } from "./draw-state"
-import { buildDrawControl } from "./draw-control"
-import { enableCrosshair, resetSnapping, disableSnapping } from "../snapping/snapping"
+import { disableCrosshair, resetSnapping, disableSnapping } from "../snapping/snapping"
 import { isEditMode } from "../edit/edit-mode"
 
 export function registerDrawEvents(): void {
@@ -68,7 +67,8 @@ function watchDrawType() {
       const phase = PHASES[phaseIdx]
       if (phase) {
         setDrawingPhase(phase)
-        void buildDrawControl(phase)
+        // Hand (pan/select) is the default mode: do not auto-arm a draw
+        // mode on phase change. Drawing is armed explicitly via the Draw button.
 
         if (phase.key === "cityCenter") {
           requestAnimationFrame(() => {
@@ -95,7 +95,9 @@ function watchDrawType() {
       }
 
       if (!isEditMode()) {
-        enableCrosshair()
+        // Hand (pan/select) is the default mode: no crosshair cursor unless
+        // the user explicitly arms a draw mode.
+        disableCrosshair()
         resetSnapping()
       }
     },

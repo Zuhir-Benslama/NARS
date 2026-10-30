@@ -7,7 +7,6 @@ import { useAppStore } from "../stores/appStore"
 import { useLayerStore } from "../stores/layerStore"
 import { showToast } from "../lib/toast"
 import { checkDistrictCoverage } from "../lib/validation"
-import { buildDrawControl } from "../map/draw/draw-control"
 import { ensureGeoman } from "../map/map-init"
 import { setDrawingPhase } from "../map/draw/draw-complete"
 import { refreshLayerVisibility } from "../map/rendering/labels"
@@ -77,10 +76,9 @@ export function setPhase(index: number): void {
   setDrawingPhase(phase ?? null)
   if (phase) {
     // User-driven phase navigation: lazily initialize the geoman editor on
-    // first use, then arm that phase's draw mode.
-    void ensureGeoman()
-      .then(() => buildDrawControl(phase))
-      .catch((err) => debugWarn("[NAV] Unable to arm draw control:", err))
+    // first use. Drawing is NOT auto-armed — "hand" (pan/select) is the
+    // default mode; the user arms a draw mode explicitly via the Draw button.
+    void ensureGeoman().catch((err) => debugWarn("[NAV] Unable to init geoman:", err))
   }
   refreshLayerVisibility()
 }

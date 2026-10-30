@@ -21,14 +21,9 @@
 }
 
 /*
- * MapLibre sets grab/grabbing on .maplibregl-interactive and the canvas itself.
- * Override all of them to crosshair — this is the default drawing cursor.
+ * Cursor is managed dynamically by mode (hand/draw/edit) in JS.
+ * MapLibre's default grab/grabbing cursor applies when no mode overrides it.
  */
-#map .maplibregl-canvas-container.maplibregl-interactive,
-#map .maplibregl-canvas-container.maplibregl-interactive:active,
-#map .maplibregl-canvas-container.maplibregl-interactive .maplibregl-canvas {
-  cursor: crosshair !important;
-}
 
 /* Maplibre Draw overrides */
 .maplibregl-ctrl-group button.maplibregl-ctrl {

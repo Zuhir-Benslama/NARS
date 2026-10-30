@@ -156,7 +156,7 @@ export async function initMap(): Promise<void> {
 function buildGeomanOptions() {
   return {
     settings: {
-      useControlsUi: false,
+      useControlsUi: true,
       useDefaultLayers: true,
     },
     controls: {
@@ -165,6 +165,7 @@ function buildGeomanOptions() {
         line: { active: false },
         marker: { active: false },
         circle: { active: false },
+        freehand: { active: true },
       },
       edit: {
         change: { active: false },

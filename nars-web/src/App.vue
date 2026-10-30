@@ -1,6 +1,5 @@
 <template>
   <ProfileMenu />
-  <EditSaveButton />
   <ContextMenu />
 
   <template v-if="isAdminUser">
@@ -13,7 +12,9 @@
 
   <template v-else>
     <PhaseBar />
-    <InfoPanel />
+    <InfoPanel v-if="!isEditing" />
+    <EditPanel />
+    <EditToolbar />
   </template>
 
   <TileControl />
@@ -47,22 +48,26 @@ import { computed, onMounted, onUnmounted } from "vue"
 import { useI18n } from "vue-i18n"
 import PhaseBar from "./components/PhaseBar.vue"
 import InfoPanel from "./components/InfoPanel.vue"
+import EditPanel from "./components/EditPanel.vue"
+import EditToolbar from "./components/EditToolbar.vue"
 import ProfileMenu from "./components/ProfileMenu.vue"
 import TileControl from "./components/TileControl.vue"
 import FeatureModal from "./components/FeatureModal.vue"
 import FieldPanel from "./components/FieldPanel.vue"
-import EditSaveButton from "./components/EditSaveButton.vue"
 import ContextMenu from "./components/ContextMenu.vue"
 import ToastContainer from "./components/ToastContainer.vue"
 import ConfirmDialog from "./components/ConfirmDialog.vue"
 import GenerationProgress from "./components/GenerationProgress.vue"
 import { useAppStore } from "./stores/appStore"
+import { useEditStore } from "./stores/editStore"
 import { destroyMap } from "./map"
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const editStore = useEditStore()
 
 const isAdminUser = computed(() => appStore.isAdminUser)
+const isEditing = computed(() => editStore.isEditMode)
 const isFieldWorker = computed(() => appStore.user?.role === "field_worker")
 
 function onBeforeUnload() {

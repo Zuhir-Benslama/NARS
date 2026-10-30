@@ -12,7 +12,6 @@ import { showToast } from "../../lib/toast"
 import { t } from "../../i18n"
 import { debugError } from "../../utils/debug"
 import { PHASES } from "../../phases"
-import { buildDrawControl } from "../draw/draw-control"
 import { repatchMarker } from "../draw/draw-complete"
 import { featureDataToGeometry } from "../features/feature-data"
 import type { LayerEntry, LatLng } from "../../types"
@@ -178,7 +177,8 @@ export async function commitEditMode(): Promise<void> {
       if (phase.key === "roads") {
         updateEndpointMarkers()
       }
-      void buildDrawControl(phase)
+      // Hand (pan/select) is the default mode: do not re-arm a draw mode
+      // after an edit session ends.
       repatchMarker()
     }
   } finally {
@@ -230,7 +230,7 @@ export async function cancelEditMode(): Promise<void> {
     if (phase.key === "roads") {
       updateEndpointMarkers()
     }
-    void buildDrawControl(phase)
+    // Hand (pan/select) is the default mode: do not re-arm a draw mode.
     repatchMarker()
   }
 }

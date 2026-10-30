@@ -121,13 +121,15 @@ describe("findLayerEntryByDbId", () => {
 })
 
 describe("enableEditGeometry", () => {
-  it("shows info toast when another feature is already selected", () => {
+  it("adopts the requested feature when another one is selected", () => {
     useSelectionStore().setSelectedFeatureDbId("other")
     addLayerEntry("areas", { dbId: "myfeature" })
 
     mod.enableEditGeometry("myfeature")
 
-    expect(mockShowToast).toHaveBeenCalledWith("map_select_feature_first", "info")
+    expect(useSelectionStore().selectedFeatureDbId).toBe("myfeature")
+    expect(mockEnableEditMode).toHaveBeenCalledWith("feat_myfeature")
+    expect(mockShowToast).not.toHaveBeenCalledWith("map_select_feature_first", "info")
   })
 
   it("selects feature when none is selected", () => {
@@ -164,15 +166,18 @@ describe("enableEditGeometry", () => {
     await vi.waitFor(() => {
       expect(mockShowToast).toHaveBeenCalledWith("map_edit_mode_unavailable", "error")
     })
+    expect(mockShowToast).not.toHaveBeenCalledWith("map_edit_mode_hint", "info")
   })
 
-  it("enables edit mode when geoman is available", () => {
+  it("enables edit mode when geoman is available", async () => {
     addLayerEntry("areas", { dbId: "g1" })
 
     mod.enableEditGeometry("g1")
 
     expect(mockEnableEditMode).toHaveBeenCalledWith("feat_g1")
-    expect(mockShowToast).toHaveBeenCalledWith("map_edit_mode_hint", "info")
+    await vi.waitFor(() => {
+      expect(mockShowToast).toHaveBeenCalledWith("map_edit_mode_hint", "info")
+    })
   })
 })
 

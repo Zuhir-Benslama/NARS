@@ -22,7 +22,6 @@ import {
   showMapContextMenu,
 } from "../context-menu/context-menu"
 import { buildDrawControl, clearEdgeVisibilityPoll } from "./draw-control"
-import { ensureGeoman } from "../map-init"
 import {
   getDrawingPhase,
   completeDrawingWithGeometry,
@@ -286,14 +285,8 @@ function onClick(e: MapLibreMapMouseEvent & { point: { x: number; y: number } })
   } else {
     selectionStore.setSelectedFeatureDbId(null)
     updateSelectionHighlight(null)
-    const currentPhase = PHASES[appStore.currentPhase]
-    if (currentPhase && currentPhase.key !== "namingPanels") {
-      // User clicked the empty map — treat it as intent to draw, loading the
-      // deferred geoman bundle on first use before re-arming the draw mode.
-      void ensureGeoman()
-        .then(() => buildDrawControl(currentPhase))
-        .catch((err) => debugError("[DRAW] Unable to arm draw control:", err))
-    }
+    // Hand (pan/select) is the default mode: an empty-map click only clears
+    // the selection. Drawing is armed explicitly via the Draw button.
   }
 }
 

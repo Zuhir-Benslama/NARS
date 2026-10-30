@@ -18,6 +18,7 @@ import type { LayerEntry } from "../../types"
 import { featureDataToGeometry } from "../features/feature-data"
 import { debugError } from "../../utils/debug"
 import { updateEndpointMarkers } from "../roads/road-directions"
+import { updateSelectionHighlight } from "../core/state"
 
 // ─── LOOKUP ───────────────────────────────────────────────────────────────────
 
@@ -28,17 +29,6 @@ export function findLayerEntryByDbId(dbId: string): LayerEntry | null {
 // ─── EDIT GEOMETRY ────────────────────────────────────────────────────────────
 
 export function enableEditGeometry(dbId: string): void {
-  const selectionStore = useSelectionStore()
-
-  if (selectionStore.selectedFeatureDbId !== null && dbId !== selectionStore.selectedFeatureDbId) {
-    showToast(t("map_select_feature_first"), "info")
-    return
-  }
-
-  if (selectionStore.selectedFeatureDbId === null) {
-    selectionStore.setSelectedFeatureDbId(dbId)
-  }
-
   const entry = findLayerEntryByDbId(dbId)
   if (!entry) {
     showToast(t("map_feature_not_found"), "error")
@@ -50,11 +40,20 @@ export function enableEditGeometry(dbId: string): void {
     return
   }
 
-  enableEditMode(entry.id).catch((err) => {
-    debugError("[EDIT] enableEditMode:", err)
-    showToast(t("map_edit_mode_unavailable"), "error")
-  })
-  showToast(t("map_edit_mode_hint"), "info")
+  // The context menu already names the feature to edit, so adopt it as the
+  // selection. Previously this refused whenever a DIFFERENT feature happened
+  // to be selected (left-click to inspect, then right-click another road):
+  // "Edit geometry" did nothing but show a hint toast, which looked like the
+  // edit mode was broken.
+  useSelectionStore().setSelectedFeatureDbId(dbId)
+  updateSelectionHighlight(dbId)
+
+  enableEditMode(entry.id)
+    .then(() => showToast(t("map_edit_mode_hint"), "info"))
+    .catch((err) => {
+      debugError("[EDIT] enableEditMode:", err)
+      showToast(t("map_edit_mode_unavailable"), "error")
+    })
 }
 
 // ─── EDIT INFO ────────────────────────────────────────────────────────────────

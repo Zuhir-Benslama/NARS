@@ -6,7 +6,6 @@ import type { LayerEntry, LatLng } from "../../types"
 import { EDIT_CONFIG } from "../../config"
 import { getCtx, updateSelectionHighlight } from "../core/state"
 import {
-  enableCrosshair,
   disableSnapping,
   enableSnapping,
   setSnapExclude,
@@ -60,7 +59,8 @@ export function disableEditMode(): void {
   setSnapExclude(null)
   useSelectionStore().setSelectedFeatureDbId(null)
   updateSelectionHighlight(null)
-  enableCrosshair()
+  // Hand (pan/select) is the default mode: do not force the crosshair cursor
+  // back on after an edit session ends.
   reEnableSnapping()
 }
 
