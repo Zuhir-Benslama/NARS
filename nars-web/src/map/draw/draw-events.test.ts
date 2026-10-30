@@ -2,13 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { createPinia, setActivePinia } from "pinia"
 import { nextTick } from "vue"
 
-const { mockBuildDrawControl, mockSetDrawingPhase, mockEnableCrosshair, mockResetSnapping } =
-  vi.hoisted(() => ({
-    mockBuildDrawControl: vi.fn(),
-    mockSetDrawingPhase: vi.fn(),
-    mockEnableCrosshair: vi.fn(),
-    mockResetSnapping: vi.fn(),
-  }))
+const { mockSetDrawingPhase, mockDisableCrosshair, mockResetSnapping } = vi.hoisted(() => ({
+  mockSetDrawingPhase: vi.fn(),
+  mockDisableCrosshair: vi.fn(),
+  mockResetSnapping: vi.fn(),
+}))
 
 const { mockGetActiveDrawModes, mockFlyTo } = vi.hoisted(() => ({
   mockGetActiveDrawModes: vi.fn(() => []),
@@ -41,12 +39,8 @@ vi.mock("../draw/draw-handlers", () => ({
   destroyDrawHandlers: vi.fn(),
 }))
 
-vi.mock("../draw/draw-control", () => ({
-  buildDrawControl: mockBuildDrawControl,
-}))
-
 vi.mock("../snapping/snapping", () => ({
-  enableCrosshair: mockEnableCrosshair,
+  disableCrosshair: mockDisableCrosshair,
   resetSnapping: mockResetSnapping,
   disableSnapping: vi.fn(),
   installSnapInterceptors: vi.fn(),
@@ -79,7 +73,7 @@ describe("registerDrawEvents watcher lifecycle", () => {
     registerDrawEvents()
     const store = useDrawStore()
     expect(store.cleanupDrawWatcher).toBeTypeOf("function")
-    expect(mockBuildDrawControl).toHaveBeenCalledTimes(1) // immediate: true
+    expect(mockSetDrawingPhase).toHaveBeenCalledTimes(1) // immediate: true
   })
 
   it("stops the previous watcher when re-registered (no watcher leak)", async () => {
@@ -88,24 +82,21 @@ describe("registerDrawEvents watcher lifecycle", () => {
 
     // Watch counter: the phase watcher fires on change. If the first watcher
     // leaked, the change would fire its callback too.
-    mockBuildDrawControl.mockClear()
     mockSetDrawingPhase.mockClear()
-    mockEnableCrosshair.mockClear()
+    mockDisableCrosshair.mockClear()
     mockResetSnapping.mockClear()
 
     registerDrawEvents()
-    mockBuildDrawControl.mockClear()
     mockSetDrawingPhase.mockClear()
-    mockEnableCrosshair.mockClear()
+    mockDisableCrosshair.mockClear()
     mockResetSnapping.mockClear()
 
     appStore.currentPhase = 1
     await nextTick()
 
     // Exactly one watcher alive → each callback runs exactly once.
-    expect(mockBuildDrawControl).toHaveBeenCalledTimes(1)
     expect(mockSetDrawingPhase).toHaveBeenCalledTimes(1)
-    expect(mockEnableCrosshair).toHaveBeenCalledTimes(1)
+    expect(mockDisableCrosshair).toHaveBeenCalledTimes(1)
     expect(mockResetSnapping).toHaveBeenCalledTimes(1)
   })
 

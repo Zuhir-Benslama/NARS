@@ -405,7 +405,7 @@ describe("onClick", () => {
     expect(mockUpdateSelectionHighlight).toHaveBeenCalledWith("db9")
   })
 
-  it("clears selection and re-arms draw control on empty click", async () => {
+  it("clears selection on empty click (hand mode default)", async () => {
     selectionStore.setSelectedFeatureDbId("old-selection")
     appStore.currentPhase = 0
     registerDrawHandlers()
@@ -413,7 +413,8 @@ describe("onClick", () => {
     expect(selectionStore.selectedFeatureDbId).toBeNull()
     expect(mockUpdateSelectionHighlight).toHaveBeenCalledWith(null)
     await nextTick()
-    expect(mockBuildDrawControl).toHaveBeenCalled()
+    // Hand (pan/select) is the default: empty-map click does not arm a draw mode.
+    expect(mockBuildDrawControl).not.toHaveBeenCalled()
   })
 
   it("does not re-arm draw control when phase is namingPanels", async () => {
@@ -423,16 +424,6 @@ describe("onClick", () => {
     fireClick()
     await nextTick()
     expect(mockBuildDrawControl).not.toHaveBeenCalled()
-  })
-
-  it("logs an error when re-arming draw control fails", async () => {
-    mockEnsureGeoman.mockRejectedValueOnce(new Error("bundle failed"))
-    appStore.currentPhase = 0
-    registerDrawHandlers()
-    fireClick()
-    await nextTick()
-    const { debugError } = await import("../../utils/debug")
-    expect(debugError).toHaveBeenCalled()
   })
 })
 
@@ -541,11 +532,13 @@ describe("registration lifecycle", () => {
     registerDrawHandlers()
     ctx.map._emit("click", { point: { x: 0, y: 0 } })
     await nextTick()
-    expect(mockBuildDrawControl).toHaveBeenCalledTimes(1)
+    // Hand (pan/select) is the default mode: an empty-map click clears the
+    // selection instead of arming a draw mode.
+    expect(mockUpdateSelectionHighlight).toHaveBeenCalledWith(null)
 
     destroyDrawHandlers()
     ctx.map._emit("click", { point: { x: 0, y: 0 } })
     await nextTick()
-    expect(mockBuildDrawControl).toHaveBeenCalledTimes(1)
+    expect(mockUpdateSelectionHighlight).toHaveBeenCalledTimes(1)
   })
 })

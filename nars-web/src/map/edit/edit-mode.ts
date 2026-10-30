@@ -71,8 +71,8 @@ export async function enableEditMode(featureId?: string): Promise<void> {
   disableCrosshair()
   disableSnapping()
 
-  const { map } = getCtx()
-  map.getCanvas().style.cursor = "move"
+  const ctx = getCtx()
+  if (ctx.map) ctx.map.getCanvas().style.cursor = "move"
 
   await geoman.enableGlobalEditMode()
   setEditModeActive(true)

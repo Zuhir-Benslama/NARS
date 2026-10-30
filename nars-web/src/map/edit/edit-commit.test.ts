@@ -255,7 +255,8 @@ describe("commitEditMode", () => {
     expect(featuresStoreUpdate).toHaveBeenCalled()
     expect(mockSetActiveGeomanFeatureId).toHaveBeenCalledWith(null)
     expect(mockDisableEditMode).toHaveBeenCalled()
-    expect(mockBuildDrawControl).toHaveBeenCalled()
+    // Hand (pan/select) is the default mode: commit no longer re-arms a draw mode.
+    expect(mockBuildDrawControl).not.toHaveBeenCalled()
     expect(mockRepatchMarker).toHaveBeenCalled()
   })
 

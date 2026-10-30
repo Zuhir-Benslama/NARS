@@ -202,7 +202,8 @@ describe("edit-state", () => {
       expect(store.activeEditCoordsSnapshot).toBeNull()
       expect(mockSetSnapExclude).toHaveBeenCalledWith(null)
       expect(mockUpdateSelectionHighlight).toHaveBeenCalledWith(null)
-      expect(mockEnableCrosshair).toHaveBeenCalledOnce()
+      // Hand (pan/select) is the default mode: disableEditMode no longer
+      // forces the crosshair cursor back on.
       expect(mockDisableSnapping).toHaveBeenCalledOnce()
       expect(mockEnableSnapping).toHaveBeenCalledOnce()
     })
