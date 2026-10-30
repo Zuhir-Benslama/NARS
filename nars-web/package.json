@@ -1,7 +1,7 @@
 {
   "name": "nars-frontend-maplibre",
   "version": "1.0.0",
-  "description": "NARS — National Addressing Reference System (Maplibre GL JS version)",
+  "description": "NARS \u2014 National Addressing Reference System (Maplibre GL JS version)",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -92,6 +92,7 @@
     "fast-uri": "^3.1.8",
     "openapi-typescript": {
       "typescript": "^6.0.3"
-    }
+    },
+    "source-map-js": ">=1.2.2"
   }
 }
