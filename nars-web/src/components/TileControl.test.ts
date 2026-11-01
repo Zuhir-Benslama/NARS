@@ -25,29 +25,30 @@ describe("TileControl", () => {
 
   it("renders toggle button", () => {
     const wrapper = mount(TileControl, { global: globalOpts })
-    expect(wrapper.find(".tile-toggle").exists()).toBe(true)
+    expect(wrapper.find(".tools-toggle").exists()).toBe(true)
   })
 
   it("dropdown is hidden by default", () => {
     const wrapper = mount(TileControl, { global: globalOpts })
-    expect(wrapper.find(".tile-dropdown").exists()).toBe(false)
+    expect(wrapper.find(".tools-panel").exists()).toBe(false)
   })
 
   it("opens dropdown on toggle click", async () => {
     const wrapper = mount(TileControl, { global: globalOpts })
-    await wrapper.find(".tile-toggle").trigger("click")
-    expect(wrapper.find(".tile-dropdown").exists()).toBe(true)
+    await wrapper.find(".tools-toggle").trigger("click")
+    expect(wrapper.find(".tools-panel").exists()).toBe(true)
   })
 
   it("closes dropdown on second toggle click", async () => {
     const wrapper = mount(TileControl, { global: globalOpts })
-    await wrapper.find(".tile-toggle").trigger("click")
-    await wrapper.find(".tile-toggle").trigger("click")
-    expect(wrapper.find(".tile-dropdown").exists()).toBe(false)
+    await wrapper.find(".tools-toggle").trigger("click")
+    await wrapper.find(".tools-toggle").trigger("click")
+    expect(wrapper.find(".tools-panel").exists()).toBe(false)
   })
 
   it("renders all four layer options", async () => {
     const wrapper = mount(TileControl, { global: globalOpts })
+    await wrapper.find(".tools-toggle").trigger("click")
     await wrapper.find(".tile-toggle").trigger("click")
     const items = wrapper.findAll(".tile-item")
     expect(items).toHaveLength(4)
@@ -55,6 +56,7 @@ describe("TileControl", () => {
 
   it("calls setBaseLayer on layer selection", async () => {
     const wrapper = mount(TileControl, { global: globalOpts })
+    await wrapper.find(".tools-toggle").trigger("click")
     await wrapper.find(".tile-toggle").trigger("click")
     await wrapper.findAll(".tile-item")[1].trigger("click")
     expect(mockSetBaseLayer).toHaveBeenCalledWith("street")
@@ -62,6 +64,7 @@ describe("TileControl", () => {
 
   it("closes dropdown on layer selection", async () => {
     const wrapper = mount(TileControl, { global: globalOpts })
+    await wrapper.find(".tools-toggle").trigger("click")
     await wrapper.find(".tile-toggle").trigger("click")
     await wrapper.findAll(".tile-item")[0].trigger("click")
     expect(wrapper.find(".tile-dropdown").exists()).toBe(false)
@@ -69,6 +72,7 @@ describe("TileControl", () => {
 
   it("does not call setBaseLayer when selecting active layer", async () => {
     const wrapper = mount(TileControl, { global: globalOpts })
+    await wrapper.find(".tools-toggle").trigger("click")
     await wrapper.find(".tile-toggle").trigger("click")
     await wrapper.findAll(".tile-item")[0].trigger("click")
     expect(mockSetBaseLayer).not.toHaveBeenCalled()

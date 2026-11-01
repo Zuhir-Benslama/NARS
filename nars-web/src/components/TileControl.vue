@@ -198,7 +198,13 @@ const optionRefs = ref<HTMLElement[]>([])
 
 const isEditMode = computed(() => editStore?.isEditMode ?? false)
 const selectedDbId = computed(() => selectionStore?.selectedFeatureDbId ?? null)
-const snapOn = computed(() => isSnappingEnabled())
+const snapOn = computed(() => {
+  try {
+    return isSnappingEnabled()
+  } catch {
+    return true
+  }
+})
 
 const layers = [
   { key: "satellite", labelKey: "layer_satellite", color: "#e67e22" },
