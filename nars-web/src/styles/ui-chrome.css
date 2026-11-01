@@ -2,8 +2,8 @@
 
 .info-panel {
   position: absolute;
-  top: 60px;
-  right: 10px;
+  top: 10px;
+  left: 10px;
   z-index: 800;
   background: var(--glass-bg) !important;
   backdrop-filter: var(--glass-blur) !important;

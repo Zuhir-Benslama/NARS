@@ -82,8 +82,8 @@ function setupPhase(key: string) {
 
 const PHASES = [
   { key: "areas", label: "Areas" },
-  { key: "roads", label: "Roads" },
   { key: "cityCenter", label: "City Center" },
+  { key: "roads", label: "Roads" },
   { key: "districts", label: "Districts" },
   { key: "houseEntrances", label: "House Entrances" },
   { key: "publicBuildings", label: "Public Buildings" },
@@ -258,10 +258,9 @@ describe("showContextMenu / bindContextMenu", () => {
     mod.showContextMenu(0, 0, "a1", "areas")
 
     const store = useContextMenuStore()
-    const genItem = store.items.find((i: any) => i.label === "ctx_generate_roads")
+    const genItem = store.items.find((i: any) => String(i.label).startsWith("ctx_generate_roads"))
     expect(genItem).toBeDefined()
-    genItem.onClick()
-    expect(mockGenerateRoadsFromUrbanAreas).toHaveBeenCalled()
+    expect(genItem.disabled).toBe(true)
   })
 
   it("does not include generate-roads item outside the roads phase", () => {
@@ -270,7 +269,9 @@ describe("showContextMenu / bindContextMenu", () => {
     mod.showContextMenu(0, 0, "r1", "roads")
 
     const store = useContextMenuStore()
-    expect(store.items.some((i: any) => i.label === "ctx_generate_roads")).toBe(false)
+    expect(store.items.some((i: any) => String(i.label).startsWith("ctx_generate_roads"))).toBe(
+      false,
+    )
   })
 
   it("offers generate-districts (not generate-roads) in the districts phase", () => {
@@ -279,7 +280,9 @@ describe("showContextMenu / bindContextMenu", () => {
     mod.showContextMenu(0, 0, "d1", "districts")
 
     const store = useContextMenuStore()
-    expect(store.items.some((i: any) => i.label === "ctx_generate_roads")).toBe(false)
+    expect(store.items.some((i: any) => String(i.label).startsWith("ctx_generate_roads"))).toBe(
+      false,
+    )
     const genItem = store.items.find((i: any) => i.label === "ctx_generate_districts")
     expect(genItem).toBeDefined()
     genItem.onClick()
@@ -399,17 +402,18 @@ describe("showMapContextMenu", () => {
     await mod.showMapContextMenu(0, 0, mkPhase("roads"))
 
     const store = useContextMenuStore()
-    const genItem = store.items.find((i: any) => i.label === "ctx_generate_roads")
+    const genItem = store.items.find((i: any) => String(i.label).startsWith("ctx_generate_roads"))
     expect(genItem).toBeDefined()
-    genItem.onClick()
-    expect(mockGenerateRoadsFromUrbanAreas).toHaveBeenCalled()
+    expect(genItem.disabled).toBe(true)
   })
 
   it("adds generate-districts item for districts phase", async () => {
     await mod.showMapContextMenu(0, 0, mkPhase("districts"))
 
     const store = useContextMenuStore()
-    expect(store.items.some((i: any) => i.label === "ctx_generate_roads")).toBe(false)
+    expect(store.items.some((i: any) => String(i.label).startsWith("ctx_generate_roads"))).toBe(
+      false,
+    )
     const genItem = store.items.find((i: any) => i.label === "ctx_generate_districts")
     expect(genItem).toBeDefined()
     genItem.onClick()

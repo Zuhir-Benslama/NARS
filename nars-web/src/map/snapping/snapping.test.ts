@@ -263,7 +263,7 @@ describe("uninstallSnapInterceptors", () => {
 
 describe("getActiveSnapPhases (draw mode)", () => {
   it("returns completed snap targets for the current phase", () => {
-    useAppStore().currentPhase = 1 // roads — snapTargets: areas, cityCenter, roads
+    useAppStore().currentPhase = 2 // roads — snapTargets: areas, cityCenter, roads
 
     const result = mod.getActiveSnapPhases()
 
@@ -447,7 +447,7 @@ describe("snap events", () => {
   it("returns early when there are no active snap phases", () => {
     mockFindNearestSnap.mockReturnValue({ lat: 1, lng: 2, type: "vertex", distance: 1 })
     enableSnapping()
-    useAppStore().currentPhase = 2 // cityCenter — has no snapTargets
+    useAppStore().currentPhase = 1 // cityCenter — has no snapTargets
 
     mockCtx.map
       .getContainer()

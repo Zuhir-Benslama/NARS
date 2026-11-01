@@ -32,7 +32,8 @@ resources:
   - pdb.yaml
   - backup-cronjob.yaml
   # nars-segma segmentation microservice (deployment.yaml + service.yaml)
-  - ../segma
+  # Detached from the cluster: generate-roads runs in beta/disabled mode.
+  # - ../segma
   # otel-metrics-service.yaml and servicemonitor.yaml are applied separately
   # after the observability stack is installed (their CRDs are only available then):
   #   make observability-servicemonitor

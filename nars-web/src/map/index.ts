@@ -2,7 +2,7 @@
 
 import { applyInitialLang } from "../i18n"
 import { tryGetCtx } from "./core/state"
-import { initRotationControls, destroyRotationControls } from "./rotation"
+import { destroyRotationControls } from "./rotation"
 import { registerDrawEvents, destroyDrawEvents } from "./draw/draw-events"
 import { registerGeomanEvents, unregisterGeomanEvents } from "./core/geoman-events"
 import { disposeGeoman, initMap as initMapInstance } from "./map-init"
@@ -27,7 +27,6 @@ export { startDraftEdit, commitDraftEdit } from "./drafts/draft-edit"
 
 export async function initMap(): Promise<void> {
   await initMapInstance()
-  initRotationControls()
   await applyInitialLang()
   registerDrawEvents()
   registerGeomanEvents()

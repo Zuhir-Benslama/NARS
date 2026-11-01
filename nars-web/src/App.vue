@@ -14,7 +14,6 @@
     <PhaseBar />
     <InfoPanel v-if="!isEditing" />
     <EditPanel />
-    <EditToolbar />
   </template>
 
   <TileControl />
@@ -49,7 +48,6 @@ import { useI18n } from "vue-i18n"
 import PhaseBar from "./components/PhaseBar.vue"
 import InfoPanel from "./components/InfoPanel.vue"
 import EditPanel from "./components/EditPanel.vue"
-import EditToolbar from "./components/EditToolbar.vue"
 import ProfileMenu from "./components/ProfileMenu.vue"
 import TileControl from "./components/TileControl.vue"
 import FeatureModal from "./components/FeatureModal.vue"

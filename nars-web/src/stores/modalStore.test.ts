@@ -123,7 +123,7 @@ describe("modalStore", () => {
     })
 
     it("openModal sets the city-center label for the cityCenter phase", async () => {
-      const promise = openModal(2, "feat-cc")
+      const promise = openModal(1, "feat-cc")
       const store = useModalStore()
       // t() is stubbed to return the key in tests — the assertion proves the
       // cityCenter branch actually calls t() to label the modal.

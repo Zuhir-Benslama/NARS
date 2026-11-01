@@ -135,7 +135,8 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
 
   if (isRoadsPhase) {
     items.push({
-      label: t("ctx_generate_roads"),
+      label: t("ctx_generate_roads") + " (beta)",
+      disabled: true,
       onClick: () => void generateRoadsFromUrbanAreas(),
     })
     items.push({
@@ -240,7 +241,8 @@ export async function showMapContextMenu(
 
   if (phase.key === "roads") {
     items.push({
-      label: t("ctx_generate_roads"),
+      label: t("ctx_generate_roads") + " (beta)",
+      disabled: true,
       onClick: () => void generateRoadsFromUrbanAreas(),
     })
     items.push({

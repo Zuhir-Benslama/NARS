@@ -37,7 +37,6 @@ patches:
     target:
       kind: PersistentVolumeClaim
       name: tiles-pvc
-  - path: patches/segma-scale.yaml
   - path: patches/api-scale.yaml
   - path: patches/remove-kind-pv.yaml
   - path: patches/remove-tiles-pv.yaml

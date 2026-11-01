@@ -39,9 +39,39 @@ export function resetRotation(): void {
 }
 
 export function setBearing(deg: number): void {
+  const ctx = tryGetCtxSafe()
+  if (!ctx) return
   const store = useRotationStore()
   store.setBearing(deg)
-  getCtx().map.easeTo({ bearing: store.currentBearing, duration: 300 })
+  ctx.map.easeTo({ bearing: store.currentBearing, duration: 300 })
+}
+
+function tryGetCtxSafe(): {
+  map: { easeTo: (o: { bearing: number; duration: number }) => void }
+} | null {
+  try {
+    return getCtx() as unknown as {
+      map: { easeTo: (o: { bearing: number; duration: number }) => void }
+    }
+  } catch {
+    return null
+  }
+}
+
+export function rotateCcw(): void {
+  try {
+    setBearing(useRotationStore().currentBearing - STEP)
+  } catch {
+    /* no-op */
+  }
+}
+
+export function rotateCw(): void {
+  try {
+    setBearing(useRotationStore().currentBearing + STEP)
+  } catch {
+    /* no-op */
+  }
 }
 
 export function initRotationControls(): void {
