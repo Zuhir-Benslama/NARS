@@ -45,6 +45,7 @@ vi.mock("maplibre-gl", () => ({
     on = vi.fn()
     off = vi.fn()
   },
+  setRTLTextPlugin: vi.fn(),
 }))
 
 vi.mock("@geoman-io/maplibre-geoman-free", () => ({

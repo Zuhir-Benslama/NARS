@@ -67,8 +67,9 @@ export function refreshLayerVisibility(): void {
     }
   }
 
-  // Endpoint layers are only visible during roads and houseEntrances phases
-  const showEndpoints = ["roads", "houseEntrances"].includes(currentPhaseKey)
+  // Endpoint markers sit on top of the road polyline, so they should be
+  // visible in every phase where the road polyline itself is visible.
+  const showEndpoints = visibleLayers.includes("roads")
   const endpointLayers = [
     "nars-endpoint-start",
     "nars-endpoint-start-label",

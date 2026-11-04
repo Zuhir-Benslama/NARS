@@ -150,13 +150,22 @@ export async function initMap(): Promise<void> {
     }, 15_000)
   })
 
+  // Load the RTL text plugin before any features/labels are added, so Arabic
+  // street names are shaped correctly (otherwise they render LTR).
+  try {
+    await maplibregl.setRTLTextPlugin?.("/rtl/mapbox-gl-rtl-text.js", true)
+  } catch (err) {
+    debugWarn("[MAP] RTL text plugin load failed:", err)
+  }
+
   initSources()
 }
 
 function buildGeomanOptions() {
   return {
     settings: {
-      useControlsUi: true,
+      useControlsUi: false,
+      controlsUiEnabledByDefault: false,
       useDefaultLayers: true,
     },
     controls: {
@@ -165,12 +174,12 @@ function buildGeomanOptions() {
         line: { active: false },
         marker: { active: false },
         circle: { active: false },
-        freehand: { active: true },
+        freehand: { active: false },
       },
       edit: {
         change: { active: false },
         drag: { active: false },
-        delete: { active: true },
+        delete: { active: false },
       },
     },
   }

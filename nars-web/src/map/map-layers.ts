@@ -258,11 +258,13 @@ export function initSources(): void {
 }
 
 export function addEndpointLayers(map: maplibregl.Map): void {
-  const layers = map.getStyle().layers || []
-  const firstSymbolId = layers.find((l) => l.type === "symbol")?.id
+  // Endpoint markers must render on top of the road polyline (and other
+  // feature layers), so they are appended without a before-id instead of
+  // being inserted before the first symbol layer (which would place them
+  // underneath the line layers).
   for (const group of ENDPOINT_LAYERS) {
     for (const layer of group.layers) {
-      map.addLayer(layer, firstSymbolId)
+      map.addLayer(layer)
     }
   }
 }

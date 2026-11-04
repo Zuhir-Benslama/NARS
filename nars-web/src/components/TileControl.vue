@@ -126,17 +126,8 @@
       >
         <img src="/tiles.svg" class="tile-icon" alt="layers" />
       </button>
-      <div
-        v-if="layersOpen"
-        ref="dropdownRef"
-        class="tile-dropdown"
-        role="listbox"
-        :aria-label="t('tile_layers')"
-        @keydown.escape="layersOpen = false"
-        @keydown.up.prevent="moveFocus(-1)"
-        @keydown.down.prevent="moveFocus(1)"
-      >
-        <div
+      <template v-if="layersOpen">
+        <button
           v-for="(layer, idx) in layers"
           :key="layer.key"
           :ref="
@@ -144,17 +135,23 @@
               if (el) optionRefs[idx] = el as HTMLElement
             }
           "
-          :class="['tile-item', { active: activeKey === layer.key }]"
+          :class="[
+            'tile-item',
+            'tile-btn',
+            'tool-btn',
+            'theme-btn',
+            { active: activeKey === layer.key, selected: activeKey === layer.key },
+          ]"
           role="option"
           :tabindex="0"
           :aria-selected="activeKey === layer.key"
+          :title="t(layer.labelKey)"
           @click="select(layer.key)"
           @keydown.enter="select(layer.key)"
         >
-          <span class="tile-dot" :style="{ background: layer.color }" />
-          {{ t(layer.labelKey) }}
-        </div>
-      </div>
+          <span class="tile-icon-glyph">{{ layer.icon }}</span>
+        </button>
+      </template>
     </div>
   </div>
 </template>
@@ -207,10 +204,10 @@ const snapOn = computed(() => {
 })
 
 const layers = [
-  { key: "satellite", labelKey: "layer_satellite", color: "#e67e22" },
-  { key: "street", labelKey: "layer_street", color: "#3498db" },
-  { key: "light", labelKey: "layer_light", color: "#ecf0f1" },
-  { key: "dark", labelKey: "layer_dark", color: "#2c3e50" },
+  { key: "satellite", labelKey: "layer_satellite", color: "#e67e22", icon: "🛰" },
+  { key: "street", labelKey: "layer_street", color: "#3498db", icon: "🛣" },
+  { key: "light", labelKey: "layer_light", color: "#ecf0f1", icon: "☀" },
+  { key: "dark", labelKey: "layer_dark", color: "#2c3e50", icon: "🌙" },
 ]
 
 function handleClickOutside() {
@@ -229,13 +226,6 @@ function toggleLayers() {
       optionRefs.value[activeIdx]?.focus()
     })
   }
-}
-
-function moveFocus(delta: number) {
-  const current = document.activeElement
-  const idx = optionRefs.value.indexOf(current as HTMLElement)
-  const next = (idx + delta + layers.length) % layers.length
-  optionRefs.value[next]?.focus()
 }
 
 function select(key: string) {
@@ -408,9 +398,8 @@ function toggleSnap() {
 }
 
 .tile-dropdown {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  right: 0;
+  position: static;
+  margin-top: 6px;
   background: var(--dropdown-bg);
   border: 1px solid var(--dropdown-border);
   border-radius: 8px;
@@ -438,9 +427,53 @@ function toggleSnap() {
 .tile-item:hover {
   background: var(--dropdown-hover);
 }
-.tile-item.active {
+.tile-item.active,
+.tile-item.selected {
   color: var(--text-primary);
   font-weight: 600;
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.tile-dropdown.tile-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 6px;
+  min-width: 0;
+}
+
+.tile-btn,
+.theme-btn,
+.tile-item {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 8px;
+  background: var(--btn-glass-bg) !important;
+  color: var(--text-primary) !important;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    transform 0.1s;
+  backdrop-filter: var(--glass-blur) !important;
+  -webkit-backdrop-filter: var(--glass-blur) !important;
+  font-size: 18px;
+  line-height: 1;
+}
+.tile-btn:hover,
+.theme-btn:hover {
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
+}
+.tile-btn.selected,
+.theme-btn.selected {
+  background: rgba(255, 255, 255, 0.22);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.55);
 }
 
 .tile-dot {
