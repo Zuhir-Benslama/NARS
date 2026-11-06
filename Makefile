@@ -34,8 +34,9 @@ POSTGRES_DATA_DIR  ?= data/nars/postgis
 # plugin. Requires the host to expose /dev/nvidia* (mode 0666 works under
 # rootless Docker). Set NARS_GPU=0 only for a legacy CPU-only dev cluster that
 # cannot schedule nars-segma.
-NARS_GPU        ?= 1
+NARS_GPU        ?= 0
 GPU_NODE_IMAGE  ?= nars/gpu-node:1.32.2
+KIND_NODE_IMAGE ?= kindest/node:v1.32.2
 GPU_DRIVER_DIR  ?= data/nvidia/driver
 REGISTRY_IMAGES    := nars-api nars-postgis nars-vite nars-backup nars-tiles
 SCALABLE_DEPLOYS   := postgis nars-api nars-frontend nars-tiles

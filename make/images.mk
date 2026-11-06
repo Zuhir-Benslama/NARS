@@ -232,6 +232,10 @@ _check-bundle-sync:
 # own once the cluster is up and a GPU is available.
 .PHONY: segma-up
 segma-up: _warn-latest-tag _guard-kind-staging-space ## Build, load and deploy nars-segma (GPU required)
+	@if [ "$(NARS_GPU)" != "1" ]; then \
+		echo "✖ segma-up requires NARS_GPU=1 (GPU-enabled cluster)."; \
+		echo "  Re-run: make cluster-up NARS_GPU=1"; exit 1; \
+	fi
 	@if [ -z "$(NARS_SEGMA_WEIGHTS_URL)" ]; then \
 		echo "✖ NARS_SEGMA_WEIGHTS_URL not set — run 'make .env'"; exit 1; \
 	fi

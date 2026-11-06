@@ -210,9 +210,13 @@ cluster-create: ## Create the kind cluster with host-mounted postgis data (idemp
 	@if $(KIND) get clusters 2>/dev/null | grep -q "^$(CLUSTER_NAME)$$"; then
 		echo "→ Cluster '$(CLUSTER_NAME)' already exists"
 	else
-		$(SUBMAKE) _gpu-preflight;
-		$(SUBMAKE) gpu-node-image;
-		$(SUBMAKE) gpu-driver-bundle;
+		if [ "$(NARS_GPU)" = "1" ]; then \
+			$(SUBMAKE) _gpu-preflight; \
+			$(SUBMAKE) gpu-node-image; \
+			$(SUBMAKE) gpu-driver-bundle; \
+		else \
+			echo "→ NARS_GPU=0: using standard kind node image (no GPU)"; \
+		fi;
 		echo "→ Creating postgis data directory at $(POSTGRES_DATA_DIR)..."
 		mkdir -p "$(POSTGRES_DATA_DIR)"
 		chmod 750 "$(POSTGRES_DATA_DIR)" 2>/dev/null || true
@@ -241,7 +245,7 @@ cluster-create: ## Create the kind cluster with host-mounted postgis data (idemp
 			echo '        - 0.0.0.0';
 			echo 'nodes:';
 			echo '  - role: control-plane';
-			echo "    image: $(GPU_NODE_IMAGE)";
+			if [ "$(NARS_GPU)" = "1" ]; then echo "    image: $(GPU_NODE_IMAGE)"; else echo "    image: $(KIND_NODE_IMAGE)"; fi;
 			echo '    extraMounts:';
 			echo "      - hostPath: $$DATA_DIR";
 			echo '        containerPath: /mnt/nars/postgis';
