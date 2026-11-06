@@ -239,6 +239,7 @@ segma-up: _warn-latest-tag _guard-kind-staging-space ## Build, load and deploy n
 	@$(SUBMAKE) _build-nars-segma
 	@echo "→ Loading nars-segma image into cluster..."
 	@$(KIND_TMPDIR_MKDIR) && $(KIND_TMPDIR_EXPORT) $(KIND) load docker-image "$(DOCKER_ORG)/nars-segma:"$(IMAGE_TAG_Q) --name "$(CLUSTER_NAME)"
+	@$(SUBMAKE) gpu-install
 	@echo "→ Creating 'nars-segma-secrets'..."
 	@tmpdir=$$(mktemp -d); \
 	printf '%s' "$(NARS_SEGMA_INTERNAL_TOKEN)" > "$$tmpdir/internal-token"; \

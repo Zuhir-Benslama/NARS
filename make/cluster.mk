@@ -30,7 +30,6 @@ cluster-up: prerequisites _check-secrets ## Full bootstrap: create cluster, buil
 	$(SUBMAKE) ca-secret
 	$(SUBMAKE) secrets-apply
 	$(SUBMAKE) images-load
-	$(SUBMAKE) gpu-install
 	$(SUBMAKE) kustomize-apply
 	$(SUBMAKE) proxy-up
 	@echo ""
