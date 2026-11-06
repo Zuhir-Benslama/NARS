@@ -25,11 +25,8 @@ _check-secrets: ## Fail fast if critical secrets are empty (prevents deploying w
 		echo "✖ NARS_SEGMA_INTERNAL_TOKEN not set — run 'make .env' to generate it";
 		exit 1;
 	fi
-	@if [ -z "$(NARS_SEGMA_WEIGHTS_URL)" ]; then
-		echo "✖ NARS_SEGMA_WEIGHTS_URL not set — the segma pod's fetch-weights initContainer would never become ready";
-		echo "  Add it to .env (see .env.example for the default URL)";
-		exit 1;
-	fi
+	# NARS_SEGMA_WEIGHTS_URL is only required when deploying nars-segma
+	# (make segma-up); cluster-up no longer builds or deploys segma.
 	# No NARS_SEGMA_ROAD_WEIGHTS_URL gate: the roads checkpoint is baked into
 	# the nars-segma image and copied in by seed-road-weights, so there is no
 	# URL to require. Requiring one made a correct setup fail for a reason
@@ -224,16 +221,6 @@ secrets-apply: .env _check-secrets namespace-ensure ## Create nars-secrets and r
 		--dry-run=client -o yaml \
 	| $(KUBECTL) apply -f -
 	@echo "✓ nars-secrets created"
-
-	@echo "→ Creating 'nars-segma-secrets' (shared internal token + buildings weights URL)..."
-	printf '%s' "$$NARS_SEGMA_INTERNAL_TOKEN" > "$$tmpdir/internal-token";
-	printf '%s' "$$NARS_SEGMA_WEIGHTS_URL" > "$$tmpdir/weights-url";
-	$(KUBECTL) create secret generic nars-segma-secrets -n "$(NAMESPACE)" \
-		--from-file=internal-token="$$tmpdir/internal-token" \
-		--from-file=weights-url="$$tmpdir/weights-url" \
-		--dry-run=client -o yaml \
-	| $(KUBECTL) apply -f -
-	@echo "✓ nars-segma-secrets created"
 
 	@if [ -n "$(DOCKER_TOKEN)" ]; then
 		echo "→ Creating 'regcred'...";

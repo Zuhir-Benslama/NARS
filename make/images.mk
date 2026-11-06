@@ -232,10 +232,22 @@ _check-bundle-sync:
 # own once the cluster is up and a GPU is available.
 .PHONY: segma-up
 segma-up: _warn-latest-tag _guard-kind-staging-space ## Build, load and deploy nars-segma (GPU required)
+	@if [ -z "$(NARS_SEGMA_WEIGHTS_URL)" ]; then \
+		echo "✖ NARS_SEGMA_WEIGHTS_URL not set — run 'make .env'"; exit 1; \
+	fi
 	@echo "→ Building nars-segma image..."
 	@$(SUBMAKE) _build-nars-segma
 	@echo "→ Loading nars-segma image into cluster..."
 	@$(KIND_TMPDIR_MKDIR) && $(KIND_TMPDIR_EXPORT) $(KIND) load docker-image "$(DOCKER_ORG)/nars-segma:"$(IMAGE_TAG_Q) --name "$(CLUSTER_NAME)"
+	@echo "→ Creating 'nars-segma-secrets'..."
+	@tmpdir=$$(mktemp -d); \
+	printf '%s' "$(NARS_SEGMA_INTERNAL_TOKEN)" > "$$tmpdir/internal-token"; \
+	printf '%s' "$(NARS_SEGMA_WEIGHTS_URL)" > "$$tmpdir/weights-url"; \
+	$(KUBECTL) create secret generic nars-segma-secrets -n "$(NAMESPACE)" \
+		--from-file=internal-token="$$tmpdir/internal-token" \
+		--from-file=weights-url="$$tmpdir/weights-url" \
+		--dry-run=client -o yaml | $(KUBECTL) apply -f -; \
+	rm -rf "$$tmpdir"
 	@echo "→ Applying nars-segma manifests..."
 	@$(KUBECTL) apply -k nars-infra/segma
 	@$(KUBECTL) rollout status deployment/nars-segma -n "$(NAMESPACE)" --timeout=300s || true
