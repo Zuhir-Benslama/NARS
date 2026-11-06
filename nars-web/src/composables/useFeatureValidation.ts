@@ -3,6 +3,30 @@ import type { ModalState, ModalResult } from "../types"
 import { PHASES } from "../phases"
 import { CITY_CENTER_CONFIG } from "../config"
 import { cityCenterRadiusError } from "../lib/city-center"
+import { t } from "../i18n"
+import {
+  AREA_TYPES,
+  DISTRICT_TYPES,
+  ROAD_TYPES,
+  PUBLIC_SPACE_TYPES,
+  PUBLIC_BUILDING_SECTORS,
+} from "../types/feature-types"
+
+function typeLabelFor(key: string | undefined, fallback: string): string {
+  if (!key) return fallback
+  const resolved = t(`featureTypes.${key}`)
+  if (resolved && resolved !== `featureTypes.${key}`) return resolved
+  // Fallback to the static English catalog label (or the key itself) when i18n
+  // has not resolved the key (e.g. tests / untranslated locales).
+  const allTypes = [
+    ...AREA_TYPES,
+    ...DISTRICT_TYPES,
+    ...ROAD_TYPES,
+    ...PUBLIC_SPACE_TYPES,
+    ...PUBLIC_BUILDING_SECTORS.flatMap((s) => s.buildings),
+  ]
+  return allTypes.find((x) => x.key === key)?.label ?? fallback
+}
 
 export function useFeatureValidation(modalStore: ModalState & { phaseIndex: number | null }) {
   const phase = computed(() =>
@@ -54,9 +78,12 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
     const key = phase.value?.key
 
     if (key === "areas") {
+      const typeLabel = typeLabelFor(modalStore.areaTypeKey, t("phase_areas_label"))
       return {
         type: "areas",
-        label: isMainUrban.value ? communeName : modalStore.label.trim(),
+        label: isMainUrban.value
+          ? `${typeLabel} ${communeName}`.trim()
+          : `${typeLabel} ${modalStore.label.trim()}`.trim(),
         decisionNumber: modalStore.decisionNumber.trim(),
         decisionDate: modalStore.decisionDate.trim(),
         areaTypeKey: modalStore.areaTypeKey,
@@ -64,9 +91,10 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
     }
 
     if (key === "districts") {
+      const typeLabel = typeLabelFor(modalStore.districtTypeKey, t("phase_districts_label"))
       return {
         type: "districts",
-        label: modalStore.label.trim(),
+        label: `${typeLabel} ${modalStore.label.trim()}`.trim(),
         decisionNumber: modalStore.decisionNumber.trim(),
         decisionDate: modalStore.decisionDate.trim(),
         districtTypeKey: modalStore.districtTypeKey,
@@ -74,17 +102,19 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
     }
 
     if (key === "cityCenter") {
+      const typeLabel = t("phase_cityCenter_label")
       return {
         type: "cityCenter",
-        label: modalStore.label.trim(),
+        label: `${typeLabel} ${modalStore.label.trim()}`.trim(),
         radius: modalStore.radius ?? undefined,
       }
     }
 
     if (key === "roads") {
+      const typeLabel = typeLabelFor(modalStore.roadTypeKey, t("phase_roads_label"))
       return {
         type: "roads",
-        label: modalStore.label.trim(),
+        label: `${typeLabel} ${modalStore.label.trim()}`.trim(),
         decisionNumber: modalStore.decisionNumber.trim(),
         decisionDate: modalStore.decisionDate.trim(),
         roadTypeKey: modalStore.roadTypeKey,
@@ -92,9 +122,10 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
     }
 
     if (key === "publicBuildings") {
+      const typeLabel = typeLabelFor(modalStore.buildingTypeKey, t("phase_publicBuildings_label"))
       return {
         type: "publicBuildings",
-        label: modalStore.label.trim(),
+        label: `${typeLabel} ${modalStore.label.trim()}`.trim(),
         decisionNumber: modalStore.decisionNumber.trim(),
         decisionDate: modalStore.decisionDate.trim(),
         sectorKey: modalStore.sectorKey,
@@ -103,18 +134,20 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
     }
 
     if (key === "publicSpaces") {
+      const typeLabel = typeLabelFor(modalStore.spaceTypeKey, t("phase_publicSpaces_label"))
       return {
         type: "publicSpaces",
-        label: modalStore.label.trim(),
+        label: `${typeLabel} ${modalStore.label.trim()}`.trim(),
         decisionNumber: modalStore.decisionNumber.trim(),
         decisionDate: modalStore.decisionDate.trim(),
         spaceTypeKey: modalStore.spaceTypeKey,
       }
     }
 
+    const typeLabel = t("phase_namingPanels_label")
     return {
       type: "namingPanels",
-      label: modalStore.label.trim(),
+      label: `${typeLabel} ${modalStore.label.trim()}`.trim(),
       decisionNumber: modalStore.decisionNumber.trim(),
       decisionDate: modalStore.decisionDate.trim(),
     }

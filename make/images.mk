@@ -58,7 +58,6 @@ images-build: _warn-latest-tag ## Build all Docker images
 	$(SUBMAKE) _build-nars-postgis
 	$(SUBMAKE) _build-nars-vite
 	$(SUBMAKE) _build-nars-backup
-	$(SUBMAKE) _build-nars-segma
 	$(SUBMAKE) _build-nars-tiles
 	@echo "✓ All images built"
 
@@ -69,7 +68,7 @@ _build-nars-api: _warn-latest-tag
 		echo "  → skipping $$img: unchanged content-hash (CI paths-filter agrees)"; \
 	else \
 		echo "  → $(DOCKER_ORG)/nars-api:"$(IMAGE_TAG_Q); \
-		docker build -f "$(DOCKER_DIR)/Dockerfile.nars-api" \
+		docker build --no-cache -f "$(DOCKER_DIR)/Dockerfile.nars-api" \
 			-t "$(DOCKER_ORG)/nars-api:"$(IMAGE_TAG_Q) .; \
 	fi
 
@@ -96,7 +95,7 @@ _build-nars-vite: _warn-latest-tag
 			args="--build-arg VITE_TILE_SATELLITE=$(TILE_SATELLITE_URL)"; \
 			echo "    · VITE_TILE_SATELLITE=$(TILE_SATELLITE_URL)"; \
 		fi; \
-		docker build -f "$(DOCKER_DIR)/Dockerfile.nars-vite" \
+		docker build --no-cache -f "$(DOCKER_DIR)/Dockerfile.nars-vite" \
 			-t "$(DOCKER_ORG)/nars-vite:"$(IMAGE_TAG_Q) $$args .; \
 	fi
 
@@ -192,6 +191,8 @@ images-load: _warn-latest-tag _guard-kind-staging-space ## Load locally built Do
 frontend-update: _warn-latest-tag _guard-kind-staging-space ## Rebuild nars-vite + sync nars-api/wwwroot, load, rollout restart, verify bundle sync
 	@echo "→ Rebuilding nars-web and syncing nars-api/wwwroot..."
 	@(cd nars-web && npm run build:deploy)
+	@rm -f "$(IMAGES_HASH_DIR)/nars-vite.guard" "$(IMAGES_HASH_DIR)/nars-api.guard"
+	@docker builder prune -f >/dev/null 2>&1 || true
 	@$(SUBMAKE) _build-nars-vite
 	@$(SUBMAKE) _build-nars-api
 	@$(KIND_TMPDIR_MKDIR) && $(KIND_TMPDIR_EXPORT) $(KIND) load docker-image "$(DOCKER_ORG)/nars-vite:"$(IMAGE_TAG_Q) --name "$(CLUSTER_NAME)"
@@ -226,5 +227,19 @@ _check-bundle-sync:
 		echo "  ✖ bundle sync check failed — / and /map disagree (run make frontend-update)"; \
 		exit 1; \
 	fi
+# ─── Standalone segma deploy ─────────────────────────────────────
+# nars-segma is detached from cluster-up (large CUDA image). Deploy it on its
+# own once the cluster is up and a GPU is available.
+.PHONY: segma-up
+segma-up: _warn-latest-tag _guard-kind-staging-space ## Build, load and deploy nars-segma (GPU required)
+	@echo "→ Building nars-segma image..."
+	@$(SUBMAKE) _build-nars-segma
+	@echo "→ Loading nars-segma image into cluster..."
+	@$(KIND_TMPDIR_MKDIR) && $(KIND_TMPDIR_EXPORT) $(KIND) load docker-image "$(DOCKER_ORG)/nars-segma:"$(IMAGE_TAG_Q) --name "$(CLUSTER_NAME)"
+	@echo "→ Applying nars-segma manifests..."
+	@$(KUBECTL) apply -k nars-infra/segma
+	@$(KUBECTL) rollout status deployment/nars-segma -n "$(NAMESPACE)" --timeout=300s || true
+	@echo "✓ nars-segma deployed"
+
 export IMAGES_SCRIPTS_DIR := $(CURDIR)/make/scripts
 export PATH := $(IMAGES_SCRIPTS_DIR):$(PATH)

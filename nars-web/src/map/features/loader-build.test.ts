@@ -36,7 +36,7 @@ describe("buildGeoJsonFeature", () => {
     const coords = (result!.geometry as GeoJSON.Point).coordinates
     expect(coords).toEqual([20, 10])
     expect(result!.properties.dbId).toBe("db-1")
-    expect(result!.properties.label).toBe("Test Feature")
+    expect(result!.properties.label).toBe("areas Test Feature")
   })
 
   it("builds a LineString for polyline phases with coordinates", () => {

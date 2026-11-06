@@ -33,6 +33,7 @@ import { ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { setLang, currentLang } from "../../i18n"
 import { theme, setTheme } from "../../composables/useTheme"
+import { loadFromDatabase } from "../../map"
 
 const { t } = useI18n()
 
@@ -44,5 +45,12 @@ watch(currentLang, (v) => {
 
 async function changeLanguage() {
   await setLang(lang.value)
+  // Rebuild the map features so localized labels (feature type + name) follow
+  // the newly selected language without requiring a logout/login.
+  try {
+    await loadFromDatabase()
+  } catch {
+    // Map may not be initialized (e.g. admin views) — ignore.
+  }
 }
 </script>

@@ -1,24 +1,26 @@
 // ─── FEATURE VALIDATION TESTS ─────────────────────────────────────────────────
 // Tests for composables/useFeatureValidation.ts.
-//
-// Regression guard: AI-generated roads are materialized with blank decision
-// fields, and requiring them made every generated road unsaveable via the
-// "Edit info" modal (FeatureModal.onSave aborts on any validation error).
 
-import { describe, it, expect } from "vitest"
-import { useFeatureValidation } from "./useFeatureValidation"
-import { PHASES } from "../phases"
+import { describe, it, expect, vi, beforeEach } from "vitest"
 import type { ModalState } from "../types"
 
-function phaseIndexOf(key: string): number {
-  const idx = PHASES.findIndex((p) => p.key === key)
+beforeEach(() => {
+  localStorage.clear()
+})
+
+async function loadModule() {
+  return vi.importActual<typeof import("./useFeatureValidation")>("./useFeatureValidation")
+}
+
+function phaseIndexOf(PHASES: any[], key: string): number {
+  const idx = PHASES.findIndex((p: any) => p.key === key)
   if (idx === -1) throw new Error(`unknown phase: ${key}`)
   return idx
 }
 
-function storeFor(key: string, overrides: Partial<ModalState> = {}) {
+function storeFor(PHASES: any[], key: string, overrides: Partial<ModalState> = {}) {
   return {
-    phaseIndex: phaseIndexOf(key),
+    phaseIndex: phaseIndexOf(PHASES, key),
     label: "Rue Exemple",
     decisionNumber: "",
     decisionDate: "",
@@ -34,66 +36,66 @@ function storeFor(key: string, overrides: Partial<ModalState> = {}) {
 }
 
 describe("validate — decision fields", () => {
-  it("does not require a decision number or date for roads", () => {
-    const { validate } = useFeatureValidation(storeFor("roads"))
-
-    // A generated road arrives with no decision metadata at all.
+  it("does not require a decision number or date for roads", async () => {
+    const { PHASES } = await vi.importActual<typeof import("../phases")>("../phases")
+    const mod = await loadModule()
+    const { validate } = mod.useFeatureValidation(storeFor(PHASES, "roads"))
     const errors = validate()
-
     expect(errors.decisionNumber).toBeUndefined()
     expect(errors.decisionDate).toBeUndefined()
     expect(errors).toEqual({})
   })
 
-  it("still requires a decision number and date for other phases", () => {
+  it("still requires a decision number and date for other phases", async () => {
+    const { PHASES } = await vi.importActual<typeof import("../phases")>("../phases")
+    const mod = await loadModule()
     for (const key of ["areas", "districts", "publicBuildings", "publicSpaces", "namingPanels"]) {
-      const { validate } = useFeatureValidation(storeFor(key))
-
+      const { validate } = mod.useFeatureValidation(storeFor(PHASES, key))
       const errors = validate()
-
       expect(errors.decisionNumber, key).toBe("Required")
       expect(errors.decisionDate, key).toBe("Required")
     }
   })
 
-  it("still requires a label for roads", () => {
-    const { validate } = useFeatureValidation(storeFor("roads", { label: "   " }))
-
+  it("still requires a label for roads", async () => {
+    const { PHASES } = await vi.importActual<typeof import("../phases")>("../phases")
+    const mod = await loadModule()
+    const { validate } = mod.useFeatureValidation(storeFor(PHASES, "roads", { label: "   " }))
     expect(validate().label).toBe("Required")
   })
 
-  it("does not require decision fields for city centers", () => {
-    const { validate } = useFeatureValidation(storeFor("cityCenter", { radius: 500 }))
-
+  it("does not require decision fields for city centers", async () => {
+    const { PHASES } = await vi.importActual<typeof import("../phases")>("../phases")
+    const mod = await loadModule()
+    const { validate } = mod.useFeatureValidation(storeFor(PHASES, "cityCenter", { radius: 500 }))
     const errors = validate()
-
     expect(errors.decisionNumber).toBeUndefined()
     expect(errors.decisionDate).toBeUndefined()
   })
 })
 
 describe("buildModalResult — roads", () => {
-  it("emits blank decision fields rather than dropping them", () => {
-    const { buildModalResult } = useFeatureValidation(storeFor("roads"))
-
+  it("emits blank decision fields rather than dropping them", async () => {
+    const { PHASES } = await vi.importActual<typeof import("../phases")>("../phases")
+    const mod = await loadModule()
+    const { buildModalResult } = mod.useFeatureValidation(storeFor(PHASES, "roads"))
     const result = buildModalResult("Commune")
-
     expect(result).toEqual({
       type: "roads",
-      label: "Rue Exemple",
+      label: "Street Rue Exemple",
       decisionNumber: "",
       decisionDate: "",
       roadTypeKey: "street",
     })
   })
 
-  it("preserves a decision number the user did supply", () => {
-    const { buildModalResult } = useFeatureValidation(
-      storeFor("roads", { decisionNumber: " 2026/014 ", decisionDate: "2026-02-01" }),
+  it("preserves a decision number the user did supply", async () => {
+    const { PHASES } = await vi.importActual<typeof import("../phases")>("../phases")
+    const mod = await loadModule()
+    const { buildModalResult } = mod.useFeatureValidation(
+      storeFor(PHASES, "roads", { decisionNumber: " 2026/014 ", decisionDate: "2026-02-01" }),
     )
-
     const result = buildModalResult("Commune")
-
     expect(result).toMatchObject({ decisionNumber: "2026/014", decisionDate: "2026-02-01" })
   })
 })
