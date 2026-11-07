@@ -1,6 +1,7 @@
 import { getCtx } from "./core/state"
 import { useFieldStore } from "../stores/fieldStore"
 import { useAppStore } from "../stores/appStore"
+import { t } from "../i18n"
 import type { InspectionType } from "../types/inspection"
 import type { MapMouseEvent } from "maplibre-gl"
 
@@ -35,7 +36,7 @@ function onFieldWorkerClick(e: MapMouseEvent): void {
 
   fieldStore.selectFeature({
     id: props.dbId as string,
-    label: (props.label as string) || `Unnamed ${type}`,
+    label: (props.label as string) || t("fp_unnamed", { type: t(`fp_type_${type}`) }),
     type,
   })
 }

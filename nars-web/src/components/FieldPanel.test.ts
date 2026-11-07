@@ -9,6 +9,7 @@ vi.mock("vue-i18n", () => ({
 
 import FieldPanel from "./FieldPanel.vue"
 import { useFieldStore } from "../stores/fieldStore"
+import { i18n } from "../i18n"
 
 const globalOpts = {
   stubs: {
@@ -84,6 +85,32 @@ describe("FieldPanel", () => {
     const items = wrapper.findAll(".fp-item")
     expect(items).toHaveLength(2)
     expect(items[0].text()).toContain("Main Road")
+  })
+
+  it("shows a localized 'unnamed' label using the singular type name", async () => {
+    const spy = vi.spyOn(i18n.global, "t").mockImplementation(((
+      key: string,
+      params?: Record<string, string>,
+    ) => {
+      if (key === "fp_type_road") return "Route"
+      if (key === "fp_unnamed") return `${params?.type} sans nom`
+      return key
+    }) as unknown as typeof i18n.global.t)
+    try {
+      const wrapper = mount(FieldPanel, {
+        global: globalOpts,
+        props: {
+          fetchFeaturesFn: async () => [{ id: "1", label: "" }],
+        },
+      })
+      await new Promise((r) => setTimeout(r, 0))
+      const items = wrapper.findAll(".fp-item")
+      expect(items).toHaveLength(1)
+      // not the raw tab key ("road") and not a hardcoded English "Unnamed"
+      expect(items[0].text()).toBe("Route sans nom")
+    } finally {
+      spy.mockRestore()
+    }
   })
 
   it("selects a feature and shows inspection form", async () => {

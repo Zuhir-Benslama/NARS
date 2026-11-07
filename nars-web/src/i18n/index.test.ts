@@ -174,3 +174,35 @@ describe("i18n", () => {
     })
   })
 })
+
+describe("locale files", () => {
+  type Messages = Record<string, unknown>
+  const load = async (): Promise<Record<"en" | "fr" | "ar", Messages>> => ({
+    en: (await import("./en.json")).default as Messages,
+    fr: (await import("./fr.json")).default as Messages,
+    ar: (await import("./ar.json")).default as Messages,
+  })
+
+  it("fr and ar define exactly the same keys as en", async () => {
+    const { en, fr, ar } = await load()
+    const keys = Object.keys(en).sort()
+    expect(Object.keys(fr).sort()).toEqual(keys)
+    expect(Object.keys(ar).sort()).toEqual(keys)
+  })
+
+  it("field-inspection labels are translated, not copied from en", async () => {
+    const { en, fr, ar } = await load()
+    // label_entrance_field_worker / label_missing_entrance_note are persisted as
+    // feature data, so they intentionally stay identical across locales.
+    const persisted = new Set(["label_entrance_field_worker", "label_missing_entrance_note"])
+    const keys = Object.keys(en).filter(
+      (k) => /^(fp_|rif_|eif_|label_)/.test(k) && !persisted.has(k),
+    )
+    for (const k of keys) {
+      // "Email" / "Name" style loanwords are the only acceptable overlap
+      if (["label_email"].includes(k)) continue
+      expect(fr[k], `fr.${k}`).not.toBe(en[k])
+      expect(ar[k], `ar.${k}`).not.toBe(en[k])
+    }
+  })
+})
