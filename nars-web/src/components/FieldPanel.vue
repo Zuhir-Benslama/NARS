@@ -33,7 +33,7 @@
       </div>
       <div v-else class="fp-list">
         <button v-for="f in features" :key="f.id" class="fp-item" @click="selectFeature(f)">
-          {{ f.label || t("fp_unnamed", { type: activeTab }) }}
+          {{ f.label || unnamedLabel(activeTab) }}
         </button>
       </div>
     </div>
@@ -71,6 +71,15 @@ import EntranceInspectionForm from "./inspection/EntranceInspectionForm.vue"
 import NamingPanelInspectionForm from "./inspection/NamingPanelInspectionForm.vue"
 import type { InspectionType } from "../types/inspection"
 
+// "Unnamed <type>" in the active language, using the singular type name
+// (fp_type_road / fp_type_house_entrance / fp_type_naming_panel).
+function unnamedLabel(tab: string): string {
+  const typeKey = `fp_type_${tab}`
+  const translated = i18n.global.t(typeKey)
+  const type = translated && translated !== typeKey ? translated : tab
+  return i18n.global.t("fp_unnamed", { type })
+}
+
 function localizedFeatureLabel(tab: string, f: unknown): string {
   const obj = (f ?? {}) as Record<string, unknown>
   const d = (obj.data ?? {}) as Record<string, unknown>
@@ -81,7 +90,7 @@ function localizedFeatureLabel(tab: string, f: unknown): string {
         ? (d.labelFr as string) || (d.labelLatin as string) || (d.label as string) || ""
         : (d.labelEn as string) || (d.labelLatin as string) || (d.label as string) || ""
   const raw = (preferred || (obj.label as string) || "").trim()
-  if (!raw) return "Unnamed"
+  if (!raw) return unnamedLabel(tab)
   let typeLabel = ""
   if (tab === "road") {
     const key = d.roadTypeKey as string | undefined
@@ -129,7 +138,7 @@ const props = withDefaults(defineProps<FieldPanelProps>(), {
     const data = await res.json()
     return (data.features ?? []).map((f: Record<string, unknown>) => ({
       id: f.id,
-      label: f.label || "Unnamed",
+      label: f.label || "",
       data: f.data,
     }))
   },
