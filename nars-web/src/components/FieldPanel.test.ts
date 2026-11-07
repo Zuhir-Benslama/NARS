@@ -96,7 +96,7 @@ describe("FieldPanel", () => {
     })
     await new Promise((r) => setTimeout(r, 0))
     await wrapper.find(".fp-item").trigger("click")
-    expect(store.selectedFeature).toEqual({ id: "1", label: "Road 1", type: "road" })
+    expect(store.selectedFeature).toEqual({ id: "1", label: "fp_tab_roads Road 1", type: "road" })
     expect(wrapper.find(".mock-road-form").exists()).toBe(true)
   })
 

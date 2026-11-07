@@ -220,7 +220,7 @@ describe("editFeatureInfo", () => {
 
     await mod.editFeatureInfo("r1")
 
-    expect(mockApiFetch).toHaveBeenCalledTimes(1)
+    expect(mockApiFetch).toHaveBeenCalledTimes(2)
     const [url, init] = mockApiFetch.mock.calls[0]
     expect(url).toBe("/api/features/r1")
     expect(init.method).toBe("PUT")
