@@ -1,5 +1,5 @@
 <template>
-  <div v-if="visible" class="edit-toolbar" role="toolbar" aria-label="Map tools">
+  <div v-if="visible" class="edit-toolbar" role="toolbar" :aria-label="t('aria_map_tools')">
     <button
       class="edit-toolbar-btn"
       :title="t('tool_hand')"

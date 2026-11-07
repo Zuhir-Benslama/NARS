@@ -28,6 +28,9 @@ export const useAppStore = defineStore("app", {
       state.user !== null &&
       ["national_admin", "wilaya_admin", "daira_admin", "commune_user"].includes(state.user.role),
     communeName: (state) => state.user?.commune?.name_fr || state.user?.commune?.name_ar || "",
+    communeNameAr: (state) => state.user?.commune?.name_ar || state.user?.commune?.name_fr || "",
+    communeNameFr: (state) => state.user?.commune?.name_fr || state.user?.commune?.name_ar || "",
+    communeNameEn: (state) => state.user?.commune?.name_fr || state.user?.commune?.name_ar || "",
     // Derived from the layer store (single source of truth for features).
     // Previously duplicated state that had to be manually re-synced at every
     // mutation site (and was missed in several).

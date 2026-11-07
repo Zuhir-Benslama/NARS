@@ -30,7 +30,7 @@
           <tr v-for="u in commune.users" :key="u.user_id" :class="{ 'row-complete': u.total > 0 }">
             <td class="user-cell">
               <span class="uname">{{ u.username }}</span>
-              <span v-if="isFieldWorker(u)" class="fw-badge">FW</span>
+              <span v-if="isFieldWorker(u)" class="fw-badge">{{ t("badge_field_worker") }}</span>
               <span class="uname-full">{{ u.name }}</span>
             </td>
             <td>{{ u.areas }}</td>

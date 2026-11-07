@@ -17,30 +17,12 @@
         {{ t(phase.hint) }}
       </div>
 
-      <!-- Name -->
-      <div class="modal-field">
-        <label>
+      <!-- Name (localized) -->
+      <fieldset class="modal-field-group">
+        <legend class="modal-group-label">
           {{ t("label_name") }}
           <span class="req">*</span>
-        </label>
-        <input
-          v-model="modalStore.label"
-          type="text"
-          :class="[
-            'modal-input',
-            {
-              error: modalStore.errors.label,
-              'modal-input-readonly': isMainUrban || isZoneWithTypeName || isCityCenter,
-            },
-          ]"
-          :placeholder="
-            isMainUrban || isZoneWithTypeName || isCityCenter ? '' : t('placeholder_feature_name')
-          "
-          :readonly="isMainUrban || isZoneWithTypeName || isCityCenter"
-          :disabled="isMainUrban"
-          autocomplete="off"
-          autofocus
-        />
+        </legend>
         <span v-if="isMainUrban" class="modal-field-note">
           {{ t("modal_note_main_urban") }}
         </span>
@@ -50,7 +32,59 @@
         <span v-if="isCityCenter" class="modal-field-note">{{
           t("modal_note_city_center_name")
         }}</span>
-      </div>
+        <div class="modal-field">
+          <label>{{ t("label_name_ar") }}</label>
+          <input
+            v-model="modalStore.labelAr"
+            type="text"
+            :class="[
+              'modal-input',
+              { 'modal-input-readonly': isMainUrban || isZoneWithTypeName || isCityCenter },
+            ]"
+            :placeholder="
+              isMainUrban || isZoneWithTypeName || isCityCenter ? '' : t('placeholder_name_ar')
+            "
+            :readonly="isMainUrban || isZoneWithTypeName || isCityCenter"
+            :disabled="isMainUrban"
+            autocomplete="off"
+            autofocus
+          />
+        </div>
+        <div class="modal-field">
+          <label>{{ t("label_name_fr") }}</label>
+          <input
+            v-model="modalStore.labelFr"
+            type="text"
+            :class="[
+              'modal-input',
+              { 'modal-input-readonly': isMainUrban || isZoneWithTypeName || isCityCenter },
+            ]"
+            :placeholder="
+              isMainUrban || isZoneWithTypeName || isCityCenter ? '' : t('placeholder_name_fr')
+            "
+            :readonly="isMainUrban || isZoneWithTypeName || isCityCenter"
+            :disabled="isMainUrban"
+            autocomplete="off"
+          />
+        </div>
+        <div class="modal-field">
+          <label>{{ t("label_name_en") }}</label>
+          <input
+            v-model="modalStore.labelEn"
+            type="text"
+            :class="[
+              'modal-input',
+              { 'modal-input-readonly': isMainUrban || isZoneWithTypeName || isCityCenter },
+            ]"
+            :placeholder="
+              isMainUrban || isZoneWithTypeName || isCityCenter ? '' : t('placeholder_name_en')
+            "
+            :readonly="isMainUrban || isZoneWithTypeName || isCityCenter"
+            :disabled="isMainUrban"
+            autocomplete="off"
+          />
+        </div>
+      </fieldset>
 
       <!-- Decision No. + Date — hidden when editing a city center -->
       <div v-if="!isCityCenter" class="modal-row">
@@ -208,12 +242,17 @@ watch(
   [() => modalStore.areaTypeKey, () => modalStore.districtTypeKey],
   ([areaType, districtType]) => {
     if (areaType === "central_urban") {
-      modalStore.patchFields({ label: appStore.communeName })
+      modalStore.patchFields({
+        label: appStore.communeName,
+        labelAr: appStore.communeNameAr,
+        labelFr: appStore.communeNameFr,
+        labelEn: appStore.communeNameEn,
+      })
     } else if (!modalStore.isEdit && modalStore.label === appStore.communeName) {
-      modalStore.patchFields({ label: "" })
+      modalStore.patchFields({ label: "", labelAr: "", labelFr: "", labelEn: "" })
     }
     if (districtType === "trad_activities_zone" || districtType === "industry_zone") {
-      modalStore.patchFields({ label: t("featureTypes." + districtType) })
+      modalStore.patchFields({ label: "" })
     }
   },
 )

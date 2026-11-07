@@ -34,6 +34,27 @@
 .modal-field {
   margin-bottom: 14px;
 }
+
+.modal-field-group {
+  border: 1px solid var(--input-border) !important;
+  border-radius: 8px !important;
+  padding: 12px 14px 4px;
+  margin-bottom: 14px;
+  background: transparent;
+}
+.modal-field-group .modal-group-label {
+  display: block;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--modal-label) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.modal-field-group legend.modal-group-label {
+  float: none;
+  width: auto;
+}
 .modal-field label {
   display: block;
   margin-bottom: 5px;

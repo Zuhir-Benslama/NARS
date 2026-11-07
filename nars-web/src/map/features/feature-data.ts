@@ -74,10 +74,16 @@ function extractCoords(geometry: GeoJSON.Geometry): { lat: number; lng: number }
 function modalResultToBase(modalResult: ModalResult): FeatureData {
   const type = modalResult.type as FeatureTypeKey
   const label = modalResult.label
+  const labelAr = modalResult.labelAr
+  const labelFr = modalResult.labelFr
+  const labelEn = modalResult.labelEn
   if (modalResult.type === "areas") {
     return {
       type,
       label,
+      labelAr,
+      labelFr,
+      labelEn,
       decisionNumber: modalResult.decisionNumber,
       decisionDate: modalResult.decisionDate,
       areaTypeKey: modalResult.areaTypeKey,
@@ -87,18 +93,24 @@ function modalResultToBase(modalResult: ModalResult): FeatureData {
     return {
       type,
       label,
+      labelAr,
+      labelFr,
+      labelEn,
       decisionNumber: modalResult.decisionNumber,
       decisionDate: modalResult.decisionDate,
       districtTypeKey: modalResult.districtTypeKey,
     } as FeatureData
   }
   if (modalResult.type === "cityCenter") {
-    return { type, label, radius: modalResult.radius } as FeatureData
+    return { type, label, labelAr, labelFr, labelEn, radius: modalResult.radius } as FeatureData
   }
   if (modalResult.type === "roads") {
     return {
       type,
       label,
+      labelAr,
+      labelFr,
+      labelEn,
       decisionNumber: modalResult.decisionNumber,
       decisionDate: modalResult.decisionDate,
       roadTypeKey: modalResult.roadTypeKey,
@@ -108,6 +120,9 @@ function modalResultToBase(modalResult: ModalResult): FeatureData {
     return {
       type,
       label,
+      labelAr,
+      labelFr,
+      labelEn,
       entranceTypeKey: modalResult.entranceTypeKey,
       roadDbId: modalResult.roadDbId,
       roadLabel: modalResult.roadLabel,
@@ -122,6 +137,9 @@ function modalResultToBase(modalResult: ModalResult): FeatureData {
     return {
       type,
       label,
+      labelAr,
+      labelFr,
+      labelEn,
       decisionNumber: modalResult.decisionNumber,
       decisionDate: modalResult.decisionDate,
       sectorKey: modalResult.sectorKey,
@@ -132,6 +150,9 @@ function modalResultToBase(modalResult: ModalResult): FeatureData {
     return {
       type,
       label,
+      labelAr,
+      labelFr,
+      labelEn,
       decisionNumber: modalResult.decisionNumber,
       decisionDate: modalResult.decisionDate,
       spaceTypeKey: modalResult.spaceTypeKey,
@@ -140,6 +161,9 @@ function modalResultToBase(modalResult: ModalResult): FeatureData {
   return {
     type,
     label,
+    labelAr,
+    labelFr,
+    labelEn,
     decisionNumber: modalResult.decisionNumber,
     decisionDate: modalResult.decisionDate,
   } as FeatureData

@@ -1,5 +1,5 @@
 <template>
-  <div v-if="visible" class="edit-panel" role="toolbar" aria-label="Edit geometry">
+  <div v-if="visible" class="edit-panel" role="toolbar" :aria-label="t('aria_edit_geometry')">
     <div class="edit-panel-title">{{ t("edit_panel_title") }}</div>
     <p class="edit-panel-hint">{{ t("map_edit_mode_hint") }}</p>
 

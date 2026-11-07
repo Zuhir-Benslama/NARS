@@ -15,6 +15,10 @@ export type FeatureTypeKey =
 export interface FeatureData {
   type: FeatureTypeKey
   label: string
+  labelAr?: string
+  labelFr?: string
+  labelEn?: string
+  labelLatin?: string
   decisionNumber?: string
   decisionDate?: string
   coordinates?: LatLng[]
@@ -43,6 +47,10 @@ export interface FeatureData {
 interface CommonFields {
   type: FeatureTypeKey
   label: string
+  labelAr?: string
+  labelFr?: string
+  labelEn?: string
+  labelLatin?: string
   coordinates?: LatLng[]
   geometry?: string
 }

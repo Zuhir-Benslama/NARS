@@ -6,7 +6,7 @@
         id="nars-generation-progress"
         class="generation-bar"
         role="progressbar"
-        aria-label="Road generation progress"
+        :aria-label="t('aria_road_generation')"
         :aria-valuemin="0"
         :aria-valuemax="100"
         :aria-valuenow="Math.round(store.progress)"

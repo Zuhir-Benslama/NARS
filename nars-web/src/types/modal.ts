@@ -4,6 +4,9 @@ export interface ModalState {
   isEdit: boolean
   editDbId: string | null
   label: string
+  labelAr: string
+  labelFr: string
+  labelEn: string
   decisionNumber: string
   decisionDate: string
   errors: Record<string, string>
@@ -21,6 +24,9 @@ export interface ModalState {
 export interface AreaModalResult {
   type: "areas"
   label: string
+  labelAr?: string
+  labelFr?: string
+  labelEn?: string
   decisionNumber: string
   decisionDate: string
   areaTypeKey?: string
@@ -29,6 +35,9 @@ export interface AreaModalResult {
 export interface DistrictModalResult {
   type: "districts"
   label: string
+  labelAr?: string
+  labelFr?: string
+  labelEn?: string
   decisionNumber: string
   decisionDate: string
   districtTypeKey?: string
@@ -37,12 +46,18 @@ export interface DistrictModalResult {
 export interface CityCenterModalResult {
   type: "cityCenter"
   label: string
+  labelAr?: string
+  labelFr?: string
+  labelEn?: string
   radius?: number
 }
 
 export interface RoadModalResult {
   type: "roads"
   label: string
+  labelAr?: string
+  labelFr?: string
+  labelEn?: string
   decisionNumber: string
   decisionDate: string
   roadTypeKey?: string
@@ -51,6 +66,9 @@ export interface RoadModalResult {
 export interface HouseEntranceModalResult {
   type: "houseEntrances"
   label: string
+  labelAr?: string
+  labelFr?: string
+  labelEn?: string
   entranceTypeKey?: "main_entrance" | "secondary_entrance"
   roadDbId?: string
   roadLabel?: string
@@ -64,6 +82,9 @@ export interface HouseEntranceModalResult {
 export interface PublicBuildingModalResult {
   type: "publicBuildings"
   label: string
+  labelAr?: string
+  labelFr?: string
+  labelEn?: string
   decisionNumber: string
   decisionDate: string
   sectorKey?: string
@@ -73,6 +94,9 @@ export interface PublicBuildingModalResult {
 export interface PublicSpaceModalResult {
   type: "publicSpaces"
   label: string
+  labelAr?: string
+  labelFr?: string
+  labelEn?: string
   decisionNumber: string
   decisionDate: string
   spaceTypeKey?: string
@@ -81,6 +105,9 @@ export interface PublicSpaceModalResult {
 export interface NamingPanelModalResult {
   type: "namingPanels"
   label: string
+  labelAr?: string
+  labelFr?: string
+  labelEn?: string
   decisionNumber: string
   decisionDate: string
 }

@@ -32,7 +32,7 @@
       v-if="appStore.isLoading"
       class="loading-overlay"
       role="alert"
-      aria-label="Loading map data"
+      :aria-label="t('aria_loading_map')"
     >
       <div class="loading-spinner">
         <div class="spinner" />

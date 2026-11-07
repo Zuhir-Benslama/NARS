@@ -68,7 +68,7 @@ describe("CommuneList", () => {
       { commune_id: 1, commune_name_fr: "Test", commune_name_ar: "", users: [user] },
     ]
     const wrapper = mount(CommuneList, { props: { communes } })
-    expect(wrapper.text()).toContain("FW")
+    expect(wrapper.text()).toContain("badge_field_worker")
   })
 
   it("hides FW badge for non-field-worker roles", () => {
@@ -77,7 +77,7 @@ describe("CommuneList", () => {
       { commune_id: 1, commune_name_fr: "Test", commune_name_ar: "", users: [user] },
     ]
     const wrapper = mount(CommuneList, { props: { communes } })
-    expect(wrapper.text()).not.toContain("FW")
+    expect(wrapper.text()).not.toContain("badge_field_worker")
   })
 
   it("renders totals row when multiple users", () => {

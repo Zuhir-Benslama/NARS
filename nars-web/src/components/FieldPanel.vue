@@ -62,6 +62,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from "vue"
 import { useI18n } from "vue-i18n"
+import { currentLang, i18n } from "../i18n"
 import { useFieldStore } from "../stores/fieldStore"
 import { apiFetch } from "../api"
 import { logError, createNetworkError } from "../lib/errors"
@@ -69,6 +70,34 @@ import RoadInspectionForm from "./inspection/RoadInspectionForm.vue"
 import EntranceInspectionForm from "./inspection/EntranceInspectionForm.vue"
 import NamingPanelInspectionForm from "./inspection/NamingPanelInspectionForm.vue"
 import type { InspectionType } from "../types/inspection"
+
+function localizedFeatureLabel(tab: string, f: unknown): string {
+  const obj = (f ?? {}) as Record<string, unknown>
+  const d = (obj.data ?? {}) as Record<string, unknown>
+  const preferred =
+    currentLang.value === "ar"
+      ? (d.labelAr as string) || (d.label as string) || ""
+      : currentLang.value === "fr"
+        ? (d.labelFr as string) || (d.labelLatin as string) || (d.label as string) || ""
+        : (d.labelEn as string) || (d.labelLatin as string) || (d.label as string) || ""
+  const raw = (preferred || (obj.label as string) || "").trim()
+  if (!raw) return "Unnamed"
+  let typeLabel = ""
+  if (tab === "road") {
+    const key = d.roadTypeKey as string | undefined
+    if (key) {
+      const r = i18n.global.t(`featureTypes.${key}`)
+      typeLabel = r && r !== `featureTypes.${key}` ? r : key
+    } else {
+      typeLabel = i18n.global.t("fp_tab_roads")
+    }
+  } else if (tab === "house_entrance") {
+    typeLabel = i18n.global.t("fp_tab_entrances")
+  } else if (tab === "naming_panel") {
+    typeLabel = i18n.global.t("fp_tab_naming_panels")
+  }
+  return typeLabel ? `${typeLabel} ${raw}`.trim() : raw
+}
 
 interface TabDef {
   key: InspectionType
@@ -87,6 +116,7 @@ const tabs = computed<TabDef[]>(() => [
 interface ApiFeature {
   id: string
   label: string
+  data?: Record<string, unknown>
 }
 
 export interface FieldPanelProps {
@@ -97,9 +127,10 @@ const props = withDefaults(defineProps<FieldPanelProps>(), {
   fetchFeaturesFn: async (apiType: string) => {
     const res = await apiFetch(`/api/field/features?type=${apiType}`)
     const data = await res.json()
-    return (data.features ?? []).map((f: ApiFeature) => ({
+    return (data.features ?? []).map((f: Record<string, unknown>) => ({
       id: f.id,
       label: f.label || "Unnamed",
+      data: f.data,
     }))
   },
 })
@@ -111,6 +142,10 @@ let _fetchController: AbortController | null = null
 
 const fieldStore = useFieldStore()
 const selectedFeature = computed(() => fieldStore.selectedFeature)
+
+watch(currentLang, () => {
+  fetchFeatures()
+})
 
 watch(activeTab, () => {
   fieldStore.clearSelection()
@@ -127,7 +162,12 @@ async function fetchFeatures() {
   _fetchController = controller
   try {
     const result = await props.fetchFeaturesFn(tab.apiType)
-    if (!controller.signal.aborted) features.value = result
+    if (!controller.signal.aborted) {
+      features.value = result.map((f) => ({
+        ...f,
+        label: localizedFeatureLabel(tab.apiType, f as unknown),
+      }))
+    }
   } catch (err) {
     if (!controller.signal.aborted)
       logError(

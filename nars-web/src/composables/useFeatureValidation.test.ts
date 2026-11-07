@@ -82,7 +82,10 @@ describe("buildModalResult — roads", () => {
     const result = buildModalResult("Commune")
     expect(result).toEqual({
       type: "roads",
-      label: "Street Rue Exemple",
+      label: "Rue Exemple",
+      labelAr: "Rue Exemple",
+      labelFr: "Rue Exemple",
+      labelEn: "Rue Exemple",
       decisionNumber: "",
       decisionDate: "",
       roadTypeKey: "street",

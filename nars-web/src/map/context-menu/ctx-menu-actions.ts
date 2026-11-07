@@ -4,8 +4,8 @@
 import { apiFetch } from "../../api"
 import { useSelectionStore } from "../../stores/selectionStore"
 import { openEditModal } from "../../stores/modalStore"
-import { PHASES, CITY_CENTER_COLOR } from "../../phases"
-import { CITY_CENTER_CONFIG } from "../../config"
+import { PHASES } from "../../phases"
+
 import { useFeaturesStore } from "../../stores/featuresStore"
 import { useLayerStore, LAYER_KEYS } from "../../stores/layerStore"
 import { showToast, showConfirm } from "../../lib/toast"
@@ -15,9 +15,10 @@ import { t } from "../../i18n"
 import { recordDelete } from "../undo"
 import { enableEditMode } from "../draw/draw-events"
 import type { LayerEntry } from "../../types"
-import { featureDataToGeometry } from "../features/feature-data"
+
 import { debugError } from "../../utils/debug"
 import { updateEndpointMarkers } from "../roads/road-directions"
+import { loadFromDatabase } from "../features/loader-db"
 import { updateSelectionHighlight } from "../core/state"
 
 // ─── LOOKUP ───────────────────────────────────────────────────────────────────
@@ -89,27 +90,9 @@ export async function editFeatureInfo(dbId: string): Promise<void> {
 
     useLayerStore().updateFeature(entry.data.type, dbId, result)
 
-    const featuresStore = useFeaturesStore()
-    const d = entry.data as { radius?: number; lat?: number; lng?: number; label: string }
-    if (entry.type === "circle" && d.radius && d.lat && d.lng) {
-      featuresStore.update(entry.id, {
-        geometry: featureDataToGeometry(d, "circle"),
-        properties: {
-          phaseKey: "cityCenter",
-          label: entry.data.label,
-          geomType: "LineString",
-          lineColor: CITY_CENTER_COLOR,
-          lineWidth: CITY_CENTER_CONFIG.ringStrokeWidth,
-        },
-      })
-    } else {
-      featuresStore.update(entry.id, {
-        properties: {
-          phaseKey: entry.data.type,
-          label: result.label,
-        },
-      })
-    }
+    // Rebuild the map so localized labels (subtype + name) follow the edit
+    // and the currently selected language.
+    await loadFromDatabase()
 
     showToast(t("map_feature_updated"), "success")
   } catch (err) {
