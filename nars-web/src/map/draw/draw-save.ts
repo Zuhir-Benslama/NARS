@@ -19,6 +19,7 @@ import { debugError } from "../../utils/debug"
 import { t } from "../../i18n"
 import { updateEndpointMarkers } from "../roads/road-directions"
 import { buildFeatureData, featureDataToGeometry } from "../features/feature-data"
+import { displayLabelFor } from "../features/feature-labels"
 import { DRAW_CONFIG, CITY_CENTER_CONFIG } from "../../config"
 import { cityCenterRadiusError } from "../../lib/city-center"
 import { saveToDatabase } from "../features/feature-persistence"
@@ -199,7 +200,7 @@ async function updateStoresAfterSave(
     properties: {
       dbId: payload.dbId,
       phaseKey: drawingPhase.key,
-      label: featureData.label,
+      label: displayLabelFor(drawingPhase, featureData),
       geomType: payload.storeGeometry.type,
       ...payload.style,
     },

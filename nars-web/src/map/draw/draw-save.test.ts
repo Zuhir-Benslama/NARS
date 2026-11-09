@@ -119,6 +119,7 @@ describe("completeDrawingWithGeometry", () => {
     setDrawingPhase(areaPhase)
 
     mockOpenModal.mockResolvedValue({
+      type: "areas",
       label: "Test Area",
       decisionNumber: "123/2024",
       decisionDate: "2024-01-15",
@@ -143,7 +144,7 @@ describe("completeDrawingWithGeometry", () => {
         properties: expect.objectContaining({
           dbId: "abc-123",
           phaseKey: "areas",
-          label: "Test Area",
+          label: "Main Urban Area Test Area",
         }),
       }),
     )
