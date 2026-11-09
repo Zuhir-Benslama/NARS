@@ -40,12 +40,18 @@ ingress-install: ## Install NGINX Ingress Controller (idempotent)
 	@echo "→ Installing NGINX Ingress Controller..."
 	@$(KUBECTL) apply -f \
 		https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-$(INGRESS_NGINX_VERSION)/deploy/static/provider/kind/deploy.yaml
-	@$(KUBECTL) label --overwrite node $(CLUSTER_NAME)-control-plane ingress-ready=true 2>/dev/null || true
+	@$(KUBECTL) label --overwrite node $(CLUSTER_NAME)-control-plane ingress-ready=true >/dev/null 2>&1 || true
 	@# Align controller labels with nars-infra/k8s/network-policy.yaml selectors
 	@$(KUBECTL) -n ingress-nginx patch deployment ingress-nginx-controller \
 		--type merge -p \
 		'{"spec":{"template":{"metadata":{"labels":{"app.kubernetes.io/part-of":"nars","app.kubernetes.io/managed-by":"kustomize"}}}}}' \
 		>/dev/null 2>&1 || true
+	@# Wait for the admission webhook cert (created by the jobs above) to exist
+	@# before any later step applies Ingress objects that hit the webhook.
+	@$(KUBECTL) wait --namespace ingress-nginx --for=condition=complete \
+		job/ingress-nginx-admission-create --timeout=120s >/dev/null 2>&1 || true
+	@$(KUBECTL) wait --namespace ingress-nginx --for=condition=complete \
+		job/ingress-nginx-admission-patch --timeout=120s >/dev/null 2>&1 || true
 	@echo "✓ Ingress controller installed"
 
 .PHONY: ingress-wait
@@ -54,13 +60,22 @@ ingress-wait: ## Wait for ingress controller to be ready
 	@$(KUBECTL) wait --namespace ingress-nginx \
 		--for=condition=available deployment/ingress-nginx-controller \
 		--timeout=180s
+	@echo "→ Waiting for ingress admission webhook jobs..."
+	@$(KUBECTL) wait --namespace ingress-nginx --for=condition=complete \
+		job/ingress-nginx-admission-create --timeout=180s
+	@$(KUBECTL) wait --namespace ingress-nginx --for=condition=complete \
+		job/ingress-nginx-admission-patch --timeout=180s
 	@echo "✓ Ingress controller ready"
 
 .PHONY: metrics-install
 metrics-install: ## Install metrics-server for HPA autoscaling (idempotent)
-	@echo "→ Installing metrics-server..."
-	@$(KUBECTL) apply -f \
-		https://github.com/kubernetes-sigs/metrics-server/releases/download/$(METRICS_SERVER_VERSION)/components.yaml
+	@if $(KUBECTL) get deployment metrics-server -n kube-system >/dev/null 2>&1; then
+		echo "→ metrics-server already installed — skipping remote fetch"
+	else
+		echo "→ Installing metrics-server..."
+		@$(KUBECTL) apply -f \
+			https://github.com/kubernetes-sigs/metrics-server/releases/download/$(METRICS_SERVER_VERSION)/components.yaml
+	fi
 	@if $(KUBECTL) get deployment metrics-server -n kube-system \
 		-o jsonpath='{.spec.template.spec.containers[0].args}' 2>/dev/null \
 		| grep -q -- '--kubelet-insecure-tls'; then

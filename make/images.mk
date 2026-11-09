@@ -62,9 +62,10 @@ images-build: _warn-latest-tag ## Build all Docker images
 	@echo "✓ All images built"
 
 .PHONY: _build-nars-api
-_build-nars-api: _warn-latest-tag
+_build-nars-api:
 	@img=nars-api; st="$(IMAGES_HASH_DIR)/$$img"; \
-	if __image_guard "$$st.guard" 'nars-api/**' 'nars-infra/docker/Dockerfile.nars-api' 'Directory.Build.props'; then \
+	if __image_guard "$$st.guard" 'nars-api/**' 'nars-infra/docker/Dockerfile.nars-api' 'Directory.Build.props' \
+		&& docker image inspect "$(DOCKER_ORG)/nars-api:$(IMAGE_TAG)" >/dev/null 2>&1; then \
 		echo "  → skipping $$img: unchanged content-hash (CI paths-filter agrees)"; \
 	else \
 		echo "  → $(DOCKER_ORG)/nars-api:"$(IMAGE_TAG_Q); \
@@ -73,9 +74,10 @@ _build-nars-api: _warn-latest-tag
 	fi
 
 .PHONY: _build-nars-postgis
-_build-nars-postgis: _warn-latest-tag
+_build-nars-postgis:
 	@img=nars-postgis; st="$(IMAGES_HASH_DIR)/$$img"; \
-	if __image_guard "$$st.guard" 'nars-infra/scripts/**' 'nars-infra/docker/Dockerfile.nars-postgis' 'docs/seed_reference_data.sql'; then \
+	if __image_guard "$$st.guard" 'nars-infra/scripts/**' 'nars-infra/docker/Dockerfile.nars-postgis' 'docs/seed_reference_data.sql' \
+		&& docker image inspect "$(DOCKER_ORG)/nars-postgis:$(IMAGE_TAG)" >/dev/null 2>&1; then \
 		echo "  → skipping $$img: unchanged content-hash (CI paths-filter agrees)"; \
 	else \
 		echo "  → $(DOCKER_ORG)/nars-postgis:"$(IMAGE_TAG_Q); \
@@ -84,9 +86,10 @@ _build-nars-postgis: _warn-latest-tag
 	fi
 
 .PHONY: _build-nars-vite
-_build-nars-vite: _warn-latest-tag
+_build-nars-vite:
 	@img=nars-vite; st="$(IMAGES_HASH_DIR)/$$img"; \
-	if __image_guard "$$st.guard" 'nars-web/**' 'nars-infra/docker/Dockerfile.nars-vite' 'nars-infra/docker/nginx.nars-vite.conf' 'nars-infra/docker/proxy-common-snippet.conf'; then \
+	if __image_guard "$$st.guard" 'nars-web/**' 'nars-infra/docker/Dockerfile.nars-vite' 'nars-infra/docker/nginx.nars-vite.conf' 'nars-infra/docker/proxy-common-snippet.conf' \
+		&& docker image inspect "$(DOCKER_ORG)/nars-vite:$(IMAGE_TAG)" >/dev/null 2>&1; then \
 		echo "  → skipping $$img: unchanged content-hash (CI paths-filter agrees)"; \
 	else \
 		echo "  → $(DOCKER_ORG)/nars-vite:"$(IMAGE_TAG_Q); \
@@ -100,9 +103,10 @@ _build-nars-vite: _warn-latest-tag
 	fi
 
 .PHONY: _build-nars-backup
-_build-nars-backup: _warn-latest-tag
+_build-nars-backup:
 	@img=nars-backup; st="$(IMAGES_HASH_DIR)/$$img"; \
-	if __image_guard "$$st.guard" 'nars-infra/scripts/**' 'nars-infra/docker/Dockerfile.nars-backup' 'docs/seed_reference_data.sql'; then \
+	if __image_guard "$$st.guard" 'nars-infra/scripts/**' 'nars-infra/docker/Dockerfile.nars-backup' 'docs/seed_reference_data.sql' \
+		&& docker image inspect "$(DOCKER_ORG)/nars-backup:$(IMAGE_TAG)" >/dev/null 2>&1; then \
 		echo "  → skipping $$img: unchanged content-hash (CI paths-filter agrees)"; \
 	else \
 		echo "  → $(DOCKER_ORG)/nars-backup:"$(IMAGE_TAG_Q); \
@@ -111,9 +115,10 @@ _build-nars-backup: _warn-latest-tag
 	fi
 
 .PHONY: _build-nars-segma
-_build-nars-segma: _warn-latest-tag
+_build-nars-segma:
 	@img=nars-segma; st="$(IMAGES_HASH_DIR)/$$img"; \
-	if __image_guard "$$st.guard" 'nars-segma/**' 'nars-infra/docker/Dockerfile.nars-segma'; then \
+	if __image_guard "$$st.guard" 'nars-segma/**' 'nars-infra/docker/Dockerfile.nars-segma' \
+		&& docker image inspect "$(DOCKER_ORG)/nars-segma:$(IMAGE_TAG)" >/dev/null 2>&1; then \
 		echo "  → skipping $$img: unchanged content-hash (CI paths-filter agrees)"; \
 	else \
 		echo "  → $(DOCKER_ORG)/nars-segma:"$(IMAGE_TAG_Q); \
@@ -122,9 +127,10 @@ _build-nars-segma: _warn-latest-tag
 	fi
 
 .PHONY: _build-nars-tiles
-_build-nars-tiles: _warn-latest-tag
+_build-nars-tiles:
 	@img=nars-tiles; st="$(IMAGES_HASH_DIR)/$$img"; \
-	if __image_guard "$$st.guard" 'nars-infra/scripts/mapserver-entrypoint.sh' 'nars-infra/docker/mapserver/**' 'nars-infra/docker/Dockerfile.nars-tiles'; then \
+	if __image_guard "$$st.guard" 'nars-infra/scripts/mapserver-entrypoint.sh' 'nars-infra/docker/mapserver/**' 'nars-infra/docker/Dockerfile.nars-tiles' \
+		&& docker image inspect "$(DOCKER_ORG)/nars-tiles:$(IMAGE_TAG)" >/dev/null 2>&1; then \
 		echo "  → skipping $$img: unchanged content-hash (CI paths-filter agrees)"; \
 	else \
 		echo "  → $(DOCKER_ORG)/nars-tiles:"$(IMAGE_TAG_Q); \
