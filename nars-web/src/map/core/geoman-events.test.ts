@@ -228,7 +228,7 @@ describe("onEditEnd", () => {
     ])
   })
 
-  it("refreshes road endpoint markers while a road is edited", () => {
+  it("does not rebuild road endpoint markers on every editend (performance)", () => {
     const entry = addLayerEntry("roads", { dbId: "rd1", data: { coordinates: [] } })
     mockGetActiveEditEntry.mockReturnValue(entry)
     mod.registerGeomanEvents()
@@ -248,7 +248,7 @@ describe("onEditEnd", () => {
       },
     })
 
-    expect(mockUpdateEndpointMarkers).toHaveBeenCalled()
+    expect(mockUpdateEndpointMarkers).not.toHaveBeenCalled()
   })
 
   it("does not refresh road endpoint markers for non-road features", () => {
