@@ -131,16 +131,17 @@ export function disableSnapping(): void {
   const { map } = getCtx()
   const store = useSnapStore()
   setSnappingEnabled(false)
+  if (store.snapRafId !== null) {
+    cancelAnimationFrame(store.snapRafId)
+  }
   store.patchSnapState({
     snapActive: false,
     snapFrozen: false,
+    snapLatLng: null,
     snapPendingCoords: null,
+    snapRafId: null,
   })
   setSnapSourceExclude(null)
-  if (store.snapRafId !== null) {
-    cancelAnimationFrame(store.snapRafId)
-    store.patchSnapState({ snapRafId: null })
-  }
   map.getContainer().removeEventListener("mousemove", onSnapMove, true)
   map.getContainer().removeEventListener("mousedown", onMouseDown, true)
   map.getContainer().removeEventListener("mouseup", onMouseUp, true)
@@ -176,6 +177,7 @@ export function resetSnapping(): void {
 
 function onSnapMove(e: MouseEvent): void {
   const store = useSnapStore()
+  if (!useSnapStore().snappingEnabled) return
   store.patchSnapState({ snapPendingCoords: { x: e.clientX, y: e.clientY } })
   if (store.snapRafId !== null) return
   store.patchSnapState({ snapRafId: requestAnimationFrame(processSnapMove) })
@@ -193,6 +195,10 @@ if (import.meta.hot) {
 
 function processSnapMove(): void {
   const store = useSnapStore()
+  if (!store.snappingEnabled) {
+    store.patchSnapState({ snapRafId: null, snapPendingCoords: null })
+    return
+  }
   const coords = store.snapPendingCoords
   store.patchSnapState({ snapRafId: null, snapPendingCoords: null })
   if (!coords || store.snapFrozen) return
