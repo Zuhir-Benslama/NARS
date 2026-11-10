@@ -123,7 +123,7 @@ export function enableSnapping(): void {
   map.getContainer().addEventListener("mousemove", onSnapMove, true)
   map.getContainer().addEventListener("mousedown", onMouseDown, true)
   map.getContainer().addEventListener("mouseup", onMouseUp, true)
-  repatchMarker()
+  if (!useEditStore().isEditMode) repatchMarker()
 }
 
 export function disableSnapping(): void {
