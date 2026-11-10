@@ -83,9 +83,7 @@ function toggleSnap() {
   left: 50%;
   transform: translateX(-50%);
   z-index: 1500;
-  background: var(--glass-bg) !important;
-  backdrop-filter: var(--glass-blur) !important;
-  -webkit-backdrop-filter: var(--glass-blur) !important;
+  background: var(--glass-bg, rgba(30, 30, 30, 0.95)) !important;
   border: 1px solid var(--glass-border) !important;
   box-shadow: var(--glass-shadow) !important;
   color: var(--text-secondary) !important;
@@ -126,8 +124,6 @@ function toggleSnap() {
   transition: all 0.15s;
   background: var(--btn-glass-bg) !important;
   color: var(--text-primary) !important;
-  backdrop-filter: var(--glass-blur) !important;
-  -webkit-backdrop-filter: var(--glass-blur) !important;
 }
 .edit-panel-btn:hover {
   background: var(--btn-glass-hover) !important;
@@ -150,8 +146,6 @@ function toggleSnap() {
   cursor: pointer;
   background: var(--btn-glass-bg) !important;
   color: var(--text-primary) !important;
-  backdrop-filter: var(--glass-blur) !important;
-  -webkit-backdrop-filter: var(--glass-blur) !important;
   transition: background 0.15s;
 }
 .edit-panel-snap:hover {
