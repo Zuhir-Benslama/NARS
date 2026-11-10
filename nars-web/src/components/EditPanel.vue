@@ -78,9 +78,10 @@ function toggleSnap() {
 
 <style scoped>
 .edit-panel {
-  position: absolute;
-  top: 60px;
-  right: 10px;
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 1500;
   background: var(--glass-bg) !important;
   backdrop-filter: var(--glass-blur) !important;
