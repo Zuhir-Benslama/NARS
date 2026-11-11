@@ -128,35 +128,41 @@ export function enableSnapping(): void {
 
 export function disableSnapping(): void {
   if (!isSnappingEnabled()) return
-  const { map } = getCtx()
-  const store = useSnapStore()
+  // Flip the master toggle first so the UI/state reflect "disabled" even if
+  // the DOM cleanup below throws (e.g. map not ready).
   setSnappingEnabled(false)
-  if (store.snapRafId !== null) {
-    cancelAnimationFrame(store.snapRafId)
+  try {
+    const { map } = getCtx()
+    const store = useSnapStore()
+    if (store.snapRafId !== null) {
+      cancelAnimationFrame(store.snapRafId)
+    }
+    store.patchSnapState({
+      snapActive: false,
+      snapFrozen: false,
+      snapLatLng: null,
+      snapPendingCoords: null,
+      snapRafId: null,
+    })
+    setSnapSourceExclude(null)
+    map.getContainer().removeEventListener("mousemove", onSnapMove, true)
+    map.getContainer().removeEventListener("mousedown", onMouseDown, true)
+    map.getContainer().removeEventListener("mouseup", onMouseUp, true)
+    if (snapMarker) {
+      snapMarker.remove()
+      snapMarker = null
+    }
+    if (snapCursor) {
+      snapCursor.remove()
+      snapCursor = null
+    }
+    if (import.meta.env.DEV) {
+      window.__narsSnapLatLng = null
+    }
+    map.getCanvas().style.cursor = store.crosshairActive ? "crosshair" : ""
+  } catch (err) {
+    console.error("[SNAP] disableSnapping cleanup failed:", err)
   }
-  store.patchSnapState({
-    snapActive: false,
-    snapFrozen: false,
-    snapLatLng: null,
-    snapPendingCoords: null,
-    snapRafId: null,
-  })
-  setSnapSourceExclude(null)
-  map.getContainer().removeEventListener("mousemove", onSnapMove, true)
-  map.getContainer().removeEventListener("mousedown", onMouseDown, true)
-  map.getContainer().removeEventListener("mouseup", onMouseUp, true)
-  if (snapMarker) {
-    snapMarker.remove()
-    snapMarker = null
-  }
-  if (snapCursor) {
-    snapCursor.remove()
-    snapCursor = null
-  }
-  if (import.meta.env.DEV) {
-    window.__narsSnapLatLng = null
-  }
-  map.getCanvas().style.cursor = store.crosshairActive ? "crosshair" : ""
   unpatchGeomanMarker()
 }
 

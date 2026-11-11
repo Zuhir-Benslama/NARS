@@ -184,6 +184,7 @@ describe("enableCrosshair / disableCrosshair", () => {
 
 describe("toggleSnapping", () => {
   it("enables snapping when disabled", () => {
+    useSnapStore().snappingEnabled = false
     mockIsSnappingEnabled.mockReturnValue(false)
 
     const result = mod.toggleSnapping()
@@ -194,6 +195,7 @@ describe("toggleSnapping", () => {
   })
 
   it("disables snapping when enabled", () => {
+    useSnapStore().snappingEnabled = true
     mockIsSnappingEnabled.mockReturnValue(true)
     mockUnpatchGeomanMarker.mockReturnValue(undefined)
 
