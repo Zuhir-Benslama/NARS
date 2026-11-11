@@ -165,11 +165,11 @@ import { ensureGeoman } from "../map/map-init"
 import { buildDrawControl } from "../map/draw/draw-control"
 import { getCtx } from "../map/core/state"
 import { enableCrosshair, disableCrosshair, toggleSnapping } from "../map/snapping/snapping"
-import { isSnappingEnabled } from "../map/draw/draw-state"
 import { PHASES } from "../phases"
 import { enableEditGeometry, removeFeature } from "../map/context-menu/ctx-menu-actions"
 
 import { useAppStore } from "../stores/appStore"
+import { useDrawStore } from "../stores/drawStore"
 import { showToast } from "../lib/toast"
 import { useEditStore } from "../stores/editStore"
 import { useSelectionStore } from "../stores/selectionStore"
@@ -195,13 +195,8 @@ const optionRefs = ref<HTMLElement[]>([])
 
 const isEditMode = computed(() => editStore?.isEditMode ?? false)
 const selectedDbId = computed(() => selectionStore?.selectedFeatureDbId ?? null)
-const snapOn = computed(() => {
-  try {
-    return isSnappingEnabled()
-  } catch {
-    return true
-  }
-})
+const drawStore = useDrawStore()
+const snapOn = computed(() => drawStore.snappingEnabled)
 
 const layers = [
   { key: "satellite", labelKey: "layer_satellite", color: "#e67e22", icon: "🛰" },

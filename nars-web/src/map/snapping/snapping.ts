@@ -119,7 +119,7 @@ export function enableSnapping(): void {
   const store = useSnapStore()
   setSnappingEnabled(true)
   store.patchSnapState({ snapActive: true })
-  setSnapSourceExclude(null)
+  if (!useEditStore().isEditMode) setSnapSourceExclude(null)
   map.getContainer().addEventListener("mousemove", onSnapMove, true)
   map.getContainer().addEventListener("mousedown", onMouseDown, true)
   map.getContainer().addEventListener("mouseup", onMouseUp, true)
@@ -144,7 +144,7 @@ export function disableSnapping(): void {
       snapPendingCoords: null,
       snapRafId: null,
     })
-    setSnapSourceExclude(null)
+    if (!useEditStore().isEditMode) setSnapSourceExclude(null)
     map.getContainer().removeEventListener("mousemove", onSnapMove, true)
     map.getContainer().removeEventListener("mousedown", onMouseDown, true)
     map.getContainer().removeEventListener("mouseup", onMouseUp, true)
@@ -163,7 +163,13 @@ export function disableSnapping(): void {
   } catch (err) {
     console.error("[SNAP] disableSnapping cleanup failed:", err)
   }
-  unpatchGeomanMarker()
+  // In geometry-edit mode the marker patch must stay in place so that
+  // re-enabling snapping (via either the drawer or the editing menu) keeps
+  // working — unpatching here would orphan the patch and leave the toggle
+  // showing "on" while snapping silently no-ops.
+  if (!useEditStore().isEditMode) {
+    unpatchGeomanMarker()
+  }
 }
 
 export function toggleSnapping(): boolean {
