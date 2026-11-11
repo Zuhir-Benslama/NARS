@@ -47,16 +47,17 @@
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import { useEditStore } from "../stores/editStore"
+import { useDrawStore } from "../stores/drawStore"
 import { commitEditMode, cancelEditMode } from "../map/edit/edit-mode"
 import { showToast } from "../lib/toast"
 import { getUserMessageKey } from "../lib/errors"
 import { toggleSnapping } from "../map/snapping/snapping"
-import { isSnappingEnabled } from "../map/draw/draw-state"
 
 const { t } = useI18n()
 const store = useEditStore()
 const visible = computed(() => store.isEditMode)
-const snapOn = computed(() => isSnappingEnabled())
+const drawStore = useDrawStore()
+const snapOn = computed(() => drawStore.snappingEnabled)
 
 function save() {
   commitEditMode().catch((err) => {
