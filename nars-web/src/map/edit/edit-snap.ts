@@ -18,6 +18,10 @@ export function patchMarkerPointerSnap(editEntryId: string | null): void {
 
   mp.setLngLat = (lngLat: LngLatTuple) => {
     const [lng, lat] = lngLat
+    if (!useSnapStore().snappingEnabled) {
+      store.origMarkerSetLngLat!([lng, lat])
+      return
+    }
     const px = getCtx().map.project([lng, lat])
     const snapped = snapPointForEdit(px.x, px.y, editEntryId ?? null)
     store.origMarkerSetLngLat!(snapped ? [snapped.lng, snapped.lat] : [lng, lat])
