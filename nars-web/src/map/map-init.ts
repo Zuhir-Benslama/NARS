@@ -134,7 +134,7 @@ export async function initMap(): Promise<void> {
       const gl = ctx.map.getCanvas().getContext("webgl2") as WebGLRenderingContext | null
       const dbg = gl?.getExtension("WEBGL_debug_renderer_info")
       if (gl && dbg) {
-        console.info(
+        debugLog(
           "[MAP] WebGL2 renderer:",
           gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL),
           "| vendor:",
