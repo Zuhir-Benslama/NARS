@@ -128,6 +128,22 @@ export async function initMap(): Promise<void> {
 
   if (import.meta.env.DEV) {
     ;(window as unknown as Record<string, unknown>).__narsMap = ctx.map
+    // Explicit GPU/WebGL verification: log the unmasked renderer so it's
+    // visible whether hardware acceleration is actually in use.
+    try {
+      const gl = ctx.map.getCanvas().getContext("webgl2") as WebGLRenderingContext | null
+      const dbg = gl?.getExtension("WEBGL_debug_renderer_info")
+      if (gl && dbg) {
+        console.info(
+          "[MAP] WebGL2 renderer:",
+          gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL),
+          "| vendor:",
+          gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL),
+        )
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   currentActiveStyle = satelliteStyle
