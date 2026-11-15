@@ -13,7 +13,9 @@
         <div class="confirm-dialog">
           <p id="confirmMsg" class="confirm-message">{{ store.message }}</p>
           <div class="confirm-actions">
-            <button class="confirm-btn cancel" @click="store.cancel()">{{ t("cancel") }}</button>
+            <button class="confirm-btn cancel" @click="store.cancel()">
+              {{ t("btn_cancel") }}
+            </button>
             <button ref="okRef" class="confirm-btn ok" @click="store.confirm()">
               {{ store.okText }}
             </button>

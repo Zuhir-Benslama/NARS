@@ -381,7 +381,7 @@
   "map_unknown_feature_type": "Unknown feature type",
   "map_feature_updated": "Feature updated.",
   "map_feature_deleted": "Feature deleted.",
-  "map_delete_confirm": "Delete \"{label}\"?",
+  "map_delete_confirm": "حذف \"{label}\"؟",
   "map_delete_failed": "Delete failed: {error}",
   "map_delete_http_failed": "Delete failed: HTTP {status}",
   "map_road_directions_applied": "Road directions applied to {count} roads.",

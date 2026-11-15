@@ -142,6 +142,7 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
     items.push({
       label: t("ctx_remove_all_roads"),
       danger: true,
+      disabled: true,
       onClick: () => void removeAllRoads(),
     })
   }
@@ -252,6 +253,7 @@ export async function showMapContextMenu(
     items.push({
       label: t("ctx_remove_all_roads"),
       danger: true,
+      disabled: true,
       onClick: () => void removeAllRoads(),
     })
   } else if (phase.key === "districts") {

@@ -36,10 +36,6 @@
         {{ t("btn_cancel") }}
       </button>
     </div>
-
-    <button class="edit-panel-snap" @click="toggleSnap">
-      {{ snapOn ? t("map_disable_snapping") : t("map_enable_snapping") }}
-    </button>
   </div>
 </template>
 
@@ -47,17 +43,13 @@
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import { useEditStore } from "../stores/editStore"
-import { useDrawStore } from "../stores/drawStore"
 import { commitEditMode, cancelEditMode } from "../map/edit/edit-mode"
 import { showToast } from "../lib/toast"
 import { getUserMessageKey } from "../lib/errors"
-import { toggleSnapping } from "../map/snapping/snapping"
 
 const { t } = useI18n()
 const store = useEditStore()
 const visible = computed(() => store.isEditMode)
-const drawStore = useDrawStore()
-const snapOn = computed(() => drawStore.snappingEnabled)
 
 function save() {
   commitEditMode().catch((err) => {
@@ -69,11 +61,6 @@ function cancel() {
   cancelEditMode().catch((err) => {
     showToast(t("map_save_failed", { error: t(getUserMessageKey(err)) }), "error")
   })
-}
-
-function toggleSnap() {
-  const on = toggleSnapping()
-  showToast(t(on ? "map_snapping_enabled" : "map_snapping_disabled"), "info")
 }
 </script>
 
@@ -138,18 +125,5 @@ function toggleSnap() {
 }
 .edit-panel-btn-cancel {
   color: var(--danger-color) !important;
-}
-.edit-panel-snap {
-  padding: 6px 10px;
-  border: 1px solid var(--glass-border) !important;
-  border-radius: 8px;
-  font-size: 12px;
-  cursor: pointer;
-  background: var(--btn-glass-bg) !important;
-  color: var(--text-primary) !important;
-  transition: background 0.15s;
-}
-.edit-panel-snap:hover {
-  background: var(--btn-glass-hover) !important;
 }
 </style>
