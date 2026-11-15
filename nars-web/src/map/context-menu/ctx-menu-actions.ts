@@ -12,6 +12,7 @@ import { showToast, showConfirm } from "../../lib/toast"
 import type { FeatureTypeKey } from "../../types"
 import { getUserMessageKey } from "../../lib/errors"
 import { t } from "../../i18n"
+import { displayLabelFor } from "../features/feature-labels"
 import { recordDelete } from "../undo"
 import { enableEditMode } from "../draw/draw-events"
 import type { LayerEntry } from "../../types"
@@ -109,7 +110,9 @@ export async function removeFeature(dbId: string): Promise<void> {
     return
   }
 
-  const confirmed = await showConfirm(t("map_delete_confirm", { label: entry.data.label }))
+  const phase = PHASES.find((p) => p.key === entry.data.type)
+  const label = phase ? displayLabelFor(phase, entry.data) : entry.data.label
+  const confirmed = await showConfirm(t("map_delete_confirm", { label }))
   if (!confirmed) return
 
   const layerStore = useLayerStore()
