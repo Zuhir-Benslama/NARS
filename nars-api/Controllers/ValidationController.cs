@@ -59,10 +59,31 @@ public class ValidationController(
 
             var angle = GeometryHelper.ComputeTurnAngle(p1.Lat, p1.Lng, p2.Lat, p2.Lng, p3.Lat, p3.Lng);
 
-            if (angle > MaxRoadTurnAngleDegrees)
-            {
+            if (angle >= MaxRoadTurnAngleDegrees)            {
                 return Ok(new ValidateRoadResponse(false,
                     $"Road turn at point {i + 2} is {angle:F1}°, which exceeds the {MaxRoadTurnAngleDegrees}° maximum."));
+            }
+        }
+
+        // Whole-road turn: even gentle corners can add up to a change in
+        // overall direction that exceeds the configured maximum.
+        if (body.Coordinates.Count >= 3)
+        {
+            var v1x = body.Coordinates[1].Lng - body.Coordinates[0].Lng;
+            var v1y = body.Coordinates[1].Lat - body.Coordinates[0].Lat;
+            var v2x = body.Coordinates[body.Coordinates.Count - 1].Lng - body.Coordinates[body.Coordinates.Count - 2].Lng;
+            var v2y = body.Coordinates[body.Coordinates.Count - 1].Lat - body.Coordinates[body.Coordinates.Count - 2].Lat;
+            var len1 = Math.Sqrt(v1x * v1x + v1y * v1y);
+            var len2 = Math.Sqrt(v2x * v2x + v2y * v2y);
+            if (len1 > 1e-10 && len2 > 1e-10)
+            {
+                var dot = (v1x * v2x + v1y * v2y) / (len1 * len2);
+                var overall = Math.Acos(Math.Clamp(dot, -1.0, 1.0)) * (180.0 / Math.PI);
+                if (overall >= MaxRoadTurnAngleDegrees)
+                {
+                    return Ok(new ValidateRoadResponse(false,
+                        $"Road turn is {overall:F1}°, which exceeds the {MaxRoadTurnAngleDegrees}° maximum."));
+                }
             }
         }
 

@@ -15,6 +15,7 @@ namespace NarsApi.Controllers;
 public class FeaturesController(
     IFeatureService featureService,
     IOptions<FeatureDefaultsOptions> featureDefaults,
+    IOptions<ValidationOptions> validationOptions,
     IDateTimeProvider timeProvider,
     IFeatureStatsService featureStatsService,
     INumberEntrancesService numberEntrancesService,
@@ -22,6 +23,7 @@ public class FeaturesController(
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
     private readonly int _maxFeatureDataSize = featureDefaults.Value.MaxFeatureDataSize;
+    private double MaxRoadTurnAngleDegrees => validationOptions.Value.RoadTurnAngleDegrees;
 
     // Mirrors FeatureSaveRequest's [MaxLength(500)] on Label, which is dropped
     // on the nullable FeatureUpdateRequest record param by the C# compiler.
@@ -53,6 +55,11 @@ public class FeaturesController(
         if (dataJson.Length > _maxFeatureDataSize)
         {
             return Problem(detail: $"Feature data is too large (max {_maxFeatureDataSize / 1024} KB).", statusCode: 400);
+        }
+
+        if (body.Type == FeatureTypes.Road && !TryValidateRoadTurnAngle(body.Data, out var turnError))
+        {
+            return Problem(detail: turnError!, statusCode: 400);
         }
 
         var roadId = TryExtractRoadId(body);
@@ -238,6 +245,11 @@ public class FeaturesController(
             {
                 return Problem(detail: $"Feature data is too large (max {_maxFeatureDataSize / 1024} KB).", statusCode: 400);
             }
+
+            if (featureType == FeatureTypes.Road && !TryValidateRoadTurnAngle(dataElement, out var turnError))
+            {
+                return Problem(detail: turnError!, statusCode: 400);
+            }
         }
 
         var labelError = UserFieldValidator.ValidateMaxLength(body.Label, MaxLabelLength, "Label");
@@ -287,6 +299,68 @@ public class FeaturesController(
         await MaybeQueueScatteredRefreshAsync(featureType);
 
         return NoContent();
+    }
+
+    private bool TryValidateRoadTurnAngle(JsonElement data, out string? error)
+    {
+        error = null;
+        if (!data.TryGetProperty("coordinates", out var coordsEl) || coordsEl.ValueKind != JsonValueKind.Array)
+        {
+            return true;
+        }
+
+        var coords = new List<(double Lat, double Lng)>();
+        foreach (var c in coordsEl.EnumerateArray())
+        {
+            if (!c.TryGetProperty("lat", out var latEl) || !latEl.TryGetDouble(out var lat) ||
+                !c.TryGetProperty("lng", out var lngEl) || !lngEl.TryGetDouble(out var lng))
+            {
+                continue;
+            }
+            coords.Add((lat, lng));
+        }
+
+        if (coords.Count < 2)
+        {
+            return true;
+        }
+
+        for (var i = 0; i < coords.Count - 2; i++)
+        {
+            var angle = GeometryHelper.ComputeTurnAngle(
+                coords[i].Lat, coords[i].Lng,
+                coords[i + 1].Lat, coords[i + 1].Lng,
+                coords[i + 2].Lat, coords[i + 2].Lng);
+
+            if (angle >= MaxRoadTurnAngleDegrees)
+            {
+                error = $"Road turn at point {i + 2} is {angle:F1}°, which exceeds the {MaxRoadTurnAngleDegrees}° maximum.";
+                return false;
+            }
+        }
+
+        // Whole-road turn.
+        if (coords.Count >= 3)
+        {
+            var v1x = coords[1].Lng - coords[0].Lng;
+            var v1y = coords[1].Lat - coords[0].Lat;
+            var v2x = coords[coords.Count - 1].Lng - coords[coords.Count - 2].Lng;
+            var v2y = coords[coords.Count - 1].Lat - coords[coords.Count - 2].Lat;
+            var len1 = Math.Sqrt(v1x * v1x + v1y * v1y);
+            var len2 = Math.Sqrt(v2x * v2x + v2y * v2y);
+            if (len1 > 1e-10 && len2 > 1e-10)
+            {
+                var dot = (v1x * v2x + v1y * v2y) / (len1 * len2);
+                var overall = Math.Acos(Math.Clamp(dot, -1.0, 1.0)) * (180.0 / Math.PI);
+                if (overall >= MaxRoadTurnAngleDegrees)
+                {
+                    error = $"Road turn is {overall:F1}°, which exceeds the {MaxRoadTurnAngleDegrees}° maximum.";
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     private static Guid? TryExtractRoadId(FeatureSaveRequest body)

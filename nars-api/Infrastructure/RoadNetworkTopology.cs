@@ -238,7 +238,7 @@ public static class RoadNetworkTopology
         var a = vertices[i];
         var b = vertices[i + 1];
         var c = vertices[i + 2];
-        return GeometryHelper.ComputeTurnAngle(a.Lat, a.Lng, b.Lat, b.Lng, c.Lat, c.Lng) > maxDegrees;
+        return GeometryHelper.ComputeTurnAngle(a.Lat, a.Lng, b.Lat, b.Lng, c.Lat, c.Lng) >= maxDegrees;
     }
 
     private static double LineLengthM(IReadOnlyList<(double Lat, double Lng)> vertices)
@@ -355,7 +355,7 @@ public static class RoadNetworkTopology
             }
 
             var chain = BuildChain(group.Select(i => candidates[i]).ToList(), toleranceM);
-            if (chain is not null && !HasFold(chain, toleranceM))
+            if (chain is not null && !HasFold(chain, toleranceM) && !HasSharpTurn(chain, 90.0))
             {
                 result.Add(new MergedComponent(chain, memberIndices));
             }
@@ -636,6 +636,28 @@ public static class RoadNetworkTopology
                 {
                     return true;
                 }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// True when the chain contains a turn of at least <paramref name="minDegrees"/>
+    /// between consecutive segments — a fold or an otherwise non-collinear kink that
+    /// must not be materialized as a single merged road.
+    /// </summary>
+    private static bool HasSharpTurn(IReadOnlyList<(double Lat, double Lng)> chain, double minDegrees)
+    {
+        for (var i = 0; i + 2 < chain.Count; i++)
+        {
+            var angle = GeometryHelper.ComputeTurnAngle(
+                chain[i].Lat, chain[i].Lng,
+                chain[i + 1].Lat, chain[i + 1].Lng,
+                chain[i + 2].Lat, chain[i + 2].Lng);
+            if (angle >= minDegrees)
+            {
+                return true;
             }
         }
 

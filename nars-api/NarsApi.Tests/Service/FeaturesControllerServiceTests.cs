@@ -38,6 +38,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : Servi
         var ctrl = new FeaturesController(
             new FeatureService(factory, bgQueueMock, new FeatureCleanupService(), Mock.Of<ILogger<FeatureService>>()),
             Options.Create(new FeatureDefaultsOptions()),
+            Options.Create(new ValidationOptions()),
             timeProvider,
             new FeatureStatsService(Fixture.CreateDbContextFactory()),
             new NumberEntrancesService(Fixture.CreateDbContextFactory()),

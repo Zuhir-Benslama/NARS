@@ -29,6 +29,7 @@ public class FeaturesControllerTests
         var ctrl = new FeaturesController(
             featureService ?? new FeatureService(factory ?? new TestDbContextFactory(db), Mock.Of<IBackgroundTaskQueue>(), Mock.Of<IFeatureCleanupService>(), Mock.Of<ILogger<FeatureService>>()),
             Options.Create(new FeatureDefaultsOptions()),
+            Options.Create(new ValidationOptions()),
             timeProvider ?? Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow),
             featureStatsService ?? Mock.Of<IFeatureStatsService>(),
             Mock.Of<INumberEntrancesService>(),

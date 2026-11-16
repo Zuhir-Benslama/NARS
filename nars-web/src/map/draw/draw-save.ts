@@ -313,6 +313,27 @@ export async function completeDrawingWithGeometry(
   )
 }
 
+// ─── TURN ANGLE HELPER ────────────────────────────────────────────────────────
+
+function computeTurnAngle(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+  lat3: number,
+  lng3: number,
+): number {
+  const v1x = lng2 - lng1
+  const v1y = lat2 - lat1
+  const v2x = lng3 - lng2
+  const v2y = lat3 - lat2
+  const len1 = Math.hypot(v1x, v1y)
+  const len2 = Math.hypot(v2x, v2y)
+  if (len1 < 1e-10 || len2 < 1e-10) return 0
+  const dot = (v1x * v2x + v1y * v2y) / (len1 * len2)
+  return (Math.acos(Math.min(1, Math.max(-1, dot))) * 180) / Math.PI
+}
+
 // ─── GEOMETRY VALIDATION ──────────────────────────────────────────────────────
 
 function validateGeometry(
@@ -326,6 +347,44 @@ function validateGeometry(
     showToast(t("map_road_min_points"), "error")
     cleanup()
     return false
+  }
+  if (phase.key === "roads" && geometry.type === "LineString") {
+    const coords = geometry.coordinates as [number, number][]
+    for (let i = 0; i < coords.length - 2; i++) {
+      const [lng1, lat1] = coords[i]
+      const [lng2, lat2] = coords[i + 1]
+      const [lng3, lat3] = coords[i + 2]
+      const angle = computeTurnAngle(lat1, lng1, lat2, lng2, lat3, lng3)
+      if (angle >= 90) {
+        showToast(t("map_road_turn_too_sharp"), "error")
+        cleanup()
+        return false
+      }
+    }
+    // Whole-road turn: even if every individual corner is gentle, a road whose
+    // overall direction changes by 90° or more is still a sharp turn.
+    if (coords.length >= 3) {
+      const [flng1, flat1] = coords[0]
+      const [flng2, flat2] = coords[1]
+      const [llng1, llat1] = coords[coords.length - 2]
+      const [llng2, llat2] = coords[coords.length - 1]
+      // Compare the first and last segment vectors directly.
+      const v1x = flng2 - flng1
+      const v1y = flat2 - flat1
+      const v2x = llng2 - llng1
+      const v2y = llat2 - llat1
+      const len1 = Math.hypot(v1x, v1y)
+      const len2 = Math.hypot(v2x, v2y)
+      if (len1 > 1e-10 && len2 > 1e-10) {
+        const dot = (v1x * v2x + v1y * v2y) / (len1 * len2)
+        const overallAngle = (Math.acos(Math.min(1, Math.max(-1, dot))) * 180) / Math.PI
+        if (overallAngle >= 90) {
+          showToast(t("map_road_turn_too_sharp"), "error")
+          cleanup()
+          return false
+        }
+      }
+    }
   }
   if (
     geometry.type === "Polygon" &&

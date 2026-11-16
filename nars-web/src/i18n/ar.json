@@ -491,5 +491,6 @@
   },
   "label_area_type": "نوع المجال",
   "label_sector": "القطاع",
-  "label_building_type": "نوع المبنى"
+  "label_building_type": "نوع المبنى",
+  "map_road_turn_too_sharp": "Road must not turn 90° or more."
 }

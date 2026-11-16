@@ -491,5 +491,6 @@
   },
   "label_area_type": "Area Type",
   "label_sector": "Sector",
-  "label_building_type": "Building Type"
+  "label_building_type": "Building Type",
+  "map_road_turn_too_sharp": "Road must not turn 90° or more."
 }

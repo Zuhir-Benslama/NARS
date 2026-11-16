@@ -390,7 +390,7 @@ public static class RoadPhaseRules
             var b = vertices[i + 1];
             var c = vertices[i + 2];
             var angle = GeometryHelper.ComputeTurnAngle(a.Lat, a.Lng, b.Lat, b.Lng, c.Lat, c.Lng);
-            if (angle > maxDegrees)
+            if (angle >= maxDegrees)
             {
                 return true;
             }
@@ -426,7 +426,7 @@ public static class RoadPhaseRules
         var a = vertices[i];
         var b = vertices[i + 1];
         var c = vertices[i + 2];
-        return GeometryHelper.ComputeTurnAngle(a.Lat, a.Lng, b.Lat, b.Lng, c.Lat, c.Lng) > maxDegrees;
+        return GeometryHelper.ComputeTurnAngle(a.Lat, a.Lng, b.Lat, b.Lng, c.Lat, c.Lng) >= maxDegrees;
     }
 
     private static bool IsWithinUrbanAreasM(
