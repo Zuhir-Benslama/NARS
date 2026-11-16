@@ -59,7 +59,8 @@ public class ValidationController(
 
             var angle = GeometryHelper.ComputeTurnAngle(p1.Lat, p1.Lng, p2.Lat, p2.Lng, p3.Lat, p3.Lng);
 
-            if (angle >= MaxRoadTurnAngleDegrees)            {
+            if (angle >= MaxRoadTurnAngleDegrees)
+            {
                 return Ok(new ValidateRoadResponse(false,
                     $"Road turn at point {i + 2} is {angle:F1}°, which exceeds the {MaxRoadTurnAngleDegrees}° maximum."));
             }
