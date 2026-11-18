@@ -217,7 +217,11 @@ async function updateStoresAfterSave(
 
   refreshLayerVisibility()
   if (drawingPhase.key === "roads") updateEndpointMarkers()
-  showToast(t("map_feature_saved"), "success")
+  // House entrances are cached locally and only persisted later (with their
+  // computed numbers), so do not claim they were saved to the database now.
+  if (drawingPhase.key !== "houseEntrances") {
+    showToast(t("map_feature_saved"), "success")
+  }
 }
 
 // ─── SAVE & UPDATE STORE ──────────────────────────────────────────
@@ -234,6 +238,21 @@ async function saveAndUpdateStore(
   let saveOk = false
   try {
     const featureData = buildFeatureData(geometry, drawingPhase, modalResult)
+
+    // House entrances are cached locally and only persisted once their house
+    // numbers have been computed (see house-numbering.ts), so drawing one
+    // does not hit the database.
+    if (drawingPhase.key === "houseEntrances") {
+      const tempId = `local_${crypto.randomUUID()}`
+      const payload = buildStorePayload(tempId, geometry, drawingPhase, modalResult, featureData)
+      await updateStoresAfterSave(featureId, payload, drawingPhase, featureData, narsDrawType)
+      saveOk = true
+
+      await delay(DRAW_CONFIG.geomanCleanupDelayMs)
+      deleteGeomanFeature(geomanFeatureData)
+      return
+    }
+
     const saveResult = await saveToDatabase(featureData)
     if (!saveResult.ok || !saveResult.data) {
       showToast(

@@ -91,7 +91,7 @@ describe("registerDrawEvents watcher lifecycle", () => {
     mockDisableCrosshair.mockClear()
     mockResetSnapping.mockClear()
 
-    appStore.currentPhase = 1
+    appStore.currentPhase = 2
     await nextTick()
 
     // Exactly one watcher alive → each callback runs exactly once.

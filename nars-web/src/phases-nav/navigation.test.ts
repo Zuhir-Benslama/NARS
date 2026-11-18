@@ -129,7 +129,7 @@ describe("navigatePhase", () => {
     await navigatePhase(1)
     await navigatePhase(1)
     await navigatePhase(1)
-    expect(appStore.currentPhase).toBe(2)
+    expect(appStore.currentPhase).toBe(3)
   })
 
   it("auto-orients road directions when leaving roads with roads present", async () => {
@@ -141,10 +141,10 @@ describe("navigatePhase", () => {
     layerStore.addFeature("districts", makeEntry())
     layerStore.addFeature("cityCenter", makeEntry())
     layerStore.addFeature("roads", makeEntry({ id: "road-1", type: "line" }))
-    appStore.currentPhase = 2
+    appStore.currentPhase = 3
     await navigatePhase(1)
     expect(computeAndApplyRoadDirections).toHaveBeenCalled()
-    expect(appStore.currentPhase).toBe(3)
+    expect(appStore.currentPhase).toBe(4)
   })
 
   it("blocks forward navigation from districts when coverage is incomplete", async () => {
@@ -162,11 +162,7 @@ describe("navigatePhase", () => {
     await navigatePhase(1)
     expect(appStore.currentPhase).toBe(1)
     await navigatePhase(1)
-    expect(appStore.currentPhase).toBe(2)
-    await navigatePhase(1)
-    expect(appStore.currentPhase).toBe(3)
-    await navigatePhase(1)
-    expect(appStore.currentPhase).toBe(3)
+    expect(appStore.currentPhase).toBe(1)
   })
 
   it("blocks forward navigation from houseEntrances when entrances layer is empty", async () => {
