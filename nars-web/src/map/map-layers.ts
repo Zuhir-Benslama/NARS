@@ -128,8 +128,8 @@ const FEATURE_LAYERS: maplibregl.LayerSpecification[] = [
     source: "features",
     filter: ["==", ["get", "geomType"], "Point"],
     paint: {
-      "circle-color": ["get", "circleColor"],
-      "circle-radius": ["get", "circleRadius"],
+      "circle-color": ["coalesce", ["get", "circleColor"], "#27ae60"],
+      "circle-radius": ["coalesce", ["get", "circleRadius"], 8],
       "circle-stroke-color": "#ffffff",
       "circle-stroke-width": 2,
     },
