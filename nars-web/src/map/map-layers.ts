@@ -126,6 +126,7 @@ const FEATURE_LAYERS: maplibregl.LayerSpecification[] = [
     id: "nars-point",
     type: "circle",
     source: "features",
+    layout: { visibility: "visible" },
     filter: ["==", ["get", "geomType"], "Point"],
     paint: {
       "circle-color": ["coalesce", ["get", "circleColor"], "#27ae60"],
