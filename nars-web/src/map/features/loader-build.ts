@@ -72,17 +72,25 @@ export function buildGeoJsonFeature(
       }
     }
 
+    const pointProperties: Record<string, unknown> = {
+      dbId,
+      phaseKey: phase.key,
+      label: displayLabel,
+      labelLatin: sanitizedLabelLatin,
+      geomType: "Point",
+      ...style,
+    }
+    // Ensure house-entrance markers always render their circle even if the
+    // style lookup missed (e.g. cached features), falling back to defaults.
+    if (phase.key === "houseEntrances") {
+      if (pointProperties.circleColor == null) pointProperties.circleColor = phase.color
+      if (pointProperties.circleRadius == null) pointProperties.circleRadius = 10
+      if (pointProperties.textColor == null) pointProperties.textColor = "#000000"
+    }
     return {
       type: "Feature" as const,
       geometry: featureDataToGeometry(data, "marker"),
-      properties: {
-        dbId,
-        phaseKey: phase.key,
-        label: displayLabel,
-        labelLatin: sanitizedLabelLatin,
-        geomType: "Point",
-        ...style,
-      },
+      properties: pointProperties,
     }
   } else if (data.coordinates && data.coordinates.length > 0) {
     if (phase.drawType === "polyline") {
