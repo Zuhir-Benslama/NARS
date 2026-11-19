@@ -120,6 +120,13 @@ export function displayLabelFor(phase: (typeof PHASES)[number], data: FeatureDat
     phase.key === "districts" &&
     (data.districtTypeKey === "trad_activities_zone" || data.districtTypeKey === "industry_zone")
   const isCityCenter = phase.key === "cityCenter"
+  const isHouseEntrance = phase.key === "houseEntrances"
+  // House entrances are identified by their number only; do not prefix them
+  // with the phase/sub-type label (e.g. show "1" instead of "House Entrance 1").
+  if (isHouseEntrance) {
+    const raw = sanitizeApiText(preferredRaw)
+    return raw || typeLabel
+  }
   const stripped =
     isZoneType || isCityCenter ? "" : stripLeadingTypePrefix(sanitizeApiText(preferredRaw))
 
