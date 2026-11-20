@@ -135,9 +135,15 @@ const FEATURE_LAYERS: maplibregl.LayerSpecification[] = [
         "#27ae60",
         ["coalesce", ["get", "circleColor"], "#27ae60"],
       ],
-      "circle-radius": 8,
+      // Scale the marker with zoom (never below 4px) so zoomed-out entrances
+      // don't merge into one blob, while keeping the full 8px size once the
+      // map is zoomed in. The circle layer has no collision handling, so the
+      // radius floor is what guarantees it is always drawn.
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 4, 16, 8],
+      "circle-opacity": 1,
       "circle-stroke-color": "#ffffff",
-      "circle-stroke-width": 2,
+      "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 12, 1, 16, 2],
+      "circle-stroke-opacity": 1,
     },
   },
   {
@@ -147,10 +153,16 @@ const FEATURE_LAYERS: maplibregl.LayerSpecification[] = [
     filter: ["==", ["get", "geomType"], "Point"],
     layout: {
       "text-field": ["get", "label"],
-      "text-size": 10,
+      "text-size": ["interpolate", ["linear"], ["zoom"], 12, 8, 16, 10],
       "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
       "text-anchor": "center",
-      "text-allow-overlap": false,
+      // Marker numbers (house entrances) must never be culled by MapLibre's
+      // collision detection. With allow-overlap off they vanished whenever
+      // they touched a road label, an endpoint arrow or a neighbouring number,
+      // which is what happened when zooming out. Ignoring placement also stops
+      // them from pushing other labels away.
+      "text-allow-overlap": true,
+      "text-ignore-placement": true,
       "text-optional": true,
     },
     paint: {
