@@ -17,7 +17,7 @@ export type DerivedGeometry = GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polyg
  * these four mappings previously drifted (e.g. edit-commit rendered a
  * radius-less circle's coordinates as a closed LineString while undo made it
  * a Polygon), so keep ALL of them on this one implementation:
- *  - marker                        → Point
+ *  - marker                        → Point (lat/lng, else first coordinate)
  *  - circle with lat/lng/radius    → closed LineString ring around the center
  *  - coordinates + kind "line"     → LineString
  *  - coordinates otherwise         → closed Polygon
@@ -42,6 +42,22 @@ export function featureDataToGeometry(
     // A circle that lost its radius degrades to its center point rather than
     // misinterpreting arbitrary vertex coordinates as a ring.
     return point()
+  }
+
+  if (kind === "marker") {
+    // A marker is ALWAYS a Point. Saved markers (house entrances, naming
+    // panels) carry both lat/lng and a one-element `coordinates` array, so this
+    // must be decided before the coordinates branch below — otherwise the
+    // marker became a one-vertex Polygon while its properties still said
+    // geomType "Point". The point layers then lost it: the label layer filters
+    // on geometry-type Point (numbers never rendered), and the zero-area
+    // polygon was dropped at every zoom below the source's max zoom (circles
+    // only appeared at z18).
+    const first = data.coordinates?.[0]
+    return {
+      type: "Point",
+      coordinates: [data.lng ?? first?.lng ?? 0, data.lat ?? first?.lat ?? 0],
+    }
   }
 
   if (data.coordinates && data.coordinates.length > 0) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { buildFeatureData, toApiSaveShape } from "./feature-data"
+import { buildFeatureData, toApiSaveShape, featureDataToGeometry } from "./feature-data"
 import type { FeatureData } from "../../types"
 import type { ModalResult } from "../../types/modal"
 import type { PHASES } from "../../phases"
@@ -280,6 +280,51 @@ describe("feature-data", () => {
         decisionDate: "",
       })
       expect(result).toEqual({ type: "naming_panel", layer: "naming_panel" })
+    })
+  })
+
+  describe("featureDataToGeometry", () => {
+    // Saved markers carry BOTH lat/lng and a one-element coordinates array
+    // (buildFeatureData writes both for a Point). This used to turn the marker
+    // into a one-vertex Polygon, which the point layers could not render
+    // (numbers never appeared; circles only at the source's max zoom).
+    it("returns a Point for a marker that has lat/lng AND coordinates", () => {
+      const geometry = featureDataToGeometry(
+        { lat: 36.9, lng: 7.76, coordinates: [{ lat: 36.9, lng: 7.76 }] },
+        "marker",
+      )
+      expect(geometry).toEqual({ type: "Point", coordinates: [7.76, 36.9] })
+    })
+
+    it("round-trips a freshly built house entrance back to a Point", () => {
+      const data = buildFeatureData(
+        { type: "Point", coordinates: [7.76, 36.9] },
+        makePhase("houseEntrances"),
+        {
+          type: "houseEntrances",
+          label: "12",
+          entranceTypeKey: "main_entrance",
+        } as unknown as ModalResult,
+      )
+      expect(featureDataToGeometry(data, "marker")).toEqual({
+        type: "Point",
+        coordinates: [7.76, 36.9],
+      })
+    })
+
+    it("falls back to the first coordinate when a marker has no lat/lng", () => {
+      const geometry = featureDataToGeometry({ coordinates: [{ lat: 36.9, lng: 7.76 }] }, "marker")
+      expect(geometry).toEqual({ type: "Point", coordinates: [7.76, 36.9] })
+    })
+
+    it("keeps lines and polygons unchanged", () => {
+      const coordinates = [
+        { lat: 0, lng: 0 },
+        { lat: 0, lng: 1 },
+        { lat: 1, lng: 1 },
+      ]
+      expect(featureDataToGeometry({ coordinates }, "line").type).toBe("LineString")
+      expect(featureDataToGeometry({ coordinates }, "polygon").type).toBe("Polygon")
     })
   })
 })
