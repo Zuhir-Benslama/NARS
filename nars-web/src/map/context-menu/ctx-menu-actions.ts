@@ -19,6 +19,7 @@ import type { LayerEntry } from "../../types"
 
 import { debugError } from "../../utils/debug"
 import { updateEndpointMarkers } from "../roads/road-directions"
+import { numberOneRoad } from "../house-numbering"
 import { loadFromDatabase } from "../features/loader-db"
 import { updateSelectionHighlight } from "../core/state"
 
@@ -129,7 +130,9 @@ export async function removeFeature(dbId: string): Promise<void> {
   if (!phaseKey) return
 
   try {
-    await apiFetch(`/api/features/${dbId}`, { method: "DELETE" })
+    if (!String(dbId).startsWith("local_")) {
+      await apiFetch(`/api/features/${dbId}`, { method: "DELETE" })
+    }
 
     recordDelete(entry, phaseKey)
 
@@ -139,6 +142,11 @@ export async function removeFeature(dbId: string): Promise<void> {
 
     if (phaseKey === "roads") {
       updateEndpointMarkers()
+    }
+
+    const ed = entry.data as { entranceTypeKey?: string; roadDbId?: string }
+    if (phaseKey === "houseEntrances" && ed.entranceTypeKey === "main_entrance" && ed.roadDbId) {
+      await numberOneRoad(ed.roadDbId)
     }
 
     showToast(t("map_feature_deleted"), "success")

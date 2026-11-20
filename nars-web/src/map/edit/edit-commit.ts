@@ -17,6 +17,7 @@ import { featureDataToGeometry } from "../features/feature-data"
 import type { LayerEntry, LatLng } from "../../types"
 import { commitDraftEdit, cancelDraftEdit } from "../drafts/draft-edit"
 import { updateEndpointMarkers } from "../roads/road-markers"
+import { numberOneRoad } from "../house-numbering"
 import {
   getActiveEditEntry,
   getActiveGeomanFeatureId,
@@ -168,6 +169,11 @@ export async function commitEditMode(): Promise<void> {
     // Update the NARS visual source so the change shows immediately
     // (without requiring a hard refresh to reload from the API)
     updateFeatureGeometry(entry)
+
+    const ed = entry.data as { type?: string; entranceTypeKey?: string; roadDbId?: string }
+    if (ed.type === "houseEntrances" && ed.entranceTypeKey === "main_entrance" && ed.roadDbId) {
+      await numberOneRoad(ed.roadDbId)
+    }
 
     await removeGeomanFeature()
     disableEditMode()

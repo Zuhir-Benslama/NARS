@@ -2,9 +2,10 @@
 // Single source of truth for house number assignment logic.
 // Used by both context-menu.ts (map right-click) and house-entrances.ts (UI).
 //
-// Projects unassigned entrance markers onto the reference road polyline, sorts
-// them by arc-length, then assigns odd numbers to the left side and even to
-// the right — each counter continuing from the highest already-assigned number.
+// Projects entrance markers onto a road polyline, sorts them by arc-length,
+// then assigns odd numbers to the left side and even to the right — each
+// counter continuing from the highest already-assigned number. Recomputes the
+// whole sequence each run so insertions/deletions are corrected.
 
 import { useAppStore } from "../stores/appStore"
 import { useLayerStore } from "../stores/layerStore"
@@ -16,30 +17,27 @@ import { saveToDatabase } from "./features/feature-persistence"
 import { debugError } from "../utils/debug"
 import type { MaplibreFeature } from "./core/state"
 
-export async function setHouseNumbers(): Promise<void> {
+/**
+ * Recompute house numbers for ALL main entrances on a single road.
+ * Exported so callers (e.g. entrance deletion) can trigger a recompute for
+ * the affected road without changing the global reference road.
+ */
+export async function numberOneRoad(roadId: string): Promise<void> {
   const featuresStore = useFeaturesStore()
-  const appStore = useAppStore()
-  if (appStore.referenceRoadDbId == null) {
-    showToast(t("alert_no_ref_road"), "error")
-    return
-  }
-
   const layerStore = useLayerStore()
   const state = layerStore.$state
-  const roadEntry = (state.roads || []).find((r) => r.dbId === appStore.referenceRoadDbId)
+
+  const roadEntry = (state.roads || []).find((r) => r.dbId === roadId)
   if (!roadEntry?.data.coordinates?.length) {
     showToast(t("alert_ref_road_no_coords"), "error")
     return
   }
 
-  const unassigned = (state.houseEntrances || []).filter(
-    (e) =>
-      e.data.entranceTypeKey === "main_entrance" &&
-      e.data.roadDbId === appStore.referenceRoadDbId &&
-      e.data.label === "?",
+  const allMain = (state.houseEntrances || []).filter(
+    (e) => e.data.entranceTypeKey === "main_entrance" && e.data.roadDbId === roadId,
   )
 
-  if (!unassigned.length) {
+  if (!allMain.length) {
     showToast(t("alert_no_unassigned_entrances"), "info")
     return
   }
@@ -51,7 +49,7 @@ export async function setHouseNumbers(): Promise<void> {
 
   const roadLine = turfHelpers.lineString(roadEntry.data.coordinates.map((c) => [c.lng, c.lat]))
 
-  const withDist = unassigned
+  const withDist = allMain
     .filter((e) => e.data.lng != null && e.data.lat != null)
     .map((e) => {
       const lng = e.data.lng!
@@ -61,6 +59,8 @@ export async function setHouseNumbers(): Promise<void> {
       return { entry: e, dist: snapped.properties.location ?? 0 }
     })
   withDist.sort((a, b) => a.dist - b.dist)
+
+  if (!withDist.length) return
 
   const cachedEntries = withDist.filter(({ entry }) => String(entry.dbId).startsWith("local_"))
   const persistedEntries = withDist.filter(({ entry }) => !String(entry.dbId).startsWith("local_"))
@@ -73,15 +73,12 @@ export async function setHouseNumbers(): Promise<void> {
   }> = []
 
   try {
-    // Persisted (already in the DB) entrances keep using the atomic
-    // server-side numbering endpoint, which locks the road and persists the
-    // computed numbers.
     if (persistedEntries.length) {
       const orderedIds = persistedEntries.map(({ entry }) => entry.dbId)
       const res = await apiFetch("/api/features/number-entrances", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roadId: appStore.referenceRoadDbId, entranceIds: orderedIds }),
+        body: JSON.stringify({ roadId, entranceIds: orderedIds }),
       })
       if (!res.ok) throw new Error(`House numbering failed (${res.status})`)
 
@@ -102,6 +99,8 @@ export async function setHouseNumbers(): Promise<void> {
           entranceNumber: numbered.entranceNumber,
           label: numbered.label,
         })
+        entry.data.entranceNumber = numbered.entranceNumber
+        entry.data.label = numbered.label
         mapPatches.push({
           id: entry.id,
           properties: { phaseKey: entry.data.type, label: numbered.label },
@@ -110,13 +109,11 @@ export async function setHouseNumbers(): Promise<void> {
       }
     }
 
-    // Cached (not yet persisted) entrances: compute their numbers locally,
-    // then save them to the database only now that their numbers are known,
-    // reducing the number of database transfers.
     if (cachedEntries.length) {
       const usedBySide: Record<string, Set<number>> = { left: new Set(), right: new Set() }
-      for (const e of state.houseEntrances || []) {
-        if (e.data.roadDbId !== appStore.referenceRoadDbId) continue
+      const currentState = useLayerStore().$state
+      for (const e of currentState.houseEntrances || []) {
+        if (e.data.roadDbId !== roadId) continue
         const side = e.data.side
         if (side !== "left" && side !== "right") continue
         let num = e.data.entranceNumber
@@ -127,8 +124,6 @@ export async function setHouseNumbers(): Promise<void> {
         if (num != null) usedBySide[side].add(num)
       }
 
-      // Compute all numbers first (no DB access), so the saves below can run
-      // in parallel instead of serially.
       const toSave: Array<{
         entry: (typeof cachedEntries)[number]["entry"]
         num: number
@@ -179,18 +174,53 @@ export async function setHouseNumbers(): Promise<void> {
 
     featuresStore.batchUpdate(mapPatches)
 
-    if (failureCount > 0) {
-      showToast(
-        t("map_assigned_numbers_partial", { assigned: assignedCount, failed: failureCount }),
-        "error",
-      )
-    } else {
-      showToast(t("map_assigned_numbers", { count: assignedCount }), "success")
+    if (assignedCount > 0 || failureCount > 0) {
+      if (failureCount > 0) {
+        showToast(
+          t("map_assigned_numbers_partial", { assigned: assignedCount, failed: failureCount }),
+          "error",
+        )
+      } else {
+        showToast(t("map_assigned_numbers", { count: assignedCount }), "success")
+      }
     }
   } catch (err) {
     debugError("setHouseNumbers error:", err)
     showToast(t("map_assigned_numbers_error"), "error")
   }
+}
+
+/**
+ * Public entry point. When `allRoads` is false (default), recomputes only the
+ * current reference road. When true, recomputes every road that has main
+ * entrances.
+ */
+export async function setHouseNumbers(allRoads = false): Promise<void> {
+  const appStore = useAppStore()
+  const layerStore = useLayerStore()
+  const state = layerStore.$state
+
+  if (allRoads) {
+    const roadIds = new Set(
+      (state.houseEntrances || [])
+        .filter((e) => e.data.entranceTypeKey === "main_entrance" && e.data.roadDbId)
+        .map((e) => e.data.roadDbId as string),
+    )
+    if (roadIds.size === 0) {
+      showToast(t("alert_no_unassigned_entrances"), "info")
+      return
+    }
+    for (const rid of roadIds) {
+      await numberOneRoad(rid)
+    }
+    return
+  }
+
+  if (appStore.referenceRoadDbId == null) {
+    showToast(t("alert_no_ref_road"), "error")
+    return
+  }
+  await numberOneRoad(appStore.referenceRoadDbId)
 }
 
 // ─── FEATURE TYPE MAPPING ─────────────────────────────────────────────────────

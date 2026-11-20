@@ -126,7 +126,7 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
     })
   }
 
-  if (isRoad && isRoadsPhase) {
+  if (isRoadsPhase) {
     items.push({
       label: t("ctx_road_dir"),
       onClick: () => computeAndApplyRoadDirections(),
@@ -135,7 +135,7 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
 
   if (isRoadsPhase) {
     items.push({
-      label: t("ctx_generate_roads") + " (beta)",
+      label: t("ctx_generate_roads") + " (experimental)",
       disabled: true,
       onClick: () => void generateRoadsFromUrbanAreas(),
     })
@@ -174,6 +174,34 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
     items.push({
       label: t("ctx_ent_ref"),
       onClick: () => setReferenceEntrance(dbId),
+    })
+  }
+
+  // House entrances can be removed in their own phase; removing a main
+  // entrance triggers a recompute of the numbers on its reference road.
+  if (phaseKey === "houseEntrances" && isHouseEntrancesPhase) {
+    items.push({
+      label: t("ctx_edit_location"),
+      onClick: () => enableEditGeometry(dbId),
+    })
+    items.push({
+      label: t("ctx_remove"),
+      danger: true,
+      onClick: () => removeFeature(dbId),
+    })
+  }
+
+  // House-number computation is available on any feature hit during the
+  // house entrances phase (not only on empty map), so it can be triggered
+  // from inside urban areas too.
+  if (isHouseEntrancesPhase) {
+    items.push({
+      label: t("ctx_house_nums"),
+      onClick: () => setHouseNumbers(false),
+    })
+    items.push({
+      label: t("ctx_house_nums_all"),
+      onClick: () => setHouseNumbers(true),
     })
   }
 
@@ -242,7 +270,7 @@ export async function showMapContextMenu(
 
   if (phase.key === "roads") {
     items.push({
-      label: t("ctx_generate_roads") + " (beta)",
+      label: t("ctx_generate_roads") + " (experimental)",
       disabled: true,
       onClick: () => void generateRoadsFromUrbanAreas(),
     })
@@ -258,13 +286,18 @@ export async function showMapContextMenu(
     })
   } else if (phase.key === "districts") {
     items.push({
-      label: t("ctx_generate_districts"),
+      label: t("ctx_generate_districts") + " (experimental)",
+      disabled: true,
       onClick: () => void generateDistrictsFromUrbanAreas(),
     })
   } else if (phase.key === "houseEntrances") {
     items.push({
       label: t("ctx_house_nums"),
-      onClick: () => setHouseNumbers(),
+      onClick: () => setHouseNumbers(false),
+    })
+    items.push({
+      label: t("ctx_house_nums_all"),
+      onClick: () => setHouseNumbers(true),
     })
   } else if (phase.key === "namingPanels") {
     items.push({
@@ -272,6 +305,7 @@ export async function showMapContextMenu(
       onClick: () => generateNamingPanels(),
     })
   }
+
   if (items.length > 0) {
     items.push({ separator: true })
   }

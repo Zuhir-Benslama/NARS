@@ -19,8 +19,8 @@ public record NumberEntrancesRequest(
     Guid RoadId,
     [property: JsonPropertyName("entranceIds")]
     [property: JsonRequired]
-    [property: MinLength(1)]
-    [property: MaxLength(NumberEntrancesRequest.MaxBatchSize)]
+    [MinLength(1)]
+    [MaxLength(NumberEntrancesRequest.MaxBatchSize)]
     List<Guid> EntranceIds
 )
 {

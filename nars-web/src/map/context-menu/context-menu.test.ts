@@ -173,7 +173,7 @@ describe("per-phase edit/remove rule", () => {
     expect(info?.onClick).toBeUndefined()
   })
 
-  it("offers no edit/remove path for house entrances at all", () => {
+  it("offers no edit path but allows remove for house entrances", () => {
     setupPhase("houseEntrances")
 
     mod.showContextMenu(0, 0, "h1", "houseEntrances")
@@ -181,7 +181,8 @@ describe("per-phase edit/remove rule", () => {
     const store = useContextMenuStore()
     const labels = store.items.map((i: any) => i.label)
     expect(labels).not.toContain("ctx_edit_info")
-    expect(labels).not.toContain("ctx_remove")
+    expect(labels).not.toContain("ctx_edit_geom")
+    expect(labels).toContain("ctx_remove")
   })
 })
 
@@ -283,7 +284,9 @@ describe("showContextMenu / bindContextMenu", () => {
     expect(store.items.some((i: any) => String(i.label).startsWith("ctx_generate_roads"))).toBe(
       false,
     )
-    const genItem = store.items.find((i: any) => i.label === "ctx_generate_districts")
+    const genItem = store.items.find((i: any) =>
+      String(i.label).startsWith("ctx_generate_districts"),
+    )
     expect(genItem).toBeDefined()
     genItem.onClick()
     expect(mockGenerateDistrictsFromUrbanAreas).toHaveBeenCalled()
@@ -414,7 +417,9 @@ describe("showMapContextMenu", () => {
     expect(store.items.some((i: any) => String(i.label).startsWith("ctx_generate_roads"))).toBe(
       false,
     )
-    const genItem = store.items.find((i: any) => i.label === "ctx_generate_districts")
+    const genItem = store.items.find((i: any) =>
+      String(i.label).startsWith("ctx_generate_districts"),
+    )
     expect(genItem).toBeDefined()
     genItem.onClick()
     expect(mockGenerateDistrictsFromUrbanAreas).toHaveBeenCalled()
