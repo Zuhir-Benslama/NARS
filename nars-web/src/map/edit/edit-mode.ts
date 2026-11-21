@@ -60,7 +60,21 @@ export async function enableEditMode(featureId?: string): Promise<void> {
           })
           const added = (result as { addedFeatures?: Array<{ id?: string }> } | undefined)
             ?.addedFeatures?.[0]
-          setActiveGeomanFeatureId(added?.id ?? null)
+          let geomanId = added?.id ?? null
+          if (!geomanId) {
+            // Fallback: importGeoJson may report no added feature on a
+            // repeated edit (Geoman keeps a stale entry). Look it up by dbId.
+            try {
+              const all = (await geoman.features.getAll()) as {
+                features?: Array<{ id?: string; properties?: { dbId?: string } }>
+              }
+              const match = all?.features?.find((f) => f.properties?.dbId === entry.dbId)
+              geomanId = match?.id ?? null
+            } catch {
+              // ignore
+            }
+          }
+          setActiveGeomanFeatureId(geomanId)
         } catch (err) {
           debugError("Geoman importGeoJson failed:", err)
         }

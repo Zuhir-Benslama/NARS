@@ -31,9 +31,27 @@ let _commitInProgress = false
 // ─── GEOMAN FEATURE REMOVAL ──────────────────────────────────────────────────
 
 async function removeGeomanFeature(): Promise<void> {
-  const geomanId = getActiveGeomanFeatureId()
   const { geoman } = getCtx()
-  if (!geoman || !geomanId) return
+  if (!geoman) return
+
+  let geomanId = getActiveGeomanFeatureId()
+  if (!geomanId) {
+    const entry = getActiveEditEntry()
+    if (entry?.dbId) {
+      try {
+        const all = (await geoman.features.getAll()) as {
+          features?: Array<{ id?: string; properties?: { dbId?: string } }>
+        }
+        geomanId = all?.features?.find((f) => f.properties?.dbId === entry.dbId)?.id ?? null
+      } catch {
+        // ignore
+      }
+    }
+  }
+  if (!geomanId) {
+    setActiveGeomanFeatureId(null)
+    return
+  }
   try {
     await geoman.features.delete(geomanId)
   } catch {
