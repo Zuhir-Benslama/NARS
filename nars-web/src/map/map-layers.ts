@@ -163,7 +163,7 @@ const FEATURE_LAYERS: maplibregl.LayerSpecification[] = [
       // them from pushing other labels away.
       "text-allow-overlap": true,
       "text-ignore-placement": true,
-      "text-optional": true,
+      "text-optional": false,
     },
     paint: {
       "text-color": ["get", "textColor"],

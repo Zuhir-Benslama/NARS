@@ -43,9 +43,12 @@ export function refreshLayerVisibility(): void {
 
   // Keep matrix-driven visibility from Phases.xlsx, but fail-safe render
   // legacy data when phaseKey is absent or not recognized.
+  // House-entrance numbers (labels) stay visible in every phase, mirroring
+  // the (unfiltered) circle layer, so the numbers are never hidden.
   const phaseScopedFilter = [
     "any",
     phaseFilter,
+    ["==", ["get", "phaseKey"], "houseEntrances"],
     ["!", ["has", "phaseKey"]],
     ["!", ["in", ["get", "phaseKey"], ["literal", KNOWN_PHASE_KEYS]]],
   ]
