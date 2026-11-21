@@ -80,11 +80,15 @@ function applyMarkerPatch(mp: GeomanMarkerPointer): void {
   registerGeomanMarker(mp, marker, orig)
   marker.setLngLat = makeSnapSetLngLat(mp, orig)
 
-  const markerEl = (
-    marker as { markerInstance?: { getElement?(): HTMLElement } }
-  ).markerInstance?.getElement?.()
+  const markerEl =
+    (
+      marker as { markerInstance?: { getElement?(): HTMLElement } }
+    ).markerInstance?.getElement?.() ?? (marker as { getElement?(): HTMLElement }).getElement?.()
   if (markerEl) {
     markerEl.style.pointerEvents = "none"
+    // Hide Geoman's default teardrop marker icon; NARS renders its own
+    // circle markers, so the extra pin is visual noise.
+    markerEl.style.display = "none"
   }
 }
 
