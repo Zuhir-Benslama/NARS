@@ -48,7 +48,6 @@ export function refreshLayerVisibility(): void {
   const phaseScopedFilter = [
     "any",
     phaseFilter,
-    ["==", ["get", "phaseKey"], "houseEntrances"],
     ["!", ["has", "phaseKey"]],
     ["!", ["in", ["get", "phaseKey"], ["literal", KNOWN_PHASE_KEYS]]],
   ]
@@ -65,10 +64,17 @@ export function refreshLayerVisibility(): void {
 
   for (const [layerId, geomType] of Object.entries(layerGeometryTypes)) {
     if (map.getLayer(layerId)) {
-      // Keep the point (circle) layer unfiltered by phase so markers such as
-      // house entrances are never hidden by phase-scoped visibility; their
-      // labels are still filtered by the phase below.
-      if (layerId === "nars-point") continue
+      // House entrances follow phase visibility (hidden outside their phase);
+      // all other point markers stay always visible.
+      if (layerId === "nars-point") {
+        const pointFilter = [
+          "all",
+          ["==", ["geometry-type"], geomType],
+          ["any", ["!=", ["get", "phaseKey"], "houseEntrances"], phaseScopedFilter],
+        ]
+        map.setFilter(layerId, pointFilter as maplibregl.FilterSpecification)
+        continue
+      }
       const combinedFilter = ["all", ["==", ["geometry-type"], geomType], phaseScopedFilter]
       map.setFilter(layerId, combinedFilter as maplibregl.FilterSpecification)
     }
