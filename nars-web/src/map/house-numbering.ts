@@ -2,10 +2,9 @@
 // Single source of truth for house number assignment logic.
 // Used by both context-menu.ts (map right-click) and house-entrances.ts (UI).
 //
-// Projects entrance markers onto a road polyline, sorts them by arc-length,
-// then assigns odd numbers to the left side and even to the right — each
-// counter continuing from the highest already-assigned number. Recomputes the
-// whole sequence each run so insertions/deletions are corrected.
+// All main entrances on a road are persisted first (if needed), then renumbered
+// together in a single server-side pass sorted by arc-length along the road, so
+// insertions/deletions are corrected in one computation.
 
 import { useAppStore } from "../stores/appStore"
 import { useLayerStore } from "../stores/layerStore"
@@ -17,11 +16,6 @@ import { saveToDatabase } from "./features/feature-persistence"
 import { debugError } from "../utils/debug"
 import type { MaplibreFeature } from "./core/state"
 
-/**
- * Recompute house numbers for ALL main entrances on a single road.
- * Exported so callers (e.g. entrance deletion) can trigger a recompute for
- * the affected road without changing the global reference road.
- */
 export async function numberOneRoad(roadId: string): Promise<void> {
   const featuresStore = useFeaturesStore()
   const layerStore = useLayerStore()
@@ -60,12 +54,11 @@ export async function numberOneRoad(roadId: string): Promise<void> {
     })
   withDist.sort((a, b) => a.dist - b.dist)
 
-  if (!withDist.length) return
+  if (!withDist.length) {
+    showToast(t("alert_no_unassigned_entrances"), "info")
+    return
+  }
 
-  const cachedEntries = withDist.filter(({ entry }) => String(entry.dbId).startsWith("local_"))
-  const persistedEntries = withDist.filter(({ entry }) => !String(entry.dbId).startsWith("local_"))
-
-  let assignedCount = 0
   let failureCount = 0
   const mapPatches: Array<{
     id: string
@@ -73,116 +66,86 @@ export async function numberOneRoad(roadId: string): Promise<void> {
   }> = []
 
   try {
-    if (persistedEntries.length) {
-      const orderedIds = persistedEntries.map(({ entry }) => entry.dbId)
-      const res = await apiFetch("/api/features/number-entrances", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roadId, entranceIds: orderedIds }),
-      })
-      if (!res.ok) throw new Error(`House numbering failed (${res.status})`)
-
-      const body = (await res.json()) as {
-        success: boolean
-        entrances: Array<{ id: string; side: string; entranceNumber: number; label: string }>
-      }
-      if (!body.success) throw new Error("House numbering failed")
-
-      const byDbId = new Map(body.entrances.map((n) => [n.id, n]))
-      for (const { entry } of persistedEntries) {
-        const numbered = byDbId.get(entry.dbId)
-        if (!numbered) {
-          failureCount++
-          continue
-        }
-        useLayerStore().updateFeature("houseEntrances", entry.dbId, {
-          entranceNumber: numbered.entranceNumber,
-          label: numbered.label,
-        })
-        entry.data.entranceNumber = numbered.entranceNumber
-        entry.data.label = numbered.label
-        mapPatches.push({
-          id: entry.id,
-          properties: { phaseKey: entry.data.type, label: numbered.label },
-        })
-        assignedCount++
-      }
-    }
-
+    // Persist any cached (local) entrances first so they receive real ids and
+    // can participate in the single spatial renumbering pass below.
+    const cachedEntries = withDist.filter(({ entry }) => String(entry.dbId).startsWith("local_"))
     if (cachedEntries.length) {
-      const usedBySide: Record<string, Set<number>> = { left: new Set(), right: new Set() }
-      const currentState = useLayerStore().$state
-      for (const e of currentState.houseEntrances || []) {
-        if (e.data.roadDbId !== roadId) continue
-        const side = e.data.side
-        if (side !== "left" && side !== "right") continue
-        let num = e.data.entranceNumber
-        if (num == null) {
-          const parsed = Number.parseInt(String(e.data.label), 10)
-          if (Number.isFinite(parsed)) num = parsed
-        }
-        if (num != null) usedBySide[side].add(num)
-      }
-
-      const toSave: Array<{
-        entry: (typeof cachedEntries)[number]["entry"]
-        num: number
-        label: string
-      }> = []
-      for (const { entry } of cachedEntries) {
-        const side =
-          entry.data.side === "left" || entry.data.side === "right" ? entry.data.side : "left"
-        const used = usedBySide[side]
-        let suggested = side === "left" ? 1 : 2
-        while (suggested <= 100000 && used.has(suggested)) suggested += 2
-        const num = suggested > 100000 ? -1 : suggested
-        if (num < 0) {
-          failureCount++
-          continue
-        }
-        used.add(num)
-        const label = String(num)
-
-        useLayerStore().updateFeature("houseEntrances", entry.dbId, {
-          entranceNumber: num,
-          label,
-        })
-        entry.data.entranceNumber = num
-        entry.data.label = label
-        toSave.push({ entry, num, label })
-      }
-
-      const saveResults = await Promise.all(toSave.map(({ entry }) => saveToDatabase(entry.data)))
-      toSave.forEach(({ entry, label }, i) => {
+      const saveResults = await Promise.all(
+        cachedEntries.map(({ entry }) => saveToDatabase(entry.data)),
+      )
+      cachedEntries.forEach(({ entry }, i) => {
         const saveRes = saveResults[i]
         if (saveRes.ok && saveRes.data?.id) {
           const realId = saveRes.data.id
           entry.dbId = realId
           featuresStore.update(entry.id, {
-            properties: { dbId: realId, phaseKey: entry.data.type, label },
+            properties: { dbId: realId, phaseKey: entry.data.type },
           })
-          mapPatches.push({
-            id: entry.id,
-            properties: { phaseKey: entry.data.type, label },
-          })
-          assignedCount++
         } else {
           failureCount++
         }
       })
     }
 
+    // After persistence, all remaining entrances are persisted (real ids).
+    const persistedEntries = withDist.filter(
+      ({ entry }) => !String(entry.dbId).startsWith("local_"),
+    )
+
+    if (!persistedEntries.length) {
+      if (failureCount > 0) {
+        showToast(t("map_assigned_numbers_error"), "error")
+      }
+      return
+    }
+
+    const orderedIds = persistedEntries.map(({ entry }) => entry.dbId)
+    const res = await apiFetch("/api/features/number-entrances", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roadId, entranceIds: orderedIds }),
+    })
+    if (!res.ok) throw new Error(`House numbering failed (${res.status})`)
+
+    const body = (await res.json()) as {
+      success: boolean
+      entrances: Array<{ id: string; side: string; entranceNumber: number; label: string }>
+    }
+    if (!body.success) throw new Error("House numbering failed")
+
+    const byDbId = new Map(body.entrances.map((n) => [n.id, n]))
+    let assignedCount = 0
+    for (const { entry } of persistedEntries) {
+      const numbered = byDbId.get(entry.dbId)
+      if (!numbered) {
+        failureCount++
+        continue
+      }
+      useLayerStore().updateFeature("houseEntrances", entry.dbId, {
+        entranceNumber: numbered.entranceNumber,
+        label: numbered.label,
+      })
+      entry.data.entranceNumber = numbered.entranceNumber
+      entry.data.label = numbered.label
+      featuresStore.update(entry.id, {
+        properties: { label: numbered.label },
+      })
+      mapPatches.push({
+        id: entry.id,
+        properties: { phaseKey: entry.data.type, label: numbered.label },
+      })
+      assignedCount++
+    }
+
     featuresStore.batchUpdate(mapPatches)
 
-    if (assignedCount > 0 || failureCount > 0) {
-      if (failureCount > 0) {
-        showToast(
-          t("map_assigned_numbers_partial", { assigned: assignedCount, failed: failureCount }),
-          "error",
-        )
-      } else {
-        showToast(t("map_assigned_numbers", { count: assignedCount }), "success")
-      }
+    if (failureCount > 0) {
+      showToast(
+        t("map_assigned_numbers_partial", { assigned: assignedCount, failed: failureCount }),
+        "error",
+      )
+    } else {
+      showToast(t("map_assigned_numbers", { count: assignedCount }), "success")
     }
   } catch (err) {
     debugError("setHouseNumbers error:", err)
@@ -190,11 +153,6 @@ export async function numberOneRoad(roadId: string): Promise<void> {
   }
 }
 
-/**
- * Public entry point. When `allRoads` is false (default), recomputes only the
- * current reference road. When true, recomputes every road that has main
- * entrances.
- */
 export async function setHouseNumbers(allRoads = false): Promise<void> {
   const appStore = useAppStore()
   const layerStore = useLayerStore()
