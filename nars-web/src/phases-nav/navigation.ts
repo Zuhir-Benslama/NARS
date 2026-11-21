@@ -10,6 +10,7 @@ import { checkDistrictCoverage } from "../lib/validation"
 import { ensureGeoman } from "../map/map-init"
 import { setDrawingPhase } from "../map/draw/draw-complete"
 import { refreshLayerVisibility } from "../map/rendering/labels"
+import { disableSnapping } from "../map/snapping/snapping"
 import { computeAndApplyRoadDirections } from "../map/roads/road-directions"
 import { savePhase } from "./storage"
 
@@ -74,6 +75,13 @@ export function setPhase(index: number): void {
   savePhase(index, communeId)
   const phase = PHASES[index]
   setDrawingPhase(phase ?? null)
+  if (phase?.key === "houseEntrances") {
+    try {
+      disableSnapping()
+    } catch {
+      // ignore
+    }
+  }
   if (phase) {
     // User-driven phase navigation: lazily initialize the geoman editor on
     // first use. Drawing is NOT auto-armed — "hand" (pan/select) is the

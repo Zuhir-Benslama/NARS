@@ -65,6 +65,8 @@ export function setSnapExclude(id: string | null): void {
 
 export function getActiveSnapPhases(): string[] {
   if (useEditStore().isEditMode) {
+    const entry = useEditStore().activeEditEntry
+    if (entry?.data?.type === "houseEntrances") return []
     const layerStore = useLayerStore()
     const state = layerStore.$state
     return Object.keys(state).filter((key) => {

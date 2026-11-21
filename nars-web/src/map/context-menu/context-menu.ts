@@ -205,7 +205,9 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
     })
   }
 
-  items.push(buildSnapToggleItem())
+  if (!isHouseEntrancesPhase) {
+    items.push(buildSnapToggleItem())
+  }
   return items
 }
 
@@ -309,7 +311,9 @@ export async function showMapContextMenu(
   if (items.length > 0) {
     items.push({ separator: true })
   }
-  items.push(buildSnapToggleItem())
+  if (phase.key !== "houseEntrances") {
+    items.push(buildSnapToggleItem())
+  }
 
   useContextMenuStore().show(x, y, items)
 }
