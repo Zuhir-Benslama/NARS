@@ -54,6 +54,26 @@ export async function enableEditMode(featureId?: string): Promise<void> {
       )
       const gj = buildGeomanImportFeature(entry)
       if (gj) {
+        // Clean up any stale Geoman features for this dbId left over from a
+        // previous (possibly incompletely torn-down) edit session, so the
+        // import below creates a single fresh, draggable marker.
+        try {
+          const all = (await geoman.features.getAll()) as {
+            features?: Array<{ id?: string; properties?: { dbId?: string } }>
+          }
+          for (const f of all?.features ?? []) {
+            if (f.properties?.dbId === entry.dbId && f.id) {
+              try {
+                await geoman.features.delete(f.id)
+              } catch {
+                // ignore
+              }
+            }
+          }
+        } catch {
+          // ignore
+        }
+
         try {
           const result = await geoman.features.importGeoJson(gj as GeoJsonImportFeature, {
             overwrite: true,
@@ -62,13 +82,11 @@ export async function enableEditMode(featureId?: string): Promise<void> {
             ?.addedFeatures?.[0]
           let geomanId = added?.id ?? null
           if (!geomanId) {
-            // Fallback: importGeoJson may report no added feature on a
-            // repeated edit (Geoman keeps a stale entry). Look it up by dbId.
             try {
-              const all = (await geoman.features.getAll()) as {
+              const all2 = (await geoman.features.getAll()) as {
                 features?: Array<{ id?: string; properties?: { dbId?: string } }>
               }
-              const match = all?.features?.find((f) => f.properties?.dbId === entry.dbId)
+              const match = all2?.features?.find((f) => f.properties?.dbId === entry.dbId)
               geomanId = match?.id ?? null
             } catch {
               // ignore

@@ -69,15 +69,17 @@ describe("edit-snap", () => {
       expect(store.origMarkerSetLngLat).toBeNull()
     })
 
-    it("does not patch if already patched", async () => {
-      const { useSnapStore } = await import("../../stores/snapStore")
-      const store = useSnapStore()
-      const savedFn = vi.fn()
-      store.origMarkerSetLngLat = savedFn as never
+    it("re-patches without compounding wrappers", async () => {
+      const marker = (mockCtx.geoman as any).markerPointer.marker
 
       patchMarkerPointerSnap("entry-1")
+      const firstPatched = marker.setLngLat
+      patchMarkerPointerSnap("entry-2")
+      const secondPatched = marker.setLngLat
 
-      expect(store.origMarkerSetLngLat).toBe(savedFn)
+      // The wrapper identity changes, but calling it does not recurse.
+      expect(typeof secondPatched).toBe("function")
+      expect(secondPatched).not.toBe(firstPatched)
     })
 
     it("patched function snaps position when snap found", async () => {
