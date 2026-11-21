@@ -179,7 +179,7 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
 
   // House entrances can be removed in their own phase; removing a main
   // entrance triggers a recompute of the numbers on its reference road.
-  if (phaseKey === "houseEntrances") {
+  if (phaseKey === "houseEntrances" && isHouseEntrancesPhase) {
     items.push({
       label: t("ctx_edit_location"),
       onClick: () => enableEditGeometry(dbId),
