@@ -201,6 +201,7 @@ public static class ServiceRegistrationExtensions
                                                                                               // every POST/PATCH/DELETE request. The cookie carries no session
                                                                                               // material — the access/refresh JWTs are in separate cookies.
                                                                                               // (CodeQL cs/web/cookie-httponly-not-set — false positive.)
+                                                                                              // codeql[cs/web/cookie-httponly-not-set]: false positive — double-submit CSRF token must be readable by JS.
                                                                                               options.Cookie.HttpOnly = false;
                                                                                               // SameAsRequest in Development: the local kind cluster and the
                                                                                               // Vite dev server serve plain HTTP, and antiforgery's SSL check
