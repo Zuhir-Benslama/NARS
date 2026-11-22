@@ -7,12 +7,39 @@
 // insertions/deletions are corrected in one computation.
 
 import { useAppStore } from "../stores/appStore"
+
+// Faithful client-side side determination (mirrors GeometryHelper.DetermineSide
+// with FindNearestSegmentIndex): nearest segment by midpoint, then cross product.
+function determineSide(
+  markerLat: number,
+  markerLng: number,
+  roadCoords: Array<{ lat: number; lng: number }>,
+): "left" | "right" {
+  if (roadCoords.length < 2) return "left"
+  const cosLat = Math.cos((markerLat * Math.PI) / 180)
+  let minDist = Infinity
+  let nearestIdx = 0
+  for (let i = 0; i < roadCoords.length - 1; i++) {
+    const midLat = (roadCoords[i].lat + roadCoords[i + 1].lat) / 2
+    const midLng = (roadCoords[i].lng + roadCoords[i + 1].lng) / 2
+    const dLat = markerLat - midLat
+    const dLng = (markerLng - midLng) * cosLat
+    const d = Math.sqrt(dLat * dLat + dLng * dLng)
+    if (d < minDist) {
+      minDist = d
+      nearestIdx = i
+    }
+  }
+  const s = roadCoords[nearestIdx]
+  const e = roadCoords[nearestIdx + 1]
+  const cross = (e.lng - s.lng) * (markerLat - s.lat) - (e.lat - s.lat) * (markerLng - s.lng)
+  return cross >= 0 ? "left" : "right"
+}
 import { useLayerStore } from "../stores/layerStore"
 import { useFeaturesStore } from "../stores/featuresStore"
 import { showToast } from "../lib/toast"
 import { t } from "../i18n"
 import { apiFetch } from "../api"
-import { getRoadSide } from "../lib/validation"
 import { saveToDatabase } from "./features/feature-persistence"
 import { debugError } from "../utils/debug"
 import type { MaplibreFeature } from "./core/state"
@@ -45,29 +72,27 @@ export async function numberOneRoad(roadId: string): Promise<void> {
   const roadLine = turfHelpers.lineString(roadEntry.data.coordinates.map((c) => [c.lng, c.lat]))
 
   // Recompute the side (left/right) for every entrance from its current
-  // position, so numbering (odd=left, even=right) uses the faithful side
-  // instead of a possibly stale stored value.
-  await Promise.all(
-    allMain.map(async (e) => {
-      if (e.data.lat == null || e.data.lng == null) return
-      const sideResult = await getRoadSide(roadId, e.data.lat, e.data.lng)
-      if (sideResult?.side && sideResult.side !== e.data.side) {
-        e.data.side = sideResult.side
-        useLayerStore().updateFeature("houseEntrances", e.dbId, { side: sideResult.side })
-        // Persist the corrected side for already-stored entrances.
-        if (!String(e.dbId).startsWith("local_")) {
-          await apiFetch(`/api/features/${e.dbId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ data: e.data }),
-          }).catch(() => {})
-        }
-      } else if (sideResult?.side) {
-        e.data.side = sideResult.side
-        useLayerStore().updateFeature("houseEntrances", e.dbId, { side: sideResult.side })
+  // position using the faithful (single-segment) determination, so numbering
+  // (odd=left, even=right) uses the correct side instead of a stale value.
+  // Done client-side to avoid one API call per entrance (rate limiting).
+  for (const e of allMain) {
+    if (e.data.lat == null || e.data.lng == null) continue
+    const coords = roadEntry.data.coordinates
+    if (!coords || coords.length < 2) continue
+    const side = determineSide(e.data.lat, e.data.lng, coords)
+    if (side !== e.data.side) {
+      e.data.side = side
+      useLayerStore().updateFeature("houseEntrances", e.dbId, { side })
+      // Persist the corrected side for already-stored entrances.
+      if (!String(e.dbId).startsWith("local_")) {
+        await apiFetch(`/api/features/${e.dbId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ data: e.data }),
+        }).catch(() => {})
       }
-    }),
-  )
+    }
+  }
 
   const withDist = allMain
     .filter((e) => e.data.lng != null && e.data.lat != null)

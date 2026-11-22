@@ -127,8 +127,13 @@ describe("setHouseNumbers", () => {
 
     await setHouseNumbers()
 
-    expect(mockApiFetch).toHaveBeenCalledTimes(1)
-    const [url, init] = mockApiFetch.mock.calls[0]
+    // Side recompute may issue a PUT for an entrance whose side changed;
+    // the numbering call is the last one.
+    const numberCall = mockApiFetch.mock.calls.find(
+      (c: any[]) => c[0] === "/api/features/number-entrances",
+    )
+    expect(numberCall).toBeDefined()
+    const [url, init] = numberCall!
     expect(url).toBe("/api/features/number-entrances")
     expect(init.method).toBe("POST")
     expect(JSON.parse(init.body)).toEqual({
@@ -161,7 +166,10 @@ describe("setHouseNumbers", () => {
 
     await setHouseNumbers()
 
-    expect(mockApiFetch).toHaveBeenCalledTimes(1)
+    const numberCall = mockApiFetch.mock.calls.find(
+      (c: any[]) => c[0] === "/api/features/number-entrances",
+    )
+    expect(numberCall).toBeDefined()
     expect((left.data as { entranceNumber: number }).entranceNumber).toBeUndefined()
     expect((right.data as { entranceNumber: number }).entranceNumber).toBeUndefined()
     expect((right.data as { label: string }).label).toBe("?")
