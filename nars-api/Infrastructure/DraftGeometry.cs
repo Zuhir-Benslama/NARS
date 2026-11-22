@@ -445,6 +445,39 @@ public static class HouseEntranceData
         return TryGetSide(data) == side && TryGetEntranceNumber(data, out number);
     }
 
+    /// <summary>Reads the entrance's own lat/lng, or false when absent/invalid.</summary>
+    public static bool TryGetLatLng(string data, out double lat, out double lng)
+    {
+        lat = 0;
+        lng = 0;
+        try
+        {
+            var node = JsonNode.Parse(data);
+            if (node?["lat"] is { } latNode && node["lng"] is { } lngNode
+                && latNode.GetValue<double>() is var la && lngNode.GetValue<double>() is var lo
+                && double.IsFinite(la) && double.IsFinite(lo))
+            {
+                lat = la;
+                lng = lo;
+                return true;
+            }
+        }
+        catch
+        {
+            // Missing/non-numeric coordinates: caller falls back to the stored side.
+        }
+
+        return false;
+    }
+
+    /// <summary>Rewrites an entrance's side into its data JSONB.</summary>
+    public static string SetSide(string data, string side)
+    {
+        var node = JsonNode.Parse(data) ?? new JsonObject();
+        node["side"] = side;
+        return node.ToJsonString();
+    }
+
     /// <summary>Rewrites an entrance's number and label into its data JSONB.</summary>
     public static string SetEntranceNumber(string data, int number, string label)
     {

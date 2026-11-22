@@ -1,5 +1,7 @@
 using System.Data.Common;
 using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using NarsApi.Data;
 using NarsApi.DTOs;
@@ -56,19 +58,27 @@ public sealed class NumberEntrancesService(IDbContextFactory<AppDbContext> dbFac
             ["right"] = [],
         };
 
+        // The road's current geometry. Left/right is relative to the order of its
+        // coordinates, which "compute road directions" can reverse after an entrance
+        // was created, so the side is recomputed here instead of trusting the value
+        // stored on the entrance.
+        List<(double Lat, double Lng)>? roadCoords = null;
+
         // Lock the road as the serialization anchor and verify ownership. Any
         // concurrent NumberAsync for the same road blocks here until we commit,
         // which is what makes the read-compute-write below atomic.
         await using (var lockCmd = conn.CreateCommand())
         {
             lockCmd.Transaction = tx;
-            lockCmd.CommandText = "SELECT 1 FROM roads WHERE id = @rid AND user_id = @uid FOR UPDATE";
+            lockCmd.CommandText = "SELECT data::text FROM roads WHERE id = @rid AND user_id = @uid FOR UPDATE";
             SqlFragments.AddParam(lockCmd, "@rid", roadId);
             SqlFragments.AddParam(lockCmd, "@uid", userId);
-            if (await lockCmd.ExecuteScalarAsync(ct) is null)
+            if (await lockCmd.ExecuteScalarAsync(ct) is not { } roadRow)
             {
                 return null; // road missing or not owned
             }
+
+            roadCoords = TryParseRoadCoords(roadRow as string);
         }
 
         // Load all of this user's main-layer entrances on the road under the
@@ -94,9 +104,9 @@ public sealed class NumberEntrancesService(IDbContextFactory<AppDbContext> dbFac
                 var data = reader.GetString(1);
                 if (entranceIds.Contains(id))
                 {
-                    if (ParseSide(data) is { } side)
+                    if (ResolveSide(data, roadCoords) is { } side)
                     {
-                        targets[id] = (side, data);
+                        targets[id] = (side, HouseEntranceData.SetSide(data, side));
                     }
                 }
                 else
@@ -162,21 +172,46 @@ public sealed class NumberEntrancesService(IDbContextFactory<AppDbContext> dbFac
         }
     }
 
-    private static string? ParseSide(string data) => HouseEntranceData.TryGetSide(data);
+    /// <summary>
+    /// Side from the road's current geometry and the entrance's own position; falls
+    /// back to the stored side when either is unavailable.
+    /// </summary>
+    private static string? ResolveSide(string data, List<(double Lat, double Lng)>? roadCoords)
+    {
+        if (roadCoords is not null && HouseEntranceData.TryGetLatLng(data, out var lat, out var lng))
+        {
+            return GeometryHelper.DetermineSideOnPolyline(lat, lng, roadCoords);
+        }
+
+        return HouseEntranceData.TryGetSide(data);
+    }
+
+    private static List<(double Lat, double Lng)>? TryParseRoadCoords(string? roadData)
+    {
+        if (roadData is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var coordsNode = JsonNode.Parse(roadData)?["coordinates"];
+            return coordsNode is null ? null : GeometryHelper.ParseRoadCoordinates(coordsNode);
+        }
+        catch (Exception ex) when (ex is ArgumentException or JsonException or InvalidOperationException)
+        {
+            return null; // unusable geometry: fall back to stored sides
+        }
+    }
 
     private static void AddUsedNumbers(string data, Dictionary<string, HashSet<int>> usedNumbers)
     {
-        var side = HouseEntranceData.TryGetSide(data);
-        if (side is null)
-        {
-            // A malformed row (bad JSON or non-integer number) simply doesn't
-            // contribute to the used set; the batch still proceeds safely.
-            return;
-        }
-
+        // Keyed by the number's parity (odd = left series, even = right series), not
+        // the stored side: a side made stale by a road reversal must not hide a used
+        // number from the series it actually occupies.
         if (HouseEntranceData.TryGetEntranceNumber(data, out var num))
         {
-            usedNumbers[side].Add(num);
+            usedNumbers[num % 2 != 0 ? "left" : "right"].Add(num);
         }
     }
 }

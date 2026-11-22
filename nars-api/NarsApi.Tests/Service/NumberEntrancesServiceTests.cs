@@ -100,6 +100,29 @@ public class NumberEntrancesServiceTests(NarsDatabaseFixture fixture) : ServiceT
     }
 
     [Fact]
+    public async Task NumberAsync_StaleStoredSide_IsRecomputedFromCurrentRoadDirection()
+    {
+        // Road runs west -> east, so a point to the north is on its left. The entrance
+        // was stored as "right" (e.g. before the road was reversed), which must not win.
+        var (roadId, entranceService) = await CreateRoadWithEntranceServiceAsync();
+        var northOfRoad = await entranceService.CreateEntranceAsync(
+            roadId, _userId, "Entrance",
+            JsonSerializer.Serialize(new { side = "right", lat = 36.41, lng = 3.0 }));
+
+        var numbered = await CreateService().NumberAsync(
+            _userId, roadId, [northOfRoad], CancellationToken.None);
+
+        Assert.NotNull(numbered);
+        Assert.Single(numbered);
+        Assert.Equal("left", numbered[0].Side);
+        Assert.Equal(1, numbered[0].EntranceNumber);
+
+        var data = await GetEntranceDataJsonAsync(northOfRoad);
+        using var doc = JsonDocument.Parse(data!);
+        Assert.Equal("left", doc.RootElement.GetProperty("side").GetString());
+    }
+
+    [Fact]
     public async Task NumberAsync_ExistingNumberedEntrances_SeedsUsedSet()
     {
         var (roadId, entranceService) = await CreateRoadWithEntranceServiceAsync();

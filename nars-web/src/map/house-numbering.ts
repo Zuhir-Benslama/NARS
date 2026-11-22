@@ -121,12 +121,17 @@ export async function numberOneRoad(roadId: string): Promise<void> {
         failureCount++
         continue
       }
+      // The server recomputes the side from the road's current direction, so the
+      // local copy must follow it (a stale side is what mis-parities numbers).
+      const side = numbered.side === "left" || numbered.side === "right" ? numbered.side : undefined
       useLayerStore().updateFeature("houseEntrances", entry.dbId, {
         entranceNumber: numbered.entranceNumber,
         label: numbered.label,
+        ...(side ? { side } : {}),
       })
       entry.data.entranceNumber = numbered.entranceNumber
       entry.data.label = numbered.label
+      if (side) entry.data.side = side
       featuresStore.update(entry.id, {
         properties: { label: numbered.label },
       })
