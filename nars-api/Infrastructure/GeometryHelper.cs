@@ -56,7 +56,7 @@ public static class GeometryHelper
     {
         var cross = (segEndLng - segStartLng) * (markerLat - segStartLat)
                   - (segEndLat - segStartLat) * (markerLng - segStartLng);
-        return cross >= 0 ? "left" : "right";
+        return cross >= 0 ? "right" : "left";
     }
 
     /// <summary>
@@ -128,7 +128,7 @@ public static class GeometryHelper
             ny += nny;
         }
 
-        return nx * qx + ny * qy >= 0 ? "left" : "right";
+        return nx * qx + ny * qy >= 0 ? "right" : "left";
     }
 
     private static (double X, double Y) LeftNormal(double dx, double dy)
