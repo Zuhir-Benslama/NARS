@@ -24,6 +24,7 @@ import { buildConnectionGraph, dm, fromNk, CONNECT_M } from "./road-graph"
 const DEAD_END_SNAP_THRESHOLD_M = CONNECT_M
 import { geographicDirection, orientFromCityCenter } from "./road-orient"
 import { updateEndpointMarkers } from "./road-markers"
+import { numberOneRoad } from "../house-numbering"
 
 const URBAN_AREA_TYPES: ReadonlySet<string> = new Set(["central_urban", "secondary_urban"])
 
@@ -248,6 +249,7 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
   let reversedCount = 0
   let failureCount = 0
   const saveTasks: Promise<void>[] = []
+  const entranceSaveTasks: Promise<void>[] = []
   const mapPatches: Array<{
     id: string
     geometry: GeoJSON.LineString
@@ -276,6 +278,38 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
               coordinates: reversed.map((c) => [c.lng, c.lat]),
             },
           })
+
+          // Reversing the road flips the left/right side of every house
+          // entrance on it, so flip their stored side to keep numbering
+          // (odd=left, even=right) consistent with the new orientation.
+          const layerStore = useLayerStore()
+          const entrances = (layerStore.$state.houseEntrances || []).filter(
+            (e) => e.data.roadDbId === dbId,
+          )
+          for (const ent of entrances) {
+            const newSide =
+              ent.data.side === "left"
+                ? "right"
+                : ent.data.side === "right"
+                  ? "left"
+                  : ent.data.side
+            layerStore.updateFeature("houseEntrances", ent.dbId, { side: newSide })
+            ent.data.side = newSide
+            if (!String(ent.dbId).startsWith("local_")) {
+              entranceSaveTasks.push(
+                apiFetch(`/api/features/${ent.dbId}`, {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ data: ent.data }),
+                })
+                  .then(() => {})
+                  .catch((err) => debugError("Entrance side update error:", err)),
+              )
+            }
+          }
+          // Recompute numbers now that sides have flipped.
+          void numberOneRoad(dbId)
+
           reversedCount++
         })
         .catch((err) => {
@@ -286,6 +320,9 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
   }
 
   await Promise.all(saveTasks)
+  if (entranceSaveTasks.length) {
+    await Promise.all(entranceSaveTasks)
+  }
   featuresStore.batchUpdate(mapPatches)
 
   updateEndpointMarkers()
