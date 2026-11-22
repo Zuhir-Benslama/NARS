@@ -60,6 +60,84 @@ public static class GeometryHelper
     }
 
     /// <summary>
+    /// Determines the side of a whole road polyline a point lies on, correctly on curves.
+    /// Unlike <see cref="DetermineSide"/> (one segment picked by nearest midpoint), this
+    /// finds the true closest point on the polyline (clamped per-segment projection) and,
+    /// when that point is a shared vertex, uses the vertex pseudo-normal (sum of the two
+    /// adjoining segments' left normals) so inner/outer bend positions get one stable side.
+    /// Works in a local equirectangular plane around the point. "left" when the signed
+    /// offset is ≥ 0, matching <see cref="DetermineSide"/>.
+    /// </summary>
+    public static string DetermineSideOnPolyline(
+        double markerLat, double markerLng, IReadOnlyList<(double Lat, double Lng)> roadCoords)
+    {
+        if (roadCoords.Count < 2)
+        {
+            throw new ArgumentException("Road must have at least 2 coordinates to determine a side.", nameof(roadCoords));
+        }
+
+        var cosLat = Math.Cos(markerLat * DegToRad);
+        (double X, double Y) ToXy((double Lat, double Lng) c) => ((c.Lng - markerLng) * cosLat, c.Lat - markerLat);
+
+        const double eps = 1e-12;
+        var bestDist = double.MaxValue;
+        var bestIdx = 0;
+        var bestT = 0.0;
+
+        for (var i = 0; i < roadCoords.Count - 1; i++)
+        {
+            var (ax, ay) = ToXy(roadCoords[i]);
+            var (bx, by) = ToXy(roadCoords[i + 1]);
+            double dx = bx - ax, dy = by - ay;
+            var len2 = dx * dx + dy * dy;
+            if (len2 < eps * eps)
+            {
+                continue; // degenerate segment
+            }
+
+            var t = Math.Clamp(-(ax * dx + ay * dy) / len2, 0.0, 1.0); // marker is the origin
+            double px = ax + t * dx, py = ay + t * dy;
+            var d = px * px + py * py;
+            if (d < bestDist - eps)
+            {
+                bestDist = d;
+                bestIdx = i;
+                bestT = t;
+            }
+        }
+
+        var (sx, sy) = ToXy(roadCoords[bestIdx]);
+        var (ex, ey) = ToXy(roadCoords[bestIdx + 1]);
+        var (nx, ny) = LeftNormal(ex - sx, ey - sy);
+        // Vector from the closest point on the road to the marker (origin).
+        var (qx, qy) = (-(sx + bestT * (ex - sx)), -(sy + bestT * (ey - sy)));
+
+        // Closest point is a vertex shared with a neighbour: blend both normals.
+        if (bestT <= 0.0 && bestIdx > 0)
+        {
+            var (px0, py0) = ToXy(roadCoords[bestIdx - 1]);
+            var (pnx, pny) = LeftNormal(sx - px0, sy - py0);
+            nx += pnx;
+            ny += pny;
+        }
+        else if (bestT >= 1.0 && bestIdx + 2 < roadCoords.Count)
+        {
+            var (nx2, ny2) = ToXy(roadCoords[bestIdx + 2]);
+            var (nnx, nny) = LeftNormal(nx2 - ex, ny2 - ey);
+            nx += nnx;
+            ny += nny;
+        }
+
+        return nx * qx + ny * qy >= 0 ? "left" : "right";
+    }
+
+    private static (double X, double Y) LeftNormal(double dx, double dy)
+    {
+        var len = Math.Sqrt(dx * dx + dy * dy);
+        return len < 1e-12 ? (0, 0) : (-dy / len, dx / len);
+    }
+
+    /// <summary>
     /// Computes the turn angle (in degrees) at the middle point of three consecutive coordinates.
     /// Returns 0 if segments are degenerate (length ≈ 0).
     /// </summary>

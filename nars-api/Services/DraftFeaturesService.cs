@@ -709,8 +709,7 @@ public class DraftFeaturesService(
             }
 
             var entrancePoint = DraftGeometry.FindNearestRingVertex(midLng, midLat, ring);
-            var side = GeometryHelper.DetermineSide(
-                centroidLat, centroidLon, start.Lat, start.Lng, end.Lat, end.Lng);
+            var side = GeometryHelper.DetermineSideOnPolyline(centroidLat, centroidLon, road.Coords);
             nearest = new RoadReference(road, segmentIndex, distanceM, entrancePoint, side);
         }
 
