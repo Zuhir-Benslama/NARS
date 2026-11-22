@@ -69,6 +69,55 @@ public class GeometryHelperTests
     }
 
     [Fact]
+    public void DetermineSideOnPolyline_StraightRoad_MatchesSegmentSide()
+    {
+        var road = new List<(double Lat, double Lng)> { (0.0, 0.0), (0.0, 1.0), (0.0, 2.0) };
+
+        Assert.Equal("left", GeometryHelper.DetermineSideOnPolyline(0.1, 1.5, road));
+        Assert.Equal("right", GeometryHelper.DetermineSideOnPolyline(-0.1, 1.5, road));
+    }
+
+    [Fact]
+    public void DetermineSideOnPolyline_InsideOfLeftBend_IsLeft()
+    {
+        // East then north (left turn). A point just inside the bend (north-west of the
+        // corner) is on the left of the road.
+        var road = new List<(double Lat, double Lng)> { (0.0, 0.0), (0.0, 1.0), (1.0, 1.0) };
+
+        Assert.Equal("left", GeometryHelper.DetermineSideOnPolyline(0.05, 0.95, road));
+    }
+
+    [Fact]
+    public void DetermineSideOnPolyline_OutsideOfLeftBend_IsRight()
+    {
+        // Past the corner on the outer (south-east) side: one stable "right" regardless
+        // of which adjoining segment is picked.
+        var road = new List<(double Lat, double Lng)> { (0.0, 0.0), (0.0, 1.0), (1.0, 1.0) };
+
+        Assert.Equal("right", GeometryHelper.DetermineSideOnPolyline(-0.05, 1.05, road));
+        Assert.Equal("right", GeometryHelper.DetermineSideOnPolyline(-0.05, 0.95, road));
+        Assert.Equal("right", GeometryHelper.DetermineSideOnPolyline(0.05, 1.05, road));
+    }
+
+    [Fact]
+    public void DetermineSideOnPolyline_PointBeyondShortSegmentEnd_UsesRealClosestSegment()
+    {
+        // Long first segment, short second. Point is near the second segment but its
+        // projection lies past the first segment's end; the midpoint heuristic would
+        // choose segment 0 and misjudge the side.
+        var road = new List<(double Lat, double Lng)> { (0.0, 0.0), (0.0, 10.0), (0.2, 10.0) };
+
+        Assert.Equal("left", GeometryHelper.DetermineSideOnPolyline(0.1, 9.9, road));
+    }
+
+    [Fact]
+    public void DetermineSideOnPolyline_FewerThanTwoCoords_Throws()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            GeometryHelper.DetermineSideOnPolyline(0, 0, new List<(double Lat, double Lng)> { (0, 0) }));
+    }
+
+    [Fact]
     public void DetermineSide_OnLine_ReturnsLeft()
     {
         // Cross product exactly zero -> left
