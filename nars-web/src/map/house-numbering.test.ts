@@ -9,6 +9,14 @@ const mockShowToast = vi.fn()
 const mockDebugError = vi.fn()
 
 vi.mock("../api", () => ({ apiFetch: mockApiFetch }))
+let roadSideCallCount = 0
+const mockGetRoadSide = vi.fn(async (_roadId: string, _lat: number, _lng: number) => {
+  roadSideCallCount++
+  return roadSideCallCount % 2 === 1
+    ? { side: "left" as const, suggestedNumber: 1 }
+    : { side: "right" as const, suggestedNumber: 2 }
+})
+vi.mock("../lib/validation", () => ({ getRoadSide: mockGetRoadSide }))
 vi.mock("../stores/featuresStore", () => ({
   useFeaturesStore: () => ({
     update: mockFeaturesStoreUpdate,
@@ -51,6 +59,7 @@ beforeEach(async () => {
     ok: true,
     json: async () => ({ success: true, entrances: [] }),
   })
+  roadSideCallCount = 0
 
   const as = await import("../stores/appStore")
   useAppStore = as.useAppStore

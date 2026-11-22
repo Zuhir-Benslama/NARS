@@ -12,6 +12,7 @@ import { useFeaturesStore } from "../stores/featuresStore"
 import { showToast } from "../lib/toast"
 import { t } from "../i18n"
 import { apiFetch } from "../api"
+import { getRoadSide } from "../lib/validation"
 import { saveToDatabase } from "./features/feature-persistence"
 import { debugError } from "../utils/debug"
 import type { MaplibreFeature } from "./core/state"
@@ -42,6 +43,31 @@ export async function numberOneRoad(roadId: string): Promise<void> {
   ])
 
   const roadLine = turfHelpers.lineString(roadEntry.data.coordinates.map((c) => [c.lng, c.lat]))
+
+  // Recompute the side (left/right) for every entrance from its current
+  // position, so numbering (odd=left, even=right) uses the faithful side
+  // instead of a possibly stale stored value.
+  await Promise.all(
+    allMain.map(async (e) => {
+      if (e.data.lat == null || e.data.lng == null) return
+      const sideResult = await getRoadSide(roadId, e.data.lat, e.data.lng)
+      if (sideResult?.side && sideResult.side !== e.data.side) {
+        e.data.side = sideResult.side
+        useLayerStore().updateFeature("houseEntrances", e.dbId, { side: sideResult.side })
+        // Persist the corrected side for already-stored entrances.
+        if (!String(e.dbId).startsWith("local_")) {
+          await apiFetch(`/api/features/${e.dbId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ data: e.data }),
+          }).catch(() => {})
+        }
+      } else if (sideResult?.side) {
+        e.data.side = sideResult.side
+        useLayerStore().updateFeature("houseEntrances", e.dbId, { side: sideResult.side })
+      }
+    }),
+  )
 
   const withDist = allMain
     .filter((e) => e.data.lng != null && e.data.lat != null)
