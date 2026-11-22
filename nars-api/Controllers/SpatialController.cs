@@ -68,7 +68,10 @@ public class SpatialController(
             return Problem(detail: "Road coordinates are invalid.", statusCode: 400);
         }
 
-        var side = GeometryHelper.DetermineSideOnPolyline(body.Lat, body.Lng, roadCoords);
+        var nearestIdx = GeometryHelper.FindNearestSegmentIndex(body.Lat, body.Lng, roadCoords);
+        var (Lat, Lng) = roadCoords[nearestIdx];
+        var p2 = roadCoords[nearestIdx + 1];
+        var side = GeometryHelper.DetermineSide(body.Lat, body.Lng, Lat, Lng, p2.Lat, p2.Lng);
 
         // Query used entrance numbers via dedicated service (raw ADO.NET
         // is required for JSONB field extraction that EF Core doesn't handle).
