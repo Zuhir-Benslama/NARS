@@ -18,6 +18,7 @@ import type { LayerEntry, LatLng } from "../../types"
 import { commitDraftEdit, cancelDraftEdit } from "../drafts/draft-edit"
 import { updateEndpointMarkers } from "../roads/road-markers"
 import { numberOneRoad } from "../house-numbering"
+import { getRoadSide } from "../../lib/validation"
 import {
   getActiveEditEntry,
   getActiveGeomanFeatureId,
@@ -179,6 +180,31 @@ export async function commitEditMode(): Promise<void> {
     if (getActiveGeomanFeatureId() && getCtx().geoman) {
       const ok = await readGeomanGeometry(entry)
       if (!ok) return
+    }
+
+    // Recompute the side (left/right) for a moved house entrance so the
+    // odd/even numbering stays consistent with the new position.
+    const ed0 = entry.data as {
+      type?: string
+      entranceTypeKey?: string
+      roadDbId?: string
+      lat?: number
+      lng?: number
+      side?: string
+    }
+    if (
+      ed0.type === "houseEntrances" &&
+      ed0.entranceTypeKey === "main_entrance" &&
+      ed0.roadDbId &&
+      ed0.lat != null &&
+      ed0.lng != null
+    ) {
+      const sideResult = await getRoadSide(ed0.roadDbId, ed0.lat, ed0.lng)
+      if (sideResult?.side) {
+        useLayerStore().updateFeature("houseEntrances", entry.dbId, { side: sideResult.side })
+        ed0.side = sideResult.side
+        ;(entry.data as { side?: string }).side = sideResult.side
+      }
     }
 
     const saved = await saveGeometry(entry)
