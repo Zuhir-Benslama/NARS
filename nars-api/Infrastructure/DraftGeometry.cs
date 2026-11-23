@@ -435,6 +435,37 @@ public static class HouseEntranceData
         return false;
     }
 
+    /// <summary>Reads the entrance's finite lat/lng, or false when absent or invalid.</summary>
+    public static bool TryGetLatLng(string data, out double lat, out double lng)
+    {
+        lat = 0;
+        lng = 0;
+        try
+        {
+            var node = JsonNode.Parse(data);
+            if (node?["lat"] is { } latNode && node["lng"] is { } lngNode)
+            {
+                lat = latNode.GetValue<double>();
+                lng = lngNode.GetValue<double>();
+                return double.IsFinite(lat) && double.IsFinite(lng);
+            }
+        }
+        catch
+        {
+            // Malformed row: the caller falls back to the stored side.
+        }
+
+        return false;
+    }
+
+    /// <summary>Rewrites an entrance's side into its data JSONB.</summary>
+    public static string SetSide(string data, string side)
+    {
+        var node = JsonNode.Parse(data) ?? new JsonObject();
+        node["side"] = side;
+        return node.ToJsonString();
+    }
+
     /// <summary>
     /// Reads a used entrance number from the data payload when its side matches.
     /// Used to build the per-side used-number set under a row lock.

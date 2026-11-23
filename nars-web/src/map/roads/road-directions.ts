@@ -249,7 +249,6 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
   let reversedCount = 0
   let failureCount = 0
   const saveTasks: Promise<void>[] = []
-  const entranceSaveTasks: Promise<void>[] = []
   const mapPatches: Array<{
     id: string
     geometry: GeoJSON.LineString
@@ -280,34 +279,10 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
           })
 
           // Reversing the road flips the left/right side of every house
-          // entrance on it, so flip their stored side to keep numbering
-          // (odd=left, even=right) consistent with the new orientation.
-          const layerStore = useLayerStore()
-          const entrances = (layerStore.$state.houseEntrances || []).filter(
-            (e) => e.data.roadDbId === dbId,
-          )
-          for (const ent of entrances) {
-            const newSide =
-              ent.data.side === "left"
-                ? "right"
-                : ent.data.side === "right"
-                  ? "left"
-                  : ent.data.side
-            layerStore.updateFeature("houseEntrances", ent.dbId, { side: newSide })
-            ent.data.side = newSide
-            if (!String(ent.dbId).startsWith("local_")) {
-              entranceSaveTasks.push(
-                apiFetch(`/api/features/${ent.dbId}`, {
-                  method: "PUT",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ data: ent.data }),
-                })
-                  .then(() => {})
-                  .catch((err) => debugError("Entrance side update error:", err)),
-              )
-            }
-          }
-          // Recompute numbers now that sides have flipped.
+          // entrance on it. Sides are decided by the server against the road's
+          // new orientation during this renumbering pass, so there is no
+          // client-side flip (and no racing per-entrance PUTs that could
+          // overwrite the freshly assigned numbers).
           void numberOneRoad(dbId)
 
           reversedCount++
@@ -320,9 +295,6 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
   }
 
   await Promise.all(saveTasks)
-  if (entranceSaveTasks.length) {
-    await Promise.all(entranceSaveTasks)
-  }
   featuresStore.batchUpdate(mapPatches)
 
   updateEndpointMarkers()

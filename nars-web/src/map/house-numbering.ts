@@ -5,6 +5,13 @@
 // All main entrances on a road are persisted first (if needed), then renumbered
 // together in a single server-side pass sorted by arc-length along the road, so
 // insertions/deletions are corrected in one computation.
+//
+// The left/right side of every entrance is decided by the server in that same
+// pass (against the true closest point of the whole road polyline, under the
+// road's row lock), and the authoritative side comes back in the response. The
+// client never recomputes or PUTs sides itself: a client-side guess could drift
+// from what the server numbers by (stale stored side, swallowed PUT failures,
+// rate limiting) and silently produce the wrong odd/even parity.
 
 import { useAppStore } from "../stores/appStore"
 import { useLayerStore } from "../stores/layerStore"
@@ -15,34 +22,6 @@ import { apiFetch } from "../api"
 import { saveToDatabase } from "./features/feature-persistence"
 import { debugError } from "../utils/debug"
 import type { MaplibreFeature } from "./core/state"
-
-// Client-side side determination mirroring GeometryHelper.DetermineSide
-// (single segment by nearest midpoint), the faithful approach.
-function determineSide(
-  markerLat: number,
-  markerLng: number,
-  roadCoords: Array<{ lat: number; lng: number }>,
-): "left" | "right" {
-  if (roadCoords.length < 2) return "left"
-  const cosLat = Math.cos((markerLat * Math.PI) / 180)
-  let minDist = Infinity
-  let nearestIdx = 0
-  for (let i = 0; i < roadCoords.length - 1; i++) {
-    const midLat = (roadCoords[i].lat + roadCoords[i + 1].lat) / 2
-    const midLng = (roadCoords[i].lng + roadCoords[i + 1].lng) / 2
-    const dLat = markerLat - midLat
-    const dLng = (markerLng - midLng) * cosLat
-    const d = Math.sqrt(dLat * dLat + dLng * dLng)
-    if (d < minDist) {
-      minDist = d
-      nearestIdx = i
-    }
-  }
-  const s = roadCoords[nearestIdx]
-  const e = roadCoords[nearestIdx + 1]
-  const cross = (e.lng - s.lng) * (markerLat - s.lat) - (e.lat - s.lat) * (markerLng - s.lng)
-  return cross >= 0 ? "left" : "right"
-}
 
 export async function numberOneRoad(roadId: string): Promise<void> {
   const featuresStore = useFeaturesStore()
@@ -70,29 +49,6 @@ export async function numberOneRoad(roadId: string): Promise<void> {
   ])
 
   const roadLine = turfHelpers.lineString(roadEntry.data.coordinates.map((c) => [c.lng, c.lat]))
-
-  // Recompute the side (left/right) for every entrance from its current
-  // position using the faithful (single-segment) determination, so numbering
-  // (odd=left, even=right) uses the correct side instead of a stale value.
-  // Done client-side to avoid one API call per entrance (rate limiting).
-  for (const e of allMain) {
-    if (e.data.lat == null || e.data.lng == null) continue
-    const coords = roadEntry.data.coordinates
-    if (!coords || coords.length < 2) continue
-    const side = determineSide(e.data.lat, e.data.lng, coords)
-    if (side !== e.data.side) {
-      e.data.side = side
-      useLayerStore().updateFeature("houseEntrances", e.dbId, { side })
-      // Persist the corrected side for already-stored entrances.
-      if (!String(e.dbId).startsWith("local_")) {
-        await apiFetch(`/api/features/${e.dbId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ data: e.data }),
-        }).catch(() => {})
-      }
-    }
-  }
 
   const withDist = allMain
     .filter((e) => e.data.lng != null && e.data.lat != null)
@@ -172,12 +128,17 @@ export async function numberOneRoad(roadId: string): Promise<void> {
         failureCount++
         continue
       }
+      // The server decided (and persisted) the side together with the number.
+      const side =
+        numbered.side === "left" || numbered.side === "right" ? numbered.side : entry.data.side
       useLayerStore().updateFeature("houseEntrances", entry.dbId, {
         entranceNumber: numbered.entranceNumber,
         label: numbered.label,
+        side,
       })
       entry.data.entranceNumber = numbered.entranceNumber
       entry.data.label = numbered.label
+      entry.data.side = side
       featuresStore.update(entry.id, {
         properties: { label: numbered.label },
       })

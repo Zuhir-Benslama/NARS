@@ -127,8 +127,9 @@ describe("setHouseNumbers", () => {
 
     await setHouseNumbers()
 
-    // Side recompute may issue a PUT for an entrance whose side changed;
-    // the numbering call is the last one.
+    // The numbering request is the only call: sides are decided server-side, so the
+    // client must not PUT per-entrance side corrections.
+    expect(mockApiFetch).toHaveBeenCalledTimes(1)
     const numberCall = mockApiFetch.mock.calls.find(
       (c: any[]) => c[0] === "/api/features/number-entrances",
     )
@@ -151,6 +152,34 @@ describe("setHouseNumbers", () => {
       ]),
     )
     expect(mockShowToast).toHaveBeenCalledWith("map_assigned_numbers", "success")
+  })
+
+  it("adopts the side decided by the server instead of the stale stored side", async () => {
+    useAppStore().referenceRoadDbId = "road-1"
+    await seedRoad()
+    const store = useLayerStore()
+    // Stored side is stale ("left"); the server computed "right" for this position.
+    const stale = entrance("e1", "e-db-1", "left")
+    store.addFeature("houseEntrances", stale)
+
+    mockApiFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        entrances: [{ id: "e-db-1", side: "right", entranceNumber: 2, label: "2" }],
+      }),
+    })
+
+    await setHouseNumbers()
+
+    // No client-side PUT of the side: only the numbering request is sent.
+    expect(mockApiFetch).toHaveBeenCalledTimes(1)
+    expect((stale.data as { side: string }).side).toBe("right")
+    expect((stale.data as { entranceNumber: number }).entranceNumber).toBe(2)
+    expect(store.houseEntrances.find((e: LayerEntry) => e.dbId === "e-db-1")?.data).toMatchObject({
+      side: "right",
+      entranceNumber: 2,
+    })
   })
 
   it("does not mutate entrances and shows an error toast when the batch request fails", async () => {

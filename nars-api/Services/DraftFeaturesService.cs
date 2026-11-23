@@ -709,10 +709,7 @@ public class DraftFeaturesService(
             }
 
             var entrancePoint = DraftGeometry.FindNearestRingVertex(midLng, midLat, ring);
-            var nearestIdx = GeometryHelper.FindNearestSegmentIndex(centroidLat, centroidLon, road.Coords);
-            var (Lat, Lng) = road.Coords[nearestIdx];
-            var p2 = road.Coords[nearestIdx + 1];
-            var side = GeometryHelper.DetermineSide(centroidLat, centroidLon, Lat, Lng, p2.Lat, p2.Lng);
+            var side = GeometryHelper.DetermineSideOnPolyline(centroidLat, centroidLon, road.Coords);
             nearest = new RoadReference(road, segmentIndex, distanceM, entrancePoint, side);
         }
 
