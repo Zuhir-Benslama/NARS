@@ -56,7 +56,7 @@ public class GeometryHelperTests
         // Moving east (0,0)->(0,1), point is north (above) -> left
         var side = GeometryHelper.DetermineSide(1.0, 0.5, 0.0, 0.0, 0.0, 1.0);
 
-        Assert.Equal("right", side);
+        Assert.Equal("left", side);
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public class GeometryHelperTests
         // Moving east (0,0)->(0,1), point is south (below) -> right
         var side = GeometryHelper.DetermineSide(-1.0, 0.5, 0.0, 0.0, 0.0, 1.0);
 
-        Assert.Equal("left", side);
+        Assert.Equal("right", side);
     }
 
     [Fact]
@@ -73,8 +73,8 @@ public class GeometryHelperTests
     {
         var road = new List<(double Lat, double Lng)> { (0.0, 0.0), (0.0, 1.0), (0.0, 2.0) };
 
-        Assert.Equal("right", GeometryHelper.DetermineSideOnPolyline(0.1, 1.5, road));
-        Assert.Equal("left", GeometryHelper.DetermineSideOnPolyline(-0.1, 1.5, road));
+        Assert.Equal("left", GeometryHelper.DetermineSideOnPolyline(0.1, 1.5, road));
+        Assert.Equal("right", GeometryHelper.DetermineSideOnPolyline(-0.1, 1.5, road));
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public class GeometryHelperTests
         // corner) is on the left of the road.
         var road = new List<(double Lat, double Lng)> { (0.0, 0.0), (0.0, 1.0), (1.0, 1.0) };
 
-        Assert.Equal("right", GeometryHelper.DetermineSideOnPolyline(0.05, 0.95, road));
+        Assert.Equal("left", GeometryHelper.DetermineSideOnPolyline(0.05, 0.95, road));
     }
 
     [Fact]
@@ -94,9 +94,9 @@ public class GeometryHelperTests
         // of which adjoining segment is picked.
         var road = new List<(double Lat, double Lng)> { (0.0, 0.0), (0.0, 1.0), (1.0, 1.0) };
 
-        Assert.Equal("left", GeometryHelper.DetermineSideOnPolyline(-0.05, 1.05, road));
-        Assert.Equal("left", GeometryHelper.DetermineSideOnPolyline(-0.05, 0.95, road));
-        Assert.Equal("left", GeometryHelper.DetermineSideOnPolyline(0.05, 1.05, road));
+        Assert.Equal("right", GeometryHelper.DetermineSideOnPolyline(-0.05, 1.05, road));
+        Assert.Equal("right", GeometryHelper.DetermineSideOnPolyline(-0.05, 0.95, road));
+        Assert.Equal("right", GeometryHelper.DetermineSideOnPolyline(0.05, 1.05, road));
     }
 
     [Fact]
@@ -107,7 +107,7 @@ public class GeometryHelperTests
         // choose segment 0 and misjudge the side.
         var road = new List<(double Lat, double Lng)> { (0.0, 0.0), (0.0, 10.0), (0.2, 10.0) };
 
-        Assert.Equal("right", GeometryHelper.DetermineSideOnPolyline(0.1, 9.9, road));
+        Assert.Equal("left", GeometryHelper.DetermineSideOnPolyline(0.1, 9.9, road));
     }
 
     [Fact]
@@ -123,7 +123,7 @@ public class GeometryHelperTests
         // Cross product exactly zero -> left
         var side = GeometryHelper.DetermineSide(0.0, 0.5, 0.0, 0.0, 0.0, 1.0);
 
-        Assert.Equal("right", side);
+        Assert.Equal("left", side);
     }
 
     [Fact]
