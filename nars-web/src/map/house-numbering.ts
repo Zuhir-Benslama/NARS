@@ -71,7 +71,7 @@ function determineSide(
 
   const qx = -(s.x + bestT * (e.x - s.x))
   const qy = -(s.y + bestT * (e.y - s.y))
-  return n.x * qx + n.y * qy >= 0 ? "right" : "left"
+  return n.x * qx + n.y * qy >= 0 ? "left" : "right"
 }
 
 export async function numberOneRoad(roadId: string): Promise<void> {
