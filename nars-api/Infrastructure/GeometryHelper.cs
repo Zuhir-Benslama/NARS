@@ -56,7 +56,7 @@ public static class GeometryHelper
     {
         var cross = (segEndLng - segStartLng) * (markerLat - segStartLat)
                   - (segEndLat - segStartLat) * (markerLng - segStartLng);
-        return cross >= 0 ? "right" : "left";
+        return cross >= 0 ? "left" : "right";
     }
 
     /// <summary>
