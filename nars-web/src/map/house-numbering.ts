@@ -41,7 +41,7 @@ function determineSide(
   const s = roadCoords[nearestIdx]
   const e = roadCoords[nearestIdx + 1]
   const cross = (e.lng - s.lng) * (markerLat - s.lat) - (e.lat - s.lat) * (markerLng - s.lng)
-  return cross >= 0 ? "left" : "right"
+  return cross >= 0 ? "right" : "left"
 }
 
 export async function numberOneRoad(roadId: string): Promise<void> {
