@@ -58,17 +58,23 @@ public sealed class NumberEntrancesService(IDbContextFactory<AppDbContext> dbFac
 
         // Lock the road as the serialization anchor and verify ownership. Any
         // concurrent NumberAsync for the same road blocks here until we commit,
-        // which is what makes the read-compute-write below atomic.
+        // which is what makes the read-compute-write below atomic. The road's
+        // geometry is read under the same lock so every side below is judged
+        // against the exact polyline the numbers are sequenced along.
+        List<(double Lat, double Lng)>? roadCoords;
         await using (var lockCmd = conn.CreateCommand())
         {
             lockCmd.Transaction = tx;
-            lockCmd.CommandText = "SELECT 1 FROM roads WHERE id = @rid AND user_id = @uid FOR UPDATE";
+            lockCmd.CommandText = "SELECT data FROM roads WHERE id = @rid AND user_id = @uid FOR UPDATE";
             SqlFragments.AddParam(lockCmd, "@rid", roadId);
             SqlFragments.AddParam(lockCmd, "@uid", userId);
-            if (await lockCmd.ExecuteScalarAsync(ct) is null)
+            await using var lockReader = await lockCmd.ExecuteReaderAsync(ct);
+            if (!await lockReader.ReadAsync(ct))
             {
                 return null; // road missing or not owned
             }
+
+            roadCoords = TryParseRoadCoordinates(lockReader.IsDBNull(0) ? null : lockReader.GetString(0));
         }
 
         // Load all of this user's main-layer entrances on the road under the
@@ -94,7 +100,7 @@ public sealed class NumberEntrancesService(IDbContextFactory<AppDbContext> dbFac
                 var data = reader.GetString(1);
                 if (entranceIds.Contains(id))
                 {
-                    if (ParseSide(data) is { } side)
+                    if (ResolveSide(data, roadCoords) is { } side)
                     {
                         targets[id] = (side, data);
                     }
@@ -133,7 +139,10 @@ public sealed class NumberEntrancesService(IDbContextFactory<AppDbContext> dbFac
 
             usedNumbers[side].Add(suggested);
             var label = suggested.ToString(CultureInfo.InvariantCulture);
-            var newData = HouseEntranceData.SetEntranceNumber(data, suggested, label);
+            // Persist the authoritative side together with the number so the two
+            // can never disagree (odd = left, even = right).
+            var newData = HouseEntranceData.SetSide(
+                HouseEntranceData.SetEntranceNumber(data, suggested, label), side);
 
             await UpdateEntranceAsync(conn, tx, id, userId, roadId, newData, ct);
             results.Add(new NumberedEntrance(id.ToString(), side, suggested, label));
@@ -162,7 +171,39 @@ public sealed class NumberEntrancesService(IDbContextFactory<AppDbContext> dbFac
         }
     }
 
-    private static string? ParseSide(string data) => HouseEntranceData.TryGetSide(data);
+    /// <summary>
+    /// The side an entrance is numbered on. When the road geometry and the
+    /// entrance position are both usable it is computed here, against the true
+    /// closest point of the whole polyline, so a stale or missing stored side
+    /// (e.g. after the road was reversed or the marker was moved) cannot produce
+    /// the wrong odd/even parity. Otherwise the stored side is used as-is.
+    /// </summary>
+    private static string? ResolveSide(string data, IReadOnlyList<(double Lat, double Lng)>? roadCoords)
+    {
+        if (roadCoords is not null && HouseEntranceData.TryGetLatLng(data, out var lat, out var lng))
+        {
+            return GeometryHelper.DetermineSideOnPolyline(lat, lng, roadCoords);
+        }
+
+        return HouseEntranceData.TryGetSide(data);
+    }
+
+    private static List<(double Lat, double Lng)>? TryParseRoadCoordinates(string? roadData)
+    {
+        if (roadData is null || JsonHelper.DeserializeSafe(roadData)?["coordinates"] is not { } coordsNode)
+        {
+            return null;
+        }
+
+        try
+        {
+            return GeometryHelper.ParseRoadCoordinates(coordsNode);
+        }
+        catch (ArgumentException)
+        {
+            return null; // unusable geometry: fall back to each entrance's stored side
+        }
+    }
 
     private static void AddUsedNumbers(string data, Dictionary<string, HashSet<int>> usedNumbers)
     {

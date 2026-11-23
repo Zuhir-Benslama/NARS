@@ -142,6 +142,64 @@ public class NumberEntrancesServiceTests(NarsDatabaseFixture fixture) : ServiceT
         Assert.Contains(3, numbers);
     }
 
+    private async Task<Guid> CreateEntranceAtAsync(
+        EntranceService entranceService, Guid roadId, string? storedSide, double lat, double lng)
+    {
+        var data = storedSide is null
+            ? JsonSerializer.Serialize(new { lat, lng })
+            : JsonSerializer.Serialize(new { side = storedSide, lat, lng });
+        return await entranceService.CreateEntranceAsync(roadId, _userId, "Entrance", data);
+    }
+
+    private async Task<string?> GetEntranceSideAsync(Guid entranceId)
+    {
+        var data = await GetEntranceDataJsonAsync(entranceId);
+        if (data is null)
+        {
+            return null;
+        }
+        using var doc = JsonDocument.Parse(data);
+        return doc.RootElement.TryGetProperty("side", out var s) ? s.GetString() : null;
+    }
+
+    [Fact]
+    public async Task NumberAsync_StaleStoredSide_IsRecomputedFromPosition()
+    {
+        // The road runs east along lat 36.4, so north of it (36.401) is the left
+        // and south of it (36.399) is the right, whatever side was stored before
+        // (e.g. before the road was reversed or the marker was moved).
+        var (roadId, entranceService) = await CreateRoadWithEntranceServiceAsync();
+        var north = await CreateEntranceAtAsync(entranceService, roadId, "right", 36.401, 3.0);
+        var south = await CreateEntranceAtAsync(entranceService, roadId, "left", 36.399, 3.0);
+
+        var numbered = await CreateService().NumberAsync(
+            _userId, roadId, [north, south], CancellationToken.None);
+
+        Assert.NotNull(numbered);
+        Assert.Equal("left", numbered[0].Side);
+        Assert.Equal(1, numbered[0].EntranceNumber);
+        Assert.Equal("right", numbered[1].Side);
+        Assert.Equal(2, numbered[1].EntranceNumber);
+
+        // The corrected side is persisted together with the number.
+        Assert.Equal("left", await GetEntranceSideAsync(north));
+        Assert.Equal("right", await GetEntranceSideAsync(south));
+    }
+
+    [Fact]
+    public async Task NumberAsync_MissingStoredSide_IsDerivedFromPosition()
+    {
+        var (roadId, entranceService) = await CreateRoadWithEntranceServiceAsync();
+        var south = await CreateEntranceAtAsync(entranceService, roadId, null, 36.399, 3.0);
+
+        var numbered = await CreateService().NumberAsync(
+            _userId, roadId, [south], CancellationToken.None);
+
+        Assert.NotNull(numbered);
+        Assert.Equal("right", numbered[0].Side);
+        Assert.Equal(2, numbered[0].EntranceNumber);
+    }
+
     [Fact]
     public async Task NumberAsync_RoadNotOwnedOrMissing_ReturnsNull()
     {

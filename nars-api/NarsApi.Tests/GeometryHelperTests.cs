@@ -126,6 +126,40 @@ public class GeometryHelperTests
         Assert.Equal("left", side);
     }
 
+    // Both side functions must share one convention (geographic left of the
+    // direction of travel) for every heading; a sign mismatch between them is what
+    // previously made left/right flip depending on which code path was used.
+    [Theory]
+    [InlineData(0.0, 0.0, 0.0, 1.0, 0.1, 0.5, "left")]   // heading east, marker north
+    [InlineData(0.0, 0.0, 0.0, 1.0, -0.1, 0.5, "right")]  // heading east, marker south
+    [InlineData(0.0, 0.0, 1.0, 0.0, 0.5, -0.1, "left")]   // heading north, marker west
+    [InlineData(0.0, 0.0, 1.0, 0.0, 0.5, 0.1, "right")]   // heading north, marker east
+    [InlineData(0.0, 1.0, 0.0, 0.0, -0.1, 0.5, "left")]   // heading west, marker south
+    [InlineData(0.0, 1.0, 0.0, 0.0, 0.1, 0.5, "right")]   // heading west, marker north
+    [InlineData(1.0, 0.0, 0.0, 0.0, 0.5, 0.1, "left")]    // heading south, marker east
+    [InlineData(1.0, 0.0, 0.0, 0.0, 0.5, -0.1, "right")]  // heading south, marker west
+    public void DetermineSide_And_DetermineSideOnPolyline_AgreeOnStraightSegments(
+        double startLat, double startLng, double endLat, double endLng,
+        double markerLat, double markerLng, string expected)
+    {
+        var road = new List<(double Lat, double Lng)> { (startLat, startLng), (endLat, endLng) };
+
+        Assert.Equal(expected, GeometryHelper.DetermineSide(markerLat, markerLng, startLat, startLng, endLat, endLng));
+        Assert.Equal(expected, GeometryHelper.DetermineSideOnPolyline(markerLat, markerLng, road));
+    }
+
+    [Fact]
+    public void DetermineSideOnPolyline_ShortLegBesideLongLeg_UsesTrueClosestSegment()
+    {
+        // 2 degrees east, then a short 0.1 degree leg north. The marker sits just south of
+        // the long leg (right of travel). It is nearer the midpoint of the short northbound
+        // leg than of the long leg, so the nearest-midpoint heuristic would pick that leg
+        // and report "left"; the true closest point is on the long leg: "right".
+        var road = new List<(double Lat, double Lng)> { (0.0, 0.0), (0.0, 2.0), (0.1, 2.0) };
+
+        Assert.Equal("right", GeometryHelper.DetermineSideOnPolyline(-0.04, 1.55, road));
+    }
+
     [Fact]
     public void ComputeTurnAngle_StraightLine_ReturnsZero()
     {

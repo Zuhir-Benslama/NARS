@@ -128,7 +128,9 @@ public static class GeometryHelper
             ny += nny;
         }
 
-        return nx * qx + ny * qy >= 0 ? "right" : "left";
+        // (nx, ny) points to the road's left, (qx, qy) from the road to the marker:
+        // a non-negative dot product means the marker is on the left of travel.
+        return nx * qx + ny * qy >= 0 ? "left" : "right";
     }
 
     private static (double X, double Y) LeftNormal(double dx, double dy)
