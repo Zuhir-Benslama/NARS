@@ -161,6 +161,27 @@ public class GeometryHelperTests
     }
 
     [Fact]
+    public void DetermineSideOnPolyline_FaithRoadBend_DoesNotMisclassifyCornerEntrances()
+    {
+        // Regression from the real "Faith" road: its bend makes the nearest
+        // midpoint belong to segment 0 even for entrances that sit ~6 m on the
+        // left of segment 1. The whole-polyline method judges them by the true
+        // closest point, while entrances on the other side stay "right".
+        var faith = new List<(double Lat, double Lng)>
+        {
+            (36.00989774319092, 7.421284662059691),
+            (36.009630858381286, 7.421949866808546),
+            (36.00763442086685, 7.423032007407272),
+        };
+
+        Assert.Equal("left", GeometryHelper.DetermineSideOnPolyline(36.009574647202214, 7.422057531298776, faith));
+        Assert.Equal("left", GeometryHelper.DetermineSideOnPolyline(36.009485689895186, 7.422095082225127, faith));
+        Assert.Equal("left", GeometryHelper.DetermineSideOnPolyline(36.00941409003913, 7.422132633151449, faith));
+        Assert.Equal("left", GeometryHelper.DetermineSideOnPolyline(36.00932079315834, 7.42218627733223, faith));
+        Assert.Equal("right", GeometryHelper.DetermineSideOnPolyline(36.009546441237774, 7.421907327594312, faith));
+    }
+
+    [Fact]
     public void ComputeTurnAngle_StraightLine_ReturnsZero()
     {
         var angle = GeometryHelper.ComputeTurnAngle(

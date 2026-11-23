@@ -435,7 +435,11 @@ public static class HouseEntranceData
         return false;
     }
 
-    /// <summary>Reads the entrance's finite lat/lng, or false when absent or invalid.</summary>
+    /// <summary>
+    /// Reads the entrance's finite lat/lng, or false when absent or invalid.
+    /// (0, 0) is a null-island placeholder used by incomplete imports, not a
+    /// usable position for judging which side of a road an entrance is on.
+    /// </summary>
     public static bool TryGetLatLng(string data, out double lat, out double lng)
     {
         lat = 0;
@@ -447,7 +451,8 @@ public static class HouseEntranceData
             {
                 lat = latNode.GetValue<double>();
                 lng = lngNode.GetValue<double>();
-                return double.IsFinite(lat) && double.IsFinite(lng);
+                return double.IsFinite(lat) && double.IsFinite(lng)
+                    && (lat != 0.0 || lng != 0.0);
             }
         }
         catch

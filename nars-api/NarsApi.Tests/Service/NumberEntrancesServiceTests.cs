@@ -201,6 +201,51 @@ public class NumberEntrancesServiceTests(NarsDatabaseFixture fixture) : ServiceT
     }
 
     [Fact]
+    public async Task NumberAsync_FaithRoadBend_RecomputesStaleSideFromGeometry()
+    {
+        // Real "Faith" geometry: the nearest midpoint of this corner entrance
+        // belongs to segment 0, but its closest point is on segment 1's left.
+        const string faithCoords = """
+            {"coordinates":[
+              {"lat":36.00989774319092,"lng":7.421284662059691},
+              {"lat":36.009630858381286,"lng":7.421949866808546},
+              {"lat":36.00763442086685,"lng":7.423032007407272}
+            ]}
+            """;
+        var roadId = await TestData.AddRoadAsync(Db, _userId, faithCoords, registerInFeatureRegistry: true);
+        var entranceId = await new EntranceService(Fixture.CreateDbContextFactory()).CreateEntranceAsync(
+            roadId, _userId, "Corner entrance",
+            JsonSerializer.Serialize(new
+            {
+                lat = 36.009574647202214,
+                lng = 7.422057531298776,
+                side = "right",
+            }));
+
+        var numbered = await CreateService().NumberAsync(_userId, roadId, [entranceId], CancellationToken.None);
+
+        Assert.NotNull(numbered);
+        Assert.Equal("left", numbered[0].Side);
+        Assert.Equal(1, numbered[0].EntranceNumber);
+        Assert.Equal("left", await GetEntranceSideAsync(entranceId));
+    }
+
+    [Fact]
+    public async Task NumberAsync_NullIslandCoordinates_FallBackToStoredSide()
+    {
+        var (roadId, entranceService) = await CreateRoadWithEntranceServiceAsync();
+        var entranceId = await entranceService.CreateEntranceAsync(
+            roadId, _userId, "Unknown position",
+            JsonSerializer.Serialize(new { lat = 0.0, lng = 0.0, side = "right" }));
+
+        var numbered = await CreateService().NumberAsync(_userId, roadId, [entranceId], CancellationToken.None);
+
+        Assert.NotNull(numbered);
+        Assert.Equal("right", numbered[0].Side);
+        Assert.Equal(2, numbered[0].EntranceNumber);
+    }
+
+    [Fact]
     public async Task NumberAsync_RoadNotOwnedOrMissing_ReturnsNull()
     {
         var result = await CreateService().NumberAsync(
