@@ -16,7 +16,8 @@ import { saveToDatabase } from "./features/feature-persistence"
 import { debugError } from "../utils/debug"
 import type { MaplibreFeature } from "./core/state"
 
-// Client-side side determination mirroring GeometryHelper.DetermineSideOnPolyline.
+// Client-side side determination mirroring GeometryHelper.DetermineSide
+// (single segment by nearest midpoint), the faithful approach.
 function determineSide(
   markerLat: number,
   markerLng: number,
@@ -24,54 +25,23 @@ function determineSide(
 ): "left" | "right" {
   if (roadCoords.length < 2) return "left"
   const cosLat = Math.cos((markerLat * Math.PI) / 180)
-  const toXy = (c: { lat: number; lng: number }) => ({
-    x: (c.lng - markerLng) * cosLat,
-    y: c.lat - markerLat,
-  })
-
-  const eps = 1e-12
-  let bestDist = Infinity
-  let bestIdx = 0
-  let bestT = 0
-
+  let minDist = Infinity
+  let nearestIdx = 0
   for (let i = 0; i < roadCoords.length - 1; i++) {
-    const a = toXy(roadCoords[i])
-    const b = toXy(roadCoords[i + 1])
-    const dx = b.x - a.x
-    const dy = b.y - a.y
-    const len2 = dx * dx + dy * dy
-    if (len2 < eps * eps) continue
-    const t = Math.max(0, Math.min(1, -(a.x * dx + a.y * dy) / len2))
-    const px = a.x + t * dx
-    const py = a.y + t * dy
-    const d = px * px + py * py
-    if (d < bestDist - eps) {
-      bestDist = d
-      bestIdx = i
-      bestT = t
+    const midLat = (roadCoords[i].lat + roadCoords[i + 1].lat) / 2
+    const midLng = (roadCoords[i].lng + roadCoords[i + 1].lng) / 2
+    const dLat = markerLat - midLat
+    const dLng = (markerLng - midLng) * cosLat
+    const d = Math.sqrt(dLat * dLat + dLng * dLng)
+    if (d < minDist) {
+      minDist = d
+      nearestIdx = i
     }
   }
-
-  const s = toXy(roadCoords[bestIdx])
-  const e = toXy(roadCoords[bestIdx + 1])
-  const leftNormal = (dx: number, dy: number) => {
-    const len = Math.sqrt(dx * dx + dy * dy)
-    return len < 1e-12 ? { x: 0, y: 0 } : { x: -dy / len, y: dx / len }
-  }
-  let n = leftNormal(e.x - s.x, e.y - s.y)
-  if (bestT <= 0 && bestIdx > 0) {
-    const p = toXy(roadCoords[bestIdx - 1])
-    const pn = leftNormal(s.x - p.x, s.y - p.y)
-    n = { x: n.x + pn.x, y: n.y + pn.y }
-  } else if (bestT >= 1 && bestIdx + 2 < roadCoords.length) {
-    const nx = toXy(roadCoords[bestIdx + 2])
-    const nn = leftNormal(nx.x - e.x, nx.y - e.y)
-    n = { x: n.x + nn.x, y: n.y + nn.y }
-  }
-
-  const qx = -(s.x + bestT * (e.x - s.x))
-  const qy = -(s.y + bestT * (e.y - s.y))
-  return n.x * qx + n.y * qy >= 0 ? "left" : "right"
+  const s = roadCoords[nearestIdx]
+  const e = roadCoords[nearestIdx + 1]
+  const cross = (e.lng - s.lng) * (markerLat - s.lat) - (e.lat - s.lat) * (markerLng - s.lng)
+  return cross >= 0 ? "left" : "right"
 }
 
 export async function numberOneRoad(roadId: string): Promise<void> {
