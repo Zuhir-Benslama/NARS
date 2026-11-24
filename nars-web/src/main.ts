@@ -7,7 +7,10 @@ import { createApp } from "vue"
 // Vite emits the worker under /assets as a raw file; its relative import of
 // maplibre-gl-shared.mjs is satisfied by copying that chunk next to it during
 // the build (scripts/copy-maplibre-worker-shared.mjs).
-setWorkerUrl(new URL("maplibre-gl/dist/maplibre-gl-worker.mjs", import.meta.url).toString())
+const maplibreWorkerUrl = new URL("maplibre-gl/dist/maplibre-gl-worker.mjs", import.meta.url)
+// Firefox reports a Security Error when the worker URL resolves to file:///.
+// Rebuild it from the page origin so the worker is always same-origin HTTP(S).
+setWorkerUrl(new URL(maplibreWorkerUrl.pathname, window.location.origin).toString())
 import { createPinia } from "pinia"
 import App from "./App.vue"
 import "./app.css"
