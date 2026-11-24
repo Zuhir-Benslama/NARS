@@ -450,4 +450,25 @@ describe("commitEditMode", () => {
     expect(mockDisableEditMode).toHaveBeenCalled()
     expect(mockBuildDrawControl).not.toHaveBeenCalled()
   })
+
+  it("keeps a locally cached house entrance edit in the store without a PUT", async () => {
+    const { useLayerStore } = await import("../../stores/layerStore")
+    const entry = markerEntry({ dbId: "local_1cd51a23-a4b3-4a03-960a-cb9dad63e66a" })
+    useLayerStore().addFeature("houseEntrances" as never, entry as never)
+    mockGetActiveEditEntry.mockReturnValue(entry)
+    mockGetActiveGeomanFeatureId.mockReturnValue("gm-1")
+    getSetCtx({
+      geoman: geomanWithFeatures({ id: "gm-1", type: "Point", coordinates: [128.5, 37.5] }),
+    })
+
+    const mod = await loadMod()
+    await mod.commitEditMode()
+
+    const d = entry.data as { lat: number; lng: number }
+    expect(d.lat).toBe(37.5)
+    expect(d.lng).toBe(128.5)
+    expect(mockApiFetch).not.toHaveBeenCalled()
+    expect(mockShowToast).toHaveBeenCalledWith("map_draft_saved", "success")
+    expect(mockDisableEditMode).toHaveBeenCalled()
+  })
 })

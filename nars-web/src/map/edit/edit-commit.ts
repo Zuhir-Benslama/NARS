@@ -131,6 +131,15 @@ async function readGeomanGeometry(entry: LayerEntry): Promise<boolean> {
 // ─── API SAVE ─────────────────────────────────────────────────────
 
 async function saveGeometry(entry: LayerEntry): Promise<boolean> {
+  // Newly drawn house entrances live only in the client until house numbering
+  // persists them with a real DB id (see house-numbering.ts). PATCHing their
+  // temporary id hits /api/features/{guid} with a non-GUID and returns 404.
+  // Keep the edited geometry in the stores; numbering will save it.
+  if (String(entry.dbId).startsWith("local_")) {
+    showToast(t("map_draft_saved"), "success")
+    return true
+  }
+
   try {
     await apiFetch(`/api/features/${entry.dbId}`, {
       method: "PUT",
