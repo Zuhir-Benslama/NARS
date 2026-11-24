@@ -316,6 +316,38 @@ describe("loader-db", () => {
     expect(mockUpdateEndpointMarkers).toHaveBeenCalled()
   })
 
+  it("pages through /api/features when the total count exceeds one page", async () => {
+    const makeFeature = (id: string) => ({
+      id,
+      layer: "street",
+      data: { type: "roads", coordinates: [{ lat: 36.0, lng: 127.0 }], label: id },
+    })
+    const firstPage = Array.from({ length: 500 }, (_, i) => makeFeature(`r${i}`))
+    const secondPage = [makeFeature("r500")]
+
+    mockApiFetch.mockImplementation((url: string) => {
+      const isFirst = url === "/api/features"
+      const features = isFirst ? firstPage : secondPage
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ features, count: 501, skip: isFirst ? 0 : 500, take: 500 }),
+      })
+    })
+    mockGetFeatureType.mockReturnValue("line")
+    mockBuildGeoJsonFeature.mockReturnValue({
+      geometry: { type: "LineString", coordinates: [[127.0, 36.0]] },
+      properties: {},
+    })
+
+    await loadFromDatabase()
+
+    expect(mockApiFetch).toHaveBeenNthCalledWith(1, "/api/features")
+    expect(mockApiFetch).toHaveBeenNthCalledWith(2, "/api/features?skip=500&take=500")
+    expect(mockFeaturesStoreBatchAdd).toHaveBeenCalledTimes(1)
+    expect(mockFeaturesStoreBatchAdd.mock.calls[0][0]).toHaveLength(501)
+  })
+
   it("sets loadError on API failure", async () => {
     mockApiFetch.mockRejectedValue(new Error("API down"))
 

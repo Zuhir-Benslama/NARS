@@ -109,18 +109,48 @@ function processFeature(
   return "ok"
 }
 
+// The API caps every page at Pagination.MaxTake (500). The first request uses
+// the endpoint defaults so existing callers/mocks keep working; follow-up pages
+// are requested explicitly until the response's total count is reached.
+async function fetchAllFeatures(): Promise<DbFeature[]> {
+  const all: DbFeature[] = []
+  const take = 500
+  let skip = 0
+  let firstPage = true
+
+  for (;;) {
+    const url = firstPage ? "/api/features" : `/api/features?skip=${skip}&take=${take}`
+    firstPage = false
+    debugLog("[LOAD] Fetching", url, "...")
+    const response = await apiFetch(url)
+    debugLog("[LOAD] Response status:", response.status)
+    const json = (await response.json()) as { features?: DbFeature[]; count?: number } | DbFeature[]
+
+    // Legacy/array responses are already the full payload.
+    if (Array.isArray(json)) {
+      all.push(...json)
+      break
+    }
+
+    const page = json.features ?? []
+    all.push(...page)
+    const total = typeof json.count === "number" ? json.count : all.length
+    debugLog("[LOAD] Fetched page", skip, page.length, "of", total)
+
+    if (page.length === 0 || page.length < take || all.length >= total) break
+    skip += take
+  }
+
+  return all
+}
+
 export async function loadFromDatabase(): Promise<void> {
   const featuresStore = useFeaturesStore()
   const appStore = useAppStore()
   debugLog("[LOAD] Starting...")
   appStore.setLoading(true)
   try {
-    debugLog("[LOAD] Fetching /api/features...")
-    const response = await apiFetch("/api/features")
-    debugLog("[LOAD] Response status:", response.status)
-    const json = (await response.json()) as { features?: DbFeature[]; count?: number } | DbFeature[]
-
-    const features: DbFeature[] = Array.isArray(json) ? json : (json.features ?? [])
+    const features = await fetchAllFeatures()
     debugLog("[LOAD] API returned", features.length, "features")
 
     if (!features.length) {
