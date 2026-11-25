@@ -137,8 +137,18 @@ spec:
                   fi
                   echo "✓ Backup saved: ${FILE}.gz.gpg ($(numfmt --to=iec "$FILESIZE"))"
                   ls -lh /backup/
-                  echo "→ Cleaning backups older than 30 days..."
-                  find /backup -name "nars_db_*.sql*" -mtime +30 -delete
+                  echo "→ Cleaning backups older than 30 days (keeping 5 newest)..."
+                  # Sort the old files newest-first and skip the first five.
+                  # Together with any backups newer than the cutoff, this keeps
+                  # at least five recent backups on the volume.
+                  find /backup -maxdepth 1 -type f -name "nars_db_*.sql*" -mtime +30 \
+                    -printf '%f\n' \
+                    | sort -r \
+                    | tail -n +6 \
+                    | while IFS= read -r file; do
+                        echo "  removing ${file}"
+                        rm -f -- "/backup/${file}"
+                      done
               resources:
                 requests:
                   cpu: 100m
