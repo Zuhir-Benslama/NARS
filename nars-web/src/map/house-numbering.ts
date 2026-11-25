@@ -23,7 +23,10 @@ import { saveToDatabase } from "./features/feature-persistence"
 import { debugError } from "../utils/debug"
 import type { MaplibreFeature } from "./core/state"
 
-export async function numberOneRoad(roadId: string): Promise<void> {
+/** Outcome of a renumbering pass, so callers can report a failed recompute. */
+export type NumberingResult = "ok" | "noop" | "failed"
+
+export async function numberOneRoad(roadId: string): Promise<NumberingResult> {
   const featuresStore = useFeaturesStore()
   const layerStore = useLayerStore()
   const state = layerStore.$state
@@ -31,7 +34,7 @@ export async function numberOneRoad(roadId: string): Promise<void> {
   const roadEntry = (state.roads || []).find((r) => r.dbId === roadId)
   if (!roadEntry?.data.coordinates?.length) {
     showToast(t("alert_ref_road_no_coords"), "error")
-    return
+    return "failed"
   }
 
   const allMain = (state.houseEntrances || []).filter(
@@ -40,7 +43,7 @@ export async function numberOneRoad(roadId: string): Promise<void> {
 
   if (!allMain.length) {
     showToast(t("alert_no_unassigned_entrances"), "info")
-    return
+    return "noop"
   }
 
   const [turfHelpers, turfNearest] = await Promise.all([
@@ -63,7 +66,7 @@ export async function numberOneRoad(roadId: string): Promise<void> {
 
   if (!withDist.length) {
     showToast(t("alert_no_unassigned_entrances"), "info")
-    return
+    return "noop"
   }
 
   let failureCount = 0
@@ -102,8 +105,9 @@ export async function numberOneRoad(roadId: string): Promise<void> {
     if (!persistedEntries.length) {
       if (failureCount > 0) {
         showToast(t("map_assigned_numbers_error"), "error")
+        return "failed"
       }
-      return
+      return "noop"
     }
 
     const orderedIds = persistedEntries.map(({ entry }) => entry.dbId)
@@ -159,9 +163,11 @@ export async function numberOneRoad(roadId: string): Promise<void> {
     } else {
       showToast(t("map_assigned_numbers", { count: assignedCount }), "success")
     }
+    return failureCount > 0 ? "failed" : "ok"
   } catch (err) {
     debugError("setHouseNumbers error:", err)
     showToast(t("map_assigned_numbers_error"), "error")
+    return "failed"
   }
 }
 

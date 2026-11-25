@@ -12,6 +12,7 @@ import { useFeaturesStore } from "../../stores/featuresStore"
 import { getActiveSnapPhases, snapPointForEdit, setEditDragActive } from "../snapping/snapping"
 import { disableEditMode, getActiveEditEntry, isEditMode } from "../edit/edit-mode"
 import { recordDelete } from "../undo"
+import { numberOneRoad } from "../house-numbering"
 import { refreshLayerVisibility } from "../rendering/labels"
 import { getUserMessageKey } from "../../lib/errors"
 import { showToast } from "../../lib/toast"
@@ -195,13 +196,17 @@ async function onRemove(e: GeomanRemoveEvent): Promise<void> {
   if (!removed || !phaseKey) return
 
   try {
-    const response = await apiFetch(`/api/features/${dbId}`, {
-      method: "DELETE",
-    })
-    if (!response.ok) {
-      showToast(t("map_delete_http_failed", { status: response.status }), "error")
-      restoreRemovedFeature(removed, phaseKey)
-      return
+    // Local (unsaved) features have no server row to delete; sending a DELETE
+    // to a non-GUID id only produces a 404 and a false failure toast.
+    if (!String(dbId).startsWith("local_")) {
+      const response = await apiFetch(`/api/features/${dbId}`, {
+        method: "DELETE",
+      })
+      if (!response.ok) {
+        showToast(t("map_delete_http_failed", { status: response.status }), "error")
+        restoreRemovedFeature(removed, phaseKey)
+        return
+      }
     }
 
     recordDelete(removed, phaseKey)
@@ -209,6 +214,14 @@ async function onRemove(e: GeomanRemoveEvent): Promise<void> {
     useFeaturesStore().remove(removed.id)
     layerStore.removeFeature(phaseKey, dbId)
     refreshLayerVisibility()
+
+    const ed = removed.data as { entranceTypeKey?: string; roadDbId?: string }
+    if (phaseKey === "houseEntrances" && ed.entranceTypeKey === "main_entrance" && ed.roadDbId) {
+      if ((await numberOneRoad(ed.roadDbId)) === "failed") {
+        showToast(t("map_delete_numbering_warning"), "warning")
+        return
+      }
+    }
 
     showToast(t("map_feature_deleted"), "success")
   } catch (err) {

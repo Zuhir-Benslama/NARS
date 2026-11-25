@@ -146,7 +146,12 @@ export async function removeFeature(dbId: string): Promise<void> {
 
     const ed = entry.data as { entranceTypeKey?: string; roadDbId?: string }
     if (phaseKey === "houseEntrances" && ed.entranceTypeKey === "main_entrance" && ed.roadDbId) {
-      await numberOneRoad(ed.roadDbId)
+      // The delete succeeded, but stale numbers must not be reported as a
+      // clean finish when the recompute fails.
+      if ((await numberOneRoad(ed.roadDbId)) === "failed") {
+        showToast(t("map_delete_numbering_warning"), "warning")
+        return
+      }
     }
 
     showToast(t("map_feature_deleted"), "success")

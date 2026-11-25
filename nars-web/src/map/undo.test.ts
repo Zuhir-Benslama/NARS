@@ -7,6 +7,7 @@ const mockFeaturesStoreAdd = vi.fn()
 const mockFeaturesStoreBatchUpdate = vi.fn()
 const mockToast = vi.fn()
 const mockToApiSaveShape = vi.fn()
+const mockNumberOneRoad = vi.fn()
 
 vi.mock("../stores/featuresStore", () => ({
   useFeaturesStore: () => ({
@@ -18,6 +19,8 @@ vi.mock("../stores/featuresStore", () => ({
 vi.mock("../lib/toast", () => ({
   showToast: mockToast,
 }))
+
+vi.mock("./house-numbering", () => ({ numberOneRoad: mockNumberOneRoad }))
 
 vi.mock("./features/feature-data", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./features/feature-data")>()
@@ -56,10 +59,14 @@ function makeEntry(overrides: Partial<LayerEntry> = {}): LayerEntry {
 
 beforeEach(async () => {
   setActivePinia(createPinia())
+  const mockFetch = vi.mocked(await import("../api")).apiFetch as ReturnType<typeof vi.fn>
+  mockFetch.mockReset()
   mockFeaturesStoreAdd.mockReset()
   mockFeaturesStoreBatchUpdate.mockReset()
   mockToast.mockReset()
   mockToApiSaveShape.mockReset()
+  mockNumberOneRoad.mockReset()
+  mockNumberOneRoad.mockResolvedValue("ok")
   mockToApiSaveShape.mockReturnValue({ type: "areas", layer: "areas" })
   await loadModule()
   resetUndoStack()
@@ -304,6 +311,57 @@ describe("undo", () => {
 
       expect(mockToast).toHaveBeenCalledWith("map_restored", "success")
       expect(mockToast).toHaveBeenCalledWith("map_restore_refs_warning", "warning")
+    })
+
+    it("does not re-create a house entrance whose only position is (0,0)", async () => {
+      recordDelete(
+        makeEntry({
+          type: "marker",
+          data: {
+            type: "houseEntrances",
+            label: "Ghost entrance",
+            entranceTypeKey: "main_entrance",
+            roadDbId: "db-road",
+            lat: 0,
+            lng: 0,
+          },
+        }),
+        "houseEntrances",
+      )
+
+      const mockFetch = vi.mocked(await import("../api")).apiFetch as ReturnType<typeof vi.fn>
+      mockFetch.mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue({ id: "new-id" }) })
+
+      await undo()
+
+      expect(mockFetch).not.toHaveBeenCalled()
+      expect(mockToast).toHaveBeenCalledWith("map_restore_no_position", "warning")
+    })
+
+    it("renumbers the road after restoring a main entrance", async () => {
+      recordDelete(
+        makeEntry({
+          type: "marker",
+          data: {
+            type: "houseEntrances",
+            label: "Main entrance",
+            entranceTypeKey: "main_entrance",
+            roadDbId: "db-road",
+            lat: 36,
+            lng: 7,
+          },
+        }),
+        "houseEntrances",
+      )
+
+      const mockFetch = vi.mocked(await import("../api")).apiFetch as ReturnType<typeof vi.fn>
+      mockFetch.mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue({ id: "new-id" }) })
+      mockNumberOneRoad.mockResolvedValue("failed")
+
+      await undo()
+
+      expect(mockNumberOneRoad).toHaveBeenCalledWith("db-road")
+      expect(mockToast).toHaveBeenCalledWith("map_restore_numbering_warning", "warning")
     })
   })
 

@@ -13,6 +13,7 @@ const {
   mockDebugError,
   mockUpdateEndpointMarkers,
   mockOpenEditModal,
+  mockNumberOneRoad,
 } = vi.hoisted(() => ({
   mockApiFetch: vi.fn(),
   mockShowToast: vi.fn(),
@@ -31,6 +32,7 @@ const {
   mockDebugError: vi.fn(),
   mockUpdateEndpointMarkers: vi.fn(),
   mockOpenEditModal: vi.fn(),
+  mockNumberOneRoad: vi.fn(),
 }))
 
 vi.mock("../../api", () => ({ apiFetch: mockApiFetch }))
@@ -48,6 +50,7 @@ vi.mock("../../utils/debug", () => ({
   debugLog: vi.fn(),
 }))
 vi.mock("../roads/road-directions", () => ({ updateEndpointMarkers: mockUpdateEndpointMarkers }))
+vi.mock("../house-numbering", () => ({ numberOneRoad: mockNumberOneRoad }))
 vi.mock("../../stores/modalStore", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../stores/modalStore")>()),
   openEditModal: mockOpenEditModal,
@@ -64,6 +67,7 @@ let useSelectionStore: any
 beforeEach(async () => {
   vi.clearAllMocks()
   vi.resetModules()
+  mockNumberOneRoad.mockResolvedValue("ok")
   setActivePinia(createPinia())
 
   const stateMod = await import("../core/state")
@@ -301,6 +305,27 @@ describe("removeFeature", () => {
     await mod.removeFeature("rd1")
 
     expect(mockUpdateEndpointMarkers).toHaveBeenCalled()
+  })
+
+  it("warns when a deleted main entrance could not be renumbered", async () => {
+    addLayerEntry("houseEntrances", {
+      dbId: "ent1",
+      data: {
+        type: "houseEntrances",
+        label: "7",
+        entranceTypeKey: "main_entrance",
+        roadDbId: "road-1",
+      },
+    })
+    mockShowConfirm.mockResolvedValue(true)
+    mockApiFetch.mockResolvedValue({ ok: true })
+    mockNumberOneRoad.mockResolvedValue("failed")
+
+    await mod.removeFeature("ent1")
+
+    expect(mockNumberOneRoad).toHaveBeenCalledWith("road-1")
+    expect(mockShowToast).toHaveBeenCalledWith("map_delete_numbering_warning", "warning")
+    expect(mockShowToast).not.toHaveBeenCalledWith("map_feature_deleted", "success")
   })
 })
 

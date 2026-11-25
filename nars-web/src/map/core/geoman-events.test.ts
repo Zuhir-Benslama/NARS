@@ -15,6 +15,7 @@ const {
   mockShowToast,
   mockDebugError,
   mockUpdateEndpointMarkers,
+  mockNumberOneRoad,
 } = vi.hoisted(() => ({
   mockApiFetch: vi.fn(),
   mockSetEditDragActive: vi.fn(),
@@ -29,6 +30,7 @@ const {
   mockShowToast: vi.fn(),
   mockDebugError: vi.fn(),
   mockUpdateEndpointMarkers: vi.fn(),
+  mockNumberOneRoad: vi.fn(),
 }))
 
 vi.mock("../../api", () => ({ apiFetch: mockApiFetch }))
@@ -45,6 +47,7 @@ vi.mock("../edit/edit-mode", () => ({
 vi.mock("../undo", () => ({ recordDelete: mockRecordDelete }))
 vi.mock("../rendering/labels", () => ({ refreshLayerVisibility: mockRefreshLayerVisibility }))
 vi.mock("../roads/road-markers", () => ({ updateEndpointMarkers: mockUpdateEndpointMarkers }))
+vi.mock("../house-numbering", () => ({ numberOneRoad: mockNumberOneRoad }))
 vi.mock("../../lib/errors", () => ({ getUserMessageKey: mockGetUserMessageKey }))
 vi.mock("../../lib/toast", () => ({ showToast: mockShowToast }))
 vi.mock("../../utils/debug", () => ({
@@ -422,6 +425,19 @@ describe("onRemove", () => {
     expect(mockApiFetch).toHaveBeenCalledWith("/api/features/del1", { method: "DELETE" })
     expect(mockRecordDelete).toHaveBeenCalled()
     expect(mockFeaturesStoreRemove).toHaveBeenCalledWith("feat_del1")
+    expect(mockShowToast).toHaveBeenCalledWith("map_feature_deleted", "success")
+  })
+
+  it("does not send a DELETE for a local, unsaved feature", async () => {
+    addLayerEntry("areas", { dbId: "local_123" })
+    mockGetActiveEditEntry.mockReturnValue(null)
+    mod.registerGeomanEvents()
+    const handler = getHandler("gm:remove")
+
+    await handler({ feature: { _geoJson: { properties: { dbId: "local_123" } } } })
+
+    expect(mockApiFetch).not.toHaveBeenCalled()
+    expect(mockRecordDelete).toHaveBeenCalled()
     expect(mockShowToast).toHaveBeenCalledWith("map_feature_deleted", "success")
   })
 

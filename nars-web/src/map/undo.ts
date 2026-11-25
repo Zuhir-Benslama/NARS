@@ -9,6 +9,7 @@ import { useLayerStore } from "../stores/layerStore"
 import { useUndoStore, MAX_UNDO_ENTRIES } from "../stores/undoStore"
 import { useFeaturesStore } from "../stores/featuresStore"
 import { toApiSaveShape, featureDataToGeometry } from "./features/feature-data"
+import { numberOneRoad } from "./house-numbering"
 import { PHASES } from "../phases"
 import { getDefaultStyle } from "./draw/draw-save"
 import { t } from "../i18n"
@@ -82,6 +83,22 @@ async function detachReferencesForEvicted(evicted: {
   }
 }
 
+/**
+ * (0,0) is the null-island placeholder used by incomplete imports. Restoring
+ * such an entrance through POST creates a new DB row with no usable position,
+ * so it can never appear on the map again — only in the numbering.
+ */
+function hasNullIslandPosition(data: LayerEntry["data"]): boolean {
+  const d = data as {
+    lat?: number
+    lng?: number
+    coordinates?: Array<{ lat?: number; lng?: number }>
+  }
+  const lat = d.lat ?? d.coordinates?.[0]?.lat
+  const lng = d.lng ?? d.coordinates?.[0]?.lng
+  return lat === 0 && lng === 0
+}
+
 /** Call BEFORE a feature is deleted. Captures the entry for Ctrl+Z restore. */
 export function recordDelete(entry: LayerEntry, phaseKey: FeatureTypeKey): void {
   const store = useUndoStore()
@@ -111,6 +128,12 @@ export async function undo(): Promise<void> {
 
     try {
       const { entry, phaseKey } = action
+
+      // Do not resurrect a placeholder entrance as a new invisible DB row.
+      if (phaseKey === "houseEntrances" && hasNullIslandPosition(entry.data)) {
+        showToast(t("map_restore_no_position"), "warning")
+        return
+      }
 
       // Re-create the feature via the API — it gets a new dbId
       const shape = toApiSaveShape(entry.data)
@@ -213,6 +236,19 @@ export async function undo(): Promise<void> {
             return { id: entrance.id, properties }
           }),
         )
+      }
+
+      // A restored main entrance comes back with its old number in data, so
+      // re-run the authoritative numbering pass on its road after the restore.
+      const restoredEntrance = restoredEntry.data as HouseEntranceFeatureData
+      if (
+        phaseKey === "houseEntrances" &&
+        restoredEntrance.entranceTypeKey === "main_entrance" &&
+        restoredEntrance.roadDbId
+      ) {
+        if ((await numberOneRoad(restoredEntrance.roadDbId)) === "failed") {
+          showToast(t("map_restore_numbering_warning"), "warning")
+        }
       }
 
       const phase = PHASES.find((p) => p.key === phaseKey)
