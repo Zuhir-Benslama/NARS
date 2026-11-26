@@ -26,6 +26,7 @@ import { registerDrawHandlers, destroyDrawHandlers } from "./draw-handlers"
 import { patchGeomanMarkerPointerSnap } from "./draw-marker-patch"
 import { installSnapInterceptors, uninstallSnapInterceptors } from "../snapping/snapping"
 import { setDrawingPhase } from "./draw-state"
+import { buildDrawControl, cancelPendingDrawModeSwitch } from "./draw-control"
 import { disableCrosshair, resetSnapping, disableSnapping } from "../snapping/snapping"
 import { isEditMode } from "../edit/edit-mode"
 
@@ -59,16 +60,27 @@ function watchDrawType() {
   store.cleanupDrawWatcher = watch(
     () => appStore.currentPhase,
     (phaseIdx) => {
+      // A previous phase may still have a delayed enableDraw() pending. Make
+      // sure it cannot arm its outdated shape after this phase change.
+      cancelPendingDrawModeSwitch()
+
       const activeDrawModes = getCtx().geoman?.getActiveDrawModes?.() || []
-      if (activeDrawModes.length > 0) {
-        debugWarn("[WATCH] Phase changed while draw mode is active; forcing mode sync")
+      const drawingActive = activeDrawModes.length > 0
+      if (drawingActive) {
+        debugWarn("[WATCH] Phase changed while draw mode is active; syncing draw tool")
       }
 
       const phase = PHASES[phaseIdx]
       if (phase) {
         setDrawingPhase(phase)
-        // Hand (pan/select) is the default mode: do not auto-arm a draw
-        // mode on phase change. Drawing is armed explicitly via the Draw button.
+        // Hand (pan/select) is the default mode: a phase change does not arm
+        // drawing on its own. But if the user already had a draw tool active,
+        // it must follow the new phase — otherwise the previous phase's shape
+        // (polygon/line/marker/circle) stays armed and every new feature is
+        // drawn with the wrong method.
+        if (drawingActive && !isEditMode()) {
+          void buildDrawControl(phase)
+        }
 
         if (phase.key === "cityCenter") {
           requestAnimationFrame(() => {
@@ -95,9 +107,9 @@ function watchDrawType() {
       }
 
       if (!isEditMode()) {
-        // Hand (pan/select) is the default mode: no crosshair cursor unless
-        // the user explicitly arms a draw mode.
-        disableCrosshair()
+        // Keep the crosshair when a draw tool remains active; only clear it
+        // when the phase switch leaves the user in hand (pan/select) mode.
+        if (!drawingActive) disableCrosshair()
         resetSnapping()
       }
     },

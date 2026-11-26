@@ -71,6 +71,7 @@
   "alert_no_unassigned_entrances": "لا توجد مداخل غير مخصّصة.",
   "alert_only_one_main_urban_area": "يسمح بمنطقة حضرية رئيسية واحدة فقط.",
   "alert_outside_boundary": "{feature} خارج الحدود البلدية.",
+  "alert_entrance_invalid_position": "المدخل ليس له موقع صالح على الخريطة.",
   "alert_ref_entrance_not_found": "لم يتم العثور على المدخل المرجعي.",
   "alert_ref_road_no_coords": "الطريق المرجعي بلا إحداثيات.",
   "alert_ref_road_not_found": "لم يتم العثور على الطريق المرجعي.",

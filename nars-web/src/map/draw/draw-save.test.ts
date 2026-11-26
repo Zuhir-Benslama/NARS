@@ -73,6 +73,9 @@ async function loadModule() {
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 const areaPhase = (await import("../../phases")).PHASES[0]
+const houseEntrancesPhase = (await import("../../phases")).PHASES.find(
+  (phase) => phase.key === "houseEntrances",
+)!
 
 function polygonGeometry(): GeoJSON.Polygon {
   return {
@@ -109,6 +112,16 @@ beforeEach(async () => {
 // ─── TESTS ────────────────────────────────────────────────────────────────────
 
 describe("completeDrawingWithGeometry", () => {
+  it("rejects a house entrance drawn at (0,0)", async () => {
+    setDrawingPhase(houseEntrancesPhase)
+
+    await completeDrawingWithGeometry({ type: "Point", coordinates: [0, 0] }, "point", {})
+
+    expect(mockOpenModal).not.toHaveBeenCalled()
+    expect(mockFeaturesStoreAdd).not.toHaveBeenCalled()
+    expect(mockToast).toHaveBeenCalledWith("alert_entrance_invalid_position", "error")
+  })
+
   it("returns early when no drawing phase is set", async () => {
     await completeDrawingWithGeometry(polygonGeometry(), "polygon", {})
     expect(mockOpenModal).not.toHaveBeenCalled()

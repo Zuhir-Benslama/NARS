@@ -177,6 +177,11 @@ public class FieldController(
             return Problem(detail: $"Feature data is too large (max {_maxFeatureDataSize / 1024} KB).", statusCode: 400);
         }
 
+        if (HouseEntranceData.HasNullIslandPosition(rawData))
+        {
+            return Problem(detail: "House entrance has no valid map position (coordinates are 0,0).", statusCode: 400);
+        }
+
         var label = body.Label ?? DefaultEntranceLabel;
         var newId = await entranceService.CreateEntranceAsync(
             roadId, roadOwner.Value.OwnerUserId, label, rawData, cancellationToken);

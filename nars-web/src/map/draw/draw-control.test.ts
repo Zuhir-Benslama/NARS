@@ -46,7 +46,12 @@ vi.mock("../core/state", () => ({
   getCtx: mockGetCtx,
 }))
 
-import { resetDrawControl, clearEdgeVisibilityPoll, buildDrawControl } from "./draw-control"
+import {
+  resetDrawControl,
+  clearEdgeVisibilityPoll,
+  buildDrawControl,
+  cancelPendingDrawModeSwitch,
+} from "./draw-control"
 
 let useDrawStore: any
 
@@ -160,6 +165,23 @@ describe("buildDrawControl", () => {
     await buildDrawControl(polygonPhase())
     await vi.advanceTimersByTimeAsync(0)
     expect(mockDebugError).toHaveBeenCalled()
+  })
+
+  it("does not arm the old shape when a pending switch is cancelled mid-switch", async () => {
+    const gm = {
+      getActiveDrawModes: vi.fn(() => ["polygon"]),
+      disableDraw: vi.fn(async () => {}),
+      enableDraw: vi.fn(async () => {}),
+    }
+    setGeoman(gm)
+    await buildDrawControl(polygonPhase())
+
+    // Phase changed while the settle delay was pending.
+    cancelPendingDrawModeSwitch()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(gm.disableDraw).toHaveBeenCalled()
+    expect(gm.enableDraw).not.toHaveBeenCalled()
   })
 
   it("logs an error when enableDraw rejects", async () => {

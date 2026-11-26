@@ -71,6 +71,7 @@
   "alert_no_unassigned_entrances": "No unassigned entrances.",
   "alert_only_one_main_urban_area": "Only one main urban area is allowed.",
   "alert_outside_boundary": "The {feature} is outside the municipal boundary.",
+  "alert_entrance_invalid_position": "Entrance has no valid map position.",
   "alert_ref_entrance_not_found": "Reference entrance not found.",
   "alert_ref_road_no_coords": "Reference road has no coordinates.",
   "alert_ref_road_not_found": "Reference road not found.",

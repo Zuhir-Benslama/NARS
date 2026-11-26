@@ -153,6 +153,36 @@ public class FeaturesControllerTests
     }
 
     [Fact]
+    public async Task SaveFeature_NullIslandEntrance_Returns400()
+    {
+        var (db, factory) = CreateInMemoryDbPair("FeaturesTest");
+        await using (db)
+        {
+            var roadId = Guid.NewGuid();
+            db.Roads.Add(new Road
+            {
+                Id = roadId,
+                UserId = UserId,
+                Layer = FeatureTypes.RoadLayers.Street,
+                Data = "{}",
+                Label = "road",
+                UpdatedAt = FixedUtcNow
+            });
+            await db.SaveChangesAsync();
+
+            var ctrl = CreateController(db, factory: factory);
+            var data = Json($$"""{"lat":0,"lng":0,"coordinates":[{"lat":0,"lng":0}],"roadDbId":"{{roadId}}"}""");
+            var body = new FeatureSaveRequest(FeatureTypes.HouseEntrance, FeatureTypes.HouseEntranceLayers.Main, "entrance", data);
+
+            var result = await ctrl.SaveFeature(body);
+
+            var objResult = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(400, objResult.StatusCode);
+            Assert.Empty(db.HouseEntrances);
+        }
+    }
+
+    [Fact]
     public async Task SaveFeature_ValidArea_Returns201()
     {
         var (db, factory) = CreateInMemoryDbPair("FeaturesTest");

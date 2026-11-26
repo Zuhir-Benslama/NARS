@@ -71,6 +71,7 @@
   "alert_no_unassigned_entrances": "Aucune entrée non attribuée.",
   "alert_only_one_main_urban_area": "Une seule zone urbaine principale est autorisée.",
   "alert_outside_boundary": "Le/la {feature} est hors de la limite communale.",
+  "alert_entrance_invalid_position": "L'entrée n'a pas de position valide sur la carte.",
   "alert_ref_entrance_not_found": "Entrée de référence introuvable.",
   "alert_ref_road_no_coords": "La route de référence n'a pas de coordonnées.",
   "alert_ref_road_not_found": "Route de référence introuvable.",

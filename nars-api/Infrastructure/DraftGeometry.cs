@@ -463,6 +463,70 @@ public static class HouseEntranceData
         return false;
     }
 
+    /// <summary>
+    /// Detects the null-island (0, 0) placeholder left by degenerate marker draws
+    /// and incomplete imports. Such a row has no usable map position: it must not
+    /// be created, and it must not reserve an entrance number. Both the
+    /// top-level lat/lng and the coordinates array are inspected because either
+    /// shape can carry the placeholder.
+    /// </summary>
+    public static bool HasNullIslandPosition(string data)
+    {
+        try
+        {
+            var node = JsonNode.Parse(data);
+            if (node is null)
+            {
+                return false;
+            }
+
+            if (IsZeroPoint(node["lat"], node["lng"]))
+            {
+                return true;
+            }
+
+            if (node["coordinates"] is JsonArray coords && coords.Count > 0)
+            {
+                if (coords[0] is JsonObject point)
+                {
+                    return IsZeroPoint(point["lat"], point["lng"]);
+                }
+
+                // Field payloads use GeoJSON [lng, lat] pairs.
+                if (coords[0] is JsonArray pair && pair.Count >= 2 && IsZeroLatLng(pair[0], pair[1]))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsZeroPoint(JsonNode? latNode, JsonNode? lngNode) =>
+        latNode is not null && lngNode is not null && IsZeroLatLng(lngNode, latNode);
+
+    private static bool IsZeroLatLng(JsonNode? lngNode, JsonNode? latNode)
+    {
+        if (lngNode is null || latNode is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            return lngNode.GetValue<double>() == 0.0 && latNode.GetValue<double>() == 0.0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     /// <summary>Rewrites an entrance's side into its data JSONB.</summary>
     public static string SetSide(string data, string side)
     {

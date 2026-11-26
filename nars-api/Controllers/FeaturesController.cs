@@ -62,6 +62,14 @@ public class FeaturesController(
             return Problem(detail: turnError!, statusCode: 400);
         }
 
+        // A (0,0) position is a placeholder, not a map location. House entrances
+        // saved with it used to occupy a parity series slot and push the first
+        // real entrance on that side from 2 to 4, so reject them at the door.
+        if (body.Type == FeatureTypes.HouseEntrance && HouseEntranceData.HasNullIslandPosition(dataJson))
+        {
+            return Problem(detail: "House entrance has no valid map position (coordinates are 0,0).", statusCode: 400);
+        }
+
         var roadId = TryExtractRoadId(body);
 
         if (roadId.HasValue && !await featureService.RoadExistsAsync(roadId.Value, RequiredCurrentUserId, cancellationToken))

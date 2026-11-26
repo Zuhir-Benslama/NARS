@@ -121,6 +121,39 @@ public class NumberEntrancesServiceTests(NarsDatabaseFixture fixture) : ServiceT
     }
 
     [Fact]
+    public async Task NumberAsync_NullIslandEntrance_DoesNotReserveNumber()
+    {
+        var (roadId, entranceService) = await CreateRoadWithEntranceServiceAsync();
+
+        // A phantom entrance at (0,0) holds #2 in its stored data. It is a
+        // placeholder, not a real doorway, so it must not push the first real
+        // right-side entrance to #4.
+        await entranceService.CreateEntranceAsync(
+            roadId, _userId, "Ghost",
+            JsonSerializer.Serialize(new
+            {
+                lat = 0.0,
+                lng = 0.0,
+                coordinates = new[] { new { lat = 0.0, lng = 0.0 } },
+                side = "right",
+                entranceNumber = 2,
+            }));
+
+        // The test road runs east along lat 36.4; a slightly lower lat is right.
+        var realRight = await entranceService.CreateEntranceAsync(
+            roadId, _userId, "Real",
+            JsonSerializer.Serialize(new { lat = 36.399, lng = 3.0, side = "right" }));
+
+        var numbered = await CreateService().NumberAsync(
+            _userId, roadId, [realRight], CancellationToken.None);
+
+        Assert.NotNull(numbered);
+        Assert.Single(numbered);
+        Assert.Equal("right", numbered[0].Side);
+        Assert.Equal(2, numbered[0].EntranceNumber);
+    }
+
+    [Fact]
     public async Task NumberAsync_ConcurrentBatchesOnSameRoad_ProduceDisjointNumbers()
     {
         var (roadId, entranceService) = await CreateRoadWithEntranceServiceAsync();

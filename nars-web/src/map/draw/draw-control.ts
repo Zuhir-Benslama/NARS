@@ -26,6 +26,15 @@ export function resetDrawControl(): void {
   store.setModeSwitchToken(0)
 }
 
+/**
+ * Invalidate a draw-mode switch that is still settling. buildDrawControl()
+ * waits before calling enableDraw(); without this, a phase change during that
+ * wait can let the old phase's delayed enableDraw() arm a stale tool.
+ */
+export function cancelPendingDrawModeSwitch(): void {
+  useDrawStore().incrementModeSwitchToken()
+}
+
 // Stops the bounded edge-visibility poll started by buildDrawControl. Must be
 // called whenever draw mode is torn down so the poll never keeps ticking
 // against a disabled/destroyed Geoman context.

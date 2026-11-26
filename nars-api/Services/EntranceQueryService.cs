@@ -35,7 +35,11 @@ public sealed class EntranceQueryService(IDbContextFactory<AppDbContext> dbFacto
               AND layer   = @layer
               AND road_id = @rid
               AND (data::jsonb->>'entranceNumber') ~ '^[0-9]+$'
-              AND ((data::jsonb->>'entranceNumber')::int % 2) = @parity";
+              AND ((data::jsonb->>'entranceNumber')::int % 2) = @parity
+              -- (0,0) rows are placeholders, not entrances; they must not hold
+              -- a parity slot. jsonb containment handles 0 / 0.0 uniformly.
+              AND NOT (data @> '{{""lat"":0,""lng"":0}}'::jsonb)
+              AND NOT (data @> '{{""coordinates"":[{{""lat"":0,""lng"":0}}]}}'::jsonb)";
 #pragma warning restore S2077
         SqlFragments.AddParam(cmd, "@uid", userId);
         SqlFragments.AddParam(cmd, "@rid", roadId);

@@ -207,6 +207,14 @@ public sealed class NumberEntrancesService(IDbContextFactory<AppDbContext> dbFac
 
     private static void AddUsedNumbers(string data, Dictionary<string, HashSet<int>> usedNumbers)
     {
+        // A null-island placeholder is not a real entrance. Letting it seed the
+        // used set is exactly what makes the first real entrance on a side start
+        // at 4 instead of 2, so such rows never reserve a number.
+        if (HouseEntranceData.HasNullIslandPosition(data))
+        {
+            return;
+        }
+
         var side = HouseEntranceData.TryGetSide(data);
         if (side is null)
         {

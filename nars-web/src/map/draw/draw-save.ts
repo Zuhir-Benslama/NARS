@@ -355,12 +355,27 @@ function computeTurnAngle(
 
 // ─── GEOMETRY VALIDATION ──────────────────────────────────────────────────────
 
+function isNullIslandPoint(geometry: GeoJSON.Geometry): boolean {
+  if (geometry.type !== "Point") return false
+  const [lng, lat] = geometry.coordinates
+  return Number.isFinite(lng) && Number.isFinite(lat) && lng === 0 && lat === 0
+}
+
 function validateGeometry(
   geometry: GeoJSON.Geometry,
   phase: (typeof PHASES)[number],
   geomanFeatureData: Record<string, unknown>,
 ): boolean {
   const cleanup = () => deleteGeomanFeature(geomanFeatureData)
+
+  // A degenerate marker at (0,0) is a placeholder, not a map position. It used
+  // to be persisted as an entrance and hold the even/odd slot that belongs to
+  // the first real entrance on that side.
+  if (phase.key === "houseEntrances" && isNullIslandPoint(geometry)) {
+    showToast(t("alert_entrance_invalid_position"), "error")
+    cleanup()
+    return false
+  }
 
   if (geometry.type === "LineString" && geometry.coordinates.length < 2) {
     showToast(t("map_road_min_points"), "error")

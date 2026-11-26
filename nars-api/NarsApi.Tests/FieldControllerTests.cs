@@ -317,6 +317,27 @@ public class FieldControllerTests
     }
 
     [Fact]
+    public async Task CreateEntranceFromInspection_NullIsland_Returns400()
+    {
+        var userId = UserId;
+        var roadId = Guid.NewGuid();
+        var entranceService = new Mock<IEntranceService>();
+        entranceService.Setup(s => s.GetRoadOwnerAsync(roadId, default))
+            .ReturnsAsync((userId, (int?)1));
+        var ctrl = CreateController(entranceService: entranceService.Object);
+        SetUser(ctrl, UserRoles.FieldWorker, communeId: 1);
+
+        var result = await ctrl.CreateEntranceFromInspection(new FieldEntranceCreateRequest(
+            roadId.ToString(), Json("""{"lat":0,"lng":0,"coordinates":[{"lat":0,"lng":0}]}"""), "Label"));
+
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, problem.StatusCode);
+        entranceService.Verify(
+            s => s.CreateEntranceAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default),
+            Times.Never);
+    }
+
+    [Fact]
     public async Task CreateEntranceFromInspection_DifferentCommune_ReturnsForbid()
     {
         var userId = UserId;

@@ -145,4 +145,25 @@ public class DraftGeometryTests
         Assert.False(data.ContainsKey("entranceNumber"));
         Assert.False(data.ContainsKey("side"));
     }
+
+    [Theory]
+    [InlineData("""{"lat":0,"lng":0,"coordinates":[{"lat":0,"lng":0}]}""")]
+    [InlineData("""{"lat":0.0,"lng":0.0}""")]
+    [InlineData("""{"coordinates":[{"lat":0,"lng":0}]}""")]
+    [InlineData("""{"coordinates":[[0,0]]}""")]
+    public void HasNullIslandPosition_DetectsPlaceholderShapes(string data)
+    {
+        Assert.True(HouseEntranceData.HasNullIslandPosition(data));
+    }
+
+    [Theory]
+    [InlineData("""{"lat":36.08,"lng":7.37,"coordinates":[{"lat":36.08,"lng":7.37}]}""")]
+    [InlineData("""{"lat":0,"lng":7.37}""")]
+    [InlineData("""{"lat":36.08,"lng":0}""")]
+    [InlineData("""{"side":"right"}""")]
+    [InlineData("{}")]
+    public void HasNullIslandPosition_KeepsRealOrIncompleteEntrances(string data)
+    {
+        Assert.False(HouseEntranceData.HasNullIslandPosition(data));
+    }
 }
