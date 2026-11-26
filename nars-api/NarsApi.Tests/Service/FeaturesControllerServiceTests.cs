@@ -42,6 +42,7 @@ public class FeaturesControllerServiceTests(NarsDatabaseFixture fixture) : Servi
             timeProvider,
             new FeatureStatsService(Fixture.CreateDbContextFactory()),
             new NumberEntrancesService(Fixture.CreateDbContextFactory()),
+            new SpecialNumberingService(Fixture.CreateDbContextFactory()),
             Mock.Of<ILogger<FeaturesController>>(),
             Mock.Of<IWebHostEnvironment>());
         AuthTestHelper.SetUser(ctrl, _userId, UserRoles.CommuneUser, communeId: 1);

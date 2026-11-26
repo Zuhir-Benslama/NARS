@@ -4,8 +4,8 @@ using System.Text.Json.Serialization;
 namespace NarsApi.DTOs;
 
 public record CoordDto(
-    [property: JsonPropertyName("lat")][Range(-90.0, 90.0)] double Lat,
-    [property: JsonPropertyName("lng")][Range(-180.0, 180.0)] double Lng
+    [property: JsonPropertyName("lat")][property: JsonRequired][Range(-90.0, 90.0)] double Lat,
+    [property: JsonPropertyName("lng")][property: JsonRequired][Range(-180.0, 180.0)] double Lng
 );
 
 public record ValidateRoadRequest(

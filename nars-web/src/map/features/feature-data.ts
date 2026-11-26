@@ -118,7 +118,16 @@ function modalResultToBase(modalResult: ModalResult): FeatureData {
     } as FeatureData
   }
   if (modalResult.type === "cityCenter") {
-    return { type, label, labelAr, labelFr, labelEn, radius: modalResult.radius } as FeatureData
+    return {
+      type,
+      label,
+      labelAr,
+      labelFr,
+      labelEn,
+      radius: modalResult.radius,
+      cityCenterTypeKey: modalResult.cityCenterTypeKey,
+      numberingOutsideBandM: modalResult.numberingOutsideBandM,
+    } as FeatureData
   }
   if (modalResult.type === "roads") {
     return {
@@ -172,6 +181,7 @@ function modalResultToBase(modalResult: ModalResult): FeatureData {
       decisionNumber: modalResult.decisionNumber,
       decisionDate: modalResult.decisionDate,
       spaceTypeKey: modalResult.spaceTypeKey,
+      numberingOutsideBandM: modalResult.numberingOutsideBandM,
     } as FeatureData
   }
   return {
@@ -233,7 +243,10 @@ export function toApiSaveShape(fd: FeatureData): ApiSaveShape {
     case "areas":
       return { type: "area", layer: fd.areaTypeKey ?? "central_urban" }
     case "cityCenter":
-      return { type: "city_center", layer: "city_center" }
+      return {
+        type: "city_center",
+        layer: fd.cityCenterTypeKey === "roundabout" ? "roundabout" : "city_center",
+      }
     case "districts":
       return { type: "district", layer: fd.districtTypeKey ?? "district" }
     case "roads":

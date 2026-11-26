@@ -12,7 +12,11 @@ import { useFeaturesStore } from "../../stores/featuresStore"
 import { getActiveSnapPhases, snapPointForEdit, setEditDragActive } from "../snapping/snapping"
 import { disableEditMode, getActiveEditEntry, isEditMode } from "../edit/edit-mode"
 import { recordDelete } from "../undo"
-import { numberOneRoad } from "../house-numbering"
+import {
+  renumberEntranceAfterChange,
+  clearSpecialNumberingForFeature,
+  specialModeForFeature,
+} from "../special-numbering"
 import { refreshLayerVisibility } from "../rendering/labels"
 import { getUserMessageKey } from "../../lib/errors"
 import { showToast } from "../../lib/toast"
@@ -215,12 +219,27 @@ async function onRemove(e: GeomanRemoveEvent): Promise<void> {
     layerStore.removeFeature(phaseKey, dbId)
     refreshLayerVisibility()
 
-    const ed = removed.data as { entranceTypeKey?: string; roadDbId?: string }
-    if (phaseKey === "houseEntrances" && ed.entranceTypeKey === "main_entrance" && ed.roadDbId) {
-      if ((await numberOneRoad(ed.roadDbId)) === "failed") {
+    const ed = removed.data as {
+      entranceTypeKey?: string
+      roadDbId?: string
+      numberingMode?: "cite" | "roundabout" | "square"
+      numberingFeatureId?: string
+      numberingStart?: { lat: number; lng: number }
+    }
+    if (
+      phaseKey === "houseEntrances" &&
+      (ed.entranceTypeKey === "main_entrance" || ed.numberingMode)
+    ) {
+      if ((await renumberEntranceAfterChange(ed)) === "failed") {
         showToast(t("map_delete_numbering_warning"), "warning")
         return
       }
+    }
+    if (
+      (phaseKey === "districts" || phaseKey === "cityCenter" || phaseKey === "publicSpaces") &&
+      specialModeForFeature(removed.data.type, removed.data)
+    ) {
+      await clearSpecialNumberingForFeature(dbId)
     }
 
     showToast(t("map_feature_deleted"), "success")

@@ -17,8 +17,12 @@ import { featureDataToGeometry } from "../features/feature-data"
 import type { LayerEntry, LatLng } from "../../types"
 import { commitDraftEdit, cancelDraftEdit } from "../drafts/draft-edit"
 import { updateEndpointMarkers } from "../roads/road-markers"
-import { numberOneRoad } from "../house-numbering"
 import { getRoadSide } from "../../lib/validation"
+import {
+  renumberEntranceAfterChange,
+  renumberSpecialFeatureByDbId,
+  specialModeForFeature,
+} from "../special-numbering"
 import {
   getActiveEditEntry,
   getActiveGeomanFeatureId,
@@ -200,11 +204,13 @@ export async function commitEditMode(): Promise<void> {
       lat?: number
       lng?: number
       side?: string
+      numberingMode?: string
     }
     if (
       ed0.type === "houseEntrances" &&
       ed0.entranceTypeKey === "main_entrance" &&
       ed0.roadDbId &&
+      !ed0.numberingMode &&
       ed0.lat != null &&
       ed0.lng != null
     ) {
@@ -223,9 +229,23 @@ export async function commitEditMode(): Promise<void> {
     // (without requiring a hard refresh to reload from the API)
     updateFeatureGeometry(entry)
 
-    const ed = entry.data as { type?: string; entranceTypeKey?: string; roadDbId?: string }
-    if (ed.type === "houseEntrances" && ed.entranceTypeKey === "main_entrance" && ed.roadDbId) {
-      await numberOneRoad(ed.roadDbId)
+    const ed = entry.data as {
+      type?: string
+      entranceTypeKey?: string
+      roadDbId?: string
+      numberingMode?: "cite" | "roundabout" | "square"
+      numberingFeatureId?: string
+      numberingStart?: { lat: number; lng: number }
+    }
+    if (
+      ed.type === "houseEntrances" &&
+      (ed.entranceTypeKey === "main_entrance" || ed.numberingMode)
+    ) {
+      await renumberEntranceAfterChange(ed)
+    } else if (specialModeForFeature(entry.data.type, entry.data)) {
+      // Moving a cité/roundabout/square changes the numbering scope; re-run
+      // its pass so inside/outside classification and order stay correct.
+      await renumberSpecialFeatureByDbId(entry.dbId)
     }
 
     await removeGeomanFeature()

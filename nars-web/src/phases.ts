@@ -14,10 +14,24 @@ import {
   ROAD_TYPES,
   PUBLIC_SPACE_TYPES,
   PUBLIC_BUILDING_SECTORS,
+  CITY_CENTER_TYPES,
 } from "./types/feature-types"
 
-export type { AreaType, DistrictType, RoadType, PublicSpaceType } from "./types/feature-types"
-export { AREA_TYPES, DISTRICT_TYPES, ROAD_TYPES, PUBLIC_SPACE_TYPES, PUBLIC_BUILDING_SECTORS }
+export type {
+  AreaType,
+  DistrictType,
+  RoadType,
+  PublicSpaceType,
+  CityCenterType,
+} from "./types/feature-types"
+export {
+  AREA_TYPES,
+  DISTRICT_TYPES,
+  ROAD_TYPES,
+  PUBLIC_SPACE_TYPES,
+  PUBLIC_BUILDING_SECTORS,
+  CITY_CENTER_TYPES,
+}
 
 // ─── PHASES ───────────────────────────────────────────────────────────
 
@@ -116,6 +130,7 @@ export function getApiLayerToPhase(): Record<string, FeatureTypeKey> {
 
   for (const t of AREA_TYPES) map[t.key] = "areas"
   map.city_center = "cityCenter"
+  map.roundabout = "cityCenter"
   for (const t of DISTRICT_TYPES) map[t.key] = "districts"
   for (const t of ROAD_TYPES) map[t.key] = "roads"
   map.main_entrance = "houseEntrances"

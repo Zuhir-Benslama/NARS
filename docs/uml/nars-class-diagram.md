@@ -445,6 +445,11 @@ classDiagram
         +NumberAsync(userId, roadId, entranceIds, ct) Task~IReadOnlyList~NumberedEntrance?~~
     }
 
+    class ISpecialNumberingService {
+        <<interface>>
+        +NumberAsync(userId, mode, featureId, entranceIds, startPoint, ct) Task~IReadOnlyList~NumberedEntrance?~~
+    }
+
     %% ===== CONTROLLERS =====
     class ControllerBase {
         <<abstract>>
@@ -494,6 +499,7 @@ classDiagram
         +ClearFeatures(ClearFeaturesRequest) Task
         +GetStats() Task
         +NumberEntrances(NumberEntrancesRequest) Task
+        +NumberEntrancesSpecial(SpecialNumberingRequest) Task
     }
 
     class FeatureCatalogController {
@@ -592,6 +598,7 @@ classDiagram
     UsersController --> IUserProfileService
     UsersController --> IRefreshTokenService
     FeaturesController --> INumberEntrancesService
+    FeaturesController --> ISpecialNumberingService
     DraftFeaturesController --> IDraftFeaturesService
     PagesController --> IPageAuthService
     LogsController --> IErrorLogService

@@ -262,6 +262,7 @@ sequenceDiagram
     participant ValidationLib
     participant ApiModule
     participant HouseNumbering
+    participant SpecialNumbering
     participant LayerStore
     participant Turf
 
@@ -292,6 +293,18 @@ sequenceDiagram
     HouseNumbering->>ApiModule: POST /api/features/number-entrances {roadId, entranceIds}
     ApiModule-->>HouseNumbering: Ordered entrance numbers
     HouseNumbering->>LayerStore: Update each entrance
+
+    Note over User: Special modes (cité / roundabout / square):
+    User->>SpecialNumbering: Right-click feature → "Number entrances"
+    alt cité
+        SpecialNumbering->>User: Pick the main gate on the map
+        User-->>SpecialNumbering: Gate lat/lng
+    end
+    SpecialNumbering->>LayerStore: Collect entrances in feature scope
+    SpecialNumbering->>ApiModule: POST /api/features/number-entrances-special
+    Note over ApiModule: Server locks the feature row, derives order<br/>and inside/outside zone, writes number + suffix
+    ApiModule-->>SpecialNumbering: {entrances: [{id, number, label, suffix}]}
+    SpecialNumbering->>LayerStore: Apply numbers, suffix and metadata
 ```
 
 ## 6. Session Refresh Flow (Single-Flight)

@@ -1,5 +1,7 @@
 import type { LatLng } from "./coordinates"
 
+export type SpecialNumberingMode = "cite" | "roundabout" | "square"
+
 export type FeatureTypeKey =
   | "areas"
   | "districts"
@@ -32,10 +34,16 @@ export interface FeatureData {
   roadLabel?: string
   side?: "left" | "right"
   entranceNumber?: number
+  numberSuffix?: string
+  numberingMode?: SpecialNumberingMode
+  numberingFeatureId?: string
+  numberingStart?: LatLng
   mainEntranceDbId?: string
   mainEntranceLabel?: string
   bisNumber?: number
   entranceTypeKey?: "main_entrance" | "secondary_entrance"
+  numberingOutsideBandM?: number
+  cityCenterTypeKey?: string
   spaceTypeKey?: string
   sectorKey?: string
   buildingTypeKey?: string
@@ -74,6 +82,8 @@ export interface CityCenterFeatureData extends CommonFields {
   radius?: number
   lat?: number
   lng?: number
+  cityCenterTypeKey?: string
+  numberingOutsideBandM?: number
 }
 export interface RoadFeatureData extends CommonFields {
   type: "roads"
@@ -88,6 +98,10 @@ export interface HouseEntranceFeatureData extends CommonFields {
   roadLabel?: string
   side?: "left" | "right"
   entranceNumber?: number
+  numberSuffix?: string
+  numberingMode?: SpecialNumberingMode
+  numberingFeatureId?: string
+  numberingStart?: LatLng
   mainEntranceDbId?: string
   mainEntranceLabel?: string
   bisNumber?: number
@@ -106,6 +120,7 @@ export interface PublicSpaceFeatureData extends CommonFields {
   decisionNumber: string
   decisionDate: string
   spaceTypeKey: string
+  numberingOutsideBandM?: number
 }
 export interface NamingPanelFeatureData extends CommonFields {
   type: "namingPanels"

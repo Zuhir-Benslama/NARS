@@ -350,6 +350,15 @@ classDiagram
         +setHouseNumbers()
     }
 
+    class SpecialNumbering {
+        +specialModeForFeature(phaseKey, data)
+        +numberSpecialFeature(featureDbId, mode, startPoint)
+        +beginCiteGatePick(featureDbId)
+        +renumberEntranceAfterChange(data)
+        +renumberSpecialFeatureByDbId(featureDbId)
+        +clearSpecialNumberingForFeature(featureDbId)
+    }
+
     class Undo {
         +recordDelete(entry, phaseKey)
         +undo()
@@ -618,6 +627,10 @@ classDiagram
 
     HouseNumbering --> LayerStore
     HouseNumbering --> ApiModule
+
+    SpecialNumbering --> LayerStore
+    SpecialNumbering --> ApiModule
+    SpecialNumbering --> HouseNumbering
 
     Undo --> LayerStore
     Undo --> ApiModule

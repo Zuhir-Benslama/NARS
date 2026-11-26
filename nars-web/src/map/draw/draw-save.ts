@@ -127,16 +127,16 @@ export function getFeatureStyle(
 
 // ─── CITY CENTER CHECK ───────────────────────────────────────────
 
-async function checkExistingCityCenter(
-  geomanFeatureData: Record<string, unknown>,
-): Promise<boolean> {
+async function checkExistingCityCenter(isRoundabout: boolean): Promise<boolean> {
   if (getDrawingPhase()?.key !== "cityCenter") return true
+  // Roundabouts share the city-center table but may coexist with the city
+  // centre; only a second plain city centre is rejected.
+  if (isRoundabout) return true
   const layerStore = useLayerStore()
   const state = layerStore.$state
   if ((state.cityCenter?.length ?? 0) === 0) return true
 
   showToast(t("map_city_center_exists"), "error")
-  deleteGeomanFeature(geomanFeatureData)
   return false
 }
 
@@ -296,7 +296,6 @@ export async function completeDrawingWithGeometry(
   const drawingPhase = getDrawingPhase()
   if (!drawingPhase) return
 
-  if (!(await checkExistingCityCenter(geomanFeatureData))) return
   if (!validateGeometry(geometry, drawingPhase, geomanFeatureData)) return
 
   const featureId = crypto.randomUUID()
@@ -311,6 +310,12 @@ export async function completeDrawingWithGeometry(
   }
 
   const modalResult = await openModalForFeature(drawingPhase, featureId, geometry)
+  const isRoundabout =
+    modalResult?.type === "cityCenter" && modalResult.cityCenterTypeKey === "roundabout"
+  if (modalResult && !(await checkExistingCityCenter(isRoundabout))) {
+    deleteGeomanFeature(geomanFeatureData)
+    return
+  }
   if (!modalResult) {
     deleteGeomanFeature(geomanFeatureData)
     void buildDrawControl({

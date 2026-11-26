@@ -131,6 +131,36 @@
         <span class="modal-field-note">{{ t("label_radius_note") }}</span>
       </div>
 
+      <!-- City centers can be plain centres or roundabouts (special numbering) -->
+      <div v-if="isCityCenter" class="modal-field">
+        <label>{{ t("label_city_center_type") }}</label>
+        <select v-model="modalStore.cityCenterTypeKey" class="modal-input">
+          <option v-for="c in CITY_CENTER_TYPES" :key="c.key" :value="c.key">
+            {{ t("featureTypes." + c.key) }}
+          </option>
+        </select>
+      </div>
+
+      <!-- Optional width of the numbering band around roundabouts and squares -->
+      <div
+        v-if="
+          (isCityCenter && modalStore.cityCenterTypeKey === 'roundabout') ||
+          (phase?.key === 'publicSpaces' && modalStore.spaceTypeKey === 'square')
+        "
+        class="modal-field"
+      >
+        <label>{{ t("label_numbering_band") }}</label>
+        <input
+          v-model.number="modalStore.numberingOutsideBandM"
+          type="number"
+          min="1"
+          :class="['modal-input', { error: modalStore.errors.numberingOutsideBandM }]"
+          :placeholder="t('placeholder_numbering_band')"
+          autocomplete="off"
+        />
+        <span class="modal-field-note">{{ t("label_numbering_band_note") }}</span>
+      </div>
+
       <!-- ── Phase-specific extras ────────────────────────────────── -->
 
       <!-- Areas: area type selector (extracted) -->
@@ -192,7 +222,13 @@
 <script setup lang="ts">
 import { computed, watch, ref } from "vue"
 import { useI18n } from "vue-i18n"
-import { PHASES, DISTRICT_TYPES, ROAD_TYPES, PUBLIC_SPACE_TYPES } from "../phases"
+import {
+  PHASES,
+  DISTRICT_TYPES,
+  ROAD_TYPES,
+  PUBLIC_SPACE_TYPES,
+  CITY_CENTER_TYPES,
+} from "../phases"
 import { useAppStore } from "../stores/appStore"
 import { useModalStore } from "../stores/modalStore"
 import { useFeatureValidation } from "../composables/useFeatureValidation"

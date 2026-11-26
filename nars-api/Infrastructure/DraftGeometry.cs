@@ -553,4 +553,81 @@ public static class HouseEntranceData
         node["label"] = label;
         return node.ToJsonString();
     }
+
+    /// <summary>Reads the letter suffix of a special-mode number (e.g. "A" in 1/A).</summary>
+    public static string? TryGetNumberSuffix(string data)
+    {
+        try
+        {
+            return JsonNode.Parse(data)?["numberSuffix"]?.GetValue<string>();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Rewrites the letter suffix, removing it when <paramref name="suffix"/> is null.</summary>
+    public static string SetNumberSuffix(string data, string? suffix)
+    {
+        var node = JsonNode.Parse(data) ?? new JsonObject();
+        if (suffix is null)
+        {
+            node.AsObject().Remove("numberSuffix");
+        }
+        else
+        {
+            node["numberSuffix"] = suffix;
+        }
+
+        return node.ToJsonString();
+    }
+
+    /// <summary>Reads the main entrance this secondary entrance belongs to.</summary>
+    public static bool TryGetMainEntranceDbId(string data, out Guid id)
+    {
+        id = Guid.Empty;
+        try
+        {
+            if (JsonNode.Parse(data)?["mainEntranceDbId"] is { } node
+                && Guid.TryParse(node.GetValue<string>(), out var parsed))
+            {
+                id = parsed;
+                return true;
+            }
+        }
+        catch
+        {
+            // Malformed row: treat as unlinked.
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Records which special mode numbered this entrance and which feature it
+    /// belongs to, so later edits can dispatch to the same numbering routine.
+    /// The optional start point is the user-picked cité gate.
+    /// </summary>
+    public static string SetSpecialNumberingMetadata(
+        string data, string mode, Guid featureId, (double Lat, double Lng)? startPoint)
+    {
+        var node = JsonNode.Parse(data) ?? new JsonObject();
+        node["numberingMode"] = mode;
+        node["numberingFeatureId"] = featureId.ToString();
+        if (startPoint is { } point)
+        {
+            node["numberingStart"] = new JsonObject
+            {
+                ["lat"] = point.Lat,
+                ["lng"] = point.Lng,
+            };
+        }
+        else
+        {
+            node.AsObject().Remove("numberingStart");
+        }
+
+        return node.ToJsonString();
+    }
 }

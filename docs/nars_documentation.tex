@@ -1376,6 +1376,33 @@ This scheme is consistent with the international convention of odd numbers
 on one side of a street and even on the other, sequenced in order of
 increasing distance from the origin of the road.
 
+\subsection{Special Feature Numbering}
+\label{sec:special_numbering}
+
+Three feature-level modes number entrances from geometry instead of a road
+polyline. The client only selects candidate entrances; the server re-derives
+the authoritative order and zone from the stored feature geometry inside one
+locked transaction:
+
+\begin{itemize}
+  \item \emph{cit\'e} --- a district layer whose entrances are numbered
+    sequentially $1, 2, 3, \ldots$ counter-clockwise from an entrance gate
+    picked by the user. Additional entrances of the same building receive
+    letter suffixes ($1/A$, $1/B$, \ldots).
+  \item \emph{roundabout} --- a city-centre layer whose entrances are ordered
+    counter-clockwise from true north. Main entrances inside the circle get
+    odd numbers; those in the surrounding band get even numbers.
+  \item \emph{square} --- the \texttt{square} public-space layer, using the
+    same odd-inside/even-outside rule with the polygon boundary as reference.
+\end{itemize}
+
+The outside band defaults to $100\,\mathrm{m}$ and can be overridden per
+feature with \texttt{data.numberingOutsideBandM}. Road numbering skips any
+entrance carrying \texttt{numberingMode}, so reversing or bulk-renumbering
+roads cannot overwrite a special number. The modes share
+\texttt{POST /api/features/number-entrances-special}; the response reports the
+assigned base number, suffix and display label for each entrance.
+
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Point-in-Polygon: Ray-Casting Algorithm}
 \label{sec:pip}

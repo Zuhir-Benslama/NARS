@@ -18,6 +18,8 @@ export interface ModalState {
   sectorKey: string
   buildingTypeKey: string
   radius: number | null
+  cityCenterTypeKey: string
+  numberingOutsideBandM: number | null
   currentModalFeatureId: string | null
 }
 
@@ -50,6 +52,8 @@ export interface CityCenterModalResult {
   labelFr?: string
   labelEn?: string
   radius?: number
+  cityCenterTypeKey?: string
+  numberingOutsideBandM?: number
 }
 
 export interface RoadModalResult {
@@ -100,6 +104,7 @@ export interface PublicSpaceModalResult {
   decisionNumber: string
   decisionDate: string
   spaceTypeKey?: string
+  numberingOutsideBandM?: number
 }
 
 export interface NamingPanelModalResult {

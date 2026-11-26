@@ -26,6 +26,8 @@ function createDefaultModalState(): ModalState {
     sectorKey: "banking_postal",
     buildingTypeKey: "bank",
     radius: null,
+    cityCenterTypeKey: "city_center",
+    numberingOutsideBandM: null,
     currentModalFeatureId: null,
   }
 }
@@ -74,6 +76,10 @@ export const useModalStore = defineStore("modal", {
         sectorKey: existing.sectorKey ?? "banking_postal",
         buildingTypeKey: existing.buildingTypeKey ?? "bank",
         radius: existing.radius ?? null,
+        cityCenterTypeKey:
+          (existing as { cityCenterTypeKey?: string }).cityCenterTypeKey ?? "city_center",
+        numberingOutsideBandM:
+          (existing as { numberingOutsideBandM?: number }).numberingOutsideBandM ?? null,
       })
     },
 

@@ -19,7 +19,12 @@ import type { LayerEntry } from "../../types"
 
 import { debugError } from "../../utils/debug"
 import { updateEndpointMarkers } from "../roads/road-directions"
-import { numberOneRoad } from "../house-numbering"
+import {
+  renumberEntranceAfterChange,
+  renumberSpecialFeatureByDbId,
+  clearSpecialNumberingForFeature,
+  specialModeForFeature,
+} from "../special-numbering"
 import { loadFromDatabase } from "../features/loader-db"
 import { updateSelectionHighlight } from "../core/state"
 
@@ -96,6 +101,10 @@ export async function editFeatureInfo(dbId: string): Promise<void> {
     // and the currently selected language.
     await loadFromDatabase()
 
+    if (specialModeForFeature(entry.data.type, entry.data)) {
+      await renumberSpecialFeatureByDbId(dbId)
+    }
+
     showToast(t("map_feature_updated"), "success")
   } catch (err) {
     showToast(t("map_save_failed", { error: t(getUserMessageKey(err)) }), "error")
@@ -144,14 +153,31 @@ export async function removeFeature(dbId: string): Promise<void> {
       updateEndpointMarkers()
     }
 
-    const ed = entry.data as { entranceTypeKey?: string; roadDbId?: string }
-    if (phaseKey === "houseEntrances" && ed.entranceTypeKey === "main_entrance" && ed.roadDbId) {
+    const ed = entry.data as {
+      entranceTypeKey?: string
+      roadDbId?: string
+      numberingMode?: "cite" | "roundabout" | "square"
+      numberingFeatureId?: string
+      numberingStart?: { lat: number; lng: number }
+    }
+    if (
+      phaseKey === "houseEntrances" &&
+      (ed.entranceTypeKey === "main_entrance" || ed.numberingMode)
+    ) {
       // The delete succeeded, but stale numbers must not be reported as a
       // clean finish when the recompute fails.
-      if ((await numberOneRoad(ed.roadDbId)) === "failed") {
+      if ((await renumberEntranceAfterChange(ed)) === "failed") {
         showToast(t("map_delete_numbering_warning"), "warning")
         return
       }
+    }
+    if (
+      (phaseKey === "districts" || phaseKey === "cityCenter" || phaseKey === "publicSpaces") &&
+      specialModeForFeature(entry.data.type, entry.data)
+    ) {
+      // Entrances numbered from this feature must not keep pointing at a
+      // deleted reference geometry.
+      await clearSpecialNumberingForFeature(dbId)
     }
 
     showToast(t("map_feature_deleted"), "success")

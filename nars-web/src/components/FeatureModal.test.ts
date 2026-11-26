@@ -119,6 +119,10 @@ vi.mock("../phases", () => ({
     { key: "trad_activities_zone", label: "Trade Activities Zone" },
     { key: "industry_zone", label: "Industrial Zone" },
   ],
+  CITY_CENTER_TYPES: [
+    { key: "city_center", label: "City Center" },
+    { key: "roundabout", label: "Roundabout" },
+  ],
   ROAD_TYPES: [
     { key: "street", label: "Street" },
     { key: "avenue", label: "Avenue" },

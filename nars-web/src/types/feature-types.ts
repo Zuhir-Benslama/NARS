@@ -28,6 +28,11 @@ export interface PublicSpaceType {
   color: string
 }
 
+export interface CityCenterType {
+  key: string
+  label: string
+}
+
 // NOTE: central_urban uses #c0392b (red) to visually distinguish it as the
 // primary area type. This intentionally differs from the areas phase color
 // (#8e44ad in phases.ts) which is used for phase navigation UI only.
@@ -41,10 +46,18 @@ export const AREA_TYPES: AreaType[] = [
 
 export const DISTRICT_TYPES: DistrictType[] = [
   { key: "housing_estate", label: "Housing Estate" },
+  { key: "cite", label: "Cité" },
   { key: "urban_pole", label: "Urban Pole" },
   { key: "district", label: "District" },
   { key: "trad_activities_zone", label: "Trad. Activities Zone" },
   { key: "industry_zone", label: "Industry Zone", allowInScattered: true },
+]
+
+// ── City-center layers: plain city centre vs. roundabout ──────────────
+
+export const CITY_CENTER_TYPES: CityCenterType[] = [
+  { key: "city_center", label: "City Center" },
+  { key: "roundabout", label: "Roundabout" },
 ]
 
 // ── Road types ────────────────────────────────────────────────────────

@@ -140,6 +140,130 @@ public static class GeometryHelper
     }
 
     /// <summary>
+    /// Averages the vertices of a feature ring to get its centre. The closing
+    /// vertex (equal to the first) is ignored so it does not skew the result.
+    /// </summary>
+    public static (double Lat, double Lng)? ComputeCentroid(IReadOnlyList<(double Lat, double Lng)> ring)
+    {
+        if (ring.Count == 0)
+        {
+            return null;
+        }
+
+        var count = ring.Count;
+        if (count > 1 && Math.Abs(ring[0].Lat - ring[^1].Lat) < 1e-12
+            && Math.Abs(ring[0].Lng - ring[^1].Lng) < 1e-12)
+        {
+            count--;
+        }
+
+        if (count == 0)
+        {
+            return null;
+        }
+
+        double lat = 0, lng = 0;
+        for (var i = 0; i < count; i++)
+        {
+            lat += ring[i].Lat;
+            lng += ring[i].Lng;
+        }
+
+        return (lat / count, lng / count);
+    }
+
+    /// <summary>
+    /// Angle of a point around <paramref name="center"/>, measured from true
+    /// north and increasing counter-clockwise (0° north, 90° west, 180° south,
+    /// 270° east). When a reference point is given the angle is relative to it,
+    /// which lets a cité start numbering at its user-picked gate instead of north.
+    /// </summary>
+    public static double AngleFromNorthCounterClockwise(
+        double lat, double lng, double centerLat, double centerLng,
+        (double Lat, double Lng)? reference = null)
+    {
+        static double Raw(double lat, double lng, double centerLat, double centerLng)
+        {
+            var cosLat = Math.Cos(centerLat * DegToRad);
+            var east = (lng - centerLng) * cosLat;
+            var north = lat - centerLat;
+            var degrees = Math.Atan2(-east, north) * (180.0 / Math.PI);
+            return (degrees + 360.0) % 360.0;
+        }
+
+        var angle = Raw(lat, lng, centerLat, centerLng);
+        if (reference is { } gate)
+        {
+            angle = (angle - Raw(gate.Lat, gate.Lng, centerLat, centerLng) + 360.0) % 360.0;
+        }
+
+        return angle;
+    }
+
+    /// <summary>
+    /// Ray-casting point-in-polygon test in a local equirectangular plane around
+    /// the point. Works for any ring winding and treats boundary as inside.
+    /// </summary>
+    public static bool IsPointInPolygon(
+        double lat, double lng, IReadOnlyList<(double Lat, double Lng)> ring)
+    {
+        if (ring.Count < 3)
+        {
+            return false;
+        }
+
+        var cosLat = Math.Cos(lat * DegToRad);
+        (double X, double Y) ToXy((double Lat, double Lng) c) => ((c.Lng - lng) * cosLat, c.Lat - lat);
+
+        var inside = false;
+        for (int i = 0, j = ring.Count - 1; i < ring.Count; j = i++)
+        {
+            var (xi, yi) = ToXy(ring[i]);
+            var (xj, yj) = ToXy(ring[j]);
+
+            if ((yi > 0) != (yj > 0) && 0.0 < (xj - xi) * (-yi) / (yj - yi) + xi)
+            {
+                inside = !inside;
+            }
+        }
+
+        return inside;
+    }
+
+    /// <summary>
+    /// Shortest distance in metres from a point to the boundary of a polygon
+    /// ring, used to decide whether an entrance is close enough to a square to
+    /// be numbered with it.
+    /// </summary>
+    public static double DistanceToPolygonBoundaryM(
+        double lat, double lng, IReadOnlyList<(double Lat, double Lng)> ring)
+    {
+        if (ring.Count == 0)
+        {
+            return double.PositiveInfinity;
+        }
+
+        const double metersPerDegree = 111_320.0;
+        var cosLat = Math.Cos(lat * DegToRad);
+        (double X, double Y) ToXy((double Lat, double Lng) c) =>
+            ((c.Lng - lng) * cosLat * metersPerDegree, (c.Lat - lat) * metersPerDegree);
+
+        var minSq = double.PositiveInfinity;
+        for (int i = 0, j = ring.Count - 1; i < ring.Count; j = i++)
+        {
+            var (ax, ay) = ToXy(ring[j]);
+            var (bx, by) = ToXy(ring[i]);
+            double dx = bx - ax, dy = by - ay;
+            var len2 = dx * dx + dy * dy;
+            var t = len2 < 1e-12 ? 0.0 : Math.Clamp(-(ax * dx + ay * dy) / len2, 0.0, 1.0);
+            double px = ax + t * dx, py = ay + t * dy;
+            minSq = Math.Min(minSq, px * px + py * py);
+        }
+
+        return Math.Sqrt(minSq);
+    }
+
+    /// <summary>
     /// Computes the turn angle (in degrees) at the middle point of three consecutive coordinates.
     /// Returns 0 if segments are degenerate (length ≈ 0).
     /// </summary>

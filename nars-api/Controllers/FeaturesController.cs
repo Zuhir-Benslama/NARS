@@ -19,6 +19,7 @@ public class FeaturesController(
     IDateTimeProvider timeProvider,
     IFeatureStatsService featureStatsService,
     INumberEntrancesService numberEntrancesService,
+    ISpecialNumberingService specialNumberingService,
     ILogger<FeaturesController> logger,
     IWebHostEnvironment webHost) : NarsControllerBase(webHost)
 {
@@ -215,6 +216,55 @@ public class FeaturesController(
         catch (NumberSeriesExhaustedException ex)
         {
             logger.LogWarning(ex, "Entrance-number series exhausted for user {UserId}: {Reason}", CurrentUserId, ex.Message);
+            return Problem(detail: ex.Message, statusCode: 409);
+        }
+    }
+
+    /// <summary>Atomically numbers entrances around a cité, roundabout or square.</summary>
+    [HttpPost("number-entrances-special")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> NumberEntrancesSpecial([FromBody] SpecialNumberingRequest body, CancellationToken cancellationToken = default)
+    {
+        if (!FeatureTypes.SpecialNumberingModes.All.Contains(body.Mode))
+        {
+            return Problem(detail: $"Unknown numbering mode '{body.Mode}'.", statusCode: 400);
+        }
+
+        if (body.EntranceIds.Count == 0
+            || body.EntranceIds.Count > SpecialNumberingRequest.MaxBatchSize)
+        {
+            return Problem(detail: $"Between 1 and {SpecialNumberingRequest.MaxBatchSize} entrances are required.", statusCode: 400);
+        }
+
+        if (body.EntranceIds.Count != body.EntranceIds.Distinct().Count())
+        {
+            return Problem(detail: "Duplicate entrance IDs are not allowed.", statusCode: 400);
+        }
+
+        if (body.Mode == FeatureTypes.SpecialNumberingModes.Cite && body.StartPoint is null)
+        {
+            return Problem(detail: "A start point is required for cité numbering.", statusCode: 400);
+        }
+
+        try
+        {
+            var startPoint = body.StartPoint is { } point ? (point.Lat, point.Lng) : ((double, double)?)null;
+            var numbered = await specialNumberingService.NumberAsync(
+                RequiredCurrentUserId, body.Mode, body.FeatureId, body.EntranceIds, startPoint, cancellationToken);
+
+            if (numbered is null)
+            {
+                return Problem(detail: "Feature or entrance not found, or outside the feature's numbering scope.", statusCode: 404);
+            }
+
+            return Ok(new NumberEntrancesResponse(Success: true, Entrances: numbered));
+        }
+        catch (NumberSeriesExhaustedException ex)
+        {
+            logger.LogWarning(ex, "Special entrance-number series exhausted for user {UserId}: {Reason}", CurrentUserId, ex.Message);
             return Problem(detail: ex.Message, statusCode: 409);
         }
     }

@@ -286,4 +286,52 @@ public class GeometryHelperTests
         Assert.Equal(10002, num);
         Assert.DoesNotContain(num, used);
     }
+
+    [Fact]
+    public void AngleFromNorthCounterClockwise_FourCardinalDirections_ReturnsExpectedAngles()
+    {
+        const double lat = 36.0, lng = 3.0;
+
+        Assert.Equal(0, GeometryHelper.AngleFromNorthCounterClockwise(36.01, lng, lat, lng), 6);
+        Assert.Equal(90, GeometryHelper.AngleFromNorthCounterClockwise(lat, 2.9, lat, lng), 6);
+        Assert.Equal(180, GeometryHelper.AngleFromNorthCounterClockwise(35.99, lng, lat, lng), 6);
+        Assert.Equal(270, GeometryHelper.AngleFromNorthCounterClockwise(lat, 3.1, lat, lng), 6);
+    }
+
+    [Fact]
+    public void AngleFromNorthCounterClockwise_WithReference_StartsAtZeroAtReference()
+    {
+        const double lat = 36.0, lng = 3.0;
+        var gate = (Lat: lat, Lng: 3.1); // due east, normally 270°
+
+        Assert.Equal(0, GeometryHelper.AngleFromNorthCounterClockwise(36.0, 3.1, lat, lng, gate), 6);
+        Assert.Equal(180, GeometryHelper.AngleFromNorthCounterClockwise(36.0, 2.9, lat, lng, gate), 6);
+    }
+
+    [Fact]
+    public void IsPointInPolygon_SquareRing_DistinguishesInsideFromOutside()
+    {
+        var ring = new List<(double Lat, double Lng)>
+        {
+            (36.0, 3.0), (36.0, 3.2), (36.2, 3.2), (36.2, 3.0), (36.0, 3.0),
+        };
+
+        Assert.True(GeometryHelper.IsPointInPolygon(36.1, 3.1, ring));
+        Assert.False(GeometryHelper.IsPointInPolygon(36.3, 3.1, ring));
+        Assert.False(GeometryHelper.IsPointInPolygon(36.1, 2.9, ring));
+    }
+
+    [Fact]
+    public void DistanceToPolygonBoundaryM_PointJustOutsideSquare_ReturnsApproximateMetres()
+    {
+        var ring = new List<(double Lat, double Lng)>
+        {
+            (36.0, 3.0), (36.0, 3.2), (36.2, 3.2), (36.2, 3.0), (36.0, 3.0),
+        };
+
+        // 0.001° south of the bottom edge at this latitude ≈ 111 m.
+        var distance = GeometryHelper.DistanceToPolygonBoundaryM(35.999, 3.1, ring);
+
+        Assert.InRange(distance, 100, 120);
+    }
 }

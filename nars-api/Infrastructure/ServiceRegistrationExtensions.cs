@@ -144,6 +144,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IBoundaryService, BoundaryService>();
         services.AddScoped<IEntranceQueryService, EntranceQueryService>();
         services.AddScoped<INumberEntrancesService, NumberEntrancesService>();
+        services.AddScoped<ISpecialNumberingService, SpecialNumberingService>();
         services.AddScoped<IAdminOverviewService, AdminOverviewService>();
         services.AddScoped<IUserAuthorizationService, UserAuthorizationService>();
         services.AddScoped<IErrorLogService, ErrorLogService>();

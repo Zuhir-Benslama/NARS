@@ -9,11 +9,11 @@ namespace NarsApi.Models;
 /// Sub-types / layers (Feature.Layer) per top-level type:
 ///   area            → central_urban | secondary_urban | scattered (auto-computed)
 ///   road            → boulevard | avenue | street | drive | lane | cul_de_sac | way
-///   district        → housing_estate | urban_pole | district
+///   district        → housing_estate | cite | urban_pole | district
 ///   house_entrance  → main_entrance | secondary_entrance
 ///   public_building → public_building
 ///   public_space    → garden | square
-///   city_center     → city_center
+///   city_center     → city_center | roundabout
 /// </summary>
 public static class FeatureTypes
 {
@@ -74,6 +74,7 @@ public static class FeatureTypes
     public static class DistrictLayers
     {
         public const string HousingEstate = "housing_estate";
+        public const string Cite = "cite";
         public const string UrbanPole = "urban_pole";
         public const string DistrictLayer = "district";
         public const string TradActivitiesZone = "trad_activities_zone";
@@ -81,7 +82,7 @@ public static class FeatureTypes
 
         public static readonly IReadOnlySet<string> All = new HashSet<string>
         {
-            HousingEstate, UrbanPole, District, TradActivitiesZone, IndustryZone
+            HousingEstate, Cite, UrbanPole, District, TradActivitiesZone, IndustryZone
         };
     }
 
@@ -203,7 +204,24 @@ public static class FeatureTypes
     public static class CityCenterLayers
     {
         public const string Default = "city_center";
-        public static readonly IReadOnlySet<string> All = new HashSet<string> { Default };
+        public const string Roundabout = "roundabout";
+        public static readonly IReadOnlySet<string> All = new HashSet<string> { Default, Roundabout };
+    }
+
+    /// <summary>
+    /// Numbering modes keyed by the feature layer they apply to. Kept here so
+    /// the API and the client agree on the wire values.
+    /// </summary>
+    public static class SpecialNumberingModes
+    {
+        public const string Cite = "cite";
+        public const string Roundabout = "roundabout";
+        public const string Square = "square";
+
+        public static readonly IReadOnlySet<string> All = new HashSet<string>
+        {
+            Cite, Roundabout, Square
+        };
     }
 
     public static class NamingPanelLayers

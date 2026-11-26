@@ -6,10 +6,17 @@ export type { LatLng } from "./types/coordinates"
 
 export type { DrawType, Phase } from "./types/phases"
 
-export type { AreaType, DistrictType, RoadType, PublicSpaceType } from "./types/feature-types"
+export type {
+  AreaType,
+  DistrictType,
+  RoadType,
+  PublicSpaceType,
+  CityCenterType,
+} from "./types/feature-types"
 
 export type {
   FeatureTypeKey,
+  SpecialNumberingMode,
   FeatureData,
   FeatureDataByType,
   AreaFeatureData,

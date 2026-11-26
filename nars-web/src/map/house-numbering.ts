@@ -38,7 +38,13 @@ export async function numberOneRoad(roadId: string): Promise<NumberingResult> {
   }
 
   const allMain = (state.houseEntrances || []).filter(
-    (e) => e.data.entranceTypeKey === "main_entrance" && e.data.roadDbId === roadId,
+    (e) =>
+      e.data.entranceTypeKey === "main_entrance" &&
+      e.data.roadDbId === roadId &&
+      // Special-mode entrances are numbered from their feature geometry, not
+      // from road arc length; road reversal / bulk road numbering must not
+      // overwrite them with odd/even road numbers.
+      !e.data.numberingMode,
   )
 
   if (!allMain.length) {
@@ -179,7 +185,10 @@ export async function setHouseNumbers(allRoads = false): Promise<void> {
   if (allRoads) {
     const roadIds = new Set(
       (state.houseEntrances || [])
-        .filter((e) => e.data.entranceTypeKey === "main_entrance" && e.data.roadDbId)
+        .filter(
+          (e) =>
+            e.data.entranceTypeKey === "main_entrance" && e.data.roadDbId && !e.data.numberingMode,
+        )
         .map((e) => e.data.roadDbId as string),
     )
     if (roadIds.size === 0) {

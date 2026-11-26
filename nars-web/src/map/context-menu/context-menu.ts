@@ -10,6 +10,11 @@ import { toggleSnapping } from "../snapping/snapping"
 import { showToast } from "../../lib/toast"
 import { useLayerStore } from "../../stores/layerStore"
 import { setHouseNumbers } from "../house-numbering"
+import {
+  beginCiteGatePick,
+  numberSpecialFeature,
+  specialModeForFeature,
+} from "../special-numbering"
 import { setReferenceRoad, clearReferenceRoad, setReferenceEntrance } from "../house-entrances"
 import { generateNamingPanels } from "../naming-panels"
 import { computeAndApplyRoadDirections, updateEndpointMarkers } from "../roads/road-directions"
@@ -82,12 +87,30 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
     ) ??
       false)
 
+  // A cité district, roundabout or square can be numbered from its own
+  // context menu, even while another phase is active (like the city-center
+  // lock exception below).
+  const specialEntry = layerStore.getFeature(dbId)
+  const specialMode = specialEntry
+    ? specialModeForFeature(specialEntry.data.type, specialEntry.data)
+    : null
+  const specialNumberItem: CtxMenuItem | null = specialMode
+    ? {
+        label: t(`ctx_number_${specialMode}`),
+        onClick: () =>
+          specialMode === "cite"
+            ? beginCiteGatePick(dbId)
+            : void numberSpecialFeature(dbId, specialMode),
+      }
+    : null
+
   if (isCityCenter && currentPhaseKey !== "cityCenter") {
     return [
       {
         label: t("ctx_cc_lock"),
         onClick: () => showToast(t("ctx_cc_lock_msg"), "info"),
       },
+      ...(specialNumberItem ? [specialNumberItem] : []),
     ]
   }
 
@@ -189,6 +212,10 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
       danger: true,
       onClick: () => removeFeature(dbId),
     })
+  }
+
+  if (specialNumberItem) {
+    items.push(specialNumberItem)
   }
 
   // House-number computation is available on any feature hit during the

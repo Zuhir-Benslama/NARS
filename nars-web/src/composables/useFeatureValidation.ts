@@ -53,6 +53,16 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
       }
     }
 
+    if (
+      (key === "cityCenter" && modalStore.cityCenterTypeKey === "roundabout") ||
+      (key === "publicSpaces" && modalStore.spaceTypeKey === "square")
+    ) {
+      const band = modalStore.numberingOutsideBandM
+      if (band != null && (!Number.isFinite(band) || band <= 0)) {
+        errors.numberingOutsideBandM = "Must be greater than 0"
+      }
+    }
+
     return errors
   }
 
@@ -141,6 +151,8 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
           (modalStore.labelAr ?? "").trim() ||
           (modalStore.label ?? "").trim(),
         radius: modalStore.radius ?? undefined,
+        cityCenterTypeKey: modalStore.cityCenterTypeKey,
+        numberingOutsideBandM: modalStore.numberingOutsideBandM ?? undefined,
       }
     }
 
@@ -235,6 +247,7 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
         decisionNumber: modalStore.decisionNumber.trim(),
         decisionDate: modalStore.decisionDate.trim(),
         spaceTypeKey: modalStore.spaceTypeKey,
+        numberingOutsideBandM: modalStore.numberingOutsideBandM ?? undefined,
       }
     }
 

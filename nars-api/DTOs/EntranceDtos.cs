@@ -32,12 +32,41 @@ public record NumberEntrancesRequest(
     public const int MaxBatchSize = 200;
 }
 
+/// <summary>
+/// Request to number main entrances around one special feature (cité,
+/// roundabout or square). The server recomputes the authoritative counter-
+/// clockwise order and inside/outside zone from the feature geometry, so the
+/// caller only supplies the candidate entrance IDs.
+/// </summary>
+public record SpecialNumberingRequest(
+    [property: JsonPropertyName("mode")]
+    [property: JsonRequired]
+    string Mode,
+    [property: JsonPropertyName("featureId")]
+    [property: JsonRequired]
+    Guid FeatureId,
+    [property: JsonPropertyName("entranceIds")]
+    [property: JsonRequired]
+    [MinLength(1)]
+    [MaxLength(SpecialNumberingRequest.MaxBatchSize)]
+    List<Guid> EntranceIds,
+    [property: JsonPropertyName("startPoint")]
+    CoordDto? StartPoint = null
+)
+{
+    public const int MaxBatchSize = 200;
+
+    /// <summary>Default width of the band outside a roundabout/square.</summary>
+    public const double DefaultOutsideBandM = 100.0;
+}
+
 /// <summary>The authoritative number assigned to one entrance.</summary>
 public record NumberedEntrance(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("side")] string Side,
     [property: JsonPropertyName("entranceNumber")] int EntranceNumber,
-    [property: JsonPropertyName("label")] string Label
+    [property: JsonPropertyName("label")] string Label,
+    [property: JsonPropertyName("numberSuffix")] string? NumberSuffix = null
 );
 
 public record NumberEntrancesResponse(

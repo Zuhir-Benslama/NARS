@@ -9,7 +9,12 @@ import { useLayerStore } from "../stores/layerStore"
 import { useUndoStore, MAX_UNDO_ENTRIES } from "../stores/undoStore"
 import { useFeaturesStore } from "../stores/featuresStore"
 import { toApiSaveShape, featureDataToGeometry } from "./features/feature-data"
-import { numberOneRoad } from "./house-numbering"
+import {
+  renumberEntranceAfterChange,
+  renumberSpecialFeatureByDbId,
+  clearSpecialNumberingForFeature,
+  specialModeForFeature,
+} from "./special-numbering"
 import { PHASES } from "../phases"
 import { getDefaultStyle } from "./draw/draw-save"
 import { t } from "../i18n"
@@ -54,6 +59,15 @@ async function detachReferencesForEvicted(evicted: {
       fixes.push({ entrance })
     }
   }
+  if (
+    (evicted.phaseKey === "districts" ||
+      evicted.phaseKey === "cityCenter" ||
+      evicted.phaseKey === "publicSpaces") &&
+    specialModeForFeature(evicted.entry.data.type, evicted.entry.data)
+  ) {
+    await clearSpecialNumberingForFeature(oldDbId)
+  }
+
   if (fixes.length === 0) return
 
   debugLog(
@@ -202,6 +216,26 @@ export async function undo(): Promise<void> {
         }
       }
 
+      // A restored cité/roundabout/square also gets a new DB id; entrances
+      // numbered from it must follow it, otherwise the next auto-renumber
+      // would look up a feature that no longer exists.
+      if (
+        (phaseKey === "districts" || phaseKey === "cityCenter" || phaseKey === "publicSpaces") &&
+        specialModeForFeature(entry.data.type, entry.data)
+      ) {
+        for (const entrance of state.houseEntrances || []) {
+          if ((entrance.data as HouseEntranceFeatureData).numberingFeatureId === oldDbId) {
+            layerStore.updateFeature("houseEntrances", entrance.dbId, {
+              numberingFeatureId: newDbId,
+            })
+            repairedEntrances.push(entrance)
+            debugLog(
+              `[UNDO] Updated entrance "${entrance.data.label}" → numberingFeatureId ${newDbId}`,
+            )
+          }
+        }
+      }
+
       // Persist the reference repair — the server still stores the old (deleted)
       // ID, so the in-memory fix alone would be lost on reload.
       if (repairedEntrances.length > 0) {
@@ -239,14 +273,20 @@ export async function undo(): Promise<void> {
       }
 
       // A restored main entrance comes back with its old number in data, so
-      // re-run the authoritative numbering pass on its road after the restore.
+      // re-run the authoritative numbering pass after the restore.
       const restoredEntrance = restoredEntry.data as HouseEntranceFeatureData
       if (
         phaseKey === "houseEntrances" &&
-        restoredEntrance.entranceTypeKey === "main_entrance" &&
-        restoredEntrance.roadDbId
+        (restoredEntrance.entranceTypeKey === "main_entrance" || restoredEntrance.numberingMode)
       ) {
-        if ((await numberOneRoad(restoredEntrance.roadDbId)) === "failed") {
+        if ((await renumberEntranceAfterChange(restoredEntrance)) === "failed") {
+          showToast(t("map_restore_numbering_warning"), "warning")
+        }
+      } else if (
+        (phaseKey === "districts" || phaseKey === "cityCenter" || phaseKey === "publicSpaces") &&
+        specialModeForFeature(restoredEntry.data.type, restoredEntry.data)
+      ) {
+        if ((await renumberSpecialFeatureByDbId(newDbId)) === "failed") {
           showToast(t("map_restore_numbering_warning"), "warning")
         }
       }

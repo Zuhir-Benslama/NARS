@@ -92,6 +92,7 @@ CLASS_FILES: dict[str, list[str]] = {
     "FeatureLoader": ["map/features/loader.ts", "map/features/loader-db.ts"],
     "PhaseNav": ["map/phases/index.ts"],
     "HouseNumbering": ["map/house-numbering.ts"],
+    "SpecialNumbering": ["map/special-numbering.ts"],
     "Undo": ["map/undo.ts"],
     "RoadDirections": ["map/roads/road-directions.ts"],
     "RoadGraph": ["map/roads/road-graph.ts"],

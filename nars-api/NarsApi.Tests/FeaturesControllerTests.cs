@@ -33,6 +33,7 @@ public class FeaturesControllerTests
             timeProvider ?? Mock.Of<IDateTimeProvider>(x => x.UtcNow == FixedUtcNow),
             featureStatsService ?? Mock.Of<IFeatureStatsService>(),
             Mock.Of<INumberEntrancesService>(),
+            Mock.Of<ISpecialNumberingService>(),
             Mock.Of<ILogger<FeaturesController>>(),
             Mock.Of<IWebHostEnvironment>())
         {
