@@ -12,7 +12,8 @@ vi.mock("../draw/draw-save", () => ({
   }),
 }))
 
-import { PHASES } from "../../phases"
+import { PHASES, ROUNDABOUTS_COLOR } from "../../phases"
+import { ROUNDABOUTS_CONFIG } from "../../config"
 
 const areasPhase = PHASES[0]
 const roundaboutsPhase = PHASES.find((p: Phase) => p.key === "roundabouts")!
@@ -78,15 +79,31 @@ describe("buildGeoJsonFeature", () => {
     expect(result!.properties.geomType).toBe("Polygon")
   })
 
-  it("builds a LineString circle ring for roundabouts with radius", () => {
+  it("builds a hollow LineString circle for a roundabout with radius", () => {
     const result = buildGeoJsonFeature(
       "db-4",
-      data({ lat: 10, lng: 20, radius: 500 }),
+      data({ lat: 10, lng: 20, radius: 500, roundaboutsTypeKey: "roundabout" }),
       roundaboutsPhase,
     )
     expect(result).not.toBeNull()
     expect(result!.geometry.type).toBe("LineString")
+    expect(result!.properties.geomType).toBe("LineString")
+    expect(result!.properties.fillOpacity).toBeUndefined()
     expect(result!.properties.radius).toBe(500)
+  })
+
+  it("builds a filled Polygon and City Center label for a plain city center", () => {
+    const result = buildGeoJsonFeature(
+      "db-cc",
+      data({ lat: 10, lng: 20, radius: 500, roundaboutsTypeKey: "city_center" }),
+      roundaboutsPhase,
+    )
+    expect(result).not.toBeNull()
+    expect(result!.geometry.type).toBe("Polygon")
+    expect(result!.properties.geomType).toBe("Polygon")
+    expect(result!.properties.label).toBe("City Center")
+    expect(result!.properties.fillOpacity).toBe(ROUNDABOUTS_CONFIG.cityCenterFillOpacity)
+    expect(result!.properties.lineColor).toBe(ROUNDABOUTS_COLOR)
   })
 
   it("builds a Point for roundabouts without radius", () => {

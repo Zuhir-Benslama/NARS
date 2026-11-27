@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest"
-import { buildFeatureData, toApiSaveShape, featureDataToGeometry } from "./feature-data"
+import {
+  buildFeatureData,
+  toApiSaveShape,
+  featureDataToGeometry,
+  roundaboutsGeometryKind,
+} from "./feature-data"
 import type { FeatureData } from "../../types"
 import type { ModalResult } from "../../types/modal"
 import type { PHASES } from "../../phases"
@@ -336,6 +341,14 @@ describe("feature-data", () => {
       ]
       expect(featureDataToGeometry({ coordinates }, "line").type).toBe("LineString")
       expect(featureDataToGeometry({ coordinates }, "polygon").type).toBe("Polygon")
+    })
+
+    it("renders a city center as a filled ring and a roundabout as a hollow ring", () => {
+      const circle = { lat: 36, lng: 3, radius: 250 }
+      expect(roundaboutsGeometryKind({ roundaboutsTypeKey: "city_center" })).toBe("filledCircle")
+      expect(roundaboutsGeometryKind({ roundaboutsTypeKey: "roundabout" })).toBe("circle")
+      expect(featureDataToGeometry(circle, "filledCircle").type).toBe("Polygon")
+      expect(featureDataToGeometry(circle, "circle").type).toBe("LineString")
     })
   })
 })

@@ -11,9 +11,11 @@ import {
   AREA_TYPES,
   DISTRICT_TYPES,
   ROAD_TYPES,
+  ROUNDABOUTS_SUBTYPES,
   PUBLIC_SPACE_TYPES,
   PUBLIC_BUILDING_SECTORS,
 } from "../../types/feature-types"
+import { roundaboutsSubtype } from "../../lib/roundabouts"
 import type { FeatureData } from "../../types"
 
 function subtypeKeyFor(phaseKey: string, data: FeatureData): string | undefined {
@@ -28,6 +30,8 @@ function subtypeKeyFor(phaseKey: string, data: FeatureData): string | undefined 
       return data.buildingTypeKey
     case "publicSpaces":
       return data.spaceTypeKey
+    case "roundabouts":
+      return roundaboutsSubtype(data)
     default:
       return undefined
   }
@@ -40,6 +44,7 @@ export function subtypeLabelFor(phaseKey: string, data: FeatureData): string {
     if (resolved && resolved !== `featureTypes.${key}`) return resolved
     const all = [
       ...AREA_TYPES,
+      ...ROUNDABOUTS_SUBTYPES,
       ...DISTRICT_TYPES,
       ...ROAD_TYPES,
       ...PUBLIC_SPACE_TYPES,

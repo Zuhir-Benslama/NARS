@@ -124,6 +124,9 @@ export const ROUNDABOUTS_CONFIG = {
 
   /** Stroke width of the roundabouts ring rendered as a LineString */
   ringStrokeWidth: 6,
+
+  /** Fill opacity of a plain city center circle, which is rendered as a Polygon */
+  cityCenterFillOpacity: 0.25,
 } as const
 
 // ─── EDIT VISUAL CONFIGURATION ───────────────────────────────────────────────

@@ -1,12 +1,13 @@
 import { PHASES } from "../../phases"
 import { debugLog, debugError } from "../../utils/debug"
 import type { FeatureData, FeatureDataByType, FeatureTypeKey, ModalResult } from "../../types"
+import { isPlainRoundabouts } from "../../lib/roundabouts"
 import { closeRing, computeCircleRing } from "../rendering/geometry"
 
 export type ApiSaveShape = { type: string; layer: string }
 
 /** How a feature's shape is drawn — determines which GeoJSON geometry is built. */
-export type GeometryKind = "marker" | "line" | "polygon" | "circle"
+export type GeometryKind = "marker" | "line" | "polygon" | "circle" | "filledCircle"
 
 export type DerivedGeometry = GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon
 
@@ -19,6 +20,7 @@ export type DerivedGeometry = GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polyg
  * a Polygon), so keep ALL of them on this one implementation:
  *  - marker                        → Point (lat/lng, else first coordinate)
  *  - circle with lat/lng/radius    → closed LineString ring around the center
+ *  - filledCircle with radius      → closed Polygon ring around the center
  *  - coordinates + kind "line"     → LineString
  *  - coordinates otherwise         → closed Polygon
  *  - fallback                      → Point at lat/lng (0,0 when absent)
@@ -32,12 +34,12 @@ export function featureDataToGeometry(
     coordinates: [data.lng ?? 0, data.lat ?? 0],
   })
 
-  if (kind === "circle") {
+  if (kind === "circle" || kind === "filledCircle") {
     if (data.lat != null && data.lng != null && data.radius) {
-      return {
-        type: "LineString",
-        coordinates: closeRing(computeCircleRing(data.lat, data.lng, data.radius)),
-      }
+      const ring = closeRing(computeCircleRing(data.lat, data.lng, data.radius))
+      return kind === "filledCircle"
+        ? { type: "Polygon", coordinates: [ring] }
+        : { type: "LineString", coordinates: ring }
     }
     // A circle that lost its radius degrades to its center point rather than
     // misinterpreting arbitrary vertex coordinates as a ring.
@@ -69,6 +71,19 @@ export function featureDataToGeometry(
   }
 
   return point()
+}
+
+/**
+ * A plain city center is displayed as a filled circle, while a true roundabout
+ * stays hollow. Both share the same stored radius/lat/lng shape, so the subtype
+ * is the only thing that decides which GeoJSON geometry (and map layer) is used.
+ */
+export function roundaboutsGeometryKind(data: unknown): GeometryKind {
+  return isPlainRoundabouts(
+    data as Pick<FeatureData, "roundaboutsTypeKey" | "cityCenterTypeKey"> | null | undefined,
+  )
+    ? "filledCircle"
+    : "circle"
 }
 
 function extractCoords(geometry: GeoJSON.Geometry): { lat: number; lng: number }[] | null {

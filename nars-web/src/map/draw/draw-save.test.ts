@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { createPinia, setActivePinia } from "pinia"
 import type { LayerEntry } from "../../types"
+import { ROUNDABOUTS_CONFIG } from "../../config"
 
 // ─── HOISTED MODULE MOCKS ────────────────────────────────────────────────────
 // These replace external dependencies so the orchestration flow is testable.
@@ -384,6 +385,48 @@ describe("completeDrawingWithGeometry", () => {
     await completeDrawingWithGeometry(roundaboutsPoint(0.5, 0.5), "circle", {})
 
     expect(mockSaveToDatabase).toHaveBeenCalledTimes(1)
+  })
+
+  it("stores a newly added city center as a filled Polygon named City Center", async () => {
+    setDrawingPhase(roundaboutsPhase)
+    const { useLayerStore } = await import("../../stores/layerStore")
+    useLayerStore().addFeature("areas", urbanArea("area-1", 0, 0))
+
+    mockOpenModal.mockResolvedValue(roundaboutsModalResult())
+    mockSaveToDatabase.mockResolvedValue({ ok: true, data: { id: "cc-new" } })
+
+    await completeDrawingWithGeometry(roundaboutsPoint(0.5, 0.5), "circle", {})
+
+    expect(mockFeaturesStoreAdd).toHaveBeenCalledTimes(1)
+    const added = mockFeaturesStoreAdd.mock.calls[0][0]
+    expect(added.geometry.type).toBe("Polygon")
+    expect(added.properties).toMatchObject({
+      dbId: "cc-new",
+      phaseKey: "roundabouts",
+      geomType: "Polygon",
+      label: "City Center",
+      fillOpacity: ROUNDABOUTS_CONFIG.cityCenterFillOpacity,
+    })
+  })
+
+  it("stores a newly added roundabout as a hollow LineString", async () => {
+    setDrawingPhase(roundaboutsPhase)
+
+    mockOpenModal.mockResolvedValue(roundaboutsModalResult("roundabout"))
+    mockSaveToDatabase.mockResolvedValue({ ok: true, data: { id: "ra-new" } })
+
+    await completeDrawingWithGeometry(roundaboutsPoint(0.5, 0.5), "circle", {})
+
+    expect(mockFeaturesStoreAdd).toHaveBeenCalledTimes(1)
+    const added = mockFeaturesStoreAdd.mock.calls[0][0]
+    expect(added.geometry.type).toBe("LineString")
+    expect(added.properties).toMatchObject({
+      dbId: "ra-new",
+      phaseKey: "roundabouts",
+      geomType: "LineString",
+      label: "Roundabout",
+    })
+    expect(added.properties.fillOpacity).toBeUndefined()
   })
 })
 

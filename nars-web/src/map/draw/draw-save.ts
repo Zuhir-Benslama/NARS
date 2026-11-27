@@ -18,7 +18,11 @@ import { showToast } from "../../lib/toast"
 import { debugError } from "../../utils/debug"
 import { t } from "../../i18n"
 import { updateEndpointMarkers } from "../roads/road-directions"
-import { buildFeatureData, featureDataToGeometry } from "../features/feature-data"
+import {
+  buildFeatureData,
+  featureDataToGeometry,
+  roundaboutsGeometryKind,
+} from "../features/feature-data"
 import { displayLabelFor } from "../features/feature-labels"
 import { DRAW_CONFIG, ROUNDABOUTS_CONFIG } from "../../config"
 import {
@@ -165,9 +169,17 @@ function applyRoundaboutsOverride(
 ): { style: Record<string, unknown>; storeGeometry: GeoJSON.Geometry } {
   const d = featureData as { radius?: number; lat?: number; lng?: number }
   if (!d.radius || d.lat == null || d.lng == null) return { style, storeGeometry }
+  const geometryKind = roundaboutsGeometryKind(featureData)
+  const isFilled = geometryKind === "filledCircle"
   return {
-    storeGeometry: featureDataToGeometry(d, "circle"),
+    storeGeometry: featureDataToGeometry(d, geometryKind),
     style: {
+      ...(isFilled
+        ? {
+            fillColor: ROUNDABOUTS_COLOR,
+            fillOpacity: ROUNDABOUTS_CONFIG.cityCenterFillOpacity,
+          }
+        : {}),
       lineColor: ROUNDABOUTS_COLOR,
       lineWidth: ROUNDABOUTS_CONFIG.ringStrokeWidth,
       textColor: "#333333",

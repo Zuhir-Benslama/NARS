@@ -3,7 +3,7 @@
 
 import { PHASES, ROUNDABOUTS_COLOR } from "../../phases"
 import { ROUNDABOUTS_CONFIG } from "../../config"
-import { featureDataToGeometry } from "./feature-data"
+import { featureDataToGeometry, roundaboutsGeometryKind } from "./feature-data"
 import { displayLabelFor } from "./feature-labels"
 import { getFeatureStyle } from "../draw/draw-save"
 import { sanitizeApiText } from "../../utils/sanitize"
@@ -40,15 +40,23 @@ export function buildGeoJsonFeature(
     if (phase.key === "roundabouts") {
       const radius = data.radius
       if (radius && radius > 0) {
+        const geometryKind = roundaboutsGeometryKind(data)
+        const isFilled = geometryKind === "filledCircle"
         return {
           type: "Feature" as const,
-          geometry: featureDataToGeometry(data, "circle"),
+          geometry: featureDataToGeometry(data, geometryKind),
           properties: {
             dbId,
             phaseKey: phase.key,
             label: displayLabel,
             labelLatin: sanitizedLabelLatin,
-            geomType: "LineString",
+            geomType: isFilled ? "Polygon" : "LineString",
+            ...(isFilled
+              ? {
+                  fillColor: ROUNDABOUTS_COLOR,
+                  fillOpacity: ROUNDABOUTS_CONFIG.cityCenterFillOpacity,
+                }
+              : {}),
             lineColor: ROUNDABOUTS_COLOR,
             lineWidth: ROUNDABOUTS_CONFIG.ringStrokeWidth,
             radius,

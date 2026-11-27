@@ -8,14 +8,20 @@ import { showToast } from "../lib/toast"
 import { useLayerStore } from "../stores/layerStore"
 import { useUndoStore, MAX_UNDO_ENTRIES } from "../stores/undoStore"
 import { useFeaturesStore } from "../stores/featuresStore"
-import { toApiSaveShape, featureDataToGeometry } from "./features/feature-data"
+import {
+  toApiSaveShape,
+  featureDataToGeometry,
+  roundaboutsGeometryKind,
+} from "./features/feature-data"
+import { displayLabelFor } from "./features/feature-labels"
 import {
   renumberEntranceAfterChange,
   renumberSpecialFeatureByDbId,
   clearSpecialNumberingForFeature,
   specialModeForFeature,
 } from "./special-numbering"
-import { PHASES } from "../phases"
+import { PHASES, ROUNDABOUTS_COLOR } from "../phases"
+import { ROUNDABOUTS_CONFIG } from "../config"
 import { getDefaultStyle } from "./draw/draw-save"
 import { t } from "../i18n"
 import { debugLog, debugError, debugWarn } from "../utils/debug"
@@ -292,16 +298,27 @@ export async function undo(): Promise<void> {
       }
 
       const phase = PHASES.find((p) => p.key === phaseKey)
-      const style = getDefaultStyle(phase?.color ?? "#8e44ad")
+      const geometryKind =
+        phase?.key === "roundabouts" ? roundaboutsGeometryKind(entry.data) : entry.type
+      const isFilledCityCenter = geometryKind === "filledCircle"
+      const style = isFilledCityCenter
+        ? {
+            fillColor: ROUNDABOUTS_COLOR,
+            fillOpacity: ROUNDABOUTS_CONFIG.cityCenterFillOpacity,
+            lineColor: ROUNDABOUTS_COLOR,
+            lineWidth: ROUNDABOUTS_CONFIG.ringStrokeWidth,
+            textColor: "#333333",
+          }
+        : getDefaultStyle(phase?.color ?? "#8e44ad")
 
-      const geometry = entryDataToGeometry(entry.data, entry.type)
+      const geometry = entryDataToGeometry(entry.data, geometryKind)
       useFeaturesStore().add({
         id: newId,
         geometry,
         properties: {
           dbId: newDbId,
           phaseKey,
-          label: entry.data.label,
+          label: phase ? displayLabelFor(phase, entry.data) : entry.data.label,
           geomType: geometry.type,
           ...style,
         },
@@ -321,7 +338,7 @@ export async function undo(): Promise<void> {
 
 function entryDataToGeometry(
   data: import("../types").FeatureData,
-  type: "polygon" | "line" | "circle" | "marker",
+  type: "polygon" | "line" | "circle" | "filledCircle" | "marker",
 ): GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon {
   return featureDataToGeometry(data, type)
 }
