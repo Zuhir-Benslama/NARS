@@ -270,6 +270,7 @@ describe("getActiveSnapPhases (draw mode)", () => {
     const result = mod.getActiveSnapPhases()
 
     expect(result).toContain("areas")
+    expect(result).toContain("roundabouts")
     expect(result).toContain("roads")
   })
 

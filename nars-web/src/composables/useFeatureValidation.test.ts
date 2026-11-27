@@ -74,6 +74,42 @@ describe("validate — decision fields", () => {
   })
 })
 
+describe("buildModalResult — roundabouts", () => {
+  it("emits a non-empty localized name for a plain city center", async () => {
+    const { PHASES } = await vi.importActual<typeof import("../phases")>("../phases")
+    const mod = await loadModule()
+    const { buildModalResult } = mod.useFeatureValidation(
+      storeFor(PHASES, "roundabouts", { roundaboutsTypeKey: "city_center", radius: 500 }),
+    )
+
+    const result = buildModalResult("Commune")
+
+    expect(result).toMatchObject({
+      type: "roundabouts",
+      label: "City Center",
+      labelEn: "City Center",
+      labelFr: "Centre-ville",
+      labelAr: "مركز المدينة",
+      roundaboutsTypeKey: "city_center",
+    })
+  })
+
+  it("names a roundabout subtype accordingly", async () => {
+    const { PHASES } = await vi.importActual<typeof import("../phases")>("../phases")
+    const mod = await loadModule()
+    const { buildModalResult } = mod.useFeatureValidation(
+      storeFor(PHASES, "roundabouts", { roundaboutsTypeKey: "roundabout", radius: 500 }),
+    )
+
+    const result = buildModalResult("Commune")
+
+    expect(result.label).not.toBe("")
+    expect(result.labelEn).toBe("Roundabout")
+    expect(result.labelFr).toBe("Rond-point")
+    expect(result.labelAr).toBe("دوار")
+  })
+})
+
 describe("buildModalResult — roads", () => {
   it("emits blank decision fields rather than dropping them", async () => {
     const { PHASES } = await vi.importActual<typeof import("../phases")>("../phases")

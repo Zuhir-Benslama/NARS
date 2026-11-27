@@ -203,6 +203,31 @@ public class FeaturesControllerTests
     }
 
     [Fact]
+    public async Task SaveFeature_ValidRoundabouts_Returns201AndPersists()
+    {
+        var (db, factory) = CreateInMemoryDbPair("FeaturesTest");
+        await using (db)
+        {
+            var ctrl = CreateController(db, factory: factory);
+
+            var data = Json("""{"type":"roundabouts","lat":36.0,"lng":3.0,"radius":500,"roundaboutsTypeKey":"city_center"}""");
+            var body = new FeatureSaveRequest(
+                FeatureTypes.Roundabouts,
+                FeatureTypes.RoundaboutsLayers.Default,
+                "City Center",
+                data);
+
+            var result = await ctrl.SaveFeature(body);
+
+            var created = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(201, created.StatusCode);
+            var saved = Assert.Single(db.Roundabouts);
+            Assert.Equal("City Center", saved.Label);
+            Assert.Contains("\"roundaboutsTypeKey\":\"city_center\"", saved.Data);
+        }
+    }
+
+    [Fact]
     public async Task SaveFeature_Area_QueuesScatteredRefresh()
     {
         var featureServiceMock = new Mock<IFeatureService>();

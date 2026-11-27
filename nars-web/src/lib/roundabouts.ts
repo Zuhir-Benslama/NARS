@@ -19,6 +19,26 @@ interface PlacementFeature {
 
 const URBAN_AREA_LAYERS = new Set(["central_urban", "secondary_urban"])
 
+/**
+ * Canonical names for the roundabouts subtypes. The modal has no editable name
+ * field for this phase, so saves use these instead of an empty label. Kept here
+ * (rather than importing locale JSON) so fr/ar remain lazily loaded chunks.
+ */
+const ROUNDABOUTS_NAMES: Record<string, { en: string; fr: string; ar: string }> = {
+  city_center: { en: "City Center", fr: "Centre-ville", ar: "مركز المدينة" },
+  roundabout: { en: "Roundabout", fr: "Rond-point", ar: "دوار" },
+}
+
+export function roundaboutsNames(subtypeKey: string) {
+  const names = ROUNDABOUTS_NAMES[subtypeKey] ?? ROUNDABOUTS_NAMES.city_center
+  return {
+    label: names.en,
+    labelEn: names.en,
+    labelFr: names.fr,
+    labelAr: names.ar,
+  }
+}
+
 /** Center point of a drawn roundabouts circle (point or polygon geometry). */
 export function roundaboutsPointFromGeometry(geometry: GeoJSON.Geometry): LatLng | null {
   if (geometry.type === "Point") {

@@ -325,4 +325,15 @@ describe("getSnapPoints", () => {
 
     expect(mod.getSnapPoints(["roundabouts"])).toEqual([])
   })
+
+  it("does not expose a roundabout center as a snap point when it has a radius", () => {
+    useLayerStore().addFeature("roundabouts", {
+      id: "cc1",
+      dbId: "cc1",
+      type: "circle",
+      data: { type: "roundabouts", label: "CC", lat: 36.0, lng: 127.0, radius: 500 },
+    } as any)
+
+    expect(mod.getSnapPoints(["roundabouts"])).toEqual([])
+  })
 })

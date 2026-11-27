@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest"
 import type { FeatureData, LatLng } from "../types"
+import enMessages from "../i18n/en.json"
+import frMessages from "../i18n/fr.json"
+import arMessages from "../i18n/ar.json"
 import {
   roundaboutsPointFromGeometry,
   roundaboutsRadiusError,
+  roundaboutsNames,
   roundaboutsSubtype,
   plainRoundaboutsPlacementError,
 } from "./roundabouts"
@@ -157,5 +161,25 @@ describe("roundaboutsPointFromGeometry", () => {
       ],
     })
     expect(point).toEqual({ lat: 1, lng: 1 })
+  })
+})
+
+describe("roundaboutsNames", () => {
+  it.each(["city_center", "roundabout"] as const)(
+    "%s matches the translated feature type labels",
+    (subtypeKey) => {
+      const names = roundaboutsNames(subtypeKey)
+
+      expect(names).toEqual({
+        label: enMessages.featureTypes[subtypeKey],
+        labelEn: enMessages.featureTypes[subtypeKey],
+        labelFr: frMessages.featureTypes[subtypeKey],
+        labelAr: arMessages.featureTypes[subtypeKey],
+      })
+    },
+  )
+
+  it("falls back to the city center name for an unknown subtype", () => {
+    expect(roundaboutsNames("unknown")).toEqual(roundaboutsNames("city_center"))
   })
 })

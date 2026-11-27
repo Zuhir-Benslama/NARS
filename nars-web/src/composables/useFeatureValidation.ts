@@ -2,7 +2,7 @@ import { computed } from "vue"
 import type { ModalState, ModalResult } from "../types"
 import { PHASES } from "../phases"
 import { ROUNDABOUTS_CONFIG } from "../config"
-import { roundaboutsRadiusError } from "../lib/roundabouts"
+import { roundaboutsNames, roundaboutsRadiusError } from "../lib/roundabouts"
 
 export function useFeatureValidation(modalStore: ModalState & { phaseIndex: number | null }) {
   const phase = computed(() =>
@@ -132,24 +132,12 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
     }
 
     if (key === "roundabouts") {
+      // The API requires a non-empty label; the modal's name fields are
+      // read-only for this phase, so derive all names from the subtype.
+      const names = roundaboutsNames(modalStore.roundaboutsTypeKey || "city_center")
       return {
         type: "roundabouts",
-        label: "",
-        labelAr:
-          (modalStore.labelAr ?? "").trim() ||
-          (modalStore.labelEn ?? "").trim() ||
-          (modalStore.labelFr ?? "").trim() ||
-          (modalStore.label ?? "").trim(),
-        labelFr:
-          (modalStore.labelFr ?? "").trim() ||
-          (modalStore.labelEn ?? "").trim() ||
-          (modalStore.labelAr ?? "").trim() ||
-          (modalStore.label ?? "").trim(),
-        labelEn:
-          (modalStore.labelEn ?? "").trim() ||
-          (modalStore.labelFr ?? "").trim() ||
-          (modalStore.labelAr ?? "").trim() ||
-          (modalStore.label ?? "").trim(),
+        ...names,
         radius: modalStore.radius ?? undefined,
         roundaboutsTypeKey: modalStore.roundaboutsTypeKey,
         numberingOutsideBandM: modalStore.numberingOutsideBandM ?? undefined,

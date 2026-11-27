@@ -132,7 +132,10 @@ export function getSnapPoints(
     if (!entries) continue
     for (const entry of entries) {
       if (entry.id === exclude) continue
-      const d = entry.data as { lat?: number; lng?: number }
+      const d = entry.data as { lat?: number; lng?: number; radius?: number }
+      // A roundabout with a radius is a circle: its centre is not a snap
+      // target, only its perimeter is (see getRoundaboutsCircles).
+      if (key === "roundabouts" && d.radius != null && d.radius > 0) continue
       if (d.lat != null && d.lng != null) {
         points.push({ lat: d.lat, lng: d.lng })
       }
