@@ -97,4 +97,10 @@ BEGIN
         VALUES ('20261127080208_RenameCityCenterToRoundabouts', '10.0.10')
         ON CONFLICT ("MigrationId") DO NOTHING;
     END IF;
+
+    -- NormalizeRoundaboutsFeatureRegistry only rewrites legacy registry rows.
+    -- Fresh schemas have none, so it is safe to baseline unconditionally.
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261127085905_NormalizeRoundaboutsFeatureRegistry', '10.0.10')
+    ON CONFLICT ("MigrationId") DO NOTHING;
 END $$;
