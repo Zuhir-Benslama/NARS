@@ -18,9 +18,9 @@ export interface ModalState {
   sectorKey: string
   buildingTypeKey: string
   radius: number | null
-  cityCenterTypeKey: string
+  roundaboutsTypeKey: string
   /** True when the plain city-center subtype is already taken or out of scope. */
-  plainCityCenterUnavailable: boolean
+  plainRoundaboutsUnavailable: boolean
   numberingOutsideBandM: number | null
   currentModalFeatureId: string | null
 }
@@ -47,14 +47,14 @@ export interface DistrictModalResult {
   districtTypeKey?: string
 }
 
-export interface CityCenterModalResult {
-  type: "cityCenter"
+export interface RoundaboutsModalResult {
+  type: "roundabouts"
   label: string
   labelAr?: string
   labelFr?: string
   labelEn?: string
   radius?: number
-  cityCenterTypeKey?: string
+  roundaboutsTypeKey?: string
   numberingOutsideBandM?: number
 }
 
@@ -122,7 +122,7 @@ export interface NamingPanelModalResult {
 export type ModalResult =
   | AreaModalResult
   | DistrictModalResult
-  | CityCenterModalResult
+  | RoundaboutsModalResult
   | RoadModalResult
   | HouseEntranceModalResult
   | PublicBuildingModalResult

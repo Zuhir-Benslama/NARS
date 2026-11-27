@@ -9,9 +9,9 @@ import { debugLog } from "../../utils/debug"
 const PHASE_VISIBILITY: Record<string, string[]> = {
   areas: ["areas"],
   districts: ["areas", "districts"],
-  cityCenter: ["areas", "cityCenter"],
-  roads: ["areas", "cityCenter", "roads"],
-  houseEntrances: ["areas", "cityCenter", "roads", "houseEntrances"],
+  roundabouts: ["areas", "roundabouts"],
+  roads: ["areas", "roundabouts", "roads"],
+  houseEntrances: ["areas", "roundabouts", "roads", "houseEntrances"],
   publicBuildings: ["areas", "publicBuildings"],
   publicSpaces: ["areas", "publicSpaces"],
   namingPanels: ["areas", "districts", "roads", "publicBuildings", "publicSpaces", "namingPanels"],

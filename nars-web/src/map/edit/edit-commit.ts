@@ -18,7 +18,7 @@ import type { LayerEntry, LatLng } from "../../types"
 import { commitDraftEdit, cancelDraftEdit } from "../drafts/draft-edit"
 import { updateEndpointMarkers } from "../roads/road-markers"
 import { getRoadSide } from "../../lib/validation"
-import { plainCityCenterPlacementError } from "../../lib/city-center"
+import { isPlainRoundabouts, plainRoundaboutsPlacementError } from "../../lib/roundabouts"
 import {
   renumberEntranceAfterChange,
   renumberSpecialFeatureByDbId,
@@ -196,24 +196,21 @@ export async function commitEditMode(): Promise<void> {
       if (!ok) return
     }
 
-    // Moving a plain city center must preserve the 0-or-1-per-urban-area rule.
-    if (
-      entry.data.type === "cityCenter" &&
-      (entry.data.cityCenterTypeKey ?? "city_center") !== "roundabout"
-    ) {
+    // Moving the plain city-center subtype must preserve the 0-or-1-per-urban-area rule.
+    if (entry.data.type === "roundabouts" && isPlainRoundabouts(entry.data)) {
       const state = useLayerStore().$state
-      const error = plainCityCenterPlacementError(
+      const error = plainRoundaboutsPlacementError(
         { lat: entry.data.lat ?? undefined, lng: entry.data.lng ?? undefined },
         state.areas ?? [],
-        state.cityCenter ?? [],
+        state.roundabouts ?? [],
         entry.dbId,
       )
       if (error) {
         showToast(
           t(
             error === "outside_urban_area"
-              ? "alert_cc_must_be_in_urban_area"
-              : "map_city_center_exists",
+              ? "alert_plain_roundabouts_must_be_in_urban_area"
+              : "map_plain_roundabouts_exists",
           ),
           "error",
         )

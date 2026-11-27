@@ -23,8 +23,8 @@ const createMockModalStore = () => ({
   sectorKey: "banking_postal",
   buildingTypeKey: "bank",
   radius: null as number | null,
-  cityCenterTypeKey: "city_center",
-  plainCityCenterUnavailable: false,
+  roundaboutsTypeKey: "city_center",
+  plainRoundaboutsUnavailable: false,
   patchFields: vi.fn(),
   close: vi.fn(),
 })
@@ -65,11 +65,11 @@ vi.mock("../phases", () => ({
     },
     {
       index: 1,
-      key: "cityCenter",
-      label: "phase_cityCenter_label",
+      key: "roundabouts",
+      label: "phase_roundabouts_label",
       drawType: "circle",
       color: "#e74c3c",
-      hint: "phase_cityCenter_hint",
+      hint: "phase_roundabouts_hint",
     },
     {
       index: 2,
@@ -121,7 +121,7 @@ vi.mock("../phases", () => ({
     { key: "trad_activities_zone", label: "Trade Activities Zone" },
     { key: "industry_zone", label: "Industrial Zone" },
   ],
-  CITY_CENTER_TYPES: [
+  ROUNDABOUTS_SUBTYPES: [
     { key: "city_center", label: "City Center" },
     { key: "roundabout", label: "Roundabout" },
   ],
@@ -353,9 +353,9 @@ describe("FeatureModal", () => {
     expect(nameInput.attributes("readonly")).toBeDefined()
   })
 
-  it("disables name input for city center", async () => {
+  it("disables name input for roundabouts", async () => {
     mockModalStore.visible = true
-    mockModalStore.phaseIndex = 1 // cityCenter
+    mockModalStore.phaseIndex = 1 // roundabouts
 
     const wrapper = mount(FeatureModal)
     await nextTick()
@@ -366,9 +366,9 @@ describe("FeatureModal", () => {
 
   it("disables the plain city-center choice when the urban area already has one", async () => {
     mockModalStore.visible = true
-    mockModalStore.phaseIndex = 1 // cityCenter
-    mockModalStore.cityCenterTypeKey = "roundabout"
-    mockModalStore.plainCityCenterUnavailable = true
+    mockModalStore.phaseIndex = 1 // roundabouts
+    mockModalStore.roundaboutsTypeKey = "roundabout"
+    mockModalStore.plainRoundaboutsUnavailable = true
 
     const wrapper = mount(FeatureModal)
     await nextTick()

@@ -21,7 +21,7 @@ SET data = data || jsonb_build_object(
     -- Geoman-specific identifiers
     '__gm_id', 'feat_' || id::text,
     '__gm_shape', CASE 
-        WHEN type = 'houseEntrances' OR type = 'namingPanels' OR type = 'cityCenter' THEN 'marker'
+        WHEN type = 'houseEntrances' OR type = 'namingPanels' OR type = 'roundabouts' THEN 'marker'
         WHEN type = 'roads' THEN 'line'
         ELSE 'polygon'
     END,
@@ -33,7 +33,7 @@ SET data = data || jsonb_build_object(
         WHEN type = 'districts' THEN '#f39c12'
         WHEN type = 'publicBuildings' THEN '#e67e22'
         WHEN type = 'publicSpaces' THEN '#2ecc71'
-        WHEN type = 'cityCenter' THEN '#e74c3c'
+        WHEN type = 'roundabouts' THEN '#e74c3c'
         ELSE '#8e44ad'
     END,
     
@@ -42,7 +42,7 @@ SET data = data || jsonb_build_object(
         WHEN type = 'districts' THEN 0
         WHEN type = 'publicBuildings' THEN 0.25
         WHEN type = 'publicSpaces' THEN 0.20
-        WHEN type = 'cityCenter' THEN 0.5
+        WHEN type = 'roundabouts' THEN 0.5
         ELSE 0.1
     END,
     
@@ -53,7 +53,7 @@ SET data = data || jsonb_build_object(
         WHEN type = 'roads' THEN '#3498db'
         WHEN type = 'publicBuildings' THEN '#e67e22'
         WHEN type = 'publicSpaces' THEN '#2ecc71'
-        WHEN type = 'cityCenter' THEN '#e74c3c'
+        WHEN type = 'roundabouts' THEN '#e74c3c'
         WHEN type = 'houseEntrances' THEN '#27ae60'
         WHEN type = 'namingPanels' THEN '#9b59b6'
         ELSE '#8e44ad'
@@ -69,14 +69,14 @@ SET data = data || jsonb_build_object(
     END,
     
     'circleColor', CASE 
-        WHEN type = 'cityCenter' THEN '#e74c3c'
+        WHEN type = 'roundabouts' THEN '#e74c3c'
         WHEN type = 'houseEntrances' THEN '#27ae60'
         WHEN type = 'namingPanels' THEN '#9b59b6'
         ELSE '#27ae60'
     END,
     
     'circleRadius', CASE 
-        WHEN type = 'cityCenter' THEN (COALESCE((data->>'radius')::numeric, 50))::int
+        WHEN type = 'roundabouts' THEN (COALESCE((data->>'radius')::numeric, 50))::int
         WHEN type = 'houseEntrances' THEN 10
         WHEN type = 'namingPanels' THEN 8
         ELSE 8
@@ -87,7 +87,7 @@ SET data = data || jsonb_build_object(
         ELSE '#333333'
     END
 )
-WHERE type IN ('areas', 'districts', 'roads', 'houseEntrances', 'publicBuildings', 'publicSpaces', 'cityCenter', 'namingPanels');
+WHERE type IN ('areas', 'districts', 'roads', 'houseEntrances', 'publicBuildings', 'publicSpaces', 'roundabouts', 'namingPanels');
 
 -- Report how many features were updated
 \echo ''

@@ -108,7 +108,7 @@ application designed for the systematic capture and validation of urban
 addressing features across Algerian administrative divisions (Wilayas,
 Daïras, and Communes). This document formalises the mathematical and
 algorithmic foundations that underpin eight distinct feature types: urban
-areas, districts, city centres, roads, house entrances, public buildings,
+areas, districts, roundabouts, roads, house entrances, public buildings,
 public spaces, and naming panels.
 
 We derive the geodetic distance metrics (Haversine formula), the angular
@@ -162,7 +162,7 @@ in the PostGIS database.
   arr/.style={-{Stealth[length=5pt]}, thick}
 ]
 \node[box] (area)    {Urban Areas\\{\tiny \texttt{area}}};
-\node[box, right=of area] (cc) {City Centres\\{\tiny \texttt{city\_center}}};
+\node[box, right=of area] (cc) {Roundabouts\\{\tiny \texttt{roundabouts}}};
 \node[box, below=of area] (dist) {Districts\\{\tiny \texttt{district}}};
 \node[box, below=of cc]   (road) {Roads\\{\tiny \texttt{road}}};
 \node[auto, below=of dist] (scat) {Scattered Areas\\{\tiny (auto-computed)}};
@@ -248,7 +248,7 @@ is acceptable for all NARS use cases.
 
 \subsection{Circle Approximation}
 
-City centres are stored as (centre, radius) pairs and rendered as
+Roundabouts are stored as (centre, radius) pairs and rendered as
 $n$-sided regular polygons. The $k$-th vertex of the approximating polygon is:
 
 \begin{equation}
@@ -529,14 +529,14 @@ Before any district or road may be created, at least one area of layer
   \label{eq:urban_exists}
 \end{equation}
 
-\subsection{City Center Placement}
-\label{sec:city_center_placement}
+\subsection{Roundabouts Placement}
+\label{sec:roundabouts_placement}
 
-A plain city center (layer \texttt{city\_center}) is optional but capped at one
+The plain city-center subtype (\texttt{roundaboutsTypeKey = city\_center}) is optional but capped at one
 per urban area polygon (layers \texttt{central\_urban} and
 \texttt{secondary\_urban}); its center point must lie inside that polygon.
-Roundabouts (layer \texttt{roundabout}) share the city-center table but are
-not subject to this cap. The rule is enforced when a city center is drawn,
+True roundabouts (\texttt{roundaboutsTypeKey = roundabout}) share the \texttt{roundabouts} table but are
+not subject to this cap. The rule is enforced when the plain subtype is drawn,
 moved, or has its subtype changed.
 
 % ══════════════════════════════════════════════════════════════════════════════
@@ -621,7 +621,7 @@ snap-target relation $\mathcal{T} \subseteq \texttt{Phase} \times
   \begin{array}{l@{\;\longmapsto\;}l}
     \texttt{areas}         & \{\texttt{areas}\}                          \\
     \texttt{districts}     & \{\texttt{areas},\, \texttt{districts}\}    \\
-    \texttt{roads}         & \{\texttt{areas},\, \texttt{cityCenter},\, \texttt{roads}\} \\
+    \texttt{roads}         & \{\texttt{areas},\, \texttt{roundabouts},\, \texttt{roads}\} \\
     \texttt{publicBuildings} & \{\texttt{areas},\, \texttt{publicBuildings},\, \texttt{publicSpaces}\} \\
     \texttt{publicSpaces}  & \{\texttt{areas},\, \texttt{publicBuildings},\, \texttt{publicSpaces}\} \\
     \text{others}          & \emptyset
@@ -1237,12 +1237,12 @@ and $e = (v_a, v_b, s) \in E$ iff sub-segment $s$ connects $v_a$ to $v_b$.
 Nodes within $\delta_J$ of each other are unified.
 \end{definition}
 
-\subsection{Phase 2A — City-Centre Orientation (DFS)}
+\subsection{Phase 2A — Roundabouts Orientation (DFS)}
 
-When at least one city centre exists, a depth-first search from the
-city-centre perimeter assigns orientation to every reachable segment.
+When at least one roundabouts feature exists, a depth-first search from its
+perimeter assigns orientation to every reachable segment.
 
-Let $\mathcal{C} = (c, r)$ be a city centre (centre $c$, radius $r$).
+Let $\mathcal{C} = (c, r)$ be a roundabouts feature (centre $c$, radius $r$).
 The \emph{seed nodes} are:
 \begin{equation}
   V_{\text{seed}} = \left\{ v \in V \;\middle|\;
@@ -1271,7 +1271,7 @@ At each recursive call with \textit{fromNode} $v_f$:
 
 \subsection{Phase 2B — Geographic Fallback}
 
-For roads unreached by the DFS (or when no city centre exists), orientation
+For roads unreached by the DFS (or when no roundabouts feature exists), orientation
 is assigned by cardinal direction:
 \begin{equation}
   s.\mathrm{reversed} =
@@ -1312,7 +1312,7 @@ majority vote:
 \end{equation}
 
 When both endpoints have $\deg = 1$ (road split by a T-junction on its
-body), the from-side is the endpoint closer to the city centre.
+body), the from-side is the endpoint closer to the roundabouts centre.
 
 \subsection{Segment Bearing}
 
@@ -1399,7 +1399,7 @@ locked transaction:
     sequentially $1, 2, 3, \ldots$ counter-clockwise from an entrance gate
     picked by the user. Additional entrances of the same building receive
     letter suffixes ($1/A$, $1/B$, \ldots).
-  \item \emph{roundabout} --- a city-centre layer whose entrances are ordered
+  \item \emph{roundabout} --- the \texttt{roundabouts} layer whose entrances are ordered
     counter-clockwise from true north. Main entrances inside the circle get
     odd numbers; those in the surrounding band get even numbers.
   \item \emph{square} --- the \texttt{square} public-space layer, using the
@@ -1546,18 +1546,18 @@ where $m$ is the coordinate count. This mirrors MapLibre Geoman's own
 minimum-vertex constraints, preventing malformed geometries from reaching
 the server.
 
-\subsection{City-Centre Radius Bounds}
+\subsection{Roundabouts Radius Bounds}
 
-City-centre features are stored as circles; the client rejects any radius
+Roundabouts features are stored as circles; the client rejects any radius
 outside the configured bounds (\texttt{draw-save.ts::validateGeometry}):
 
 \begin{equation}
   r_{\min} \leq r \leq r_{\max}, \qquad
   r_{\min} = 5\ \mathrm{m}, \quad r_{\max} = 50{,}000\ \mathrm{m}
-  \label{eq:city_radius_bounds}
+  \label{eq:roundabouts_radius_bounds}
 \end{equation}
 
-When a city centre is drawn as a polygon, the radius is derived from the
+When a roundabouts feature is drawn as a polygon, the radius is derived from the
 circumradius of the drawn ring before this check is applied.
 
 \subsection{Two-Stage Validation Architecture}
@@ -1578,7 +1578,7 @@ client-side fast checks followed by server-side PostGIS spatial predicates.
 ]
 \node[box, fill=gray!15] (input)  {User draws feature};
 \node[dec, fill=yellow!20, below=of input] (c1) {Cardinality $\geq$ min?};
-\node[dec, fill=yellow!20, below=of c1] (c2) {City-centre radius bounded?};
+\node[dec, fill=yellow!20, below=of c1] (c2) {Roundabouts radius bounded?};
 \node[box, fill=blue!10, below=of c2] (api) {POST /api/validate/\{type\}};
 \node[dec, fill=yellow!20, below=of api] (s1) {Angle $\leq 90^{\circ}$?};
 \node[dec, fill=yellow!20, below=of s1] (s2) {Spatial predicate?};
@@ -1793,7 +1793,7 @@ National Addressing Reference System. The key formal results are:
   \item The road-direction algorithm (\cref{sec:road_direction}) constructs
     a full topology graph handling T-junctions and X-junctions in
     $O(n^2)$ time, then orients every segment via a depth-first search
-    from the city-centre perimeter, with geographic fallback for isolated
+    from the roundabouts perimeter, with geographic fallback for isolated
     roads.
 
   \item The house-entrance numbering scheme (\cref{sec:house_numbering})

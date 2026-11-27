@@ -61,7 +61,7 @@ async function detachReferencesForEvicted(evicted: {
   }
   if (
     (evicted.phaseKey === "districts" ||
-      evicted.phaseKey === "cityCenter" ||
+      evicted.phaseKey === "roundabouts" ||
       evicted.phaseKey === "publicSpaces") &&
     specialModeForFeature(evicted.entry.data.type, evicted.entry.data)
   ) {
@@ -220,7 +220,7 @@ export async function undo(): Promise<void> {
       // numbered from it must follow it, otherwise the next auto-renumber
       // would look up a feature that no longer exists.
       if (
-        (phaseKey === "districts" || phaseKey === "cityCenter" || phaseKey === "publicSpaces") &&
+        (phaseKey === "districts" || phaseKey === "roundabouts" || phaseKey === "publicSpaces") &&
         specialModeForFeature(entry.data.type, entry.data)
       ) {
         for (const entrance of state.houseEntrances || []) {
@@ -283,7 +283,7 @@ export async function undo(): Promise<void> {
           showToast(t("map_restore_numbering_warning"), "warning")
         }
       } else if (
-        (phaseKey === "districts" || phaseKey === "cityCenter" || phaseKey === "publicSpaces") &&
+        (phaseKey === "districts" || phaseKey === "roundabouts" || phaseKey === "publicSpaces") &&
         specialModeForFeature(restoredEntry.data.type, restoredEntry.data)
       ) {
         if ((await renumberSpecialFeatureByDbId(newDbId)) === "failed") {

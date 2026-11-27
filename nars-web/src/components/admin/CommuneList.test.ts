@@ -16,7 +16,7 @@ const mockUser = (overrides: Partial<UserFeatureStats> = {}): UserFeatureStats =
   role: "field_worker",
   areas: 5,
   districts: 3,
-  city_centers: 1,
+  roundabouts: 1,
   roads: 12,
   house_entrances: 20,
   public_buildings: 2,

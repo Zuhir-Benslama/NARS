@@ -76,6 +76,14 @@ describe("loadPhase", () => {
     expect(loadPhase()).toBeNull()
   })
 
+  it("migrates the old cityCenter phase key to roundabouts", async () => {
+    const { getPhaseStorageKey, loadPhase } = await freshStorage()
+    const key = getPhaseStorageKey()
+    localStorage.setItem(key, "cityCenter")
+    expect(loadPhase()).toBe(2)
+    expect(localStorage.getItem(key)).toBe("roundabouts")
+  })
+
   it("handles localStorage errors gracefully", async () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
       throw new Error("Storage error")

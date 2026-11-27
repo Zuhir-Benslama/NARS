@@ -64,10 +64,10 @@ describe("validate — decision fields", () => {
     expect(validate().label).toBe("Required")
   })
 
-  it("does not require decision fields for city centers", async () => {
+  it("does not require decision fields for roundabouts", async () => {
     const { PHASES } = await vi.importActual<typeof import("../phases")>("../phases")
     const mod = await loadModule()
-    const { validate } = mod.useFeatureValidation(storeFor(PHASES, "cityCenter", { radius: 500 }))
+    const { validate } = mod.useFeatureValidation(storeFor(PHASES, "roundabouts", { radius: 500 }))
     const errors = validate()
     expect(errors.decisionNumber).toBeUndefined()
     expect(errors.decisionDate).toBeUndefined()

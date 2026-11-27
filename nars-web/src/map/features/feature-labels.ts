@@ -62,7 +62,7 @@ function collectPrefixes(messages: Record<string, unknown>): string[] {
   }
   out.push(
     "areas",
-    "cityCenter",
+    "roundabouts",
     "roads",
     "districts",
     "houseEntrances",
@@ -119,7 +119,7 @@ export function displayLabelFor(phase: (typeof PHASES)[number], data: FeatureDat
   const isZoneType =
     phase.key === "districts" &&
     (data.districtTypeKey === "trad_activities_zone" || data.districtTypeKey === "industry_zone")
-  const isCityCenter = phase.key === "cityCenter"
+  const isRoundabouts = phase.key === "roundabouts"
   const isHouseEntrance = phase.key === "houseEntrances"
   // House entrances are identified by their number only; do not prefix them
   // with the phase/sub-type label (e.g. show "1" instead of "House Entrance 1").
@@ -128,7 +128,7 @@ export function displayLabelFor(phase: (typeof PHASES)[number], data: FeatureDat
     return raw || typeLabel
   }
   const stripped =
-    isZoneType || isCityCenter ? "" : stripLeadingTypePrefix(sanitizeApiText(preferredRaw))
+    isZoneType || isRoundabouts ? "" : stripLeadingTypePrefix(sanitizeApiText(preferredRaw))
 
   return stripped ? `${typeLabel} ${stripped}`.trim() : typeLabel
 }

@@ -29,7 +29,7 @@ describe("layerStore", () => {
 
   it("has initial empty state", () => {
     expect(store.areas).toEqual([])
-    expect(store.cityCenter).toEqual([])
+    expect(store.roundabouts).toEqual([])
     expect(store.districts).toEqual([])
     expect(store.roads).toEqual([])
     expect(store.houseEntrances).toEqual([])
@@ -165,7 +165,7 @@ describe("layerStore", () => {
       expect(store.roadCount).toBe(1)
       expect(store.mainEntranceCount).toBe(1)
       expect(store.secondaryEntranceCount).toBe(0)
-      expect(store.cityCenterCount).toBe(0)
+      expect(store.roundaboutsCount).toBe(0)
       expect(store.districtCount).toBe(0)
       expect(store.publicBuildingCount).toBe(0)
       expect(store.publicSpaceCount).toBe(0)

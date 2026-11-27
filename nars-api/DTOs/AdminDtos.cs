@@ -68,7 +68,7 @@ public record UserFeatureStats(
     [property: JsonPropertyName("role")] string Role,
     [property: JsonPropertyName("areas")] long Areas,
     [property: JsonPropertyName("districts")] long Districts,
-    [property: JsonPropertyName("city_centers")] long CityCenters,
+    [property: JsonPropertyName("roundabouts")] long Roundabouts,
     [property: JsonPropertyName("roads")] long Roads,
     [property: JsonPropertyName("house_entrances")] long HouseEntrances,
     [property: JsonPropertyName("public_buildings")] long PublicBuildings,

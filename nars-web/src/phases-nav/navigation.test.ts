@@ -123,7 +123,7 @@ describe("navigatePhase", () => {
     const layerStore = useLayerStore()
     layerStore.addFeature("areas", makeEntry())
     layerStore.addFeature("districts", makeEntry())
-    layerStore.addFeature("cityCenter", makeEntry())
+    layerStore.addFeature("roundabouts", makeEntry())
     appStore.currentPhase = 0
     await navigatePhase(1)
     await navigatePhase(1)
@@ -139,7 +139,7 @@ describe("navigatePhase", () => {
     const layerStore = useLayerStore()
     layerStore.addFeature("areas", makeEntry())
     layerStore.addFeature("districts", makeEntry())
-    layerStore.addFeature("cityCenter", makeEntry())
+    layerStore.addFeature("roundabouts", makeEntry())
     layerStore.addFeature("roads", makeEntry({ id: "road-1", type: "line" }))
     appStore.currentPhase = 3
     await navigatePhase(1)
@@ -172,7 +172,7 @@ describe("navigatePhase", () => {
     const layerStore = useLayerStore()
     layerStore.addFeature("areas", makeEntry())
     layerStore.addFeature("districts", makeEntry())
-    layerStore.addFeature("cityCenter", makeEntry())
+    layerStore.addFeature("roundabouts", makeEntry())
     layerStore.addFeature("roads", makeEntry({ id: "road-1", type: "line" }))
     appStore.currentPhase = 3
     await navigatePhase(1)
@@ -208,7 +208,7 @@ describe("goToPhase", () => {
     const appStore = useAppStore()
     const layerStore = useLayerStore()
     layerStore.addFeature("areas", makeEntry())
-    layerStore.addFeature("cityCenter", makeEntry())
+    layerStore.addFeature("roundabouts", makeEntry())
     layerStore.addFeature("roads", makeEntry({ id: "road-1", type: "line" }))
     layerStore.addFeature("districts", makeEntry())
     appStore.currentPhase = 0

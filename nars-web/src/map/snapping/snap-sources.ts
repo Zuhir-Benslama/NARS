@@ -96,17 +96,17 @@ export function getRoadChains(
   return chains
 }
 
-/** City center points with radius info */
-export function getCityCenterCircles(
+/** Roundabouts circles with radius info */
+export function getRoundaboutsCircles(
   phaseKeys: string[],
   excludeId?: string | null,
 ): Array<{ lat: number; lng: number; radius: number }> {
   const exclude = resolveExclude(excludeId)
   const circles: Array<{ lat: number; lng: number; radius: number }> = []
-  if (!phaseKeys.includes("cityCenter")) return circles
+  if (!phaseKeys.includes("roundabouts")) return circles
   const layerStore = useLayerStore()
   const state = layerStore.$state
-  const entries = state.cityCenter
+  const entries = state.roundabouts
   if (!entries) return circles
   for (const entry of entries) {
     if (entry.id === exclude) continue
@@ -118,7 +118,7 @@ export function getCityCenterCircles(
   return circles
 }
 
-/** Point features (city centers, etc.) */
+/** Point features (roundabouts, etc.) */
 export function getSnapPoints(
   phaseKeys: string[],
   excludeId?: string | null,

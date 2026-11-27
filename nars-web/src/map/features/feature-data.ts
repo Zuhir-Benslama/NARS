@@ -117,7 +117,7 @@ function modalResultToBase(modalResult: ModalResult): FeatureData {
       districtTypeKey: modalResult.districtTypeKey,
     } as FeatureData
   }
-  if (modalResult.type === "cityCenter") {
+  if (modalResult.type === "roundabouts") {
     return {
       type,
       label,
@@ -125,7 +125,7 @@ function modalResultToBase(modalResult: ModalResult): FeatureData {
       labelFr,
       labelEn,
       radius: modalResult.radius,
-      cityCenterTypeKey: modalResult.cityCenterTypeKey,
+      roundaboutsTypeKey: modalResult.roundaboutsTypeKey,
       numberingOutsideBandM: modalResult.numberingOutsideBandM,
     } as FeatureData
   }
@@ -202,8 +202,8 @@ export function buildFeatureData(
 ): FeatureDataByType {
   const base = modalResultToBase(modalResult)
 
-  if (phase.key === "cityCenter") {
-    base.radius = modalResult.type === "cityCenter" ? modalResult.radius : base.radius
+  if (phase.key === "roundabouts") {
+    base.radius = modalResult.type === "roundabouts" ? modalResult.radius : base.radius
   }
 
   const coords = extractCoords(geometry)
@@ -242,11 +242,9 @@ export function toApiSaveShape(fd: FeatureData): ApiSaveShape {
   switch (fd.type) {
     case "areas":
       return { type: "area", layer: fd.areaTypeKey ?? "central_urban" }
-    case "cityCenter":
-      return {
-        type: "city_center",
-        layer: fd.cityCenterTypeKey === "roundabout" ? "roundabout" : "city_center",
-      }
+    case "roundabouts":
+      // City center is a subtype of roundabouts, not a separate API layer.
+      return { type: "roundabouts", layer: "roundabouts" }
     case "districts":
       return { type: "district", layer: fd.districtTypeKey ?? "district" }
     case "roads":

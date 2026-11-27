@@ -51,7 +51,7 @@ vi.mock("./snap-sources", () => ({
   setSnapSourceExclude: mockSetSnapSourceExclude,
   getSnapRings: vi.fn(),
   getRoadChains: vi.fn(),
-  getCityCenterCircles: vi.fn(),
+  getRoundaboutsCircles: vi.fn(),
   getSnapPoints: vi.fn(),
 }))
 
@@ -265,7 +265,7 @@ describe("uninstallSnapInterceptors", () => {
 
 describe("getActiveSnapPhases (draw mode)", () => {
   it("returns completed snap targets for the current phase", () => {
-    useAppStore().currentPhase = 3 // roads — snapTargets: areas, cityCenter, roads
+    useAppStore().currentPhase = 3 // roads — snapTargets: areas, roundabouts, roads
 
     const result = mod.getActiveSnapPhases()
 
@@ -449,7 +449,7 @@ describe("snap events", () => {
   it("returns early when there are no active snap phases", () => {
     mockFindNearestSnap.mockReturnValue({ lat: 1, lng: 2, type: "vertex", distance: 1 })
     enableSnapping()
-    useAppStore().currentPhase = 2 // cityCenter — has no snapTargets
+    useAppStore().currentPhase = 2 // roundabouts — has no snapTargets
 
     mockCtx.map
       .getContainer()

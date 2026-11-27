@@ -26,8 +26,8 @@ function createDefaultModalState(): ModalState {
     sectorKey: "banking_postal",
     buildingTypeKey: "bank",
     radius: null,
-    cityCenterTypeKey: "city_center",
-    plainCityCenterUnavailable: false,
+    roundaboutsTypeKey: "city_center",
+    plainRoundaboutsUnavailable: false,
     numberingOutsideBandM: null,
     currentModalFeatureId: null,
   }
@@ -47,9 +47,9 @@ export const useModalStore = defineStore("modal", {
     /** Open the modal for creating a new feature in the given phase. */
     openCreate(
       phaseIndex: number,
-      extras?: { radius?: number; plainCityCenterUnavailable?: boolean },
+      extras?: { radius?: number; plainRoundaboutsUnavailable?: boolean },
     ) {
-      const plainCityCenterUnavailable = extras?.plainCityCenterUnavailable ?? false
+      const plainRoundaboutsUnavailable = extras?.plainRoundaboutsUnavailable ?? false
       this.$patch({
         ...createDefaultModalState(),
         visible: true,
@@ -57,8 +57,8 @@ export const useModalStore = defineStore("modal", {
         isEdit: false,
         editDbId: null,
         radius: extras?.radius ?? null,
-        plainCityCenterUnavailable,
-        ...(plainCityCenterUnavailable ? { cityCenterTypeKey: "roundabout" } : {}),
+        plainRoundaboutsUnavailable,
+        ...(plainRoundaboutsUnavailable ? { roundaboutsTypeKey: "roundabout" } : {}),
       })
     },
 
@@ -83,8 +83,7 @@ export const useModalStore = defineStore("modal", {
         sectorKey: existing.sectorKey ?? "banking_postal",
         buildingTypeKey: existing.buildingTypeKey ?? "bank",
         radius: existing.radius ?? null,
-        cityCenterTypeKey:
-          (existing as { cityCenterTypeKey?: string }).cityCenterTypeKey ?? "city_center",
+        roundaboutsTypeKey: roundaboutsSubtype(existing),
         numberingOutsideBandM:
           (existing as { numberingOutsideBandM?: number }).numberingOutsideBandM ?? null,
       })
@@ -161,21 +160,21 @@ export function resetModalStore(): void {
 
 import { PHASES } from "../phases"
 import { t } from "../i18n"
-import { plainCityCenterPlacementError } from "../lib/city-center"
+import { plainRoundaboutsPlacementError, roundaboutsSubtype } from "../lib/roundabouts"
 import { useLayerStore } from "./layerStore"
 
 export function openModal(
   phaseIndex: number,
   featureId: string,
-  extras?: { radius?: number; plainCityCenterUnavailable?: boolean },
+  extras?: { radius?: number; plainRoundaboutsUnavailable?: boolean },
 ): Promise<ModalResult | null> {
   const modalStore = useModalStore()
   modalStore.openCreate(phaseIndex, extras)
   // Set after openCreate (which resets state via createDefaultModalState)
   modalStore.currentModalFeatureId = featureId
   const phase = PHASES[phaseIndex]
-  if (phase?.key === "cityCenter") {
-    modalStore.label = t("phase_cityCenter_label")
+  if (phase?.key === "roundabouts") {
+    modalStore.label = t("phase_roundabouts_label")
   }
   return awaitModalResult()
 }
@@ -188,21 +187,18 @@ export function openEditModal(
   const modalStore = useModalStore()
   modalStore.openEdit(phaseIndex, dbId, existing)
   const phase = PHASES[phaseIndex]
-  if (
-    phase?.key === "cityCenter" &&
-    (existing as { cityCenterTypeKey?: string }).cityCenterTypeKey === "roundabout"
-  ) {
+  if (phase?.key === "roundabouts" && roundaboutsSubtype(existing) === "roundabout") {
     // A roundabout can only become a plain city center if the urban area's
     // slot is still free; reflect that in the subtype dropdown.
     const state = useLayerStore().$state
     const unavailable =
-      plainCityCenterPlacementError(
+      plainRoundaboutsPlacementError(
         { lat: (existing as { lat?: number }).lat, lng: (existing as { lng?: number }).lng },
         state.areas ?? [],
-        state.cityCenter ?? [],
+        state.roundabouts ?? [],
         dbId,
-      ) === "urban_area_has_city_center"
-    modalStore.patchFields({ plainCityCenterUnavailable: unavailable })
+      ) === "urban_area_has_plain_roundabouts"
+    modalStore.patchFields({ plainRoundaboutsUnavailable: unavailable })
   }
   return awaitModalResult()
 }

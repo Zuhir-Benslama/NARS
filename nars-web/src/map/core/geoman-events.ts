@@ -236,7 +236,7 @@ async function onRemove(e: GeomanRemoveEvent): Promise<void> {
       }
     }
     if (
-      (phaseKey === "districts" || phaseKey === "cityCenter" || phaseKey === "publicSpaces") &&
+      (phaseKey === "districts" || phaseKey === "roundabouts" || phaseKey === "publicSpaces") &&
       specialModeForFeature(removed.data.type, removed.data)
     ) {
       await clearSpecialNumberingForFeature(dbId)

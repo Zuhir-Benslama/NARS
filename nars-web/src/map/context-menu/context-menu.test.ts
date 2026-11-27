@@ -83,7 +83,7 @@ function setupPhase(key: string) {
 const PHASES = [
   { key: "areas", label: "Areas" },
   { key: "districts", label: "Districts" },
-  { key: "cityCenter", label: "City Center" },
+  { key: "roundabouts", label: "City Center" },
   { key: "roads", label: "Roads" },
   { key: "houseEntrances", label: "House Entrances" },
   { key: "publicBuildings", label: "Public Buildings" },
@@ -336,39 +336,39 @@ describe("showContextMenu / bindContextMenu", () => {
     expect(store.items.some((i: any) => i.label === "ctx_remove_all_roads")).toBe(false)
   })
 
-  it("shows cityCenter lock when not on cityCenter phase", () => {
+  it("shows roundabouts lock when not on roundabouts phase", () => {
     setupPhase("areas")
 
-    mod.showContextMenu(0, 0, "cc42", "cityCenter")
+    mod.showContextMenu(0, 0, "cc42", "roundabouts")
 
     const store = useContextMenuStore()
-    const lockItem = store.items.find((i: any) => i.label === "ctx_cc_lock")
+    const lockItem = store.items.find((i: any) => i.label === "ctx_roundabouts_lock")
     expect(lockItem).toBeDefined()
     lockItem.onClick()
-    expect(mockShowToast).toHaveBeenCalledWith("ctx_cc_lock_msg", "info")
+    expect(mockShowToast).toHaveBeenCalledWith("ctx_roundabouts_lock_msg", "info")
   })
 
   it("does not allow deleting a roundabout outside its own phase", async () => {
     setupPhase("areas")
     const { useLayerStore } = await import("../../stores/layerStore")
-    useLayerStore().addFeature("cityCenter", {
+    useLayerStore().addFeature("roundabouts", {
       id: "ra1",
       dbId: "ra1",
       type: "circle",
       data: {
-        type: "cityCenter",
+        type: "roundabouts",
         label: "Roundabout",
         lat: 0,
         lng: 0,
         radius: 100,
-        cityCenterTypeKey: "roundabout",
+        roundaboutsTypeKey: "roundabout",
       },
     } as any)
 
-    mod.showContextMenu(0, 0, "ra1", "cityCenter")
+    mod.showContextMenu(0, 0, "ra1", "roundabouts")
 
     const labels = useContextMenuStore().items.map((i: any) => i.label)
-    expect(labels).toContain("ctx_cc_lock")
+    expect(labels).toContain("ctx_roundabouts_lock")
     expect(labels).toContain("ctx_number_roundabout")
     expect(labels).not.toContain("ctx_remove")
     expect(mockRemoveFeature).not.toHaveBeenCalled()

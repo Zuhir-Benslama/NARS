@@ -5,7 +5,7 @@ export type SpecialNumberingMode = "cite" | "roundabout" | "square"
 export type FeatureTypeKey =
   | "areas"
   | "districts"
-  | "cityCenter"
+  | "roundabouts"
   | "roads"
   | "houseEntrances"
   | "publicBuildings"
@@ -43,6 +43,8 @@ export interface FeatureData {
   bisNumber?: number
   entranceTypeKey?: "main_entrance" | "secondary_entrance"
   numberingOutsideBandM?: number
+  roundaboutsTypeKey?: string
+  /** Legacy JSON key written before roundabouts became a single layer. */
   cityCenterTypeKey?: string
   spaceTypeKey?: string
   sectorKey?: string
@@ -75,14 +77,14 @@ export interface DistrictFeatureData extends CommonFields {
   decisionDate: string
   districtTypeKey: string
 }
-export interface CityCenterFeatureData extends CommonFields {
-  type: "cityCenter"
+export interface RoundaboutsFeatureData extends CommonFields {
+  type: "roundabouts"
   decisionNumber: string
   decisionDate: string
   radius?: number
   lat?: number
   lng?: number
-  cityCenterTypeKey?: string
+  roundaboutsTypeKey?: string
   numberingOutsideBandM?: number
 }
 export interface RoadFeatureData extends CommonFields {
@@ -131,7 +133,7 @@ export interface NamingPanelFeatureData extends CommonFields {
 export type FeatureDataByType =
   | AreaFeatureData
   | DistrictFeatureData
-  | CityCenterFeatureData
+  | RoundaboutsFeatureData
   | RoadFeatureData
   | HouseEntranceFeatureData
   | PublicBuildingFeatureData

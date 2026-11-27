@@ -24,7 +24,7 @@ vi.mock("../../phases", () => ({
   PHASES: [
     { key: "areas", color: "#ff0000" },
     { key: "roads", color: "#3498db" },
-    { key: "cityCenter", color: "#00ff00" },
+    { key: "roundabouts", color: "#00ff00" },
   ],
 }))
 
@@ -101,15 +101,15 @@ describe("road-markers", () => {
       expect(data.features.length).toBe(4)
     })
 
-    it("only creates end marker when start is on city center", async () => {
+    it("only creates end marker when start is on roundabouts", async () => {
       const { useLayerStore } = await import("../../stores/layerStore")
       const store = useLayerStore()
-      store.addFeature("cityCenter", {
+      store.addFeature("roundabouts", {
         id: "cc-1",
         dbId: "db-cc-1",
         type: "circle",
         data: {
-          type: "cityCenter",
+          type: "roundabouts",
           label: "C",
           decisionNumber: "",
           decisionDate: "",
@@ -132,15 +132,15 @@ describe("road-markers", () => {
       expect(data.features[0].properties!.endpointType).toBe("end")
     })
 
-    it("suppresses start marker when start is within 2m of city center", async () => {
+    it("suppresses start marker when start is within 2m of roundabouts", async () => {
       const { useLayerStore } = await import("../../stores/layerStore")
       const store = useLayerStore()
-      store.addFeature("cityCenter", {
+      store.addFeature("roundabouts", {
         id: "cc-1",
         dbId: "db-cc-1",
         type: "circle",
         data: {
-          type: "cityCenter",
+          type: "roundabouts",
           label: "C",
           decisionNumber: "",
           decisionDate: "",

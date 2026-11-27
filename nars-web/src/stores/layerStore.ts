@@ -1,7 +1,7 @@
 import { defineStore } from "pinia"
 import type {
   AreaFeatureData,
-  CityCenterFeatureData,
+  RoundaboutsFeatureData,
   DistrictFeatureData,
   FeatureDataByType,
   HouseEntranceFeatureData,
@@ -14,7 +14,7 @@ import type {
 
 export interface LayerState {
   areas: LayerEntry<AreaFeatureData>[]
-  cityCenter: LayerEntry<CityCenterFeatureData>[]
+  roundabouts: LayerEntry<RoundaboutsFeatureData>[]
   districts: LayerEntry<DistrictFeatureData>[]
   roads: LayerEntry<RoadFeatureData>[]
   houseEntrances: LayerEntry<HouseEntranceFeatureData>[]
@@ -30,7 +30,7 @@ export function resetLayerCache(): void {
 function createInitialState(): LayerState {
   return {
     areas: [],
-    cityCenter: [],
+    roundabouts: [],
     districts: [],
     roads: [],
     houseEntrances: [],
@@ -47,7 +47,7 @@ function layerEntries(state: LayerState, layer: keyof LayerState): LayerEntry[] 
 
 export const LAYER_KEYS: (keyof LayerState)[] = [
   "areas",
-  "cityCenter",
+  "roundabouts",
   "districts",
   "roads",
   "houseEntrances",
@@ -69,7 +69,7 @@ export const useLayerStore = defineStore("layer", {
     secondaryEntrances: (state) => state.houseEntrances.filter(isSecondaryEntrance),
 
     areaCount: (state) => state.areas.length,
-    cityCenterCount: (state) => state.cityCenter.length,
+    roundaboutsCount: (state) => state.roundabouts.length,
     districtCount: (state) => state.districts.length,
     roadCount: (state) => state.roads.length,
     mainEntranceCount: (state) => state.houseEntrances.filter(isMainEntrance).length,

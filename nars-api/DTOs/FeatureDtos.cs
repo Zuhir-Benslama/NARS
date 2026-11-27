@@ -79,7 +79,7 @@ public record LoadFeaturesResponse<T>(
 public record FeatureStatsResponse(
     long Area,
     long District,
-    long CityCenter,
+    long Roundabouts,
     long Road,
     long HouseEntrance,
     long PublicBuilding,

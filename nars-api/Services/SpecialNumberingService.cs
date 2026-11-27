@@ -31,7 +31,7 @@ public sealed class SpecialNumberingService(IDbContextFactory<AppDbContext> dbFa
         new Dictionary<string, (string, string)>
         {
             [FeatureTypes.SpecialNumberingModes.Cite] = (FeatureTypes.District, FeatureTypes.DistrictLayers.Cite),
-            [FeatureTypes.SpecialNumberingModes.Roundabout] = (FeatureTypes.CityCenter, FeatureTypes.CityCenterLayers.Roundabout),
+            [FeatureTypes.SpecialNumberingModes.Roundabout] = (FeatureTypes.Roundabouts, FeatureTypes.RoundaboutsLayers.Default),
             [FeatureTypes.SpecialNumberingModes.Square] = (FeatureTypes.PublicSpace, FeatureTypes.PublicSpaceLayers.Square),
         }.ToFrozenDictionary();
 
@@ -165,6 +165,14 @@ public sealed class SpecialNumberingService(IDbContextFactory<AppDbContext> dbFa
 
             if (mode == FeatureTypes.SpecialNumberingModes.Roundabout)
             {
+                // The plain city center shares this layer but is not numbered
+                // in the even-outside/odd-inside series. Older rows used
+                // `cityCenterTypeKey`, so accept both spellings.
+                var subtype = ReadRoundaboutsSubtype(node);
+                if (subtype != FeatureTypes.RoundaboutsSubtypes.Roundabout)
+                {
+                    return null;
+                }
                 if (TryReadDouble(node, "lat", out var lat) && TryReadDouble(node, "lng", out var lng)
                     && TryReadDouble(node, "radius", out var radius)
                     && double.IsFinite(lat) && double.IsFinite(lng)
@@ -202,6 +210,14 @@ public sealed class SpecialNumberingService(IDbContextFactory<AppDbContext> dbFa
         {
             return null;
         }
+    }
+
+    private static string? ReadRoundaboutsSubtype(JsonNode? node)
+    {
+        var current = node?["roundaboutsTypeKey"]?.GetValue<string>();
+        return !string.IsNullOrEmpty(current)
+            ? current
+            : node?["cityCenterTypeKey"]?.GetValue<string>();
     }
 
     private static bool TryReadDouble(JsonNode? node, string key, out double value)

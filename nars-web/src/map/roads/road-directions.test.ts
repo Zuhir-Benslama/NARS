@@ -9,7 +9,7 @@ const mockShowToast = vi.fn()
 const mockDebugError = vi.fn()
 const mockBuildConnectionGraph = vi.fn()
 const mockGeographicDirection = vi.fn()
-const mockOrientFromCityCenter = vi.fn()
+const mockOrientFromRoundabouts = vi.fn()
 const mockUpdateEndpointMarkers = vi.fn()
 
 vi.mock("../../api", () => ({
@@ -50,7 +50,7 @@ vi.mock("./road-graph", () => ({
 
 vi.mock("./road-orient", () => ({
   geographicDirection: mockGeographicDirection,
-  orientFromCityCenter: mockOrientFromCityCenter,
+  orientFromRoundabouts: mockOrientFromRoundabouts,
 }))
 
 vi.mock("./road-markers", () => ({
@@ -137,7 +137,7 @@ describe("road-directions", () => {
       expect(mockShowToast).not.toHaveBeenCalled()
     })
 
-    it("processes roads without city centers using geographic fallback", async () => {
+    it("processes roads without roundabouts using geographic fallback", async () => {
       const graph = makeGraphMock()
       const segs = new Map()
       segs.set("s1", {
@@ -165,7 +165,7 @@ describe("road-directions", () => {
       expect(mockShowToast).toHaveBeenCalled()
     })
 
-    it("uses orientFromCityCenter when city centers exist", async () => {
+    it("uses orientFromRoundabouts when roundabouts exist", async () => {
       const graph = makeGraphMock()
       const segs = new Map()
       mockBuildConnectionGraph.mockReturnValue({ graph, segs })
@@ -179,12 +179,12 @@ describe("road-directions", () => {
           { lat: 36.01, lng: 127.01 },
         ]),
       )
-      store.addFeature("cityCenter", {
+      store.addFeature("roundabouts", {
         id: "cc-1",
         dbId: "db-cc-1",
         type: "circle",
         data: {
-          type: "cityCenter",
+          type: "roundabouts",
           label: "C",
           decisionNumber: "",
           decisionDate: "",
@@ -196,7 +196,7 @@ describe("road-directions", () => {
 
       await computeAndApplyRoadDirections()
 
-      expect(mockOrientFromCityCenter).toHaveBeenCalled()
+      expect(mockOrientFromRoundabouts).toHaveBeenCalled()
     })
 
     it("reverses road when rev votes exceed fwd votes", async () => {
@@ -376,7 +376,7 @@ describe("road-directions", () => {
       expect(mockFeaturesStoreBatchUpdate).toHaveBeenCalled()
     })
 
-    it("keeps orientation when both endpoints are dead ends and no city center exists", async () => {
+    it("keeps orientation when both endpoints are dead ends and no roundabouts feature exists", async () => {
       const segs = new Map()
       const { nodes } = roadWithNodes(segs, [
         { lat: 36.0, lng: 127.0 },
@@ -403,7 +403,7 @@ describe("road-directions", () => {
       expect(mockApiFetch).not.toHaveBeenCalled()
     })
 
-    it("reverses when both endpoints are dead ends and the city center sits near the far endpoint", async () => {
+    it("reverses when both endpoints are dead ends and the roundabouts centre sits near the far endpoint", async () => {
       const segs = new Map()
       const { nodes } = roadWithNodes(segs, [
         { lat: 36.0, lng: 127.0 },
@@ -424,12 +424,12 @@ describe("road-directions", () => {
           { lat: 36.01, lng: 127.01 },
         ]),
       )
-      store.addFeature("cityCenter", {
+      store.addFeature("roundabouts", {
         id: "cc-1",
         dbId: "db-cc-1",
         type: "circle",
         data: {
-          type: "cityCenter",
+          type: "roundabouts",
           label: "C",
           decisionNumber: "",
           decisionDate: "",
@@ -447,7 +447,7 @@ describe("road-directions", () => {
       )
     })
 
-    it("ignores a city center with null coordinates when resolving dead ends", async () => {
+    it("ignores a roundabouts feature with null coordinates when resolving dead ends", async () => {
       const segs = new Map()
       const { nodes } = roadWithNodes(segs, [
         { lat: 36.0, lng: 127.0 },
@@ -468,12 +468,12 @@ describe("road-directions", () => {
           { lat: 36.01, lng: 127.01 },
         ]),
       )
-      store.addFeature("cityCenter", {
+      store.addFeature("roundabouts", {
         id: "cc-1",
         dbId: "db-cc-1",
         type: "circle",
         data: {
-          type: "cityCenter",
+          type: "roundabouts",
           label: "C",
           decisionNumber: "",
           decisionDate: "",

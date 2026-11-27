@@ -18,7 +18,7 @@ classDiagram
     %% ===== CONCRETE FEATURES =====
     class Area
     class District
-    class CityCenter
+    class Roundabout
     class Road
     class HouseEntrance {
         +Guid? RoadId
@@ -29,7 +29,7 @@ classDiagram
 
     FeatureBase <|-- Area
     FeatureBase <|-- District
-    FeatureBase <|-- CityCenter
+    FeatureBase <|-- Roundabout
     FeatureBase <|-- Road
     FeatureBase <|-- HouseEntrance
     FeatureBase <|-- PublicBuilding
@@ -159,7 +159,7 @@ classDiagram
         +DbSet~FeatureRegistry~ FeatureRegistry
         +DbSet~Area~ Areas
         +DbSet~District~ Districts
-        +DbSet~CityCenter~ CityCenters
+        +DbSet~Roundabout~ Roundabouts
         +DbSet~Road~ Roads
         +DbSet~HouseEntrance~ HouseEntrances
         +DbSet~PublicBuilding~ PublicBuildings

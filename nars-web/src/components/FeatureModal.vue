@@ -29,8 +29,8 @@
         <span v-if="isZoneWithTypeName" class="modal-field-note">{{
           t("modal_note_zone_type_name")
         }}</span>
-        <span v-if="isCityCenter" class="modal-field-note">{{
-          t("modal_note_city_center_name")
+        <span v-if="isRoundabouts" class="modal-field-note">{{
+          t("modal_note_plain_roundabouts_name")
         }}</span>
         <div class="modal-field">
           <label>{{ t("label_name_ar") }}</label>
@@ -39,12 +39,12 @@
             type="text"
             :class="[
               'modal-input',
-              { 'modal-input-readonly': isMainUrban || isZoneWithTypeName || isCityCenter },
+              { 'modal-input-readonly': isMainUrban || isZoneWithTypeName || isRoundabouts },
             ]"
             :placeholder="
-              isMainUrban || isZoneWithTypeName || isCityCenter ? '' : t('placeholder_name_ar')
+              isMainUrban || isZoneWithTypeName || isRoundabouts ? '' : t('placeholder_name_ar')
             "
-            :readonly="isMainUrban || isZoneWithTypeName || isCityCenter"
+            :readonly="isMainUrban || isZoneWithTypeName || isRoundabouts"
             :disabled="isMainUrban"
             autocomplete="off"
             autofocus
@@ -57,12 +57,12 @@
             type="text"
             :class="[
               'modal-input',
-              { 'modal-input-readonly': isMainUrban || isZoneWithTypeName || isCityCenter },
+              { 'modal-input-readonly': isMainUrban || isZoneWithTypeName || isRoundabouts },
             ]"
             :placeholder="
-              isMainUrban || isZoneWithTypeName || isCityCenter ? '' : t('placeholder_name_fr')
+              isMainUrban || isZoneWithTypeName || isRoundabouts ? '' : t('placeholder_name_fr')
             "
-            :readonly="isMainUrban || isZoneWithTypeName || isCityCenter"
+            :readonly="isMainUrban || isZoneWithTypeName || isRoundabouts"
             :disabled="isMainUrban"
             autocomplete="off"
           />
@@ -74,20 +74,20 @@
             type="text"
             :class="[
               'modal-input',
-              { 'modal-input-readonly': isMainUrban || isZoneWithTypeName || isCityCenter },
+              { 'modal-input-readonly': isMainUrban || isZoneWithTypeName || isRoundabouts },
             ]"
             :placeholder="
-              isMainUrban || isZoneWithTypeName || isCityCenter ? '' : t('placeholder_name_en')
+              isMainUrban || isZoneWithTypeName || isRoundabouts ? '' : t('placeholder_name_en')
             "
-            :readonly="isMainUrban || isZoneWithTypeName || isCityCenter"
+            :readonly="isMainUrban || isZoneWithTypeName || isRoundabouts"
             :disabled="isMainUrban"
             autocomplete="off"
           />
         </div>
       </fieldset>
 
-      <!-- Decision No. + Date — hidden when editing a city center -->
-      <div v-if="!isCityCenter" class="modal-row">
+      <!-- Decision No. + Date — hidden when editing roundabouts -->
+      <div v-if="!isRoundabouts" class="modal-row">
         <div class="modal-field">
           <label>
             {{ t("label_decision_no") }}
@@ -114,8 +114,8 @@
         </div>
       </div>
 
-      <!-- City Center: radius input -->
-      <div v-if="isCityCenter" class="modal-field">
+      <!-- Roundabouts: radius input -->
+      <div v-if="isRoundabouts" class="modal-field">
         <label>
           {{ t("label_radius") }}
           <span class="req">*</span>
@@ -131,28 +131,31 @@
         <span class="modal-field-note">{{ t("label_radius_note") }}</span>
       </div>
 
-      <!-- City centers can be plain centres or roundabouts (special numbering) -->
-      <div v-if="isCityCenter" class="modal-field">
-        <label>{{ t("label_city_center_type") }}</label>
-        <select v-model="modalStore.cityCenterTypeKey" class="modal-input">
+      <!-- Roundabouts can be plain city centers or true roundabouts (special numbering) -->
+      <div v-if="isRoundabouts" class="modal-field">
+        <label>{{ t("label_roundabouts_type") }}</label>
+        <select v-model="modalStore.roundaboutsTypeKey" class="modal-input">
           <option
-            v-for="c in CITY_CENTER_TYPES"
+            v-for="c in ROUNDABOUTS_SUBTYPES"
             :key="c.key"
             :value="c.key"
-            :disabled="c.key === 'city_center' && modalStore.plainCityCenterUnavailable"
+            :disabled="c.key === 'city_center' && modalStore.plainRoundaboutsUnavailable"
           >
             {{ t("featureTypes." + c.key) }}
           </option>
         </select>
-        <span v-if="isCityCenter && modalStore.plainCityCenterUnavailable" class="modal-field-note">
-          {{ t("map_city_center_exists") }}
+        <span
+          v-if="isRoundabouts && modalStore.plainRoundaboutsUnavailable"
+          class="modal-field-note"
+        >
+          {{ t("map_plain_roundabouts_exists") }}
         </span>
       </div>
 
       <!-- Optional width of the numbering band around roundabouts and squares -->
       <div
         v-if="
-          (isCityCenter && modalStore.cityCenterTypeKey === 'roundabout') ||
+          (isRoundabouts && modalStore.roundaboutsTypeKey === 'roundabout') ||
           (phase?.key === 'publicSpaces' && modalStore.spaceTypeKey === 'square')
         "
         class="modal-field"
@@ -235,7 +238,7 @@ import {
   DISTRICT_TYPES,
   ROAD_TYPES,
   PUBLIC_SPACE_TYPES,
-  CITY_CENTER_TYPES,
+  ROUNDABOUTS_SUBTYPES,
 } from "../phases"
 import { useAppStore } from "../stores/appStore"
 import { useModalStore } from "../stores/modalStore"
@@ -255,7 +258,7 @@ const phase = computed(() =>
 const modalRef = ref<HTMLElement | null>(null)
 useFocusTrap(modalRef, () => modalStore.visible)
 
-const { validate, buildModalResult, isMainUrban, isCityCenter } = useFeatureValidation(modalStore)
+const { validate, buildModalResult, isMainUrban, isRoundabouts } = useFeatureValidation(modalStore)
 
 // Roads may exist without an administrative decision (AI-generated), so the
 // decision fields are only mandatory for the other phases. Keep the asterisks

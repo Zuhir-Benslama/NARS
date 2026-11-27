@@ -14,7 +14,7 @@ import {
   ROAD_TYPES,
   PUBLIC_SPACE_TYPES,
   PUBLIC_BUILDING_SECTORS,
-  CITY_CENTER_TYPES,
+  ROUNDABOUTS_SUBTYPES,
 } from "./types/feature-types"
 
 export type {
@@ -22,7 +22,7 @@ export type {
   DistrictType,
   RoadType,
   PublicSpaceType,
-  CityCenterType,
+  RoundaboutsSubtype,
 } from "./types/feature-types"
 export {
   AREA_TYPES,
@@ -30,7 +30,7 @@ export {
   ROAD_TYPES,
   PUBLIC_SPACE_TYPES,
   PUBLIC_BUILDING_SECTORS,
-  CITY_CENTER_TYPES,
+  ROUNDABOUTS_SUBTYPES,
 }
 
 // ─── PHASES ───────────────────────────────────────────────────────────
@@ -56,11 +56,11 @@ export const PHASES: Phase[] = [
   },
   {
     index: 2,
-    key: "cityCenter",
-    label: "phase_cityCenter_label",
+    key: "roundabouts",
+    label: "phase_roundabouts_label",
     drawType: "circle",
     color: "#e74c3c",
-    hint: "phase_cityCenter_hint",
+    hint: "phase_roundabouts_hint",
     geometryType: "Point",
   },
   {
@@ -111,11 +111,11 @@ export const PHASES: Phase[] = [
 ]
 
 /**
- * Single source for the city-center stroke color. The phase table owns the
+ * Single source for the roundabouts stroke color. The phase table owns the
  * color; feature styling (loader, draw-save, context-menu) must reference
  * this constant instead of hardcoding "#e74c3c" again.
  */
-export const CITY_CENTER_COLOR = PHASES.find((p) => p.key === "cityCenter")?.color ?? "#e74c3c"
+export const ROUNDABOUTS_COLOR = PHASES.find((p) => p.key === "roundabouts")?.color ?? "#e74c3c"
 
 // ─── getApiLayerToPhase ───────────────────────────────────────────────
 // Auto-generated from feature-types.ts — no manual sync needed when
@@ -129,8 +129,10 @@ export function getApiLayerToPhase(): Record<string, FeatureTypeKey> {
   const map: Record<string, FeatureTypeKey> = {}
 
   for (const t of AREA_TYPES) map[t.key] = "areas"
-  map.city_center = "cityCenter"
-  map.roundabout = "cityCenter"
+  // Legacy layers are still accepted while old rows migrate to `roundabouts`.
+  map.city_center = "roundabouts"
+  map.roundabout = "roundabouts"
+  map.roundabouts = "roundabouts"
   for (const t of DISTRICT_TYPES) map[t.key] = "districts"
   for (const t of ROAD_TYPES) map[t.key] = "roads"
   map.main_entrance = "houseEntrances"

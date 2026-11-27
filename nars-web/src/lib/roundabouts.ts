@@ -1,14 +1,15 @@
-// ─── CITY CENTER RULES ────────────────────────────────────────────────────────
+// ─── ROUNDABOUTS RULES ────────────────────────────────────────────────────────
 // Shared rules for draw/edit placement checks and the modal's radius check:
 // radius limits, and the "0 or 1 plain city center per urban area" placement
-// rule. Roundabouts are a different city-center layer and are not capped.
+// rule. The plain city center is a subtype of roundabouts and is capped;
+// true roundabouts are not.
 
 import type { FeatureData, LatLng } from "../types"
-import { CITY_CENTER_CONFIG } from "../config"
+import { ROUNDABOUTS_CONFIG } from "../config"
 
-export type CityCenterRadiusError = "too_small" | "too_large" | null
-export type PlainCityCenterPlacementError =
-  "outside_urban_area" | "urban_area_has_city_center" | null
+export type RoundaboutsRadiusError = "too_small" | "too_large" | null
+export type PlainRoundaboutsPlacementError =
+  "outside_urban_area" | "urban_area_has_plain_roundabouts" | null
 
 interface PlacementFeature {
   data: FeatureData
@@ -18,8 +19,8 @@ interface PlacementFeature {
 
 const URBAN_AREA_LAYERS = new Set(["central_urban", "secondary_urban"])
 
-/** Center point of a drawn city-center circle (point or polygon geometry). */
-export function cityCenterPointFromGeometry(geometry: GeoJSON.Geometry): LatLng | null {
+/** Center point of a drawn roundabouts circle (point or polygon geometry). */
+export function roundaboutsPointFromGeometry(geometry: GeoJSON.Geometry): LatLng | null {
   if (geometry.type === "Point") {
     const [lng, lat] = geometry.coordinates as [number, number]
     return Number.isFinite(lng) && Number.isFinite(lat) ? { lat, lng } : null
@@ -41,11 +42,11 @@ export function cityCenterPointFromGeometry(geometry: GeoJSON.Geometry): LatLng 
   return null
 }
 
-export function cityCenterRadiusError(radius: number | undefined | null): CityCenterRadiusError {
-  if (!radius || Number.isNaN(radius) || radius < CITY_CENTER_CONFIG.minRadiusM) {
+export function roundaboutsRadiusError(radius: number | undefined | null): RoundaboutsRadiusError {
+  if (!radius || Number.isNaN(radius) || radius < ROUNDABOUTS_CONFIG.minRadiusM) {
     return "too_small"
   }
-  if (radius > CITY_CENTER_CONFIG.maxRadiusM) {
+  if (radius > ROUNDABOUTS_CONFIG.maxRadiusM) {
     return "too_large"
   }
   return null
@@ -70,8 +71,20 @@ function isUrbanArea(feature: PlacementFeature): boolean {
   return URBAN_AREA_LAYERS.has(feature.data.areaTypeKey ?? "")
 }
 
-function isPlainCityCenter(feature: PlacementFeature): boolean {
-  return (feature.data.cityCenterTypeKey ?? "city_center") !== "roundabout"
+/**
+ * Reads the roundabouts subtype. Rows created before the collapse stored it as
+ * `cityCenterTypeKey`, so that spelling is accepted until every row is migrated.
+ */
+export function roundaboutsSubtype(
+  data: Pick<FeatureData, "roundaboutsTypeKey" | "cityCenterTypeKey"> | null | undefined,
+): string {
+  return data?.roundaboutsTypeKey ?? data?.cityCenterTypeKey ?? "city_center"
+}
+
+export function isPlainRoundabouts(
+  data: Pick<FeatureData, "roundaboutsTypeKey" | "cityCenterTypeKey"> | null | undefined,
+): boolean {
+  return roundaboutsSubtype(data) !== "roundabout"
 }
 
 /**
@@ -79,12 +92,12 @@ function isPlainCityCenter(feature: PlacementFeature): boolean {
  * must be placed inside one. Passing `ignoreId` excludes the feature currently
  * being edited from the occupancy check.
  */
-export function plainCityCenterPlacementError(
+export function plainRoundaboutsPlacementError(
   point: Partial<LatLng> | null | undefined,
   areas: readonly PlacementFeature[],
-  cityCenters: readonly PlacementFeature[],
+  roundabouts: readonly PlacementFeature[],
   ignoreId?: string,
-): PlainCityCenterPlacementError {
+): PlainRoundaboutsPlacementError {
   const lat = point?.lat
   const lng = point?.lng
   if (
@@ -103,9 +116,9 @@ export function plainCityCenterPlacementError(
   )
   if (!area) return "outside_urban_area"
 
-  const occupied = cityCenters.some((center) => {
+  const occupied = roundabouts.some((center) => {
     if (ignoreId && (center.dbId === ignoreId || center.id === ignoreId)) return false
-    if (!isPlainCityCenter(center)) return false
+    if (!isPlainRoundabouts(center.data)) return false
     if (center.data.lat == null || center.data.lng == null) return false
     return pointInRing(
       { lat: center.data.lat, lng: center.data.lng },
@@ -113,5 +126,5 @@ export function plainCityCenterPlacementError(
     )
   })
 
-  return occupied ? "urban_area_has_city_center" : null
+  return occupied ? "urban_area_has_plain_roundabouts" : null
 }

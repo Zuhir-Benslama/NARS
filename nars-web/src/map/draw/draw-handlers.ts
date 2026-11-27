@@ -228,9 +228,9 @@ function onContextMenu(e: MouseEvent): void {
   }
 
   let feature
-  if (phase.key === "cityCenter") {
+  if (phase.key === "roundabouts") {
     feature = features.find(
-      (f) => f.source === "features" && f.properties?.phaseKey === "cityCenter",
+      (f) => f.source === "features" && f.properties?.phaseKey === "roundabouts",
     )
   } else {
     feature = features.find((f) => f.source === "features" && f.properties?.dbId)
@@ -266,9 +266,9 @@ function onClick(e: MapLibreMapMouseEvent & { point: { x: number; y: number } })
   }
 
   let feature
-  if (phase?.key === "cityCenter") {
+  if (phase?.key === "roundabouts") {
     feature = features.find(
-      (f) => f.source === "features" && f.properties?.phaseKey === "cityCenter",
+      (f) => f.source === "features" && f.properties?.phaseKey === "roundabouts",
     )
   } else {
     feature = features.find((f) => f.source === "features")

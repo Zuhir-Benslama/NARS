@@ -244,23 +244,23 @@ CREATE TABLE IF NOT EXISTS public.districts
 
 CREATE INDEX IF NOT EXISTS ix_districts_user_id ON public.districts (user_id);
 
--- ── City centres ──────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.city_centers
+-- ── Roundabouts (city center is a subtype) ────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.roundabouts
 (
     id         uuid                     NOT NULL,
     user_id    uuid                     NOT NULL,
-    layer      character varying(50)    NOT NULL DEFAULT 'city_center',
-    label      character varying(500)   NOT NULL DEFAULT 'City Center',
+    layer      character varying(50)    NOT NULL DEFAULT 'roundabouts',
+    label      character varying(500)   NOT NULL DEFAULT 'Roundabouts',
     data       jsonb                    NOT NULL,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     updated_at timestamp with time zone,
-    CONSTRAINT city_centers_pkey PRIMARY KEY (id),
-    CONSTRAINT city_centers_user_fk FOREIGN KEY (user_id)
+    CONSTRAINT roundabouts_pkey PRIMARY KEY (id),
+    CONSTRAINT roundabouts_user_fk FOREIGN KEY (user_id)
         REFERENCES public.users (id)
         ON UPDATE NO ACTION ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS ix_city_centers_user_id ON public.city_centers (user_id);
+CREATE INDEX IF NOT EXISTS ix_roundabouts_user_id ON public.roundabouts (user_id);
 
 -- ── Roads ─────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.roads

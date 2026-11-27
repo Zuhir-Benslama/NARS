@@ -47,16 +47,24 @@ public class SpecialNumberingServiceTests(NarsDatabaseFixture fixture) : Service
         return id;
     }
 
-    private async Task<Guid> AddCityCenterAsync(string layer, double lat, double lng, double radius)
+    private async Task<Guid> AddRoundaboutAsync(
+        double lat,
+        double lng,
+        double radius,
+        string subtype = FeatureTypes.RoundaboutsSubtypes.Roundabout,
+        bool legacySubtypeKey = false)
     {
         var id = Guid.NewGuid();
-        Db.CityCenters.Add(new CityCenter
+        var data = legacySubtypeKey
+            ? JsonSerializer.Serialize(new { cityCenterTypeKey = subtype, lat, lng, radius })
+            : JsonSerializer.Serialize(new { roundaboutsTypeKey = subtype, lat, lng, radius });
+        Db.Roundabouts.Add(new Roundabout
         {
             Id = id,
             UserId = _userId,
-            Layer = layer,
-            Label = layer,
-            Data = JsonSerializer.Serialize(new { lat, lng, radius }),
+            Layer = FeatureTypes.Roundabouts,
+            Label = "Roundabout",
+            Data = data,
         });
         await Db.SaveChangesAsync();
         return id;
@@ -143,8 +151,7 @@ public class SpecialNumberingServiceTests(NarsDatabaseFixture fixture) : Service
     [Fact]
     public async Task NumberAsync_Roundabout_FromNorth_EvenOutsideOddInside()
     {
-        var featureId = await AddCityCenterAsync(
-            FeatureTypes.CityCenterLayers.Roundabout, 36.0, 3.0, 500);
+        var featureId = await AddRoundaboutAsync(36.0, 3.0, 500);
 
         var insideNorth = await AddEntranceAsync(36.002, 3.0);
         var insideWest = await AddEntranceAsync(36.0, 2.998);
@@ -162,6 +169,40 @@ public class SpecialNumberingServiceTests(NarsDatabaseFixture fixture) : Service
         Assert.Equal(4, numbered.Single(r => r.Id == outsideSouth.ToString()).EntranceNumber);
         Assert.Equal("inside", numbered.Single(r => r.Id == insideNorth.ToString()).Side);
         Assert.Equal("outside", numbered.Single(r => r.Id == outsideNorth.ToString()).Side);
+    }
+
+    [Fact]
+    public async Task NumberAsync_Roundabout_LegacySubtypeKey_StillNumbers()
+    {
+        var featureId = await AddRoundaboutAsync(
+            36.0, 3.0, 500, legacySubtypeKey: true);
+
+        var insideNorth = await AddEntranceAsync(36.002, 3.0);
+        var outsideNorth = await AddEntranceAsync(36.0046, 3.0);
+
+        var numbered = await CreateService().NumberAsync(
+            _userId, FeatureTypes.SpecialNumberingModes.Roundabout, featureId,
+            [outsideNorth, insideNorth], null, CancellationToken.None);
+
+        Assert.NotNull(numbered);
+        Assert.Equal(1, numbered.Single(r => r.Id == insideNorth.ToString()).EntranceNumber);
+        Assert.Equal(2, numbered.Single(r => r.Id == outsideNorth.ToString()).EntranceNumber);
+    }
+
+    [Fact]
+    public async Task NumberAsync_PlainCityCenterInRoundaboutsLayer_ReturnsNull()
+    {
+        var featureId = await AddRoundaboutAsync(
+            36.0, 3.0, 500, FeatureTypes.RoundaboutsSubtypes.CityCenter);
+        var entrance = await AddEntranceAsync(36.002, 3.0);
+
+        var numbered = await CreateService().NumberAsync(
+            _userId, FeatureTypes.SpecialNumberingModes.Roundabout, featureId,
+            [entrance], null, CancellationToken.None);
+
+        Assert.Null(numbered);
+        using var unchanged = await GetDataAsync(entrance);
+        Assert.False(unchanged.RootElement.TryGetProperty("entranceNumber", out _));
     }
 
     [Fact]

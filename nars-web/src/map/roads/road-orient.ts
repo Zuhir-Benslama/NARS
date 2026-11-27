@@ -1,6 +1,6 @@
 // ─── ROAD ORIENTATION ─────────────────────────────────────────────────────────
-// Phase 2: BFS/DFS from city center perimeter outward to orient road segments.
-// Phase 2A: Geographic fallback when no city center exists.
+// Phase 2: BFS/DFS from roundabouts perimeter outward to orient road segments.
+// Phase 2A: Geographic fallback when no roundabouts feature exists.
 
 import Graph from "graphology"
 import * as turfDistance from "@turf/distance"
@@ -22,7 +22,7 @@ export function geographicDirection(seg: Seg): void {
       : first.lng < last.lng // E→W: start at highest lng
 }
 
-// ─── PHASE 2B: RECURSIVE DFS FROM CITY CENTER ───────────────────────────────
+// ─── PHASE 2B: RECURSIVE DFS FROM ROUNDABOUTS ─────────────────────────────────
 
 function orientFrom(
   fromNode: string,
@@ -68,7 +68,7 @@ function orientFrom(
   }
 }
 
-export function orientFromCityCenter(
+export function orientFromRoundabouts(
   center: Coord,
   radius: number,
   graph: Graph,
@@ -76,7 +76,7 @@ export function orientFromCityCenter(
   visited: Set<string>,
 ): void {
   const seeds = graph.nodes().filter((k: string) => {
-    // `radius` (city-center ring) and CONNECT_M are in meters; turf distance
+    // `radius` (roundabouts ring) and CONNECT_M are in meters; turf distance
     // defaults to km, so request meters explicitly or the 30 m ring tolerance
     // silently becomes 30 km and every node becomes a seed.
     const d = turfDistance.distance(toPt(center), toPt(fromNk(k)), { units: "meters" })

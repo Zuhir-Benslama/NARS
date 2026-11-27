@@ -14,7 +14,7 @@ public sealed class FeatureStatsService(
 {
     private static readonly string[] _featureTypes =
     [
-        FeatureTypes.Area, FeatureTypes.District, FeatureTypes.CityCenter, FeatureTypes.Road,
+        FeatureTypes.Area, FeatureTypes.District, FeatureTypes.Roundabouts, FeatureTypes.Road,
         FeatureTypes.HouseEntrance, FeatureTypes.PublicBuilding, FeatureTypes.PublicSpace, FeatureTypes.NamingPanel,
     ];
 
@@ -114,7 +114,7 @@ public sealed class FeatureStatsService(
                 Role: user.Role,
                 Areas: GetCount(FeatureTypes.Area),
                 Districts: GetCount(FeatureTypes.District),
-                CityCenters: GetCount(FeatureTypes.CityCenter),
+                Roundabouts: GetCount(FeatureTypes.Roundabouts),
                 Roads: GetCount(FeatureTypes.Road),
                 HouseEntrances: GetCount(FeatureTypes.HouseEntrance),
                 PublicBuildings: GetCount(FeatureTypes.PublicBuilding),

@@ -151,10 +151,10 @@ describe("enableEditGeometry", () => {
   })
 
   it("delegates to editFeatureInfo for circle type", () => {
-    addLayerEntry("cityCenter", {
+    addLayerEntry("roundabouts", {
       dbId: "circle1",
       type: "circle",
-      data: { type: "cityCenter", label: "CC", radius: 100, lat: 36.0, lng: 127.0 },
+      data: { type: "roundabouts", label: "CC", radius: 100, lat: 36.0, lng: 127.0 },
     })
 
     mod.enableEditGeometry("circle1")
@@ -284,17 +284,17 @@ describe("removeFeature", () => {
     expect(mockShowToast).toHaveBeenCalledWith("map_delete_failed", expect.any(String))
   })
 
-  it("city-center state derives from the layer store after delete", async () => {
+  it("roundabouts state derives from the layer store after delete", async () => {
     const { useLayerStore } = await import("../../stores/layerStore")
-    addLayerEntry("cityCenter", { dbId: "cc1", data: { type: "cityCenter", label: "CC" } })
-    expect(useLayerStore().cityCenter).toHaveLength(1)
+    addLayerEntry("roundabouts", { dbId: "cc1", data: { type: "roundabouts", label: "CC" } })
+    expect(useLayerStore().roundabouts).toHaveLength(1)
     mockShowConfirm.mockResolvedValue(true)
     mockApiFetch.mockResolvedValue({ ok: true })
 
     await mod.removeFeature("cc1")
 
-    expect(useLayerStore().cityCenter).toHaveLength(0)
-    expect(useAppStore().cityCenterLatLng).toBeNull()
+    expect(useLayerStore().roundabouts).toHaveLength(0)
+    expect(useAppStore().roundaboutsLatLng).toBeNull()
   })
 
   it("calls updateEndpointMarkers on road delete", async () => {

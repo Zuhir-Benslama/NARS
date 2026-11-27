@@ -154,9 +154,29 @@ describe("loader-db", () => {
     // The phase key is authoritative; the stored data.type is normalized to it.
     expect(store.getFeature("a")?.data.type).toBe("areas")
     expect(store.getFeature("d")?.data.type).toBe("districts")
-    expect(store.getFeature("c")?.data.type).toBe("cityCenter")
+    expect(store.getFeature("c")?.data.type).toBe("roundabouts")
     expect(store.getFeature("h")?.data.type).toBe("houseEntrances")
     expect(store.getFeature("n")?.data.type).toBe("namingPanels")
+  })
+
+  it("normalizes a legacy roundabouts subtype key on load", async () => {
+    const feature = {
+      id: "legacy-roundabout",
+      layer: "roundabout",
+      data: { type: "roundabout", cityCenterTypeKey: "roundabout", radius: 100 },
+    }
+    mockApiFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([feature]) })
+    mockGetFeatureType.mockReturnValue("geojson")
+    mockBuildGeoJsonFeature.mockReturnValue(null)
+
+    await loadFromDatabase()
+
+    const { useLayerStore } = await import("../../stores/layerStore")
+    const entry = useLayerStore().getFeature("legacy-roundabout")
+    const data = entry?.data as { roundaboutsTypeKey?: string } | undefined
+    expect(entry?.data.type).toBe("roundabouts")
+    expect(data?.roundaboutsTypeKey).toBe("roundabout")
+    expect(data).not.toHaveProperty("cityCenterTypeKey")
   })
 
   it("handles scattered features", async () => {
@@ -239,11 +259,11 @@ describe("loader-db", () => {
     expect(batchFeatures[0].properties.label).toBe("Parsed St")
   })
 
-  it("handles cityCenter feature and updates appStore", async () => {
+  it("handles roundabouts feature and updates appStore", async () => {
     const feature = {
       id: "4",
       layer: "city_center",
-      data: { type: "cityCenter", label: "CC", lat: 36.0, lng: 127.5 },
+      data: { type: "roundabouts", label: "CC", lat: 36.0, lng: 127.5 },
     }
     mockApiFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([feature]) })
     mockGetFeatureType.mockReturnValue("circle")
@@ -257,15 +277,15 @@ describe("loader-db", () => {
 
     await loadFromDatabase()
 
-    expect(useLayerStore().cityCenter).toHaveLength(1)
-    expect(useAppStore().cityCenterLatLng).toEqual({ lat: 36.0, lng: 127.5 })
+    expect(useLayerStore().roundabouts).toHaveLength(1)
+    expect(useAppStore().roundaboutsLatLng).toEqual({ lat: 36.0, lng: 127.5 })
   })
 
   it("restores persisted phase index", async () => {
     const feature = {
       id: "1",
       layer: "city_center",
-      data: { type: "cityCenter", label: "X", lat: 36.0, lng: 127.0 },
+      data: { type: "roundabouts", label: "X", lat: 36.0, lng: 127.0 },
     }
     mockApiFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([feature]) })
     mockGetFeatureType.mockReturnValue("circle")
@@ -283,7 +303,7 @@ describe("loader-db", () => {
     const feature = {
       id: "1",
       layer: "city_center",
-      data: { type: "cityCenter", label: "X", lat: 36.0, lng: 127.0 },
+      data: { type: "roundabouts", label: "X", lat: 36.0, lng: 127.0 },
     }
     mockApiFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([feature]) })
     mockGetFeatureType.mockReturnValue("circle")
@@ -301,7 +321,7 @@ describe("loader-db", () => {
     const feature = {
       id: "1",
       layer: "city_center",
-      data: { type: "cityCenter", label: "X", lat: 36.0, lng: 127.0 },
+      data: { type: "roundabouts", label: "X", lat: 36.0, lng: 127.0 },
     }
     mockApiFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([feature]) })
     mockGetFeatureType.mockReturnValue("circle")

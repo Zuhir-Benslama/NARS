@@ -11,7 +11,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<FeatureRegistry> FeatureRegistry { get; set; }
     public DbSet<Area> Areas { get; set; }
     public DbSet<District> Districts { get; set; }
-    public DbSet<CityCenter> CityCenters { get; set; }
+    public DbSet<Roundabout> Roundabouts { get; set; }
     public DbSet<Road> Roads { get; set; }
     public DbSet<HouseEntrance> HouseEntrances { get; set; }
     public DbSet<PublicBuilding> PublicBuildings { get; set; }

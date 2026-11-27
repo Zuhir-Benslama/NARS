@@ -10,6 +10,8 @@ DECLARE
     has_inspections boolean;
     has_inspections_fk boolean;
     has_security_stamp boolean;
+    has_roundabouts boolean;
+    has_city_centers boolean;
 BEGIN
     SELECT EXISTS (
         SELECT 1
@@ -43,6 +45,23 @@ BEGIN
           AND column_name = 'security_stamp'
     ) INTO has_security_stamp;
 
+    -- RenameCityCenterToRoundabouts is already reflected by the table name in
+    -- schemas created from create_nars_db.sql. Older schemas still have
+    -- `city_centers` and must run the EF migration to preserve their rows.
+    -- Do not baseline when both tables exist: that needs manual inspection so
+    -- no feature rows are silently orphaned or overwritten.
+    SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'roundabouts'
+    ) INTO has_roundabouts;
+
+    SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'city_centers'
+    ) INTO has_city_centers;
+
     IF has_areas THEN
         INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
         VALUES ('20260510191030_AddErrorLogs', '10.0.10')
@@ -70,6 +89,12 @@ BEGIN
     IF has_security_stamp THEN
         INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
         VALUES ('20260810062821_AddUserSecurityStamp', '10.0.10')
+        ON CONFLICT ("MigrationId") DO NOTHING;
+    END IF;
+
+    IF has_roundabouts AND NOT has_city_centers THEN
+        INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+        VALUES ('20261127080208_RenameCityCenterToRoundabouts', '10.0.10')
         ON CONFLICT ("MigrationId") DO NOTHING;
     END IF;
 END $$;

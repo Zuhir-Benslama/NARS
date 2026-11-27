@@ -8,7 +8,7 @@ export interface UserFeatureStats {
   role: UserRole
   areas: number
   districts: number
-  city_centers: number
+  roundabouts: number
   roads: number
   house_entrances: number
   public_buildings: number

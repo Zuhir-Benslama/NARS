@@ -2,7 +2,7 @@
 // Update endpoint source with start/end-of-road markers.
 // Start marker (→) at coords[0], rotated to segment direction.
 // End marker (X) at coords[last], rotated to segment direction.
-// Start marker suppressed if road starts at city center location.
+// Start marker suppressed if road starts at a roundabouts feature location.
 
 import { useLayerStore } from "../../stores/layerStore"
 import { getCtx } from "../core/state"
@@ -27,7 +27,7 @@ export function updateEndpointMarkers(): void {
 
   const features: GeoJSON.Feature[] = []
 
-  const ccLatLngs: Coord[] = (state.cityCenter || [])
+  const ccLatLngs: Coord[] = (state.roundabouts || [])
     .filter((e) => e.data.lat != null && e.data.lng != null)
     .map((e) => ({ lat: e.data.lat!, lng: e.data.lng! }))
 
@@ -39,8 +39,8 @@ export function updateEndpointMarkers(): void {
     const endAngle = computeSegmentAngle(coords[coords.length - 2], coords[coords.length - 1])
 
     const startLL = coords[0]
-    const onCityCenter = ccLatLngs.some((cc) => haversineMeters(startLL, cc) < 2)
-    if (!onCityCenter) {
+    const onRoundabouts = ccLatLngs.some((cc) => haversineMeters(startLL, cc) < 2)
+    if (!onRoundabouts) {
       features.push({
         type: "Feature" as const,
         geometry: { type: "Point" as const, coordinates: [startLL.lng, startLL.lat] },

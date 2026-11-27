@@ -93,8 +93,8 @@ export const SNAP_CONFIG = {
   snapTargets: {
     areas: ["areas"],
     districts: ["areas", "districts"],
-    cityCenter: [],
-    roads: ["areas", "cityCenter", "roads"],
+    roundabouts: [],
+    roads: ["areas", "roundabouts", "roads"],
     houseEntrances: [],
     publicBuildings: ["areas", "publicBuildings", "publicSpaces"],
     publicSpaces: ["areas", "publicBuildings", "publicSpaces"],
@@ -113,16 +113,16 @@ export const DRAW_CONFIG = {
   drawModeResetDelayMs: 200,
 } as const
 
-// ─── CITY CENTER CONFIGURATION ───────────────────────────────────────────────
+// ─── ROUNDABOUTS CONFIGURATION ────────────────────────────────────────────────
 
-export const CITY_CENTER_CONFIG = {
+export const ROUNDABOUTS_CONFIG = {
   /** Minimum allowed radius in meters */
   minRadiusM: 5,
 
   /** Maximum allowed radius in meters */
   maxRadiusM: 50_000,
 
-  /** Stroke width of the city-center ring rendered as a LineString */
+  /** Stroke width of the roundabouts ring rendered as a LineString */
   ringStrokeWidth: 6,
 } as const
 

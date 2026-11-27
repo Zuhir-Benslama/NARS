@@ -15,7 +15,7 @@ vi.mock("../draw/draw-save", () => ({
 import { PHASES } from "../../phases"
 
 const areasPhase = PHASES[0]
-const cityCenterPhase = PHASES.find((p: Phase) => p.key === "cityCenter")!
+const roundaboutsPhase = PHASES.find((p: Phase) => p.key === "roundabouts")!
 const roadPhase = PHASES.find((p: Phase) => p.key === "roads")!
 
 function data(overrides: Partial<FeatureData> = {}): FeatureData {
@@ -78,19 +78,19 @@ describe("buildGeoJsonFeature", () => {
     expect(result!.properties.geomType).toBe("Polygon")
   })
 
-  it("builds a LineString circle ring for cityCenter with radius", () => {
+  it("builds a LineString circle ring for roundabouts with radius", () => {
     const result = buildGeoJsonFeature(
       "db-4",
       data({ lat: 10, lng: 20, radius: 500 }),
-      cityCenterPhase,
+      roundaboutsPhase,
     )
     expect(result).not.toBeNull()
     expect(result!.geometry.type).toBe("LineString")
     expect(result!.properties.radius).toBe(500)
   })
 
-  it("builds a Point for cityCenter without radius", () => {
-    const result = buildGeoJsonFeature("db-5", data({ lat: 10, lng: 20 }), cityCenterPhase)
+  it("builds a Point for roundabouts without radius", () => {
+    const result = buildGeoJsonFeature("db-5", data({ lat: 10, lng: 20 }), roundaboutsPhase)
     expect(result).not.toBeNull()
     expect(result!.geometry.type).toBe("Point")
   })

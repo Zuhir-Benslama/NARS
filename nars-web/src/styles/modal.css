@@ -183,9 +183,9 @@ label {
   color: var(--modal-label) !important;
 }
 
-/* ── City-center dialog ─────────────────────────────────────────────────────── */
+/* ── Roundabouts dialog ──────────────────────────────────────────────────────── */
 
-#cityCenterDialog {
+#roundaboutsDialog {
   position: fixed;
   z-index: 2100;
   left: 0;
@@ -194,7 +194,7 @@ label {
   height: 100%;
   background: var(--overlay-bg) !important;
 }
-#cityCenterDialog .dialog-box {
+#roundaboutsDialog .dialog-box {
   background: var(--modal-bg) !important;
   backdrop-filter: var(--glass-blur) !important;
   -webkit-backdrop-filter: var(--glass-blur) !important;
@@ -207,24 +207,24 @@ label {
   width: 420px;
   text-align: center;
 }
-#cityCenterDialog .dialog-title {
+#roundaboutsDialog .dialog-title {
   font-size: 17px;
   font-weight: 700;
   margin-bottom: 12px;
   color: var(--text-primary) !important;
 }
-#cityCenterDialog .dialog-body {
+#roundaboutsDialog .dialog-body {
   font-size: 13px;
   color: var(--text-secondary) !important;
   line-height: 1.6;
   margin-bottom: 24px;
 }
-#cityCenterDialog .dialog-buttons {
+#roundaboutsDialog .dialog-buttons {
   display: flex;
   gap: 12px;
   justify-content: center;
 }
-#cityCenterDialog .dialog-btn {
+#roundaboutsDialog .dialog-btn {
   padding: 10px 28px;
   border: none;
   border-radius: 7px;
@@ -250,8 +250,8 @@ label {
   background: var(--btn-cancel-hover) !important;
 }
 
-/* ── Skip city-center button ─────────────────────────────────────────────────── */
-#skipCityCenterBtn {
+/* ── Skip roundabouts button ──────────────────────────────────────────────────── */
+#skipRoundaboutsBtn {
   position: fixed;
   bottom: 80px;
   left: 50%;
@@ -269,7 +269,7 @@ label {
   cursor: pointer;
   transition: all 0.2s;
 }
-#skipCityCenterBtn:hover {
+#skipRoundaboutsBtn:hover {
   background: var(--glass-bg-hover) !important;
   color: var(--text-primary) !important;
 }

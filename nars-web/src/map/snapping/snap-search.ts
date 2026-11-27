@@ -5,7 +5,7 @@
 import { getCtx } from "../core/state"
 import { SNAP_CONFIG } from "../../config"
 import { closestOnSegmentProjected, closestOnCirclePerimeter, pixelDist } from "./snap-geometry"
-import { getSnapRings, getRoadChains, getCityCenterCircles, getSnapPoints } from "./snap-sources"
+import { getSnapRings, getRoadChains, getRoundaboutsCircles, getSnapPoints } from "./snap-sources"
 
 // ─── THRESHOLDS ───────────────────────────────────────────────────────────────
 
@@ -188,7 +188,7 @@ export function findNearestSnap(
   }
 
   // ── Circle perimeters ───────────────────────────────────────────
-  const circles = getCityCenterCircles(phaseKeys, excludeId)
+  const circles = getRoundaboutsCircles(phaseKeys, excludeId)
   for (const c of circles) {
     const cp = closestOnCirclePerimeter(
       cursorX,

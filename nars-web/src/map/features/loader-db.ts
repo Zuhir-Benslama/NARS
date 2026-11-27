@@ -33,7 +33,7 @@ const TYPE_TO_LAYER: Record<string, string> = {
   house_entrance: "main_entrance",
   public_building: "public_building",
   public_space: "garden",
-  city_center: "city_center",
+  roundabouts: "roundabouts",
   naming_panel: "naming_panel",
 }
 
@@ -86,6 +86,16 @@ function processFeature(
     // generated road kept type "road", matched no phase, and every action on it
     // failed with "unknown feature type".
     const data = { ...rawData, type: phaseKey } as FeatureDataByType
+
+    // Old rows stored the roundabouts subtype under `cityCenterTypeKey`.
+    if (phaseKey === "roundabouts") {
+      const roundaboutsData = data as FeatureDataByType & {
+        cityCenterTypeKey?: string
+        roundaboutsTypeKey?: string
+      }
+      roundaboutsData.roundaboutsTypeKey ??= roundaboutsData.cityCenterTypeKey
+      delete roundaboutsData.cityCenterTypeKey
+    }
 
     const layerEntry: LayerEntry = {
       id: `feat_${feature.id}`,

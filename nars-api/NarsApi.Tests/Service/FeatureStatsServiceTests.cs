@@ -45,7 +45,7 @@ public class FeatureStatsServiceTests(NarsDatabaseFixture fixture) : ServiceTest
         Assert.Equal(2, counts[FeatureTypes.Area]);
         Assert.Equal(1, counts[FeatureTypes.Road]);
         Assert.Equal(0, counts[FeatureTypes.District]);
-        Assert.Equal(0, counts[FeatureTypes.CityCenter]);
+        Assert.Equal(0, counts[FeatureTypes.Roundabouts]);
         Assert.Equal(0, counts[FeatureTypes.HouseEntrance]);
         Assert.Equal(0, counts[FeatureTypes.PublicBuilding]);
         Assert.Equal(0, counts[FeatureTypes.PublicSpace]);

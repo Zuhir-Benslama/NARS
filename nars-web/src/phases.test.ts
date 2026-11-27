@@ -40,8 +40,8 @@ describe("PHASES", () => {
     expect(areas?.geometryType).toBe("Polygon")
   })
 
-  it("cityCenter phase uses circle drawType and Point geometry", () => {
-    const cc = PHASES.find((p) => p.key === "cityCenter")
+  it("roundabouts phase uses circle drawType and Point geometry", () => {
+    const cc = PHASES.find((p) => p.key === "roundabouts")
     expect(cc?.drawType).toBe("circle")
     expect(cc?.geometryType).toBe("Point")
   })
@@ -68,8 +68,8 @@ describe("getApiLayerToPhase", () => {
     expect(getApiLayerToPhase()["secondary_urban"]).toBe("areas")
   })
 
-  it("maps city_center to cityCenter", () => {
-    expect(getApiLayerToPhase()["city_center"]).toBe("cityCenter")
+  it("maps city_center to roundabouts", () => {
+    expect(getApiLayerToPhase()["city_center"]).toBe("roundabouts")
   })
 
   it("maps all road types to roads", () => {

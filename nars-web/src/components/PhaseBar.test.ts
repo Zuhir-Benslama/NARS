@@ -28,11 +28,11 @@ vi.mock("../phases", () => ({
     },
     {
       index: 2,
-      key: "cityCenter",
-      label: "phase_cityCenter_label",
+      key: "roundabouts",
+      label: "phase_roundabouts_label",
       drawType: "circle",
       color: "#e74c3c",
-      hint: "phase_cityCenter_hint",
+      hint: "phase_roundabouts_hint",
     },
     {
       index: 3,

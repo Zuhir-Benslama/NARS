@@ -17,7 +17,7 @@
             <th>{{ t("admin.user") }}</th>
             <th>{{ t("admin.areas") }}</th>
             <th>{{ t("admin.districts") }}</th>
-            <th>{{ t("admin.city_center") }}</th>
+            <th>{{ t("admin.roundabouts") }}</th>
             <th>{{ t("admin.roads") }}</th>
             <th>{{ t("admin.entrances") }}</th>
             <th>{{ t("admin.pub_bldg") }}</th>
@@ -35,7 +35,7 @@
             </td>
             <td>{{ u.areas }}</td>
             <td>{{ u.districts }}</td>
-            <td>{{ u.city_centers }}</td>
+            <td>{{ u.roundabouts }}</td>
             <td>{{ u.roads }}</td>
             <td>{{ u.house_entrances }}</td>
             <td>{{ u.public_buildings }}</td>
@@ -49,7 +49,7 @@
             <td class="totals-label">{{ t("admin.totals") }}</td>
             <td>{{ sum(commune.users, "areas") }}</td>
             <td>{{ sum(commune.users, "districts") }}</td>
-            <td>{{ sum(commune.users, "city_centers") }}</td>
+            <td>{{ sum(commune.users, "roundabouts") }}</td>
             <td>{{ sum(commune.users, "roads") }}</td>
             <td>{{ sum(commune.users, "house_entrances") }}</td>
             <td>{{ sum(commune.users, "public_buildings") }}</td>

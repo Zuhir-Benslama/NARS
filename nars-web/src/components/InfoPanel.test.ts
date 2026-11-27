@@ -71,19 +71,19 @@ describe("InfoPanel", () => {
     expect(wrapper.text()).toContain("—")
   })
 
-  it('shows "placed" for city center when one exists', () => {
+  it('shows "placed" for roundabouts when one exists', () => {
     const store = useLayerStore()
-    store.addFeature("cityCenter", {
+    store.addFeature("roundabouts", {
       id: "cc1",
       dbId: "cc1",
       type: "circle",
-      data: { type: "cityCenter", label: "CC", lat: 36.7, lng: 3.1, radius: 500 },
+      data: { type: "roundabouts", label: "CC", lat: 36.7, lng: 3.1, radius: 500 },
     } as LayerEntry)
     const wrapper = mount(InfoPanel)
     expect(wrapper.text()).toContain("info_status_placed")
   })
 
-  it("shows em dash for city center when not placed", () => {
+  it("shows em dash for roundabouts when not placed", () => {
     const wrapper = mount(InfoPanel)
     expect(wrapper.text()).toContain("—")
   })

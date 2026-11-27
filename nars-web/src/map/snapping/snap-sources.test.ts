@@ -271,58 +271,58 @@ describe("getRoadChains", () => {
   })
 })
 
-describe("getCityCenterCircles", () => {
-  it("returns empty when phaseKeys has no cityCenter", () => {
-    expect(mod.getCityCenterCircles(["areas"])).toEqual([])
+describe("getRoundaboutsCircles", () => {
+  it("returns empty when phaseKeys has no roundabouts", () => {
+    expect(mod.getRoundaboutsCircles(["areas"])).toEqual([])
   })
 
   it("collects entries with valid lat/lng/radius", () => {
-    useLayerStore().addFeature("cityCenter", {
+    useLayerStore().addFeature("roundabouts", {
       id: "cc1",
       dbId: "cc1",
       type: "circle",
-      data: { type: "cityCenter", label: "CC", lat: 36.0, lng: 127.0, radius: 500 },
+      data: { type: "roundabouts", label: "CC", lat: 36.0, lng: 127.0, radius: 500 },
     } as any)
 
-    const result = mod.getCityCenterCircles(["cityCenter"])
+    const result = mod.getRoundaboutsCircles(["roundabouts"])
 
     expect(result).toEqual([{ lat: 36.0, lng: 127.0, radius: 500 }])
   })
 
   it("skips entries with missing or zero radius", () => {
-    useLayerStore().addFeature("cityCenter", {
+    useLayerStore().addFeature("roundabouts", {
       id: "cc2",
       dbId: "cc2",
       type: "circle",
-      data: { type: "cityCenter", label: "CC", lat: 36.0, lng: 127.0, radius: 0 },
+      data: { type: "roundabouts", label: "CC", lat: 36.0, lng: 127.0, radius: 0 },
     } as any)
 
-    expect(mod.getCityCenterCircles(["cityCenter"])).toEqual([])
+    expect(mod.getRoundaboutsCircles(["roundabouts"])).toEqual([])
   })
 })
 
 describe("getSnapPoints", () => {
   it("collects point features with lat/lng", () => {
-    useLayerStore().addFeature("cityCenter", {
+    useLayerStore().addFeature("roundabouts", {
       id: "p1",
       dbId: "p1",
       type: "point",
-      data: { type: "cityCenter", label: "P", lat: 36.5, lng: 127.5 },
+      data: { type: "roundabouts", label: "P", lat: 36.5, lng: 127.5 },
     } as any)
 
-    const result = mod.getSnapPoints(["cityCenter"])
+    const result = mod.getSnapPoints(["roundabouts"])
 
     expect(result).toEqual([{ lat: 36.5, lng: 127.5 }])
   })
 
   it("skips entries without lat/lng", () => {
-    useLayerStore().addFeature("cityCenter", {
+    useLayerStore().addFeature("roundabouts", {
       id: "p2",
       dbId: "p2",
       type: "point",
-      data: { type: "cityCenter", label: "P" },
+      data: { type: "roundabouts", label: "P" },
     } as any)
 
-    expect(mod.getSnapPoints(["cityCenter"])).toEqual([])
+    expect(mod.getSnapPoints(["roundabouts"])).toEqual([])
   })
 })

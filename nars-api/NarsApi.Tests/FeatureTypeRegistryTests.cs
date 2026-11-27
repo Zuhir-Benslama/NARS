@@ -18,7 +18,7 @@ public class FeatureTypeRegistryTests
         Assert.Contains(FeatureTypes.HouseEntrance, types);
         Assert.Contains(FeatureTypes.PublicBuilding, types);
         Assert.Contains(FeatureTypes.PublicSpace, types);
-        Assert.Contains(FeatureTypes.CityCenter, types);
+        Assert.Contains(FeatureTypes.Roundabouts, types);
         Assert.Contains(FeatureTypes.NamingPanel, types);
         Assert.Equal(ExpectedFeatureTypeCount, types.Count);
     }
@@ -68,7 +68,7 @@ public class FeatureTypeRegistryTests
     [Theory]
     [InlineData(FeatureTypes.Area)]
     [InlineData(FeatureTypes.District)]
-    [InlineData(FeatureTypes.CityCenter)]
+    [InlineData(FeatureTypes.Roundabouts)]
     [InlineData(FeatureTypes.Road)]
     [InlineData(FeatureTypes.HouseEntrance)]
     [InlineData(FeatureTypes.PublicBuilding)]
@@ -85,7 +85,7 @@ public class FeatureTypeRegistryTests
         {
             FeatureTypes.Area => typeof(Area),
             FeatureTypes.District => typeof(District),
-            FeatureTypes.CityCenter => typeof(CityCenter),
+            FeatureTypes.Roundabouts => typeof(Roundabout),
             FeatureTypes.Road => typeof(Road),
             FeatureTypes.HouseEntrance => typeof(HouseEntrance),
             FeatureTypes.PublicBuilding => typeof(PublicBuilding),

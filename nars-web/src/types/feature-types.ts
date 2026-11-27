@@ -28,7 +28,7 @@ export interface PublicSpaceType {
   color: string
 }
 
-export interface CityCenterType {
+export interface RoundaboutsSubtype {
   key: string
   label: string
 }
@@ -53,9 +53,9 @@ export const DISTRICT_TYPES: DistrictType[] = [
   { key: "industry_zone", label: "Industry Zone", allowInScattered: true },
 ]
 
-// ── City-center layers: plain city centre vs. roundabout ──────────────
+// ── Roundabouts subtypes: plain city center vs. true roundabout ───────
 
-export const CITY_CENTER_TYPES: CityCenterType[] = [
+export const ROUNDABOUTS_SUBTYPES: RoundaboutsSubtype[] = [
   { key: "city_center", label: "City Center" },
   { key: "roundabout", label: "Roundabout" },
 ]

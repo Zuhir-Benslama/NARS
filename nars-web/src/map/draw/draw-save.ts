@@ -11,7 +11,7 @@ import { useFeaturesStore } from "../../stores/featuresStore"
 import { buildDrawControl, clearEdgeVisibilityPoll } from "./draw-control"
 import { refreshLayerVisibility } from "../rendering/labels"
 import { computeCircleRadius, closeRing } from "../rendering/geometry"
-import { CITY_CENTER_COLOR } from "../../phases"
+import { ROUNDABOUTS_COLOR } from "../../phases"
 import { getFeatureType } from "../house-numbering"
 import { getUserMessageKey } from "../../lib/errors"
 import { showToast } from "../../lib/toast"
@@ -20,12 +20,12 @@ import { t } from "../../i18n"
 import { updateEndpointMarkers } from "../roads/road-directions"
 import { buildFeatureData, featureDataToGeometry } from "../features/feature-data"
 import { displayLabelFor } from "../features/feature-labels"
-import { DRAW_CONFIG, CITY_CENTER_CONFIG } from "../../config"
+import { DRAW_CONFIG, ROUNDABOUTS_CONFIG } from "../../config"
 import {
-  cityCenterPointFromGeometry,
-  cityCenterRadiusError,
-  plainCityCenterPlacementError,
-} from "../../lib/city-center"
+  roundaboutsPointFromGeometry,
+  roundaboutsRadiusError,
+  plainRoundaboutsPlacementError,
+} from "../../lib/roundabouts"
 import { saveToDatabase } from "../features/feature-persistence"
 import { openModalForFeature } from "./draw-modal"
 import { getDrawingPhase, setSavingFeature, repatchMarker } from "./draw-state"
@@ -129,25 +129,25 @@ export function getFeatureStyle(
   return style
 }
 
-// ─── CITY CENTER CHECK ───────────────────────────────────────────
+// ─── ROUNDABOUTS CHECK ────────────────────────────────────────────
 
-function checkCityCenterPlacement(geometry: GeoJSON.Geometry, isRoundabout: boolean): boolean {
-  if (getDrawingPhase()?.key !== "cityCenter") return true
-  // Roundabouts share the city-center table but are not capped per urban area.
+function checkRoundaboutsPlacement(geometry: GeoJSON.Geometry, isRoundabout: boolean): boolean {
+  if (getDrawingPhase()?.key !== "roundabouts") return true
+  // Roundabouts share the roundabouts layer with the plain city-center subtype but are not capped.
   if (isRoundabout) return true
 
   const state = useLayerStore().$state
-  const error = plainCityCenterPlacementError(
-    cityCenterPointFromGeometry(geometry),
+  const error = plainRoundaboutsPlacementError(
+    roundaboutsPointFromGeometry(geometry),
     state.areas ?? [],
-    state.cityCenter ?? [],
+    state.roundabouts ?? [],
   )
   if (error) {
     showToast(
       t(
         error === "outside_urban_area"
-          ? "alert_cc_must_be_in_urban_area"
-          : "map_city_center_exists",
+          ? "alert_plain_roundabouts_must_be_in_urban_area"
+          : "map_plain_roundabouts_exists",
       ),
       "error",
     )
@@ -156,9 +156,9 @@ function checkCityCenterPlacement(geometry: GeoJSON.Geometry, isRoundabout: bool
   return true
 }
 
-// ─── CITY CENTER GEOMETRY OVERRIDE ─────────────────────────────────
+// ─── ROUNDABOUTS GEOMETRY OVERRIDE ───────────────────────────────────
 
-function applyCityCenterOverride(
+function applyRoundaboutsOverride(
   featureData: FeatureDataByType,
   style: Record<string, unknown>,
   storeGeometry: GeoJSON.Geometry,
@@ -168,8 +168,8 @@ function applyCityCenterOverride(
   return {
     storeGeometry: featureDataToGeometry(d, "circle"),
     style: {
-      lineColor: CITY_CENTER_COLOR,
-      lineWidth: CITY_CENTER_CONFIG.ringStrokeWidth,
+      lineColor: ROUNDABOUTS_COLOR,
+      lineWidth: ROUNDABOUTS_CONFIG.ringStrokeWidth,
       textColor: "#333333",
       radius: d.radius,
     },
@@ -194,9 +194,9 @@ function buildStorePayload(
   const style = getFeatureStyle(drawingPhase, modalResult)
   const storeGeometry = normalizeGeometry(geometry, drawingPhase.drawType)
 
-  if (drawingPhase.key !== "cityCenter") return { dbId: saveId, style, storeGeometry }
+  if (drawingPhase.key !== "roundabouts") return { dbId: saveId, style, storeGeometry }
 
-  const overridden = applyCityCenterOverride(featureData, style, storeGeometry)
+  const overridden = applyRoundaboutsOverride(featureData, style, storeGeometry)
   return { dbId: saveId, style: overridden.style, storeGeometry: overridden.storeGeometry }
 }
 
@@ -327,8 +327,8 @@ export async function completeDrawingWithGeometry(
 
   const modalResult = await openModalForFeature(drawingPhase, featureId, geometry)
   const isRoundabout =
-    modalResult?.type === "cityCenter" && modalResult.cityCenterTypeKey === "roundabout"
-  if (modalResult && !checkCityCenterPlacement(geometry, isRoundabout)) {
+    modalResult?.type === "roundabouts" && modalResult.roundaboutsTypeKey === "roundabout"
+  if (modalResult && !checkRoundaboutsPlacement(geometry, isRoundabout)) {
     deleteGeomanFeature(geomanFeatureData)
     return
   }
@@ -449,7 +449,7 @@ function validateGeometry(
     cleanup()
     return false
   }
-  if (phase.key === "cityCenter") {
+  if (phase.key === "roundabouts") {
     let radius = (geometry as { radius?: number }).radius
     if (geometry.type === "Polygon" && geometry.coordinates[0]?.length >= 3) {
       const coords = geometry.coordinates[0] as [number, number][]
@@ -465,14 +465,14 @@ function validateGeometry(
     }
     // Shared rule — the modal validation in useFeatureValidation enforces the
     // same limits with inline errors instead of toasts.
-    const radiusError = cityCenterRadiusError(radius)
+    const radiusError = roundaboutsRadiusError(radius)
     if (radiusError === "too_small") {
-      showToast(t("map_city_center_too_small"), "error")
+      showToast(t("map_roundabouts_too_small"), "error")
       cleanup()
       return false
     }
     if (radiusError === "too_large") {
-      showToast(t("map_city_center_too_large"), "error")
+      showToast(t("map_roundabouts_too_large"), "error")
       cleanup()
       return false
     }

@@ -3,7 +3,7 @@ import Graph from "graphology"
 import type { Coord, Seg } from "./road-graph"
 import { nk } from "./road-graph"
 
-import { geographicDirection, orientFromCityCenter } from "./road-orient"
+import { geographicDirection, orientFromRoundabouts } from "./road-orient"
 
 function makeSeg(coords: Coord[], dbId = "db-1"): Seg {
   return {
@@ -74,7 +74,7 @@ describe("road-orient", () => {
     })
   })
 
-  describe("orientFromCityCenter", () => {
+  describe("orientFromRoundabouts", () => {
     it("processes graph without error", () => {
       const graph = new Graph({ multi: true, type: "undirected" })
       const segs = new Map<string, Seg>()
@@ -94,7 +94,7 @@ describe("road-orient", () => {
       const visited = new Set<string>()
       // Node `b` sits ~1113 m from the center — a 1100 m ring captures it within
       // the 30 m tolerance.
-      orientFromCityCenter({ lat: 36.0, lng: 127.0 }, 1100, graph, segs, visited)
+      orientFromRoundabouts({ lat: 36.0, lng: 127.0 }, 1100, graph, segs, visited)
 
       expect(visited.size).toBeGreaterThan(0)
     })
@@ -105,7 +105,7 @@ describe("road-orient", () => {
       const visited = new Set<string>()
 
       expect(() =>
-        orientFromCityCenter({ lat: 36.0, lng: 127.0 }, 100, graph, segs, visited),
+        orientFromRoundabouts({ lat: 36.0, lng: 127.0 }, 100, graph, segs, visited),
       ).not.toThrow()
     })
 
@@ -142,7 +142,7 @@ describe("road-orient", () => {
       segs.set("seg2", seg2)
 
       const visited = new Set<string>()
-      orientFromCityCenter({ lat: 36.0, lng: 127.0 }, 1000, graph, segs, visited)
+      orientFromRoundabouts({ lat: 36.0, lng: 127.0 }, 1000, graph, segs, visited)
 
       expect(seg1.reversed).toBe(true)
       expect(seg2.reversed).toBe(false)
@@ -168,7 +168,7 @@ describe("road-orient", () => {
       segs.set("seg1", seg)
 
       const visited = new Set<string>()
-      orientFromCityCenter({ lat: 36.0, lng: 127.0 }, 1000, graph, segs, visited)
+      orientFromRoundabouts({ lat: 36.0, lng: 127.0 }, 1000, graph, segs, visited)
 
       expect(visited.has("ghost")).toBe(false)
       expect(visited.has("seg1")).toBe(true)
@@ -192,7 +192,7 @@ describe("road-orient", () => {
 
       const visited = new Set<string>()
       // radius far larger than any node distance → no seeds
-      orientFromCityCenter({ lat: 36.0, lng: 127.0 }, 100000, graph, segs, visited)
+      orientFromRoundabouts({ lat: 36.0, lng: 127.0 }, 100000, graph, segs, visited)
 
       expect(visited.size).toBe(0)
       expect(seg.reversed).toBe(false)

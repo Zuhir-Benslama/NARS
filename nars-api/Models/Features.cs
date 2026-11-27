@@ -5,7 +5,7 @@ namespace NarsApi.Models;
 
 [Table("areas")] public class Area : FeatureBase { }
 [Table("districts")] public class District : FeatureBase { }
-[Table("city_centers")] public class CityCenter : FeatureBase { }
+[Table("roundabouts")] public class Roundabout : FeatureBase { }
 [Table("roads")] public class Road : FeatureBase { }
 
 [Table("house_entrances")]

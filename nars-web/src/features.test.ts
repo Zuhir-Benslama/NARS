@@ -137,15 +137,15 @@ describe("toApiSaveShape", () => {
     expect(result).toEqual({ type: "area", layer: "central_urban" })
   })
 
-  it("maps cityCenter to correct API shape", () => {
+  it("maps roundabouts to correct API shape", () => {
     const result = toApiSaveShape({
-      type: "cityCenter",
+      type: "roundabouts",
       label: "City Center",
       decisionNumber: "001",
       decisionDate: "2024-01-01",
     })
 
-    expect(result).toEqual({ type: "city_center", layer: "city_center" })
+    expect(result).toEqual({ type: "roundabouts", layer: "roundabouts" })
   })
 
   it("maps districts to correct API shape", () => {

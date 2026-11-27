@@ -66,7 +66,7 @@ classDiagram
         +isAdminUser
         +canManageUsers
         +communeName
-        +cityCenterLatLng
+        +roundaboutsLatLng
         +counts (from layerStore)
         Actions
         +setUser(UserInfo)
@@ -119,7 +119,7 @@ classDiagram
     class LayerStore {
         State
         +LayerEntry[] areas
-        +LayerEntry[] cityCenter
+        +LayerEntry[] roundabouts
         +LayerEntry[] districts
         +LayerEntry[] roads
         +LayerEntry[] houseEntrances
@@ -374,7 +374,7 @@ classDiagram
     }
 
     class RoadOrient {
-        +orientFromCityCenter(center, radius, graph, segs, visited)
+        +orientFromRoundabouts(center, radius, graph, segs, visited)
         +geographicDirection(seg)
     }
 
@@ -417,7 +417,7 @@ classDiagram
         +validate()
         +buildModalResult()
         +isMainUrban
-        +isCityCenter
+        +isRoundabouts
     }
 
     class UseFocusTrap {

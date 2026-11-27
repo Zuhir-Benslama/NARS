@@ -16,7 +16,7 @@ public static class FeatureCatalog
     private const string IconHouseEntrance = "\U0001F6AA";
     private const string IconPublicBuilding = "\U0001F3DB\uFE0F";
     private const string IconPublicSpace = "\U0001F333";
-    private const string IconCityCenter = "\U0001F3D9\uFE0F";
+    private const string IconRoundabout = "\U0001F3D9\uFE0F";
     private const string IconNamingPanel = "\U0001FAB5";
 
     /// <summary>Returns the full catalog of feature types with their available layers.</summary>
@@ -111,12 +111,8 @@ public static class FeatureCatalog
                 new LayerOption(FeatureTypes.PublicSpaceLayers.Garden, "Garden"),
                 new LayerOption(FeatureTypes.PublicSpaceLayers.Square, "Square"),
             ]),
-        new(Key: FeatureTypes.CityCenter, Label: "City Center", Icon: IconCityCenter,
-            Layers:
-            [
-                new LayerOption(FeatureTypes.CityCenterLayers.Default, "City Center"),
-                new LayerOption(FeatureTypes.CityCenterLayers.Roundabout, "Roundabout"),
-            ]),
+        new(Key: FeatureTypes.Roundabouts, Label: "Roundabouts", Icon: IconRoundabout,
+            Layers: [new LayerOption(FeatureTypes.RoundaboutsLayers.Default, "Roundabouts")]),
         new(Key: FeatureTypes.NamingPanel, Label: "Naming Panel", Icon: IconNamingPanel,
             Layers: [new LayerOption(FeatureTypes.NamingPanelLayers.Default, "Naming Panel")]),
     ];

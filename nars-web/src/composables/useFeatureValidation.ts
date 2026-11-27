@@ -1,15 +1,15 @@
 import { computed } from "vue"
 import type { ModalState, ModalResult } from "../types"
 import { PHASES } from "../phases"
-import { CITY_CENTER_CONFIG } from "../config"
-import { cityCenterRadiusError } from "../lib/city-center"
+import { ROUNDABOUTS_CONFIG } from "../config"
+import { roundaboutsRadiusError } from "../lib/roundabouts"
 
 export function useFeatureValidation(modalStore: ModalState & { phaseIndex: number | null }) {
   const phase = computed(() =>
     modalStore.phaseIndex !== null ? (PHASES[modalStore.phaseIndex] ?? null) : null,
   )
 
-  const isCityCenter = computed(() => phase.value?.key === "cityCenter")
+  const isRoundabouts = computed(() => phase.value?.key === "roundabouts")
 
   const isMainUrban = computed(
     () => phase.value?.key === "areas" && modalStore.areaTypeKey === "central_urban",
@@ -19,7 +19,7 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
     const errors: Record<string, string> = {}
     const key = phase.value?.key
 
-    if (!isCityCenter.value) {
+    if (!isRoundabouts.value) {
       const labelRequired =
         !(
           key === "districts" &&
@@ -43,18 +43,18 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
       }
     }
 
-    if (key === "cityCenter") {
-      // Shared rule with draw-save's toast validation (lib/city-center.ts).
-      const radiusError = cityCenterRadiusError(modalStore.radius)
+    if (key === "roundabouts") {
+      // Shared rule with draw-save's toast validation (lib/roundabouts.ts).
+      const radiusError = roundaboutsRadiusError(modalStore.radius)
       if (radiusError === "too_small") {
-        errors.radius = `Must be at least ${CITY_CENTER_CONFIG.minRadiusM} meters`
+        errors.radius = `Must be at least ${ROUNDABOUTS_CONFIG.minRadiusM} meters`
       } else if (radiusError === "too_large") {
-        errors.radius = `Must not exceed ${CITY_CENTER_CONFIG.maxRadiusM / 1000} km`
+        errors.radius = `Must not exceed ${ROUNDABOUTS_CONFIG.maxRadiusM / 1000} km`
       }
     }
 
     if (
-      (key === "cityCenter" && modalStore.cityCenterTypeKey === "roundabout") ||
+      (key === "roundabouts" && modalStore.roundaboutsTypeKey === "roundabout") ||
       (key === "publicSpaces" && modalStore.spaceTypeKey === "square")
     ) {
       const band = modalStore.numberingOutsideBandM
@@ -131,9 +131,9 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
       }
     }
 
-    if (key === "cityCenter") {
+    if (key === "roundabouts") {
       return {
-        type: "cityCenter",
+        type: "roundabouts",
         label: "",
         labelAr:
           (modalStore.labelAr ?? "").trim() ||
@@ -151,7 +151,7 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
           (modalStore.labelAr ?? "").trim() ||
           (modalStore.label ?? "").trim(),
         radius: modalStore.radius ?? undefined,
-        cityCenterTypeKey: modalStore.cityCenterTypeKey,
+        roundaboutsTypeKey: modalStore.roundaboutsTypeKey,
         numberingOutsideBandM: modalStore.numberingOutsideBandM ?? undefined,
       }
     }
@@ -268,5 +268,5 @@ export function useFeatureValidation(modalStore: ModalState & { phaseIndex: numb
     }
   }
 
-  return { validate, buildModalResult, isMainUrban, isCityCenter }
+  return { validate, buildModalResult, isMainUrban, isRoundabouts }
 }

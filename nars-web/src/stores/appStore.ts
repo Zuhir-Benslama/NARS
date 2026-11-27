@@ -34,8 +34,8 @@ export const useAppStore = defineStore("app", {
     // Derived from the layer store (single source of truth for features).
     // Previously duplicated state that had to be manually re-synced at every
     // mutation site (and was missed in several).
-    cityCenterLatLng: (): LatLng | null => {
-      const cc = useLayerStore().cityCenter[0]
+    roundaboutsLatLng: (): LatLng | null => {
+      const cc = useLayerStore().roundabouts[0]
       if (!cc) return null
       const d = cc.data as { lat?: number; lng?: number }
       return d.lat != null && d.lng != null ? { lat: d.lat, lng: d.lng } : null
@@ -44,7 +44,7 @@ export const useAppStore = defineStore("app", {
       const layerStore = useLayerStore()
       return {
         areas: layerStore.areaCount,
-        cityCenter: layerStore.cityCenterCount,
+        roundabouts: layerStore.roundaboutsCount,
         districts: layerStore.districtCount,
         roads: layerStore.roadCount,
         mainEntrances: layerStore.mainEntranceCount,

@@ -1,8 +1,8 @@
 // ─── LOADER BUILD ─────────────────────────────────────────────────────────────
 // Builds GeoJSON features from loaded database entries with proper styling.
 
-import { PHASES, CITY_CENTER_COLOR } from "../../phases"
-import { CITY_CENTER_CONFIG } from "../../config"
+import { PHASES, ROUNDABOUTS_COLOR } from "../../phases"
+import { ROUNDABOUTS_CONFIG } from "../../config"
 import { featureDataToGeometry } from "./feature-data"
 import { displayLabelFor } from "./feature-labels"
 import { getFeatureStyle } from "../draw/draw-save"
@@ -37,7 +37,7 @@ export function buildGeoJsonFeature(
   )
 
   if (data.lat != null && data.lng != null) {
-    if (phase.key === "cityCenter") {
+    if (phase.key === "roundabouts") {
       const radius = data.radius
       if (radius && radius > 0) {
         return {
@@ -49,8 +49,8 @@ export function buildGeoJsonFeature(
             label: displayLabel,
             labelLatin: sanitizedLabelLatin,
             geomType: "LineString",
-            lineColor: CITY_CENTER_COLOR,
-            lineWidth: CITY_CENTER_CONFIG.ringStrokeWidth,
+            lineColor: ROUNDABOUTS_COLOR,
+            lineWidth: ROUNDABOUTS_CONFIG.ringStrokeWidth,
             radius,
           },
         }
@@ -65,7 +65,7 @@ export function buildGeoJsonFeature(
           labelLatin: sanitizedLabelLatin,
           geomType: "Point",
           ...style,
-          circleColor: CITY_CENTER_COLOR,
+          circleColor: ROUNDABOUTS_COLOR,
           circleRadius: 12,
           textColor: "#000000",
         },

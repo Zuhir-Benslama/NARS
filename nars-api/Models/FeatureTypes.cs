@@ -4,7 +4,7 @@ namespace NarsApi.Models;
 /// Defines the complete feature-type hierarchy used across NARS.
 ///
 /// Top-level types (Feature.Type):
-///   area | road | district | house_entrance | public_building | public_space | city_center
+///   area | road | district | house_entrance | public_building | public_space | roundabouts
 ///
 /// Sub-types / layers (Feature.Layer) per top-level type:
 ///   area            → central_urban | secondary_urban | scattered (auto-computed)
@@ -13,8 +13,11 @@ namespace NarsApi.Models;
 ///   house_entrance  → main_entrance | secondary_entrance
 ///   public_building → public_building
 ///   public_space    → garden | square
-///   city_center     → city_center | roundabout
+///   roundabouts     → roundabouts                 (one DB layer)
 /// </summary>
+///
+/// The plain city center is a subtype of `roundabouts`, stored in
+/// Feature.Data.roundaboutsTypeKey rather than in a separate layer/table.
 public static class FeatureTypes
 {
     // ── Top-level type keys ────────────────────────────────────
@@ -24,12 +27,12 @@ public static class FeatureTypes
     public const string HouseEntrance = "house_entrance";
     public const string PublicBuilding = "public_building";
     public const string PublicSpace = "public_space";
-    public const string CityCenter = "city_center";
+    public const string Roundabouts = "roundabouts";
     public const string NamingPanel = "naming_panel";
 
     public static readonly IReadOnlySet<string> AllTypes = new HashSet<string>
     {
-        Area, Road, District, HouseEntrance, PublicBuilding, PublicSpace, CityCenter, NamingPanel
+        Area, Road, District, HouseEntrance, PublicBuilding, PublicSpace, Roundabouts, NamingPanel
     };
 
     // ── Layer keys per type ────────────────────────────────────
@@ -201,11 +204,21 @@ public static class FeatureTypes
         };
     }
 
-    public static class CityCenterLayers
+    public static class RoundaboutsLayers
     {
-        public const string Default = "city_center";
+        public const string Default = "roundabouts";
+        public static readonly IReadOnlySet<string> All = new HashSet<string> { Default };
+    }
+
+    /// <summary>
+    /// Subtypes stored in Feature.Data.roundaboutsTypeKey. The plain city
+    /// center is a special kind of roundabout and shares the same DB layer.
+    /// </summary>
+    public static class RoundaboutsSubtypes
+    {
+        public const string CityCenter = "city_center";
         public const string Roundabout = "roundabout";
-        public static readonly IReadOnlySet<string> All = new HashSet<string> { Default, Roundabout };
+        public static readonly IReadOnlySet<string> All = new HashSet<string> { CityCenter, Roundabout };
     }
 
     /// <summary>
@@ -240,7 +253,7 @@ public static class FeatureTypes
         HouseEntrance => HouseEntranceLayers.All.Contains(layer),
         PublicBuilding => PublicBuildingLayers.All.Contains(layer),
         PublicSpace => PublicSpaceLayers.All.Contains(layer),
-        CityCenter => CityCenterLayers.All.Contains(layer),
+        Roundabouts => RoundaboutsLayers.All.Contains(layer),
         NamingPanel => NamingPanelLayers.All.Contains(layer),
         _ => false,
     };

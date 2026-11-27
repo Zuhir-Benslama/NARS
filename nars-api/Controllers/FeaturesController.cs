@@ -168,7 +168,7 @@ public class FeaturesController(
         return Ok(new FeatureStatsResponse(
             Area: GetCount(FeatureTypes.Area),
             District: GetCount(FeatureTypes.District),
-            CityCenter: GetCount(FeatureTypes.CityCenter),
+            Roundabouts: GetCount(FeatureTypes.Roundabouts),
             Road: GetCount(FeatureTypes.Road),
             HouseEntrance: GetCount(FeatureTypes.HouseEntrance),
             PublicBuilding: GetCount(FeatureTypes.PublicBuilding),

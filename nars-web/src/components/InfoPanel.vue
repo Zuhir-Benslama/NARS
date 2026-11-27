@@ -8,8 +8,8 @@
       <span>{{ counts.areas }}</span>
     </div>
     <div class="info-item">
-      📍 {{ t("info_city_center") }}:
-      <span>{{ cityCenterStatus }}</span>
+      📍 {{ t("info_roundabouts") }}:
+      <span>{{ roundaboutsStatus }}</span>
     </div>
     <div class="info-item">
       🏘️ {{ t("info_districts") }}:
@@ -48,8 +48,8 @@ const appStore = useAppStore()
 
 const counts = computed(() => appStore.counts)
 
-const cityCenterStatus = computed(() => {
-  if (counts.value.cityCenter > 0) return t("info_status_placed")
+const roundaboutsStatus = computed(() => {
+  if (counts.value.roundabouts > 0) return t("info_status_placed")
   return "—"
 })
 </script>

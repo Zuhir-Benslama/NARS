@@ -60,18 +60,18 @@ function urbanAreaEntry(dbId: string, lat: number, lng: number): LayerEntry {
   } as unknown as LayerEntry
 }
 
-function cityCenterEntry(dbId: string, lat: number, lng: number): LayerEntry {
+function roundaboutsEntry(dbId: string, lat: number, lng: number): LayerEntry {
   return {
     id: dbId,
     dbId,
     type: "marker",
     data: {
-      type: "cityCenter",
+      type: "roundabouts",
       label: dbId,
       lat,
       lng,
       radius: 100,
-      cityCenterTypeKey: "city_center",
+      roundaboutsTypeKey: "city_center",
     },
   } as unknown as LayerEntry
 }
@@ -184,8 +184,8 @@ describe("openModalForFeature", () => {
     expect(result).toEqual(expect.objectContaining({ side: "left" }))
   })
 
-  it("captures the radius for a cityCenter point and calls prepareModalExtras", async () => {
-    mockOpenModal.mockResolvedValue({ type: "cityCenter", label: "CC" })
+  it("captures the radius for a roundabouts point and calls prepareModalExtras", async () => {
+    mockOpenModal.mockResolvedValue({ type: "roundabouts", label: "CC" })
     const geometry = {
       type: "Point",
       coordinates: [127.5, 36.5],
@@ -194,17 +194,17 @@ describe("openModalForFeature", () => {
     const result = await mod.openModalForFeature(PHASES[2], "feat_1", geometry as GeoJSON.Geometry)
     expect(mockOpenModal).toHaveBeenCalledWith(2, "feat_1", {
       radius: 250,
-      plainCityCenterUnavailable: false,
+      plainRoundaboutsUnavailable: false,
     })
     expect(mockPrepareModalExtras).toHaveBeenCalled()
-    expect(result).toEqual({ type: "cityCenter", label: "CC" })
+    expect(result).toEqual({ type: "roundabouts", label: "CC" })
   })
 
   it("flags the plain city-center subtype as unavailable when the area has one", async () => {
     const layerStore = useLayerStore()
     layerStore.addFeature("areas", urbanAreaEntry("area-1", 0, 0))
-    layerStore.addFeature("cityCenter", cityCenterEntry("cc-1", 0, 0))
-    mockOpenModal.mockResolvedValue({ type: "cityCenter", label: "CC" })
+    layerStore.addFeature("roundabouts", roundaboutsEntry("cc-1", 0, 0))
+    mockOpenModal.mockResolvedValue({ type: "roundabouts", label: "CC" })
 
     await mod.openModalForFeature(PHASES[2], "feat_1", {
       type: "Point",
@@ -214,7 +214,7 @@ describe("openModalForFeature", () => {
 
     expect(mockOpenModal).toHaveBeenCalledWith(2, "feat_1", {
       radius: 250,
-      plainCityCenterUnavailable: true,
+      plainRoundaboutsUnavailable: true,
     })
   })
 

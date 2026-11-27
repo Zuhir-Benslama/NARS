@@ -11,7 +11,7 @@ export type {
   DistrictType,
   RoadType,
   PublicSpaceType,
-  CityCenterType,
+  RoundaboutsSubtype,
 } from "./types/feature-types"
 
 export type {
@@ -21,7 +21,7 @@ export type {
   FeatureDataByType,
   AreaFeatureData,
   DistrictFeatureData,
-  CityCenterFeatureData,
+  RoundaboutsFeatureData,
   RoadFeatureData,
   HouseEntranceFeatureData,
   PublicBuildingFeatureData,
@@ -35,7 +35,7 @@ export type {
   ModalResult,
   AreaModalResult,
   DistrictModalResult,
-  CityCenterModalResult,
+  RoundaboutsModalResult,
   RoadModalResult,
   HouseEntranceModalResult,
   PublicBuildingModalResult,

@@ -61,7 +61,7 @@ $$;
 -- ──────────────────────────────────────────────────────────────────────────────
 
 ALTER TABLE areas            DROP CONSTRAINT IF EXISTS areas_user_fk;
-ALTER TABLE city_centers     DROP CONSTRAINT IF EXISTS city_centers_user_fk;
+ALTER TABLE roundabouts     DROP CONSTRAINT IF EXISTS roundabouts_user_fk;
 ALTER TABLE districts        DROP CONSTRAINT IF EXISTS districts_user_fk;
 ALTER TABLE house_entrances  DROP CONSTRAINT IF EXISTS house_entrances_user_fk;
 ALTER TABLE house_entrances  DROP CONSTRAINT IF EXISTS house_entrances_road_fk;
@@ -82,7 +82,7 @@ DROP VIEW IF EXISTS v_features;
 ALTER TABLE users            ADD COLUMN new_id uuid;
 ALTER TABLE areas            ADD COLUMN new_id uuid, ADD COLUMN new_user_id uuid;
 ALTER TABLE districts        ADD COLUMN new_id uuid, ADD COLUMN new_user_id uuid;
-ALTER TABLE city_centers     ADD COLUMN new_id uuid, ADD COLUMN new_user_id uuid;
+ALTER TABLE roundabouts     ADD COLUMN new_id uuid, ADD COLUMN new_user_id uuid;
 ALTER TABLE roads            ADD COLUMN new_id uuid, ADD COLUMN new_user_id uuid;
 ALTER TABLE house_entrances  ADD COLUMN new_id uuid, ADD COLUMN new_user_id uuid, ADD COLUMN new_road_id uuid;
 ALTER TABLE public_buildings ADD COLUMN new_id uuid, ADD COLUMN new_user_id uuid;
@@ -98,7 +98,7 @@ ALTER TABLE refresh_tokens   ADD COLUMN new_id uuid, ADD COLUMN new_user_id uuid
 UPDATE users            SET new_id = uuid_v7();
 UPDATE areas            SET new_id = uuid_v7();
 UPDATE districts        SET new_id = uuid_v7();
-UPDATE city_centers     SET new_id = uuid_v7();
+UPDATE roundabouts     SET new_id = uuid_v7();
 UPDATE roads            SET new_id = uuid_v7();
 UPDATE house_entrances  SET new_id = uuid_v7();
 UPDATE public_buildings SET new_id = uuid_v7();
@@ -113,7 +113,7 @@ UPDATE refresh_tokens   SET new_id = uuid_v7();
 
 UPDATE areas            SET new_user_id = u.new_id FROM users u WHERE areas.user_id = u.id;
 UPDATE districts        SET new_user_id = u.new_id FROM users u WHERE districts.user_id = u.id;
-UPDATE city_centers     SET new_user_id = u.new_id FROM users u WHERE city_centers.user_id = u.id;
+UPDATE roundabouts     SET new_user_id = u.new_id FROM users u WHERE roundabouts.user_id = u.id;
 UPDATE roads            SET new_user_id = u.new_id FROM users u WHERE roads.user_id = u.id;
 UPDATE house_entrances  SET new_user_id = u.new_id FROM users u WHERE house_entrances.user_id = u.id;
 UPDATE house_entrances  SET new_road_id = r.new_id FROM roads r WHERE house_entrances.road_id = r.id;
@@ -139,7 +139,7 @@ DECLARE tbl text;
 BEGIN
     FOR tbl IN
         SELECT unnest(ARRAY[
-            'areas', 'districts', 'city_centers', 'roads',
+            'areas', 'districts', 'roundabouts', 'roads',
             'house_entrances', 'public_buildings', 'public_spaces', 'naming_panels'
         ])
     LOOP
@@ -187,7 +187,7 @@ DROP SEQUENCE IF EXISTS refresh_tokens_id_seq;
 
 ALTER TABLE areas            ADD CONSTRAINT areas_user_fk            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
 ALTER TABLE districts        ADD CONSTRAINT districts_user_fk        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
-ALTER TABLE city_centers     ADD CONSTRAINT city_centers_user_fk     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE roundabouts     ADD CONSTRAINT roundabouts_user_fk     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
 ALTER TABLE roads            ADD CONSTRAINT roads_user_fk            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
 ALTER TABLE house_entrances  ADD CONSTRAINT house_entrances_user_fk  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
 ALTER TABLE house_entrances  ADD CONSTRAINT house_entrances_road_fk  FOREIGN KEY (road_id)   REFERENCES roads(id) ON DELETE CASCADE;
@@ -203,7 +203,7 @@ ALTER TABLE refresh_tokens   ADD CONSTRAINT FK_refresh_tokens_users_user_id FORE
 DROP INDEX IF EXISTS ix_areas_user_id;
 DROP INDEX IF EXISTS ix_areas_user_layer;
 DROP INDEX IF EXISTS ix_districts_user_id;
-DROP INDEX IF EXISTS ix_city_centers_user_id;
+DROP INDEX IF EXISTS ix_roundabouts_user_id;
 DROP INDEX IF EXISTS ix_roads_user_id;
 DROP INDEX IF EXISTS ix_roads_user_layer;
 DROP INDEX IF EXISTS ix_house_entrances_user_id;
@@ -217,7 +217,7 @@ DROP INDEX IF EXISTS idx_refresh_tokens_user_id;
 CREATE INDEX ix_areas_user_id             ON areas(user_id);
 CREATE INDEX ix_areas_user_layer          ON areas(user_id, layer);
 CREATE INDEX ix_districts_user_id         ON districts(user_id);
-CREATE INDEX ix_city_centers_user_id      ON city_centers(user_id);
+CREATE INDEX ix_roundabouts_user_id      ON roundabouts(user_id);
 CREATE INDEX ix_roads_user_id             ON roads(user_id);
 CREATE INDEX ix_roads_user_layer          ON roads(user_id, layer);
 CREATE INDEX ix_house_entrances_user_id   ON house_entrances(user_id);
@@ -235,7 +235,7 @@ CREATE INDEX idx_refresh_tokens_user_id   ON refresh_tokens(user_id);
 CREATE VIEW v_features AS
  SELECT areas.id, areas.user_id, 'area'::text AS type, areas.layer, areas.label, areas.data, areas.created_at, areas.updated_at FROM areas
 UNION ALL SELECT districts.id, districts.user_id, 'district'::text, districts.layer, districts.label, districts.data, districts.created_at, districts.updated_at FROM districts
-UNION ALL SELECT city_centers.id, city_centers.user_id, 'city_center'::text, city_centers.layer, city_centers.label, city_centers.data, city_centers.created_at, city_centers.updated_at FROM city_centers
+UNION ALL SELECT roundabouts.id, roundabouts.user_id, 'roundabouts'::text, roundabouts.layer, roundabouts.label, roundabouts.data, roundabouts.created_at, roundabouts.updated_at FROM roundabouts
 UNION ALL SELECT roads.id, roads.user_id, 'road'::text, roads.layer, roads.label, roads.data, roads.created_at, roads.updated_at FROM roads
 UNION ALL SELECT house_entrances.id, house_entrances.user_id, 'house_entrance'::text, house_entrances.layer, house_entrances.label, house_entrances.data, house_entrances.created_at, house_entrances.updated_at FROM house_entrances
 UNION ALL SELECT public_buildings.id, public_buildings.user_id, 'public_building'::text, public_buildings.layer, public_buildings.label, public_buildings.data, public_buildings.created_at, public_buildings.updated_at FROM public_buildings

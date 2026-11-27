@@ -17,6 +17,7 @@ import { showToast } from "../lib/toast"
 import { useFeaturesStore } from "../stores/featuresStore"
 import { useLayerStore } from "../stores/layerStore"
 import type { FeatureData, FeatureTypeKey, LayerEntry, SpecialNumberingMode } from "../types"
+import { roundaboutsSubtype } from "../lib/roundabouts"
 import { debugError } from "../utils/debug"
 import type { MaplibreFeature } from "./core/state"
 import { tryGetCtx } from "./core/state"
@@ -42,7 +43,7 @@ export function specialModeForFeature(
   data: FeatureData,
 ): SpecialNumberingMode | null {
   if (phaseKey === "districts" && data.districtTypeKey === "cite") return "cite"
-  if (phaseKey === "cityCenter" && data.cityCenterTypeKey === "roundabout") return "roundabout"
+  if (phaseKey === "roundabouts" && roundaboutsSubtype(data) === "roundabout") return "roundabout"
   if (phaseKey === "publicSpaces" && data.spaceTypeKey === "square") return "square"
   return null
 }
@@ -133,7 +134,7 @@ function findFeature(featureDbId: string): { phaseKey: FeatureTypeKey; data: Fea
   const state = useLayerStore().$state
   const phases: Array<[FeatureTypeKey, LayerEntry[]]> = [
     ["districts", (state.districts ?? []) as LayerEntry[]],
-    ["cityCenter", (state.cityCenter ?? []) as LayerEntry[]],
+    ["roundabouts", (state.roundabouts ?? []) as LayerEntry[]],
     ["publicSpaces", (state.publicSpaces ?? []) as LayerEntry[]],
   ]
   for (const [phaseKey, entries] of phases) {

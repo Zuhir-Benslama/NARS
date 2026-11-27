@@ -48,8 +48,8 @@ function houseEntranceModal(overrides: Partial<{ label: string }> = {}): ModalRe
   return { type: "houseEntrances", label: "Test Feature", ...overrides }
 }
 
-function cityCenterModal(overrides: Partial<{ label: string; radius: number }> = {}): ModalResult {
-  return { type: "cityCenter", label: "Test Feature", ...overrides }
+function roundaboutsModal(overrides: Partial<{ label: string; radius: number }> = {}): ModalResult {
+  return { type: "roundabouts", label: "Test Feature", ...overrides }
 }
 
 describe("feature-data", () => {
@@ -155,13 +155,13 @@ describe("feature-data", () => {
       expect(result.roadTypeKey).toBe("highway")
     })
 
-    it("includes radius for cityCenter phase", () => {
+    it("includes radius for roundabouts phase", () => {
       const geometry: GeoJSON.Point = {
         type: "Point",
         coordinates: [127.5, 36.0],
       }
-      const modal = cityCenterModal({ radius: 500 })
-      const result = buildFeatureData(geometry, makePhase("cityCenter"), modal) as FeatureData
+      const modal = roundaboutsModal({ radius: 500 })
+      const result = buildFeatureData(geometry, makePhase("roundabouts"), modal) as FeatureData
 
       expect(result.radius).toBe(500)
     })
@@ -189,14 +189,25 @@ describe("feature-data", () => {
       expect(result).toEqual({ type: "area", layer: "central_urban" })
     })
 
-    it('maps "cityCenter"', () => {
+    it('maps "roundabouts"', () => {
       const result = toApiSaveShape({
-        type: "cityCenter",
+        type: "roundabouts",
         label: "C",
         decisionNumber: "",
         decisionDate: "",
       })
-      expect(result).toEqual({ type: "city_center", layer: "city_center" })
+      expect(result).toEqual({ type: "roundabouts", layer: "roundabouts" })
+    })
+
+    it("keeps the city-center subtype on the roundabouts layer", () => {
+      const result = toApiSaveShape({
+        type: "roundabouts",
+        label: "RA",
+        roundaboutsTypeKey: "roundabout",
+        decisionNumber: "",
+        decisionDate: "",
+      })
+      expect(result).toEqual({ type: "roundabouts", layer: "roundabouts" })
     })
 
     it('maps "districts" with default layer', () => {

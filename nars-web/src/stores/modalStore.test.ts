@@ -41,9 +41,9 @@ describe("modalStore", () => {
 
     it("openCreate forces roundabout when the plain city-center slot is taken", () => {
       const store = useModalStore()
-      store.openCreate(2, { plainCityCenterUnavailable: true })
-      expect(store.plainCityCenterUnavailable).toBe(true)
-      expect(store.cityCenterTypeKey).toBe("roundabout")
+      store.openCreate(2, { plainRoundaboutsUnavailable: true })
+      expect(store.plainRoundaboutsUnavailable).toBe(true)
+      expect(store.roundaboutsTypeKey).toBe("roundabout")
     })
 
     it("openEdit sets edit mode with existing data", () => {
@@ -130,17 +130,17 @@ describe("modalStore", () => {
       await expect(promise).resolves.toEqual(emptyResult)
     })
 
-    it("openModal sets the city-center label for the cityCenter phase", async () => {
+    it("openModal sets the city-center label for the roundabouts phase", async () => {
       const promise = openModal(2, "feat-cc")
       const store = useModalStore()
       // t() is stubbed to return the key in tests — the assertion proves the
-      // cityCenter branch actually calls t() to label the modal.
-      expect(store.label).toBe("phase_cityCenter_label")
+      // roundabouts branch actually calls t() to label the modal.
+      expect(store.label).toBe("phase_roundabouts_label")
       resolveModal(emptyResult)
       await expect(promise).resolves.toEqual(emptyResult)
     })
 
-    it("openModal leaves the label empty for non-cityCenter phases", async () => {
+    it("openModal leaves the label empty for non-roundabouts phases", async () => {
       const promise = openModal(0, "feat-1")
       const store = useModalStore()
       expect(store.label).toBe("")
@@ -181,33 +181,33 @@ describe("modalStore", () => {
           ],
         },
       } as any)
-      layerStore.addFeature("cityCenter", {
+      layerStore.addFeature("roundabouts", {
         id: "cc-1",
         dbId: "cc-1",
         type: "marker",
         data: {
-          type: "cityCenter",
+          type: "roundabouts",
           label: "Existing CC",
           lat: 0,
           lng: 0,
           radius: 100,
-          cityCenterTypeKey: "city_center",
+          roundaboutsTypeKey: "city_center",
         },
       } as any)
 
       const promise = openEditModal(2, "ra-1", {
-        type: "cityCenter",
+        type: "roundabouts",
         label: "Roundabout",
         decisionNumber: "",
         decisionDate: "",
         lat: 0,
         lng: 0,
         radius: 100,
-        cityCenterTypeKey: "roundabout",
+        roundaboutsTypeKey: "roundabout",
       } as any)
       const store = useModalStore()
-      expect(store.plainCityCenterUnavailable).toBe(true)
-      expect(store.cityCenterTypeKey).toBe("roundabout")
+      expect(store.plainRoundaboutsUnavailable).toBe(true)
+      expect(store.roundaboutsTypeKey).toBe("roundabout")
       resolveModal(null)
       await expect(promise).resolves.toBeNull()
     })

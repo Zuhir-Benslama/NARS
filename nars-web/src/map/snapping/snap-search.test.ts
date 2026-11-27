@@ -20,13 +20,13 @@ vi.mock("../core/state", () => ({
 
 const mockGetSnapRings = vi.fn()
 const mockGetRoadChains = vi.fn()
-const mockGetCityCenterCircles = vi.fn()
+const mockGetRoundaboutsCircles = vi.fn()
 const mockGetSnapPoints = vi.fn()
 
 vi.mock("./snap-sources", () => ({
   getSnapRings: mockGetSnapRings,
   getRoadChains: mockGetRoadChains,
-  getCityCenterCircles: mockGetCityCenterCircles,
+  getRoundaboutsCircles: mockGetRoundaboutsCircles,
   getSnapPoints: mockGetSnapPoints,
 }))
 
@@ -179,7 +179,7 @@ describe("snap-search", () => {
     beforeEach(() => {
       mockGetSnapRings.mockReturnValue([])
       mockGetRoadChains.mockReturnValue([])
-      mockGetCityCenterCircles.mockReturnValue([])
+      mockGetRoundaboutsCircles.mockReturnValue([])
       mockGetSnapPoints.mockReturnValue([])
     })
 
@@ -248,9 +248,9 @@ describe("snap-search", () => {
     })
 
     it("snaps to circle perimeter", () => {
-      mockGetCityCenterCircles.mockReturnValue([{ lat: 10, lng: 10, radius: 1000000 }])
+      mockGetRoundaboutsCircles.mockReturnValue([{ lat: 10, lng: 10, radius: 1000000 }])
 
-      const result = findNearestSnap(15, -10, ["cityCenter"], false)
+      const result = findNearestSnap(15, -10, ["roundabouts"], false)
       expect(result).not.toBeNull()
       expect(result!.type).toBe("circle")
     })

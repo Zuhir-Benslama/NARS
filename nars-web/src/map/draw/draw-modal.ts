@@ -1,6 +1,6 @@
 // ─── DRAW MODAL HELPERS ───────────────────────────────────────────────────────
 // Prepares and opens the feature modal for newly drawn shapes.
-// Handles reference-driven house entrance logic and city center radius extraction.
+// Handles reference-driven house entrance logic and roundabouts radius extraction.
 
 import { PHASES } from "../../phases"
 import { useAppStore } from "../../stores/appStore"
@@ -9,7 +9,7 @@ import { useLayerStore } from "../../stores/layerStore"
 import type { LayerState } from "../../stores/layerStore"
 import { showToast } from "../../lib/toast"
 import { getRoadSide } from "../../lib/validation"
-import { cityCenterPointFromGeometry, plainCityCenterPlacementError } from "../../lib/city-center"
+import { roundaboutsPointFromGeometry, plainRoundaboutsPlacementError } from "../../lib/roundabouts"
 import { t } from "../../i18n"
 import type { ModalResult } from "../../types"
 import { prepareModalExtras } from "../features/feature-modal"
@@ -22,27 +22,27 @@ export async function openModalForFeature(
     return openHouseEntranceModal(geometry)
   }
 
-  const isCityCenter = phase.key === "cityCenter"
+  const isRoundabouts = phase.key === "roundabouts"
   const state = useLayerStore().$state
   const radius =
-    isCityCenter && geometry.type === "Point"
+    isRoundabouts && geometry.type === "Point"
       ? ((geometry as GeoJSON.Point & { radius?: number }).radius ?? null)
       : null
 
   // The geometry is already drawn when the modal opens. Only suppress the
   // plain option when an existing center occupies this urban area; placement
   // outside any urban area is still reported by the draw-time validation.
-  const placementError = isCityCenter
-    ? plainCityCenterPlacementError(
-        cityCenterPointFromGeometry(geometry),
+  const placementError = isRoundabouts
+    ? plainRoundaboutsPlacementError(
+        roundaboutsPointFromGeometry(geometry),
         state.areas ?? [],
-        state.cityCenter ?? [],
+        state.roundabouts ?? [],
       )
     : null
-  const plainCityCenterUnavailable = placementError === "urban_area_has_city_center"
+  const plainRoundaboutsUnavailable = placementError === "urban_area_has_plain_roundabouts"
 
-  const extras = isCityCenter
-    ? { ...(radius ? { radius } : {}), plainCityCenterUnavailable }
+  const extras = isRoundabouts
+    ? { ...(radius ? { radius } : {}), plainRoundaboutsUnavailable }
     : undefined
 
   // Open modal first (initializes state via openCreate), then populate extras

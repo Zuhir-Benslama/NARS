@@ -74,11 +74,11 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
   // Roads are off-limits in the house entrances phase, and house entrances are
   // driven by their own reference-road/entrance flow rather than this menu.
   const canEdit = isCurrentPhase && !roadInHousePhase && phaseKey !== "houseEntrances"
-  const isCityCenter = phaseKey === "cityCenter"
+  const isRoundabouts = phaseKey === "roundabouts"
   // Genuine phase mismatch (as opposed to "this feature type has no edit path
   // here"): show the actions disabled with the reason, so the rule is
   // discoverable instead of the items silently missing.
-  const phaseMismatch = !isCurrentPhase && !isCityCenter && phaseKey !== "houseEntrances"
+  const phaseMismatch = !isCurrentPhase && !isRoundabouts && phaseKey !== "houseEntrances"
   const phaseLabel = t(PHASES.find((p) => p.key === phaseKey)?.label ?? "")
   const isMainEntrance =
     phaseKey === "houseEntrances" &&
@@ -88,7 +88,7 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
       false)
 
   // A cité district, roundabout or square can be numbered from its own
-  // context menu, even while another phase is active (like the city-center
+  // context menu, even while another phase is active (like the roundabouts
   // lock exception below).
   const specialEntry = layerStore.getFeature(dbId)
   const specialMode = specialEntry
@@ -104,11 +104,11 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
       }
     : null
 
-  if (isCityCenter && currentPhaseKey !== "cityCenter") {
+  if (isRoundabouts && currentPhaseKey !== "roundabouts") {
     return [
       {
-        label: t("ctx_cc_lock"),
-        onClick: () => showToast(t("ctx_cc_lock_msg"), "info"),
+        label: t("ctx_roundabouts_lock"),
+        onClick: () => showToast(t("ctx_roundabouts_lock_msg"), "info"),
       },
       ...(specialNumberItem ? [specialNumberItem] : []),
     ]
@@ -119,7 +119,7 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
   const blockedEdit = t("alert_switch_phase_to_edit", { phase: phaseLabel })
   const blockedRemove = t("alert_switch_phase_to_remove", { phase: phaseLabel })
 
-  if (!isCityCenter) {
+  if (!isRoundabouts) {
     if (canEdit) {
       items.push({ label: t("ctx_edit_geom"), onClick: () => enableEditGeometry(dbId) })
     } else if (phaseMismatch) {

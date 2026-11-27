@@ -35,7 +35,7 @@ describe("buildGeomanImportFeature", () => {
     const result = mod.buildGeomanImportFeature(
       entry({
         type: "circle",
-        data: { type: "cityCenter", label: "C", lat: 36.5, lng: 127.5, radius: 20 },
+        data: { type: "roundabouts", label: "C", lat: 36.5, lng: 127.5, radius: 20 },
       }),
     )
     expect(mockComputeCircleRingForEdit).toHaveBeenCalledWith(36.5, 127.5, 20)

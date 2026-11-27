@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest"
 import type { FeatureData, LatLng } from "../types"
 import {
-  cityCenterPointFromGeometry,
-  cityCenterRadiusError,
-  plainCityCenterPlacementError,
-} from "./city-center"
+  roundaboutsPointFromGeometry,
+  roundaboutsRadiusError,
+  roundaboutsSubtype,
+  plainRoundaboutsPlacementError,
+} from "./roundabouts"
 
 function square(centerLat: number, centerLng: number): LatLng[] {
   return [
@@ -28,101 +29,122 @@ function area(id: string, centerLat: number, centerLng: number) {
   }
 }
 
-function cityCenter(id: string, lat?: number, lng?: number, subtype = "city_center") {
+function roundabouts(id: string, lat?: number, lng?: number, subtype = "city_center") {
   return {
     dbId: id,
     data: {
-      type: "cityCenter",
+      type: "roundabouts",
       label: id,
       ...(lat != null && lng != null ? { lat, lng } : {}),
-      cityCenterTypeKey: subtype,
+      roundaboutsTypeKey: subtype,
     } as FeatureData,
   }
 }
 
-describe("cityCenterRadiusError", () => {
-  it("returns too_small for null/undefined/NaN radius", () => {
-    expect(cityCenterRadiusError(null)).toBe("too_small")
-    expect(cityCenterRadiusError(undefined)).toBe("too_small")
-    expect(cityCenterRadiusError(Number.NaN)).toBe("too_small")
+describe("roundaboutsSubtype", () => {
+  it("reads the current JSON key", () => {
+    expect(roundaboutsSubtype({ roundaboutsTypeKey: "roundabout" })).toBe("roundabout")
   })
 
-  it("returns too_small below the minimum radius", () => {
-    expect(cityCenterRadiusError(0)).toBe("too_small")
-    expect(cityCenterRadiusError(4.9)).toBe("too_small")
-    expect(cityCenterRadiusError(5)).toBeNull()
+  it("falls back to the legacy JSON key", () => {
+    expect(roundaboutsSubtype({ cityCenterTypeKey: "roundabout" })).toBe("roundabout")
   })
 
-  it("returns too_large above the maximum radius", () => {
-    expect(cityCenterRadiusError(50_000.1)).toBe("too_large")
-  })
-
-  it("returns null for a valid radius", () => {
-    expect(cityCenterRadiusError(10)).toBeNull()
-    expect(cityCenterRadiusError(50_000)).toBeNull()
+  it("defaults to the plain city-center subtype", () => {
+    expect(roundaboutsSubtype({})).toBe("city_center")
+    expect(roundaboutsSubtype(null)).toBe("city_center")
   })
 })
 
-describe("plainCityCenterPlacementError", () => {
+describe("roundaboutsRadiusError", () => {
+  it("returns too_small for null/undefined/NaN radius", () => {
+    expect(roundaboutsRadiusError(null)).toBe("too_small")
+    expect(roundaboutsRadiusError(undefined)).toBe("too_small")
+    expect(roundaboutsRadiusError(Number.NaN)).toBe("too_small")
+  })
+
+  it("returns too_small below the minimum radius", () => {
+    expect(roundaboutsRadiusError(0)).toBe("too_small")
+    expect(roundaboutsRadiusError(4.9)).toBe("too_small")
+    expect(roundaboutsRadiusError(5)).toBeNull()
+  })
+
+  it("returns too_large above the maximum radius", () => {
+    expect(roundaboutsRadiusError(50_000.1)).toBe("too_large")
+  })
+
+  it("returns null for a valid radius", () => {
+    expect(roundaboutsRadiusError(10)).toBeNull()
+    expect(roundaboutsRadiusError(50_000)).toBeNull()
+  })
+})
+
+describe("plainRoundaboutsPlacementError", () => {
   const main = area("main", 0, 0)
   const secondary = area("secondary", 10, 10)
 
   it("allows one plain city center in an urban area", () => {
-    expect(plainCityCenterPlacementError({ lat: 0, lng: 0 }, [main], [])).toBeNull()
+    expect(plainRoundaboutsPlacementError({ lat: 0, lng: 0 }, [main], [])).toBeNull()
   })
 
   it("rejects a point outside every urban area", () => {
-    expect(plainCityCenterPlacementError({ lat: 5, lng: 5 }, [main], [])).toBe("outside_urban_area")
+    expect(plainRoundaboutsPlacementError({ lat: 5, lng: 5 }, [main], [])).toBe(
+      "outside_urban_area",
+    )
   })
 
   it("rejects a second plain city center in the same urban area", () => {
     expect(
-      plainCityCenterPlacementError({ lat: 0.5, lng: 0.5 }, [main], [cityCenter("existing", 0, 0)]),
-    ).toBe("urban_area_has_city_center")
+      plainRoundaboutsPlacementError(
+        { lat: 0.5, lng: 0.5 },
+        [main],
+        [roundabouts("existing", 0, 0)],
+      ),
+    ).toBe("urban_area_has_plain_roundabouts")
   })
 
   it("allows one plain city center in each urban area", () => {
     expect(
-      plainCityCenterPlacementError(
+      plainRoundaboutsPlacementError(
         { lat: 10, lng: 10 },
         [main, secondary],
-        [cityCenter("existing", 0, 0)],
+        [roundabouts("existing", 0, 0)],
       ),
     ).toBeNull()
   })
 
   it("does not count roundabouts toward the slot", () => {
     expect(
-      plainCityCenterPlacementError(
+      plainRoundaboutsPlacementError(
         { lat: 0, lng: 0 },
         [main],
-        [cityCenter("roundabout", 0, 0, "roundabout")],
+        [roundabouts("roundabout", 0, 0, "roundabout")],
       ),
     ).toBeNull()
   })
 
   it("ignores the feature currently being edited", () => {
     expect(
-      plainCityCenterPlacementError(
+      plainRoundaboutsPlacementError(
         { lat: 0.5, lng: 0.5 },
         [main],
-        [cityCenter("self", 0, 0)],
+        [roundabouts("self", 0, 0)],
         "self",
       ),
     ).toBeNull()
   })
 })
 
-describe("cityCenterPointFromGeometry", () => {
+describe("roundaboutsPointFromGeometry", () => {
   it("reads a point's coordinates", () => {
-    expect(cityCenterPointFromGeometry({ type: "Point", coordinates: [2, 1] })).toEqual({
+    expect(roundaboutsPointFromGeometry({ type: "Point", coordinates: [2, 1] })).toEqual({
       lat: 1,
       lng: 2,
     })
   })
 
   it("averages a polygon ring without double-counting the closing vertex", () => {
-    const point = cityCenterPointFromGeometry({
+    const point = roundaboutsPointFromGeometry({
       type: "Polygon",
       coordinates: [
         [

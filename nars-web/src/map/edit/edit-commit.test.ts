@@ -403,7 +403,7 @@ describe("commitEditMode", () => {
       dbId: "db-6",
       type: "circle",
       data: {
-        type: "cityCenter",
+        type: "roundabouts",
         label: "C1",
         lat: 0,
         lng: 0,
@@ -411,7 +411,7 @@ describe("commitEditMode", () => {
         coordinates: [],
       },
     } as unknown as LayerEntry
-    useLayerStore().addFeature("cityCenter" as never, circleEntry as never)
+    useLayerStore().addFeature("roundabouts" as never, circleEntry as never)
     mockGetActiveEditEntry.mockReturnValue(circleEntry)
     mockGetActiveGeomanFeatureId.mockReturnValue("gm-1")
     getSetCtx({

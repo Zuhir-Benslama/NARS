@@ -82,7 +82,7 @@ function watchDrawType() {
           void buildDrawControl(phase)
         }
 
-        if (phase.key === "cityCenter") {
+        if (phase.key === "roundabouts") {
           requestAnimationFrame(() => {
             const userLat = appStore.user?.commune?.latitude
             const userLng = appStore.user?.commune?.longitude
@@ -94,9 +94,9 @@ function watchDrawType() {
                 duration: 1500,
                 essential: true,
               })
-            } else if (appStore.cityCenterLatLng) {
+            } else if (appStore.roundaboutsLatLng) {
               getCtx().map.flyTo({
-                center: [appStore.cityCenterLatLng.lng, appStore.cityCenterLatLng.lat],
+                center: [appStore.roundaboutsLatLng.lng, appStore.roundaboutsLatLng.lat],
                 zoom: 17,
                 duration: 1500,
                 essential: true,

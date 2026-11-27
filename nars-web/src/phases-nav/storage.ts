@@ -4,12 +4,12 @@
 //
 // IMPORTANT (phase reorder, Sep 2026): earlier builds stored a RAW INTEGER
 // index into the phase array. Because phase ORDER can change (phases were
-// reordered so that cityCenter/roads come before districts), a stored integer
+// reordered so that roundabouts/roads come before districts), a stored integer
 // index no longer names the same phase after a reorder — the app would resume
 // on the WRONG (data-still-empty) phase, i.e. "nothing changed" even though
 // the phase list is in the new order.
 //
-// Fix: persist the stable phase KEY (areas, cityCenter, ...) and migrate any
+// Fix: persist the stable phase KEY (areas, roundabouts, ...) and migrate any
 // legacy raw-integer value on first read.
 
 import { PHASES } from "../phases"
@@ -42,7 +42,8 @@ export function getPhaseStorageKey(communeId?: number | string | null): string {
 function parseLegacy(raw: string): string | null {
   const n = Number.parseInt(raw, 10)
   if (Number.isNaN(n)) return null
-  return OLD_PHASE_ORDER[n] ?? null
+  const key = OLD_PHASE_ORDER[n]
+  return key === "cityCenter" ? "roundabouts" : (key ?? null)
 }
 
 export function savePhase(index: number, communeId?: number | string | null): void {
@@ -67,6 +68,20 @@ export function loadPhase(communeId?: number | string | null): number | null {
     // New format: the stored value is a phase KEY. Resolve directly.
     const byKey = phaseKeyToIndex(raw)
     if (byKey !== null) return byKey
+
+    // The phase was renamed from `cityCenter` to `roundabouts`; upgrade the
+    // persisted key so existing users resume on the same phase.
+    if (raw === "cityCenter") {
+      const newIndex = phaseKeyToIndex("roundabouts")
+      if (newIndex !== null) {
+        try {
+          localStorage.setItem(key, "roundabouts")
+        } catch {
+          // ignore
+        }
+        return newIndex
+      }
+    }
 
     // Legacy format: a raw integer index in the OLD phase order. One-time
     // migration: translate old-index → stable key → new index, then upgrade

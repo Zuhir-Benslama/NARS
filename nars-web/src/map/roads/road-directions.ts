@@ -1,14 +1,14 @@
 // ─── ROAD DIRECTION COMPUTATION (ORCHESTRATOR) ────────────────────────────────
 // Two-phase algorithm:
 //   Phase 1 — CONNECTION SCAN: builds full topology graph (road-graph.ts).
-//   Phase 2 — ORIENTATION: DFS from city center outward (road-orient.ts).
+//   Phase 2 — ORIENTATION: DFS from roundabouts outward (road-orient.ts).
 //   Phase 3 — DEAD-END CORRECTION: overrides vote-based orientation.
 //   Phase 4 — APPLY: persist reversals, update markers (road-markers.ts).
 //
-// Each urban area is processed independently: roads (and city centres) are
+// Each urban area is processed independently: roads (and roundabouts) are
 // grouped by the urban area they fall inside, and the topology graph, the
 // orientation DFS and the dead-end correction are run per group. This keeps a
-// city centre in one urban area from orienting roads that belong to another.
+// roundabouts feature in one urban area from orienting roads that belong to another.
 
 import { apiFetch } from "../../api"
 import { useLayerStore } from "../../stores/layerStore"
@@ -17,12 +17,12 @@ import { useFeaturesStore } from "../../stores/featuresStore"
 import { showToast } from "../../lib/toast"
 import { debugError } from "../../utils/debug"
 import type { LayerEntry } from "../../types"
-import type { AreaFeatureData, CityCenterFeatureData, RoadFeatureData } from "../../types"
+import type { AreaFeatureData, RoundaboutsFeatureData, RoadFeatureData } from "../../types"
 import { t } from "../../i18n"
 
 import { buildConnectionGraph, dm, fromNk, CONNECT_M } from "./road-graph"
 const DEAD_END_SNAP_THRESHOLD_M = CONNECT_M
-import { geographicDirection, orientFromCityCenter } from "./road-orient"
+import { geographicDirection, orientFromRoundabouts } from "./road-orient"
 import { updateEndpointMarkers } from "./road-markers"
 import { numberOneRoad } from "../house-numbering"
 
@@ -36,7 +36,7 @@ interface Coord {
 interface RoadGroup {
   area: LayerEntry<AreaFeatureData> | null
   roads: LayerEntry<RoadFeatureData>[]
-  cityCenters: LayerEntry<CityCenterFeatureData>[]
+  roundabouts: LayerEntry<RoundaboutsFeatureData>[]
 }
 
 function isUrbanArea(entry: LayerEntry): entry is LayerEntry<AreaFeatureData> {
@@ -85,17 +85,17 @@ function roadMidpoint(road: LayerEntry<RoadFeatureData>): Coord | null {
 
 function buildGroups(
   roads: LayerEntry<RoadFeatureData>[],
-  cityCenters: LayerEntry<CityCenterFeatureData>[],
+  roundabouts: LayerEntry<RoundaboutsFeatureData>[],
   urbanAreas: LayerEntry<AreaFeatureData>[],
 ): RoadGroup[] {
   if (urbanAreas.length === 0) {
-    return [{ area: null, roads: [...roads], cityCenters: [...cityCenters] }]
+    return [{ area: null, roads: [...roads], roundabouts: [...roundabouts] }]
   }
 
   const groups: RoadGroup[] = urbanAreas.map((area) => ({
     area,
     roads: [],
-    cityCenters: [],
+    roundabouts: [],
   }))
 
   // Assign each road to the urban area whose polygon contains its midpoint;
@@ -119,8 +119,8 @@ function buildGroups(
     if (target) target.roads.push(road)
   }
 
-  // Assign each city centre to the urban area whose polygon contains it.
-  for (const cc of cityCenters) {
+  // Assign each roundabouts feature to the urban area whose polygon contains it.
+  for (const cc of roundabouts) {
     const lat = cc.data.lat
     const lng = cc.data.lng
     if (lat == null || lng == null) continue
@@ -136,7 +136,7 @@ function buildGroups(
         }
       }
     }
-    if (target) target.cityCenters.push(cc)
+    if (target) target.roundabouts.push(cc)
   }
 
   return groups
@@ -150,7 +150,7 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
   const roads = state.roads || []
   if (!roads.length) return
 
-  const cityCenters = (state.cityCenter || []).filter(
+  const roundabouts = (state.roundabouts || []).filter(
     (e) => e.data.lat != null && e.data.lng != null,
   )
 
@@ -158,7 +158,7 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
 
   const groups = buildGroups(
     roads as LayerEntry<RoadFeatureData>[],
-    cityCenters as LayerEntry<CityCenterFeatureData>[],
+    roundabouts as LayerEntry<RoundaboutsFeatureData>[],
     urbanAreas as LayerEntry<AreaFeatureData>[],
   )
 
@@ -174,15 +174,15 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
 
     const visited = new Set<string>()
 
-    const groupCityCenters = group.cityCenters.filter(
+    const groupRoundabouts = group.roundabouts.filter(
       (e) => e.data.lat != null && e.data.lng != null,
     )
 
-    if (groupCityCenters.length > 0) {
-      for (const ccEntry of groupCityCenters) {
+    if (groupRoundabouts.length > 0) {
+      for (const ccEntry of groupRoundabouts) {
         const { lat, lng, radius } = ccEntry.data
         if (lat == null || lng == null) continue
-        orientFromCityCenter({ lat, lng }, radius ?? 50, graph, segs, visited)
+        orientFromRoundabouts({ lat, lng }, radius ?? 50, graph, segs, visited)
       }
     } else {
       for (const seg of segs.values()) geographicDirection(seg)
@@ -219,13 +219,13 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
 
       if (degFirst !== 1 && degLast !== 1) continue
 
-      // Pick the city centre belonging to this urban area that is closest to
+      // Pick the roundabouts feature belonging to this urban area that is closest to
       // the road, so each urban area stays independent.
-      const ccEntries = groupCityCenters.length ? groupCityCenters : cityCenters
+      const ccEntries = groupRoundabouts.length ? groupRoundabouts : roundabouts
       const fromIsFirst = (() => {
         if (degFirst === 1 && degLast === 1) {
           if (!ccEntries.length) return degFirst >= degLast
-          // nearest city centre to the road
+          // nearest roundabouts feature to the road
           let nearest = ccEntries[0]
           let best = Infinity
           const mid = coords[Math.floor(coords.length / 2)]

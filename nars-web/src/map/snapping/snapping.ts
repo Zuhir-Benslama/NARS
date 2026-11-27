@@ -19,7 +19,7 @@ export { findNearestSnap, mergeExternalSnapWithDrawFirstVertex } from "./snap-se
 export type { SnapResult } from "./snap-search"
 
 import { setSnapSourceExclude } from "./snap-sources"
-export { getSnapRings, getRoadChains, getCityCenterCircles, getSnapPoints } from "./snap-sources"
+export { getSnapRings, getRoadChains, getRoundaboutsCircles, getSnapPoints } from "./snap-sources"
 
 declare global {
   interface Window {

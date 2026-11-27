@@ -11,7 +11,7 @@ import { useLayerStore, LAYER_KEYS } from "../../stores/layerStore"
 import { showToast, showConfirm } from "../../lib/toast"
 import type { FeatureData, FeatureTypeKey } from "../../types"
 import { getUserMessageKey } from "../../lib/errors"
-import { plainCityCenterPlacementError } from "../../lib/city-center"
+import { isPlainRoundabouts, plainRoundaboutsPlacementError } from "../../lib/roundabouts"
 import { t } from "../../i18n"
 import { displayLabelFor } from "../features/feature-labels"
 import { recordDelete } from "../undo"
@@ -88,23 +88,20 @@ export async function editFeatureInfo(dbId: string): Promise<void> {
   // Changing a roundabout into a plain city center must respect the same
   // 0-or-1-per-urban-area rule as drawing a new one.
   const mergedData = { ...entry.data, ...result } as FeatureData
-  if (
-    entry.data.type === "cityCenter" &&
-    (mergedData.cityCenterTypeKey ?? "city_center") !== "roundabout"
-  ) {
+  if (entry.data.type === "roundabouts" && isPlainRoundabouts(mergedData)) {
     const state = useLayerStore().$state
-    const error = plainCityCenterPlacementError(
+    const error = plainRoundaboutsPlacementError(
       { lat: mergedData.lat, lng: mergedData.lng },
       state.areas ?? [],
-      state.cityCenter ?? [],
+      state.roundabouts ?? [],
       dbId,
     )
     if (error) {
       showToast(
         t(
           error === "outside_urban_area"
-            ? "alert_cc_must_be_in_urban_area"
-            : "map_city_center_exists",
+            ? "alert_plain_roundabouts_must_be_in_urban_area"
+            : "map_plain_roundabouts_exists",
         ),
         "error",
       )
@@ -200,7 +197,7 @@ export async function removeFeature(dbId: string): Promise<void> {
       }
     }
     if (
-      (phaseKey === "districts" || phaseKey === "cityCenter" || phaseKey === "publicSpaces") &&
+      (phaseKey === "districts" || phaseKey === "roundabouts" || phaseKey === "publicSpaces") &&
       specialModeForFeature(entry.data.type, entry.data)
     ) {
       // Entrances numbered from this feature must not keep pointing at a

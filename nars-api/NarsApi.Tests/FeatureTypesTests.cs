@@ -12,7 +12,7 @@ public sealed class FeatureTypesTests
     [InlineData(FeatureTypes.HouseEntrance, FeatureTypes.HouseEntranceLayers.Main)]
     [InlineData(FeatureTypes.PublicBuilding, FeatureTypes.PublicBuildingLayers.School)]
     [InlineData(FeatureTypes.PublicSpace, FeatureTypes.PublicSpaceLayers.Square)]
-    [InlineData(FeatureTypes.CityCenter, FeatureTypes.CityCenterLayers.Default)]
+    [InlineData(FeatureTypes.Roundabouts, FeatureTypes.RoundaboutsLayers.Default)]
     [InlineData(FeatureTypes.NamingPanel, FeatureTypes.NamingPanelLayers.Default)]
     public void IsValidLayer_ValidTypeAndLayer_ReturnsTrue(string type, string layer)
     {
@@ -24,7 +24,7 @@ public sealed class FeatureTypesTests
     [InlineData(FeatureTypes.Road, FeatureTypes.AreaLayers.Scattered)]
     [InlineData(FeatureTypes.PublicBuilding, FeatureTypes.PublicSpaceLayers.Garden)]
     [InlineData(FeatureTypes.HouseEntrance, FeatureTypes.DistrictLayers.UrbanPole)]
-    [InlineData(FeatureTypes.CityCenter, FeatureTypes.PublicBuildingLayers.Mosque)]
+    [InlineData(FeatureTypes.Roundabouts, FeatureTypes.PublicBuildingLayers.Mosque)]
     [InlineData(FeatureTypes.NamingPanel, FeatureTypes.AreaLayers.CentralUrban)]
     public void IsValidLayer_TypeMismatchedLayer_ReturnsFalse(string type, string layer)
     {
@@ -46,7 +46,7 @@ public sealed class FeatureTypesTests
         {
             FeatureTypes.Area, FeatureTypes.Road, FeatureTypes.District,
             FeatureTypes.HouseEntrance, FeatureTypes.PublicBuilding,
-            FeatureTypes.PublicSpace, FeatureTypes.CityCenter, FeatureTypes.NamingPanel,
+            FeatureTypes.PublicSpace, FeatureTypes.Roundabouts, FeatureTypes.NamingPanel,
         };
         Assert.Equal(expected.OrderBy(t => t), FeatureTypes.AllTypes.OrderBy(t => t));
     }

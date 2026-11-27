@@ -13,7 +13,7 @@ echo ""
 echo "This will PERMANENTLY DELETE ALL FEATURES from the database:"
 echo "  - Phase 0: Areas"
 echo "  - Phase 1: Districts"
-echo "  - Phase 2: City Center"
+echo "  - Phase 2: Roundabouts"
 echo "  - Phase 3: Roads"
 echo "  - Phase 4: House Entrances"
 echo "  - Phase 5: Public Buildings"
@@ -25,20 +25,20 @@ echo ""
 echo "📊 Counting features..."
 AREAS=$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT COUNT(*) FROM areas;")
 DISTRICTS=$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT COUNT(*) FROM districts;")
-CITY_CENTERS=$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT COUNT(*) FROM city_centers;")
+ROUNDABOUTS=$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT COUNT(*) FROM roundabouts;")
 ROADS=$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT COUNT(*) FROM roads;")
 ENTRANCES=$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT COUNT(*) FROM house_entrances;")
 BUILDINGS=$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT COUNT(*) FROM public_buildings;")
 SPACES=$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT COUNT(*) FROM public_spaces;")
 PANELS=$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT COUNT(*) FROM naming_panels;")
 
-TOTAL=$((AREAS + DISTRICTS + CITY_CENTERS + ROADS + ENTRANCES + BUILDINGS + SPACES + PANELS))
+TOTAL=$((AREAS + DISTRICTS + ROUNDABOUTS + ROADS + ENTRANCES + BUILDINGS + SPACES + PANELS))
 
 echo ""
 echo "Current features:"
 echo "  - Areas:            $AREAS"
 echo "  - Districts:        $DISTRICTS"
-echo "  - City Centers:     $CITY_CENTERS"
+echo "  - Roundabouts:     $ROUNDABOUTS"
 echo "  - Roads:            $ROADS"
 echo "  - House Entrances:  $ENTRANCES"
 echo "  - Public Buildings: $BUILDINGS"
@@ -81,7 +81,7 @@ DELETE FROM public_spaces;
 DELETE FROM public_buildings;
 DELETE FROM house_entrances;
 DELETE FROM roads;
-DELETE FROM city_centers;
+DELETE FROM roundabouts;
 DELETE FROM districts;
 DELETE FROM areas;
 
@@ -91,7 +91,7 @@ VACUUM ANALYZE;
 -- Verify deletion
 SELECT 'Areas: ' || COUNT(*) FROM areas
 UNION ALL SELECT 'Districts: ' || COUNT(*) FROM districts
-UNION ALL SELECT 'City Centers: ' || COUNT(*) FROM city_centers
+UNION ALL SELECT 'Roundabouts: ' || COUNT(*) FROM roundabouts
 UNION ALL SELECT 'Roads: ' || COUNT(*) FROM roads
 UNION ALL SELECT 'Entrances: ' || COUNT(*) FROM house_entrances
 UNION ALL SELECT 'Buildings: ' || COUNT(*) FROM public_buildings

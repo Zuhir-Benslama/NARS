@@ -5,7 +5,7 @@ import type { UserInfo } from "./user"
 // All other PHASES keys have a 1:1 field here.
 export interface FeatureCounts {
   areas: number
-  cityCenter: number
+  roundabouts: number
   districts: number
   roads: number
   mainEntrances: number
