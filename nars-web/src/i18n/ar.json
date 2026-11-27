@@ -380,7 +380,7 @@
   "npf_saving": "جارٍ الحفظ...",
   "npf_complete": "تم الانتهاء من تفتيش لوحة التسمية.",
   "npf_issue_reported": "تم الإبلاغ عن مشكلة.",
-  "map_city_center_exists": "A city center already exists. Delete it first to create a new one.",
+  "map_city_center_exists": "يوجد بالفعل مركز مدينة في هذه المنطقة الحضرية. احذفه أولاً لإنشاء مركز جديد.",
   "map_feature_saved": "Feature saved.",
   "map_save_failed": "Save failed: {error}",
   "map_save_failed_fallback": "Please try again.",

@@ -9,8 +9,9 @@ import { PHASES } from "../../phases"
 import { useFeaturesStore } from "../../stores/featuresStore"
 import { useLayerStore, LAYER_KEYS } from "../../stores/layerStore"
 import { showToast, showConfirm } from "../../lib/toast"
-import type { FeatureTypeKey } from "../../types"
+import type { FeatureData, FeatureTypeKey } from "../../types"
 import { getUserMessageKey } from "../../lib/errors"
+import { plainCityCenterPlacementError } from "../../lib/city-center"
 import { t } from "../../i18n"
 import { displayLabelFor } from "../features/feature-labels"
 import { recordDelete } from "../undo"
@@ -83,6 +84,33 @@ export async function editFeatureInfo(dbId: string): Promise<void> {
 
   const result = await openEditModal(phaseIndex, dbId, entry.data)
   if (!result) return
+
+  // Changing a roundabout into a plain city center must respect the same
+  // 0-or-1-per-urban-area rule as drawing a new one.
+  const mergedData = { ...entry.data, ...result } as FeatureData
+  if (
+    entry.data.type === "cityCenter" &&
+    (mergedData.cityCenterTypeKey ?? "city_center") !== "roundabout"
+  ) {
+    const state = useLayerStore().$state
+    const error = plainCityCenterPlacementError(
+      { lat: mergedData.lat, lng: mergedData.lng },
+      state.areas ?? [],
+      state.cityCenter ?? [],
+      dbId,
+    )
+    if (error) {
+      showToast(
+        t(
+          error === "outside_urban_area"
+            ? "alert_cc_must_be_in_urban_area"
+            : "map_city_center_exists",
+        ),
+        "error",
+      )
+      return
+    }
+  }
 
   try {
     await apiFetch(`/api/features/${dbId}`, {

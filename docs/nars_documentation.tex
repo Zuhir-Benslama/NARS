@@ -529,6 +529,16 @@ Before any district or road may be created, at least one area of layer
   \label{eq:urban_exists}
 \end{equation}
 
+\subsection{City Center Placement}
+\label{sec:city_center_placement}
+
+A plain city center (layer \texttt{city_center}) is optional but capped at one
+per urban area polygon (layers \texttt{central\_urban} and
+\texttt{secondary\_urban}); its center point must lie inside that polygon.
+Roundabouts (layer \texttt{roundabout}) share the city-center table but are
+not subject to this cap. The rule is enforced when a city center is drawn,
+moved, or has its subtype changed.
+
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Snap Geometry}
 \label{sec:snap}

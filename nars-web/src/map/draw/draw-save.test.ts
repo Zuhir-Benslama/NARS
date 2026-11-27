@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { createPinia, setActivePinia } from "pinia"
+import type { LayerEntry } from "../../types"
 
 // ─── HOISTED MODULE MOCKS ────────────────────────────────────────────────────
 // These replace external dependencies so the orchestration flow is testable.
@@ -73,6 +74,9 @@ async function loadModule() {
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 const areaPhase = (await import("../../phases")).PHASES[0]
+const cityCenterPhase = (await import("../../phases")).PHASES.find(
+  (phase) => phase.key === "cityCenter",
+)!
 const houseEntrancesPhase = (await import("../../phases")).PHASES.find(
   (phase) => phase.key === "houseEntrances",
 )!
@@ -88,6 +92,61 @@ function polygonGeometry(): GeoJSON.Polygon {
         [1, 2],
       ],
     ],
+  }
+}
+
+function cityCenterPoint(lng: number, lat: number): GeoJSON.Point & { radius: number } {
+  return { type: "Point", coordinates: [lng, lat], radius: 100 }
+}
+
+function urbanArea(dbId: string, lat: number, lng: number): LayerEntry {
+  return {
+    id: dbId,
+    dbId,
+    type: "polygon",
+    data: {
+      type: "areas",
+      label: dbId,
+      areaTypeKey: "central_urban",
+      coordinates: [
+        { lat: lat - 1, lng: lng - 1 },
+        { lat: lat - 1, lng: lng + 1 },
+        { lat: lat + 1, lng: lng + 1 },
+        { lat: lat + 1, lng: lng - 1 },
+        { lat: lat - 1, lng: lng - 1 },
+      ],
+    },
+  } as LayerEntry
+}
+
+function cityCenter(
+  dbId: string,
+  lat: number,
+  lng: number,
+  cityCenterTypeKey = "city_center",
+): LayerEntry {
+  return {
+    id: dbId,
+    dbId,
+    type: "marker",
+    data: {
+      type: "cityCenter",
+      label: dbId,
+      lat,
+      lng,
+      radius: 100,
+      cityCenterTypeKey,
+    },
+  } as LayerEntry
+}
+
+function cityCenterModalResult(cityCenterTypeKey = "city_center") {
+  return {
+    type: "cityCenter",
+    label: "City Center",
+    radius: 100,
+    cityCenterTypeKey,
+    numberingOutsideBandM: 100,
   }
 }
 
@@ -233,6 +292,98 @@ describe("completeDrawingWithGeometry", () => {
     expect(layerStore.roads[0].data.label).toBe("Main Road")
 
     expect(mockUpdateEndpoints).toHaveBeenCalled()
+  })
+
+  it("rejects a second plain city center in the same urban area", async () => {
+    setDrawingPhase(cityCenterPhase)
+    const { useLayerStore } = await import("../../stores/layerStore")
+    const store = useLayerStore()
+    store.addFeature("areas", urbanArea("area-1", 0, 0))
+    store.addFeature("cityCenter", cityCenter("cc-existing", 0, 0))
+
+    mockOpenModal.mockResolvedValue(cityCenterModalResult())
+    mockSaveToDatabase.mockResolvedValue({ ok: true, data: { id: "cc-new" } })
+
+    await completeDrawingWithGeometry(cityCenterPoint(0.5, 0.5), "circle", {})
+
+    expect(mockToast).toHaveBeenCalledWith("map_city_center_exists", "error")
+    expect(mockSaveToDatabase).not.toHaveBeenCalled()
+  })
+
+  it("rejects a plain city center outside every urban area", async () => {
+    setDrawingPhase(cityCenterPhase)
+    const { useLayerStore } = await import("../../stores/layerStore")
+    useLayerStore().addFeature("areas", urbanArea("area-1", 0, 0))
+
+    mockOpenModal.mockResolvedValue(cityCenterModalResult())
+    mockSaveToDatabase.mockResolvedValue({ ok: true, data: { id: "cc-new" } })
+
+    await completeDrawingWithGeometry(cityCenterPoint(5, 5), "circle", {})
+
+    expect(mockToast).toHaveBeenCalledWith("alert_cc_must_be_in_urban_area", "error")
+    expect(mockSaveToDatabase).not.toHaveBeenCalled()
+  })
+
+  it("allows one plain city center in each urban area", async () => {
+    setDrawingPhase(cityCenterPhase)
+    const { useLayerStore } = await import("../../stores/layerStore")
+    const store = useLayerStore()
+    store.addFeature("areas", urbanArea("area-1", 0, 0))
+    store.addFeature("areas", urbanArea("area-2", 10, 10))
+    store.addFeature("cityCenter", cityCenter("cc-existing", 0, 0))
+
+    mockOpenModal.mockResolvedValue(cityCenterModalResult())
+    mockSaveToDatabase.mockResolvedValue({ ok: true, data: { id: "cc-new" } })
+
+    await completeDrawingWithGeometry(cityCenterPoint(10, 10), "circle", {})
+
+    expect(mockSaveToDatabase).toHaveBeenCalledTimes(1)
+    expect(mockToast).not.toHaveBeenCalledWith("map_city_center_exists", "error")
+  })
+
+  it("does not count a roundabout toward the plain city-center slot", async () => {
+    setDrawingPhase(cityCenterPhase)
+    const { useLayerStore } = await import("../../stores/layerStore")
+    const store = useLayerStore()
+    store.addFeature("areas", urbanArea("area-1", 0, 0))
+    store.addFeature("cityCenter", cityCenter("ra-existing", 0, 0, "roundabout"))
+
+    mockOpenModal.mockResolvedValue(cityCenterModalResult())
+    mockSaveToDatabase.mockResolvedValue({ ok: true, data: { id: "cc-new" } })
+
+    await completeDrawingWithGeometry(cityCenterPoint(0.5, 0.5), "circle", {})
+
+    expect(mockSaveToDatabase).toHaveBeenCalledTimes(1)
+  })
+
+  it("allows a roundabout alongside a plain city center in the same urban area", async () => {
+    setDrawingPhase(cityCenterPhase)
+    const { useLayerStore } = await import("../../stores/layerStore")
+    const store = useLayerStore()
+    store.addFeature("areas", urbanArea("area-1", 0, 0))
+    store.addFeature("cityCenter", cityCenter("cc-existing", 0, 0))
+
+    mockOpenModal.mockResolvedValue(cityCenterModalResult("roundabout"))
+    mockSaveToDatabase.mockResolvedValue({ ok: true, data: { id: "ra-new" } })
+
+    await completeDrawingWithGeometry(cityCenterPoint(0.5, 0.5), "circle", {})
+
+    expect(mockSaveToDatabase).toHaveBeenCalledTimes(1)
+  })
+
+  it("allows a second roundabout in the same urban area", async () => {
+    setDrawingPhase(cityCenterPhase)
+    const { useLayerStore } = await import("../../stores/layerStore")
+    const store = useLayerStore()
+    store.addFeature("areas", urbanArea("area-1", 0, 0))
+    store.addFeature("cityCenter", cityCenter("ra-existing", 0, 0, "roundabout"))
+
+    mockOpenModal.mockResolvedValue(cityCenterModalResult("roundabout"))
+    mockSaveToDatabase.mockResolvedValue({ ok: true, data: { id: "ra-new" } })
+
+    await completeDrawingWithGeometry(cityCenterPoint(0.5, 0.5), "circle", {})
+
+    expect(mockSaveToDatabase).toHaveBeenCalledTimes(1)
   })
 })
 

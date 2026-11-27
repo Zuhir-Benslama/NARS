@@ -4,7 +4,7 @@
 
 import { PHASES } from "../../phases"
 import { useLayerStore } from "../../stores/layerStore"
-import type { FeatureDataByType, ModalResult } from "../../types"
+import type { FeatureDataByType, LatLng, ModalResult } from "../../types"
 import { getCtx } from "../core/state"
 import { useFeaturesStore } from "../../stores/featuresStore"
 
@@ -21,7 +21,7 @@ import { updateEndpointMarkers } from "../roads/road-directions"
 import { buildFeatureData, featureDataToGeometry } from "../features/feature-data"
 import { displayLabelFor } from "../features/feature-labels"
 import { DRAW_CONFIG, CITY_CENTER_CONFIG } from "../../config"
-import { cityCenterRadiusError } from "../../lib/city-center"
+import { cityCenterRadiusError, plainCityCenterPlacementError } from "../../lib/city-center"
 import { saveToDatabase } from "../features/feature-persistence"
 import { openModalForFeature } from "./draw-modal"
 import { getDrawingPhase, setSavingFeature, repatchMarker } from "./draw-state"
@@ -127,17 +127,51 @@ export function getFeatureStyle(
 
 // ─── CITY CENTER CHECK ───────────────────────────────────────────
 
-async function checkExistingCityCenter(isRoundabout: boolean): Promise<boolean> {
-  if (getDrawingPhase()?.key !== "cityCenter") return true
-  // Roundabouts share the city-center table but may coexist with the city
-  // centre; only a second plain city centre is rejected.
-  if (isRoundabout) return true
-  const layerStore = useLayerStore()
-  const state = layerStore.$state
-  if ((state.cityCenter?.length ?? 0) === 0) return true
+function cityCenterPoint(geometry: GeoJSON.Geometry): LatLng | null {
+  if (geometry.type === "Point") {
+    const [lng, lat] = geometry.coordinates as [number, number]
+    return Number.isFinite(lng) && Number.isFinite(lat) ? { lat, lng } : null
+  }
+  if (geometry.type === "Polygon") {
+    const ring = (geometry.coordinates as [number, number][][])[0] ?? []
+    if (ring.length < 3) return null
+    // Closing vertex is omitted so it does not skew the centroid.
+    const vertices =
+      ring.length > 1 &&
+      ring[0][0] === ring[ring.length - 1][0] &&
+      ring[0][1] === ring[ring.length - 1][1]
+        ? ring.slice(0, -1)
+        : ring
+    const lat = vertices.reduce((sum, c) => sum + c[1], 0) / vertices.length
+    const lng = vertices.reduce((sum, c) => sum + c[0], 0) / vertices.length
+    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null
+  }
+  return null
+}
 
-  showToast(t("map_city_center_exists"), "error")
-  return false
+function checkCityCenterPlacement(geometry: GeoJSON.Geometry, isRoundabout: boolean): boolean {
+  if (getDrawingPhase()?.key !== "cityCenter") return true
+  // Roundabouts share the city-center table but are not capped per urban area.
+  if (isRoundabout) return true
+
+  const state = useLayerStore().$state
+  const error = plainCityCenterPlacementError(
+    cityCenterPoint(geometry),
+    state.areas ?? [],
+    state.cityCenter ?? [],
+  )
+  if (error) {
+    showToast(
+      t(
+        error === "outside_urban_area"
+          ? "alert_cc_must_be_in_urban_area"
+          : "map_city_center_exists",
+      ),
+      "error",
+    )
+    return false
+  }
+  return true
 }
 
 // ─── CITY CENTER GEOMETRY OVERRIDE ─────────────────────────────────
@@ -312,7 +346,7 @@ export async function completeDrawingWithGeometry(
   const modalResult = await openModalForFeature(drawingPhase, featureId, geometry)
   const isRoundabout =
     modalResult?.type === "cityCenter" && modalResult.cityCenterTypeKey === "roundabout"
-  if (modalResult && !(await checkExistingCityCenter(isRoundabout))) {
+  if (modalResult && !checkCityCenterPlacement(geometry, isRoundabout)) {
     deleteGeomanFeature(geomanFeatureData)
     return
   }

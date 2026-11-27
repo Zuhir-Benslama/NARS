@@ -59,6 +59,16 @@ public class FeatureCatalogControllerTests
             keys);
     }
 
+    [Fact]
+    public void GetFeatureTypes_IncludesRoundaboutLayerForCityCenter()
+    {
+        var ok = Assert.IsType<OkObjectResult>(CreateController().GetFeatureTypes());
+        var types = Assert.IsType<List<FeatureTypeDefinition>>(ok.Value);
+        var cityCenter = Assert.Single(types, t => t.Key == FeatureTypes.CityCenter);
+
+        Assert.Contains(cityCenter.Layers, l => l.Key == FeatureTypes.CityCenterLayers.Roundabout);
+    }
+
     // ── LoadByLayer ─────────────────────────────────────────────────────
 
     [Fact]

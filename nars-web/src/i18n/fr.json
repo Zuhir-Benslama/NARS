@@ -380,7 +380,7 @@
   "npf_saving": "Enregistrement...",
   "npf_complete": "Inspection du panneau de nomination terminée.",
   "npf_issue_reported": "Problème signalé.",
-  "map_city_center_exists": "A city center already exists. Delete it first to create a new one.",
+  "map_city_center_exists": "Un centre-ville existe déjà dans cette zone urbaine. Supprimez-le d'abord pour en créer un nouveau.",
   "map_feature_saved": "Feature saved.",
   "map_save_failed": "Save failed: {error}",
   "map_save_failed_fallback": "Please try again.",

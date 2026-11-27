@@ -18,6 +18,7 @@ import type { LayerEntry, LatLng } from "../../types"
 import { commitDraftEdit, cancelDraftEdit } from "../drafts/draft-edit"
 import { updateEndpointMarkers } from "../roads/road-markers"
 import { getRoadSide } from "../../lib/validation"
+import { plainCityCenterPlacementError } from "../../lib/city-center"
 import {
   renumberEntranceAfterChange,
   renumberSpecialFeatureByDbId,
@@ -193,6 +194,31 @@ export async function commitEditMode(): Promise<void> {
     if (getActiveGeomanFeatureId() && getCtx().geoman) {
       const ok = await readGeomanGeometry(entry)
       if (!ok) return
+    }
+
+    // Moving a plain city center must preserve the 0-or-1-per-urban-area rule.
+    if (
+      entry.data.type === "cityCenter" &&
+      (entry.data.cityCenterTypeKey ?? "city_center") !== "roundabout"
+    ) {
+      const state = useLayerStore().$state
+      const error = plainCityCenterPlacementError(
+        { lat: entry.data.lat ?? undefined, lng: entry.data.lng ?? undefined },
+        state.areas ?? [],
+        state.cityCenter ?? [],
+        entry.dbId,
+      )
+      if (error) {
+        showToast(
+          t(
+            error === "outside_urban_area"
+              ? "alert_cc_must_be_in_urban_area"
+              : "map_city_center_exists",
+          ),
+          "error",
+        )
+        return
+      }
     }
 
     // Recompute the side (left/right) for a moved house entrance so the
