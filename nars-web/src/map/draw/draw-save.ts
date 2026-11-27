@@ -4,7 +4,7 @@
 
 import { PHASES } from "../../phases"
 import { useLayerStore } from "../../stores/layerStore"
-import type { FeatureDataByType, LatLng, ModalResult } from "../../types"
+import type { FeatureDataByType, ModalResult } from "../../types"
 import { getCtx } from "../core/state"
 import { useFeaturesStore } from "../../stores/featuresStore"
 
@@ -21,7 +21,11 @@ import { updateEndpointMarkers } from "../roads/road-directions"
 import { buildFeatureData, featureDataToGeometry } from "../features/feature-data"
 import { displayLabelFor } from "../features/feature-labels"
 import { DRAW_CONFIG, CITY_CENTER_CONFIG } from "../../config"
-import { cityCenterRadiusError, plainCityCenterPlacementError } from "../../lib/city-center"
+import {
+  cityCenterPointFromGeometry,
+  cityCenterRadiusError,
+  plainCityCenterPlacementError,
+} from "../../lib/city-center"
 import { saveToDatabase } from "../features/feature-persistence"
 import { openModalForFeature } from "./draw-modal"
 import { getDrawingPhase, setSavingFeature, repatchMarker } from "./draw-state"
@@ -127,28 +131,6 @@ export function getFeatureStyle(
 
 // ─── CITY CENTER CHECK ───────────────────────────────────────────
 
-function cityCenterPoint(geometry: GeoJSON.Geometry): LatLng | null {
-  if (geometry.type === "Point") {
-    const [lng, lat] = geometry.coordinates as [number, number]
-    return Number.isFinite(lng) && Number.isFinite(lat) ? { lat, lng } : null
-  }
-  if (geometry.type === "Polygon") {
-    const ring = (geometry.coordinates as [number, number][][])[0] ?? []
-    if (ring.length < 3) return null
-    // Closing vertex is omitted so it does not skew the centroid.
-    const vertices =
-      ring.length > 1 &&
-      ring[0][0] === ring[ring.length - 1][0] &&
-      ring[0][1] === ring[ring.length - 1][1]
-        ? ring.slice(0, -1)
-        : ring
-    const lat = vertices.reduce((sum, c) => sum + c[1], 0) / vertices.length
-    const lng = vertices.reduce((sum, c) => sum + c[0], 0) / vertices.length
-    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null
-  }
-  return null
-}
-
 function checkCityCenterPlacement(geometry: GeoJSON.Geometry, isRoundabout: boolean): boolean {
   if (getDrawingPhase()?.key !== "cityCenter") return true
   // Roundabouts share the city-center table but are not capped per urban area.
@@ -156,7 +138,7 @@ function checkCityCenterPlacement(geometry: GeoJSON.Geometry, isRoundabout: bool
 
   const state = useLayerStore().$state
   const error = plainCityCenterPlacementError(
-    cityCenterPoint(geometry),
+    cityCenterPointFromGeometry(geometry),
     state.areas ?? [],
     state.cityCenter ?? [],
   )

@@ -19,6 +19,8 @@ export interface ModalState {
   buildingTypeKey: string
   radius: number | null
   cityCenterTypeKey: string
+  /** True when the plain city-center subtype is already taken or out of scope. */
+  plainCityCenterUnavailable: boolean
   numberingOutsideBandM: number | null
   currentModalFeatureId: string | null
 }

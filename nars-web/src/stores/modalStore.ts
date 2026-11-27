@@ -27,6 +27,7 @@ function createDefaultModalState(): ModalState {
     buildingTypeKey: "bank",
     radius: null,
     cityCenterTypeKey: "city_center",
+    plainCityCenterUnavailable: false,
     numberingOutsideBandM: null,
     currentModalFeatureId: null,
   }
@@ -44,7 +45,11 @@ export const useModalStore = defineStore("modal", {
 
   actions: {
     /** Open the modal for creating a new feature in the given phase. */
-    openCreate(phaseIndex: number, extras?: { radius?: number }) {
+    openCreate(
+      phaseIndex: number,
+      extras?: { radius?: number; plainCityCenterUnavailable?: boolean },
+    ) {
+      const plainCityCenterUnavailable = extras?.plainCityCenterUnavailable ?? false
       this.$patch({
         ...createDefaultModalState(),
         visible: true,
@@ -52,6 +57,8 @@ export const useModalStore = defineStore("modal", {
         isEdit: false,
         editDbId: null,
         radius: extras?.radius ?? null,
+        plainCityCenterUnavailable,
+        ...(plainCityCenterUnavailable ? { cityCenterTypeKey: "roundabout" } : {}),
       })
     },
 
@@ -154,11 +161,13 @@ export function resetModalStore(): void {
 
 import { PHASES } from "../phases"
 import { t } from "../i18n"
+import { plainCityCenterPlacementError } from "../lib/city-center"
+import { useLayerStore } from "./layerStore"
 
 export function openModal(
   phaseIndex: number,
   featureId: string,
-  extras?: { radius?: number },
+  extras?: { radius?: number; plainCityCenterUnavailable?: boolean },
 ): Promise<ModalResult | null> {
   const modalStore = useModalStore()
   modalStore.openCreate(phaseIndex, extras)
@@ -178,6 +187,23 @@ export function openEditModal(
 ): Promise<ModalResult | null> {
   const modalStore = useModalStore()
   modalStore.openEdit(phaseIndex, dbId, existing)
+  const phase = PHASES[phaseIndex]
+  if (
+    phase?.key === "cityCenter" &&
+    (existing as { cityCenterTypeKey?: string }).cityCenterTypeKey === "roundabout"
+  ) {
+    // A roundabout can only become a plain city center if the urban area's
+    // slot is still free; reflect that in the subtype dropdown.
+    const state = useLayerStore().$state
+    const unavailable =
+      plainCityCenterPlacementError(
+        { lat: (existing as { lat?: number }).lat, lng: (existing as { lng?: number }).lng },
+        state.areas ?? [],
+        state.cityCenter ?? [],
+        dbId,
+      ) === "urban_area_has_city_center"
+    modalStore.patchFields({ plainCityCenterUnavailable: unavailable })
+  }
   return awaitModalResult()
 }
 

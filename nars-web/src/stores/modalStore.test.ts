@@ -9,6 +9,7 @@ import {
   resetModalBridge,
 } from "./modalStore"
 import type { ModalResult } from "../types/modal"
+import { useLayerStore } from "./layerStore"
 
 const emptyResult: ModalResult = {
   type: "namingPanels",
@@ -36,6 +37,13 @@ describe("modalStore", () => {
       const store = useModalStore()
       store.openCreate(1, { radius: 500 })
       expect(store.radius).toBe(500)
+    })
+
+    it("openCreate forces roundabout when the plain city-center slot is taken", () => {
+      const store = useModalStore()
+      store.openCreate(2, { plainCityCenterUnavailable: true })
+      expect(store.plainCityCenterUnavailable).toBe(true)
+      expect(store.cityCenterTypeKey).toBe("roundabout")
     })
 
     it("openEdit sets edit mode with existing data", () => {
@@ -150,6 +158,56 @@ describe("modalStore", () => {
       const store = useModalStore()
       expect(store.isEdit).toBe(true)
       expect(store.editDbId).toBe("db-e1")
+      resolveModal(null)
+      await expect(promise).resolves.toBeNull()
+    })
+
+    it("openEditModal disables plain subtype for a roundabout in an occupied area", async () => {
+      const layerStore = useLayerStore()
+      layerStore.addFeature("areas", {
+        id: "area-1",
+        dbId: "area-1",
+        type: "polygon",
+        data: {
+          type: "areas",
+          label: "Main",
+          areaTypeKey: "central_urban",
+          coordinates: [
+            { lat: -1, lng: -1 },
+            { lat: -1, lng: 1 },
+            { lat: 1, lng: 1 },
+            { lat: 1, lng: -1 },
+            { lat: -1, lng: -1 },
+          ],
+        },
+      } as any)
+      layerStore.addFeature("cityCenter", {
+        id: "cc-1",
+        dbId: "cc-1",
+        type: "marker",
+        data: {
+          type: "cityCenter",
+          label: "Existing CC",
+          lat: 0,
+          lng: 0,
+          radius: 100,
+          cityCenterTypeKey: "city_center",
+        },
+      } as any)
+
+      const promise = openEditModal(2, "ra-1", {
+        type: "cityCenter",
+        label: "Roundabout",
+        decisionNumber: "",
+        decisionDate: "",
+        lat: 0,
+        lng: 0,
+        radius: 100,
+        cityCenterTypeKey: "roundabout",
+      } as any)
+      const store = useModalStore()
+      expect(store.plainCityCenterUnavailable).toBe(true)
+      expect(store.cityCenterTypeKey).toBe("roundabout")
       resolveModal(null)
       await expect(promise).resolves.toBeNull()
     })

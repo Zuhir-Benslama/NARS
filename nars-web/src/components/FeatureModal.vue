@@ -135,10 +135,18 @@
       <div v-if="isCityCenter" class="modal-field">
         <label>{{ t("label_city_center_type") }}</label>
         <select v-model="modalStore.cityCenterTypeKey" class="modal-input">
-          <option v-for="c in CITY_CENTER_TYPES" :key="c.key" :value="c.key">
+          <option
+            v-for="c in CITY_CENTER_TYPES"
+            :key="c.key"
+            :value="c.key"
+            :disabled="c.key === 'city_center' && modalStore.plainCityCenterUnavailable"
+          >
             {{ t("featureTypes." + c.key) }}
           </option>
         </select>
+        <span v-if="isCityCenter && modalStore.plainCityCenterUnavailable" class="modal-field-note">
+          {{ t("map_city_center_exists") }}
+        </span>
       </div>
 
       <!-- Optional width of the numbering band around roundabouts and squares -->

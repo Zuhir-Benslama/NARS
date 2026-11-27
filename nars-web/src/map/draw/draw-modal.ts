@@ -9,6 +9,7 @@ import { useLayerStore } from "../../stores/layerStore"
 import type { LayerState } from "../../stores/layerStore"
 import { showToast } from "../../lib/toast"
 import { getRoadSide } from "../../lib/validation"
+import { cityCenterPointFromGeometry, plainCityCenterPlacementError } from "../../lib/city-center"
 import { t } from "../../i18n"
 import type { ModalResult } from "../../types"
 import { prepareModalExtras } from "../features/feature-modal"
@@ -21,14 +22,32 @@ export async function openModalForFeature(
     return openHouseEntranceModal(geometry)
   }
 
+  const isCityCenter = phase.key === "cityCenter"
+  const state = useLayerStore().$state
   const radius =
-    phase.key === "cityCenter" && geometry.type === "Point"
+    isCityCenter && geometry.type === "Point"
       ? ((geometry as GeoJSON.Point & { radius?: number }).radius ?? null)
       : null
 
+  // The geometry is already drawn when the modal opens. Only suppress the
+  // plain option when an existing center occupies this urban area; placement
+  // outside any urban area is still reported by the draw-time validation.
+  const placementError = isCityCenter
+    ? plainCityCenterPlacementError(
+        cityCenterPointFromGeometry(geometry),
+        state.areas ?? [],
+        state.cityCenter ?? [],
+      )
+    : null
+  const plainCityCenterUnavailable = placementError === "urban_area_has_city_center"
+
+  const extras = isCityCenter
+    ? { ...(radius ? { radius } : {}), plainCityCenterUnavailable }
+    : undefined
+
   // Open modal first (initializes state via openCreate), then populate extras
   // so prepareModalExtras' values are not wiped by createDefaultModalState.
-  const result = openModal(phase.index, featureId, radius ? { radius } : undefined)
+  const result = openModal(phase.index, featureId, extras)
   await prepareModalExtras(phase)
   return result
 }

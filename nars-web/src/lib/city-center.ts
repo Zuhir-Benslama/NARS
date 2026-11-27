@@ -18,6 +18,29 @@ interface PlacementFeature {
 
 const URBAN_AREA_LAYERS = new Set(["central_urban", "secondary_urban"])
 
+/** Center point of a drawn city-center circle (point or polygon geometry). */
+export function cityCenterPointFromGeometry(geometry: GeoJSON.Geometry): LatLng | null {
+  if (geometry.type === "Point") {
+    const [lng, lat] = geometry.coordinates as [number, number]
+    return Number.isFinite(lng) && Number.isFinite(lat) ? { lat, lng } : null
+  }
+  if (geometry.type === "Polygon") {
+    const ring = (geometry.coordinates as [number, number][][])[0] ?? []
+    if (ring.length < 3) return null
+    // Closing vertex is omitted so it does not skew the centroid.
+    const vertices =
+      ring.length > 1 &&
+      ring[0][0] === ring[ring.length - 1][0] &&
+      ring[0][1] === ring[ring.length - 1][1]
+        ? ring.slice(0, -1)
+        : ring
+    const lat = vertices.reduce((sum, c) => sum + c[1], 0) / vertices.length
+    const lng = vertices.reduce((sum, c) => sum + c[0], 0) / vertices.length
+    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null
+  }
+  return null
+}
+
 export function cityCenterRadiusError(radius: number | undefined | null): CityCenterRadiusError {
   if (!radius || Number.isNaN(radius) || radius < CITY_CENTER_CONFIG.minRadiusM) {
     return "too_small"

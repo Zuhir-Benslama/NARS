@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest"
 import type { FeatureData, LatLng } from "../types"
-import { cityCenterRadiusError, plainCityCenterPlacementError } from "./city-center"
+import {
+  cityCenterPointFromGeometry,
+  cityCenterRadiusError,
+  plainCityCenterPlacementError,
+} from "./city-center"
 
 function square(centerLat: number, centerLng: number): LatLng[] {
   return [
@@ -106,5 +110,30 @@ describe("plainCityCenterPlacementError", () => {
         "self",
       ),
     ).toBeNull()
+  })
+})
+
+describe("cityCenterPointFromGeometry", () => {
+  it("reads a point's coordinates", () => {
+    expect(cityCenterPointFromGeometry({ type: "Point", coordinates: [2, 1] })).toEqual({
+      lat: 1,
+      lng: 2,
+    })
+  })
+
+  it("averages a polygon ring without double-counting the closing vertex", () => {
+    const point = cityCenterPointFromGeometry({
+      type: "Polygon",
+      coordinates: [
+        [
+          [0, 0],
+          [2, 0],
+          [2, 2],
+          [0, 2],
+          [0, 0],
+        ],
+      ],
+    })
+    expect(point).toEqual({ lat: 1, lng: 1 })
   })
 })

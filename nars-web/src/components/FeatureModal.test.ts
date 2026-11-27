@@ -23,6 +23,8 @@ const createMockModalStore = () => ({
   sectorKey: "banking_postal",
   buildingTypeKey: "bank",
   radius: null as number | null,
+  cityCenterTypeKey: "city_center",
+  plainCityCenterUnavailable: false,
   patchFields: vi.fn(),
   close: vi.fn(),
 })
@@ -360,5 +362,20 @@ describe("FeatureModal", () => {
 
     const nameInput = wrapper.find('input[type="text"]')
     expect(nameInput.attributes("readonly")).toBeDefined()
+  })
+
+  it("disables the plain city-center choice when the urban area already has one", async () => {
+    mockModalStore.visible = true
+    mockModalStore.phaseIndex = 1 // cityCenter
+    mockModalStore.cityCenterTypeKey = "roundabout"
+    mockModalStore.plainCityCenterUnavailable = true
+
+    const wrapper = mount(FeatureModal)
+    await nextTick()
+
+    const plainOption = wrapper
+      .findAll("select option")
+      .find((option) => option.attributes("value") === "city_center")
+    expect(plainOption?.attributes("disabled")).toBeDefined()
   })
 })

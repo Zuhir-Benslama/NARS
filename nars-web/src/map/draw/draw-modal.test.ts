@@ -40,6 +40,42 @@ function roadEntry(overrides: Partial<LayerEntry> = {}): LayerEntry {
   } as unknown as LayerEntry
 }
 
+function urbanAreaEntry(dbId: string, lat: number, lng: number): LayerEntry {
+  return {
+    id: dbId,
+    dbId,
+    type: "polygon",
+    data: {
+      type: "areas",
+      label: dbId,
+      areaTypeKey: "central_urban",
+      coordinates: [
+        { lat: lat - 1, lng: lng - 1 },
+        { lat: lat - 1, lng: lng + 1 },
+        { lat: lat + 1, lng: lng + 1 },
+        { lat: lat + 1, lng: lng - 1 },
+        { lat: lat - 1, lng: lng - 1 },
+      ],
+    },
+  } as unknown as LayerEntry
+}
+
+function cityCenterEntry(dbId: string, lat: number, lng: number): LayerEntry {
+  return {
+    id: dbId,
+    dbId,
+    type: "marker",
+    data: {
+      type: "cityCenter",
+      label: dbId,
+      lat,
+      lng,
+      radius: 100,
+      cityCenterTypeKey: "city_center",
+    },
+  } as unknown as LayerEntry
+}
+
 function mainEntranceEntry(overrides: Partial<LayerEntry> = {}): LayerEntry {
   return {
     id: "ent_1",
@@ -156,9 +192,30 @@ describe("openModalForFeature", () => {
       radius: 250,
     } as GeoJSON.Point & { radius?: number }
     const result = await mod.openModalForFeature(PHASES[2], "feat_1", geometry as GeoJSON.Geometry)
-    expect(mockOpenModal).toHaveBeenCalledWith(2, "feat_1", { radius: 250 })
+    expect(mockOpenModal).toHaveBeenCalledWith(2, "feat_1", {
+      radius: 250,
+      plainCityCenterUnavailable: false,
+    })
     expect(mockPrepareModalExtras).toHaveBeenCalled()
     expect(result).toEqual({ type: "cityCenter", label: "CC" })
+  })
+
+  it("flags the plain city-center subtype as unavailable when the area has one", async () => {
+    const layerStore = useLayerStore()
+    layerStore.addFeature("areas", urbanAreaEntry("area-1", 0, 0))
+    layerStore.addFeature("cityCenter", cityCenterEntry("cc-1", 0, 0))
+    mockOpenModal.mockResolvedValue({ type: "cityCenter", label: "CC" })
+
+    await mod.openModalForFeature(PHASES[2], "feat_1", {
+      type: "Point",
+      coordinates: [0.1, 0.1],
+      radius: 250,
+    } as GeoJSON.Geometry)
+
+    expect(mockOpenModal).toHaveBeenCalledWith(2, "feat_1", {
+      radius: 250,
+      plainCityCenterUnavailable: true,
+    })
   })
 
   it("opens a non-city-center modal without a radius", async () => {
