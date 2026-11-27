@@ -94,11 +94,6 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
   const specialMode = specialEntry
     ? specialModeForFeature(specialEntry.data.type, specialEntry.data)
     : null
-  // Roundabouts are mapped into the city-center layer but are independent
-  // features (many per urban area), so they can be removed from any phase —
-  // just like their numbering action — while a plain city center stays locked
-  // to its own phase.
-  const isRoundabout = isCityCenter && specialMode === "roundabout"
   const specialNumberItem: CtxMenuItem | null = specialMode
     ? {
         label: t(`ctx_number_${specialMode}`),
@@ -116,15 +111,6 @@ function buildFeatureMenuItems(dbId: string, phaseKey: string): CtxMenuItem[] {
         onClick: () => showToast(t("ctx_cc_lock_msg"), "info"),
       },
       ...(specialNumberItem ? [specialNumberItem] : []),
-      ...(isRoundabout
-        ? [
-            {
-              label: t("ctx_remove"),
-              danger: true,
-              onClick: () => removeFeature(dbId),
-            },
-          ]
-        : []),
     ]
   }
 

@@ -348,7 +348,7 @@ describe("showContextMenu / bindContextMenu", () => {
     expect(mockShowToast).toHaveBeenCalledWith("ctx_cc_lock_msg", "info")
   })
 
-  it("allows deleting a roundabout outside the city-center phase", async () => {
+  it("does not allow deleting a roundabout outside its own phase", async () => {
     setupPhase("areas")
     const { useLayerStore } = await import("../../stores/layerStore")
     useLayerStore().addFeature("cityCenter", {
@@ -367,36 +367,11 @@ describe("showContextMenu / bindContextMenu", () => {
 
     mod.showContextMenu(0, 0, "ra1", "cityCenter")
 
-    const store = useContextMenuStore()
-    const removeItem = store.items.find((i: any) => i.label === "ctx_remove")
-    expect(removeItem).toBeDefined()
-    expect(removeItem.disabled).toBeFalsy()
-    expect(removeItem.danger).toBe(true)
-    removeItem.onClick()
-    expect(mockRemoveFeature).toHaveBeenCalledWith("ra1")
-  })
-
-  it("keeps plain city-center deletion locked outside its phase", async () => {
-    setupPhase("areas")
-    const { useLayerStore } = await import("../../stores/layerStore")
-    useLayerStore().addFeature("cityCenter", {
-      id: "cc1",
-      dbId: "cc1",
-      type: "circle",
-      data: {
-        type: "cityCenter",
-        label: "City Center",
-        lat: 0,
-        lng: 0,
-        radius: 100,
-        cityCenterTypeKey: "city_center",
-      },
-    } as any)
-
-    mod.showContextMenu(0, 0, "cc1", "cityCenter")
-
-    const store = useContextMenuStore()
-    expect(store.items.some((i: any) => i.label === "ctx_remove")).toBe(false)
+    const labels = useContextMenuStore().items.map((i: any) => i.label)
+    expect(labels).toContain("ctx_cc_lock")
+    expect(labels).toContain("ctx_number_roundabout")
+    expect(labels).not.toContain("ctx_remove")
+    expect(mockRemoveFeature).not.toHaveBeenCalled()
   })
 
   it("includes set reference road for road in houseEntrances phase", () => {
