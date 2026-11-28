@@ -168,16 +168,17 @@ describe("navigatePhase", () => {
   it("blocks forward navigation from houseEntrances when entrances layer is empty", async () => {
     const { navigatePhase } = await import("./navigation")
     const { showToast } = await import("../lib/toast")
+    const { PHASES } = await import("../phases")
     const appStore = useAppStore()
     const layerStore = useLayerStore()
     layerStore.addFeature("areas", makeEntry())
     layerStore.addFeature("districts", makeEntry())
     layerStore.addFeature("roundabouts", makeEntry())
     layerStore.addFeature("roads", makeEntry({ id: "road-1", type: "line" }))
-    appStore.currentPhase = 3
+    const houseEntrancesPhase = PHASES.findIndex((p) => p.key === "houseEntrances")
+    appStore.currentPhase = houseEntrancesPhase
     await navigatePhase(1)
-    await navigatePhase(1)
-    expect(appStore.currentPhase).toBe(4)
+    expect(appStore.currentPhase).toBe(houseEntrancesPhase)
     expect(showToast).toHaveBeenCalledWith("alert_at_least_one_entrance", "error")
   })
 })

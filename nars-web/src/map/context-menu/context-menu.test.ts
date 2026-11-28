@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { setActivePinia, createPinia } from "pinia"
+import { PHASES } from "../../phases"
 
 const {
   mockIsSnappingEnabled,
@@ -79,17 +80,6 @@ let useContextMenuStore: any
 function setupPhase(key: string) {
   useAppStore().currentPhase = PHASES.findIndex((p: any) => p.key === key)
 }
-
-const PHASES = [
-  { key: "areas", label: "Areas" },
-  { key: "districts", label: "Districts" },
-  { key: "roundabouts", label: "City Center" },
-  { key: "roads", label: "Roads" },
-  { key: "houseEntrances", label: "House Entrances" },
-  { key: "publicBuildings", label: "Public Buildings" },
-  { key: "publicSpaces", label: "Public Spaces" },
-  { key: "namingPanels", label: "Naming Panels" },
-]
 
 beforeEach(async () => {
   vi.clearAllMocks()

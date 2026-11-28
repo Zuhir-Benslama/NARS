@@ -108,8 +108,8 @@ application designed for the systematic capture and validation of urban
 addressing features across Algerian administrative divisions (Wilayas,
 Daïras, and Communes). This document formalises the mathematical and
 algorithmic foundations that underpin eight distinct feature types: urban
-areas, districts, roundabouts, roads, house entrances, public buildings,
-public spaces, and naming panels.
+areas, districts, roundabouts, roads, public buildings, public spaces,
+house entrances, and naming panels.
 
 We derive the geodetic distance metrics (Haversine formula), the angular
 deviation predicates used in road validation, the polygon adjacency and
@@ -1237,10 +1237,10 @@ and $e = (v_a, v_b, s) \in E$ iff sub-segment $s$ connects $v_a$ to $v_b$.
 Nodes within $\delta_J$ of each other are unified.
 \end{definition}
 
-\subsection{Phase 2A — Roundabouts Orientation (DFS)}
+\subsection{Phase 2A — Roundabouts Orientation (BFS)}
 
-When at least one roundabouts feature exists, a depth-first search from its
-perimeter assigns orientation to every reachable segment.
+When at least one roundabouts feature exists, a closest-first breadth-first
+search from its perimeter assigns orientation to every reachable segment.
 
 Let $\mathcal{C} = (c, r)$ be a roundabouts feature (centre $c$, radius $r$).
 The \emph{seed nodes} are:
@@ -1251,13 +1251,23 @@ The \emph{seed nodes} are:
   \label{eq:seed_nodes}
 \end{equation}
 
-For each seed $v_s \in V_{\text{seed}}$, \textsc{OrientFrom}$(v_s)$ is called.
-At each recursive call with \textit{fromNode} $v_f$:
+All unvisited edges incident to seed nodes form the initial frontier. Each
+seed starts at its straight-line distance $d_{\text{geo}}(c, v)$; after that,
+the distance of a node is \emph{accumulated road distance} from the centre:
+\begin{equation}
+  D(v) = \min_{\text{frontier paths } c \to v} \sum_{s \in \text{path}} L(s),
+  \label{eq:road_distance}
+\end{equation}
+where $L(s) = \sum_{i=1}^{\abs{s}-1} d_{\text{geo}}(s_{i-1}, s_i)$ is the length
+of road segment $s$ along its vertices. When the feature is a city centre
+inside an urban area, frontier edges are ordered by road category first
+(primary, then secondary, then tertiary) and only then by accumulated road
+distance $D(v_{\text{to}})$; otherwise that distance alone decides the order.
+At each step:
 \begin{enumerate}
-  \item Collect unvisited, unassigned edges incident to $v_f$, sorted by
-    ascending distance of their far endpoint to $c$
-    (closest roads oriented first).
-  \item For each edge $e = (v_f, v_{\text{to}}, s)$:
+  \item Pop the frontier edge $e = (v_f, v_{\text{to}}, s)$ with the smallest
+    (category rank, accumulated road distance) key (closest roads served first).
+  \item For that edge:
     \begin{equation}
       s.\mathrm{reversed} = \left[
         d_{\text{geo}}(s_0, v_f) > d_{\text{geo}}(s_{|\cdot|-1}, v_f)
@@ -1266,12 +1276,12 @@ At each recursive call with \textit{fromNode} $v_f$:
     \end{equation}
     where $s_0$ and $s_{|s|-1}$ are the first and last coordinates of $s$.
   \item Mark $e$ and all segments of the same road as visited.
-  \item Recurse: \textsc{OrientFrom}$(v_{\text{to}})$.
+  \item Add every unvisited edge incident to $v_{\text{to}}$ to the frontier.
 \end{enumerate}
 
 \subsection{Phase 2B — Geographic Fallback}
 
-For roads unreached by the DFS (or when no roundabouts feature exists), orientation
+For roads unreached by the BFS (or when no roundabouts feature exists), orientation
 is assigned by cardinal direction:
 \begin{equation}
   s.\mathrm{reversed} =
@@ -1287,7 +1297,7 @@ is assigned by cardinal direction:
 \subsection{Phase 3 — Majority Vote}
 
 Sub-segments of the same road may have received different orientations via
-different DFS paths. The final orientation of road $R_i$ is determined by
+different BFS paths. The final orientation of road $R_i$ is determined by
 majority vote over its $k_i$ sub-segments:
 
 \begin{equation}
@@ -1792,8 +1802,9 @@ National Addressing Reference System. The key formal results are:
 
   \item The road-direction algorithm (\cref{sec:road_direction}) constructs
     a full topology graph handling T-junctions and X-junctions in
-    $O(n^2)$ time, then orients every segment via a depth-first search
-    from the roundabouts perimeter, with geographic fallback for isolated
+    $O(n^2)$ time, then orients every segment via a closest-first
+    breadth-first search from the roundabouts perimeter, with geographic
+    fallback for isolated
     roads.
 
   \item The house-entrance numbering scheme (\cref{sec:house_numbering})

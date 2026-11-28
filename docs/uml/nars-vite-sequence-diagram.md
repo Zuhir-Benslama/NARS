@@ -234,7 +234,7 @@ sequenceDiagram
         else Roads exist
             PhaseNav->>PhaseNav: computeAndApplyRoadDirections()
         end
-    else Advancing from entrances (4->5)
+    else Advancing from entrances (6->7)
         PhaseNav->>LayerStore: Check $state.houseEntrances.length
         alt No entrances created
             PhaseNav-->>User: Show warning toast

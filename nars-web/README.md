@@ -102,7 +102,7 @@ npm run build:deploy
 
 ## Features
 
-- 8-phase mapping pipeline (areas → districts → roundabouts → roads → house entrances → public buildings → public spaces → naming panels)
+- 8-phase mapping pipeline (areas → districts → roundabouts → roads → public buildings → public spaces → house entrances → naming panels)
 - Drawing, editing, and validation of geographic features
 - Snap-to-feature with configurable thresholds
 - Phase-based workflow with validation gates

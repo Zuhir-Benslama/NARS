@@ -199,6 +199,114 @@ describe("road-directions", () => {
       expect(mockOrientFromRoundabouts).toHaveBeenCalled()
     })
 
+    it("uses category priority for a city centre inside an urban area", async () => {
+      const graph = makeGraphMock()
+      const segs = new Map()
+      mockBuildConnectionGraph.mockReturnValue({ graph, segs })
+
+      const { useLayerStore } = await import("../../stores/layerStore")
+      const store = useLayerStore()
+      store.addFeature(
+        "roads",
+        makeRoad("r1", "db-1", [
+          { lat: 36.0, lng: 127.0 },
+          { lat: 36.01, lng: 127.01 },
+        ]),
+      )
+      store.addFeature("areas", {
+        id: "area-1",
+        dbId: "db-area-1",
+        type: "polygon",
+        data: {
+          type: "areas",
+          label: "Urban area",
+          decisionNumber: "",
+          decisionDate: "",
+          areaTypeKey: "central_urban",
+          coordinates: [
+            { lat: 35.99, lng: 126.99 },
+            { lat: 35.99, lng: 127.01 },
+            { lat: 36.01, lng: 127.01 },
+            { lat: 36.01, lng: 126.99 },
+            { lat: 35.99, lng: 126.99 },
+          ],
+        },
+      })
+      store.addFeature("roundabouts", {
+        id: "cc-1",
+        dbId: "db-cc-1",
+        type: "circle",
+        data: {
+          type: "roundabouts",
+          label: "City centre",
+          decisionNumber: "",
+          decisionDate: "",
+          roundaboutsTypeKey: "city_center",
+          lat: 36.0,
+          lng: 127.0,
+          radius: 50,
+        },
+      })
+
+      await computeAndApplyRoadDirections()
+
+      expect(mockOrientFromRoundabouts.mock.calls[0]?.[5]).toBe(true)
+    })
+
+    it("keeps distance-only traversal for a plain roundabout in an urban area", async () => {
+      const graph = makeGraphMock()
+      const segs = new Map()
+      mockBuildConnectionGraph.mockReturnValue({ graph, segs })
+
+      const { useLayerStore } = await import("../../stores/layerStore")
+      const store = useLayerStore()
+      store.addFeature(
+        "roads",
+        makeRoad("r1", "db-1", [
+          { lat: 36.0, lng: 127.0 },
+          { lat: 36.01, lng: 127.01 },
+        ]),
+      )
+      store.addFeature("areas", {
+        id: "area-1",
+        dbId: "db-area-1",
+        type: "polygon",
+        data: {
+          type: "areas",
+          label: "Urban area",
+          decisionNumber: "",
+          decisionDate: "",
+          areaTypeKey: "central_urban",
+          coordinates: [
+            { lat: 35.99, lng: 126.99 },
+            { lat: 35.99, lng: 127.01 },
+            { lat: 36.01, lng: 127.01 },
+            { lat: 36.01, lng: 126.99 },
+            { lat: 35.99, lng: 126.99 },
+          ],
+        },
+      })
+      store.addFeature("roundabouts", {
+        id: "rb-1",
+        dbId: "db-rb-1",
+        type: "circle",
+        data: {
+          type: "roundabouts",
+          label: "Roundabout",
+          decisionNumber: "",
+          decisionDate: "",
+          roundaboutsTypeKey: "roundabout",
+          lat: 36.0,
+          lng: 127.0,
+          radius: 50,
+        },
+      })
+
+      await computeAndApplyRoadDirections()
+
+      expect(mockOrientFromRoundabouts.mock.calls[0]?.[5]).toBe(false)
+    })
+
     it("reverses road when rev votes exceed fwd votes", async () => {
       const graph = makeGraphMock()
       graph.nodes().add("36.00000,127.00000")

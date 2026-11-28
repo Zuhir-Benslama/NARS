@@ -5,6 +5,8 @@ import { useLayerStore } from "../../stores/layerStore"
 import { PHASES } from "../../phases"
 import type { LayerEntry } from "../../types"
 
+const houseEntrancesPhase = PHASES.find((p) => p.key === "houseEntrances")!
+
 const { mockOpenModal, mockPrepareModalExtras, mockGetRoadSide, mockShowToast } = vi.hoisted(
   () => ({
     mockOpenModal: vi.fn(),
@@ -105,7 +107,7 @@ beforeEach(async () => {
 
 describe("openModalForFeature", () => {
   it("returns null and notifies when a house entrance has no reference", async () => {
-    const result = await mod.openModalForFeature(PHASES[4], "feat_1", {
+    const result = await mod.openModalForFeature(houseEntrancesPhase, "feat_1", {
       type: "Point",
       coordinates: [1, 2],
     })
@@ -118,7 +120,7 @@ describe("openModalForFeature", () => {
     appStore.$patch({ referenceEntranceDbId: "main-1" })
     useLayerStore().addFeature("houseEntrances", mainEntranceEntry())
 
-    const result = await mod.openModalForFeature(PHASES[4], "feat_1", {
+    const result = await mod.openModalForFeature(houseEntrancesPhase, "feat_1", {
       type: "Point",
       coordinates: [1, 2],
     })
@@ -139,7 +141,7 @@ describe("openModalForFeature", () => {
   it("toasts when the reference entrance is missing", async () => {
     const appStore = useAppStore()
     appStore.$patch({ referenceEntranceDbId: "missing" })
-    const result = await mod.openModalForFeature(PHASES[4], "feat_1", {
+    const result = await mod.openModalForFeature(houseEntrancesPhase, "feat_1", {
       type: "Point",
       coordinates: [1, 2],
     })
@@ -152,7 +154,7 @@ describe("openModalForFeature", () => {
     appStore.$patch({ referenceRoadDbId: "road-1" })
     useLayerStore().addFeature("roads", roadEntry())
 
-    const result = await mod.openModalForFeature(PHASES[4], "feat_1", {
+    const result = await mod.openModalForFeature(houseEntrancesPhase, "feat_1", {
       type: "Point",
       coordinates: [127.5, 36.5],
     })
@@ -177,7 +179,7 @@ describe("openModalForFeature", () => {
     useLayerStore().addFeature("roads", roadEntry())
     mockGetRoadSide.mockResolvedValue(undefined)
 
-    const result = await mod.openModalForFeature(PHASES[4], "feat_1", {
+    const result = await mod.openModalForFeature(houseEntrancesPhase, "feat_1", {
       type: "Point",
       coordinates: [127.5, 36.5],
     })

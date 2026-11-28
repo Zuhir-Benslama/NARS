@@ -1,0 +1,8 @@
+key,category,en,fr,ar
+boulevard,primary,Boulevard,Boulevard,شارع
+avenue,primary,Avenue,Avenue,نهج
+street,secondary,Street,Rue,طريق
+drive,tertiary,Drive,Allée,ممر
+lane,tertiary,Lane,Ruelle,زقاق
+cul_de_sac,tertiary,Cul-de-sac,Impasse,طريق مسدود
+way,tertiary,Way,Chemin,طريق ترابي

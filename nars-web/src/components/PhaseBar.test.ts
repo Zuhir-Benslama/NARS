@@ -44,14 +44,6 @@ vi.mock("../phases", () => ({
     },
     {
       index: 4,
-      key: "houseEntrances",
-      label: "phase_houseEntrances_label",
-      drawType: "marker",
-      color: "#27ae60",
-      hint: "phase_houseEntrances_hint",
-    },
-    {
-      index: 5,
       key: "publicBuildings",
       label: "phase_publicBuildings_label",
       drawType: "polygon",
@@ -59,12 +51,20 @@ vi.mock("../phases", () => ({
       hint: "phase_publicBuildings_hint",
     },
     {
-      index: 6,
+      index: 5,
       key: "publicSpaces",
       label: "phase_publicSpaces_label",
       drawType: "polygon",
       color: "#2ecc71",
       hint: "phase_publicSpaces_hint",
+    },
+    {
+      index: 6,
+      key: "houseEntrances",
+      label: "phase_houseEntrances_label",
+      drawType: "marker",
+      color: "#27ae60",
+      hint: "phase_houseEntrances_hint",
     },
   ],
 }))

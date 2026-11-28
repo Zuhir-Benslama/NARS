@@ -1,7 +1,7 @@
 // ─── ROAD DIRECTION COMPUTATION (ORCHESTRATOR) ────────────────────────────────
 // Two-phase algorithm:
 //   Phase 1 — CONNECTION SCAN: builds full topology graph (road-graph.ts).
-//   Phase 2 — ORIENTATION: DFS from roundabouts outward (road-orient.ts).
+//   Phase 2 — ORIENTATION: closest-first BFS from roundabouts outward (road-orient.ts).
 //   Phase 3 — DEAD-END CORRECTION: overrides vote-based orientation.
 //   Phase 4 — APPLY: persist reversals, update markers (road-markers.ts).
 //
@@ -9,12 +9,15 @@
 // grouped by the urban area they fall inside, and the topology graph, the
 // orientation DFS and the dead-end correction are run per group. This keeps a
 // roundabouts feature in one urban area from orienting roads that belong to another.
+// Inside an urban area with a city centre, orientation walks primary roads first,
+// then secondary, then tertiary; distance to the centre breaks ties.
 
 import { apiFetch } from "../../api"
 import { useLayerStore } from "../../stores/layerStore"
 import { useFeaturesStore } from "../../stores/featuresStore"
 
 import { showToast } from "../../lib/toast"
+import { roundaboutsSubtype } from "../../lib/roundabouts"
 import { debugError } from "../../utils/debug"
 import type { LayerEntry } from "../../types"
 import type { AreaFeatureData, RoundaboutsFeatureData, RoadFeatureData } from "../../types"
@@ -178,11 +181,25 @@ export async function computeAndApplyRoadDirections(): Promise<void> {
       (e) => e.data.lat != null && e.data.lng != null,
     )
 
+    // Only city centres inside a real urban area impose road-category priority.
+    // Plain roundabouts (and groups without an urban area) keep the old
+    // distance-only traversal.
+    const prioritizeCategories =
+      group.area !== null &&
+      groupRoundabouts.some((cc) => roundaboutsSubtype(cc.data) === "city_center")
+
     if (groupRoundabouts.length > 0) {
       for (const ccEntry of groupRoundabouts) {
         const { lat, lng, radius } = ccEntry.data
         if (lat == null || lng == null) continue
-        orientFromRoundabouts({ lat, lng }, radius ?? 50, graph, segs, visited)
+        orientFromRoundabouts(
+          { lat, lng },
+          radius ?? 50,
+          graph,
+          segs,
+          visited,
+          prioritizeCategories,
+        )
       }
     } else {
       for (const seg of segs.values()) geographicDirection(seg)

@@ -24,6 +24,19 @@ describe("PHASES", () => {
     }
   })
 
+  it("runs public buildings and spaces before house entrances", () => {
+    expect(PHASES.map((p) => p.key)).toEqual([
+      "areas",
+      "districts",
+      "roundabouts",
+      "roads",
+      "publicBuildings",
+      "publicSpaces",
+      "houseEntrances",
+      "namingPanels",
+    ])
+  })
+
   it("each phase has a unique key", () => {
     const keys = PHASES.map((p) => p.key)
     expect(new Set(keys).size).toBe(keys.length)

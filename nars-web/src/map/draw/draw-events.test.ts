@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { createPinia, setActivePinia } from "pinia"
 import { nextTick } from "vue"
+import { PHASES } from "../../phases"
 
 const {
   mockSetDrawingPhase,
@@ -133,7 +134,7 @@ describe("registerDrawEvents watcher lifecycle", () => {
     mockDisableCrosshair.mockClear()
     mockResetSnapping.mockClear()
 
-    appStore.currentPhase = 4 // houseEntrances — marker
+    appStore.currentPhase = PHASES.findIndex((p) => p.key === "houseEntrances") // marker
     await nextTick()
 
     expect(mockBuildDrawControl).toHaveBeenCalledTimes(1)
@@ -154,7 +155,7 @@ describe("registerDrawEvents watcher lifecycle", () => {
     mockDisableCrosshair.mockClear()
     mockResetSnapping.mockClear()
 
-    appStore.currentPhase = 3 // roads — polyline
+    appStore.currentPhase = PHASES.findIndex((p) => p.key === "roads") // polyline
     await nextTick()
 
     expect(mockBuildDrawControl).not.toHaveBeenCalled()

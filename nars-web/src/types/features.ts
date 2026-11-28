@@ -7,9 +7,9 @@ export type FeatureTypeKey =
   | "districts"
   | "roundabouts"
   | "roads"
-  | "houseEntrances"
   | "publicBuildings"
   | "publicSpaces"
+  | "houseEntrances"
   | "namingPanels"
 
 // ── Permissive bag-of-optional-fields (backward compat for stores / generic code) ──

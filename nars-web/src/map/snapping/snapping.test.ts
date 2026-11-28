@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { setActivePinia, createPinia } from "pinia"
+import { PHASES } from "../../phases"
 
 const {
   mockUnpatchGeomanMarker,
@@ -265,7 +266,7 @@ describe("uninstallSnapInterceptors", () => {
 
 describe("getActiveSnapPhases (draw mode)", () => {
   it("returns completed snap targets for the current phase", () => {
-    useAppStore().currentPhase = 3 // roads — snapTargets: areas, roundabouts, roads
+    useAppStore().currentPhase = PHASES.findIndex((p) => p.key === "roads") // snapTargets: areas, roundabouts, roads
 
     const result = mod.getActiveSnapPhases()
 
@@ -275,7 +276,7 @@ describe("getActiveSnapPhases (draw mode)", () => {
   })
 
   it("returns empty array for phases without snap targets", () => {
-    useAppStore().currentPhase = 4
+    useAppStore().currentPhase = PHASES.findIndex((p) => p.key === "houseEntrances")
 
     expect(mod.getActiveSnapPhases()).toEqual([])
   })
